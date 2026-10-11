@@ -29,7 +29,13 @@ import {
   Zap
 } from '@/lib/icons'
 import { runtimeReadinessDisplay, type RuntimeReadinessResult } from '@/lib/runtime-readiness'
-import { cacheHitLabel, contextBarLabel, LiveDuration, tokensPerSecondLabel, usageContextLabel } from '@/lib/statusbar'
+import {
+  cacheHitLabel,
+  LiveDuration,
+  tokensPerSecondLabel,
+  usageContextPercentLabel,
+  usageContextSummary
+} from '@/lib/statusbar'
 import { useStoreSelector } from '@/lib/use-session-slice'
 import { cn } from '@/lib/utils'
 import { resolveVersionStatus } from '@/lib/version-status'
@@ -285,8 +291,19 @@ export function useStatusbarItems({
     [contextBreakdown, currentUsage]
   )
 
-  const contextUsage = useMemo(() => usageContextLabel(gaugeUsage), [gaugeUsage])
-  const contextBar = useMemo(() => contextBarLabel(gaugeUsage), [gaugeUsage])
+  // The bottom readout is the localized label plus the share of the window in
+  // use; the exact counts ride the tooltip, and the panel opened on click has
+  // the rest. A usage report with no known window has no share to show, so the
+  // label stands alone and the entry (and its panel) stays reachable.
+  const contextPercent = useMemo(() => usageContextPercentLabel(gaugeUsage), [gaugeUsage])
+
+  const contextTooltip = useMemo(
+    () => usageContextSummary(gaugeUsage, copy.contextUsagePanel.tokenSummary),
+    [copy, gaugeUsage]
+  )
+
+  const contextReadable = Boolean(gaugeUsage.context_max) || gaugeUsage.total > 0
+  const contextLabel = contextPercent ? `${copy.contextShort} ${contextPercent}` : copy.contextShort
   // Both ride the same usage payload the context meter does (session.usage
   // ticks mid-turn, message.complete after) — no extra RPC, no polling.
   const cacheHit = cacheHitLabel(currentUsage)
@@ -356,8 +373,9 @@ export function useStatusbarItems({
       id: 'version-client',
       label: status.label,
       // Update state is not a preference: hiding it is how a user misses that
-      // their client is behind. Listed in the menu, but locked on.
-      lockedVisible: true,
+      // their client is behind. The chip is locked on while an update is waiting
+      // or applying; otherwise the version itself is a preference, hidden by default.
+      lockedVisible: applying || status.hasUpdate,
       onSelect: () => openUpdateOverlayFor('client'),
       title: status.tooltip,
       toggleLabel: copy.toggleVersion,
@@ -401,7 +419,7 @@ export function useStatusbarItems({
       icon: applying ? <Loader2 className="size-3 animate-spin" /> : <Hash className="size-3" />,
       id: 'version-backend',
       label: status.label,
-      lockedVisible: true,
+      lockedVisible: applying || status.hasUpdate,
       onSelect: () => openUpdateOverlayFor('backend'),
       title: status.tooltip,
       toggleLabel: copy.toggleBackendVersion,
@@ -569,12 +587,11 @@ export function useStatusbarItems({
         variant: 'text'
       },
       {
-        detail: contextBar || undefined,
         // A readout with no value is not rendered. While its breakdown is still
         // being read it shows the reading label instead of a dash.
-        hidden: !contextUsage && !contextBreakdownLoading,
+        hidden: !contextReadable && !contextBreakdownLoading,
         id: 'context-usage',
-        label: contextUsage || (contextBreakdownLoading ? copy.reading : undefined),
+        label: contextReadable ? contextLabel : contextBreakdownLoading ? copy.reading : undefined,
         menuAlign: 'end',
         menuClassName: 'w-auto border-(--ui-stroke-secondary) p-0',
         menuContent: (
@@ -585,6 +602,7 @@ export function useStatusbarItems({
             usage={gaugeUsage}
           />
         ),
+        title: contextTooltip || undefined,
         toggleLabel: copy.toggleContextUsage,
         variant: 'menu'
       },
@@ -641,10 +659,11 @@ export function useStatusbarItems({
       cacheHit,
       chatOpen,
       clientVersionItem,
-      contextBar,
       contextBreakdown,
       contextBreakdownLoading,
-      contextUsage,
+      contextLabel,
+      contextReadable,
+      contextTooltip,
       copy,
       gaugeUsage,
       sessionTokenUsage,

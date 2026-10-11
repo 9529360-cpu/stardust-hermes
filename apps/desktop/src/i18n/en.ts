@@ -4036,6 +4036,7 @@ export const en: Translations = {
       openStarmap: 'Open memory graph',
       turnRunning: 'Running',
       contextUsage: 'Context usage',
+      contextShort: 'Context',
       systemResources: {
         title: 'System Resources',
         loading: 'Resources…',

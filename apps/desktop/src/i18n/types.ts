@@ -3557,6 +3557,7 @@ export interface Translations {
       openStarmap: string
       turnRunning: string
       contextUsage: string
+      contextShort: string
       systemResources: {
         title: string
         loading: string

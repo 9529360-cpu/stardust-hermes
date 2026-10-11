@@ -3263,6 +3263,7 @@ export const ja = defineLocale({
       openStarmap: 'メモリグラフを開く',
       turnRunning: '実行中',
       contextUsage: 'コンテキスト使用状況',
+      contextShort: 'コンテキスト',
       systemResources: {
         title: 'システムリソース',
         loading: 'リソース…',

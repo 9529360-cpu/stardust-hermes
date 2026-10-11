@@ -34,29 +34,29 @@ export function compactPath(path: string, max = 44): string {
   return tail.length + 2 >= max ? `…${tail.slice(-(max - 1))}` : `…/${tail}`
 }
 
-export function contextBar(percent: number | undefined, width = 10): string {
-  const bounded = Math.max(0, Math.min(100, percent ?? 0))
-  const filled = Math.round((bounded / 100) * width)
-
-  return `${'█'.repeat(filled)}${'░'.repeat(width - filled)}`
-}
-
-export function usageContextLabel(usage: UsageStats): string {
-  if (usage.context_max) {
-    return `${usage.context_estimated ? '~' : ''}${compactNumber(usage.context_used ?? 0)}/${compactNumber(usage.context_max)}`
-  }
-
-  return usage.total > 0 ? `${compactNumber(usage.total)} tok` : ''
-}
-
-export function contextBarLabel(usage: UsageStats): string {
+/** `30%` for the share of the context window in use, `~30%` while the backend
+ *  only estimates occupancy. '' without a known window: there is no share to show. */
+export function usageContextPercentLabel(usage: UsageStats): string {
   if (!usage.context_max) {
     return ''
   }
 
   const pct = Math.max(0, Math.min(100, Math.round(usage.context_percent ?? 0)))
 
-  return `[${contextBar(usage.context_percent)}] ${usage.context_estimated ? '~' : ''}${pct}%`
+  return `${usage.context_estimated ? '~' : ''}${pct}%`
+}
+
+/** Exact occupancy for the tooltip, in the caller's localized summary
+ *  (`19.5k / 64k Tokens`). '' without a known window. */
+export function usageContextSummary(usage: UsageStats, format: (used: string, max: string) => string): string {
+  if (!usage.context_max) {
+    return ''
+  }
+
+  return format(
+    `${usage.context_estimated ? '~' : ''}${compactNumber(usage.context_used ?? 0)}`,
+    compactNumber(usage.context_max)
+  )
 }
 
 /** `87%` for a reported hit rate; '' when the backend omitted it (no cache

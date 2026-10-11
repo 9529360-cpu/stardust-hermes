@@ -96,6 +96,22 @@ describe('statusbar item visibility', () => {
     expect(screen.getByText('Plugin thing')).toBeTruthy()
   })
 
+  it('starts the version chips hidden, and the customisation menu can show them again', async () => {
+    $statusbarHiddenIds.set([...STATUSBAR_HIDDEN_BY_DEFAULT])
+
+    const statusbar = bar([
+      item('version-client', 'Version & updates', { lockedVisible: false }),
+      item('gateway-health', 'Gateway')
+    ])
+
+    expect(within(statusbar).queryByText('Version & updates')).toBeNull()
+
+    openContextMenu(statusbar)
+    fireEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Version & updates' }))
+
+    expect(within(statusbar).getByText('Version & updates')).toBeTruthy()
+  })
+
   it('shows the bottom context/usage entry and keeps optional live diagnostics hidden', async () => {
     const statusbar = bar([
       item('running-timer', 'Turn timer', { variant: 'text' }),

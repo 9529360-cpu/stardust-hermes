@@ -3477,6 +3477,7 @@ export const zhHant = defineLocale({
       openStarmap: '開啟記憶圖譜',
       turnRunning: '執行中',
       contextUsage: '上下文使用量',
+      contextShort: '上下文',
       systemResources: {
         title: '系統資源',
         loading: '資源…',
