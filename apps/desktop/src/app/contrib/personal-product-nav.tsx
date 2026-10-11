@@ -1,11 +1,12 @@
 import './personal-product-nav.css'
 
 import { useStore } from '@nanostores/react'
-import { useEffect, useState } from 'react'
+import { type ComponentPropsWithoutRef, useEffect, useState } from 'react'
 import { useLocation } from 'react-router'
 
 import { revealTreePane } from '@/components/pane-shell/tree/store'
 import { Codicon } from '@/components/ui/codicon'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 import { $sidebarGrouping, dismissNarrowSidebar, setSidebarAgentsGrouped, setSidebarOpen } from '@/store/layout'
@@ -31,8 +32,10 @@ import type { SessionInfo } from '@/types/hermes'
 import { ProjectContextMenu } from '../chat/sidebar/projects/project-menu'
 import type { SidebarProjectTree } from '../chat/sidebar/projects/workspace-groups'
 import { WorkspaceAddButton } from '../chat/sidebar/projects/workspace-header'
-import { type AppView, BOTS_ROUTE, CRON_ROUTE, routePathname, SKILLS_ROUTE } from '../routes'
+import { type AppView, BOTS_ROUTE, CRON_ROUTE, routePathname, SETTINGS_ROUTE, SKILLS_ROUTE } from '../routes'
 import type { SidebarNavItem } from '../types'
+
+import { PersonalizationPanel } from './personalization-panel'
 
 const PRODUCT_NAV_COPY = {
   ar: {
@@ -74,16 +77,17 @@ interface PersonalProductNavProps {
   onResumeSession?: (sessionId: string, session?: SessionInfo) => void
 }
 
-interface ProductNavButtonProps {
+interface ProductNavButtonProps extends Omit<ComponentPropsWithoutRef<'button'>, 'children'> {
   active?: boolean
   expanded?: boolean
   icon: string
   label: string
-  onClick: () => void
   tour?: string
 }
 
-function ProductNavButton({ active = false, expanded, icon, label, onClick, tour }: ProductNavButtonProps) {
+// Spreads the rest of its props so a Radix trigger (`asChild`) can attach its
+// aria state, handlers and ref to the row.
+function ProductNavButton({ active = false, expanded, icon, label, tour, ...props }: ProductNavButtonProps) {
   return (
     <button
       aria-current={active ? 'page' : undefined}
@@ -95,8 +99,8 @@ function ProductNavButton({ active = false, expanded, icon, label, onClick, tour
           : 'text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-(--ui-text-primary)'
       )}
       data-tour={tour}
-      onClick={onClick}
       type="button"
+      {...props}
     >
       <Codicon className="shrink-0" name={icon} size="0.88rem" />
       <span className="min-w-0 flex-1 truncate">{label}</span>
@@ -120,7 +124,12 @@ export function PersonalProductNav({
   const [expandedProjectId, setExpandedProjectId] = useState<null | string>(null)
   const [enteredProject, setEnteredProject] = useState<null | SidebarProjectTree>(null)
   const [projectLoadFailed, setProjectLoadFailed] = useState(false)
+  const [personalizeOpen, setPersonalizeOpen] = useState(false)
   const projects = useStore($projectTree)
+  // Home is the backend's bucket for chats with no folder. Those chats belong to
+  // 对话 (recents) and never to a project, so the bucket is not listed as one.
+  // The bucket stays in the tree for the surfaces that still need it.
+  const projectRows = projects.filter(project => !project.isNoProject)
   const projectsRead = useStore($projectsRpcAvailable) === true
   const projectsLoading = useStore($projectTreeLoading)
   const profileScope = useStore($profileScope)
@@ -209,6 +218,17 @@ export function PersonalProductNav({
       icon: NULL_ICON,
       route: BOTS_ROUTE
     })
+
+  // The quick panel points at the detailed controls; they live in Settings > Appearance.
+  const openAppearance = () => {
+    setPersonalizeOpen(false)
+    pick({
+      id: 'settings',
+      label: t.personalization.moreSettings,
+      icon: NULL_ICON,
+      route: `${SETTINGS_ROUTE}?tab=appearance`
+    })
+  }
 
   const openTasks = () =>
     pick({
@@ -318,16 +338,22 @@ export function PersonalProductNav({
           label={copy.plugins}
           onClick={openPlugins}
         />
+        <Popover onOpenChange={setPersonalizeOpen} open={personalizeOpen}>
+          <PopoverTrigger asChild>
+            <ProductNavButton icon="paintcan" label={t.personalization.navLabel} />
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-72 p-4" side="right" sideOffset={10}>
+            <PersonalizationPanel onOpenAppearance={openAppearance} />
+          </PopoverContent>
+        </Popover>
         <ProductNavButton expanded={projectsOpen} icon="repo" label={copy.project} onClick={openProject} />
         {projectsOpen && (
           <div
             aria-label={t.sidebar.projects.sectionLabel}
             className="ml-5 flex max-h-56 flex-col gap-0.5 overflow-y-auto border-l border-(--ui-stroke-tertiary) pl-2"
           >
-            {projects.map(project => {
-              // Home is a bucket of folder-less chats ("对话" already lists them), so only real
-              // projects get a "+".
-              const canStartChat = !project.isNoProject && Boolean(projectRootCwd(project)) && onNewSessionInWorkspace
+            {projectRows.map(project => {
+              const canStartChat = Boolean(projectRootCwd(project)) && onNewSessionInWorkspace
 
               const row = (
                 <div className="group/workspace flex items-center rounded-md hover:bg-(--ui-control-hover-background)">
@@ -360,25 +386,21 @@ export function PersonalProductNav({
 
               return (
                 <div key={project.id}>
-                  {/* Same right-click actions as the sessions sidebar's project rows; Home has none. */}
-                  {project.isNoProject ? (
-                    row
-                  ) : (
-                    <ProjectContextMenu
-                      isActive={project.id === activeProjectId}
-                      onExitScope={() => {
-                        setExpandedProjectId(null)
+                  {/* Same right-click actions as the sessions sidebar's project rows. */}
+                  <ProjectContextMenu
+                    isActive={project.id === activeProjectId}
+                    onExitScope={() => {
+                      setExpandedProjectId(null)
 
-                        if (projectScope === project.id) {
-                          exitProjectScope()
-                        }
-                      }}
-                      project={project}
-                      scoped={expandedProjectId === project.id || projectScope === project.id}
-                    >
-                      {row}
-                    </ProjectContextMenu>
-                  )}
+                      if (projectScope === project.id) {
+                        exitProjectScope()
+                      }
+                    }}
+                    project={project}
+                    scoped={expandedProjectId === project.id || projectScope === project.id}
+                  >
+                    {row}
+                  </ProjectContextMenu>
                   {expandedProjectId === project.id && (
                     <div className="ml-3 border-l border-(--ui-stroke-tertiary) pl-1.5">
                       {projectLoadFailed && (
@@ -406,8 +428,7 @@ export function PersonalProductNav({
               )
             })}
             {/* Only once the tree is read and not loading, and only when no real project exists. */}
-            {/* Home is folder-less chats, not a project, so a Home-only tree still shows the line. */}
-            {projectsRead && !projectsLoading && projects.every(project => project.isNoProject) && (
+            {projectsRead && !projectsLoading && projectRows.length === 0 && (
               <div className="px-2 py-1 text-xs text-(--ui-text-tertiary)">{t.sidebar.projects.emptyTitle}</div>
             )}
             <button

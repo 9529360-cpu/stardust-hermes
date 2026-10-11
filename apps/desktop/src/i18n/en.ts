@@ -3,6 +3,21 @@ import { FIELD_DESCRIPTIONS, FIELD_LABELS } from '@/app/settings/constants'
 import type { Translations } from './types'
 
 export const en: Translations = {
+  personalization: {
+    navLabel: 'Personalization',
+    title: 'Personalization',
+    subtitle: 'Adjust the look quickly. More options are in Settings › Appearance.',
+    themeTitle: 'Theme',
+    backgroundTitle: 'Background image',
+    backgroundShow: 'Show background image',
+    opacityLabel: 'Image opacity',
+    noImage: 'No image chosen yet.',
+    chooseImage: 'Choose image…',
+    removeImage: 'Remove',
+    petTitle: 'Desktop pet',
+    petDesc: 'Show a pet on your desktop.',
+    moreSettings: 'More appearance settings'
+  },
   connectors: {
     title: 'Connect your apps',
     connect: 'Connect',
@@ -870,9 +885,9 @@ export const en: Translations = {
       embedsAlways: 'Always',
       embedsOff: 'Off',
       embedsReset: (count: number) => `Reset ${count} allowed ${count === 1 ? 'service' : 'services'}`,
-      resumeLastSessionTitle: 'Reopen Last Chat on Launch',
+      resumeLastSessionTitle: 'Reopen Last Page or Chat on Launch',
       resumeLastSessionDesc:
-        'When enabled, the app reopens your most recent chat on cold start. Turn off to always start with a fresh new chat.',
+        'When enabled, the app reopens the page or chat you had open. Pop-up windows such as Settings are not restored. Turn off to always start with a fresh new chat.',
       product: 'Product',
       productDesc: 'Human-friendly tool activity with concise summaries.',
       technical: 'Technical',
@@ -2277,6 +2292,7 @@ export const en: Translations = {
   },
 
   messaging: {
+    pageTitle: 'Messaging',
     search: 'Search messaging...',
     loading: 'Loading messaging platforms...',
     loadFailed: 'Messaging platforms failed to load',
@@ -2390,7 +2406,8 @@ export const en: Translations = {
       },
       TELEGRAM_ALLOWED_USERS: {
         label: 'Allowed Telegram user IDs',
-        help: 'Recommended. Comma-separated numeric IDs from @userinfobot. Without this, anyone can DM your bot.'
+        help: 'Recommended. Comma-separated numeric IDs from @userinfobot. Without this, anyone can DM your bot.',
+        placeholder: 'Comma-separated numeric IDs'
       },
       TELEGRAM_PROXY: { label: 'Proxy URL', help: 'Only needed on networks where Telegram is blocked.' },
       DISCORD_BOT_TOKEN: {

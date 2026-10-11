@@ -148,6 +148,13 @@ describe('room listing', () => {
     expect(stripPreviewMarkdown('')).toBe('')
   })
 
+  it('strips headings and bullets that were flattened onto one line, but keeps operators and C#', () => {
+    const { stripPreviewMarkdown } = modules.labels
+
+    expect(stripPreviewMarkdown('Plan ## Steps - ship it - test it')).toBe('Plan Steps ship it test it')
+    expect(stripPreviewMarkdown('Note a >= b and C# ok')).toBe('Note a >= b and C# ok')
+  })
+
   it('stripPreviewMarkdown turns tables, list markers and rules into readable row text', () => {
     const { stripPreviewMarkdown } = modules.labels
     const table = '| 任务 | 状态 |\n| --- | :---: |\n| 整理周报 | 已完成 |'
