@@ -275,6 +275,35 @@ describe('a build with no Capabilities exports at all', () => {
   })
 })
 
+describe('the staged toolset checklist (builds without the Capabilities surface)', () => {
+  const noCapabilities = { McpTab: undefined, SkillsView: undefined, ToolsetConfigPanel: undefined }
+
+  const toolsets: CapabilityEntry[] = [
+    { enabled: true, name: 'web', tool_count: 4 },
+    // Config-only: zero tools, so no checkbox. Its real switch is stt.enabled in Settings → Voice.
+    { enabled: true, name: 'stt', tool_count: 0 }
+  ]
+
+  it('offers no checkbox for a config-only toolset', async () => {
+    await renderEditor(noCapabilities, localBot, { toolsets })
+
+    expect(screen.getByText('web')).toBeTruthy()
+    expect(screen.queryByText('stt')).toBeNull()
+  })
+
+  it('counts only the toolsets it offers', async () => {
+    await renderEditor(noCapabilities, localBot, { toolsets })
+
+    expect(screen.getByText(/^Toolsets \(1\/1 enabled/)).toBeTruthy()
+  })
+
+  it('keeps a toolset that reports no tool count as a toggle', async () => {
+    await renderEditor(noCapabilities, localBot, { toolsets: [{ enabled: true, name: 'older-tools' }] })
+
+    expect(screen.getByText('older-tools')).toBeTruthy()
+  })
+})
+
 describe('the model catalog read', () => {
   it('#95279: rides the bot\u2019s captured route and never forces a refresh', async () => {
     sdk.exports = {}

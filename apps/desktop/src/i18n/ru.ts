@@ -3964,6 +3964,34 @@ export const ru = defineLocale({
       copyFile: 'Копировать файл',
       copyPath: 'Копировать путь',
       failedCalls: (count: number) => `Вызовов с ошибкой: ${count}`,
+      runSummary: {
+        delegate: {
+          past: 'Делегировано',
+          present: 'Делегируется',
+          counted: count => `${count} ${RU_PLURAL(count, 'задача', 'задачи', 'задач')}`
+        },
+        edit: {
+          past: 'Отредактировано',
+          present: 'Редактируется',
+          counted: count => `${count} ${RU_PLURAL(count, 'файл', 'файла', 'файлов')}`
+        },
+        explore: {
+          past: 'Изучено',
+          present: 'Изучается',
+          counted: count => `${count} ${RU_PLURAL(count, 'файл', 'файла', 'файлов')}`
+        },
+        other: {
+          past: 'Использовано',
+          present: 'Используется',
+          counted: count => `${count} ${RU_PLURAL(count, 'инструмент', 'инструмента', 'инструментов')}`
+        },
+        run: {
+          past: 'Выполнено',
+          present: 'Выполняется',
+          counted: count => `${count} ${RU_PLURAL(count, 'команда', 'команды', 'команд')}`
+        },
+        separator: ', '
+      },
       skillActivity: {
         loading: 'Загружается скилл',
         loaded: 'Загружен скилл',
@@ -4016,14 +4044,37 @@ export const ru = defineLocale({
         runningTool: action => `Выполняется: ${action.toLowerCase()}`
       },
       cron: {
+        actionOnly: action => `${action}: cron-задача`,
+        actions: {
+          create: 'Создать',
+          update: 'Изменить',
+          pause: 'Пауза',
+          resume: 'Возобновить',
+          remove: 'Удалить',
+          run: 'Запустить',
+          list: 'Список',
+          refresh: 'Обновить',
+          manage: 'Управление'
+        },
+        delivery: 'Доставка',
+        deliveryAll: 'Все подключённые каналы',
+        deliveryCurrentChat: 'Текущий чат',
+        deliverySaveOnly: 'Только сохранение',
+        jobCount: count => `Cron-задачи: ${count}`,
+        nextRun: 'Следующий запуск',
+        nextRuns: 'Следующие запуски',
+        noJobs: 'Cron-задач нет',
+        noJobsScheduled: 'Запланированных cron-задач нет',
+        notSaved: 'Не сохранено',
         preview: 'Предпросмотр cron-задачи',
         previewWithSchedule: schedule => `Предпросмотр cron-задачи · ${schedule}`,
         previousSchedule: 'Прежнее расписание',
-        nextRuns: 'Следующие запуски',
-        delivery: 'Доставка',
-        deliveryCurrentChat: 'Текущий чат',
-        deliverySaveOnly: 'Только сохранение',
-        notSaved: 'Не сохранено'
+        repeat: 'Повтор',
+        repeatForever: 'бессрочно',
+        repeatOnce: 'однократно',
+        repeatTimes: times => `${times}×`,
+        schedule: 'Расписание',
+        untitledJob: 'задача'
       },
       titles: {
         browser_click: {

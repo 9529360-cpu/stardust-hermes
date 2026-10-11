@@ -3991,6 +3991,34 @@ export const zhHant = defineLocale({
       copyFile: '複製檔案',
       copyPath: '複製路徑',
       failedCalls: (count: number) => `${count} 次工具呼叫失敗`,
+      runSummary: {
+        delegate: {
+          past: '已委派',
+          present: '正在委派',
+          counted: count => `${count} 個任務`
+        },
+        edit: {
+          past: '已編輯',
+          present: '正在編輯',
+          counted: count => `${count} 個檔案`
+        },
+        explore: {
+          past: '已探索',
+          present: '正在探索',
+          counted: count => `${count} 個檔案`
+        },
+        other: {
+          past: '已使用',
+          present: '正在使用',
+          counted: count => `${count} 個工具`
+        },
+        run: {
+          past: '已執行',
+          present: '正在執行',
+          counted: count => `${count} 個指令`
+        },
+        separator: '，'
+      },
       skillActivity: {
         loading: '正在載入技能',
         loaded: '已載入技能',
@@ -4042,14 +4070,37 @@ export const zhHant = defineLocale({
         runningTool: action => `正在執行 ${action}`
       },
       cron: {
+        actionOnly: action => `${action}定時任務`,
+        actions: {
+          create: '建立',
+          update: '更新',
+          pause: '暫停',
+          resume: '恢復',
+          remove: '刪除',
+          run: '執行',
+          list: '列出',
+          refresh: '重新整理',
+          manage: '管理'
+        },
+        delivery: '傳遞',
+        deliveryAll: '全部已連線頻道',
+        deliveryCurrentChat: '當前對話',
+        deliverySaveOnly: '僅儲存',
+        jobCount: count => `${count} 個定時任務`,
+        nextRun: '下次執行',
+        nextRuns: '下次執行',
+        noJobs: '沒有定時任務',
+        noJobsScheduled: '沒有已排程的定時任務',
+        notSaved: '未儲存',
         preview: '定時任務預覽',
         previewWithSchedule: schedule => `定時任務預覽 · ${schedule}`,
         previousSchedule: '原排程',
-        nextRuns: '下次執行',
-        delivery: '傳遞',
-        deliveryCurrentChat: '當前對話',
-        deliverySaveOnly: '僅儲存',
-        notSaved: '未儲存'
+        repeat: '重複',
+        repeatForever: '永久',
+        repeatOnce: '一次',
+        repeatTimes: times => `${times} 次`,
+        schedule: '排程',
+        untitledJob: '任務'
       },
       titles: {
         browser_click: { done: '已點擊頁面元素', pending: '正在點擊頁面元素', pendingAction: '正在點擊' },
@@ -4059,7 +4110,7 @@ export const zhHant = defineLocale({
         browser_take_screenshot: { done: '已擷取截圖', pending: '正在擷取截圖', pendingAction: '正在擷取' },
         browser_type: { done: '已在頁面輸入', pending: '正在頁面輸入', pendingAction: '正在輸入' },
         clarify: { done: '已提問', pending: '正在提問', pendingAction: '正在提問' },
-        cronjob: { done: 'Cron 工作', pending: '正在安排 Cron 工作', pendingAction: '正在安排' },
+        cronjob: { done: '定時任務', pending: '正在安排定時任務', pendingAction: '正在安排' },
         edit_file: { done: '已編輯檔案', pending: '正在編輯檔案', pendingAction: '正在編輯' },
         execute_code: { done: '已執行程式碼', pending: '正在撰寫腳本', pendingAction: '正在撰寫腳本' },
         image_generate: { done: '已生成圖片', pending: '正在生成圖片', pendingAction: '正在生成' },

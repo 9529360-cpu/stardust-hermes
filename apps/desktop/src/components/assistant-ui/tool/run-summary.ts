@@ -30,13 +30,10 @@ type RunCategory = 'delegate' | 'edit' | 'explore' | 'other' | 'run'
 // category happens to be live.
 const CATEGORY_ORDER: readonly RunCategory[] = ['edit', 'explore', 'run', 'delegate', 'other']
 
-const CATEGORY_COPY: Record<RunCategory, { noun: [string, string]; past: string; present: string }> = {
-  delegate: { noun: ['task', 'tasks'], past: 'Delegated', present: 'Delegating' },
-  edit: { noun: ['file', 'files'], past: 'Edited', present: 'Editing' },
-  explore: { noun: ['file', 'files'], past: 'Explored', present: 'Exploring' },
-  other: { noun: ['tool', 'tools'], past: 'Used', present: 'Using' },
-  run: { noun: ['command', 'commands'], past: 'Ran', present: 'Running' }
-}
+// Copy lives in the locale bundles under `assistant.tool.runSummary`: a past and
+// a present verb per category, and a `counted` phrase for a count of its things.
+const copyKey = (category: RunCategory, part: 'counted' | 'past' | 'present') =>
+  `assistant.tool.runSummary.${category}.${part}`
 
 const EXPLORE_TOOLS = new Set([
   'list_files',
@@ -82,7 +79,7 @@ export function toolPresentVerb(toolName: string): string {
     return translateNow('assistant.tool.skillActivity.loading')
   }
 
-  return CATEGORY_COPY[toolCategory(toolName)].present
+  return translateNow(copyKey(toolCategory(toolName), 'present'))
 }
 
 /** The thing a tool acted on, as the header should name it. */
@@ -105,15 +102,14 @@ function toolTarget(tool: ToolCallLike): string {
  * command line only earns its space while it's the thing you're waiting on.
  */
 function clause(category: RunCategory, tools: ToolCallLike[], live: boolean): string {
-  const copy = CATEGORY_COPY[category]
-  const verb = live ? copy.present : copy.past
+  const verb = translateNow(copyKey(category, live ? 'present' : 'past'))
   const target = tools.length === 1 ? toolTarget(tools[0]) : ''
 
   if (target && (live || category !== 'run')) {
     return `${verb} ${target}`
   }
 
-  return `${verb} ${tools.length} ${copy.noun[tools.length === 1 ? 0 : 1]}`
+  return `${verb} ${translateNow(copyKey(category, 'counted'), tools.length)}`
 }
 
 function lowerFirst(text: string): string {
@@ -186,5 +182,7 @@ export function summarizeToolRun(tools: readonly ToolCallLike[], live: boolean):
     clauses.push(translateNow('assistant.tool.failedCalls', failed))
   }
 
-  return [...skillClauses, ...clauses].map((text, index) => (index === 0 ? text : lowerFirst(text))).join(', ')
+  return [...skillClauses, ...clauses]
+    .map((text, index) => (index === 0 ? text : lowerFirst(text)))
+    .join(translateNow('assistant.tool.runSummary.separator'))
 }
