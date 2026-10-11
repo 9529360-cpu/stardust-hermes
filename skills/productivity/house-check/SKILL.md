@@ -85,7 +85,7 @@ JSON keys. Every key below is part of the output contract; `schema_version` chan
 - A row marked 至少 is a lower bound. It stopped at the per-row entry budget (`file_budget`) or at the whole-run time budget (`time_budget`). The default time budget is 8 seconds for all rows together, so large caches on a slow disk can be cut short. On the maintainer's Windows machine the walk ran at roughly 7,500 to 15,000 entries per second.
 - The drive check is not covered by the time budget. A disconnected mapped network drive can take a long time to answer.
 - Symbolic links and junctions are never followed or counted. A cache folder that is a link reports `link_not_followed` and no size.
-- The Stardust data home is measured but never suggested for cleanup. A cache path that is a drive root, the home folder itself or an ancestor of it, or inside or above the data home gets `command_kind` `none` and no printed command.
+- The Stardust data home is measured but never suggested for cleanup. For a cache with no tool cleanup command (Electron, electron-builder, Puppeteer, Playwright), a path that is a drive root, the home folder itself or an ancestor of it, or inside or above the data home gets `command_kind` `none` and no printed command.
 - Cache locations come from environment variables first (for example `npm_config_cache`, `UV_CACHE_DIR`, `PIP_CACHE_DIR`, `ELECTRON_CACHE`, `PUPPETEER_CACHE_DIR`, `PLAYWRIGHT_BROWSERS_PATH`), then the platform default. `path_source` and `env_var` show which one applied.
 - Sizes use 1024-based units (1 GB = 1024 MB), matching Windows Explorer.
 - The script stats entries only. It never opens a file, reads configuration, `.env`, tokens, or credentials, and never prints file names.
