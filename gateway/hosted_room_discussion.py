@@ -19,6 +19,7 @@ from gateway import hosted_room_driver as driver
 from gateway import hosted_rooms
 from gateway import hosted_rooms_common as common
 from gateway.hosted_rooms_common import compact_json
+from tools.bot_mode_probe import PRIMARY_HANDLE_ALIASES
 
 
 MAX_DISCUSSION_MEMBERS = 6
@@ -291,8 +292,12 @@ def is_pass_text(value: Any) -> bool:
 def resolve_mentions(
     texts: Iterable[str], members: Sequence[DiscussionMember], *, default_all: bool = True
 ) -> tuple[DiscussionMember, ...]:
-    """Resolve member handles deterministically against the frozen roster."""
+    """Resolve member handles deterministically against the frozen roster. The local primary
+    profile also answers to the primary's aliases (``stardust`` and the legacy ``hermes``); when
+    the room has no local primary, an alias names nobody."""
     by_handle = {member.handle.casefold(): member for member in members}
+    primary = next((member for member in members
+                    if member.profile == "default" and dict(member.target or {}).get("kind") == "local"), None)
     mentioned: set[str] = set()
     everyone = False
     for text in texts:
@@ -300,6 +305,9 @@ def resolve_mentions(
             handle = match.group(1).casefold()
             if handle in {"all", "everyone"}:
                 everyone = True
+            elif handle in PRIMARY_HANDLE_ALIASES:
+                if primary is not None:
+                    mentioned.add(primary.handle.casefold())
             elif handle in by_handle:
                 mentioned.add(handle)
     if everyone or (default_all and not mentioned):

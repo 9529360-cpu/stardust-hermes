@@ -80,6 +80,8 @@ def test_resolve_remote_target_forms(root):
     roster = bot_relay.read_remote_roster(root)
     assert bot_relay.resolve_remote_target("researcher", roster)["connection_id"] == "ssh-vps"
     assert bot_relay.resolve_remote_target("@hermes", roster)["profile"] == "default"
+    # the primary's Stardust handle reaches the same row, whatever handle the row carries
+    assert bot_relay.resolve_remote_target("@stardust", roster)["profile"] == "default"
     # profile name resolves too
     assert bot_relay.resolve_remote_target("default", roster)["connection_id"] == "cloud-1"
     # exact connection-qualified form
@@ -102,7 +104,7 @@ def test_resolve_ambiguous_handle_across_connections(root):
     assert match["connection_id"] == "ssh-vps"
     forms = bot_relay.remote_target_forms(roster)
     assert "researcher@ssh-vps" in forms and "researcher@cloud-1" in forms
-    assert "hermes" in forms  # unique handle stays bare
+    assert "stardust" in forms  # the primary shows as stardust; a unique handle stays bare
 
 
 # ── outbox / replies ─────────────────────────────────────────────────────────

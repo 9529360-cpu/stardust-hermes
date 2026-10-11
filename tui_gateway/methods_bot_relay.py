@@ -69,13 +69,14 @@ def _(rid, params: dict, _root=_relay_root, _run=_run_delivery) -> dict:
     try:
         from tools.bot_mode_dm import MESSAGE_MAX_CHARS
         from tools.bot_relay import acquire_turn_lock
+        from tools.bot_mode_probe import PRIMARY_HANDLE_ALIASES
         if len(message) > MESSAGE_MAX_CHARS + 200:  # + attribution headroom
             return _err(rid, 4091, "message too long")
         root = _root()
         known = {"default"}
         if (root / "profiles").is_dir():
             known.update(c.name for c in (root / "profiles").iterdir() if c.is_dir())
-        resolved = "default" if profile.lower() == "hermes" else profile
+        resolved = "default" if profile.lower() in PRIMARY_HANDLE_ALIASES else profile
         if resolved not in known:
             return _err(rid, 4092, f"no profile '{profile}' on this gateway")
 

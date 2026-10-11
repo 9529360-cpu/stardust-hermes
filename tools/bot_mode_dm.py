@@ -156,9 +156,12 @@ def ensure_message_agent_tool(agent: Any) -> bool:
 
 
 def _resolve_local_name(target: str, roster: list[str]) -> Optional[str]:
-    """Map a target handle to a profile name ('hermes' → 'default')."""
+    """Map a target handle to a profile name: the primary's names ('stardust', and the legacy
+    'hermes') map to 'default'."""
+    from tools.bot_mode_probe import PRIMARY_HANDLE_ALIASES
+
     want = target.strip().lower()
-    if want == "hermes":
+    if want in PRIMARY_HANDLE_ALIASES:
         return "default" if "default" in roster else None
     return next((name for name in roster if name.lower() == want), None) if want else None
 
