@@ -8,12 +8,12 @@ export const CANONICAL_BOT_CHAT_TITLE = 'Bot Chat'
 
 /**
  * Is this row a bot's canonical Bot Chat? The backend decides it the same way
- * (hermes_state_titles.py): the registry title on a HIDDEN session. A visible
- * session that merely has the name is an ordinary chat, and a hidden side-chat
- * keeps its own name, so neither is canonical.
+ * (hermes_state_titles.py): the registry title, compared exactly, on a HIDDEN
+ * session. A visible session that merely has the name is an ordinary chat, and
+ * a hidden side-chat keeps its own name, so neither is canonical.
  */
 export function isCanonicalBotChatSession(session: { hidden?: boolean | number | null; title?: null | string }): boolean {
-  return Boolean(session.hidden) && session.title?.trim() === CANONICAL_BOT_CHAT_TITLE
+  return Boolean(session.hidden) && session.title === CANONICAL_BOT_CHAT_TITLE
 }
 
 /**

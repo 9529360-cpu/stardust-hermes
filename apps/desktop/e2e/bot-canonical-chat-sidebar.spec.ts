@@ -6,6 +6,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
+import { MOCK_REPLY } from '../../../tests-js/scripts/mock-server'
+
 import { type MockBackendFixture, setupMockBackend, waitForAppReady } from './fixtures'
 import { expect, test } from './test'
 
@@ -24,6 +26,8 @@ async function capture(page: MockBackendFixture['page'], label: string): Promise
 
 // The untitled fallback a row shows when it has no name and no first message.
 const UNTITLED = /^(无标题会话|Untitled session)$/
+// The conversation list when it holds no rows.
+const EMPTY_LIST = /^(暂无会话|No sessions yet)$/
 
 let fixture: MockBackendFixture | null = null
 
@@ -54,12 +58,20 @@ test('opening the default bot row never lists its canonical Bot Chat in the side
 
   // The Bot Chat is the open, focused chat: its empty state is on screen.
   await expect(page.locator('[data-slot="bot_chat_empty"]')).toBeVisible({ timeout: 60_000 })
-  // Let the open finish resolving the chat into the sidebar cache.
-  await page.waitForTimeout(3_000)
+
+  // A first turn proves the chat is live. Its open has already resolved the
+  // chat into the sidebar cache, so an empty list after that is a real answer.
+  const composer = page.locator('[data-slot="composer-root"] [contenteditable="true"]').filter({ visible: true }).first()
+  await expect(composer).toBeVisible({ timeout: 15_000 })
+  await composer.click()
+  await composer.fill('hello bot')
+  await page.keyboard.press('Enter')
+  await expect(page.getByText(MOCK_REPLY).filter({ visible: true }).first()).toBeVisible({ timeout: 60_000 })
 
   const sidebar = page.locator('[data-tour="sessions-sidebar"]')
 
   try {
+    await expect(sidebar.getByText(EMPTY_LIST)).toBeVisible({ timeout: 15_000 })
     await expect(sidebar.getByText(UNTITLED)).toHaveCount(0)
     await expect(sidebar.getByText('Bot Chat', { exact: true })).toHaveCount(0)
   } finally {
