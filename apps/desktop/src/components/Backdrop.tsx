@@ -1,45 +1,16 @@
 import { useStore } from '@nanostores/react'
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 
-import { $backdrop, $backdropImagePath } from '@/store/backdrop'
+import { useBackdropImageSrc } from '@/hooks/use-backdrop-image-src'
+import { $backdrop, $backdropImagePath, $backdropOpacity } from '@/store/backdrop'
 
 const assetPath = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\/+/, '')}`
 
 export function Backdrop() {
   const on = useStore($backdrop)
   const imagePath = useStore($backdropImagePath)
-  const [customSrc, setCustomSrc] = useState<null | string>(null)
-
-  useEffect(() => {
-    let canceled = false
-
-    if (!on || !imagePath || !window.stardustDesktop?.readFileDataUrl) {
-      setCustomSrc(null)
-
-      return () => {
-        canceled = true
-      }
-    }
-
-    setCustomSrc(null)
-
-    void window.stardustDesktop
-      .readFileDataUrl(imagePath)
-      .then(src => {
-        if (!canceled && src.startsWith('data:image/')) {
-          setCustomSrc(src)
-        }
-      })
-      .catch(() => {
-        if (!canceled) {
-          setCustomSrc(null)
-        }
-      })
-
-    return () => {
-      canceled = true
-    }
-  }, [imagePath, on])
+  const opacity = useStore($backdropOpacity)
+  const customSrc = useBackdropImageSrc(imagePath, on)
 
   useEffect(() => {
     const root = document.documentElement
@@ -77,6 +48,7 @@ export function Backdrop() {
         }
         fetchPriority="low"
         src={customSrc ?? assetPath('ds-assets/filler-bg0.jpg')}
+        style={custom ? { opacity: opacity / 100 } : undefined}
       />
       {custom && (
         <div

@@ -3,6 +3,21 @@ import { defineFieldCopy } from '@/app/settings/field-copy'
 import { defineLocale } from './define-locale'
 
 export const zhHant = defineLocale({
+  personalization: {
+    navLabel: '個人化',
+    title: '個人化',
+    subtitle: '快速調整外觀。更多選項在設定的「外觀」裡。',
+    themeTitle: '主題',
+    backgroundTitle: '背景圖片',
+    backgroundShow: '顯示背景圖片',
+    opacityLabel: '圖片不透明度',
+    noImage: '尚未選擇圖片。',
+    chooseImage: '選擇圖片…',
+    removeImage: '移除',
+    petTitle: '桌面寵物',
+    petDesc: '在桌面上顯示一隻寵物陪伴你。',
+    moreSettings: '更多外觀設定'
+  },
   sessionImport: {
     title: '從其他應用程式繼續',
     subtitle: '將對話匯入 Stardust，接著上次的進度繼續。',
@@ -583,8 +598,8 @@ export const zhHant = defineLocale({
       embedsAlways: '一律',
       embedsOff: '關閉',
       embedsReset: (count: number) => `重設 ${count} 個已允許的服務`,
-      resumeLastSessionTitle: '啟動時恢復上次對話',
-      resumeLastSessionDesc: '開啟後，應用冷啟動時重新打開最近的聊天。關閉則始終從空白新對話開始。',
+      resumeLastSessionTitle: '啟動時恢復上次頁面或對話',
+      resumeLastSessionDesc: '開啟後，應用啟動時回到你上次打開的頁面或對話。設定等彈出視窗不會被恢復。關閉則始終從空白新對話開始。',
       product: '產品',
       productDesc: '易讀的工具活動與精簡摘要。',
       technical: '技術',
@@ -2048,6 +2063,7 @@ export const zhHant = defineLocale({
   },
 
   messaging: {
+    pageTitle: '訊息平台',
     search: '搜尋訊息平台…',
     loading: '正在載入訊息平台…',
     loadFailed: '訊息平台載入失敗',
@@ -2139,7 +2155,8 @@ export const zhHant = defineLocale({
       },
       TELEGRAM_ALLOWED_USERS: {
         label: '允許的 Telegram 使用者 ID',
-        help: '建議設定。來自 @userinfobot 的逗號分隔數字 ID。不設定則任何人都能私訊您的機器人。'
+        help: '建議設定。來自 @userinfobot 的逗號分隔數字 ID。不設定則任何人都能私訊您的機器人。',
+        placeholder: '用逗號分隔的數字 ID'
       },
       TELEGRAM_PROXY: { label: '代理 URL', help: '僅在 Telegram 被封鎖的網路中需要。' },
       DISCORD_BOT_TOKEN: {

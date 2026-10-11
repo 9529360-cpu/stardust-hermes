@@ -59,6 +59,22 @@ interface AuxTaskCopy {
 }
 
 export interface Translations {
+  /** Quick personalization entry in the left navigation and its panel. */
+  personalization: {
+    navLabel: string
+    title: string
+    subtitle: string
+    themeTitle: string
+    backgroundTitle: string
+    backgroundShow: string
+    opacityLabel: string
+    noImage: string
+    chooseImage: string
+    removeImage: string
+    petTitle: string
+    petDesc: string
+    moreSettings: string
+  }
   connectors: {
     title: string
     connect: string
@@ -2047,6 +2063,7 @@ export interface Translations {
   }
 
   messaging: {
+    pageTitle: string
     search: string
     loading: string
     loadFailed: string

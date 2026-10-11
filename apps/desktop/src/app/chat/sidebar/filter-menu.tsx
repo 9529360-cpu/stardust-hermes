@@ -380,19 +380,22 @@ export function SidebarFilterMenu({ className }: { className?: string }) {
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>{t.sidebar.filterMenu.project}</DropdownMenuSubTrigger>
               <DropdownMenuSubContent className="max-h-80 overflow-y-auto">
-                {projects.map(project => (
-                  <OptionCheckbox
-                    checked={projectFilter.includes(project.id)}
-                    key={project.id}
-                    onCheck={() => toggleSidebarProjectFilter(project.id)}
-                    option={{
-                      icon: project.isNoProject ? 'home' : 'root-folder',
-                      id: project.id,
-                      // Home is synthetic, so its label is ours to translate.
-                      label: project.isNoProject ? t.sidebar.projects.home : project.label
-                    }}
-                  />
-                ))}
+                {/* Home is not a project. It is listed only while it is the active filter, so it can be cleared. */}
+                {projects
+                  .filter(project => !project.isNoProject || projectFilter.includes(project.id))
+                  .map(project => (
+                    <OptionCheckbox
+                      checked={projectFilter.includes(project.id)}
+                      key={project.id}
+                      onCheck={() => toggleSidebarProjectFilter(project.id)}
+                      option={{
+                        icon: project.isNoProject ? 'home' : 'root-folder',
+                        id: project.id,
+                        // Home is synthetic, so its label is ours to translate.
+                        label: project.isNoProject ? t.sidebar.projects.home : project.label
+                      }}
+                    />
+                  ))}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
           )}

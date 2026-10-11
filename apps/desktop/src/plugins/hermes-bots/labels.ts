@@ -227,12 +227,14 @@ export function stripPreviewMarkdown(text: unknown) {
     .replace(/(\*\*|__)(.*?)\1/g, '$2')
     .replace(/(^|\s)[*_](\S(?:.*?\S)?)[*_](?=\s|$|[.,;:!?])/g, '$1$2')
     .replace(/~~(.*?)~~/g, '$1')
-    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
-    .replace(/^\s{0,3}>\s?/gm, '')
+    // The stored preview is one flattened line, so a heading, quote or list
+    // marker can sit mid-string: match after whitespace as well as at the start.
+    .replace(/(^|\s)#{1,6}\s+/g, '$1')
+    .replace(/(^|\s)>\s+/g, '$1')
 
   return flattenTables(plain)
     .replace(/^\s*([-*_])(?:\s*\1){2,}\s*$/gm, '')
-    .replace(/^\s{0,3}(?:[-*+]|\d{1,3}[.)])\s+(?:\[[ xX]\]\s+)?/gm, '')
+    .replace(/(^|\s)(?:[-*+]|\d{1,3}[.)])\s+(?:\[[ xX]\]\s+)?/g, '$1')
     .replace(/\s+/g, ' ')
     .trim()
 }

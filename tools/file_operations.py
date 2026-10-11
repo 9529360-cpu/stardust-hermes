@@ -1223,14 +1223,21 @@ class ShellFileOperations(LintMixin, SearchMixin, FileOperations):
             ending = _detect_line_ending(head.stdout) if head.exit_code == 0 and head.stdout else None
         return self._file_has_bom(path, pre_content), pre_content, ending
 
+    # sha256sum prints the digest first on its line ("<64 hex digits> <path>", with a "*"
+    # marker in binary mode). The local terminal merges stderr into stdout, so shell startup
+    # noise (a bash setlocale warning) can precede that line: the digest is the line that
+    # starts with 64 hex digits, not the output's first token.
+    _SHA256_LINE_RE = re.compile(r"(?m)^([0-9a-fA-F]{64})\s")
+
     def _verify_written_hash(self, path: str, content_bytes: bytes) -> tuple[Optional[bool], Optional[WriteResult]]:
         """Compare the on-disk sha256 to the intended bytes: ``(verified, error)``.
         The explicit flag saves the model a confirming re-read; a mismatch is a hard
         error. ``verified`` is None when the hash could not be taken."""
         try:
             hash_result = self._exec(f"sha256sum {self._escape_shell_arg(path)} 2>/dev/null")
-            if hash_result.exit_code == 0 and hash_result.stdout.strip():
-                disk_sha = hash_result.stdout.strip().split()[0]
+            found = self._SHA256_LINE_RE.search(hash_result.stdout) if hash_result.exit_code == 0 else None
+            if found is not None:
+                disk_sha = found.group(1).lower()
                 if disk_sha != hashlib.sha256(content_bytes).hexdigest():
                     return False, WriteResult(error=(
                         f"Post-write verification failed for {path}: on-disk "
