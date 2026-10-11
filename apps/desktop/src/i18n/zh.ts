@@ -4312,6 +4312,7 @@ export const zh = defineLocale({
       openStarmap: '打开记忆图谱',
       turnRunning: '运行中',
       contextUsage: '上下文用量',
+      contextShort: '上下文',
       systemResources: {
         title: '系统资源',
         loading: '资源…',

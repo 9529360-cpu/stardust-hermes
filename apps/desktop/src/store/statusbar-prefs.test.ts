@@ -59,3 +59,36 @@ describe('statusbar hidden items', () => {
     expect(reloaded.$statusbarHiddenIds.get()).toContain('approval-mode')
   })
 })
+
+describe('statusbar version chips', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    vi.resetModules()
+  })
+
+  it('starts both version chips hidden on a fresh install', async () => {
+    const { $statusbarHiddenIds } = await loadStore()
+
+    expect($statusbarHiddenIds.get()).toEqual(expect.arrayContaining(['version-client', 'version-backend']))
+  })
+
+  it('keeps a saved layout as the user left it, so a saved choice wins over the new default', async () => {
+    window.localStorage.setItem('hermes.desktop.statusbarHidden.v3', JSON.stringify(['cron']))
+
+    const { $statusbarHiddenIds } = await loadStore()
+
+    expect($statusbarHiddenIds.get()).toEqual(['cron'])
+  })
+
+  it('shows a version chip again when the user turns it on, and keeps that choice', async () => {
+    const first = await loadStore()
+
+    first.setStatusbarItemVisible('version-client', true)
+
+    vi.resetModules()
+    const reloaded = await loadStore()
+
+    expect(reloaded.$statusbarHiddenIds.get()).not.toContain('version-client')
+    expect(reloaded.$statusbarHiddenIds.get()).toContain('version-backend')
+  })
+})

@@ -71,9 +71,10 @@ export interface StatusbarItem {
    *  one is never listed there and always shows — the safe default for plugin
    *  contributions that don't opt in. */
   toggleLabel?: string
-  /** Listed in the menu but not switchable: the bar's own affordances (command
-   *  center, update/version pills) would strand the user if they could be
-   *  hidden from the surface that hides them. */
+  /** Listed in the menu but not switchable while set: the bar's own affordances
+   *  (the command center) would strand the user if they could be hidden from the
+   *  surface that hides them, and a version pill must stay in view while an
+   *  update is waiting. Items set this per render, so a pill locks only then. */
   lockedVisible?: boolean
 }
 

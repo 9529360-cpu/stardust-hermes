@@ -25,7 +25,10 @@ export function toggleStatusbarVisible() {
 // (the yolo zap) stays: whether dangerous commands run unasked is state the
 // user should see at a glance. The per-turn
 // live diagnostics (running/session timers, cache hit rate, tokens/sec) stay
-// optional; the context/usage menu is now the default bottom entry.
+// optional; the context/usage menu is now the default bottom entry. The version
+// chips are identity, not health: the version lives in Settings → About, and a
+// chip appears on its own only while an update is waiting or applying
+// (use-statusbar-items).
 export const STATUSBAR_HIDDEN_BY_DEFAULT: readonly string[] = [
   'agents',
   'cache-hit-rate',
@@ -35,6 +38,8 @@ export const STATUSBAR_HIDDEN_BY_DEFAULT: readonly string[] = [
   'system-resources',
   'terminal',
   'tokens-per-second',
+  'version-backend',
+  'version-client',
   'webhooks'
 ]
 

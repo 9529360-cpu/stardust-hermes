@@ -38,4 +38,12 @@ describe('bottom usage entry preference migration', () => {
 
     expect(prefs.$statusbarHiddenIds.get()).toEqual(['context-usage', 'webhooks'])
   })
+
+  it('keeps a saved v2 layout as written, so the version-chip default does not reach it', async () => {
+    window.localStorage.setItem(previous, JSON.stringify(['cron']))
+    vi.resetModules()
+    const prefs = await import('./statusbar-prefs')
+
+    expect(prefs.$statusbarHiddenIds.get()).toEqual(['cron'])
+  })
 })
