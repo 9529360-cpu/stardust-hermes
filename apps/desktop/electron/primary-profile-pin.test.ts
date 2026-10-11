@@ -15,7 +15,7 @@ test('a live primary keeps answering for its booted profile after the preference
     'default'
   )
 
-  // hermes:profile:remember rewrites active-profile.json without re-homing.
+  // stardust:profile:remember rewrites active-profile.json without re-homing.
   preference = 'claude'
 
   // Routing must still see the running primary as "default": otherwise a

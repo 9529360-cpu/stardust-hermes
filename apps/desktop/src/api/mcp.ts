@@ -25,7 +25,7 @@ export interface McpOAuthFlow {
 /** Connect to the server, list its tools, disconnect. Slow (spawns/handshakes
  *  for real) — well past the 15s default fetch timeout. */
 export function testMcpServer(name: string, profile?: ProfileScope): Promise<McpTestResult> {
-  return window.hermesDesktop.api<McpTestResult>({
+  return window.stardustDesktop.api<McpTestResult>({
     ...capabilityScoped(profile),
     path: `/api/mcp/servers/${encodeURIComponent(name)}/test`,
     method: 'POST',
@@ -40,7 +40,7 @@ export function saveMcpServers(
   servers: Record<string, Record<string, unknown>>,
   profile?: ProfileScope
 ): Promise<{ ok: boolean }> {
-  return window.hermesDesktop.api<{ ok: boolean }>({
+  return window.stardustDesktop.api<{ ok: boolean }>({
     ...capabilityScoped(profile),
     path: '/api/mcp/servers',
     method: 'PUT',
@@ -87,7 +87,7 @@ export function addMcpServer(
   },
   profile?: ProfileScope
 ): Promise<McpServerSummary> {
-  return window.hermesDesktop.api<McpServerSummary>({
+  return window.stardustDesktop.api<McpServerSummary>({
     ...capabilityScoped(profile),
     path: '/api/mcp/servers',
     method: 'POST',
@@ -98,7 +98,7 @@ export function addMcpServer(
 /** Remove one server from `mcp_servers` (the inline setup card's rollback
  *  when a directory install is cancelled after the config write). */
 export function removeMcpServer(name: string, profile?: ProfileScope): Promise<{ ok: boolean }> {
-  return window.hermesDesktop.api<{ ok: boolean }>({
+  return window.stardustDesktop.api<{ ok: boolean }>({
     ...capabilityScoped(profile),
     path: `/api/mcp/servers/${encodeURIComponent(name)}`,
     method: 'DELETE'
@@ -119,7 +119,7 @@ export function setMcpServerEnabled(
 }
 
 export function getMcpCatalog(profile?: ProfileScope): Promise<McpCatalogResponse> {
-  return window.hermesDesktop.api<McpCatalogResponse>({
+  return window.stardustDesktop.api<McpCatalogResponse>({
     ...capabilityScoped(profile),
     path: '/api/mcp/catalog'
   })
@@ -130,7 +130,7 @@ export function installMcpCatalogEntry(
   env: Record<string, string> = {},
   profile?: ProfileScope
 ): Promise<{ ok: boolean; name?: string; pid?: number; action?: string; background?: boolean }> {
-  return window.hermesDesktop.api<{ ok: boolean; name?: string; pid?: number; action?: string; background?: boolean }>({
+  return window.stardustDesktop.api<{ ok: boolean; name?: string; pid?: number; action?: string; background?: boolean }>({
     ...capabilityScoped(profile),
     path: '/api/mcp/catalog/install',
     method: 'POST',

@@ -44,7 +44,7 @@ const localConnection = {
 beforeEach(() => {
   getConnectionConfig.mockResolvedValue(localConnection)
   saveConnectionConfig.mockResolvedValue(localConnection)
-  Object.defineProperty(window, 'hermesDesktop', {
+  Object.defineProperty(window, 'stardustDesktop', {
     configurable: true,
     value: { getConnectionConfig, saveConnectionConfig }
   })
@@ -71,7 +71,7 @@ describe('GatewaySettings', () => {
     expect(remoteCard.className).toContain('border-primary')
     expect(screen.queryByText('Hermes Cloud')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Connect', exact: true })).toBeNull()
-    expect((window.hermesDesktop as any).cloud).toBeUndefined()
+    expect((window.stardustDesktop as any).cloud).toBeUndefined()
   })
   it('does not offer a Cloud mode tile', async () => {
     render(<GatewaySettings embedded />)

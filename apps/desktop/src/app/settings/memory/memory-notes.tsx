@@ -1,4 +1,4 @@
-import type { MemoryEntry } from '@hermes/shared'
+import type { MemoryEntry } from '@stardust/shared'
 import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'

@@ -1,4 +1,4 @@
-import { Button, Codicon, DisclosureCaret, GlyphSpinner, PanelEmpty, RowButton } from '@hermes/plugin-sdk'
+import { Button, Codicon, DisclosureCaret, GlyphSpinner, PanelEmpty, RowButton } from '@stardust/plugin-sdk'
 import type { ReactNode, RefObject } from 'react'
 
 import type { useRoster } from './data'

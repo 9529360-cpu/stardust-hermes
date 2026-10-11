@@ -161,11 +161,9 @@ function textureImage(): HTMLImageElement | null {
     texture = img
   }
 
-  // Not `nous-girl.jpg`: that asset is the BrandMark tile art, dark on white, and
-  // reads as a solid white block once it is wrapped around a cube. This one is
-  // light-on-dark line work, so the faces keep their shading and the channel
-  // split has edges to offset.
-  img.src = `${import.meta.env.BASE_URL}intro-nous-girl.png`
+  // The Stardust app tile (square, full colour). The cube maps the whole image
+  // onto every face, so keep the source square.
+  img.src = `${import.meta.env.BASE_URL}brand/png-512.png`
 
   return null
 }

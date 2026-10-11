@@ -12,14 +12,14 @@
  * the row label must opt out of the auto minimum width.
  */
 
-import type * as HermesSdk from '@hermes/plugin-sdk'
+import type * as HermesSdk from '@stardust/plugin-sdk'
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { translateBots } from './i18n-test-helper'
 import type { RosterRow } from './types'
 
-vi.mock('@hermes/plugin-sdk', async importOriginal => {
+vi.mock('@stardust/plugin-sdk', async importOriginal => {
   const original = await importOriginal<typeof HermesSdk>()
 
   return {

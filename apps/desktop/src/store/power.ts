@@ -23,7 +23,7 @@ export function batteryPollInterval(intervalMs: number, onBattery: boolean): num
 }
 
 if (typeof window !== 'undefined') {
-  const desktop = window.hermesDesktop
+  const desktop = window.stardustDesktop
 
   void desktop?.getOnBattery?.().then(onBattery => $onBattery.set(onBattery))
   desktop?.onBatteryChanged?.(onBattery => $onBattery.set(onBattery))

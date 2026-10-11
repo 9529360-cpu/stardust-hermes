@@ -128,7 +128,7 @@ export function AboutSettings() {
                     <p className="mt-1 text-xs text-muted-foreground">{a.bundleSwapPendingDesc}</p>
                     <Button
                       className="mt-2"
-                      onClick={() => void window.hermesDesktop?.relaunchApp?.()}
+                      onClick={() => void window.stardustDesktop?.relaunchApp?.()}
                       size="sm"
                       variant="textStrong"
                     >
@@ -145,7 +145,7 @@ export function AboutSettings() {
                         href={INSTALLER_URL}
                         onClick={event => {
                           event.preventDefault()
-                          void window.hermesDesktop?.openExternal?.(INSTALLER_URL)
+                          void window.stardustDesktop?.openExternal?.(INSTALLER_URL)
                         }}
                         rel="noreferrer"
                         target="_blank"
@@ -215,7 +215,7 @@ export function AboutSettings() {
                 href={PRODUCT_RELEASES_URL}
                 onClick={event => {
                   event.preventDefault()
-                  void window.hermesDesktop?.openExternal?.(PRODUCT_RELEASES_URL)
+                  void window.stardustDesktop?.openExternal?.(PRODUCT_RELEASES_URL)
                 }}
                 rel="noreferrer"
                 target="_blank"

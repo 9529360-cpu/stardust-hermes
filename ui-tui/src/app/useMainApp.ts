@@ -8,7 +8,7 @@ import {
   useStdout,
   useTerminalTitle
 } from '@hermes/ink'
-import { JSON_RPC_METHOD_NOT_FOUND, type ServerRequest } from '@hermes/shared/json-rpc-channel'
+import { JSON_RPC_METHOD_NOT_FOUND, type ServerRequest } from '@stardust/shared/json-rpc-channel'
 import { useStore } from '@nanostores/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 

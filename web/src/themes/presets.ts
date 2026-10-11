@@ -1,4 +1,4 @@
-import { parseColor, THEME_PRESET_PALETTES, type ThemePresetPalette } from "@hermes/shared";
+import { parseColor, THEME_PRESET_PALETTES, type ThemePresetPalette } from "@stardust/shared";
 import type { DashboardTheme, ThemePalette, ThemeTypography, ThemeLayout } from "./types";
 
 /**
@@ -12,7 +12,7 @@ import type { DashboardTheme, ThemePalette, ThemeTypography, ThemeLayout } from 
  * `_BUILTIN_DASHBOARD_THEMES` list in `hermes_cli/web_server.py`.
  *
  * Presets that also ship on the desktop (midnight, ember, mono, cyberpunk)
- * take their colours from `@hermes/shared` `THEME_PRESET_PALETTES` so both
+ * take their colours from `@stardust/shared` `THEME_PRESET_PALETTES` so both
  * surfaces render one palette; only typography/layout/overrides live here.
  */
 

@@ -1,4 +1,4 @@
-import type { WorkItem } from '@hermes/shared'
+import type { WorkItem } from '@stardust/shared'
 import { useState } from 'react'
 
 import { SubagentRow } from '@/app/agents'

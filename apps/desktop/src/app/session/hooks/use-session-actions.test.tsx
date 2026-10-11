@@ -1,5 +1,5 @@
-import { registryBackendScopeKey } from '@hermes/shared'
 import { useStore } from '@nanostores/react'
+import { registryBackendScopeKey } from '@stardust/shared'
 import { act, cleanup, render, waitFor } from '@testing-library/react'
 import type { MutableRefObject } from 'react'
 import { useEffect, useRef } from 'react'

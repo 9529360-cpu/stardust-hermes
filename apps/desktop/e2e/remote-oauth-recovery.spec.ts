@@ -7,7 +7,7 @@ import { buildAppEnv, createSandbox, launchDesktop } from './fixtures'
 import { allowErrorBanners, expect, test } from './test'
 
 type DesktopWindow = Window & {
-  hermesDesktop: {
+  stardustDesktop: {
     getBootProgress: () => Promise<{ running: boolean; retryable?: boolean; statusCode?: number; error?: string }>
     getConnection: () => Promise<unknown>
   }
@@ -64,12 +64,12 @@ for (const status of [401, 403]) {
     let app: Awaited<ReturnType<typeof launchDesktop>>['app'] | undefined
     try {
       const launched = await launchDesktop(buildAppEnv(sandbox, {
-        HERMES_DESKTOP_DEV_SERVER: ''
+        STARDUST_DESKTOP_DEV_SERVER: ''
       }))
       app = launched.app
       const page = launched.page
       await expect(page.getByRole('button', { name: /gateway settings/i })).toBeVisible({ timeout: 60_000 })
-      const snapshot = await page.evaluate(() => (window as unknown as DesktopWindow).hermesDesktop.getBootProgress())
+      const snapshot = await page.evaluate(() => (window as unknown as DesktopWindow).stardustDesktop.getBootProgress())
       expect(snapshot).toMatchObject({ running: false, retryable: false, statusCode: status })
       expect(snapshot.error).toMatch(/not signed in/)
       expect(mints).toBeGreaterThan(0)
@@ -82,7 +82,7 @@ for (const status of [401, 403]) {
       // Concurrent IPC readers must reuse the terminal failure, not republish
       // startup progress and unmount the settings form.
       await page.evaluate(async () => {
-        await Promise.allSettled(Array.from({ length: 20 }, () => (window as unknown as DesktopWindow).hermesDesktop.getConnection()))
+        await Promise.allSettled(Array.from({ length: 20 }, () => (window as unknown as DesktopWindow).stardustDesktop.getConnection()))
       })
       await expect(back).toBeVisible()
       await expect(gatewayUrl).toHaveValue(url)
@@ -95,7 +95,7 @@ for (const status of [401, 403]) {
       await expect.poll(() => signedIn).toBe(true)
       await expect.poll(async () => {
         try {
-          return await page.evaluate(() => (window as unknown as DesktopWindow).hermesDesktop.getConnection())
+          return await page.evaluate(() => (window as unknown as DesktopWindow).stardustDesktop.getConnection())
         } catch {
           return null
         }

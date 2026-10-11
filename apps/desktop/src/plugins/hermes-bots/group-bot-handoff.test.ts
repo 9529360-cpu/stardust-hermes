@@ -20,7 +20,7 @@ const { openBotCanonicalChat, prepareBotSource } = vi.hoisted(() => ({
   prepareBotSource: vi.fn()
 }))
 
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@stardust/plugin-sdk', async () => {
   const { pluginSdkMock } = await import('./group-test-utils')
   const base = await pluginSdkMock(host)
 

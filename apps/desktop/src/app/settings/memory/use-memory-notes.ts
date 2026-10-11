@@ -1,4 +1,4 @@
-import type { MemoryEntry, MemoryListResult, MemoryMutationResult } from '@hermes/shared'
+import type { MemoryEntry, MemoryListResult, MemoryMutationResult } from '@stardust/shared'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { useGatewayRequest } from '@/app/gateway/hooks/use-gateway-request'

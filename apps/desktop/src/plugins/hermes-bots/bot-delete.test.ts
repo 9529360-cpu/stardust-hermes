@@ -13,7 +13,7 @@
  * under `vm`.
  */
 
-import type * as HermesSdk from '@hermes/plugin-sdk'
+import type * as HermesSdk from '@stardust/plugin-sdk'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { ProfileRoute, RosterRow } from './types'
@@ -50,7 +50,7 @@ const { forgetSessionUnread, invalidateQueries, newChat, overrides, request, sta
   }
 })
 
-vi.mock('@hermes/plugin-sdk', async importOriginal => {
+vi.mock('@stardust/plugin-sdk', async importOriginal => {
   const sdk = await importOriginal<typeof HermesSdk>()
 
   overrides.newChat = newChat

@@ -1,4 +1,4 @@
-import type { ConnectionRequestPayload } from '@hermes/shared'
+import type { ConnectionRequestPayload } from '@stardust/shared'
 
 export interface ConfigFieldSchema {
   category?: string

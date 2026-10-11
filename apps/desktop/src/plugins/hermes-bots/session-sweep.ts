@@ -7,7 +7,7 @@
  * scheduler without pulling a view in.
  */
 
-import { host } from '@hermes/plugin-sdk'
+import { host } from '@stardust/plugin-sdk'
 
 import { PROFILE_SESSION_LIST_LIMIT } from './canonical-chat'
 import { $lastRoster } from './data'

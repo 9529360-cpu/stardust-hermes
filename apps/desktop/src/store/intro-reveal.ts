@@ -39,14 +39,14 @@ export function markIntroRevealSeen(): void {
 }
 
 export function isIntroRevealEnabled(): boolean {
-  return isOnboardingEnabled() && window.hermesDesktop?.skipIntro !== true
+  return isOnboardingEnabled() && window.stardustDesktop?.skipIntro !== true
 }
 
 /** The guided flow is on but its intro film was turned off at launch
  * (HERMES_SKIP_INTRO). Distinct from isIntroRevealEnabled(): false there also
  * covers onboarding being off entirely, where nothing may queue. */
 export function isIntroRevealSkipped(): boolean {
-  return isOnboardingEnabled() && window.hermesDesktop?.skipIntro === true
+  return isOnboardingEnabled() && window.stardustDesktop?.skipIntro === true
 }
 
 export function shouldPlayFirstRunIntro(firstRunSkipped: boolean): boolean {
@@ -60,7 +60,7 @@ export function startIntroReveal(): void {
 
   $introReveal.set({ phase: 'playing' })
   // The overlay covers the desktop, so every exit path has to restore the main window.
-  void window.hermesDesktop?.introReveal?.open({ hideMain: true }).catch(finishIntroReveal)
+  void window.stardustDesktop?.introReveal?.open({ hideMain: true }).catch(finishIntroReveal)
 }
 
 export function leaveIntroReveal(): void {
@@ -80,11 +80,11 @@ export function finishIntroReveal(): void {
   // shape (small window, greeting layout) synchronously, so the main window
   // is already the guide when it is shown. Showing first and shrinking after
   // is what flashed the full app between the film and the greeting.
-  void window.hermesDesktop?.introReveal?.close({ showMain: true }).catch(() => undefined)
+  void window.stardustDesktop?.introReveal?.close({ showMain: true }).catch(() => undefined)
 }
 
 export function installIntroRevealBridgeListeners(): () => void {
-  const bridge = window.hermesDesktop?.introReveal
+  const bridge = window.stardustDesktop?.introReveal
   const offSkip = bridge?.onSkip(leaveIntroReveal)
   const offClosed = bridge?.onClosed(finishIntroReveal)
 

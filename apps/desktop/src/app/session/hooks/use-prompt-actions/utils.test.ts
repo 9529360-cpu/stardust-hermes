@@ -385,7 +385,7 @@ describe('readFileDataUrlForAttach', () => {
   it('prefers the attachment-specific desktop reader over the preview reader', async () => {
     const previewReader = vi.fn(async () => 'preview')
     const attachmentReader = vi.fn(async () => 'data:application/zip;base64,UEs=')
-    Object.defineProperty(window, 'hermesDesktop', {
+    Object.defineProperty(window, 'stardustDesktop', {
       configurable: true,
       value: { readFileDataUrl: previewReader, readFileDataUrlForAttach: attachmentReader }
     })
@@ -397,7 +397,7 @@ describe('readFileDataUrlForAttach', () => {
 
   it('falls back to the preview reader on older shells', async () => {
     const previewReader = vi.fn(async () => 'data:text/plain;base64,YQ==')
-    Object.defineProperty(window, 'hermesDesktop', {
+    Object.defineProperty(window, 'stardustDesktop', {
       configurable: true,
       value: { readFileDataUrl: previewReader }
     })

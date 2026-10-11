@@ -13,7 +13,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { RosterRow } from './types'
 
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@stardust/plugin-sdk', async () => {
   const { atom } = await import('nanostores')
 
   return {

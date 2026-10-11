@@ -23,7 +23,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { RosterRow } from './types'
 
-vi.mock('@hermes/plugin-sdk', () => ({
+vi.mock('@stardust/plugin-sdk', () => ({
   BOT_CHAT_SESSION_HYDRATION_TIMEOUT_MS: 15_000,
   host: {}
 }))

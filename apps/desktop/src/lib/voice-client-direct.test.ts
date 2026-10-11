@@ -27,7 +27,7 @@ const relay = { mode: 'relay', reason: 'local provider' } as const
 function mockDesktopApi(response: unknown) {
   const api = vi.fn(async (_request: unknown) => response)
 
-  Object.defineProperty(window, 'hermesDesktop', {
+  Object.defineProperty(window, 'stardustDesktop', {
     configurable: true,
     value: { api }
   })
@@ -41,7 +41,7 @@ describe('fetchVoiceClientConfig', () => {
   afterEach(() => {
     setApiRequestConnection(null)
     setApiRequestProfile(null)
-    Reflect.deleteProperty(window, 'hermesDesktop')
+    Reflect.deleteProperty(window, 'stardustDesktop')
     vi.restoreAllMocks()
   })
 
@@ -78,7 +78,7 @@ describe('fetchVoiceClientConfig', () => {
   })
 
   it('resolves null on an older backend without the endpoint', async () => {
-    Object.defineProperty(window, 'hermesDesktop', {
+    Object.defineProperty(window, 'stardustDesktop', {
       configurable: true,
       value: { api: vi.fn(async () => Promise.reject(new Error('404'))) }
     })
@@ -93,7 +93,7 @@ describe('transcribeAudioClientDirect', () => {
   afterEach(() => {
     setApiRequestConnection(null)
     setApiRequestProfile(null)
-    Reflect.deleteProperty(window, 'hermesDesktop')
+    Reflect.deleteProperty(window, 'stardustDesktop')
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
   })

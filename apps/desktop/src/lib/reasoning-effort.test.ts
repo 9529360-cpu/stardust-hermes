@@ -1,4 +1,4 @@
-import { DEFAULT_REASONING_EFFORT, REASONING_EFFORT_VALUES } from '@hermes/shared'
+import { DEFAULT_REASONING_EFFORT, REASONING_EFFORT_VALUES } from '@stardust/shared'
 import { describe, expect, it } from 'vitest'
 
 import { type Locale, TRANSLATIONS } from '@/i18n'

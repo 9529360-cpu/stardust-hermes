@@ -1,4 +1,4 @@
-import type { GatewayEvent } from '@hermes/shared'
+import type { GatewayEvent } from '@stardust/shared'
 import { act, cleanup, render, waitFor } from '@testing-library/react'
 import { useEffect } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -76,7 +76,7 @@ describe('preview routing', () => {
     setRightContextOpen(false)
     window.localStorage.clear()
 
-    Object.defineProperty(window, 'hermesDesktop', {
+    Object.defineProperty(window, 'stardustDesktop', {
       configurable: true,
       value: { normalizePreviewTarget: vi.fn(async (target: string) => fileTarget(target)) }
     })
@@ -196,7 +196,7 @@ describe('preview routing', () => {
       })
 
       expect($previewTabs.get()).toHaveLength(0)
-      expect(window.hermesDesktop.normalizePreviewTarget).not.toHaveBeenCalled()
+      expect(window.stardustDesktop.normalizePreviewTarget).not.toHaveBeenCalled()
     })
 
     it('does not open a preview off the back of a tool result', async () => {

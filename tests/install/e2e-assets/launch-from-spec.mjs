@@ -275,7 +275,7 @@ async function main() {
     // captured. Pull the full status over the same IPC the panel uses so
     // the log names the real error.
     const status = await window.evaluate(() =>
-      window.hermesDesktop?.updates?.check?.() ?? Promise.resolve('no updates.check bridge')
+      window.stardustDesktop?.updates?.check?.() ?? Promise.resolve('no updates.check bridge')
     ).catch((err) => `updates.check failed: ${err?.message || err}`);
     log(`[update-status] ${JSON.stringify(status)}`);
     throw e;

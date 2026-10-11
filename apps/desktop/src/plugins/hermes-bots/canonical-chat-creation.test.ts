@@ -31,7 +31,7 @@ const { hostMock, persistMock, pluginCtx, requestForBotMock, saveBotMetaMock } =
   saveBotMetaMock: vi.fn()
 }))
 
-vi.mock('@hermes/plugin-sdk', () => ({
+vi.mock('@stardust/plugin-sdk', () => ({
   BOT_CHAT_SESSION_HYDRATION_TIMEOUT_MS: 15_000,
   host: hostMock
 }))

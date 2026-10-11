@@ -1,4 +1,4 @@
-import { host } from '@hermes/plugin-sdk'
+import { host } from '@stardust/plugin-sdk'
 import type { ReactNode } from 'react'
 
 import { botRosterKey } from './data'

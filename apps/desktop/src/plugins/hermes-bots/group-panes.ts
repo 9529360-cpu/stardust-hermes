@@ -7,7 +7,7 @@
  * tab without any of those paths importing a view.
  */
 
-import { atom } from '@hermes/plugin-sdk'
+import { atom } from '@stardust/plugin-sdk'
 
 import { $groupChatWorkspace, groupChatRoomKey } from './group-chat'
 import type { GroupChatRoom } from './group-chat'

@@ -148,7 +148,7 @@ beforeEach(() => {
   api.mockResolvedValue({ profiles: [] })
   setApiRequestConnection(null)
   setApiRequestProfile(null)
-  vi.stubGlobal('window', { hermesDesktop: { api, connections: { list, setLastUsed } }, localStorage })
+  vi.stubGlobal('window', { stardustDesktop: { api, connections: { list, setLastUsed } }, localStorage })
 })
 
 afterEach(() => vi.unstubAllGlobals())

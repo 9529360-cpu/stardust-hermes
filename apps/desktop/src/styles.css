@@ -3519,7 +3519,7 @@ button[data-slot='aui_msg-reactions'] svg {
 /* The resize frame — hot edges/corners, not buttons. The window is created
    non-resizable (the transparent-frameless Windows drag-growth bug), so this
    is the one sanctioned way to change the HUD's size; it drives
-   `hermes:hud:set-bounds`, which flips resizable on for the call.
+   `stardust:hud:set-bounds`, which flips resizable on for the call.
 
    CanvasTTY grammar: four edge strips + four larger corner targets, each with
    its native resize cursor and each preserving the opposite edge. Deliberately

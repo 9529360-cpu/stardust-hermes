@@ -125,7 +125,7 @@ describe('selectProfile startup preference (#79886)', () => {
     const getConnectionConfig = vi.fn(async () => ({ mode: 'local' }))
 
     ;(globalThis as { window?: unknown }).window = {
-      hermesDesktop: {
+      stardustDesktop: {
         getConnection,
         getConnectionConfig,
         profile: { remember: rememberProfile }
@@ -190,7 +190,7 @@ describe('selectProfile startup preference (#79886)', () => {
     const getConnectionConfig = vi.fn(async () => ({ mode: 'local' }))
 
     ;(globalThis as { window?: unknown }).window = {
-      hermesDesktop: {
+      stardustDesktop: {
         getConnection,
         getConnectionConfig,
         profile: { remember: rememberProfile }
@@ -211,7 +211,7 @@ describe('selectProfile startup preference (#79886)', () => {
     const getConnectionConfig = vi.fn(async () => ({ mode: 'ssh' }))
 
     ;(globalThis as { window?: unknown }).window = {
-      hermesDesktop: {
+      stardustDesktop: {
         getConnection,
         getConnectionConfig,
         profile: { remember: rememberProfile }

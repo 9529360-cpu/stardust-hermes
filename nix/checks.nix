@@ -438,15 +438,15 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
               ) "the launcher must report HERMES_MANAGED=home-manager while the services own the configuration (got: ${toString (setValue "HERMES_MANAGED")})"
               ++ lib.optional (
                 lib.length agentPackages == 1
-                && setValue "HERMES_DESKTOP_HERMES" != "${lib.head agentPackages}/bin/hermes"
-              ) "the launcher must pin the agent package that programs.enable installs, and not a second runtime: ${toString (setValue "HERMES_DESKTOP_HERMES")}"
+                && setValue "STARDUST_DESKTOP_HERMES" != "${lib.head agentPackages}/bin/hermes"
+              ) "the launcher must pin the agent package that programs.enable installs, and not a second runtime: ${toString (setValue "STARDUST_DESKTOP_HERMES")}"
 
               # ── The application reaches the backend of the service ──────
               ++ lib.optional (
-                setValue "HERMES_DESKTOP_REMOTE_URL" != "http://127.0.0.1:9231"
-              ) "the launcher must name the backend of the service, or the application starts a second one (got: ${toString (setValue "HERMES_DESKTOP_REMOTE_URL")})"
+                setValue "STARDUST_DESKTOP_REMOTE_URL" != "http://127.0.0.1:9231"
+              ) "the launcher must name the backend of the service, or the application starts a second one (got: ${toString (setValue "STARDUST_DESKTOP_REMOTE_URL")})"
               ++ lib.optional (
-                !lib.hasInfix "HERMES_DESKTOP_REMOTE_TOKEN" wrapper
+                !lib.hasInfix "STARDUST_DESKTOP_REMOTE_TOKEN" wrapper
               ) "the launcher must give a token with the URL: the desktop resolver throws when the URL is set alone"
               ++ lib.optional (
                 !lib.hasInfix "HERMES_DASHBOARD_SESSION_TOKEN" backendScript
@@ -463,7 +463,7 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
                 !lib.hasInfix tokenFile backendScript
               ) "the backend must read the token from ${tokenFile} at start time"
               ++ lib.optional (
-                setValue "HERMES_DESKTOP_REMOTE_TOKEN" != null
+                setValue "STARDUST_DESKTOP_REMOTE_TOKEN" != null
               ) "the token must never be a --set value: makeWrapper writes it into the world-readable Nix store";
           in
           pkgs.runCommand "hermes-home-manager-desktop" { } (
@@ -507,7 +507,7 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
                 lib.hasInfix "HERMES_MANAGED" wrapper
               ) "the launcher must not claim a managed install when no activation writes one"
               ++ lib.optional (
-                lib.hasInfix "HERMES_DESKTOP_REMOTE_URL" wrapper
+                lib.hasInfix "STARDUST_DESKTOP_REMOTE_URL" wrapper
               ) "the launcher must not name a backend when the services run none"
               ++ lib.optional (
                 cfg.systemd.user.services ? hermes-backend || cfg.launchd.agents ? hermes-backend

@@ -8,14 +8,14 @@
  * job cannot invalidate every other bot's list.
  */
 
-import type * as HermesSdk from '@hermes/plugin-sdk'
-import { queryClient } from '@hermes/plugin-sdk'
+import type * as HermesSdk from '@stardust/plugin-sdk'
+import { queryClient } from '@stardust/plugin-sdk'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { request } = vi.hoisted(() => ({ request: vi.fn(async () => ({})) }))
 
-vi.mock('@hermes/plugin-sdk', async importOriginal => {
+vi.mock('@stardust/plugin-sdk', async importOriginal => {
   const sdk = await importOriginal<typeof HermesSdk>()
 
   return { ...sdk, host: { ...sdk.host, request } }

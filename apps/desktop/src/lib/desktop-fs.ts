@@ -56,7 +56,7 @@ function fsPath(endpoint: string, filePath: string) {
 }
 
 function bridge() {
-  const desktop = window.hermesDesktop
+  const desktop = window.stardustDesktop
 
   if (!desktop) {
     throw new Error('Stardust Desktop bridge is unavailable')
@@ -124,7 +124,7 @@ export async function readDesktopFileDataUrl(path: string): Promise<string> {
  */
 export async function readDesktopFileDataUrlLocalFirst(path: string): Promise<string> {
   try {
-    const local = await window.hermesDesktop?.readFileDataUrl?.(path)
+    const local = await window.stardustDesktop?.readFileDataUrl?.(path)
 
     if (local) {
       return local

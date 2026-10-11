@@ -6,7 +6,7 @@ import {
   JsonRpcGatewayError,
   reconnectBackoffDelayMs,
   resolveGatewayWsUrl
-} from '@hermes/shared'
+} from '@stardust/shared'
 import { useEffect, useRef } from 'react'
 
 import { shouldApplyPostBootProgressError } from '@/components/boot-failure-reauth'
@@ -156,7 +156,7 @@ interface GatewayBootOptions {
   /** Server→client request from any registry socket; false = no handler (the channel answers -32601). */
   handleServerRequest: (request: ScopedServerRequest) => boolean
   onConnectionReady: (
-    connection: Awaited<ReturnType<NonNullable<typeof window.hermesDesktop>['getConnection']>> | null
+    connection: Awaited<ReturnType<NonNullable<typeof window.stardustDesktop>['getConnection']>> | null
   ) => void
   onGatewayReady: (gateway: HermesGateway | null) => void
   refreshHermesConfig: (force?: boolean, shouldPublish?: () => boolean) => Promise<void>
@@ -194,7 +194,7 @@ export function useGatewayBoot({
 
   useEffect(() => {
     let cancelled = false
-    const desktop = window.hermesDesktop
+    const desktop = window.stardustDesktop
 
     const publish = (next: HermesConnection | null) => {
       callbacksRef.current.onConnectionReady(next)

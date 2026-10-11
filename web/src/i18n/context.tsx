@@ -1,4 +1,4 @@
-import { applyDocumentLocale, LOCALE_ENDONYMS } from "@hermes/shared/i18n";
+import { applyDocumentLocale, LOCALE_ENDONYMS } from "@stardust/shared/i18n";
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 import type { Locale, Translations } from "./types";
 import { en } from "./en";
@@ -41,7 +41,7 @@ const TRANSLATIONS: Record<Locale, Translations> = {
 
 const SUPPORTED_LOCALES = Object.keys(TRANSLATIONS) as Locale[];
 
-// Display metadata for the language picker — endonyms from @hermes/shared so the
+// Display metadata for the language picker — endonyms from @stardust/shared so the
 // desktop and web pickers can never disagree on a language's native name.
 export const LOCALE_META: Record<Locale, { name: string }> = Object.fromEntries(
   SUPPORTED_LOCALES.map((id) => [id, { name: LOCALE_ENDONYMS[id] }]),

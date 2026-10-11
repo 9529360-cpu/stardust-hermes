@@ -1,4 +1,4 @@
-import { applyDocumentLocale, isRecord } from '@hermes/shared/i18n'
+import { applyDocumentLocale, isRecord } from '@stardust/shared/i18n'
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 
 import { getHermesConfigRecord, type HermesConfigRecord, saveHermesConfig } from '@/hermes'
@@ -23,7 +23,7 @@ export interface I18nConfigClient {
 
 const defaultConfigClient: I18nConfigClient = {
   getConfig: () => {
-    if (typeof window === 'undefined' || !window.hermesDesktop?.api) {
+    if (typeof window === 'undefined' || !window.stardustDesktop?.api) {
       return Promise.resolve({})
     }
 
@@ -32,7 +32,7 @@ const defaultConfigClient: I18nConfigClient = {
     return getHermesConfigRecord(undefined, { includeDefaults: false })
   },
   saveConfig: config => {
-    if (typeof window === 'undefined' || !window.hermesDesktop?.api) {
+    if (typeof window === 'undefined' || !window.stardustDesktop?.api) {
       return Promise.resolve({ ok: true })
     }
 
@@ -144,7 +144,7 @@ export function I18nProvider({ children, configClient = defaultConfigClient, ini
 
           // Keep inference unsaved so OS language changes apply on the next boot
           // until the user explicitly picks a language.
-          const machineProfile = await window.hermesDesktop?.getMachineProfile?.().catch(() => null)
+          const machineProfile = await window.stardustDesktop?.getMachineProfile?.().catch(() => null)
 
           if (!cancelled && !userLocaleRef.current) {
             setLocaleState(resolveInitialLocale(undefined, machineProfile?.locale))

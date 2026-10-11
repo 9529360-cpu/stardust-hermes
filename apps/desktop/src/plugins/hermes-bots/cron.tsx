@@ -35,7 +35,7 @@ import {
   useI18n,
   useQuery,
   useValue
-} from '@hermes/plugin-sdk'
+} from '@stardust/plugin-sdk'
 import { useState } from 'react'
 
 import { avatarColor, botAppearance, BotFace } from './avatar'

@@ -1,4 +1,4 @@
-import type { GatewayWsUrlResult } from '@hermes/shared'
+import type { GatewayWsUrlResult } from '@stardust/shared'
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -119,7 +119,7 @@ function installRemoteDesktop() {
     }
   )
 
-  Object.defineProperty(window, 'hermesDesktop', {
+  Object.defineProperty(window, 'stardustDesktop', {
     configurable: true,
     value: { getConnection, getConnectionFor, getGatewayWsUrl, getGatewayWsUrlFor }
   })
@@ -148,7 +148,7 @@ function installPrimaryDesktop(authMode: 'oauth' | 'token') {
   const getConnectionFor = vi.fn()
   const getGatewayWsUrlFor = vi.fn()
 
-  Object.defineProperty(window, 'hermesDesktop', {
+  Object.defineProperty(window, 'stardustDesktop', {
     configurable: true,
     value: { getConnection, getConnectionFor, getGatewayWsUrl, getGatewayWsUrlFor }
   })
@@ -228,7 +228,7 @@ afterEach(() => {
   $connection.set(null)
   $gatewayState.set('idle')
   $activeGatewayProfile.set('default')
-  Reflect.deleteProperty(window, 'hermesDesktop')
+  Reflect.deleteProperty(window, 'stardustDesktop')
 })
 
 describe('useGatewayRequest', () => {
@@ -324,7 +324,7 @@ describe('useGatewayRequest', () => {
 
   it('surfaces a missing optional scoped mint bridge without falling back to a stale ticket or local lookup', async () => {
     const { desktop, gateway } = await activateRemoteGateway()
-    Reflect.deleteProperty(window.hermesDesktop, 'getGatewayWsUrlFor')
+    Reflect.deleteProperty(window.stardustDesktop, 'getGatewayWsUrlFor')
 
     const { result } = renderHook(() => useGatewayRequest())
 
@@ -375,7 +375,7 @@ describe('useGatewayRequest', () => {
 
     const getConnection = vi.fn(() => new Promise(() => undefined))
 
-    ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = { getConnection }
+    ;(window as unknown as { stardustDesktop: unknown }).stardustDesktop = { getConnection }
     $gateway.set(dropped)
 
     const { result } = renderHook(() => useGatewayRequest())

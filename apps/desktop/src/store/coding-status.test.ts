@@ -42,7 +42,7 @@ const otherStatus: HermesRepoStatus = {
 }
 
 function stubProbe(impl: (cwd: string) => Promise<HermesRepoStatus | null>) {
-  ;(window as unknown as { hermesDesktop?: unknown }).hermesDesktop = { git: { repoStatus: impl } }
+  ;(window as unknown as { stardustDesktop?: unknown }).stardustDesktop = { git: { repoStatus: impl } }
 }
 
 describe('refreshRepoStatus', () => {
@@ -53,7 +53,7 @@ describe('refreshRepoStatus', () => {
     $selectedStoredSessionId.set(null)
     // Drain the cwd/session subscribe side-effects the sets above kick off.
     vi.advanceTimersByTime(200)
-    delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
+    delete (window as unknown as { stardustDesktop?: unknown }).stardustDesktop
     _resetCodingStatusForTests()
   })
 
@@ -61,7 +61,7 @@ describe('refreshRepoStatus', () => {
     _resetCodingStatusForTests()
     vi.clearAllTimers()
     vi.useRealTimers()
-    delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
+    delete (window as unknown as { stardustDesktop?: unknown }).stardustDesktop
   })
 
   it('populates the per-cwd cache and the primary computed for that cwd', async () => {

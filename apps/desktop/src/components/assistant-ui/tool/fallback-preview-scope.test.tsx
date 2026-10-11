@@ -46,7 +46,7 @@ function renderToolRow(wrap: (node: ReactNode) => ReactNode, path = '/tile/work/
 }
 
 beforeEach(() => {
-  Object.defineProperty(window, 'hermesDesktop', {
+  Object.defineProperty(window, 'stardustDesktop', {
     configurable: true,
     value: { normalizePreviewTarget: vi.fn(async (target: string) => fileTarget(target)) }
   })
@@ -120,7 +120,7 @@ describe('tool row preview auto-open', () => {
     // resolution a turn, then confirm the rail stayed empty.
     await Promise.resolve()
     expect($previewTabs.get()).toHaveLength(0)
-    expect(window.hermesDesktop.normalizePreviewTarget).not.toHaveBeenCalled()
+    expect(window.stardustDesktop.normalizePreviewTarget).not.toHaveBeenCalled()
   })
 
   it('does not re-open after the user closes it and the same tool row re-renders', async () => {

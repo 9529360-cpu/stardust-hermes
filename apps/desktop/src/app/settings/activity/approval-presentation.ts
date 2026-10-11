@@ -1,4 +1,4 @@
-import type { ApprovalAuditEntry, ApprovalGrant } from '@hermes/shared'
+import type { ApprovalAuditEntry, ApprovalGrant } from '@stardust/shared'
 
 import type { Translations } from '@/i18n/types'
 

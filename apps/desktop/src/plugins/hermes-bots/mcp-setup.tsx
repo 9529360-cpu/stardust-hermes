@@ -6,7 +6,7 @@
  * the button, so it lives below both.
  */
 
-import { Button, host, Input, useI18n } from '@hermes/plugin-sdk'
+import { Button, host, Input, useI18n } from '@stardust/plugin-sdk'
 import { useEffect, useRef, useState } from 'react'
 
 // -- inline MCP setup (per-profile), driven by the mcp.servers.* gateway RPCs --

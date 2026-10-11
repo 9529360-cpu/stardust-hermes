@@ -1,4 +1,4 @@
-import { SLASH_COMMAND_RE } from '@hermes/shared'
+import { SLASH_COMMAND_RE } from '@stardust/shared'
 import { atom } from 'nanostores'
 
 import type { ComposerAttachment } from './composer'

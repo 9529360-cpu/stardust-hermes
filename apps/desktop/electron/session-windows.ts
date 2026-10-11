@@ -18,7 +18,7 @@ const SESSION_WINDOW_MIN_HEIGHT = 620
 // throttling opt-out).
 //
 // Background throttling is deliberately NOT set here. It is managed at runtime
-// by main.ts (`setBackgroundThrottling` driven by the merged `hermes:active-work`
+// by main.ts (`setBackgroundThrottling` driven by the merged `stardust:active-work`
 // reports): while any turn is in flight every chat window is unthrottled so the
 // transcript's bounded timer flush keeps painting while blurred, occluded, or
 // minimized — and once all turns finish, Chromium's default throttling returns

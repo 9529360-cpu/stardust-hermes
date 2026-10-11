@@ -1,6 +1,6 @@
 /** Starts the first build in its own session. A submit that fails or is unconfirmed keeps that session:
  * it must not close the session or start a second build. */
-import { JsonRpcGatewayError } from '@hermes/shared'
+import { JsonRpcGatewayError } from '@stardust/shared'
 
 import type { ClientSessionState } from '@/app/types'
 import type { HandoffPlan } from '@/components/onboarding-chat/setup-profile'

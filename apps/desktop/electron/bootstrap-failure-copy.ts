@@ -76,7 +76,7 @@ export function describeBootstrapFailure(failedStage: string | null | undefined,
 /**
  * Error.message for an installed Hermes with a piece missing (source tree,
  * Python environment). The renderer's install overlay offers the Repair install
- * button ('hermes:bootstrap:repair'), so the copy points there. `whatIsMissing`
+ * button ('stardust:bootstrap:repair'), so the copy points there. `whatIsMissing`
  * names the missing part and its path, e.g. "Python environment missing at /x".
  */
 export function missingInstallPartMessage(whatIsMissing: string): string {

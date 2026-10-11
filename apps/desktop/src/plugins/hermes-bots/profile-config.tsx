@@ -8,7 +8,7 @@
  * detection.
  */
 
-import * as sdk from '@hermes/plugin-sdk'
+import * as sdk from '@stardust/plugin-sdk'
 import {
   Checkbox,
   GlyphSpinner,
@@ -17,7 +17,7 @@ import {
   queryClient,
   surfaceModelSwitchConfirm,
   Textarea
-} from '@hermes/plugin-sdk'
+} from '@stardust/plugin-sdk'
 import { useState } from 'react'
 
 import { $lastRoster, ROSTER_KEY } from './data'

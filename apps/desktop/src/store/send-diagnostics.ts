@@ -68,7 +68,7 @@ interface DiscardBundleResponse {
  *  IPC (browser dashboard, older shells) just omits the file. */
 async function collectLocalExtras(): Promise<Record<string, string>> {
   try {
-    const logs = await window.hermesDesktop?.getRecentLogs?.()
+    const logs = await window.stardustDesktop?.getRecentLogs?.()
     const lines = Array.isArray(logs?.lines) ? logs.lines : []
 
     return lines.length ? { 'desktop.log': lines.join('\n') } : {}
@@ -152,7 +152,7 @@ export async function confirmSendDiagnostics(): Promise<void> {
       return
     }
 
-    const saveGatewayFile = window.hermesDesktop?.saveGatewayFile
+    const saveGatewayFile = window.stardustDesktop?.saveGatewayFile
 
     if (!saveGatewayFile) {
       throw new Error('Desktop file save bridge is unavailable')

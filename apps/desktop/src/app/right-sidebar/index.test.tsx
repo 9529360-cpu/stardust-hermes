@@ -11,7 +11,7 @@ import { RightSidebarPane } from './index'
 const readDir = vi.fn<(path: string) => Promise<HermesReadDirResult>>()
 
 function installBridge() {
-  ;(window as unknown as { hermesDesktop: { readDir: typeof readDir } }).hermesDesktop = { readDir }
+  ;(window as unknown as { stardustDesktop: { readDir: typeof readDir } }).stardustDesktop = { readDir }
 }
 
 describe('RightSidebarPane', () => {
@@ -32,7 +32,7 @@ describe('RightSidebarPane', () => {
     $workspaceCwdOwner.set(null)
     setCurrentCwd('')
     resetProjectTreeState()
-    delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
+    delete (window as unknown as { stardustDesktop?: unknown }).stardustDesktop
   })
 
   it('renders the tree whenever the session has a working dir (repo or not) — no picker', async () => {

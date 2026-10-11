@@ -10,7 +10,7 @@ import {
   SearchField,
   SidebarPanelLabel,
   Tip
-} from '@hermes/plugin-sdk'
+} from '@stardust/plugin-sdk'
 
 import { botSourceStatus } from './data'
 import type { useBots } from './i18n'

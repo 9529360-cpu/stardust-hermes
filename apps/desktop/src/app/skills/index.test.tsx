@@ -541,7 +541,7 @@ describe('SkillsView toolset management', { timeout: 60_000 }, () => {
       sources: []
     })
 
-    ;(window as { hermesDesktop?: unknown }).hermesDesktop = { connections, getAgentRoster }
+    ;(window as { stardustDesktop?: unknown }).stardustDesktop = { connections, getAgentRoster }
 
     try {
       await renderSkills()
@@ -550,7 +550,7 @@ describe('SkillsView toolset management', { timeout: 60_000 }, () => {
       // The selector paints roster rows labeled profile — device.
       expect(await screen.findByText('default — This device (current)')).toBeTruthy()
     } finally {
-      delete (window as { hermesDesktop?: unknown }).hermesDesktop
+      delete (window as { stardustDesktop?: unknown }).stardustDesktop
     }
   })
 

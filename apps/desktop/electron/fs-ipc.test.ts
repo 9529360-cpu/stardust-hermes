@@ -48,7 +48,7 @@ test('file actions resolve paths before reaching shell or filesystem operations'
   const { resolved, invoke } = register()
   for (const channel of ['reveal', 'openDir', 'rename', 'trash']) {
     const args = channel === 'rename' ? ['unsafe-device', 'safe-name'] : ['unsafe-device']
-    await assert.rejects(invoke(`hermes:fs:${channel}`, ...args), /Blocked unsafe path/)
+    await assert.rejects(invoke(`stardust:fs:${channel}`, ...args), /Blocked unsafe path/)
   }
   assert.deepEqual(resolved.map(entry => entry.purpose), [
     'Reveal path', 'Open directory', 'Rename path', 'Trash path'
@@ -58,8 +58,8 @@ test('file actions resolve paths before reaching shell or filesystem operations'
 
 test('reveal and trash use the normalized path rather than renderer input', async () => {
   const { invoke } = register()
-  await invoke('hermes:fs:reveal', './relative-item')
-  await invoke('hermes:fs:trash', './relative-item')
+  await invoke('stardust:fs:reveal', './relative-item')
+  await invoke('stardust:fs:trash', './relative-item')
   const normalized = path.resolve('./relative-item')
   assert.deepEqual(shellCalls.revealed, [normalized])
   assert.deepEqual(shellCalls.trashed, [normalized])

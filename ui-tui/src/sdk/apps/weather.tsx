@@ -1,5 +1,5 @@
 import { Box, Text } from '@hermes/ink'
-import { mix } from '@hermes/shared/color'
+import { mix } from '@stardust/shared/color'
 
 import { ShimmerRows } from '../../components/loaders.js'
 import { Dialog } from '../../components/overlay.js'

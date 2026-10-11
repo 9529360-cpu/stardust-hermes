@@ -1,4 +1,4 @@
-import { TRANSLUCENCY_MAX, TRANSLUCENCY_MIN } from '@hermes/shared/translucency'
+import { TRANSLUCENCY_MAX, TRANSLUCENCY_MIN } from '@stardust/shared/translucency'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { $userBubbleTransparency, setUserBubbleTransparency } from './user-bubble-transparency'

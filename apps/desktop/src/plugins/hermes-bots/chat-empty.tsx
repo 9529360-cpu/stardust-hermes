@@ -8,7 +8,7 @@
  * A starter only fills the composer: the user reads it and sends it themselves.
  */
 
-import { Button, host, useValue, Wordmark } from '@hermes/plugin-sdk'
+import { Button, host, useValue, Wordmark } from '@stardust/plugin-sdk'
 
 import { avatarColor, botAppearance, BotFace } from './avatar'
 import { isBackfilledFacePng } from './avatar-image'

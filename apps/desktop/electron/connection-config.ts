@@ -790,7 +790,7 @@ const SELF_PROFILE_QUERY_KEYS_BY_PATH: Record<string, string[]> = {
  * equal to the alias itself are rewritten; cross-profile selectors (`all`,
  * another concrete profile) and unfiltered paths pass through untouched. Used
  * by the v1 profile route above and by the registry SSH branch of the
- * `hermes:api` handler — both routes reach a backend whose namespace is the
+ * `stardust:api` handler — both routes reach a backend whose namespace is the
  * remote profile, not the alias.
  */
 function translateSelfProfileQuery(path, profile, backendProfile) {
@@ -912,7 +912,7 @@ export interface ProfileApiRequestRoute {
 }
 
 /**
- * Resolve the two decisions made by the `hermes:api` IPC handler from the same
+ * Resolve the two decisions made by the `stardust:api` IPC handler from the same
  * routing table: which backend serves the request, and whether its URL needs a
  * profile query scope.
  */

@@ -112,7 +112,7 @@ export function extractDroppedFiles(transfer: DataTransfer): DroppedFile[] {
   const result: DroppedFile[] = []
   const seenPaths = new Set<string>()
   const seenFiles = new Set<File>()
-  const getPath = window.hermesDesktop?.getPathForFile
+  const getPath = window.stardustDesktop?.getPathForFile
   const urls = droppedLinkUrls(transfer)
 
   // In-app drags first — they carry richer metadata (isDirectory) than the
@@ -600,7 +600,7 @@ export function useComposerActions({
         const buffer = await blob.arrayBuffer()
         const data = new Uint8Array(buffer)
         const name = blob instanceof File ? blob.name : undefined
-        const savedPath = await window.hermesDesktop?.saveImageBuffer(data, blobExtension(blob), name)
+        const savedPath = await window.stardustDesktop?.saveImageBuffer(data, blobExtension(blob), name)
 
         if (!savedPath) {
           notify({ kind: 'error', title: copy.imageAttach, message: copy.imageWriteFailed })
@@ -642,7 +642,7 @@ export function useComposerActions({
   const pasteClipboardImage = useCallback(
     async ({ silent = false }: { silent?: boolean } = {}) => {
       try {
-        const path = await window.hermesDesktop?.saveClipboardImage()
+        const path = await window.stardustDesktop?.saveClipboardImage()
 
         if (!path) {
           if (!silent) {
@@ -680,7 +680,7 @@ export function useComposerActions({
    */
   const attachPastedText = useCallback(
     async (text: string) => {
-      const save = window.hermesDesktop?.savePastedText
+      const save = window.stardustDesktop?.savePastedText
 
       if (!text || !save) {
         return false
@@ -784,7 +784,7 @@ export function useComposerActions({
         }
 
         const fallbackPath =
-          !knownPath && window.hermesDesktop?.getPathForFile ? window.hermesDesktop.getPathForFile(file) : ''
+          !knownPath && window.stardustDesktop?.getPathForFile ? window.stardustDesktop.getPathForFile(file) : ''
 
         const filePath = knownPath || fallbackPath || ''
         const isImage = file.type.startsWith('image/') || isImagePath(file.name) || (filePath && isImagePath(filePath))

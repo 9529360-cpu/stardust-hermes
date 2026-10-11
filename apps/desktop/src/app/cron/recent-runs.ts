@@ -1,4 +1,4 @@
-import type { WorkItem } from '@hermes/shared'
+import type { WorkItem } from '@stardust/shared'
 
 import type { Translations } from '@/i18n/types'
 import type { CronJob } from '@/types/hermes'

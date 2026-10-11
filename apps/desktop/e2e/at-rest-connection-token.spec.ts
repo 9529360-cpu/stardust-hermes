@@ -370,8 +370,8 @@ function expectOwnerOnlyMode(filePath: string, why: string): void {
  */
 async function launchAgainst(sandbox: Sandbox): Promise<{ app: ElectronApplication; page: Page }> {
   const env = buildAppEnv(sandbox, {
-    HERMES_DESKTOP_APP_NAME: STABLE_APP_NAME,
-    HERMES_DESKTOP_BOOT_FAKE_ERROR: 'E2E at-rest storage spec: local backend intentionally not started',
+    STARDUST_DESKTOP_APP_NAME: STABLE_APP_NAME,
+    STARDUST_DESKTOP_BOOT_FAKE_ERROR: 'E2E at-rest storage spec: local backend intentionally not started',
   })
 
   const { app, page } = await launchDesktop(env)
@@ -379,7 +379,7 @@ async function launchAgainst(sandbox: Sandbox): Promise<{ app: ElectronApplicati
   // The capability bridge is what we drive; it lands with the preload, well
   // before the app would be "ready" in the boot sense.
   await page.waitForFunction(
-    () => Boolean((window as unknown as { hermesDesktop?: Record<string, unknown> }).hermesDesktop?.saveConnectionConfig),
+    () => Boolean((window as unknown as { stardustDesktop?: Record<string, unknown> }).stardustDesktop?.saveConnectionConfig),
     undefined,
     { timeout: 60_000 },
   )
@@ -451,7 +451,7 @@ interface SaveOutcome {
 async function saveRemoteToken(page: Page, remoteUrl: string, remoteToken?: string): Promise<SaveOutcome> {
   return page.evaluate(
     async ([url, token]) => {
-      const desktop = (window as unknown as { hermesDesktop: any }).hermesDesktop
+      const desktop = (window as unknown as { stardustDesktop: any }).stardustDesktop
 
       try {
         const config = await desktop.saveConnectionConfig({
@@ -480,7 +480,7 @@ async function saveRemoteToken(page: Page, remoteUrl: string, remoteToken?: stri
  */
 async function exerciseStoredToken(page: Page, remoteUrl: string): Promise<{ error: null | string }> {
   return page.evaluate(async url => {
-    const desktop = (window as unknown as { hermesDesktop: any }).hermesDesktop
+    const desktop = (window as unknown as { stardustDesktop: any }).stardustDesktop
 
     try {
       await desktop.testConnectionConfig({ mode: 'remote', remoteUrl: url })
@@ -637,7 +637,7 @@ test.describe('remote gateway session token at rest', () => {
     ).toBe(userDataDir)
 
     const reread = await second.page.evaluate(async () => {
-      const desktop = (window as unknown as { hermesDesktop: any }).hermesDesktop
+      const desktop = (window as unknown as { stardustDesktop: any }).stardustDesktop
 
       return desktop.getConnectionConfig()
     })
@@ -698,7 +698,7 @@ test.describe('remote gateway session token at rest', () => {
     app = second.app
 
     const reread = await second.page.evaluate(async () => {
-      const desktop = (window as unknown as { hermesDesktop: any }).hermesDesktop
+      const desktop = (window as unknown as { stardustDesktop: any }).stardustDesktop
 
       return desktop.getConnectionConfig()
     })
@@ -779,7 +779,7 @@ test.describe('remote gateway session token at rest', () => {
     app = second.app
 
     const reread = await second.page.evaluate(async () => {
-      const desktop = (window as unknown as { hermesDesktop: any }).hermesDesktop
+      const desktop = (window as unknown as { stardustDesktop: any }).stardustDesktop
 
       return desktop.getConnectionConfig()
     })
@@ -844,7 +844,7 @@ test.describe('remote gateway session token at rest', () => {
     app = launched.app
 
     const reread = await launched.page.evaluate(async () => {
-      const desktop = (window as unknown as { hermesDesktop: any }).hermesDesktop
+      const desktop = (window as unknown as { stardustDesktop: any }).stardustDesktop
 
       return desktop.getConnectionConfig()
     })

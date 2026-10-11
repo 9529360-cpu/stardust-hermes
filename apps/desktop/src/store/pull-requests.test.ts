@@ -19,7 +19,7 @@ const checksResult = (overrides: Partial<HermesReviewChecks> = {}): HermesReview
 })
 
 function installBridge(checks: ReturnType<typeof vi.fn>) {
-  ;(window as unknown as { hermesDesktop?: unknown }).hermesDesktop = {
+  ;(window as unknown as { stardustDesktop?: unknown }).stardustDesktop = {
     git: { review: { checks } }
   }
 }
@@ -30,7 +30,7 @@ describe('pull request checks state', () => {
   })
 
   afterEach(() => {
-    delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
+    delete (window as unknown as { stardustDesktop?: unknown }).stardustDesktop
   })
 
   it.each([
@@ -78,7 +78,7 @@ describe('pull request checks state', () => {
   })
 
   it('marks the state unavailable when the bridge is absent', async () => {
-    delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
+    delete (window as unknown as { stardustDesktop?: unknown }).stardustDesktop
 
     await refreshPullRequestChecks('/repo', 7, true)
 

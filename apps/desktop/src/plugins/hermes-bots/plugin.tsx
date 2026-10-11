@@ -23,8 +23,8 @@ import {
   PALETTE_AREA,
   ROUTES_AREA,
   translateNow
-} from '@hermes/plugin-sdk'
-import type { ChatEmptyProps, PluginContext } from '@hermes/plugin-sdk'
+} from '@stardust/plugin-sdk'
+import type { ChatEmptyProps, PluginContext } from '@stardust/plugin-sdk'
 
 import { startFaceClock, stopFaceClock } from './avatar'
 import {
@@ -277,7 +277,7 @@ export default {
             try {
               const registry =
                 typeof window !== 'undefined'
-                  ? await Promise.resolve(window.hermesDesktop?.connections?.list?.()).catch(() => null)
+                  ? await Promise.resolve(window.stardustDesktop?.connections?.list?.()).catch(() => null)
                   : null
 
               const liveIds = Array.isArray(registry?.connections)
@@ -338,7 +338,7 @@ export default {
     try {
       if (typeof window !== 'undefined') {
         unbindConnectionsChanged =
-          window.hermesDesktop?.connections?.onChanged?.(payload => {
+          window.stardustDesktop?.connections?.onChanged?.(payload => {
             if (payload?.reason === 'removed') {
               sweepGroupChatMembersForRemovedConnection(payload.connectionId)
             }

@@ -14,7 +14,7 @@ const { hostMock, pluginCtx } = vi.hoisted(() => ({
   pluginCtx: { current: null as null | { i18n?: { t: (key: string, ...args: unknown[]) => string } } }
 }))
 
-vi.mock('@hermes/plugin-sdk', () => ({
+vi.mock('@stardust/plugin-sdk', () => ({
   BOT_CHAT_SESSION_HYDRATION_TIMEOUT_MS: 15_000,
   host: hostMock,
   usePluginI18n: () => (key: string) => key

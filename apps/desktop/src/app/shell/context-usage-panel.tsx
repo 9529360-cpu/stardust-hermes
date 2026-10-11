@@ -1,4 +1,4 @@
-import { compactNumber } from '@hermes/shared'
+import { compactNumber } from '@stardust/shared'
 import { useMemo } from 'react'
 
 import { useI18n } from '@/i18n'

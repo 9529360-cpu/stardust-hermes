@@ -7,7 +7,7 @@ Root TypeScript style rules apply.
 
 Electron + React + nanostores (`@assistant-ui/react`) talking to a `tui_gateway` backend over
 JSON-RPC (`requestGateway(method, params)`); transport lives in the framework-agnostic `apps/shared`
-(`@hermes/shared`: `JsonRpcGatewayClient` + WS URL helpers), which the web dashboard also consumes.
+(`@stardust/shared`: `JsonRpcGatewayClient` + WS URL helpers), which the web dashboard also consumes.
 The desktop has **no build/runtime dependency on the dashboard frontend**: it spawns a headless
 `hermes serve` (`headless_backend=True` → `cmd_dashboard` skips `_build_web_ui` and exports
 `HERMES_SERVE_HEADLESS=1` so `mount_spa()` disables the SPA even if a stray `web_dist/` exists).

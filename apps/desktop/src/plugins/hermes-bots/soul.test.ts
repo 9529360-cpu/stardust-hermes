@@ -22,7 +22,7 @@ const { hostMock, serverInjects } = vi.hoisted(() => ({
   serverInjects: { value: false }
 }))
 
-vi.mock('@hermes/plugin-sdk', () => ({ host: hostMock }))
+vi.mock('@stardust/plugin-sdk', () => ({ host: hostMock }))
 
 vi.mock('./data', () => ({
   botHandle: (name: string) => (String(name).toLowerCase() === 'default' ? 'hermes' : name),

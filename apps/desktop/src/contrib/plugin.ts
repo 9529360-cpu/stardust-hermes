@@ -37,7 +37,7 @@ export interface PluginStorage {
 }
 
 /** The curated OS door — every way a plugin reaches outside the app window,
- *  in one attributed namespace instead of the raw `window.hermesDesktop`
+ *  in one attributed namespace instead of the raw `window.stardustDesktop`
  *  bridge. Every member resolves a result instead of throwing when the
  *  capability can't apply (no Electron shell, older desktop build), so
  *  callers branch on the return value rather than sniffing the bridge. */
@@ -46,7 +46,7 @@ export interface PluginOs {
    *  Settings ▸ Notifications ▸ "Plugin notifications" and fires only while
    *  the user is away from Hermes — use `host.notify` for the in-app toast.
    *  Throttled per plugin; reserve it for genuinely notable events.
-   *  Supports `icon`, `activate` (e.g. `hermes://index-network/intent/1`),
+   *  Supports `icon`, `activate` (e.g. `stardust://index-network/intent/1`),
    *  action buttons, and renderer `onActivate` / `onAction` callbacks. */
   notify: (input: PluginNativeNotificationInput) => void
   /** Open a URL with the OS default handler (browser, mail client, custom
@@ -147,8 +147,8 @@ function createPluginStorage(pluginId: string): PluginStorage {
 // Electron shell (or run in a plain browser), so every door degrades to a
 // false result the plugin can branch on.
 function createPluginOs(pluginId: string): PluginOs {
-  const attempt = async (run: (bridge: NonNullable<typeof window.hermesDesktop>) => Promise<boolean>) => {
-    const bridge = typeof window === 'undefined' ? undefined : window.hermesDesktop
+  const attempt = async (run: (bridge: NonNullable<typeof window.stardustDesktop>) => Promise<boolean>) => {
+    const bridge = typeof window === 'undefined' ? undefined : window.stardustDesktop
 
     if (!bridge) {
       return false
@@ -162,8 +162,8 @@ function createPluginOs(pluginId: string): PluginOs {
   }
 
   // Same shape as `attempt`, for the pickers that answer with a path.
-  const attemptPath = async (run: (bridge: NonNullable<typeof window.hermesDesktop>) => Promise<null | string>) => {
-    const bridge = typeof window === 'undefined' ? undefined : window.hermesDesktop
+  const attemptPath = async (run: (bridge: NonNullable<typeof window.stardustDesktop>) => Promise<null | string>) => {
+    const bridge = typeof window === 'undefined' ? undefined : window.stardustDesktop
 
     if (!bridge) {
       return null

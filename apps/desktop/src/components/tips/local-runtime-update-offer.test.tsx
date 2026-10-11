@@ -65,7 +65,7 @@ beforeEach(async () => {
   $tipShownAt.set({})
   $nextTipAt.set(null)
   $tipsEnabled.set(true)
-  window.hermesDesktop = { api } as never
+  window.stardustDesktop = { api } as never
   api.mockImplementation(async request => {
     if (request.path.endsWith('/status')) {
       return eligible

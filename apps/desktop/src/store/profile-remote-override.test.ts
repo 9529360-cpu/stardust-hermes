@@ -14,7 +14,7 @@ import {
 const getConnectionConfig = vi.fn()
 
 beforeEach(() => {
-  Object.defineProperty(window, 'hermesDesktop', {
+  Object.defineProperty(window, 'stardustDesktop', {
     configurable: true,
     value: { getConnectionConfig }
   })

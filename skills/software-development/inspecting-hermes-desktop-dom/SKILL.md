@@ -48,15 +48,15 @@ Open on `127.0.0.1:9222` for any dev-server run. Closed in exactly two cases
 (`apps/desktop/electron/dev-cdp.ts`):
 
 - **packaged builds** — always, and no environment value overrides it;
-- **no `HERMES_DESKTOP_DEV_SERVER`** — an unpackaged `electron .` against
+- **no `STARDUST_DESKTOP_DEV_SERVER`** — an unpackaged `electron .` against
   `dist/` is how the packaged app gets smoke tested, so it behaves like one.
 
-`HERMES_DESKTOP_CDP_PORT` moves the port (`=9333`) or disables it (`=off`).
+`STARDUST_DESKTOP_CDP_PORT` moves the port (`=9333`) or disables it (`=off`).
 
 Check before doing anything else:
 
 ```bash
-curl -s --max-time 3 http://127.0.0.1:${HERMES_DESKTOP_CDP_PORT:-9222}/json/version
+curl -s --max-time 3 http://127.0.0.1:${STARDUST_DESKTOP_CDP_PORT:-9222}/json/version
 ```
 
 Empty → no port. Do not guess another port silently.
@@ -123,8 +123,8 @@ When there is no port, or you must not disturb the user's window:
 ```bash
 cd apps/desktop
 HERMES_HOME=/tmp/cdp-probe-home \
-HERMES_DESKTOP_DEV_SERVER=http://127.0.0.1:5174 \
-HERMES_DESKTOP_CDP_PORT=9333 \
+STARDUST_DESKTOP_DEV_SERVER=http://127.0.0.1:5174 \
+STARDUST_DESKTOP_CDP_PORT=9333 \
   npx electron . --user-data-dir=/tmp/cdp-probe-userdata
 ```
 
@@ -142,7 +142,7 @@ also want the perf harness.
   kill nukes Chromium's socket pool, and the resulting `ERR_NETWORK_CHANGED`
   gets blamed on whatever you just changed.
 - **A throwaway `HERMES_HOME` has no backend.** The app logs `ECONNREFUSED` for
-  `hermes:api` and may exit on its own. The renderer still mounts and the DOM is
+  `stardust:api` and may exit on its own. The renderer still mounts and the DOM is
   readable — read promptly, and don't mistake a self-exited probe for a broken
   port. Chromium logs `DevTools listening on ws://127.0.0.1:<port>/…` when it
   binds; that line is the proof the port opened.

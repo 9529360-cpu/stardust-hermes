@@ -7,7 +7,7 @@ import type {
   ConnectionTargetKind,
   ConnectionTargetState,
   ConnectionUpdatePayload
-} from '@hermes/shared'
+} from '@stardust/shared'
 import { atom, computed } from 'nanostores'
 
 import { $gateway } from './gateway'

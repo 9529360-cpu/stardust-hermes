@@ -8,7 +8,7 @@
  * A chat that is not that bot's Bot Chat gets no state at all.
  */
 
-import type * as HermesSdk from '@hermes/plugin-sdk'
+import type * as HermesSdk from '@stardust/plugin-sdk'
 import { cleanup, fireEvent, render, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -19,7 +19,7 @@ import type { RosterRow } from './types'
 
 const { fillComposer } = vi.hoisted(() => ({ fillComposer: vi.fn() }))
 
-vi.mock('@hermes/plugin-sdk', async importOriginal => {
+vi.mock('@stardust/plugin-sdk', async importOriginal => {
   const sdk = await importOriginal<typeof HermesSdk>()
 
   return {

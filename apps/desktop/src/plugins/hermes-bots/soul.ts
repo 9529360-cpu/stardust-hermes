@@ -7,7 +7,7 @@
  * a custom SOUL is saved, and the roster backfills profiles that predate it.
  */
 
-import { host } from '@hermes/plugin-sdk'
+import { host } from '@stardust/plugin-sdk'
 
 import { botHandle, serverInjectsProtocol } from './data'
 import { displayName } from './labels'

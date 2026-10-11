@@ -1,4 +1,4 @@
-import { JsonRpcGatewayError } from '@hermes/shared/json-rpc-channel'
+import { JsonRpcGatewayError } from '@stardust/shared/json-rpc-channel'
 import { describe, expect, it } from 'vitest'
 
 import {

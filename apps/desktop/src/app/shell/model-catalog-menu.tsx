@@ -1,6 +1,6 @@
-import type { ModelOptionProvider, ModelOptionsResult } from '@hermes/shared'
-import { DEFAULT_REASONING_EFFORT } from '@hermes/shared'
 import { useStore } from '@nanostores/react'
+import type { ModelOptionProvider, ModelOptionsResult } from '@stardust/shared'
+import { DEFAULT_REASONING_EFFORT } from '@stardust/shared'
 import { useQuery } from '@tanstack/react-query'
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from 'react'
 

@@ -33,7 +33,7 @@ const { hostMock, storageMock } = vi.hoisted(() => ({
   storageMock: { get: vi.fn(), remove: vi.fn(), set: vi.fn() }
 }))
 
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@stardust/plugin-sdk', async () => {
   const { atom } = await import('nanostores')
 
   return {

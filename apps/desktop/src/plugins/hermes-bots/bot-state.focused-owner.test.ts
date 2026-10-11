@@ -33,7 +33,7 @@ const { state } = vi.hoisted(() => ({
 
 const store = <T>(read: () => T): Store<T> => ({ get: read, listen: () => () => undefined })
 
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@stardust/plugin-sdk', async () => {
   const { atom } = await import('nanostores')
 
   return {

@@ -37,7 +37,7 @@ beforeEach(() => {
   stopPreviewFileWatch.mockResolvedValue(true)
   onPreviewFileChanged.mockReset()
   getStatus.mockClear()
-  ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = {
+  ;(window as unknown as { stardustDesktop: unknown }).stardustDesktop = {
     desktopPluginsRoot,
     onPreviewFileChanged,
     readDir,
@@ -49,7 +49,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
+  delete (window as unknown as { stardustDesktop?: unknown }).stardustDesktop
 })
 
 describe('scanDiskPlugins (#66899)', () => {
@@ -280,7 +280,7 @@ describe('plugin source reads (512 KiB preview-cap bug)', () => {
   }
 
   it('inventories standalone full-source plugins inert until the user explicitly enables them', async () => {
-    ;(window.hermesDesktop as unknown as { readPluginSource: unknown }).readPluginSource = readPluginSource
+    ;(window.stardustDesktop as unknown as { readPluginSource: unknown }).readPluginSource = readPluginSource
     desktopPluginsRoot.mockResolvedValue('/local/.hermes/desktop-plugins')
     standaloneRootWith('big')
     // The preview read would truncate this source — it must never be used.

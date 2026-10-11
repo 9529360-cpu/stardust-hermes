@@ -26,7 +26,7 @@ const { hostMock } = vi.hoisted(() => ({
   hostMock: { agents: vi.fn(), profileRoutes: vi.fn() }
 }))
 
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@stardust/plugin-sdk', async () => {
   const { atom } = await import('nanostores')
 
   return { atom, host: hostMock, queryClient: undefined, useQuery: vi.fn(), useValue: vi.fn() }

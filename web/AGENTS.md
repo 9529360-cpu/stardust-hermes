@@ -2,7 +2,7 @@
 
 Applies on top of the root `AGENTS.md`. Backend routers: `hermes_cli/web_routers/*.py`, one file per
 dashboard surface, mounted by `hermes_cli/web_server.py` (+ `web_server_*.py` siblings). Frontend:
-`web/src/`. Shared JSON-RPC/WS client: `apps/shared` (`@hermes/shared`), also used by the desktop.
+`web/src/`. Shared JSON-RPC/WS client: `apps/shared` (`@stardust/shared`), also used by the desktop.
 
 ## The dashboard embeds the REAL `hermes --tui` — not a rewrite
 

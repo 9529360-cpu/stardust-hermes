@@ -1,4 +1,4 @@
-// Profile-delete routing logic for the `hermes:api` IPC handler.
+// Profile-delete routing logic for the `stardust:api` IPC handler.
 //
 // When the renderer issues DELETE /api/profiles/<name>, the handler must
 // tear down every local backend for that profile and route the DELETE itself
@@ -38,7 +38,7 @@ export function profileNameFromPath(path: unknown): string | null {
   return name.toLowerCase()
 }
 
-/** Parse a `hermes:api` request into the profile name a DELETE targets. */
+/** Parse a `stardust:api` request into the profile name a DELETE targets. */
 export function profileNameFromDeleteRequest(request) {
   if (!request || String(request.method || 'GET').toUpperCase() !== 'DELETE') {
     return null
@@ -233,7 +233,7 @@ export function decideProfileDeleteAction(
 }
 
 /**
- * Route the next `hermes:api` request away from the primary/window backend
+ * Route the next `stardust:api` request away from the primary/window backend
  * whenever a profile was just torn down -- otherwise ensureBackend would
  * spawn a fresh pool backend for the deleted profile, whose
  * ensure_hermes_home() recreates the directory the delete just removed.

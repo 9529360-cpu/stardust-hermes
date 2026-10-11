@@ -1,11 +1,11 @@
+import { useStore } from '@nanostores/react'
 import type {
   ApprovalAuditEntry,
   ApprovalAuditResult,
   ApprovalGrant,
   ApprovalGrantsListResult,
   ApprovalGrantsRevokeResult
-} from '@hermes/shared'
-import { useStore } from '@nanostores/react'
+} from '@stardust/shared'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { useGatewayRequest } from '@/app/gateway/hooks/use-gateway-request'

@@ -56,7 +56,7 @@ interface DesktopStub {
 }
 
 function installDesktop(stub: DesktopStub): void {
-  ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = stub
+  ;(window as unknown as { stardustDesktop: unknown }).stardustDesktop = stub
 }
 
 function makePrimary(): { connectionState: string } {
@@ -90,7 +90,7 @@ beforeEach(() => {
 afterEach(() => {
   closeSecondaryGateways()
   vi.clearAllMocks()
-  delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
+  delete (window as unknown as { stardustDesktop?: unknown }).stardustDesktop
 })
 
 describe('secondary activation requires an open socket, not just a connection descriptor (issue #92265)', () => {

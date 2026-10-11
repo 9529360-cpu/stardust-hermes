@@ -15,7 +15,7 @@
  * plugin.js bundle under `vm`.
  */
 
-import type * as HermesSdk from '@hermes/plugin-sdk'
+import type * as HermesSdk from '@stardust/plugin-sdk'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { GroupMember, ProfileRoute, RosterRow } from './types'
@@ -26,7 +26,7 @@ const { overrides, request, requestProfile } = vi.hoisted(() => ({
   requestProfile: vi.fn()
 }))
 
-vi.mock('@hermes/plugin-sdk', async importOriginal => {
+vi.mock('@stardust/plugin-sdk', async importOriginal => {
   const sdk = await importOriginal<typeof HermesSdk>()
 
   overrides.request = request

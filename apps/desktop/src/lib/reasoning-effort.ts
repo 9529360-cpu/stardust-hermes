@@ -1,4 +1,4 @@
-import { DEFAULT_REASONING_EFFORT, isReasoningEffort } from '@hermes/shared'
+import { DEFAULT_REASONING_EFFORT, isReasoningEffort } from '@stardust/shared'
 
 import { TRANSLATIONS } from '@/i18n/catalog'
 import { getRuntimeI18nLocale } from '@/i18n/runtime'

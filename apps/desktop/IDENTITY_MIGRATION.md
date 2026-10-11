@@ -1,5 +1,17 @@
 # Desktop Install Identity Migration Plan (Hermes → Stardust)
 
+> **Superseded for the desktop build (2026-10-11).** The owner decided to take
+> the desktop identity fully to Stardust. This is a private install with no other
+> users, so internal names change and no data migration is needed. The R1a change
+> applies the moves §3 deferred: `build.appId` is `com.stardust.desktop`,
+> `productName` and `executableName` are `Stardust`, the primary deep-link scheme
+> is `stardust://`, and the workspace packages are `@stardust/shared` and
+> `@stardust/plugin-sdk`. The legacy `hermes://` scheme is still parsed and, in
+> packaged builds, registered, only because the Python backend still builds
+> `hermes://` blueprint links (`cron/blueprint_catalog.py`). Remove that legacy
+> entry when those emitters move. The sections below are the original plan,
+> kept for history; where they conflict with this note, this note wins.
+
 Status: **plan only** — appId, executable name, and protocol scheme are
 **not** changed by this document. This is the migration-sensitive piece
 flagged by root `AGENTS.md` ("Hermes naming may remain at compatibility

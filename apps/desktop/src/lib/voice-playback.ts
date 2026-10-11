@@ -1,4 +1,4 @@
-import { resolveGatewayWsUrl } from '@hermes/shared'
+import { resolveGatewayWsUrl } from '@stardust/shared'
 
 import { getApiRequestConnection, getApiRequestProfile, speakText } from '@/hermes'
 import {
@@ -106,7 +106,7 @@ export function stopVoicePlayback() {
 /** Exported for tests: the (connection, profile) routing contract below is
  *  exactly what broke in the desktop-remote voice report — keep it pinned. */
 export async function resolveSpeakStreamUrl(): Promise<null | string> {
-  const desktop = window.hermesDesktop
+  const desktop = window.stardustDesktop
 
   if (!desktop?.getConnection) {
     return null

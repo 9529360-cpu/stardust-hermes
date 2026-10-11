@@ -1,4 +1,4 @@
-import type { ApprovalGrant } from '@hermes/shared'
+import type { ApprovalGrant } from '@stardust/shared'
 import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'

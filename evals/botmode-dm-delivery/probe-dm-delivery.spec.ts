@@ -26,8 +26,8 @@ test.beforeAll(async () => {
   const bin = path.join(sandbox.root, 'bin')
   fs.mkdirSync(bin)
   fs.writeFileSync(path.join(bin, 'hermes'), `#!/bin/sh\ncd ${repo}\nexec ${python} -m hermes_cli.main "$@"\n`, { mode: 0o755 })
-  env = buildAppEnv(sandbox, { HOME: sandbox.root, HERMES_DESKTOP_PYTHON: python,
-    HERMES_DESKTOP_HERMES: path.join(bin, 'hermes'), PATH: `${bin}:${process.env.PATH}`,
+  env = buildAppEnv(sandbox, { HOME: sandbox.root, STARDUST_DESKTOP_PYTHON: python,
+    STARDUST_DESKTOP_HERMES: path.join(bin, 'hermes'), PATH: `${bin}:${process.env.PATH}`,
     PYTHONPATH: repo, HERMES_SINGLE_QUERY_LINGER_SECONDS: '30' })
   const { app, page } = await launchDesktop(env)
   fixture = { app, page, sandbox, mock, mockUrl: mock.url, cleanup: async () => {

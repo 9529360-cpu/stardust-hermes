@@ -10,7 +10,7 @@ git apply evals/botmode-dm-delivery/mock-trigger.patch
 (cd apps/desktop && npm run build)
 (cd apps/desktop && DISPLAY=:0 XAUTHORITY=/run/user/1000/xauth_cnpsqU \
   XDG_RUNTIME_DIR=/run/user/1000 VIRTUAL_ENV="$VIRTUAL_ENV" \
-  HERMES_DESKTOP_CDP_PORT=off npx playwright test e2e/probe-dm-delivery.spec.ts --reporter=list)
+  STARDUST_DESKTOP_CDP_PORT=off npx playwright test e2e/probe-dm-delivery.spec.ts --reporter=list)
 git apply -R evals/botmode-dm-delivery/mock-trigger.patch
 rm apps/desktop/e2e/probe-dm-delivery.spec.ts
 ```

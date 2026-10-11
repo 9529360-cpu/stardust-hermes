@@ -649,7 +649,7 @@ const ErrorRecoveryActions: FC = () => {
   // the user needs to see to free space after a disk-full failure).
   const openLocalDir = useCallback(async (resolve: (logsRoot: string) => string, failedMessage: string) => {
     try {
-      const root = await window.hermesDesktop?.logsRoot?.()
+      const root = await window.stardustDesktop?.logsRoot?.()
 
       if (!root) {
         notifyError(new Error('logs root unavailable'), failedMessage)
@@ -657,7 +657,7 @@ const ErrorRecoveryActions: FC = () => {
         return
       }
 
-      const result = await window.hermesDesktop?.openDir?.(resolve(root))
+      const result = await window.stardustDesktop?.openDir?.(resolve(root))
 
       if (result && !result.ok) {
         notifyError(new Error(result.error || 'open failed'), failedMessage)
@@ -697,7 +697,7 @@ const ErrorRecoveryActions: FC = () => {
     setModelPickerOpen(true)
   }, [])
 
-  const localFolders = Boolean(window.hermesDesktop?.logsRoot)
+  const localFolders = Boolean(window.stardustDesktop?.logsRoot)
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">

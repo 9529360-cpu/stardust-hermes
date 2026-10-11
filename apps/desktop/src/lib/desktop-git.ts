@@ -13,15 +13,15 @@ import { hermesApi } from '@/hermes'
 import { desktopFsProfile, isDesktopFsRemoteMode } from './desktop-fs'
 
 // Remote-aware git facade. Locally the desktop runs git through Electron
-// (window.hermesDesktop.git); on a remote gateway that's the wrong filesystem,
+// (window.stardustDesktop.git); on a remote gateway that's the wrong filesystem,
 // so we mirror the same surface over the dashboard REST API (/api/git/*) — the
 // coding rail, worktree lanes, review pane, and branch ops then act on the
 // BACKEND repo where sessions actually run. Mirrors desktop-fs.ts.
 
-type GitBridge = NonNullable<NonNullable<Window['hermesDesktop']>['git']>
+type GitBridge = NonNullable<NonNullable<Window['stardustDesktop']>['git']>
 
 function desktopApi<T>(path: string, body?: Record<string, unknown>): Promise<T> {
-  const desktop = window.hermesDesktop
+  const desktop = window.stardustDesktop
 
   if (!desktop) {
     throw new Error('Stardust Desktop bridge is unavailable')
@@ -117,5 +117,5 @@ export function desktopGit(): GitBridge | undefined {
     return undefined
   }
 
-  return isDesktopFsRemoteMode() ? remoteGit : window.hermesDesktop?.git
+  return isDesktopFsRemoteMode() ? remoteGit : window.stardustDesktop?.git
 }

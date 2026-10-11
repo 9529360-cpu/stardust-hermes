@@ -13,7 +13,7 @@
  * the wrong machine — so those builds must fail closed to "staged only".
  */
 
-import type * as HermesSdk from '@hermes/plugin-sdk'
+import type * as HermesSdk from '@stardust/plugin-sdk'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
@@ -58,7 +58,7 @@ const sdk = vi.hoisted(() => {
 // The optional exports are read at MODULE scope, so each build's set has to
 // be live at the moment `vi.resetModules()` re-evaluates the editor — a value
 // baked into the factory would freeze the first test's build for the rest.
-vi.mock('@hermes/plugin-sdk', async importOriginal => {
+vi.mock('@stardust/plugin-sdk', async importOriginal => {
   const original = await importOriginal<typeof HermesSdk>()
 
   const mocked: Record<string, unknown> = {
