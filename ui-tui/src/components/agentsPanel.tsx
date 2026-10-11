@@ -1,6 +1,6 @@
 import { Box, stringWidth, Text, useStdout } from '@hermes/ink'
-import { mix } from '@stardust/shared/color'
 import { useStore } from '@nanostores/react'
+import { mix } from '@stardust/shared/color'
 import { useEffect, useState } from 'react'
 
 import { $agentDockCollapsed, useAgentRoster } from '../app/agentRoster.js'
