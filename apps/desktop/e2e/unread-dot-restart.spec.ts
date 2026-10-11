@@ -28,6 +28,8 @@
 import { expect, type Page, test } from '@playwright/test'
 import { type ElectronApplication } from '@playwright/test'
 
+import { restartMockServer } from '../../../tests-js/scripts/mock-server'
+
 import {
   buildAppEnv,
   launchDesktop,
@@ -35,7 +37,6 @@ import {
   setupMockBackend,
   waitForAppReady,
 } from './fixtures'
-import { restartMockServer } from '../../../tests-js/scripts/mock-server'
 
 /** Finished-unread dot aria-label (from i18n en.ts). */
 const UNREAD_DOT_LABEL = 'Finished — unread'
@@ -105,7 +106,7 @@ test.describe('unread dot survives app restart', () => {
     await fixture.mock.waitForHeldStream()
 
     // ── 2. Session B: complete a turn while SELECTED (stays read) ──────
-    await page.locator('button:has-text("New session")').first().click()
+    await page.locator('button:has-text("New chat"), button:has-text("新建对话")').first().click()
     await sendMessage(page, SECOND_PROMPT)
 
     // B's reply lands in the open transcript — this session is "read".

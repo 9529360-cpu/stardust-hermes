@@ -132,7 +132,7 @@ describe('ContextUsagePanel', () => {
       />
     )
 
-    const rows = screen.getByText('Session token usage').closest('[data-slot="session-token-usage"]')
+    const rows = screen.getByText('Chat token usage').closest('[data-slot="session-token-usage"]')
     expect(rows?.textContent).toContain('Uncached input1k')
     expect(rows?.textContent).toContain('Cache read2k')
     expect(rows?.textContent).toContain('Cache write500')

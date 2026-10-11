@@ -165,7 +165,7 @@ describe('PendingToolApproval', () => {
     fireEvent.keyDown(screen.getByRole('button', { name: /More approval options/ }), { key: 'Enter' })
 
     expect(await screen.findByRole('menuitem', { name: /Always allow/ })).toBeTruthy()
-    expect(screen.getByRole('menuitem', { name: /Allow this session/ })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: /Allow this chat/ })).toBeTruthy()
   })
 
   it('hides "Always allow" when the backend disallows a permanent allow', async () => {
@@ -176,7 +176,7 @@ describe('PendingToolApproval', () => {
     fireEvent.keyDown(screen.getByRole('button', { name: /More approval options/ }), { key: 'Enter' })
 
     // The session + reject options still render, but never the permanent allow.
-    expect(await screen.findByRole('menuitem', { name: /Allow this session/ })).toBeTruthy()
+    expect(await screen.findByRole('menuitem', { name: /Allow this chat/ })).toBeTruthy()
     expect(screen.queryByRole('menuitem', { name: /Always allow/ })).toBeNull()
   })
 
@@ -187,7 +187,7 @@ describe('PendingToolApproval', () => {
     expect(screen.getByRole('button', { name: /Run/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: /Reject/ })).toBeTruthy()
     expect(screen.queryByRole('button', { name: /More approval options/ })).toBeNull()
-    expect(screen.queryByText(/Allow this session/)).toBeNull()
+    expect(screen.queryByText(/Allow this chat/)).toBeNull()
     expect(screen.queryByText(/Always allow/)).toBeNull()
   })
 

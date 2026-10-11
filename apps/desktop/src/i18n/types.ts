@@ -1688,6 +1688,7 @@ export interface Translations {
 
   skills: {
     tabSkills: string
+    pageTitles: { skills: string; toolsets: string; mcp: string; plugins: string }
     tabToolsets: string
     configuringProfile: string
     tabMcp: string

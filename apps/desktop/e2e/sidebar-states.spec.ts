@@ -9,13 +9,8 @@
  * Prerequisite: `npm run build` must have been run so dist/ exists.
  */
 
-import { expect, test, type Page } from '@playwright/test'
+import { expect, type Page, test } from '@playwright/test'
 
-import {
-  type MockBackendFixture,
-  setupMockBackend,
-  waitForAppReady,
-} from './fixtures'
 import {
   createBackgroundReleaseHandle,
   restartMockServer,
@@ -23,10 +18,16 @@ import {
   SIDEBAR_TEXTS,
 } from '../../../tests-js/scripts/mock-server'
 
+import {
+  type MockBackendFixture,
+  setupMockBackend,
+  waitForAppReady,
+} from './fixtures'
+
 /** Background-running dot aria-label (from i18n en.ts). */
 const BG_DOT_LABEL = 'Background task running'
 /** Foreground turn-running dot aria-label. */
-const SESSION_RUNNING_DOT_LABEL = 'Session running'
+const SESSION_RUNNING_DOT_LABEL = 'Chat running'
 /** Finished-unread dot aria-label. */
 const UNREAD_DOT_LABEL = 'Finished — unread'
 
@@ -120,6 +121,7 @@ test.describe('sidebar states — background process and subagent', () => {
     const viewportText = await page
       .locator('[data-slot="aui_thread-viewport"]')
       .textContent()
+
     expect(viewportText).toContain(SIDEBAR_TEXTS.finalText)
   })
 })
@@ -172,7 +174,7 @@ test.describe('sidebar states — subagent and background dot coexist', () => {
     )
 
     // While the turn is busy the dot-state priority paints the session as
-    // "working" ('Session running') — that claim OUTRANKS 'background', so
+    // "working" ('Chat running') — that claim OUTRANKS 'background', so
     // polling for the bg dot mid-turn races the turn length against the poll
     // budget. Wait for the turn to END (final text + running dot cleared),
     // then assert the background dot as a stable, sentinel-held state.
@@ -253,7 +255,7 @@ test.describe('sidebar states — cross-session dot transition', () => {
     await page.keyboard.press('Enter')
 
     // While the turn is busy the dot-state priority paints the session as
-    // "working" ('Session running') — that claim OUTRANKS 'background', so
+    // "working" ('Chat running') — that claim OUTRANKS 'background', so
     // polling for the bg dot mid-turn races the turn length (two model trips
     // + a real subagent spawn) against the poll budget: the CI flake this
     // spec had. Wait for the turn to END first, then assert the bg dot as a
@@ -289,8 +291,8 @@ test.describe('sidebar states — cross-session dot transition', () => {
     // background process hasn't exited yet.
     await page.screenshot({ path: 'test-results/cross-session-bg-dot-before-switch.png' })
 
-    // Create a new session (click "New session" button).
-    await page.locator('button:has-text("New session")').first().click()
+    // Create a new chat (click "New chat" button).
+    await page.locator('button:has-text("New chat"), button:has-text("新建对话")').first().click()
     await page.waitForTimeout(2000)
 
     // Now let the background process finish. The session A dot should

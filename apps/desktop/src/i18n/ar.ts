@@ -4,24 +4,24 @@ export const ar = defineLocale({
   sessionImport: {
     title: 'المتابعة من تطبيق آخر',
     subtitle: 'انقل محادثة إلى Hermes وتابع من حيث توقفت.',
-    action: 'استيراد جلسة',
+    action: 'استيراد محادثة',
     readingFrom: 'القراءة من',
     connectedComputer: 'الكمبيوتر المتصل',
     destination: 'الاستيراد إلى',
     all: 'الكل',
-    search: 'البحث في الجلسات المحملة',
+    search: 'البحث في المحادثات المحملة',
     scanning: 'جارٍ البحث عن المحادثات',
-    scanError: 'تعذر العثور على الجلسات',
+    scanError: 'تعذر العثور على المحادثات',
     scanHelp: 'تحقق من اتصال الخادم ثم أعد المحاولة. قد تحتاج الخوادم القديمة إلى تحديث.',
     empty: 'لا توجد محادثات',
-    emptyHelp: 'ستظهر هنا جلسات Claude Code وCodex الموجودة على هذا الخادم.',
+    emptyHelp: 'ستظهر هنا محادثات Claude Code وCodex الموجودة على هذا الخادم.',
     noMatches: 'لا توجد محادثات مطابقة',
-    searchHelp: 'جرّب عنوانًا أو مجلدًا آخر، أو حمّل المزيد من الجلسات.',
+    searchHelp: 'جرّب عنوانًا أو مجلدًا آخر، أو حمّل المزيد من المحادثات.',
     skipped: 'تم تجاوز بعض السجلات الفارغة أو غير المقروءة أو الكبيرة جدًا.',
-    more: 'تحميل المزيد من الجلسات',
+    more: 'تحميل المزيد من المحادثات',
     messages: 'رسائل',
     choose: 'محادثة تستحق المتابعة',
-    chooseHelp: 'اختر جلسة لقراءة سجلها قبل نقلها إلى Hermes.',
+    chooseHelp: 'اختر محادثة لقراءة سجلها قبل نقلها إلى Hermes.',
     previewLoading: 'جارٍ فتح المعاينة',
     previewError: 'المعاينة غير متاحة',
     previewHelp: 'ربما تم نقل الملف الأصلي أو تغييره. حدّث القائمة وحاول مرة أخرى.',
@@ -115,7 +115,7 @@ export const ar = defineLocale({
     steps: {
       connectingGateway: 'جار الاتصال ببوابة سطح المكتب',
       loadingSettings: 'جار تحميل إعدادات Hermes',
-      loadingSessions: 'جار تحميل الجلسات الأخيرة',
+      loadingSessions: 'جار تحميل المحادثات الأخيرة',
       retryingRemoteBackend: 'جارٍ إعادة الاتصال بخادم Hermes البعيد…',
       startingDesktopConnection: 'جار بدء اتصال سطح المكتب',
       startingHermesDesktop: 'جار تشغيل Hermes Desktop...'
@@ -202,7 +202,7 @@ export const ar = defineLocale({
     },
     voice: {
       configureSpeechToText: 'اضبط تحويل الكلام إلى نص لاستخدام وضع الصوت.',
-      couldNotStartSession: 'تعذر بدء جلسة الصوت',
+      couldNotStartSession: 'تعذر بدء محادثة الصوت',
       microphoneAccessDenied: 'تم رفض الوصول إلى الميكروفون.',
       microphoneConstraintsUnsupported: 'قيود الميكروفون غير مدعومة على هذا الجهاز.',
       microphoneFailed: 'فشل الميكروفون',
@@ -240,11 +240,11 @@ export const ar = defineLocale({
     hideSidebar: 'إخفاء الشريط الجانبي',
     showSidebar: 'إظهار الشريط الجانبي',
     search: 'بحث',
-    searchTitle: 'البحث في الجلسات والعروض والإجراءات',
+    searchTitle: 'البحث في المحادثات والعروض والإجراءات',
     swapSidebarSides: 'تبديل جانبي الأشرطة',
     hideRightSidebar: 'إخفاء الشريط الأيمن',
     showRightSidebar: 'إظهار الشريط الأيمن',
-    unreadSessions: count => (count === 1 ? 'جلسة واحدة غير مقروءة' : `${count} جلسات غير مقروءة`),
+    unreadSessions: count => (count === 1 ? 'محادثة واحدة غير مقروءة' : `${count} محادثات غير مقروءة`),
     muteHaptics: 'كتم الاهتزازات',
     unmuteHaptics: 'تفعيل الاهتزازات',
     openSettings: 'فتح الإعدادات',
@@ -268,7 +268,7 @@ export const ar = defineLocale({
     categories: {
       composer: 'المحرّر',
       profiles: 'الملفات الشخصية',
-      session: 'الجلسة',
+      session: 'المحادثة',
       navigation: 'التنقل',
       view: 'العرض'
     },
@@ -283,28 +283,28 @@ export const ar = defineLocale({
       'nav.artifacts': 'فتح العناصر',
       'nav.cron': 'فتح المهام المجدولة',
       'nav.agents': 'فتح الوكلاء',
-      'session.new': 'جلسة جديدة',
-      'session.newTab': 'علامة تبويب جلسة جديدة',
-      'session.newWindow': 'جلسة جديدة في نافذة',
-      'session.next': 'الجلسة التالية',
-      'session.prev': 'الجلسة السابقة',
-      'session.slot.1': 'الانتقال إلى الجلسة الأخيرة 1',
-      'session.slot.2': 'الانتقال إلى الجلسة الأخيرة 2',
-      'session.slot.3': 'الانتقال إلى الجلسة الأخيرة 3',
-      'session.slot.4': 'الانتقال إلى الجلسة الأخيرة 4',
-      'session.slot.5': 'الانتقال إلى الجلسة الأخيرة 5',
-      'session.slot.6': 'الانتقال إلى الجلسة الأخيرة 6',
-      'session.slot.7': 'الانتقال إلى الجلسة الأخيرة 7',
-      'session.slot.8': 'الانتقال إلى الجلسة الأخيرة 8',
-      'session.slot.9': 'الانتقال إلى الجلسة الأخيرة 9',
-      'session.focusSearch': 'البحث في الجلسات',
-      'session.togglePin': 'تثبيت / إلغاء تثبيت الجلسة الحالية',
+      'session.new': 'محادثة جديدة',
+      'session.newTab': 'علامة تبويب محادثة جديدة',
+      'session.newWindow': 'محادثة جديدة في نافذة',
+      'session.next': 'المحادثة التالية',
+      'session.prev': 'المحادثة السابقة',
+      'session.slot.1': 'الانتقال إلى المحادثة الأخيرة 1',
+      'session.slot.2': 'الانتقال إلى المحادثة الأخيرة 2',
+      'session.slot.3': 'الانتقال إلى المحادثة الأخيرة 3',
+      'session.slot.4': 'الانتقال إلى المحادثة الأخيرة 4',
+      'session.slot.5': 'الانتقال إلى المحادثة الأخيرة 5',
+      'session.slot.6': 'الانتقال إلى المحادثة الأخيرة 6',
+      'session.slot.7': 'الانتقال إلى المحادثة الأخيرة 7',
+      'session.slot.8': 'الانتقال إلى المحادثة الأخيرة 8',
+      'session.slot.9': 'الانتقال إلى المحادثة الأخيرة 9',
+      'session.focusSearch': 'البحث في المحادثات',
+      'session.togglePin': 'تثبيت / إلغاء تثبيت المحادثة الحالية',
       'workspace.newWorktree': 'worktree جديد',
       'workspace.openFolder': 'فتح مجلد كمشروع',
       'composer.focus': 'التركيز على المحرّر',
       'composer.modelPicker': 'فتح منتقي النموذج',
       'composer.voice': 'بدء / إيقاف المحادثة الصوتية',
-      'view.toggleSidebar': 'تبديل الشريط الجانبي للجلسات',
+      'view.toggleSidebar': 'تبديل الشريط الجانبي للمحادثات',
       'view.toggleRightSidebar': 'تبديل متصفح الملفات',
       'view.toggleReview': 'تبديل لوحة المراجعة',
       'view.showFiles': 'إظهار متصفح الملفات',
@@ -378,7 +378,7 @@ export const ar = defineLocale({
       confirmationsEmpty: 'لم يحتج أي شيء إلى تأكيدك بعد.',
       confirmationCommand: (command: string) => `تشغيل ${command}`,
       confirmationTool: (tool: string) => `استخدام ${tool}`,
-      outcome: { approved_once: 'مسموح مرة واحدة', approved_session: 'مسموح لهذه الجلسة', approved_permanent: 'مسموح دائمًا', auto_approved: 'مسموح تلقائيًا', denied: 'مرفوض', blocked: 'محظور', notify_failed: 'تعذر إبلاغك', unknown: 'مسجّل' },
+      outcome: { approved_once: 'مسموح مرة واحدة', approved_session: 'مسموح لهذه المحادثة', approved_permanent: 'مسموح دائمًا', auto_approved: 'مسموح تلقائيًا', denied: 'مرفوض', blocked: 'محظور', notify_failed: 'تعذر إبلاغك', unknown: 'مسجّل' },
       dayToday: 'اليوم',
       dayYesterday: 'أمس',
       loadFailed: 'تعذر تحميل أذوناتك.',
@@ -799,7 +799,7 @@ export const ar = defineLocale({
       model: 'يستخدم في المحادثات الجديدة ما لم تختر نموذجاً مختلفاً من محرر الرسائل.',
       modelContextLength: 'اتركه 0 لاستخدام نافذة السياق المكتشفة للنموذج المحدد.',
       fallbackProviders: 'إدخالات احتياطية بصيغة provider:model لتجربتها إذا فشل النموذج الافتراضي.',
-      'display.personality': 'أسلوب المساعد الافتراضي للجلسات الجديدة.',
+      'display.personality': 'أسلوب المساعد الافتراضي للمحادثات الجديدة.',
       'display.showReasoning': 'يعرض أقسام التفكير عندما توفرها الخلفية.',
       timezone: 'تستخدم عندما يحتاج Hermes إلى سياق الوقت المحلي. اتركها فارغة لاستخدام منطقة النظام.',
       'agent.imageInputMode': 'يتحكم في طريقة إرسال مرفقات الصور إلى النموذج.',
@@ -817,7 +817,7 @@ export const ar = defineLocale({
       'approvals.timeout': 'مدة انتظار طلبات الموافقة قبل انتهاء المهلة.',
       'security.redactSecrets': 'يخفي الأسرار المكتشفة من المحتوى المرئي للنموذج قدر الإمكان.',
       'checkpoints.enabled': 'ينشئ لقطات رجوع قبل تعديلات الملفات.',
-      'memory.memoryEnabled': 'يحفظ ذكريات دائمة يمكن أن تساعد الجلسات القادمة.',
+      'memory.memoryEnabled': 'يحفظ ذكريات دائمة يمكن أن تساعد المحادثات القادمة.',
       'memory.userProfileEnabled': 'يحافظ على ملف مختصر لتفضيلات المستخدم.',
       'context.engine': 'استراتيجية إدارة المحادثات الطويلة قرب حد السياق.',
       'compression.enabled': 'يلخص السياق الأقدم عندما تكبر المحادثات.',
@@ -894,9 +894,9 @@ export const ar = defineLocale({
       askPlaceholder: 'اسأل Stardust…',
       disconnectedPlaceholder: 'غير متصل — افتح Stardust لإعادة الاتصال',
       sendTo: 'إرسال إلى',
-      targetLabel: 'الجلسة المستهدفة',
+      targetLabel: 'المحادثة المستهدفة',
       currentChat: 'المحادثة الحالية',
-      newSession: 'جلسة جديدة'
+      newSession: 'محادثة جديدة'
     },
     credentials: {
       pasteKey: 'لصق المفتاح',
@@ -1035,7 +1035,7 @@ export const ar = defineLocale({
     },
     model: {
       loading: 'جار تحميل إعدادات النموذج...',
-      appliesDesc: 'ينطبق على الجلسات الجديدة. استخدم منتقي النموذج في صندوق الإنشاء لتبديل المحادثة النشطة فورا.',
+      appliesDesc: 'ينطبق على المحادثات الجديدة. استخدم منتقي النموذج في صندوق الإنشاء لتبديل المحادثة النشطة فورا.',
       provider: 'المزوّد',
       model: 'النموذج',
       applying: 'جار التطبيق...',
@@ -1079,7 +1079,7 @@ export const ar = defineLocale({
         },
         title_generation: {
           label: 'توليد العناوين',
-          hint: 'عناوين الجلسات'
+          hint: 'عناوين المحادثات'
         },
         review: {
           label: 'المراجعة',
@@ -1130,8 +1130,8 @@ export const ar = defineLocale({
       loading: 'جار تحميل المزودين...'
     },
     sessions: {
-      loading: 'جار تحميل الجلسات المؤرشفة...',
-      archivedTitle: 'الجلسات المؤرشفة',
+      loading: 'جار تحميل المحادثات المؤرشفة...',
+      archivedTitle: 'المحادثات المؤرشفة',
       archivedIntro:
         'تُخفى المحادثات المؤرشفة من الشريط الجانبي مع الاحتفاظ بكل رسائلها. اضغط Ctrl/⌘ مع النقر على محادثة في الشريط الجانبي لأرشفتها.',
       emptyArchivedTitle: 'لا توجد محادثات مؤرشفة',
@@ -1142,14 +1142,14 @@ export const ar = defineLocale({
       restored: 'تمت الاستعادة',
       deleteConfirm: title => `حذف "${title}" نهائياً؟ لا يمكن التراجع عن هذا.`,
       defaultDirTitle: 'مجلد المشروع الافتراضي',
-      defaultDirDesc: 'تبدأ الجلسات الجديدة في هذا المجلد ما لم تختر غيره. اتركه غير مضبوط لاستخدام مجلدك الرئيسي.',
+      defaultDirDesc: 'تبدأ المحادثات الجديدة في هذا المجلد ما لم تختر غيره. اتركه غير مضبوط لاستخدام مجلدك الرئيسي.',
       defaultDirUpdated: 'تم تحديث مجلد المشروع الافتراضي، ابدأ محادثة جديدة (Ctrl/⌘+N) ليطبق التغيير',
       defaultsTo: label => `الافتراضي هو ${label}.`,
       change: 'تغيير',
       choose: 'اختيار',
       clear: 'مسح',
       notSet: 'غير مضبوط',
-      failedLoad: 'تعذر تحميل الجلسات المؤرشفة',
+      failedLoad: 'تعذر تحميل المحادثات المؤرشفة',
       unarchiveFailed: 'فشل إلغاء الأرشفة',
       deleteFailed: 'فشل الحذف',
       updateDirFailed: 'تعذر تحديث المجلد الافتراضي',
@@ -1247,6 +1247,7 @@ export const ar = defineLocale({
   },
   skills: {
     tabSkills: 'المهارات',
+    pageTitles: { skills: 'المهارات', toolsets: 'الأدوات', mcp: 'MCP', plugins: 'الإضافات' },
     tabToolsets: 'مجموعات الأدوات',
     all: 'الكل',
     searchSkills: 'البحث في المهارات',
@@ -1320,7 +1321,7 @@ export const ar = defineLocale({
     back: 'رجوع',
     searchPlaceholder: 'ابحث عن أمر أو إعداد...',
     goTo: 'انتقال إلى',
-    goToSession: 'الانتقال إلى الجلسة',
+    goToSession: 'الانتقال إلى المحادثة',
     branches: 'الفروع',
     startInBranch: branch => `محادثة جديدة في ${branch}`,
     commandCenter: 'مركز الأوامر',
@@ -1400,14 +1401,14 @@ export const ar = defineLocale({
       usage: 'الاستخدام'
     },
     sectionDescriptions: {
-      sessions: 'البحث في الجلسات وإدارتها',
+      sessions: 'البحث في المحادثات وإدارتها',
       system: 'الحالة والسجلات وإجراءات النظام',
       usage: 'نشاط الرموز والتكلفة والمهارات عبر الزمن'
     },
     nav: {
       newChat: {
-        title: 'جلسة جديدة',
-        detail: 'بدء جلسة جديدة'
+        title: 'محادثة جديدة',
+        detail: 'بدء محادثة جديدة'
       },
       settings: {
         title: 'الإعدادات',
@@ -1428,8 +1429,8 @@ export const ar = defineLocale({
     },
     sectionEntries: {
       sessions: {
-        title: 'لوحة الجلسات',
-        detail: 'البحث في الجلسات وتثبيتها وإدارتها'
+        title: 'لوحة المحادثات',
+        detail: 'البحث في المحادثات وتثبيتها وإدارتها'
       },
       system: {
         title: 'لوحة النظام',
@@ -1441,18 +1442,18 @@ export const ar = defineLocale({
       }
     },
     providerNavigate: 'فتح المزود',
-    providerSessions: 'جلسات المزود',
+    providerSessions: 'محادثات المزود',
     refresh: 'تحديث',
     refreshing: 'جار التحديث...',
     noResults: 'لا توجد نتائج',
-    pinSession: 'تثبيت الجلسة',
-    unpinSession: 'إلغاء تثبيت الجلسة',
-    exportSession: 'تصدير الجلسة',
-    deleteSession: 'حذف الجلسة',
-    noSessions: 'لا توجد جلسات',
+    pinSession: 'تثبيت المحادثة',
+    unpinSession: 'إلغاء تثبيت المحادثة',
+    exportSession: 'تصدير المحادثة',
+    deleteSession: 'حذف المحادثة',
+    noSessions: 'لا توجد محادثات',
     gatewayRunning: 'البوابة تعمل',
     gatewayStopped: 'البوابة متوقفة',
-    hermesActiveSessions: (version, count) => `Hermes ${version} لديه ${count} جلسة نشطة`,
+    hermesActiveSessions: (version, count) => `Hermes ${version} لديه ${count} محادثة نشطة`,
     restartGateway: 'إعادة تشغيل البوابة',
     openBrowser: 'فتح المتصفح',
     gatewayRestartFailed: 'فشل إعادة تشغيل البوابة.',
@@ -1470,7 +1471,7 @@ export const ar = defineLocale({
     recentLogs: 'السجلات الأخيرة',
     noLogs: 'لا توجد سجلات',
     days: count => `${count} يوم`,
-    statSessions: 'الجلسات',
+    statSessions: 'المحادثات',
     statApiCalls: 'نداءات API',
     statTokens: 'الرموز',
     statCost: 'التكلفة',
@@ -1722,7 +1723,7 @@ export const ar = defineLocale({
       menuItem: 'الاتصال بمضيف بعيد…',
       badge: (host: string) => `يعمل على ${host}`,
       title: (profile: string) => `ربط ${profile} بمضيف بعيد`,
-      description: 'ستعمل جلسات هذا الملف الشخصي على خادم Hermes البعيد الذي تحدده، بدلاً من هذا الجهاز.',
+      description: 'ستعمل محادثات هذا الملف الشخصي على خادم Hermes البعيد الذي تحدده، بدلاً من هذا الجهاز.',
       urlLabel: 'العنوان البعيد',
       urlPlaceholder: 'https://hermes.example.com',
       urlInvalid: 'أدخل عنواناً كاملاً يبدأ بـ http:// أو https://',
@@ -1790,10 +1791,10 @@ export const ar = defineLocale({
     cloneFrom: 'استنساخ من',
     cloneFromNone: 'لا شيء (فارغ)',
     cloneFromDesc:
-      'ينسخ الإعدادات وأسرار .env والمهارات وSOUL.md والذاكرة المنسقة (MEMORY.md وUSER.md) من الملف الشخصي المحدد. لا يتم نسخ الجلسات أو المهام المجدولة.',
+      'ينسخ الإعدادات وأسرار .env والمهارات وSOUL.md والذاكرة المنسقة (MEMORY.md وUSER.md) من الملف الشخصي المحدد. لا يتم نسخ المحادثات أو المهام المجدولة.',
     cloneFromDefault: 'نسخ إعداد الافتراضي',
     cloneFromDefaultDesc:
-      'ينسخ الإعدادات وأسرار .env والمهارات وSOUL.md والذاكرة المنسقة (MEMORY.md وUSER.md) من الملف الشخصي الافتراضي. لا يتم نسخ الجلسات أو المهام المجدولة.',
+      'ينسخ الإعدادات وأسرار .env والمهارات وSOUL.md والذاكرة المنسقة (MEMORY.md وUSER.md) من الملف الشخصي الافتراضي. لا يتم نسخ المحادثات أو المهام المجدولة.',
     invalidName: hint => `اسم غير صالح: ${hint}`,
     nameRequired: 'الاسم مطلوب',
     creating: 'جار الإنشاء...',
@@ -1995,7 +1996,7 @@ export const ar = defineLocale({
     colLocationLink: 'الموقع',
     colLocationFile: 'الموقع',
     colLocationDefault: 'الموقع',
-    colSession: 'الجلسة',
+    colSession: 'المحادثة',
     kindImage: 'صورة',
     kindFile: 'ملف',
     kindLink: 'رابط',
@@ -2039,7 +2040,7 @@ export const ar = defineLocale({
       actions: 'إجراءات المجموعة'
     },
     nav: {
-      'new-session': 'جلسة جديدة',
+      'new-session': 'محادثة جديدة',
       skills: 'المهارات',
       messaging: 'المراسلة',
       artifacts: 'العناصر',
@@ -2049,29 +2050,29 @@ export const ar = defineLocale({
       agents: 'الوكلاء',
       more: 'المزيد'
     },
-    searchAria: 'البحث في الجلسات',
-    searchPlaceholder: 'البحث في الجلسات...',
+    searchAria: 'البحث في المحادثات',
+    searchPlaceholder: 'البحث في المحادثات...',
     clearSearch: 'مسح البحث',
-    noMatch: query => `لا توجد جلسات تطابق "${query}"`,
+    noMatch: query => `لا توجد محادثات تطابق "${query}"`,
     results: 'النتائج',
     pinned: 'المحادثات المثبتة',
     sessions: 'المحادثات',
     cronJobs: 'المهام المجدولة',
-    groupAriaGrouped: 'الجلسات مجمعة حسب مساحة العمل',
-    groupAriaUngrouped: 'الجلسات غير مجمعة',
+    groupAriaGrouped: 'المحادثات مجمعة حسب مساحة العمل',
+    groupAriaUngrouped: 'المحادثات غير مجمعة',
     showProjects: 'عرض المشاريع',
-    showSessions: 'عرض الجلسات',
+    showSessions: 'عرض المحادثات',
     groupTitleGrouped: 'مجمعة حسب مساحة العمل',
-    groupTitleUngrouped: 'كل الجلسات',
-    allPinned: 'كل الجلسات مثبتة',
+    groupTitleUngrouped: 'كل المحادثات',
+    allPinned: 'كل المحادثات مثبتة',
     shiftClickHint: 'استخدم Shift للتحديد المتعدد',
     noWorkspace: 'بدون مساحة عمل',
-    projectEmpty: 'لا توجد جلسات بعد',
-    projectLoadFailed: 'تعذر تحميل الجلسات',
-    noSessions: 'لا توجد جلسات بعد',
-    noFilterMatches: 'لا توجد جلسات تطابق عوامل التصفية هذه',
+    projectEmpty: 'لا توجد محادثات بعد',
+    projectLoadFailed: 'تعذر تحميل المحادثات',
+    noSessions: 'لا توجد محادثات بعد',
+    noFilterMatches: 'لا توجد محادثات تطابق عوامل التصفية هذه',
     projects: {
-      showAllSessions: 'عرض جميع الجلسات',
+      showAllSessions: 'عرض جميع المحادثات',
       sectionLabel: 'المشاريع',
       home: 'الرئيسية',
       autoDiscovered: 'مكتشف تلقائيًا',
@@ -2135,10 +2136,10 @@ export const ar = defineLocale({
       forceRemove: 'إزالة بالقوة',
       enter: label => `فتح ${label}`,
       reorder: label => `إعادة ترتيب ${label}`,
-      toggle: (label, open) => `${open ? 'إظهار' : 'إخفاء'} جلسات ${label}`,
+      toggle: (label, open) => `${open ? 'إظهار' : 'إخفاء'} محادثات ${label}`,
       back: 'كل المشاريع'
     },
-    newSessionIn: label => `جلسة جديدة في ${label}`,
+    newSessionIn: label => `محادثة جديدة في ${label}`,
     showMoreIn: (count, label) => `إظهار ${count} أخرى في ${label}`,
     loading: 'جار التحميل...',
     loadMore: 'تحميل المزيد',
@@ -2158,8 +2159,8 @@ export const ar = defineLocale({
       openInTerminal: 'فتح في الطرفية',
       copyIdFailed: 'فشل نسخ المعرف',
 
-      sessionActions: 'إجراءات الجلسة',
-      sessionRunning: 'الجلسة تعمل',
+      sessionActions: 'إجراءات المحادثة',
+      sessionRunning: 'المحادثة تعمل',
       needsInput: 'تحتاج إدخالا',
       waitingForAnswer: 'بانتظار إجابة',
       backgroundRunning: 'تعمل في الخلفية',
@@ -2173,13 +2174,13 @@ export const ar = defineLocale({
       handoffOrigin: platform => `قادمة من ${platform}`,
       renamed: 'تمت إعادة التسمية',
       renameFailed: 'فشلت إعادة التسمية',
-      renameTitle: 'إعادة تسمية الجلسة',
+      renameTitle: 'إعادة تسمية المحادثة',
       renameDesc: '',
-      untitledPlaceholder: 'جلسة بلا عنوان',
-      deleteTitle: 'حذف الجلسة؟',
+      untitledPlaceholder: 'محادثة بلا عنوان',
+      deleteTitle: 'حذف المحادثة؟',
       deleteDesc: title => `سيتم حذف «${title}» نهائيًا. لا يمكن التراجع عن هذا الإجراء.`,
       deleting: 'جارٍ الحذف…',
-      deleted: 'تم حذف الجلسة',
+      deleted: 'تم حذف المحادثة',
       ageNow: 'الآن',
       ageDay: 'يوم',
       ageHour: 'ساعة',
@@ -2253,8 +2254,8 @@ export const ar = defineLocale({
     helpFooter: 'استخدم الأسهم للتنقل و Enter للاختيار.',
     commandDescs: {
       '/help': 'قائمة كاملة بالأوامر + اختصارات لوحة المفاتيح',
-      '/clear': 'بدء جلسة جديدة',
-      '/resume': 'استئناف جلسة سابقة',
+      '/clear': 'بدء محادثة جديدة',
+      '/resume': 'استئناف محادثة سابقة',
       '/details': 'التحكم في مستوى تفاصيل النص',
       '/copy': 'نسخ التحديد أو آخر رسالة من المساعد',
       '/quit': 'الخروج من hermes'
@@ -2311,7 +2312,7 @@ export const ar = defineLocale({
     snippetsTitle: 'مقتطفات الموجّهات',
     snippetsDesc: 'اختر موجّهًا أوليًا لإدراجه في المحرّر.',
     dropFiles: 'أفلت الملفات للإرفاق',
-    dropSession: 'أفلت الجلسة للفتح',
+    dropSession: 'أفلت المحادثة للفتح',
     snippets: {
       codeReview: {
         label: 'مراجعة الكود',
@@ -2379,7 +2380,7 @@ export const ar = defineLocale({
       contractStopWhen: 'التوقف عند',
       waitBarrierTitle: 'شرط الانتظار',
       waitUntil: target => `في الانتظار حتى ${target}`,
-      waitSession: target => `في انتظار الجلسة ${target}`,
+      waitSession: target => `في انتظار المحادثة ${target}`,
       waitPid: pid => `في انتظار العملية ${pid}`,
       qualityGatesTitle: 'بوابات الجودة',
       gateCommand: 'الأمر',
@@ -2407,7 +2408,7 @@ export const ar = defineLocale({
       loopPromptLabel: 'الموجه',
       loopCadenceLabel: 'الإيقاع',
       loopUntilLabel: 'شرط الانتهاء',
-      loopDeferredNotice: 'الهدف النشط يتحكم بالجلسة حالياً.',
+      loopDeferredNotice: 'الهدف النشط يتحكم بالمحادثة حالياً.',
       loopAwaitingResponse: 'في انتظار الاستجابة',
       heartbeatActive: 'النبض نشط',
       heartbeatPaused: 'النبض متوقف مؤقتاً',
@@ -2428,8 +2429,8 @@ export const ar = defineLocale({
       copyFailure: 'فشل نسخ المعيار إلى الحافظة',
       continuationFailed: 'فشل إرسال متابعة الهدف',
       continuationQueued: 'تم استئناف الهدف — المتابعة في قائمة الانتظار حتى انتهاء الدور الحالي',
-      continuationBusy: 'تم استئناف الهدف — الجلسة مشغولة، نفّذ /interrupt للدور الحالي للمتابعة',
-      controlUnavailable: msg => `عناصر تحكم الجلسة غير متاحة: ${msg}`,
+      continuationBusy: 'تم استئناف الهدف — المحادثة مشغولة، نفّذ /interrupt للدور الحالي للمتابعة',
+      controlUnavailable: msg => `عناصر تحكم المحادثة غير متاحة: ${msg}`,
       dismissError: 'تجاهل الخطأ',
       add: 'إضافة'
     },
@@ -2694,8 +2695,8 @@ export const ar = defineLocale({
     docs: provider => `وثائق ${provider}`,
     skipSetup: 'تخطي الإعداد',
     retryFirstBuild: 'إعادة محاولة البناء الأول',
-    firstBuildFailed: 'تعذّر بدء البناء الأول. أعد المحاولة للتحقق من جلسته.',
-    buildStarted: (title: string) => `تم بدء ${title} — ابحث عنه في جلساتك`,
+    firstBuildFailed: 'تعذّر بدء البناء الأول. أعد المحاولة للتحقق من محادثته.',
+    buildStarted: (title: string) => `تم بدء ${title} — ابحث عنه في محادثاتك`,
     buildOpening: (title: string) => `جارٍ فتح ${title}…`,
     workingOnIt: 'جارٍ العمل على ذلك'
   },
@@ -2804,7 +2805,7 @@ export const ar = defineLocale({
       openCron: 'فتح المهام المجدولة',
       turnRunning: 'الدور يعمل',
       contextUsage: 'استخدام السياق',
-      session: 'الجلسة',
+      session: 'المحادثة',
       yoloOn: 'YOLO مفعل',
       yoloOff: 'YOLO معطل',
       modelNone: 'لا نموذج',
@@ -2816,10 +2817,10 @@ export const ar = defineLocale({
       providerModelTitle: (provider, model) => `${provider}: ${model}`
     },
     tiles: {
-      sessionOpenFailed: 'تعذّر فتح هذه الجلسة',
+      sessionOpenFailed: 'تعذّر فتح هذه المحادثة',
       noPageAt: (path: string) => `لا توجد صفحة في ${path}`,
-      resumeStillAvailable: 'الجلسة ما زالت متاحة — أعد محاولة استئنافها.',
-      resumeUnavailable: 'الجلسة غير متاحة — يمكنك إعادة محاولة استئنافها.'
+      resumeStillAvailable: 'المحادثة ما زالت متاحة — أعد محاولة استئنافها.',
+      resumeUnavailable: 'المحادثة غير متاحة — يمكنك إعادة محاولة استئنافها.'
     }
   },
   rightSidebar: {
@@ -2966,7 +2967,7 @@ export const ar = defineLocale({
     restore: 'استعادة',
     closeRunningTitle: 'إغلاق تبويب يعمل؟',
     closeRunningBody:
-      'هذه المحادثة ما زالت تعمل (أو تنتظر إدخالك). إغلاق التبويب يخفيها فقط — ستحتفظ الجلسة بتقدمها ويمكن إعادة فتحها من الشريط الجانبي.',
+      'هذه المحادثة ما زالت تعمل (أو تنتظر إدخالك). إغلاق التبويب يخفيها فقط — ستحتفظ المحادثة بتقدمها ويمكن إعادة فتحها من الشريط الجانبي.',
     closeRunningConfirm: 'إغلاق التبويب',
     reload: 'إعادة التحميل',
     closeOthers: 'إغلاق الأخرى',
@@ -3032,7 +3033,7 @@ export const ar = defineLocale({
       actions: 'استكشف الأوامر'
     },
     thread: {
-      loadingSession: 'جار تحميل الجلسة...',
+      loadingSession: 'جار تحميل المحادثة...',
       showEarlier: 'عرض الرسائل الأقدم',
       workProgress: count => `${count} تحديثات عن العمل`,
       loadingResponse: 'جار تحميل الرد...',
@@ -3066,7 +3067,7 @@ export const ar = defineLocale({
         streaming: 'خطأ في اتصال البث'
       },
       errorRetry: 'إعادة المحاولة',
-      errorStartNewSession: 'بدء جلسة جديدة',
+      errorStartNewSession: 'بدء محادثة جديدة',
       errorSwitchProvider: 'تبديل المزوّد',
       errorSetUpFallback: 'إعداد نموذج احتياطي',
       errorSignInAgain: provider => `تسجيل الدخول إلى ${provider} مجدداً`,
@@ -3121,7 +3122,7 @@ export const ar = defineLocale({
       run: 'تشغيل',
       command: 'الأمر',
       moreOptions: 'خيارات إضافية',
-      allowSession: 'السماح لهذه الجلسة',
+      allowSession: 'السماح لهذه المحادثة',
       alwaysAllowMenu: 'السماح دائما',
       jumpToApproval: 'الموافقة مطلوبة',
       reject: 'رفض',
@@ -3295,8 +3296,8 @@ export const ar = defineLocale({
           pendingAction: 'جار البحث'
         },
         session_search_recall: {
-          done: 'تم البحث في سجل الجلسة',
-          pending: 'جار البحث في سجل الجلسة',
+          done: 'تم البحث في سجل المحادثة',
+          pending: 'جار البحث في سجل المحادثة',
           pendingAction: 'جار البحث'
         },
         terminal: {
@@ -3354,7 +3355,7 @@ export const ar = defineLocale({
     secretSendFailed: 'فشل إرسال السر',
     sudoTitle: 'مطلوب sudo',
     sudoDesc:
-      'راجع الأمر قبل إدخال كلمة مرور sudo. تُرسل كلمة المرور إلى الوكيل الذي ينفّذه وتُحفظ مؤقتًا لهذه الجلسة.',
+      'راجع الأمر قبل إدخال كلمة مرور sudo. تُرسل كلمة المرور إلى الوكيل الذي ينفّذه وتُحفظ مؤقتًا لهذه المحادثة.',
     sudoCommandUnavailable: 'لم يقدّم هذا الوكيل الأمر. ألغِ الطلب إذا لم تتمكن من التحقق منه في المحادثة.',
     sudoPlaceholder: 'كلمة المرور',
     secretTitle: 'مطلوب سر',
@@ -3363,7 +3364,7 @@ export const ar = defineLocale({
     vaultUnlockSendFailed: 'تعذر إرسال كلمة المرور الرئيسية',
     vaultUnlockTitle: name => `فتح قفل ${name}`,
     vaultUnlockDesc: name =>
-      `يريد الوكيل تسجيل الدخول إلى موقع ببيانات دخول محفوظة في ${name}. أدخل كلمة المرور الرئيسية لفتح القفل لهذه الجلسة — تُسلَّم مباشرة إلى ${name} على هذا الجهاز ولا تُخزَّن ولا تُعرض على الوكيل.`,
+      `يريد الوكيل تسجيل الدخول إلى موقع ببيانات دخول محفوظة في ${name}. أدخل كلمة المرور الرئيسية لفتح القفل لهذه المحادثة — تُسلَّم مباشرة إلى ${name} على هذا الجهاز ولا تُخزَّن ولا تُعرض على الوكيل.`,
     vaultUnlockPlaceholder: 'كلمة المرور الرئيسية',
     vaultUnlockKeepLocked: 'إبقاؤه مقفلًا',
     vaultUnlockConfirm: 'فتح القفل',
@@ -3389,8 +3390,8 @@ export const ar = defineLocale({
   },
   desktop: {
     audioReadFailed: 'فشلت قراءة الصوت',
-    sessionUnavailable: 'الجلسة غير متاحة',
-    createSessionFailed: 'فشل إنشاء الجلسة',
+    sessionUnavailable: 'المحادثة غير متاحة',
+    createSessionFailed: 'فشل إنشاء المحادثة',
     promptFailed: 'فشل إرسال الرسالة',
     providerCredentialRequired: 'مطلوب اعتماد المزود',
     emptySlashCommand: 'أمر slash فارغ',
@@ -3417,16 +3418,16 @@ export const ar = defineLocale({
     readOnlyTranscriptBody:
       'لا يوجد بعد خادم متصل يملك هذه المحادثة القديمة، لذا فُتحت كنصّ محفوظ للقراءة فقط. السجل سليم؛ الإرسال معطّل حتى يتبنّاها خادم.',
     readOnlyTranscriptSendBlocked: 'هذه المحادثة مفتوحة كنصّ محفوظ للقراءة فقط — الإرسال معطّل.',
-    resumeStrandedTitle: 'تعذّر تحميل هذه الجلسة',
+    resumeStrandedTitle: 'تعذّر تحميل هذه المحادثة',
     resumeStrandedBody:
-      'فشل الاتصال بهذه الجلسة وتوقفت إعادة المحاولة التلقائية. تأكد من تشغيل البوابة، ثم حاول مجددا.',
+      'فشل الاتصال بهذه المحادثة وتوقفت إعادة المحاولة التلقائية. تأكد من تشغيل البوابة، ثم حاول مجددا.',
     poolSlotTimeoutBody:
       'جميع خانات الواجهات الخلفية المحلية للملفات الشخصية مشغولة. زد عدد Warm Bot Backends من الإعدادات ← متقدم، أو أعد المحاولة بعد إزالة واجهة خلفية خاملة.',
     poolSlotTimeoutOpenSettings: 'فتح الإعدادات المتقدمة',
     resumeRetry: 'إعادة المحاولة',
     nothingToBranch: 'لا يوجد ما يمكن تفريعه',
     branchNeedsChat: 'يحتاج التفريع إلى محادثة',
-    sessionBusy: 'الجلسة مشغولة',
+    sessionBusy: 'المحادثة مشغولة',
     branchStopCurrent: 'أوقف الدور الحالي قبل التفريع',
     branchNoText: 'لا يوجد نص للتفريع',
     branchTitle: n => `مسودة: تفريع #${n}`,
@@ -3439,8 +3440,8 @@ export const ar = defineLocale({
     cwdStagedMessage: 'سيطبق مجلد العمل على الرسالة التالية.',
     modelSwitchFailed: 'فشل تبديل النموذج',
     hydrationSyncing: (profile: string) => `جارٍ مزامنة ${profile}\u2026`,
-    sessionExported: 'تم تصدير الجلسة',
-    sessionExportFailed: 'فشل تصدير الجلسة',
+    sessionExported: 'تم تصدير المحادثة',
+    sessionExportFailed: 'فشل تصدير المحادثة',
     imageSaved: 'تم حفظ الصورة',
     downloadStarted: 'بدأ التنزيل',
     restartToUseSaveImage: 'أعد التشغيل لاستخدام حفظ الصور',
@@ -3492,7 +3493,7 @@ export const ar = defineLocale({
       },
       artifacts: {
         title: 'كل ما صنعه Hermes',
-        text: 'الصور والملفات والروابط من كل الجلسات، مفهرسة في مكان واحد.'
+        text: 'الصور والملفات والروابط من كل المحادثات، مفهرسة في مكان واحد.'
       },
       cron: {
         title: 'عمل يجري من تلقاء نفسه',
@@ -3500,11 +3501,11 @@ export const ar = defineLocale({
       },
       'command-palette': {
         title: 'صندوق واحد لكل شيء',
-        text: 'الجلسات والإعدادات والمهارات والأوامر كلها تستجيب للوحة الأوامر.'
+        text: 'المحادثات والإعدادات والمهارات والأوامر كلها تستجيب للوحة الأوامر.'
       },
       profiles: {
         title: 'الملفات الشخصية منفصلة',
-        text: 'كل واحد منها Hermes مستقل — مفاتيحه وذاكرته وجلساته الخاصة.'
+        text: 'كل واحد منها Hermes مستقل — مفاتيحه وذاكرته ومحادثاته الخاصة.'
       },
       'composer-mentions': {
         title: 'المرفقات والأوامر',

@@ -4,10 +4,10 @@
  * height without needing a manual scroll to repair the position.
  */
 
-import { expect, test, type Page } from './test'
+import { TASK_PANEL_RESUME_TRIGGER } from '../../../tests-js/scripts/mock-server'
 
 import { type MockBackendFixture, setupMockBackend, waitForAppReady } from './fixtures'
-import { TASK_PANEL_RESUME_TRIGGER } from '../../../tests-js/scripts/mock-server'
+import { expect, type Page, test } from './test'
 
 const SURFACE = '[data-composer-target]:visible'
 const PROMPT = `${TASK_PANEL_RESUME_TRIGGER}: keep the task panel expanded while this session is reopened.`
@@ -33,7 +33,7 @@ async function openFreshDraft(page: Page): Promise<void> {
 
 async function reopenWorkingSession(page: Page): Promise<void> {
   const sidebar = page.locator('[data-slot="sidebar"]')
-  const row = sidebar.getByRole('button', { name: /(?:Session running|Needs your input|Working|会话运行中|需要.*输入|正在工作)/ }).first()
+  const row = sidebar.getByRole('button', { name: /(?:Chat running|Needs your input|Working|对话运行中|需要.*输入|正在工作)/ }).first()
 
   await row.waitFor({ state: 'visible', timeout: 30_000 })
   await row.click()
@@ -84,6 +84,7 @@ test.describe('working-session task-panel clearance', () => {
     fixture = null
   })
 
+  // eslint-disable-next-line no-empty-pattern -- Playwright needs the object pattern here
   test('window focus reanchors a working session above the expanded task panel', async ({}, testInfo) => {
     const page = fixture!.page
 
@@ -103,6 +104,7 @@ test.describe('working-session task-panel clearance', () => {
     // disable Chromium's background throttling, so visibility can stay `visible`
     // and window focus is the only foreground edge that can repair it.
     await page.waitForTimeout(750)
+
     const staleState = await activeSurface(page)
       .locator('[data-slot="aui_thread-viewport"]')
       .evaluate(viewport => {

@@ -22,7 +22,7 @@ describe('session.archive keybind action', () => {
   })
 
   it('has an English label so it renders in the shortcuts panel', () => {
-    expect(en.keybinds.actions['session.archive']).toBe('Archive current session')
+    expect(en.keybinds.actions['session.archive']).toBe('Archive current chat')
   })
 
   it('appears exactly once in KEYBIND_ACTIONS', () => {
