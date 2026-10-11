@@ -31,17 +31,10 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 
-try:  # inside the repository: the same functions the runtime uses
-    from hermes_constants import display_hermes_home, get_hermes_home
-except ImportError:  # standalone copy: the same rules with the standard library only
-
-    def get_hermes_home() -> Path:
-        """STARDUST_HOME when set, else the platform default home."""
-        value = os.environ.get("STARDUST_HOME", "").strip()
-        return Path(value) if value else _platform_default_home()
-
-    def display_hermes_home() -> str:
-        return _tilde(get_hermes_home())
+try:  # the runtime's own resolver: the only source of the Stardust data home
+    from hermes_constants import get_hermes_home
+except ImportError:  # not importable here: the data home is reported as unknown, never guessed
+    get_hermes_home = None
 
 
 GB = 1024**3
@@ -80,12 +73,6 @@ def _xdg_cache() -> Path:
 
 def _library_caches() -> Path:
     return Path.home() / "Library" / "Caches"
-
-
-def _platform_default_home() -> Path:
-    if sys.platform == "win32":
-        return _local_appdata() / "stardust"
-    return Path.home() / ".stardust"
 
 
 @dataclass(frozen=True)
@@ -289,9 +276,11 @@ def probe_drive(root: str) -> DriveRow:
 # --- cleanup suggestions -----------------------------------------------------
 
 
-def _delete_is_safe(path: Path, data_home: Path) -> bool:
+def _delete_is_safe(path: Path, data_home: Path | None) -> bool:
     """A printed delete command must never reach a drive root, the home folder or its ancestors,
-    or any part of the Stardust data home."""
+    or any part of the Stardust data home. Without a known data home nothing can be ruled out."""
+    if data_home is None:
+        return False
     home = Path.home()
     if path.parent == path or path == home or path in home.parents:
         return False
@@ -305,7 +294,7 @@ def _delete_command(path: str) -> str:
     return f"rm -rf -- {shlex.quote(path)}"
 
 
-def _cleanup_command(row: StorageRow, data_home: Path) -> tuple[str | None, str]:
+def _cleanup_command(row: StorageRow, data_home: Path | None) -> tuple[str | None, str]:
     if row.clean_command:
         return row.clean_command, "native"
     if not _delete_is_safe(Path(row.path), data_home):
@@ -313,7 +302,7 @@ def _cleanup_command(row: StorageRow, data_home: Path) -> tuple[str | None, str]
     return _delete_command(row.path), "delete_path"
 
 
-def build_suggestions(rows: Sequence[StorageRow], *, data_home: Path) -> list[Suggestion]:
+def build_suggestions(rows: Sequence[StorageRow], *, data_home: Path | None) -> list[Suggestion]:
     """Suggestions for caches of SUGGEST_BYTES or more. The Stardust data home is never suggested."""
     suggestions = []
     for row in rows:
@@ -345,7 +334,7 @@ class StorageRow:
     name: str
     path: str
     display_path: str
-    path_source: str  # "env" or "default"
+    path_source: str  # "env" or "default" for a cache; "runtime" for the data home
     env_var: str | None
     present: bool
     bytes: int
@@ -370,6 +359,7 @@ class Report:
     generated_at: str
     elapsed_seconds: float
     budgets: dict[str, float | int]
+    data_home_line: str
     drives: list[DriveRow]
     storage: list[StorageRow]
     suggestions: list[Suggestion]
@@ -380,6 +370,18 @@ def _tilde(path: Path) -> str:
         return "~/" + path.relative_to(Path.home()).as_posix()
     except ValueError:
         return str(path)
+
+
+UNKNOWN_DATA_HOME_LINE = "数据目录：无法确定（get_hermes_home 不可用）"
+
+
+def resolve_data_home() -> Path | None:
+    """The data home as the runtime's get_hermes_home() resolves it, or None when it cannot be imported."""
+    return None if get_hermes_home is None else get_hermes_home()
+
+
+def data_home_line(home: Path | None) -> str:
+    return UNKNOWN_DATA_HOME_LINE if home is None else f"数据目录：{_tilde(home)}"
 
 
 def _storage_row(
@@ -413,20 +415,12 @@ def build_report(*, max_entries: int = DEFAULT_MAX_ENTRIES, max_seconds: float =
     started = time.monotonic()
     budget = Budget(max_entries=max_entries, deadline=started + max_seconds)
 
-    home = get_hermes_home()
-    home_from_env = bool(os.environ.get("STARDUST_HOME", "").strip())
-    storage = [
-        _storage_row(
-            "data",
-            "Stardust 数据目录",
-            home,
-            display_hermes_home(),
-            "env" if home_from_env else "default",
-            "STARDUST_HOME" if home_from_env else None,
-            None,
-            budget,
+    home = resolve_data_home()
+    storage: list[StorageRow] = []
+    if home is not None:
+        storage.append(
+            _storage_row("data", "Stardust 数据目录", home, _tilde(home), "runtime", None, None, budget)
         )
-    ]
     for spec in CACHES:
         path, source, env_var = resolve_cache(spec, os.environ)
         storage.append(
@@ -441,6 +435,7 @@ def build_report(*, max_entries: int = DEFAULT_MAX_ENTRIES, max_seconds: float =
         generated_at=datetime.now().astimezone().isoformat(timespec="seconds"),
         elapsed_seconds=round(time.monotonic() - started, 2),
         budgets={"max_entries_per_row": max_entries, "max_seconds": max_seconds},
+        data_home_line=data_home_line(home),
         drives=drives,
         storage=storage,
         suggestions=build_suggestions(storage, data_home=home),
@@ -526,6 +521,8 @@ def render_markdown(report: Report) -> str:
         "偏低：可用空间少于 10 GB，或可用比例低于 10%。",
         "",
         "## 缓存与数据",
+        "",
+        report.data_home_line,
         "",
         *_storage_lines(report.storage),
         "",

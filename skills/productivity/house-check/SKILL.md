@@ -26,7 +26,7 @@ Reports the state of the owner's computer: free space on each drive, the size of
 
 - The repository Python environment (`.venv`, Python 3.11 or newer). The script uses only the standard library, so nothing needs installing.
 - Run it with the `terminal` tool from the repository root. On Windows it checks every drive letter that exists; on Linux and macOS it checks `/`.
-- The Stardust data home comes from the runtime's own resolver when the script runs inside the repository. A copy outside the repository follows the same rules: `STARDUST_HOME` when set, else the platform default home.
+- The Stardust data home is whatever the runtime's `get_hermes_home()` returns, and nothing else. The script does not read `HERMES_HOME` or any other variable for it. If that function cannot be imported (a copy outside the repository), the report prints `数据目录：无法确定（get_hermes_home 不可用）`, measures no folder, and prints no delete command for manual caches.
 
 ## How to Run
 
@@ -54,16 +54,17 @@ JSON keys. Every key below is part of the output contract; `schema_version` chan
 | top | `generated_at` | Local ISO 8601 time of the check. |
 | top | `elapsed_seconds` | Wall time of the whole run. |
 | top | `budgets` | `max_entries_per_row` and `max_seconds` used for the run. |
+| top | `data_home_line` | The data-home line as printed: `数据目录：` and the path, or the unavailable message. |
 | top | `drives` | One row per drive. |
-| top | `storage` | The Stardust data home first, then the known caches. |
+| top | `storage` | The Stardust data home first (only when `get_hermes_home()` is available), then the known caches. |
 | top | `suggestions` | Cleanup suggestions. |
 | `drives[]` | `drive` | Drive root, such as `C:\`, or `/`. |
 | `drives[]` | `status` | `ok`, `low` (under 10 GB free, or under 10% free), or `error`. |
 | `drives[]` | `free_bytes`, `total_bytes`, `free_percent` | Bytes and percent; null on error. |
 | `drives[]` | `error` | Error text when the drive could not be read, else null. |
-| `storage[]` | `kind` | `data` (Stardust home) or `cache`. |
+| `storage[]` | `kind` | `data` (Stardust home, from `get_hermes_home()`) or `cache`. |
 | `storage[]` | `name`, `path`, `display_path` | Label, absolute path, and the path shown with `~`. |
-| `storage[]` | `path_source`, `env_var` | `env` or `default`, and the variable that set the path (or null). |
+| `storage[]` | `path_source`, `env_var` | `env` or `default` for a cache, `runtime` for the data home; the variable that set a cache path, or null. |
 | `storage[]` | `present` | False when the folder does not exist. |
 | `storage[]` | `bytes`, `entries` | File bytes counted and directory entries examined. |
 | `storage[]` | `complete` | False when a budget, an unreadable folder, or a link ended the count. |
@@ -87,6 +88,7 @@ JSON keys. Every key below is part of the output contract; `schema_version` chan
 - Symbolic links and junctions are never followed or counted. A cache folder that is a link reports `link_not_followed` and no size.
 - The Stardust data home is measured but never suggested for cleanup. For a cache with no tool cleanup command (Electron, electron-builder, Puppeteer, Playwright), a path that is a drive root, the home folder itself or an ancestor of it, or inside or above the data home gets `command_kind` `none` and no printed command.
 - Cache locations come from environment variables first (for example `npm_config_cache`, `UV_CACHE_DIR`, `PIP_CACHE_DIR`, `ELECTRON_CACHE`, `PUPPETEER_CACHE_DIR`, `PLAYWRIGHT_BROWSERS_PATH`), then the platform default. `path_source` and `env_var` show which one applied.
+- The data home is whatever `get_hermes_home()` returns. The current runtime does not read the legacy `HERMES_HOME` variable, so a machine that sets only that variable gets the platform default folder. Read the `数据目录：` line before quoting a data-home size.
 - Sizes use 1024-based units (1 GB = 1024 MB), matching Windows Explorer.
 - The script stats entries only. It never opens a file, reads configuration, `.env`, tokens, or credentials, and never prints file names.
 

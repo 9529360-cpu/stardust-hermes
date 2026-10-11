@@ -29,8 +29,8 @@ GB = 1024**3
 Usage = namedtuple("Usage", "total used free")
 
 
-def _load_script():
-    spec = importlib.util.spec_from_file_location("house_check_under_test", SCRIPT)
+def _load_script(name: str = "house_check_under_test"):
+    spec = importlib.util.spec_from_file_location(name, SCRIPT)
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module  # dataclasses look the module up by name while it executes
     spec.loader.exec_module(module)
@@ -445,6 +445,51 @@ def test_negative_budgets_are_refused(sandbox):
     with pytest.raises(SystemExit) as refused:
         house_check.main(["--max-entries", "-1"])
     assert refused.value.code == 2
+
+
+# --- data home ---------------------------------------------------------------
+
+
+def test_the_data_home_is_whatever_get_hermes_home_returns(sandbox, tmp_path, monkeypatch):
+    legacy = tmp_path / "legacy-hermes"
+    _write(legacy / "state.bin", 500)
+    monkeypatch.setenv("HERMES_HOME", str(legacy))  # the script never reads this variable itself
+    resolved = tmp_path / "resolved-home"
+    _write(resolved / "state.bin", 70)
+    monkeypatch.setattr(house_check, "get_hermes_home", lambda: resolved)
+
+    report = house_check.build_report(max_entries=1000, max_seconds=60)
+    (data_row,) = [row for row in report.storage if row.kind == "data"]
+
+    assert data_row.path == str(resolved)
+    assert (data_row.bytes, data_row.path_source) == (70, "runtime")
+    assert report.data_home_line == f"数据目录：{resolved}"
+
+
+def test_without_the_runtime_resolver_the_data_home_is_unknown(sandbox, monkeypatch):
+    _, data_home = sandbox
+    _write(data_home / "state.bin", 4096)  # would be measured if the script guessed a location
+    monkeypatch.setitem(sys.modules, "hermes_constants", None)  # makes the runtime import fail
+    module = _load_script("house_check_without_resolver")
+
+    assert module.get_hermes_home is None
+    report = module.build_report(max_entries=1000, max_seconds=60)
+    markdown = module.render_markdown(report)
+
+    assert report.data_home_line == "数据目录：无法确定（get_hermes_home 不可用）"
+    assert "数据目录：无法确定（get_hermes_home 不可用）" in markdown
+    assert all(row.kind == "cache" for row in report.storage)
+    assert str(data_home) not in markdown
+    manual = _storage_row(name="manual", size=GB, path=str(data_home / "cache"), clean_command=None)
+    (suggestion,) = module.build_suggestions([manual], data_home=None)
+    assert suggestion.command_kind == "none"
+
+
+def test_the_data_home_line_shows_the_path_in_display_form(sandbox):
+    home, _ = sandbox
+
+    assert house_check.data_home_line(home / ".stardust") == "数据目录：~/.stardust"
+    assert house_check.data_home_line(None) == "数据目录：无法确定（get_hermes_home 不可用）"
 
 
 # --- policy ------------------------------------------------------------------
