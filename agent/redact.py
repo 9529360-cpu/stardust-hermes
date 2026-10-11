@@ -995,7 +995,7 @@ def _command_segments(command: str) -> list[str]:
 def _is_under_hermes_home(path: str) -> bool:
     """True when an absolute ``config.yaml`` path sits under the active Hermes home or root.
 
-    The default home's basename is an installation detail — ``.stardust`` on POSIX, ``hermes``
+    The default home's basename is an installation detail — ``.stardust`` on POSIX, ``stardust``
     under ``AppData/Local`` on Windows — and a resolved path never spells ``$STARDUST_HOME``,
     so the literal-segment test in ``_is_secret_file_arg`` cannot see a native Windows path.
     Compare against the resolved homes instead. Only reached for a ``config.yaml`` basename,

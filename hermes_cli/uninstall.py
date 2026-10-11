@@ -458,7 +458,7 @@ def run_gui_uninstall(args):
     print()
     _print_box("│          ✓ Stardust Desktop Uninstalled!                │", Colors.GREEN)
     print()
-    print("The compatible agent runtime is still installed. Run 'hermes' to use the CLI,")
+    print("The compatible agent runtime is still installed. Run 'stardust' to use the CLI,")
     print("or 'stardust uninstall' to remove the runtime too.")
     print()
 

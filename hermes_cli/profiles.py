@@ -175,9 +175,9 @@ def _wrapper_path(alias: str) -> Path:
 
 
 def _is_our_wrapper(path: Path) -> bool:
-    """True when *path* reads as a Hermes-generated wrapper (contains ``hermes -p``)."""
+    """True when *path* reads as a Hermes-generated wrapper (contains ``stardust -p``)."""
     try:
-        return "hermes -p" in path.read_text(encoding="utf-8")
+        return "stardust -p" in path.read_text(encoding="utf-8")
     except Exception:
         return False
 
@@ -394,9 +394,9 @@ def create_wrapper_script(name: str, target: Optional[str] = None) -> Optional[P
     wrapper_path = _wrapper_path(canon)
     try:
         if sys.platform == "win32":
-            wrapper_path.write_text(f"@echo off\r\nhermes -p {profile} %*\r\n", encoding="utf-8")
+            wrapper_path.write_text(f"@echo off\r\nstardust -p {profile} %*\r\n", encoding="utf-8")
         else:
-            hermes_exe = shutil.which("hermes") or "hermes"
+            hermes_exe = shutil.which("stardust") or "stardust"
             wrapper_path.write_text(f'#!/bin/sh\nexec {shlex.quote(hermes_exe)} -p {profile} "$@"\n', encoding="utf-8")
             wrapper_path.chmod(wrapper_path.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
         return wrapper_path
@@ -453,7 +453,7 @@ def find_alias_for_profile(profile_name: str) -> Optional[str]:
 
 
 # Cap on how much of a wrapper file is read when reverse-looking-up its profile. Real
-# wrappers are a few hundred bytes with the ``hermes -p X`` needle near the top; the wrapper
+# wrappers are a few hundred bytes with the ``stardust -p X`` needle near the top; the wrapper
 # dir commonly also holds large binaries (ffmpeg, node, …) whose whole-file reads, N times,
 # dominated ``list_profiles`` (~4.5s).
 _WRAPPER_READ_LIMIT = 8192
@@ -470,7 +470,7 @@ def build_alias_map() -> dict[str, str]:
     if not wrapper_dir.is_dir():
         return result
     is_windows = sys.platform == "win32"
-    prefix = "hermes -p "
+    prefix = "stardust -p "
     for entry in sorted(wrapper_dir.iterdir()):
         if not entry.is_file():
             continue
@@ -1095,21 +1095,21 @@ _BACKEND_TOKENS = frozenset({"serve", "dashboard", "gateway"})
 _HERMES_ARGV_MARKERS = ("hermes_cli.main", "hermes-gateway", "tui_gateway")
 # python / python3 / python3.12 / pythonw(.exe): the interpreter basenames a
 # `#!/…/python3` console-script shim is exec'd through when something (e.g. Electron's
-# `findOnPath('hermes')`) spawns the shim by handing the interpreter its path — then the
-# OS-reported argv[0] is the interpreter, not "hermes".
+# `findOnPath('stardust')`) spawns the shim by handing the interpreter its path — then the
+# OS-reported argv[0] is the interpreter, not "stardust".
 _PYTHON_INTERPRETER_RE = re.compile(r"^python[\d.]*w?(\.exe)?$")
 # Console-script entry points this project ships (pyproject.toml [project.scripts]).
 # argv[1] is matched against exact names, not ``startswith("hermes")``: with a bare
 # interpreter argv[0], argv[1] can be ANY user script ("hermes-notes.py").
-_HERMES_CONSOLE_SCRIPT_NAMES = frozenset({"hermes", "hermes-agent", "hermes-acp"})
+_HERMES_CONSOLE_SCRIPT_NAMES = frozenset({"stardust", "hermes", "hermes-agent", "hermes-acp"})
 
 
 def _is_hermes_argv(argv: list) -> bool:
-    """True for a Hermes process: entrypoint marker in argv, executable named ``hermes*``,
-    or a python interpreter directly exec'ing a known ``hermes`` console-script shim."""
+    """True for a Hermes process: entrypoint marker in argv, executable named ``hermes*`` or ``stardust*``,
+    or a python interpreter directly exec'ing a known ``stardust`` or ``hermes`` console-script shim."""
     joined = " ".join(argv)
     exe_name = os.path.basename(argv[0]).lower()
-    if any(marker in joined for marker in _HERMES_ARGV_MARKERS) or exe_name.startswith("hermes"):
+    if any(marker in joined for marker in _HERMES_ARGV_MARKERS) or exe_name.startswith(("hermes", "stardust")):
         return True
     if len(argv) >= 2 and _PYTHON_INTERPRETER_RE.match(exe_name):
         script_name = os.path.basename(str(argv[1])).lower()

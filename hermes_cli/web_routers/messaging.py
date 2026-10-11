@@ -791,7 +791,7 @@ async def get_messaging_platforms(profile: Optional[str] = None):
         with _profile_scope(profile) as scoped_dir:
             return {
                 "env_path": str(get_env_path()),
-                "gateway_start_command": " ".join(["hermes", *_gateway_subcommand(profile, "start")]),
+                "gateway_start_command": " ".join(["stardust", *_gateway_subcommand(profile, "start")]),
                 "platforms": _platform_payloads(scoped_dir, _messaging_platform_catalog()),
             }
 

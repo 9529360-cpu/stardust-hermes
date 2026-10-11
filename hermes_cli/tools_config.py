@@ -1035,5 +1035,5 @@ def tools_command(args=None, first_install: bool = False, config: dict = None):
     print()
     from hermes_constants import display_hermes_home
     print(color(f"  Tool configuration saved to {display_hermes_home()}/config.yaml", Colors.DIM))
-    print(color("  Changes take effect on next 'hermes' or gateway restart.", Colors.DIM))
+    print(color("  Changes take effect on next 'stardust' or gateway restart.", Colors.DIM))
     print()

@@ -602,7 +602,7 @@ class A2AAdapter(BasePlatformAdapter):
             session_id = self._profile_sessions.get(key) or _state_db(
                 profile, "SELECT id FROM sessions WHERE title = ? ORDER BY started_at DESC LIMIT 1",
                 (session_title,), "A2A: could not lookup forwarded session")
-            cmd = ["hermes", "chat", "-q", framed_text, "-Q", "--source", "a2a"] + (["--resume", session_id] if session_id else [])
+            cmd = ["stardust", "chat", "-q", framed_text, "-Q", "--source", "a2a"] + (["--resume", session_id] if session_id else [])
             # The child IS the target profile's turn: build its env for that home (launch .env /
             # TERMINAL_* residue dropped, the target's own secrets overlaid), not the gateway's raw environ.
             from tools.environments.local import served_profile_child_env

@@ -1608,7 +1608,7 @@ class TestV1SpecRegressionFixes:
         fakebin = tmp_path / "bin"
         fakebin.mkdir()
         calls = tmp_path / "calls.jsonl"
-        hermes = fakebin / "hermes"
+        hermes = fakebin / "stardust"
         hermes.write_text("""#!/usr/bin/env python3
 import json, os, sqlite3, sys, time
 calls = os.environ['FAKE_HERMES_CALLS']

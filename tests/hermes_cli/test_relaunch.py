@@ -28,7 +28,7 @@ class TestResolveHermesBin:
     def test_falls_back_to_path_which(self, monkeypatch):
         monkeypatch.setattr(sys, "argv", ["-c"])  # not a real path
         monkeypatch.setattr(
-            relaunch_mod.shutil, "which", lambda name: "/usr/bin/stardust" if name == "hermes" else None
+            relaunch_mod.shutil, "which", lambda name: "/usr/bin/stardust" if name == "stardust" else None
         )
         assert relaunch_mod.resolve_hermes_bin() == "/usr/bin/stardust"
 
@@ -208,7 +208,7 @@ class TestResolveHermesBinWindowsPyGuard:
         # exercise the None-fallback path (that's a separate test).
         monkeypatch.setattr(
             relaunch_mod.shutil, "which",
-            lambda name: r"C:\venv\Scripts\stardust.exe" if name == "hermes" else None,
+            lambda name: r"C:\venv\Scripts\stardust.exe" if name == "stardust" else None,
         )
 
         bin_path = relaunch_mod.resolve_hermes_bin()
@@ -235,7 +235,7 @@ class TestResolveHermesBinWindowsPyGuard:
         monkeypatch.setattr(relaunch_mod.sys, "argv", [str(script), "chat"])
         monkeypatch.setattr(
             relaunch_mod.shutil, "which",
-            lambda name: str(wrapper) if name == "hermes" else None,
+            lambda name: str(wrapper) if name == "stardust" else None,
         )
         assert relaunch_mod.resolve_hermes_bin() == str(wrapper)
 
@@ -252,7 +252,7 @@ class TestResolveHermesBinWindowsPyGuard:
         monkeypatch.setattr(
             relaunch_mod.shutil,
             "which",
-            lambda name: str(script) if name == "hermes" else None,
+            lambda name: str(script) if name == "stardust" else None,
         )
 
         assert relaunch_mod.resolve_hermes_bin() is None

@@ -46,7 +46,7 @@ _EDIT_CONFIG_ROWS = (
     ("stardust config", "         View current settings"), ("stardust config edit", "    Open config in your editor"),
     ("stardust config set <key> <value>", ""))
 _READY_ROWS = (
-    ("hermes", "              Start chatting"), ("stardust gateway", "      Start messaging gateway"),
+    ("stardust", "              Start chatting"), ("stardust gateway", "      Start messaging gateway"),
     ("stardust doctor", "       Check for issues"))
 
 

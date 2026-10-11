@@ -402,8 +402,8 @@ def slack_native_slashes() -> list[tuple[str, str, str]]:
     wanted += [(name, desc, hint or "") for name, desc, hint in _iter_plugin_command_entries()]
 
     entries: list[tuple[str, str, str]] = [
-        ("hermes", "Talk to Hermes or run a subcommand", "[subcommand] [args]")]
-    seen = {"hermes"}
+        ("stardust", "Talk to Hermes or run a subcommand", "[subcommand] [args]")]
+    seen = {"stardust"}
     for name, desc, hint in wanted:
         slack_name = _sanitize_slack_name(name)
         if (not slack_name or slack_name in seen or slack_name in _SLACK_RESERVED_COMMANDS

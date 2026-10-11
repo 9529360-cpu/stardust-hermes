@@ -380,11 +380,11 @@ def _serve_relaunch_commands(entries: list[dict]) -> list[list[str]]:
     """Rebuild launch commands for stopped serves from ledger host/port/profile — never argv parsing
     (joined argv cannot round-trip Windows paths with spaces). Entries without a port are skipped."""
     from hermes_cli.update_cmd import _m
-    hermes = "hermes"
+    hermes = "stardust"
     with suppress(Exception):
         scripts_dir = _m()._venv_scripts_dir()
         if scripts_dir is not None:
-            hermes = next((str(scripts_dir / n) for n in ("stardust.exe", "hermes") if (scripts_dir / n).is_file()), hermes)
+            hermes = next((str(scripts_dir / n) for n in ("stardust.exe", "stardust") if (scripts_dir / n).is_file()), hermes)
     commands: list[list[str]] = []
     for entry in entries:
         port = entry.get("port")

@@ -29,7 +29,7 @@ INSTALLED_SKILL_CANARY = "relay-smoke-private-installed-skill"
 
 def _resolve_hermes_executable(hermes_repo: Path) -> Path:
     for relative_path in (
-        Path(".venv") / "bin" / "hermes",
+        Path(".venv") / "bin" / "stardust",
         Path(".venv") / "Scripts" / "stardust.exe",
     ):
         candidate = hermes_repo / relative_path

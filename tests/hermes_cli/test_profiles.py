@@ -435,7 +435,7 @@ class TestDeleteProfile:
     def test_backend_scan_matches_shebang_exec_of_hermes_shim(self, profile_env, monkeypatch):
         """A `stardust` console-script shim spawned directly (e.g. Electron's
         findOnPath('stardust') resolution) reports argv[0] as the interpreter
-        (python3) and argv[1] as the shim's path -- not "hermes" -- because
+        (python3) and argv[1] as the shim's path -- not "stardust" -- because
         the OS execs the shebang. The scanner must still recognize it so
         profile delete doesn't leave a zombie Desktop-spawned backend behind
         (issue: deleting a Desktop profile kept reappearing after relaunch).
@@ -461,10 +461,10 @@ class TestDeleteProfile:
         procs = [
             # Shebang-exec'd shim bound to coder → matched despite argv[0]
             # being the python interpreter, not "hermes".
-            FakeProc(201, ["/usr/bin/python3", "/Users/x/.local/bin/hermes", "--profile", "coder", "serve",
+            FakeProc(201, ["/usr/bin/python3", "/Users/x/.local/bin/stardust", "--profile", "coder", "serve",
                             "--host", "127.0.0.1", "--port", "0"]),
             # Same shape but a different profile → skipped.
-            FakeProc(202, ["/usr/bin/python3", "/Users/x/.local/bin/hermes", "--profile", "other", "serve"]),
+            FakeProc(202, ["/usr/bin/python3", "/Users/x/.local/bin/stardust", "--profile", "other", "serve"]),
             # Non-hermes script run by python3 → skipped.
             FakeProc(203, ["/usr/bin/python3", "/Users/x/some_script.py", "--profile", "coder", "serve"]),
         ]
@@ -660,7 +660,7 @@ class TestAliasCollision:
         wrapper_dir = profile_env / ".local" / "bin"
         wrapper_dir.mkdir(parents=True, exist_ok=True)
         bat_path = wrapper_dir / "mybot.bat"
-        bat_path.write_text("@echo off\r\nhermes -p mybot %*\r\n")
+        bat_path.write_text("@echo off\r\nstardust -p mybot %*\r\n")
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(
                 returncode=0, stdout=str(bat_path),
