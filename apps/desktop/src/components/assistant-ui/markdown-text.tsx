@@ -22,6 +22,7 @@ import { normalizeExternalUrl, openExternalLink, PrettyLink } from '@/lib/extern
 import { createMemoizedMathPlugin } from '@/lib/katex-memo'
 import { parseMarkdownIntoBlocksCached } from '@/lib/markdown-blocks'
 import { preprocessMarkdown } from '@/lib/markdown-preprocess'
+import { BLOCKED_IMAGE_TAG, markdownRehypePlugins } from '@/lib/markdown-rehype'
 import {
   downloadGatewayMediaFile,
   isFileMediaPath,
@@ -449,6 +450,27 @@ function MarkdownImageContent({ className, src, alt, ...props }: ComponentProps<
   )
 }
 
+// The placeholder for an image the markdown policy refused (file:, javascript:,
+// non-image data:, or a bare relative name). It names the image and offers no
+// open action: a refused source is not ours to open.
+// Props are the open record streamdown hands custom tags, so `alt` and `src`
+// are narrowed here rather than typed on the component.
+function BlockedImageNotice(props: Record<string, unknown>) {
+  const { t } = useI18n()
+  const alt = typeof props.alt === 'string' ? props.alt.trim() : ''
+  const src = typeof props.src === 'string' ? props.src : ''
+  const name = alt || (src ? mediaName(src) : '') || t.artifacts.kindImage
+
+  return <span className="my-2 block text-sm text-muted-foreground">{t.assistant.media.couldntLoad(name)}</span>
+}
+
+// Merged in beside the typed map, not written into it: a custom tag key inside that
+// object breaks its cast to StreamdownTextComponents. Object.assign returns an
+// intersection that already includes the typed map, so no cast is needed.
+function withBlockedImagePlaceholder(components: StreamdownTextComponents): StreamdownTextComponents {
+  return Object.assign({}, components, { [BLOCKED_IMAGE_TAG]: BlockedImageNotice })
+}
+
 interface MarkdownTextSurfaceProps {
   containerClassName?: string
   containerProps?: ComponentProps<'div'>
@@ -700,6 +722,8 @@ function MarkdownTextSurface({
     [disableArtifacts, isStreaming, previewOnly, scratchpad]
   )
 
+  const surfaceComponents = useMemo(() => withBlockedImagePlaceholder(components), [components])
+
   if (text.length > MAX_MARKDOWN_CHARS) {
     return <HugeTextFallback containerClassName={containerClassName} text={text} />
   }
@@ -728,7 +752,7 @@ function MarkdownTextSurface({
       label="markdown-render"
     >
       <StreamdownTextPrimitive
-        components={components}
+        components={surfaceComponents}
         containerClassName={cn(MARKDOWN_CONTAINER_CLASS_NAME, containerClassName)}
         containerProps={containerProps}
         defer={defer}
@@ -743,6 +767,9 @@ function MarkdownTextSurface({
         parseMarkdownIntoBlocksFn={parseMarkdownIntoBlocksCached}
         plugins={plugins}
         preprocess={preprocessWithTailRepair}
+        // The image-safe pipeline: data: image sources reach <img>, and any
+        // image the policy refuses renders the localized placeholder above.
+        rehypePlugins={markdownRehypePlugins}
       />
     </ErrorBoundary>
   )
