@@ -348,7 +348,7 @@ def test_relay_route_queues_envelope_and_spawns_waiter(tmp_path, monkeypatch):
     assert len(pending) == 1
     assert pending[0]["target_connection"] == "cloud-1"
     assert pending[0]["target_profile"] == "default"
-    assert pending[0]["message"].startswith("Message from 🤖 hermes (@hermes): ping")
+    assert pending[0]["message"].startswith("Message from 🤖 stardust (@stardust): ping")
     # waiter watches this envelope's reply file
     assert pending[0]["id"] in spawned["command"]
 
@@ -388,7 +388,7 @@ def test_protocol_section_lists_remote_teammates(tmp_path):
     ])
     section = bot_mode_probe.get_bot_mode_protocol_section(home, force_refresh=True)
     assert "OTHER connected machines" in section
-    assert "`@hermes` — on Hermes Cloud — Moxie" in section
+    assert "`@stardust` — on Hermes Cloud — Moxie" in section
 
 
 def test_capability_fingerprint_changes_with_relay_roster(tmp_path):
