@@ -82,6 +82,11 @@ jobs:
         with:
           command: uv sync --locked --python 3.11 --extra all --extra dev
 
+      # ── Playwright browsers (the suite launches chromium directly) ────
+      - name: Install Playwright browsers
+        working-directory: apps/desktop
+        run: npx playwright install --with-deps chromium
+
       # ── Build desktop app ─────────────────────────────────────────────
       # The Playwright step below runs `npm run build` before testing so
       # dist/ is always fresh — no separate build step needed here.
@@ -121,6 +126,11 @@ jobs:
           fi
         env:
           CI: 'true'
+          # Some specs need the repo backend interpreter and a writable temp
+          # directory. Locally these are set by hand (Windows paths); CI names
+          # the Linux equivalents.
+          STARDUST_DESKTOP_PYTHON: ${{ github.workspace }}/.venv/bin/python
+          STARDUST_TASK_TEMP: ${{ runner.temp }}
           # Ensure no real API keys leak into the test env.
           OPENROUTER_API_KEY: ''
           OPENAI_API_KEY: ''
