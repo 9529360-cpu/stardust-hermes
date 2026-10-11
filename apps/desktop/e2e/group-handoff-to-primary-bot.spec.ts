@@ -55,7 +55,9 @@ async function roomLog(page: Page, group: string): Promise<RoomLogEntry[]> {
 }
 
 test.beforeAll(async () => {
-  fixture = await setupMockBackend()
+  // The labels this spec clicks and asserts are English. Pin the display language so the run
+  // does not follow the OS language, which would fail on a Chinese-language machine.
+  fixture = await setupMockBackend({ extraDisplayConfig: '  language: en' })
   await waitForAppReady(fixture, 120_000)
 })
 
@@ -103,10 +105,19 @@ test('a teammate handing off with @hermes drives the primary profile', async () 
   await openBots(page)
   await createAgent(page, 'code-farmer', 'Code Farmer')
 
+  // The primary's roster row and its New Group Chat entry, as the PR body cites them.
+  await expect(page.getByRole('button', { name: /^Stardust · @stardust/ }).first()).toBeVisible({
+    timeout: 30_000
+  })
+
   await page.getByRole('button', { name: 'New bot or group chat' }).click()
   await page.getByRole('menuitem', { name: 'New Group Chat' }).click()
 
   const dialog = page.getByRole('dialog', { name: 'New Group Chat' })
+
+  await expect(dialog.getByRole('checkbox', { name: 'Stardust @stardust', exact: true })).toBeVisible({
+    timeout: 30_000
+  })
 
   for (const title of ['Stardust', 'Code Farmer']) {
     await dialog.getByText(title, { exact: true }).locator('xpath=ancestor::label').getByRole('checkbox').click()
