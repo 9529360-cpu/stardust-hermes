@@ -2,7 +2,7 @@
  * `applyAdvancedConfig` — the advanced editor's save, which persists ONLY the
  * dirty sections and reports per-section outcomes back to the dialog.
  *
- * Two contracts live here:
+ * Three contracts live here:
  *
  *  - **Inherit clears the pin.** A dirty model section with both fields empty
  *    means "inherit the gateway default", which is a `config unset model`, not
@@ -17,6 +17,9 @@
  *    core picker uses (one applier, no forked confirm UI), must not count as a
  *    FAILED section while it is merely pending, and Confirm must resend ONLY
  *    the model section with `confirm_expensive_model: true`.
+ *  - **The toolset pin ignores config-only rows.** A row with no tools (stt) has
+ *    no checkbox, so its state never decides the pin: every tool row on, or none,
+ *    clears it to the default.
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -227,5 +230,35 @@ describe('a guarded model switch (#95293)', () => {
     expect(routed).toHaveLength(1)
     expect(confirmMock).not.toHaveBeenCalled()
     expect(result).toMatchObject({ applied: { model: true }, ok: true })
+  })
+})
+
+describe('the toolset pin', () => {
+  // `tool_count` is what profiles.describe reports per toolset; stt has no tools.
+  const toolset = (name: string, enabled: boolean, tool_count: number) => ({ enabled, name, tool_count })
+
+  /** The `enabled_toolsets` a toolset save sends for these rows. */
+  const pinFor = async (toolsets: ReturnType<typeof toolset>[]) => {
+    await applyAdvancedConfig(bot, { ...emptyAdvancedState(), dirtyToolsets: true, loaded: true, toolsets })
+
+    return routed.find(call => call.method === 'profiles.configure')?.params.enabled_toolsets
+  }
+
+  it('clears the pin when every tool row is on, whatever stt says', async () => {
+    const pin = await pinFor([toolset('web', true, 4), toolset('terminal', true, 6), toolset('stt', false, 0)])
+
+    expect(pin).toEqual([])
+  })
+
+  it('restores the default when every tool row is off, instead of pinning stt alone', async () => {
+    const pin = await pinFor([toolset('web', false, 4), toolset('terminal', false, 6), toolset('stt', true, 0)])
+
+    expect(pin).toEqual([])
+  })
+
+  it('pins the checked tool rows and keeps stt as it was', async () => {
+    const pin = await pinFor([toolset('web', true, 4), toolset('terminal', false, 6), toolset('stt', true, 0)])
+
+    expect(pin).toEqual(['web', 'stt'])
   })
 })

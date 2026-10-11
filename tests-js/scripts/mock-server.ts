@@ -413,6 +413,48 @@ function includesBatchClarifyTrigger(value: unknown): boolean {
 }
 
 /**
+ * A marker that makes the mock call the real `cronjob_manage` create tool. The
+ * backend saves the routine in the sandbox and the result card renders what it
+ * returned, so the card shows a real routine result rather than a fixture.
+ */
+export const CRON_ROUTINE_TRIGGER = 'E2E_CRON_ROUTINE_TRIGGER'
+export const CRON_ROUTINE_REPLY = '已为你设置好每天 9 点的晨间摘要。'
+
+const CRON_ROUTINE_TURN: ScriptedTurn = {
+  text: '',
+  toolCalls: [
+    {
+      name: 'cronjob_manage',
+      args: {
+        action: 'create',
+        name: '晨间摘要',
+        schedule: '0 9 * * *',
+        prompt: '整理昨天的待办，并列出今天最重要的三件事。',
+        deliver: 'origin',
+      },
+    },
+  ],
+}
+
+const CRON_ROUTINE_REPLY_TURN: ScriptedTurn = { text: CRON_ROUTINE_REPLY }
+
+function includesCronRoutineTrigger(value: unknown): boolean {
+  if (typeof value === 'string') {
+    return value.includes(CRON_ROUTINE_TRIGGER)
+  }
+
+  if (Array.isArray(value)) {
+    return value.some(includesCronRoutineTrigger)
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.values(value).some(includesCronRoutineTrigger)
+  }
+
+  return false
+}
+
+/**
  * Per-speaker scripted line for Bot Mode group rooms. A room turn prompt opens
  * with `You are @<handle>` and quotes the user's message verbatim, so one user
  * send can script every member's reply:
@@ -608,6 +650,22 @@ export function startMockServer(options: MockServerOptions = {}): Promise<MockSe
               void heldStreamReleased.then(respond)
             } else {
               respond()
+            }
+
+            return
+          }
+
+          if (includesCronRoutineTrigger(parsed.messages)) {
+            // The first completion calls the cron tool; once its result is in the history the
+            // trigger text stays put, so the next completion is the closing reply.
+            const hasToolResult = Array.isArray(parsed.messages)
+              && parsed.messages.some((message: { role?: string }) => message?.role === 'tool')
+            const turn = hasToolResult ? CRON_ROUTINE_REPLY_TURN : CRON_ROUTINE_TURN
+
+            if (stream) {
+              streamScriptedTurn(res, model, turn)
+            } else {
+              nonStreamingScriptedTurn(res, model, turn)
             }
 
             return

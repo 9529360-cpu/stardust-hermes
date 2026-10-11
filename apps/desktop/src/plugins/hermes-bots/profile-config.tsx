@@ -61,6 +61,32 @@ export interface CapabilityEntry {
   requires?: string[]
   tool_count?: number
 }
+
+/** A toolset row is a toggle unless the backend reports it has no tools. This is
+ *  the zero-tool part of the Tools page's rule (`isDesktopToolsetRow` in
+ *  lib/desktop-toolsets.ts), restated for `profiles.describe` rows, which carry
+ *  `tool_count` rather than tool names. A row with no count keeps its checkbox.
+ *  Plugin code stays on the SDK boundary and does not import `lib/`. A
+ *  config-only capability (speech-to-text) reports zero tools: its switch is its
+ *  own config section (Settings → Voice), so no checklist offers it a checkbox. */
+export function isToolsetRow(toolset: Pick<CapabilityEntry, 'tool_count'>): boolean {
+  return toolset.tool_count !== 0
+}
+
+/** The `enabled_toolsets` pin a checklist save writes. Only the rows the user can
+ *  see decide whether it clears: every row on, or none, is the default (`[]`).
+ *  Otherwise the pin lists each enabled entry, so a hidden row keeps its state. */
+export function enabledToolsetsPayload(toolsets: CapabilityEntry[]): string[] {
+  const rows = toolsets.filter(isToolsetRow)
+  const enabledRows = rows.filter(t => t.enabled).length
+
+  if (enabledRows === rows.length || enabledRows === 0) {
+    return []
+  }
+
+  return toolsets.filter(t => t.enabled).map(t => t.name)
+}
+
 interface CheckListProps {
   columns?: number
   items: CapabilityEntry[]
@@ -245,7 +271,8 @@ export function AdvancedProfileConfig({ bot, state, setState }: AdvancedProfileC
     }))
 
   const enabledSkills = state.skills.filter(s => s.enabled).length
-  const enabledToolsets = state.toolsets.filter(t => t.enabled).length
+  const toolsetRows = state.toolsets.filter(isToolsetRow)
+  const enabledToolsets = toolsetRows.filter(t => t.enabled).length
   const mcpList = state.mcp || []
 
   // Newer desktop builds export the WHOLE core Capabilities surface
@@ -397,7 +424,7 @@ export function AdvancedProfileConfig({ bot, state, setState }: AdvancedProfileC
         </div>
       )}
       {labeled(
-        `Toolsets (${enabledToolsets}/${state.toolsets.length} enabled — unchecking all restores the default)`,
+        `Toolsets (${enabledToolsets}/${toolsetRows.length} enabled — unchecking all restores the default)`,
         <div className="rounded-md border border-(--ui-stroke-secondary) p-2">
           <div
             className="overflow-y-auto overscroll-contain"
@@ -406,7 +433,7 @@ export function AdvancedProfileConfig({ bot, state, setState }: AdvancedProfileC
             }}
           >
             <div className="grid gap-1.5">
-              {state.toolsets.map(tset => (
+              {toolsetRows.map(tset => (
                 <div className="rounded-md border border-(--ui-stroke-secondary) p-2" key={tset.name}>
                   <label className="flex items-center gap-2 text-xs font-medium text-(--ui-text-secondary)">
                     <Checkbox
@@ -585,10 +612,7 @@ export async function applyAdvancedConfig(bot: RosterRow, state: AdvancedConfigS
   }
 
   if (state.dirtyToolsets) {
-    const all = state.toolsets.length
-    const enabled = state.toolsets.filter(t => t.enabled)
-    // All enabled (or none) = clear the pin; otherwise pin the checked set.
-    payload.enabled_toolsets = enabled.length === all || enabled.length === 0 ? [] : enabled.map(t => t.name)
+    payload.enabled_toolsets = enabledToolsetsPayload(state.toolsets)
   }
 
   if (state.dirtyMcp) {

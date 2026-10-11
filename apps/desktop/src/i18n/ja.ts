@@ -3797,6 +3797,34 @@ export const ja = defineLocale({
       copyFile: 'ファイルをコピー',
       copyPath: 'パスをコピー',
       failedCalls: (count: number) => `失敗したツール呼び出し: ${count}`,
+      runSummary: {
+        delegate: {
+          past: '委任済み',
+          present: '委任中',
+          counted: count => `${count} 件のタスク`
+        },
+        edit: {
+          past: '編集済み',
+          present: '編集中',
+          counted: count => `${count} 件のファイル`
+        },
+        explore: {
+          past: '探索済み',
+          present: '探索中',
+          counted: count => `${count} 件のファイル`
+        },
+        other: {
+          past: '使用済み',
+          present: '使用中',
+          counted: count => `${count} 件のツール`
+        },
+        run: {
+          past: '実行済み',
+          present: '実行中',
+          counted: count => `${count} 件のコマンド`
+        },
+        separator: '、'
+      },
       skillActivity: {
         loading: 'スキルを読み込み中',
         loaded: 'スキルを読み込みました',
@@ -3848,14 +3876,37 @@ export const ja = defineLocale({
         runningTool: action => `${action}を実行中`
       },
       cron: {
+        actionOnly: action => `${action} Cron ジョブ`,
+        actions: {
+          create: '作成',
+          update: '更新',
+          pause: '一時停止',
+          resume: '再開',
+          remove: '削除',
+          run: '実行',
+          list: '一覧表示',
+          refresh: '更新',
+          manage: '管理'
+        },
+        delivery: '配信先',
+        deliveryAll: '接続中のすべてのチャネル',
+        deliveryCurrentChat: '現在の会話',
+        deliverySaveOnly: '保存のみ',
+        jobCount: count => `${count} 件の Cron ジョブ`,
+        nextRun: '次回の実行',
+        nextRuns: '次回の実行',
+        noJobs: 'Cron ジョブはありません',
+        noJobsScheduled: '予定されている Cron ジョブはありません',
+        notSaved: '未保存',
         preview: 'Cron ジョブのプレビュー',
         previewWithSchedule: schedule => `Cron ジョブのプレビュー · ${schedule}`,
         previousSchedule: '変更前のスケジュール',
-        nextRuns: '次回の実行',
-        delivery: '配信先',
-        deliveryCurrentChat: '現在の会話',
-        deliverySaveOnly: '保存のみ',
-        notSaved: '未保存'
+        repeat: '繰り返し',
+        repeatForever: '無期限',
+        repeatOnce: '1回',
+        repeatTimes: times => `${times} 回`,
+        schedule: 'スケジュール',
+        untitledJob: 'ジョブ'
       },
       titles: {
         browser_click: {

@@ -4605,6 +4605,34 @@ export const en: Translations = {
       copyFile: 'Copy file',
       copyPath: 'Copy path',
       failedCalls: (count: number) => `${count} tool call${count === 1 ? '' : 's'} failed`,
+      runSummary: {
+        delegate: {
+          past: 'Delegated',
+          present: 'Delegating',
+          counted: count => `${count} task${count === 1 ? '' : 's'}`
+        },
+        edit: {
+          past: 'Edited',
+          present: 'Editing',
+          counted: count => `${count} file${count === 1 ? '' : 's'}`
+        },
+        explore: {
+          past: 'Explored',
+          present: 'Exploring',
+          counted: count => `${count} file${count === 1 ? '' : 's'}`
+        },
+        other: {
+          past: 'Used',
+          present: 'Using',
+          counted: count => `${count} tool${count === 1 ? '' : 's'}`
+        },
+        run: {
+          past: 'Ran',
+          present: 'Running',
+          counted: count => `${count} command${count === 1 ? '' : 's'}`
+        },
+        separator: ', '
+      },
       skillActivity: {
         loading: 'Loading skill',
         loaded: 'Loaded skill',
@@ -4656,14 +4684,37 @@ export const en: Translations = {
         runningTool: action => `Running ${action.toLowerCase()}`
       },
       cron: {
+        actionOnly: action => `Cron ${action.toLowerCase()}`,
+        actions: {
+          create: 'Create',
+          update: 'Update',
+          pause: 'Pause',
+          resume: 'Resume',
+          remove: 'Remove',
+          run: 'Run',
+          list: 'List',
+          refresh: 'Refresh',
+          manage: 'Manage'
+        },
+        delivery: 'Delivery',
+        deliveryAll: 'All connected channels',
+        deliveryCurrentChat: 'Current chat',
+        deliverySaveOnly: 'Save only',
+        jobCount: count => `${count} cron job${count === 1 ? '' : 's'}`,
+        nextRun: 'Next run',
+        nextRuns: 'Next runs',
+        noJobs: 'No cron jobs',
+        noJobsScheduled: 'No cron jobs scheduled',
+        notSaved: 'Not saved',
         preview: 'Cron job preview',
         previewWithSchedule: schedule => `Cron job preview · ${schedule}`,
         previousSchedule: 'Previous schedule',
-        nextRuns: 'Next runs',
-        delivery: 'Delivery',
-        deliveryCurrentChat: 'Current chat',
-        deliverySaveOnly: 'Save only',
-        notSaved: 'Not saved'
+        repeat: 'Repeat',
+        repeatForever: 'forever',
+        repeatOnce: 'once',
+        repeatTimes: times => `${times} times`,
+        schedule: 'Schedule',
+        untitledJob: 'job'
       },
       titles: {
         browser_click: { done: 'Clicked page element', pending: 'Clicking page element', pendingAction: 'Clicking' },
