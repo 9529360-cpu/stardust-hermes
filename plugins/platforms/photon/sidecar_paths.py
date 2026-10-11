@@ -25,7 +25,7 @@ SOURCE_SIDECAR_DIR = Path(__file__).parent / "sidecar"
 _MIRROR_FILES = ("index.mjs", "package.json", "package-lock.json", "patch-spectrum-mixed-attachments.mjs")
 # Tests monkeypatch these module globals directly; the accessors honor a non-None value.
 _SIDECAR_DIR: Optional[Path] = None
-# Written by `hermes photon install-sidecar` on npm failure so check_requirements() can
+# Written by `stardust photon install-sidecar` on npm failure so check_requirements() can
 # surface the root cause later; cleared on success.
 _NPM_ERROR_LOG: Optional[Path] = None
 _NPM_ERROR_LOG_MAX_CHARS = 300

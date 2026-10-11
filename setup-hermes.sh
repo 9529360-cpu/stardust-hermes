@@ -382,9 +382,9 @@ fi
 # PATH setup — symlink hermes into a user-facing bin dir
 # ============================================================================
 
-echo -e "${CYAN}→${NC} Setting up hermes command..."
+echo -e "${CYAN}→${NC} Setting up stardust command..."
 
-STARDUST_BIN="$SCRIPT_DIR/venv/bin/hermes"
+STARDUST_BIN="$SCRIPT_DIR/venv/bin/stardust"
 COMMAND_LINK_DIR="$(get_command_link_dir)"
 COMMAND_LINK_DISPLAY_DIR="$(get_command_link_display_dir)"
 mkdir -p "$COMMAND_LINK_DIR"
@@ -433,14 +433,14 @@ else
 fi
 
 # ============================================================================
-# Seed bundled skills into ~/.hermes/skills/
+# Seed bundled skills into ~/.stardust/skills/
 # ============================================================================
 
-STARDUST_SKILLS_DIR="${STARDUST_HOME:-$HOME/.hermes}/skills"
+STARDUST_SKILLS_DIR="${STARDUST_HOME:-$HOME/.stardust}/skills"
 mkdir -p "$STARDUST_SKILLS_DIR"
 
 echo ""
-echo "Syncing bundled skills to ~/.hermes/skills/ ..."
+echo "Syncing bundled skills to ~/.stardust/skills/ ..."
 if "$SCRIPT_DIR/venv/bin/python" "$SCRIPT_DIR/tools/skills_sync.py" 2>/dev/null; then
     echo -e "${GREEN}✓${NC} Skills synced"
 else
@@ -462,7 +462,7 @@ echo "Next steps:"
 echo ""
 if is_termux; then
     echo "  1. Run the setup wizard to configure API keys:"
-    echo "     hermes setup"
+    echo "     stardust setup"
     echo ""
     echo "  2. Start chatting:"
     echo "     hermes"
@@ -472,21 +472,21 @@ else
     echo "     source $SHELL_CONFIG"
     echo ""
     echo "  2. Run the setup wizard to configure API keys:"
-    echo "     hermes setup"
+    echo "     stardust setup"
     echo ""
     echo "  3. Start chatting:"
     echo "     hermes"
     echo ""
 fi
 echo "Other commands:"
-echo "  hermes status        # Check configuration"
+echo "  stardust status        # Check configuration"
 if is_termux; then
-    echo "  hermes gateway       # Run gateway in foreground"
+    echo "  stardust gateway       # Run gateway in foreground"
 else
-    echo "  hermes gateway install # Install gateway service (messaging + cron)"
+    echo "  stardust gateway install # Install gateway service (messaging + cron)"
 fi
-echo "  hermes cron list     # View scheduled jobs"
-echo "  hermes doctor        # Diagnose issues"
+echo "  stardust cron list     # View scheduled jobs"
+echo "  stardust doctor        # Diagnose issues"
 echo ""
 
 # Ask if they want to run setup wizard now

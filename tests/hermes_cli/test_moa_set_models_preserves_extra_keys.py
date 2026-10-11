@@ -94,7 +94,7 @@ def test_moa_save_writes_only_the_moa_section(tmp_path, monkeypatch):
     import yaml
     from hermes_cli.config import get_config_path, load_config, read_raw_config
 
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     monkeypatch.setenv("STARDUST_HOME", str(home))
     get_config_path().write_text(yaml.safe_dump({"model": {"default": "m1", "provider": "custom"}}), encoding="utf-8")

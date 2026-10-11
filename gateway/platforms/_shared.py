@@ -87,7 +87,7 @@ def platform_gate_env(name: str, default: str = "") -> str:
 
 
 def decode_json_list_literal(raw):
-    """Decode a JSON-encoded allowlist written by ``hermes config set``.
+    """Decode a JSON-encoded allowlist written by ``stardust config set``.
 
     String-typed defaults keep list literals verbatim on write (``allowed_chats`` is
     declared as ``""``), so the config can hold ``'["-100","-200"]'`` as a string.

@@ -1,6 +1,6 @@
 """Tests for the bundled Nous dashboard-auth plugin.
 
-Covers four shapes from Phase 4 of ``.hermes/plans/2026-05-21-dashboard-oauth-auth.md``:
+Covers four shapes from Phase 4 of ``.stardust/plans/2026-05-21-dashboard-oauth-auth.md``:
 
 1. Plugin entry-point retirement (legacy provider class remains importable).
 2. ``start_login`` shape (PKCE/state, authorize URL parameters).

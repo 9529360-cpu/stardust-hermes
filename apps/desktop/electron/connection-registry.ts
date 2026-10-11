@@ -632,7 +632,7 @@ export function shouldRetrySshInventory(
 
 const PROFILE_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/
 
-/** Turn `ls ~/.hermes/profiles` output into roster names. Always includes
+/** Turn `ls ~/.stardust/profiles` output into roster names. Always includes
  *  `default`. Drops rollback snapshots and junk lines. */
 export function parseRemoteProfileListing(text: string): string[] {
   const names = new Set<string>(['default'])
@@ -783,7 +783,7 @@ export interface UpdateEligibility {
 
 /**
  * Whether "Update all instances" may drive this connection. Hermes Cloud
- * instances are platform-managed — we never run `hermes update` against them.
+ * instances are platform-managed — we never run `stardust update` against them.
  * Local, remote, and ssh sources are all eligible (reachability and busy
  * checks happen at dispatch time, not here).
  */

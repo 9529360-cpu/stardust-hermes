@@ -1,6 +1,6 @@
 """Tests for the Windows half-updated-venv hardening (July 2026 incident).
 
-Covers three additions to ``hermes update``:
+Covers three additions to ``stardust update``:
 
 1. ``_venv_core_imports_healthy`` — the venv health probe that lets an
    "Already up to date" checkout still repair a broken dependency install.
@@ -76,7 +76,7 @@ def test_detect_venv_python_excludes_self_and_ancestors(_winp, tmp_path):
         process_iter=lambda attrs: iter(
             [
                 _proc(_os.getpid(), venv_py, "python.exe"),
-                _proc(555, venv_py, "hermes.exe"),
+                _proc(555, venv_py, "stardust.exe"),
             ]
         ),
         Process=lambda *a, **k: me,

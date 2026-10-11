@@ -25,7 +25,7 @@ from hermes_state import SessionDB
 
 @pytest.fixture()
 def hermes_home(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     monkeypatch.setenv("STARDUST_HOME", str(home))

@@ -1,6 +1,6 @@
 """OpenAI Codex OAuth: token store, refresh, quota probe, device-code login.
 
-Tokens live in ~/.hermes/auth.json, NOT ~/.codex/: Hermes keeps its own Codex OAuth session
+Tokens live in ~/.stardust/auth.json, NOT ~/.codex/: Hermes keeps its own Codex OAuth session
 separate from the Codex CLI / VS Code extension so one app's refresh-token rotation cannot
 invalidate the other's session.
 
@@ -32,10 +32,10 @@ if TYPE_CHECKING:  # annotation-only; the runtime import would be a cycle
 logger = logging.getLogger("hermes_cli.auth")
 
 _MISSING_ACCESS_TOKEN_MSG = (
-    "Codex auth is missing access_token. Run `hermes auth` to re-authenticate.")
+    "Codex auth is missing access_token. Run `stardust auth` to re-authenticate.")
 _MISSING_REFRESH_TOKEN_MSG = (
-    "Codex auth is missing refresh_token. Run `hermes auth` to re-authenticate.")
-_NO_CREDENTIALS_MSG = "No Codex credentials stored. Run `hermes auth` to authenticate."
+    "Codex auth is missing refresh_token. Run `stardust auth` to re-authenticate.")
+_NO_CREDENTIALS_MSG = "No Codex credentials stored. Run `stardust auth` to authenticate."
 
 
 def _parse_retry_after_seconds(headers: Any) -> Optional[int]:
@@ -82,7 +82,7 @@ def _load_auth_store_maybe_locked(lock: bool) -> Dict[str, Any]:
 
 
 def _read_codex_tokens(*, _lock: bool = True) -> Dict[str, Any]:
-    """Read Codex OAuth tokens from Hermes auth store (~/.hermes/auth.json)."""
+    """Read Codex OAuth tokens from Hermes auth store (~/.stardust/auth.json)."""
     from hermes_cli.auth import _load_provider_state, _nonempty_str
     auth_store = _load_auth_store_maybe_locked(_lock)
     state = _load_provider_state(auth_store, "openai-codex")
@@ -91,7 +91,7 @@ def _read_codex_tokens(*, _lock: bool = True) -> Dict[str, Any]:
     tokens = state.get("tokens")
     if not isinstance(tokens, dict):
         raise _codex_err(
-            "Codex auth state is missing tokens. Run `hermes auth` to re-authenticate.",
+            "Codex auth state is missing tokens. Run `stardust auth` to re-authenticate.",
             "codex_auth_invalid_shape", relogin=True)
     if not _nonempty_str(tokens.get("access_token")):
         raise _codex_err(_MISSING_ACCESS_TOKEN_MSG, "codex_auth_missing_access_token", relogin=True)
@@ -106,8 +106,8 @@ def _sync_codex_pool_entries(
     previous_singleton_tokens: Optional[Dict[str, str]] = None) -> None:
     """Mirror a fresh Codex re-auth into the credential_pool OAuth entries.
 
-    ``device_code`` (the singleton-seeded entry from ``hermes setup`` / the model picker) is always
-    synced. ``manual:device_code`` (``hermes auth add openai-codex``) is synced only when its
+    ``device_code`` (the singleton-seeded entry from ``stardust setup`` / the model picker) is always
+    synced. ``manual:device_code`` (``stardust auth add openai-codex``) is synced only when its
     access_token equals the PREVIOUS singleton token — a legacy alias of the singleton; an entry
     with its own token material is an independent account and must be left alone. ``manual:api_key``
     and any other source are independent credentials and are never overwritten by a re-auth.
@@ -326,7 +326,7 @@ def _codex_refresh_failure_error(response: "httpx.Response") -> AuthError:
             "Codex refresh token was already consumed by another client "
             "(e.g. Codex CLI or VS Code extension). "
             "Run `codex` in your terminal to generate fresh tokens, "
-            "then run `hermes auth` to re-authenticate.")
+            "then run `stardust auth` to re-authenticate.")
     # A 401/403 from the token endpoint always means the refresh token is invalid/expired —
     # force relogin even if the body error code wasn't one of the known strings.
     relogin_required = (
@@ -697,7 +697,7 @@ def _pool_codex_access_token() -> str:
 
 
 def _login_openai_codex(args, pconfig: ProviderConfig, *, force_new_login: bool = False) -> None:
-    """OpenAI Codex login via device code flow. Tokens stored in ~/.hermes/auth.json."""
+    """OpenAI Codex login via device code flow. Tokens stored in ~/.stardust/auth.json."""
     from hermes_cli.auth import (
         _codex_access_token_is_expiring, _codex_device_code_login, _import_codex_cli_tokens,
         _offer_existing_oauth_credentials, _print_login_success, _prompt_yes_no, _save_codex_tokens,
@@ -740,7 +740,7 @@ def _codex_login_rate_limited_error(response: "httpx.Response", *, during: str =
     """AuthError for a 429 from OpenAI's device-auth endpoints (throttle, not credential fault)."""
     # Upstream rate-limit / usage-quota exhaustion on the token endpoint. The stored refresh token is still
     # valid here — re-authenticating cannot lift a quota cap. Classify distinctly from auth failures so
-    # callers surface a "retry later" notice instead of a misleading "run hermes auth" prompt (see issue
+    # callers surface a "retry later" notice instead of a misleading "run stardust auth" prompt (see issue
     # #32790).
     retry_after = _parse_retry_after_seconds(getattr(response, "headers", None))
     wait_hint = (

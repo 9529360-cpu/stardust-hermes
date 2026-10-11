@@ -160,7 +160,7 @@ def _openai_http_client_kwargs(base_url: Optional[str], *, async_mode: bool = Fa
             logger.warning(
                 "agent.process_bootstrap.build_keepalive_http_client is "
                 "unavailable — mixed/stale install detected (#64333). Falling "
-                "back to the SDK default HTTP client. Run `hermes update` (or "
+                "back to the SDK default HTTP client. Run `stardust update` (or "
                 "reinstall the Desktop app) to resync the runtime.")
         client = None
     return {"http_client": client} if client is not None else {}
@@ -547,7 +547,7 @@ def _try_nous(vision: bool = False) -> Tuple[Optional[OpenAI], Optional[str]]:
     nous = _read_nous_auth()
     runtime = _resolve_nous_runtime_api(force_refresh=False)
     if runtime is None and not nous:
-        logger.warning("Auxiliary Nous client unavailable: no Nous authentication found (run: hermes auth).")
+        logger.warning("Auxiliary Nous client unavailable: no Nous authentication found (run: stardust auth).")
         _mark_provider_unhealthy("nous", ttl=60)
         return None, None
     if runtime is None and nous:
@@ -559,7 +559,7 @@ def _try_nous(vision: bool = False) -> Tuple[Optional[OpenAI], Optional[str]]:
         if not api_key:
             logger.warning(
                 "Auxiliary Nous client unavailable: no usable inference JWT found "
-                "(run: hermes auth add nous)."
+                "(run: stardust auth add nous)."
             )
             _mark_provider_unhealthy("nous", ttl=60)
             return None, None
@@ -855,7 +855,7 @@ def clear_runtime_main() -> None:
 
 def _warn_stale_openai_base_url(runtime_provider: str) -> None:
     """Warn once when OPENAI_BASE_URL is set but config.yaml names a non-custom provider (a stale
-    ~/.hermes/.env value after `hermes model` poisons routing)."""
+    ~/.stardust/.env value after `stardust model` poisons routing)."""
     global _stale_base_url_warned
     if _stale_base_url_warned:
         return
@@ -865,8 +865,8 @@ def _warn_stale_openai_base_url(runtime_provider: str) -> None:
         logger.warning(
             "OPENAI_BASE_URL is set (%s) but model.provider is '%s'. "
             "Auxiliary clients may route to the wrong endpoint. "
-            "Run: hermes model to reconfigure, or remove "
-            "OPENAI_BASE_URL from ~/.hermes/.env",
+            "Run: stardust model to reconfigure, or remove "
+            "OPENAI_BASE_URL from ~/.stardust/.env",
             _env_base, _cfg_provider,
         )
         _stale_base_url_warned = True

@@ -10,7 +10,7 @@ for key in list(os.environ):
     if key.startswith("STARDUST_") or key.endswith(("_API_KEY", "_TOKEN")):
         os.environ.pop(key, None)
 os.environ["HOME"] = str(home)
-os.environ["STARDUST_HOME"] = str(home / ".hermes")
+os.environ["STARDUST_HOME"] = str(home / ".stardust")
 sys.path.insert(0, sys.argv[1])
 from gateway.config import GatewayConfig, Platform
 from gateway.session import SessionStore, SessionSource

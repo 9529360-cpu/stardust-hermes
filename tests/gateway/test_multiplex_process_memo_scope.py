@@ -16,7 +16,7 @@ from hermes_constants import reset_hermes_home_override, set_hermes_home_overrid
 @pytest.fixture
 def two_homes(tmp_path, monkeypatch):
     """Launch home A (STARDUST_HOME) and a routed profile B with different config everywhere."""
-    a = tmp_path / ".hermes"
+    a = tmp_path / ".stardust"
     b = a / "profiles" / "b"
     b.mkdir(parents=True)
     monkeypatch.setenv("STARDUST_HOME", str(a))

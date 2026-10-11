@@ -17,10 +17,10 @@ from plugins.memory import byterover
 
 @pytest.fixture
 def two_profiles(tmp_path, monkeypatch):
-    root = tmp_path / ".hermes"
+    root = tmp_path / ".stardust"
     prof_b = root / "profiles" / "b"
     prof_b.mkdir(parents=True)
-    (root / ".env").write_text("BRV_API_KEY=DEFAULT-PROFILE-KEY\nHERMES_MODEL=default-model\n", encoding="utf-8")
+    (root / ".env").write_text("BRV_API_KEY=DEFAULT-PROFILE-KEY\nSTARDUST_MODEL=default-model\n", encoding="utf-8")
     monkeypatch.setenv("STARDUST_HOME", str(root))
     monkeypatch.setenv("BRV_API_KEY", "DEFAULT-PROFILE-KEY")  # the gateway loaded default's .env at boot
     monkeypatch.setenv("STARDUST_MODEL", "default-model")

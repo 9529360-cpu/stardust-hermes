@@ -68,7 +68,7 @@ VERCEL_AI_GATEWAY_MODELS: list[tuple[str, str]] = [("moonshotai/kimi-k2.6", "rec
 
 def _codex_curated_models() -> list[str]:
     """openai-codex curated list from codex_models.py (DEFAULT_CODEX_MODELS + forward-compat
-    synthesis) so the gateway /model picker and the CLI ``hermes model`` flow share one source."""
+    synthesis) so the gateway /model picker and the CLI ``stardust model`` flow share one source."""
     from hermes_cli.codex_models import DEFAULT_CODEX_MODELS, _finalize_codex_models
     return _finalize_codex_models(list(DEFAULT_CODEX_MODELS))
 
@@ -300,9 +300,9 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
 
 # ---------------------------------------------------------------------------
 # Canonical provider list — single source of truth for provider identity. Every code path that
-# lists, displays, or iterates providers (hermes model, /model, list_authenticated_providers)
+# lists, displays, or iterates providers (stardust model, /model, list_authenticated_providers)
 # derives from it. slug = internal ID (config.yaml, --provider); label = short display name;
-# tui_desc = longer description for the `hermes model` picker.
+# tui_desc = longer description for the `stardust model` picker.
 # ---------------------------------------------------------------------------
 
 class ProviderEntry(NamedTuple):
@@ -377,7 +377,7 @@ _PROVIDER_LABELS["custom"] = "Custom endpoint"  # special case: not a named prov
 
 # ---------------------------------------------------------------------------
 # Provider groups — DISPLAY ONLY. Vendors with several slugs (global API, China API, OAuth plan,
-# ...) fold under one top-level row in the INTERACTIVE PICKERS (``hermes model``, setup wizard,
+# ...) fold under one top-level row in the INTERACTIVE PICKERS (``stardust model``, setup wizard,
 # Telegram ``/model``). They do NOT change CANONICAL_PROVIDERS, slug identity, ``--provider``,
 # ``/model <provider:model>`` or any typed path — every member slug stays individually addressable.
 # ``group_providers()`` is the single fold used by all three surfaces.
@@ -493,7 +493,7 @@ PREFERRED_SILENT_DEFAULT_MODEL = "z-ai/glm-5.2"
 # best-first, so [0] is the priciest flagship; a profile that sets a provider with no model would
 # otherwise silently bill the most expensive model (863 Opus requests before one user noticed).
 # Network-free (cache-only) on purpose — this is the hot resolution path. The *interactive* default
-# (GUI onboarding / ``hermes model``) uses the tier-aware ``get_recommended_default_model`` in
+# (GUI onboarding / ``stardust model``) uses the tier-aware ``get_recommended_default_model`` in
 # hermes_cli/web_server.py + ``partition_nous_models_by_tier``, which may hit the Portal.
 _SILENT_DEFAULT_PROVIDERS: frozenset[str] = frozenset({"nous", "openrouter"})
 

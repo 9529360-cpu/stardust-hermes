@@ -1,4 +1,4 @@
-"""Skill usage telemetry + provenance for the Curator: a sidecar ``~/.hermes/skills/.usage.json`` keyed by
+"""Skill usage telemetry + provenance for the Curator: a sidecar ``~/.stardust/skills/.usage.json`` keyed by
 skill name (never frontmatter — keeps telemetry out of user-authored SKILL.md and off bundled/hub skills).
 Counter bumps are best-effort (DEBUG-logged failures never break the tool call); writes are atomic under a
 cross-process lock. Curator management is an explicit ``created_by: agent`` marker written by skill_manage —

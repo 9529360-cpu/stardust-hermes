@@ -506,7 +506,7 @@ def test_dead_manual_entry_pruned_after_24h(tmp_path, monkeypatch):
     Manual entries (``manual:*``) are independent credentials with no
     singleton to re-seed from, so we can clean them up after a quiet
     window without losing recoverability — the user can always re-add
-    via ``hermes auth add``.
+    via ``stardust auth add``.
     """
     monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "hermes"))
     # DEAD entry from > 24h ago
@@ -932,7 +932,7 @@ def test_write_credential_pool_preserves_known_provider_owned_oauth_state(tmp_pa
 
 def test_load_pool_prefers_dotenv_over_stale_os_environ(tmp_path, monkeypatch):
     """Regression for #18254: stale OPENROUTER_API_KEY in os.environ (inherited
-    from a parent shell) must NOT shadow the fresh key in ~/.hermes/.env when
+    from a parent shell) must NOT shadow the fresh key in ~/.stardust/.env when
     seeding the credential pool. Before the fix, `get_env_value()` preferred
     os.environ and silently wrote the stale value into auth.json, causing
     persistent 401 errors after key rotation.
@@ -944,7 +944,7 @@ def test_load_pool_prefers_dotenv_over_stale_os_environ(tmp_path, monkeypatch):
     # Simulate the bug: parent shell exported a stale test key
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-STALE-from-shell")
 
-    # User edited ~/.hermes/.env with the fresh key
+    # User edited ~/.stardust/.env with the fresh key
     (hermes_home / ".env").write_text(
         "OPENROUTER_API_KEY=sk-or-FRESH-from-dotenv\n"
     )
@@ -964,7 +964,7 @@ def test_load_pool_prefers_dotenv_over_stale_os_environ(tmp_path, monkeypatch):
 
 
 def test_load_pool_falls_back_to_os_environ_when_dotenv_empty(tmp_path, monkeypatch):
-    """When ~/.hermes/.env does not define OPENROUTER_API_KEY (typical Docker /
+    """When ~/.stardust/.env does not define OPENROUTER_API_KEY (typical Docker /
     K8s / systemd deployment), seeding must still pick up the key from
     os.environ. Guards against regressions that would break production
     deployments relying on runtime-injected env vars.
@@ -1077,7 +1077,7 @@ def test_nous_runtime_api_key_rejects_opaque_agent_key():
 def test_load_pool_api_key_path_skips_oauth_autodiscovery(tmp_path, monkeypatch):
     """API-key auth path: autodiscovered OAuth creds must NOT be seeded.
 
-    When the user picks "Anthropic API key" at `hermes setup`,
+    When the user picks "Anthropic API key" at `stardust setup`,
     `save_anthropic_api_key()` writes ANTHROPIC_API_KEY and zeros
     ANTHROPIC_TOKEN.  That env-var pattern is the explicit signal that the
     user opted into the API-key path and explicitly OUT of the OAuth
@@ -1133,7 +1133,7 @@ def test_load_pool_api_key_path_prunes_stale_oauth_entries(tmp_path, monkeypatch
 
     Without this, a user who logs into OAuth (seeding `claude_code` or
     `hermes_pkce` into auth.json) and later switches to the API key at
-    `hermes setup` would still have those OAuth entries dormant on disk.
+    `stardust setup` would still have those OAuth entries dormant on disk.
     Pool rotation on a transient 401 could revive them and flip the
     session onto the OAuth masquerade.
     """
@@ -1184,7 +1184,7 @@ def test_load_pool_oauth_path_still_autodiscovers(tmp_path, monkeypatch):
     """OAuth path: ANTHROPIC_TOKEN set, autodiscovery still fires.
 
     Regression guard: the API-key gate must not affect users who chose the
-    OAuth path at `hermes setup`.  When ANTHROPIC_TOKEN is set (and
+    OAuth path at `stardust setup`.  When ANTHROPIC_TOKEN is set (and
     ANTHROPIC_API_KEY is empty), autodiscovered Claude Code creds should
     still be seeded into the pool as before.
     """
@@ -1449,7 +1449,7 @@ def test_load_pool_skips_exchange_for_suppressed_copilot(tmp_path, monkeypatch):
     ``get_copilot_api_token`` (which retries 3x with backoff, ~13s worst
     case), so every pool load — model picker open, /model, agent startup —
     burned the full exchange dead time for a source the user had already
-    removed with ``hermes auth remove copilot gh_cli``.  The gate must run
+    removed with ``stardust auth remove copilot gh_cli``.  The gate must run
     BEFORE the network call.
     """
     monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "hermes"))
@@ -2159,7 +2159,7 @@ def test_reset_statuses_clears_a_cooldown_that_is_still_binding(tmp_path, monkey
     snapshot so one process cannot resurrect a key another has just benched.
     ``reset_statuses`` clears ``last_status_at`` to None, which that merge reads
     as epoch 0 — older than any real timestamp — so the reset always lost and
-    the cooldown was copied straight back. ``hermes auth reset`` printed "Reset
+    the cooldown was copied straight back. ``stardust auth reset`` printed "Reset
     status on 1 credentials" and changed nothing on disk.
 
     The cooldown here is deliberately RECENT. Once a cooldown has expired the
@@ -2192,7 +2192,7 @@ def test_reset_statuses_clears_the_classified_failure_reason(tmp_path, monkeypat
 
     It lives in ``extra`` rather than as a dataclass field, so ``replace()``
     could not reach it and it outlived every reset — leaving an entry with no
-    status and no error code but still classified ``billing``. ``hermes auth
+    status and no error code but still classified ``billing``. ``stardust auth
     list`` renders that leftover as though it were a current finding.
     """
     monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "hermes"))

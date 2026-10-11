@@ -1,4 +1,4 @@
-"""hermes claw — OpenClaw migration commands."""
+"""stardust claw — OpenClaw migration commands."""
 
 import importlib.util
 import itertools
@@ -29,7 +29,7 @@ _OPENCLAW_DIR_NAMES = (".openclaw", ".clawdbot", ".moltbot")
 # pgrep -f ERE anchored on a node interpreter as argv[0] (``node /usr/local/bin/openclaw gateway``).
 _OPENCLAW_NODE_CMDLINE_RE = r"^(\S*/)?node(js)?\s.*(openclaw|clawd)"
 
-# `hermes claw migrate` flags/defaults. Secrets are never included implicitly: --migrate-secrets
+# `stardust claw migrate` flags/defaults. Secrets are never included implicitly: --migrate-secrets
 # is required even under --preset full (OpenClaw's two-phase posture); no silent API-key import.
 _MIGRATE_ARG_DEFAULTS = (
     ("source", None), ("dry_run", False), ("preset", "full"), ("overwrite", False),
@@ -176,7 +176,7 @@ def _warn_if_gateway_running(auto_yes: bool) -> None:
         ("Migrating bot tokens while the gateway is active will cause "
          "conflicts (Telegram, Discord, and Slack only allow one active "
          "session per token).",
-         "Recommendation: stop the gateway first with 'hermes gateway stop'."),
+         "Recommendation: stop the gateway first with 'stardust gateway stop'."),
         "Continue anyway?", declined="Migration cancelled. Stop the gateway and try again.",
     ) is False:
         sys.exit(0)
@@ -233,17 +233,17 @@ def _archive_directory(source_dir: Path, dry_run: bool = False) -> Path:
 
 
 def claw_command(args):
-    """Route hermes claw subcommands."""
+    """Route stardust claw subcommands."""
     action = getattr(args, "claw_action", None)
     if action == "migrate":
         _cmd_migrate(args)
     elif action in {"cleanup", "clean"}:
         _cmd_cleanup(args)
     else:
-        print("Usage: hermes claw <command> [options]\n\nCommands:\n"
+        print("Usage: stardust claw <command> [options]\n\nCommands:\n"
               "  migrate          Migrate settings from OpenClaw to Hermes\n"
               "  cleanup          Archive leftover OpenClaw directories after migration\n\n"
-              "Run 'hermes claw <command> --help' for options.")
+              "Run 'stardust claw <command> --help' for options.")
 
 
 def _cmd_migrate(args):
@@ -257,7 +257,7 @@ def _cmd_migrate(args):
         return _error_block(
             f"OpenClaw directory not found: {opts.source_dir}",
             "Make sure your OpenClaw installation is at the expected path.",
-            "You can specify a custom path: hermes claw migrate --source /path/to/.openclaw")
+            "You can specify a custom path: stardust claw migrate --source /path/to/.openclaw")
     script_path = _find_migration_script()
     if not script_path:
         return _error_block(
@@ -286,9 +286,9 @@ def _cmd_migrate(args):
     print()
     if _confirm(opts.yes, "Proceed with migration?", default=True, declined="Migration cancelled.",
                 non_tty=("Non-interactive session — preview only.",
-                         "To execute, re-run with: hermes claw migrate --yes")):
+                         "To execute, re-run with: stardust claw migrate --yes")):
         _apply_migration(run_migrator, opts)
-    # Source directory is left untouched — archiving is `hermes claw cleanup`'s job.
+    # Source directory is left untouched — archiving is `stardust claw cleanup`'s job.
 
 
 def _load_migrator(script_path: Path, opts: SimpleNamespace) -> Optional[Callable[[bool], dict]]:
@@ -337,7 +337,7 @@ def _preview_migration(run_migrator: Callable[[bool], dict], opts: SimpleNamespa
     if conflicts > 0 and not opts.overwrite:
         _error_block(
             f"Plan has {conflicts} conflict(s). Refusing to apply.",
-            "Each conflict is an item whose target already exists in ~/.hermes/. "
+            "Each conflict is an item whose target already exists in ~/.stardust/. "
             "Re-run with --overwrite to replace conflicting targets (item-level "
             "backups are written to the migration report directory).",
             "Or re-run with --dry-run to review the full plan.")
@@ -348,7 +348,7 @@ def _preview_migration(run_migrator: Callable[[bool], dict], opts: SimpleNamespa
 def _apply_migration(run_migrator: Callable[[bool], dict], opts: SimpleNamespace) -> None:
     """Take a pre-migration backup (unless --no-backup), execute, and print the report. The backup
     shares the pre-update backup's implementation (exclusions, SQLite safe-copy, zip) so it is
-    restorable with `hermes import`: one restore point before any mutation, pruned to the last 5."""
+    restorable with `stardust import`: one restore point before any mutation, pruned to the last 5."""
     backup_archive: Optional[Path] = None
     if not opts.no_backup:
         try:
@@ -359,7 +359,7 @@ def _apply_migration(run_migrator: Callable[[bool], dict], opts: SimpleNamespace
                 print()
                 print_success(f"Pre-migration backup: {backup_archive} "
                               f"({_format_size(backup_archive.stat().st_size)})")
-                print_info(f"Restore with: hermes import {backup_archive.name}")
+                print_info(f"Restore with: stardust import {backup_archive.name}")
         except Exception as e:
             return _error_block(
                 f"Could not create pre-migration backup: {e}",
@@ -371,7 +371,7 @@ def _apply_migration(run_migrator: Callable[[bool], dict], opts: SimpleNamespace
         _error_block(f"Migration failed: {e}", debug="OpenClaw migration error")
         if backup_archive:
             _info(f"A pre-migration backup is available at: {backup_archive}",
-                  f"Restore with: hermes import {backup_archive.name}")
+                  f"Restore with: stardust import {backup_archive.name}")
         return
     _print_migration_report(report, dry_run=False)
 
@@ -394,7 +394,7 @@ def _cmd_cleanup(args):
          "immediately recreate an empty skeleton directory, destroying your config.",
          "Stop OpenClaw first: systemctl --user stop openclaw-gateway.service"),
         "Proceed anyway?",
-        declined="Aborted. Stop OpenClaw first, then re-run: hermes claw cleanup",
+        declined="Aborted. Stop OpenClaw first, then re-run: stardust claw cleanup",
         non_tty=("Non-interactive session — aborting. Stop OpenClaw and re-run.",)):
         return
     total_archived = 0
@@ -405,7 +405,7 @@ def _cmd_cleanup(args):
             print_info(f"Would archive: {source_dir} → {archive_path}")
         elif _confirm(auto_yes, f"Archive {source_dir}?", default=True, declined="Skipped.",
                       non_tty=(f"Non-interactive session — would archive: {source_dir}",
-                               "To execute, re-run with: hermes claw cleanup --yes")):
+                               "To execute, re-run with: stardust claw cleanup --yes")):
             try:
                 archive_path = _archive_directory(source_dir)
                 print_success(f"Archived: {source_dir} → {archive_path}")
@@ -491,7 +491,7 @@ def _print_migration_report(report: dict, dry_run: bool):
         print_info(f"Full report saved to: {report['output_dir']}")
     if dry_run:
         _info("", "To execute the migration, run without --dry-run:",
-              f"  hermes claw migrate --preset {report.get('preset', 'full')}")
+              f"  stardust claw migrate --preset {report.get('preset', 'full')}")
     elif migrated:
         print()
         print_success("Migration complete!")
@@ -503,5 +503,5 @@ def _print_migration_report(report: dict, dry_run: bool):
                 "  Your OPENROUTER_API_KEY and other provider keys must be added manually."):
                 print(color(line, Colors.YELLOW))
             _info("", "To migrate API keys, re-run with:",
-                  "  hermes claw migrate --migrate-secrets", "", "Or add your key manually:",
-                  "  hermes config set OPENROUTER_API_KEY sk-or-v1-...")
+                  "  stardust claw migrate --migrate-secrets", "", "Or add your key manually:",
+                  "  stardust config set OPENROUTER_API_KEY sk-or-v1-...")

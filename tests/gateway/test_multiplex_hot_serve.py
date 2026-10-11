@@ -33,7 +33,7 @@ class _Adapter:
 
 
 def _runner(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     (home / "profiles").mkdir(parents=True)
     monkeypatch.setenv("STARDUST_HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)

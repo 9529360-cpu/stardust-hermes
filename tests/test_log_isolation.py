@@ -27,7 +27,7 @@ import pytest
 
 def _real_hermes_home() -> Path:
     """Where the operator's logs live, ignoring any test sandboxing."""
-    return Path.home() / ".hermes"
+    return Path.home() / ".stardust"
 
 
 def _all_file_destinations() -> list[str]:

@@ -17,7 +17,7 @@ from tools.terminal_tool import terminal_tool
 
 @pytest.fixture
 def isolated_home(tmp_path, monkeypatch):
-    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
     return tmp_path
 
 

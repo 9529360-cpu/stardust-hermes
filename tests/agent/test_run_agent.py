@@ -1797,8 +1797,8 @@ class TestExecuteToolCalls:
         assert "tool was not executed" in messages[0]["content"].lower()
 
     def test_result_truncation_over_100k(self, agent, tmp_path, monkeypatch):
-        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
-        (tmp_path / ".hermes").mkdir()
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+        (tmp_path / ".stardust").mkdir()
         tc = _mock_tool_call(name="web_search", arguments="{}", call_id="c1")
         mock_msg = _mock_assistant_msg(content="", tool_calls=[tc])
         messages = []

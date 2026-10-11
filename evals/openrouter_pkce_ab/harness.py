@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local A/B harness for `hermes auth add openrouter --type oauth` against a FAKE OpenRouter.
+"""Local A/B harness for `stardust auth add openrouter --type oauth` against a FAKE OpenRouter.
 
 Runs the REAL entry point (``hermes_cli.auth_commands.auth_add_command``) with a temp STARDUST_HOME.
 Only the network authority is replaced: ``webbrowser.open`` is swapped for a scripted "browser"
@@ -12,7 +12,7 @@ Scenarios (each prints PASS/FAIL, exit code = number of failures):
   wrong_state    browser redirects to a different callback path (forged nonce) → 404, no exchange
   replayed_code  code already consumed at the fake server → 403 → AuthError, nothing persisted
   malformed      exchange returns JSON without "key" → AuthError, nothing persisted
-  api_key_path   `hermes auth add openrouter --api-key` still works with no --type (regression)
+  api_key_path   `stardust auth add openrouter --api-key` still works with no --type (regression)
 
 Usage: STARDUST_PYTHON=<venv python> python3 evals/openrouter_pkce_ab/harness.py [--json OUT]
 Run against origin/main to see the BEFORE state (every oauth scenario fails with SystemExit

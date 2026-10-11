@@ -178,7 +178,7 @@ def _session_tool_names(enabled_toolsets, *, connectors, disabled_toolsets=None)
 
 
 def test_cli_session_gets_the_tool_outside_a_code_workspace(tmp_path, monkeypatch):
-    """The path a plain `hermes` run takes: _get_platform_tools, no git cwd."""
+    """The path a plain `stardust` run takes: _get_platform_tools, no git cwd."""
     from hermes_cli.tools_config import _get_platform_tools
 
     monkeypatch.chdir(tmp_path)

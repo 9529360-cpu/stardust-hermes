@@ -74,7 +74,7 @@ def _count_metrics(messages: list) -> dict:
 def run_task(task, model: str, provider: str, timeout_mult: float,
              toolsets: list[str]) -> dict:
     ws = Path(tempfile.mkdtemp(prefix=f"readtool-{task.task_id}-"))
-    hermes_home = Path(tempfile.mkdtemp(prefix="readtool-home-")) / ".hermes"
+    hermes_home = Path(tempfile.mkdtemp(prefix="readtool-home-")) / ".stardust"
     hermes_home.mkdir(parents=True)
     build_workspace(ws)
 
@@ -162,7 +162,7 @@ def main() -> int:
     if not os.environ.get("OPENROUTER_API_KEY"):
         raise SystemExit(
             "OPENROUTER_API_KEY not in environment. Run: set -a; "
-            "source ~/.hermes/.env; set +a  — then relaunch."
+            "source ~/.stardust/.env; set +a  — then relaunch."
         )
 
     slate = (

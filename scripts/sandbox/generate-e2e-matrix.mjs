@@ -55,7 +55,7 @@ import { fileURLToPath } from 'node:url';
  *   installer's stage registers one (install.sh --include-desktop
  *   builds the app but registers nothing), so these legs pair with a
  *   desktop-installer install; hermes-desktop-app-update starts the app
- *   via `hermes desktop`, which every install method provides on every
+ *   via `stardust desktop`, which every install method provides on every
  *   OS that ships the desktop app. Both then update through the app's
  *   own Update button.
  * @typedef {'linux' | 'windows' | 'macos'} Os
@@ -113,7 +113,7 @@ export const SPEC = {
       // Settings -> About -> "Update now", app launched from the installed
       // exe (the entry point the desktop installer created).
       { method: 'open-app-update' },
-      // Same button, app launched via `hermes desktop`.
+      // Same button, app launched via `stardust desktop`.
       { method: 'hermes-desktop-app-update' },
     ],
   },
@@ -145,7 +145,7 @@ export const SPEC = {
       { method: 'installer-script+desktop' },
       { method: 'hermes-update' },
       // No desktop installer and no packaged desktop artifact exist for
-      // linux, so there is no open-app-update; `hermes desktop` is always
+      // linux, so there is no open-app-update; `stardust desktop` is always
       // the source-mode path (build apps/desktop from the checkout, launch
       // electron) and is the one app surface a linux install has.
       { method: 'hermes-desktop-app-update' },

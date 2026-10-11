@@ -7,7 +7,7 @@ import { $connection } from '@/store/session'
 import { ArtifactsView } from './index'
 
 const paths = vi.hoisted(() => [
-  '~/.hermes/memories/USER.md',
+  '~/.stardust/memories/USER.md',
   './report.md',
   '../parent.md',
   String.raw`~\home.txt`,

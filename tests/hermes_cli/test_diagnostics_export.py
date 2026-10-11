@@ -12,7 +12,7 @@ import pytest
 
 @pytest.fixture
 def diagnostics_home(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     monkeypatch.setenv("STARDUST_HOME", str(home))
 

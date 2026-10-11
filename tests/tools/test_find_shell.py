@@ -108,7 +108,7 @@ class TestFindBashSkipsBrokenCustomPath:
     @pytest.mark.windows_only
     def test_falls_through_to_portable_when_custom_fails_probe(self, tmp_path, monkeypatch):
         """Windows-only: the candidate ladder (STARDUST_GIT_BASH_PATH →
-        %LOCALAPPDATA%\\hermes\\git → Program Files) only exists in
+        %LOCALAPPDATA%\\stardust\\git → Program Files) only exists in
         ``_find_bash``'s Windows branch."""
         import tools.environments.local as local_mod
         from tools.environments import local_gitbash_probe as gitbash_probe

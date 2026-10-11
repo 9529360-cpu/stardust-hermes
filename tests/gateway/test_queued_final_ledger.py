@@ -41,7 +41,7 @@ TEXT = "**Yes.** I would make room for one island trip and one Balkan trip."
 
 @pytest.fixture(autouse=True)
 def _fresh_db(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     monkeypatch.setattr(dl, "_db_path", lambda: home / "state.db")
     monkeypatch.setattr(dl, "_owner_stamp", lambda: (os.getpid(), 202))

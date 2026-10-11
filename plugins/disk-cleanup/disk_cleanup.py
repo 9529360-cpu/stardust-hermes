@@ -3,7 +3,7 @@
 Rules: test files delete at task end (age >= 0); temp after 7 days; cron-output
 after 14 days; empty dirs under STARDUST_HOME always. Prompt-only: research
 (keep 10 newest, > 30 days), chrome-profile > 14 days, any file > 500 MB.
-Scope: strictly STARDUST_HOME and /tmp/hermes-*; never ~/.hermes/logs/ or system dirs.
+Scope: strictly STARDUST_HOME and /tmp/hermes-*; never ~/.stardust/logs/ or system dirs.
 """
 
 from __future__ import annotations

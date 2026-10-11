@@ -176,13 +176,13 @@ def test_spawn_detached_warns_and_marks_no_breakaway_fallback(
 
 class TestStableWindowsGatewayWorkingDir:
     def test_stable_gateway_working_dir_uses_hermes_home(self, tmp_path, monkeypatch):
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".stardust"
         home.mkdir()
         monkeypatch.setattr("hermes_cli.config.get_hermes_home", lambda: home)
         assert gateway_windows._stable_gateway_working_dir(tmp_path / "checkout") == str(home.resolve())
 
     def test_stable_gateway_working_dir_falls_back_to_project_root(self, tmp_path, monkeypatch):
-        missing = tmp_path / "missing" / ".hermes"
+        missing = tmp_path / "missing" / ".stardust"
         project = tmp_path / "checkout"
         monkeypatch.setattr("hermes_cli.config.get_hermes_home", lambda: missing)
         assert gateway_windows._stable_gateway_working_dir(project) == str(project)
@@ -357,7 +357,7 @@ def test_gateway_vbs_script_is_console_less(monkeypatch):
 #
 # Background: on Windows, asyncio.add_signal_handler raises NotImplementedError,
 # so the gateway's SIGTERM handler (which drains in-flight agents and writes
-# resume_pending=True) never fires when `hermes gateway stop` kills the
+# resume_pending=True) never fires when `stardust gateway stop` kills the
 # process. The fix: stop() writes the planned_stop_marker first, waits for
 # the gateway's marker-watcher thread to drain + exit cleanly, then escalates
 # to taskkill if drain times out.

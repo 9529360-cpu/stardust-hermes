@@ -18,7 +18,7 @@ def test_host_save_during_upload_survives_unchanged_remote(
     host = tmp_path / "home" / "skills" / "example" / "SKILL.md"
     host.parent.mkdir(parents=True)
     host.write_bytes(b"original skill")
-    remote_path = "/root/.hermes/skills/example/SKILL.md"
+    remote_path = "/root/.stardust/skills/example/SKILL.md"
     remote = tmp_path / "remote.md"
 
     def upload(source, destination):

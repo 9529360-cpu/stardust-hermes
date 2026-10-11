@@ -654,7 +654,7 @@ def test_update_parser_accepts_keep_stash():
 
 def test_bootstrap_marker_not_autostashed_by_update(tmp_path):
     """#38529: the Desktop bootstrap marker must be git-ignored so that
-    ``hermes update``'s ``git stash push --include-untracked`` does not sweep it
+    ``stardust update``'s ``git stash push --include-untracked`` does not sweep it
     into an autostash on every run.
 
     Behavioral + hermetic: build a throwaway repo that adopts the project's real
@@ -685,7 +685,7 @@ def test_bootstrap_marker_not_autostashed_by_update(tmp_path):
     marker = tmp_path / ".hermes-bootstrap-complete"
     marker.write_text("")
 
-    # Exact flags used by hermes update (hermes_cli/main.py).
+    # Exact flags used by stardust update (hermes_cli/main.py).
     git("stash", "push", "--include-untracked", "-m", "hermes-update-autostash")
 
     assert marker.exists(), (

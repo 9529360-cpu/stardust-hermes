@@ -64,7 +64,7 @@ def test_tools_wired_and_home_not_hardcoded():
     assert re.search(r"desktop_preview\(action=\"open\"", body)
     assert "[SILENT]" in body
     assert "dashboard.json" in body
-    assert "~/.hermes" not in body
+    assert "~/.stardust" not in body
 
 
 def test_frontmatter_blueprint_is_a_valid_installed_blueprint():
@@ -77,4 +77,4 @@ def test_frontmatter_blueprint_is_a_valid_installed_blueprint():
     job = blueprint_to_job_spec(spec)
     assert job["skills"] == ["live-dashboard"]
     assert len(job["schedule"].split()) == 5, f"invalid cron expr: {job['schedule']}"
-    assert "[SILENT]" in job["prompt"] and "~/.hermes" not in job["prompt"]
+    assert "[SILENT]" in job["prompt"] and "~/.stardust" not in job["prompt"]

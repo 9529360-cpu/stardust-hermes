@@ -1,7 +1,7 @@
 """Characterization tests for the cron trigger before/after the provider refactor.
 
 These lock the CURRENT in-process-ticker contract (Phase 0 of the pluggable
-CronScheduler plan, .hermes/plans/cron-scheduler-provider-interface.md). They
+CronScheduler plan, .stardust/plans/cron-scheduler-provider-interface.md). They
 must pass unchanged on `main` now, and after every subsequent phase of the
 refactor — they are the regression harness that proves the built-in firing
 behavior is byte-for-byte preserved when the ticker is moved behind the
@@ -916,7 +916,7 @@ def test_multiplex_ticker_reenumerates_profiles_each_cycle(tmp_path):
 
     def _tick(*args, **kwargs):
         ticked.append(str(get_hermes_home()))
-        if len(ticked) == 1:  # "hermes profile create gamma" happens between two cycles
+        if len(ticked) == 1:  # "stardust profile create gamma" happens between two cycles
             (gamma / "cron").mkdir(parents=True)
             homes.append(("gamma", gamma))
         if len(ticked) >= 4:

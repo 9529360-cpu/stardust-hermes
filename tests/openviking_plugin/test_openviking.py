@@ -1404,7 +1404,7 @@ class TestUnavailableWarningsPromiseRetry:
             def health(self):
                 return False
 
-        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
         monkeypatch.setenv("OPENVIKING_ENDPOINT", "https://sick.example")
         monkeypatch.setattr(openviking_plugin, "_VikingClient", _UnhealthyClient)
         provider = OpenVikingMemoryProvider()
@@ -1448,7 +1448,7 @@ class TestUnavailableWarningsPromiseRetry:
                 probes.append(self.endpoint)
                 return len(probes) > 1  # down at startup, up on the next access
 
-        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
         monkeypatch.setenv("OPENVIKING_ENDPOINT", "https://remote.example")
         monkeypatch.setattr(openviking_plugin, "_VikingClient", _FlakyClient)
         provider = OpenVikingMemoryProvider()

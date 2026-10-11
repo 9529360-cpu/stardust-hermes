@@ -300,7 +300,7 @@ def prune_stale_shallow_grafts(repo_root: Path) -> int:
     Every ``git fetch --depth 1`` appends the fetched tip to ``.git/shallow`` as a new
     graft and never removes the previous one, so a long-lived shallow installer checkout
     accumulates one graft per update check (57 observed in the wild). The stale grafts
-    break ``merge-base`` and push ``hermes update`` into the orphan-divergence reset path
+    break ``merge-base`` and push ``stardust update`` into the orphan-divergence reset path
     on every run. Keep only the boundaries that still protect referenced tips (HEAD,
     FETCH_HEAD, and every ref tip): the dropped commits are already unreachable and their
     objects are left for ``git gc``. Returns the number of graft lines removed; never

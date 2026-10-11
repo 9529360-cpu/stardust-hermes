@@ -977,7 +977,7 @@ class TestTerminalOutputRedaction:
         assert _command_reads_secret_file("cat -n .env")
         assert _command_reads_secret_file("cat -A .env")
         # With paths
-        assert _command_reads_secret_file("cat ~/.hermes/.env")
+        assert _command_reads_secret_file("cat ~/.stardust/.env")
         assert _command_reads_secret_file("cat /home/user/project/.env")
         assert _command_reads_secret_file("cat ./config/.env.local")
         # In a pipeline / sequence
@@ -1071,9 +1071,9 @@ class TestTerminalOutputRedaction:
     @pytest.mark.parametrize(
         ("command", "output", "secret"),
         [
-            ("cat ~/.hermes/config.yaml", "api_key: hermesConfigSecret123", "hermesConfigSecret123"),
+            ("cat ~/.stardust/config.yaml", "api_key: hermesConfigSecret123", "hermesConfigSecret123"),
             (
-                "head ~/.hermes/profiles/work/config.yaml",
+                "head ~/.stardust/profiles/work/config.yaml",
                 "provider.token=profileConfigSecret456",
                 "profileConfigSecret456",
             ),
@@ -1096,7 +1096,7 @@ class TestTerminalOutputRedaction:
                 "variablePathSecret123456789",
             ),
             (
-                "cat $HOME/.hermes/config.yaml",
+                "cat $HOME/.stardust/config.yaml",
                 "SERVICE_TOKEN=homeVariablePathSecret123456",
                 "homeVariablePathSecret123456",
             ),
@@ -1106,7 +1106,7 @@ class TestTerminalOutputRedaction:
                 "awkQuotedSecret123",
             ),
             (
-                "grep 'foo|bar' ~/.hermes/config.yaml",
+                "grep 'foo|bar' ~/.stardust/config.yaml",
                 "SERVICE_TOKEN=grepQuotedSecret456",
                 "grepQuotedSecret456",
             ),
@@ -1122,8 +1122,8 @@ class TestTerminalOutputRedaction:
         [
             "cat config.yaml",
             "cat /project/config.yaml",
-            "cat ~/.hermes/config.example.yaml",
-            "cat ~/.hermes/config.template.yaml",
+            "cat ~/.stardust/config.example.yaml",
+            "cat ~/.stardust/config.template.yaml",
             "cat ~/.bashrc.example",
             'cat "$OTHER/config.yaml"',
             "grep TOKEN app.py",
@@ -1291,14 +1291,14 @@ class TestSecretFileAssignmentRedaction:
 
 class TestHermesHomePathClassification:
     """``_is_secret_file_arg`` must see the RESOLVED Hermes home: a managed Windows home
-    (``%LOCALAPPDATA%\\hermes``) has no ``.hermes`` segment and a resolved path never spells
+    (``%LOCALAPPDATA%\\stardust``) has no ``.stardust`` segment and a resolved path never spells
     ``$STARDUST_HOME``, so the literal test alone classified its ``config.yaml`` as ordinary YAML."""
 
     def test_resolved_home_config_is_secret_bearing_but_project_config_is_not(self, tmp_path, monkeypatch):
         import agent.file_safety as file_safety
         from agent.redact import _is_secret_file_arg
 
-        home = tmp_path / "hermes"  # no ".hermes" segment
+        home = tmp_path / "hermes"  # no ".stardust" segment
         monkeypatch.setattr(file_safety, "_hermes_home_path", lambda: home)
         monkeypatch.setattr(file_safety, "_hermes_root_path", lambda: home)
         assert _is_secret_file_arg(str(home / "config.yaml"))

@@ -30,8 +30,8 @@ param(
     # existing tree pass -ForceCommit.
     [switch]$ForceCommit,
     [string]$Tag = "",
-    [string]$HermesHome = $(if ($env:STARDUST_HOME) { $env:STARDUST_HOME } else { "$env:LOCALAPPDATA\hermes" }),
-    [string]$InstallDir = $(if ($env:STARDUST_HOME) { "$env:STARDUST_HOME\hermes-agent" } else { "$env:LOCALAPPDATA\hermes\hermes-agent" }),
+    [string]$HermesHome = $(if ($env:STARDUST_HOME) { $env:STARDUST_HOME } else { "$env:LOCALAPPDATA\stardust" }),
+    [string]$InstallDir = $(if ($env:STARDUST_HOME) { "$env:STARDUST_HOME\hermes-agent" } else { "$env:LOCALAPPDATA\stardust\hermes-agent" }),
 
     # --- Stage protocol (additive; default invocation behaves as before) ----
     # See the "Stage protocol" section near the bottom of the file for the
@@ -71,7 +71,7 @@ param(
     #     on disk and fail. The recursive path omits the flag.
     #   * The canonical CLI one-liner (irm | iex) omits the flag too;
     #     terminal users don't need a desktop binary built for them, and
-    #     `hermes desktop` already builds on demand.
+    #     `stardust desktop` already builds on demand.
     [switch]$IncludeDesktop
 )
 
@@ -345,14 +345,14 @@ if ($PSBoundParameters.ContainsKey('HermesHome')) {
     $HermesHome = ConvertTo-LongPath $HermesHome
 } else {
     $HermesHome = ConvertTo-LongPath $(
-        if ($env:STARDUST_HOME) { $env:STARDUST_HOME } else { "$env:LOCALAPPDATA\hermes" }
+        if ($env:STARDUST_HOME) { $env:STARDUST_HOME } else { "$env:LOCALAPPDATA\stardust" }
     )
 }
 if ($PSBoundParameters.ContainsKey('InstallDir')) {
     $InstallDir = ConvertTo-LongPath $InstallDir
 } else {
     $InstallDir = ConvertTo-LongPath $(
-        if ($env:STARDUST_HOME) { "$env:STARDUST_HOME\hermes-agent" } else { "$env:LOCALAPPDATA\hermes\hermes-agent" }
+        if ($env:STARDUST_HOME) { "$env:STARDUST_HOME\hermes-agent" } else { "$env:LOCALAPPDATA\stardust\hermes-agent" }
     )
 }
 if ($script:NormalizedProfilePaths) {
@@ -671,7 +671,7 @@ function Install-AgentBrowser {
 
     # agent-browser itself is intentionally NOT installed here (#43564 /
     # PR #44772 review): it resolves lazily via `npx agent-browser` instead,
-    # which every consumer (tools/browser_tool.py, `hermes update`'s npx
+    # which every consumer (tools/browser_tool.py, `stardust update`'s npx
     # cache warm) already goes through. Eagerly npm-installing a second,
     # separately version-pinned copy here -- only reachable via this
     # explicit -Ensure browser fallback in the first place -- was redundant
@@ -746,7 +746,7 @@ function Install-Uv {
     # Hermes owns its own uv at $HermesHome\bin\uv.exe.  Always install there --
     # no PATH probing, no conda guards, no multi-location resolution chains.
     # The runtime update path (hermes_cli/managed_uv.py) looks in the same
-    # place, so install.ps1 and `hermes update` stay in sync.
+    # place, so install.ps1 and `stardust update` stay in sync.
     $managedUv = Join-Path $HermesHome "bin\uv.exe"
 
     if (Test-Path $managedUv) {
@@ -1433,7 +1433,7 @@ function Install-Git {
       1. Existing ``git`` on PATH -- use it as-is (the common fast path).
       2. Download **PortableGit** from the official git-for-windows GitHub
          release (self-extracting 7z.exe) and unpack it to
-         ``%LOCALAPPDATA%\hermes\git`` -- never touches system Git, never
+         ``%LOCALAPPDATA%\stardust\git`` -- never touches system Git, never
          requires admin, works even on locked-down machines and machines
          with a broken system Git install.
 
@@ -1447,7 +1447,7 @@ function Install-Git {
     We deliberately skip winget because it fails badly when the system Git
     install is in a half-installed state (partially registered, or uninstall-
     blocked).  Owning the Hermes copy of Git ourselves is predictable and
-    recoverable: if it ever breaks, ``Remove-Item %LOCALAPPDATA%\hermes\git``
+    recoverable: if it ever breaks, ``Remove-Item %LOCALAPPDATA%\stardust\git``
     and re-running this installer fully recovers.
 
     After install we locate ``bash.exe`` and persist the path in
@@ -2214,7 +2214,7 @@ function Install-Repository {
                     # -- the GUI "git checkout main failed (exit 1)" install
                     # failure. Clear the conflict markers with `git reset` first:
                     # working-tree changes are kept (and stashed just below); only
-                    # the index conflict state is dropped. Mirrors the `hermes
+                    # the index conflict state is dropped. Mirrors the `stardust
                     # update` path (#4735).
                     $unmergedOut = git -c windows.appendAtomically=false ls-files --unmerged 2>$null
                     if (-not [string]::IsNullOrWhiteSpace(($unmergedOut -join "`n"))) {
@@ -2270,7 +2270,7 @@ function Install-Repository {
                     if ($LASTEXITCODE -ne 0) { throw "git checkout $Branch failed (exit $LASTEXITCODE)" }
                     # Managed installs should follow origin/$Branch exactly. If
                     # the checkout has diverged (or has local-only commits),
-                    # ff-only pull cannot succeed -- mirror ``hermes update`` and
+                    # ff-only pull cannot succeed -- mirror ``stardust update`` and
                     # reset to the fetched remote so bootstrap/install can recover.
                     git -c windows.appendAtomically=false pull --ff-only origin $Branch
                     if ($LASTEXITCODE -ne 0) {
@@ -2371,7 +2371,7 @@ function Install-Repository {
             } catch {
                 Write-Err "Could not move $InstallDir aside : $_"
                 Write-Info "Close any programs that might be using files in $InstallDir (editors,"
-                Write-Info "terminals, running hermes processes) and try again."
+                Write-Info "terminals, running stardust processes) and try again."
                 throw
             }
         }
@@ -2453,7 +2453,7 @@ function Install-Repository {
                     # repo's LF text files to CRLF in the working tree during
                     # `checkout -f FETCH_HEAD` -- leaving this freshly-created
                     # managed checkout dirty vs HEAD and aborting the next
-                    # `hermes update` (see the notes at the shared clone-path
+                    # `stardust update` (see the notes at the shared clone-path
                     # config below and install.ps1:1461-1469). The later pin on
                     # the shared path is idempotent and still covers git clones.
                     git -c windows.appendAtomically=false config core.autocrlf false 2>$null
@@ -2512,7 +2512,7 @@ function Install-Repository {
     git -c windows.appendAtomically=false config windows.appendAtomically false 2>$null
     # Pin autocrlf=false on the managed clone so git never renormalizes the
     # repo's LF text files to CRLF in the working tree. Without this, the very
-    # next `hermes update` checkout aborts on a "dirty" tree the user never
+    # next `stardust update` checkout aborts on a "dirty" tree the user never
     # touched (see the update path above).
     git -c windows.appendAtomically=false config core.autocrlf false 2>$null
 
@@ -2583,14 +2583,14 @@ function Install-Venv {
         $venvHadExistingVenv = $true
         Write-Info "Virtual environment already exists, recreating..."
         # On Windows, native Python extensions (e.g. _bcrypt.pyd, tornado's
-        # speedups.pyd) are loaded as DLLs by any running hermes process.
+        # speedups.pyd) are loaded as DLLs by any running stardust process.
         # Windows denies deletion of loaded DLLs, so every process running out
         # of this venv must be stopped before retiring it. This keeps cleanup
         # from accumulating locked stale trees and avoids carrying a live
         # gateway into the replacement venv.
         if ($env:OS -eq "Windows_NT") {
             $myPid = $PID
-            Write-Info "Stopping any running hermes processes before recreating venv..."
+            Write-Info "Stopping any running stardust processes before recreating venv..."
             # Disarm the respawner FIRST: the gateway autostart Scheduled Task
             # relaunches a killed gateway within seconds, and losing that race
             # re-locks the venv's .pyd files between our kill sweep and
@@ -2616,12 +2616,12 @@ function Install-Venv {
             } catch {
                 Write-Warn "Could not enumerate gateway scheduled tasks: $($_.Exception.Message)"
             }
-            # The launcher CLI (hermes.exe) plus its child tree.
-            & taskkill /F /T /IM hermes.exe /FI "PID ne $myPid" 2>$null | Out-Null
-            # taskkill /IM hermes.exe is NOT enough: the gateway/agent that a
+            # The launcher CLI (stardust.exe) plus its child tree.
+            & taskkill /F /T /IM stardust.exe /FI "PID ne $myPid" 2>$null | Out-Null
+            # taskkill /IM stardust.exe is NOT enough: the gateway/agent that a
             # scheduled task or watchdog autostarts runs as
             # `pythonw.exe -m hermes_cli.main gateway run` straight out of
-            # venv\Scripts\, so its image name is python/pythonw, not hermes.exe.
+            # venv\Scripts\, so its image name is python/pythonw, not stardust.exe.
             # That process holds the venv's .pyd files open and re-triggers the
             # access-denied failure. Select only roots whose executable lives
             # under this venv, then stop each root's whole process tree. Some
@@ -2799,7 +2799,7 @@ function Install-Venv {
         # user's gateway autostart in the disabled state. Same function scope,
         # so the list survives even under the stage-per-process bootstrap.
         # Deliberately NOT started here -- dependencies aren't installed yet;
-        # the task fires normally on next logon and `hermes update` / the
+        # the task fires normally on next logon and `stardust update` / the
         # gateway resume path handles the immediate restart.
         if ($gatewayTasksDisabled -and $gatewayTasksDisabled.Count -gt 0) {
             foreach ($tn in $gatewayTasksDisabled) {
@@ -2914,7 +2914,7 @@ function Install-Dependencies {
         # UV_PROJECT_ENVIRONMENT pins the sync target to our venv\.
         # Without it, modern uv (>=0.5) ignores VIRTUAL_ENV for `sync`
         # and creates a sibling .venv\ inside the repo -- leaving venv\
-        # empty and producing the broken state where `hermes.exe` exists
+        # empty and producing the broken state where `stardust.exe` exists
         # in the wrong directory and imports fail with ModuleNotFoundError.
         # (Mirrors the same flag in scripts/install.sh::install_deps.)
         $env:UV_PROJECT_ENVIRONMENT = "$InstallDir\venv"
@@ -3010,10 +3010,10 @@ except Exception:
     # Baseline-import gate. Even if a tier reported success above, the
     # actual deps may have landed somewhere other than $InstallDir\venv\
     # (e.g. uv 0.5+ syncing into a sibling .venv\ when UV_PROJECT_ENVIRONMENT
-    # isn't set, leaving venv\ empty and hermes.exe broken with
+    # isn't set, leaving venv\ empty and stardust.exe broken with
     # `ModuleNotFoundError: No module named 'dotenv'` on first run).
     # We probe via the venv's own python so a misdirected sync is caught
-    # here, not 30 seconds later when the user runs `hermes`.
+    # here, not 30 seconds later when the user runs `stardust`.
     if (-not $NoVenv) {
         $venvPython = "$InstallDir\venv\Scripts\python.exe"
         if (-not (Test-Path $venvPython)) {
@@ -3056,10 +3056,10 @@ except Exception:
     }
 
     if (-not $NoVenv) {
-        # uv on Windows can register hermes.exe in dist-info/RECORD but fail to
+        # uv on Windows can register stardust.exe in dist-info/RECORD but fail to
         # materialise the .exe (file lock during self-update, distlib edge case).
         # Catch it here so a fresh install/update does not finish with a broken
-        # `hermes` command while hermes-agent.exe / hermes-acp.exe exist
+        # `stardust` command while hermes-agent.exe / hermes-acp.exe exist
         $scriptsDir = Join-Path $InstallDir "venv\Scripts"
         $pythonExe = Join-Path $scriptsDir "python.exe"
         if ((Test-Path $scriptsDir) -and (Test-Path $pythonExe)) {
@@ -3098,7 +3098,7 @@ print(','.join(scripts))
     }
 
     # Verify the dashboard deps specifically -- they're the most common thing
-    # users hit and lazy-import errors from `hermes dashboard` are confusing.
+    # users hit and lazy-import errors from `stardust dashboard` are confusing.
     # If tier 1 failed (the common case), [web] was still picked up by tiers
     # 2-3; only tier 4 leaves you without it.
     $pythonExe = if (-not $NoVenv) { "$InstallDir\venv\Scripts\python.exe" } else { (& $UvCmd python find $PythonVersion) }
@@ -3122,11 +3122,11 @@ print(','.join(scripts))
         } catch { }
         $ErrorActionPreference = $prevEAP
         if (-not $webOk) {
-            Write-Warn "fastapi/uvicorn not importable -- `hermes dashboard` will not work."
+            Write-Warn "fastapi/uvicorn not importable -- `stardust dashboard` will not work."
             Write-Info "Attempting targeted install of [web] extra as last resort..."
             & $UvCmd pip install -e ".[web]"
             if ($LASTEXITCODE -eq 0) {
-                Write-Success "[web] extra installed; `hermes dashboard` should now work."
+                Write-Success "[web] extra installed; `stardust dashboard` should now work."
             } else {
                 Write-Warn "Could not install [web] extra. Run manually: uv pip install --python `"$pythonExe`" `"fastapi>=0.104,<1`" `"uvicorn[standard]>=0.24,<1`""
             }
@@ -3147,15 +3147,15 @@ function Install-HermesCommandLaunchers {
         [Parameter(Mandatory=$true)] [string]$Destination
     )
 
-    # Expose ONLY the hermes launchers on PATH -- never the whole
+    # Expose ONLY the stardust launchers on PATH -- never the whole
     # venv\Scripts directory, which contains python.exe / pip.exe and
     # silently hijacks the `python` command in every terminal (#83797).
-    # Requiring hermes.exe before creating the destination keeps the PATH
+    # Requiring stardust.exe before creating the destination keeps the PATH
     # stage from reporting success with an unusable command (PR #92092).
     $scriptsDir = Join-Path $Root "venv\Scripts"
-    $requiredSource = Join-Path $scriptsDir "hermes.exe"
+    $requiredSource = Join-Path $scriptsDir "stardust.exe"
     if (-not (Test-Path -LiteralPath $requiredSource -PathType Leaf)) {
-        throw "Cannot set up the hermes command: required launcher not found: $requiredSource"
+        throw "Cannot set up the stardust command: required launcher not found: $requiredSource"
     }
 
     New-Item -ItemType Directory -Force -Path $Destination | Out-Null
@@ -3172,7 +3172,7 @@ function Install-HermesCommandLaunchers {
     if (Test-Path -LiteralPath $pyvenvCfg) {
         $venvRelocatable = [bool](Select-String -Path $pyvenvCfg -Pattern '^\s*relocatable\s*=\s*true\s*$' -Quiet)
     }
-    foreach ($launcher in @("hermes", "hermes-acp")) {
+    foreach ($launcher in @("stardust", "hermes-acp")) {
         $src = Join-Path $scriptsDir "$launcher.exe"
         if (-not (Test-Path -LiteralPath $src -PathType Leaf)) { continue }
         if ($venvRelocatable) {
@@ -3185,23 +3185,23 @@ function Install-HermesCommandLaunchers {
     }
 
     # Verify either staged form before the caller mutates PATH.
-    $requiredExe = Join-Path $Destination "hermes.exe"
-    $requiredCmd = Join-Path $Destination "hermes.cmd"
+    $requiredExe = Join-Path $Destination "stardust.exe"
+    $requiredCmd = Join-Path $Destination "stardust.cmd"
     if (-not ((Test-Path -LiteralPath $requiredExe -PathType Leaf) -or
               (Test-Path -LiteralPath $requiredCmd -PathType Leaf))) {
-        throw "Cannot set up the hermes command: launcher was not installed: $requiredExe"
+        throw "Cannot set up the stardust command: launcher was not installed: $requiredExe"
     }
     return $Destination
 }
 
 function Set-PathVariable {
-    Write-Info "Setting up hermes command..."
+    Write-Info "Setting up stardust command..."
     
     if ($NoVenv) {
         $hermesBin = "$InstallDir"
     } else {
         # $HermesHome\bin is the managed binary dir (shared with the managed
-        # uv), OUTSIDE the git checkout: `hermes update`'s autostash
+        # uv), OUTSIDE the git checkout: `stardust update`'s autostash
         # (git stash push --include-untracked) deletes untracked files from
         # the working tree, which silently removed the launchers an earlier
         # installer staged under hermes-agent\bin. No git operation can ever
@@ -3244,8 +3244,8 @@ function Set-PathVariable {
     }
     
     # Set STARDUST_HOME so the Python code finds config/data in the right place.
-    # Only needed on Windows where we install to %LOCALAPPDATA%\hermes instead
-    # of the Unix default ~/.hermes
+    # Only needed on Windows where we install to %LOCALAPPDATA%\stardust instead
+    # of the Unix default ~/.stardust
     $currentHermesHome = [Environment]::GetEnvironmentVariable("STARDUST_HOME", "User")
     if (-not $currentHermesHome -or $currentHermesHome -ne $HermesHome) {
         [Environment]::SetEnvironmentVariable("STARDUST_HOME", $HermesHome, "User")
@@ -3256,7 +3256,7 @@ function Set-PathVariable {
     # Update current session
     $env:Path = "$hermesBin;$env:Path"
     
-    Write-Success "hermes command ready"
+    Write-Success "stardust command ready"
 }
 
 function Write-BootstrapMarker {
@@ -3274,7 +3274,7 @@ function Write-BootstrapMarker {
     # Hermes-Setup.exe) or fall back to whatever git resolves in the
     # checkout. The desktop validates schemaVersion + pinnedCommit
     # length but doesn't enforce that HEAD matches the pin (users
-    # update via `hermes update` which moves HEAD legitimately).
+    # update via `stardust update` which moves HEAD legitimately).
     if (-not (Test-Path $InstallDir)) {
         Write-Warn "Skipping bootstrap marker: $InstallDir doesn't exist"
         return
@@ -3339,7 +3339,7 @@ function Write-BootstrapMarker {
 function Copy-ConfigTemplates {
     Write-Info "Setting up configuration files..."
     
-    # Create the STARDUST_HOME directory structure ($HermesHome, default %LOCALAPPDATA%\hermes)
+    # Create the STARDUST_HOME directory structure ($HermesHome, default %LOCALAPPDATA%\stardust)
     New-Item -ItemType Directory -Force -Path "$HermesHome\cron" | Out-Null
     New-Item -ItemType Directory -Force -Path "$HermesHome\sessions" | Out-Null
     New-Item -ItemType Directory -Force -Path "$HermesHome\logs" | Out-Null
@@ -3459,7 +3459,7 @@ function Install-NodeDeps {
     $npmCmd = Get-Command npm -ErrorAction SilentlyContinue
     if (-not $npmCmd) {
         Write-Warn "npm not found on PATH -- skipping Node.js dependencies."
-        Write-Info "Open a new PowerShell window and re-run 'hermes setup tools' later."
+        Write-Info "Open a new PowerShell window and re-run 'stardust setup tools' later."
         return
     }
     $npmExe = $npmCmd.Source
@@ -3718,7 +3718,7 @@ function Install-NodeDeps {
 # The Browser Use CLI is the default browser backend when it is runnable
 # (tools/browser_use_cli.py). Provision it at install time so fresh installs
 # don't silently fall back to the built-in browser tools. Best-effort: any
-# failure is non-fatal (browser_exec can still run via uvx, and `hermes tools`
+# failure is non-fatal (browser_exec can still run via uvx, and `stardust tools`
 # can install it later).
 function Install-BrowserUseCli {
     if (-not $script:UvCmd) { Resolve-UvCmd }
@@ -3749,7 +3749,7 @@ function Install-BrowserUseCli {
             Write-Success "Browser Use CLI installed"
         } else {
             Write-Warn "Browser Use CLI install failed (exit $LASTEXITCODE) -- browser automation falls back to built-in tools."
-            Write-Info "Install later with: uv tool install browser-use  (or via 'hermes tools')"
+            Write-Info "Install later with: uv tool install browser-use  (or via 'stardust tools')"
         }
     } catch {
         Write-Warn "Browser Use CLI install failed: $_"
@@ -3812,7 +3812,7 @@ function Test-CuaDriverRuntimeContract {
 }
 
 # cua-driver powers the computer_use toolset (background desktop control).
-# Provision it at install time so enabling the tool later -- via `hermes
+# Provision it at install time so enabling the tool later -- via `stardust
 # tools`, the dashboard, or the desktop app -- is a config flip, not a
 # surprise multi-minute binary fetch. Best-effort and non-fatal: the enable
 # paths still lazy-install via install_cua_driver() (hermes_cli/tools_config)
@@ -3835,7 +3835,7 @@ function Install-CuaDriver {
     $prevEAP = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
-        # Same upstream installer `hermes computer-use install` runs. Bounded
+        # Same upstream installer `stardust computer-use install` runs. Bounded
         # via a background job: the upstream installer serializes with its own
         # lock (600s stale window), so the ceiling sits above that -- matching
         # Hermes' _CUA_INSTALLER_TIMEOUT (660s).
@@ -3847,20 +3847,20 @@ function Install-CuaDriver {
             Remove-Job $job -Force -ErrorAction SilentlyContinue
             $installedCuaDriver = Get-Command cua-driver -ErrorAction SilentlyContinue
             if ($installedCuaDriver -and (Test-CuaDriverRuntimeContract -DriverPath $installedCuaDriver.Source)) {
-                Write-Success "Computer Use driver installed (enable via 'hermes tools' -> Computer Use)"
+                Write-Success "Computer Use driver installed (enable via 'stardust tools' -> Computer Use)"
             } else {
                 Write-Warn "Computer Use driver install did not produce a compatible runtime -- repair it before enabling the tool."
-                Write-Info "Install later with: hermes computer-use install"
+                Write-Info "Install later with: stardust computer-use install"
             }
         } else {
             Stop-Job $job -ErrorAction SilentlyContinue
             Remove-Job $job -Force -ErrorAction SilentlyContinue
             Write-Warn "Computer Use driver install timed out -- it will install on demand when you enable the tool."
-            Write-Info "Install later with: hermes computer-use install"
+            Write-Info "Install later with: stardust computer-use install"
         }
     } catch {
         Write-Warn "Computer Use driver install failed: $_"
-        Write-Info "Install later with: hermes computer-use install"
+        Write-Info "Install later with: stardust computer-use install"
     } finally {
         $ErrorActionPreference = $prevEAP
     }
@@ -4305,7 +4305,7 @@ function Install-Desktop {
     }
 
     # 4. Create Start Menu + Desktop shortcuts pointing DIRECTLY at the packed
-    #    Stardust.exe. We deliberately do NOT point them at `hermes desktop`: that
+    #    Stardust.exe. We deliberately do NOT point them at `stardust desktop`: that
     #    command rebuilds (npm install + electron-builder) on every launch,
     #    which would cost minutes each time. The packed exe is the consumer --
     #    launching it directly is instant, and updates flow through the
@@ -4376,7 +4376,7 @@ function New-DesktopShortcuts {
 
 function Install-PlatformSdks {
     # Ensure messaging-platform SDKs matching tokens the user added to
-    # ~/.hermes/.env are importable.  Two problems this solves:
+    # ~/.stardust/.env are importable.  Two problems this solves:
     #
     # 1. The tiered `uv pip install` cascade above can fall through to a
     #    lower tier when the first fails (common when RL git deps choke),
@@ -4493,7 +4493,7 @@ function Invoke-SetupWizard {
         # The setup wizard prompts for API keys, model choice, persona, etc.
         # Non-interactive callers (GUI installer) own that UX themselves; let
         # them drive it after install.ps1 returns.
-        Write-Info "Skipping setup wizard (non-interactive). Configure via the GUI or 'hermes setup'."
+        Write-Info "Skipping setup wizard (non-interactive). Configure via the GUI or 'stardust setup'."
         return
     }
 
@@ -4503,7 +4503,7 @@ function Invoke-SetupWizard {
 
     Push-Location $InstallDir
 
-    # Run hermes setup using the venv Python directly (no activation needed)
+    # Run stardust setup using the venv Python directly (no activation needed)
     if (-not $NoVenv) {
         & ".\venv\Scripts\python.exe" -m hermes_cli.main setup
     } else {
@@ -4526,9 +4526,9 @@ function Start-GatewayIfConfigured {
 
     if (-not $hasMessaging) { return }
 
-    $hermesCmd = "$InstallDir\venv\Scripts\hermes.exe"
+    $hermesCmd = "$InstallDir\venv\Scripts\stardust.exe"
     if (-not (Test-Path $hermesCmd)) {
-        $hermesCmd = "hermes"
+        $hermesCmd = "stardust"
     }
 
     # If WhatsApp is enabled but not yet paired, run foreground for QR scan
@@ -4537,7 +4537,7 @@ function Start-GatewayIfConfigured {
     if ($whatsappEnabled -and -not (Test-Path $whatsappSession)) {
         Write-Host ""
         Write-Info "WhatsApp is enabled but not yet paired."
-        Write-Info "Running 'hermes whatsapp' to pair via QR code..."
+        Write-Info "Running 'stardust whatsapp' to pair via QR code..."
         Write-Host ""
         # Non-interactive callers (GUI installer, CI) skip the QR-pair prompt;
         # WhatsApp pairing requires a human looking at a phone camera, so the
@@ -4566,7 +4566,7 @@ function Start-GatewayIfConfigured {
     # services on the build agent, etc.).  Treat it like the user declined.
     if ($NonInteractive) {
         Write-Info "Skipping gateway autostart prompt (non-interactive)."
-        Write-Info "Start the gateway later with: hermes gateway"
+        Write-Info "Start the gateway later with: stardust gateway"
         return
     }
 
@@ -4584,10 +4584,10 @@ function Start-GatewayIfConfigured {
             Write-Info "Logs: $logFile"
             Write-Info "To stop: close the gateway process from Task Manager"
         } catch {
-            Write-Warn "Failed to start gateway. Run manually: hermes gateway"
+            Write-Warn "Failed to start gateway. Run manually: stardust gateway"
         }
     } else {
-        Write-Info "Skipped. Start the gateway later with: hermes gateway"
+        Write-Info "Skipped. Start the gateway later with: stardust gateway"
     }
 }
 
@@ -4615,17 +4615,17 @@ function Write-Completion {
     Write-Host ""
     Write-Host "* Commands:" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "   hermes              " -NoNewline -ForegroundColor Green
+    Write-Host "   stardust            " -NoNewline -ForegroundColor Green
     Write-Host "Start chatting"
-    Write-Host "   hermes setup        " -NoNewline -ForegroundColor Green
+    Write-Host "   stardust setup        " -NoNewline -ForegroundColor Green
     Write-Host "Configure API keys & settings"
-    Write-Host "   hermes config       " -NoNewline -ForegroundColor Green
+    Write-Host "   stardust config       " -NoNewline -ForegroundColor Green
     Write-Host "View/edit configuration"
-    Write-Host "   hermes config edit  " -NoNewline -ForegroundColor Green
+    Write-Host "   stardust config edit  " -NoNewline -ForegroundColor Green
     Write-Host "Open config in editor"
-    Write-Host "   hermes gateway      " -NoNewline -ForegroundColor Green
+    Write-Host "   stardust gateway      " -NoNewline -ForegroundColor Green
     Write-Host "Start messaging gateway (Telegram, Discord, etc.)"
-    Write-Host "   hermes update       " -NoNewline -ForegroundColor Green
+    Write-Host "   stardust update       " -NoNewline -ForegroundColor Green
     Write-Host "Update to latest version"
     Write-Host ""
     

@@ -14,13 +14,13 @@ interface ServeCandidate {
 }
 
 // Does the resolved runtime understand the `serve` subcommand? The desktop
-// spawns `hermes serve`; runtimes older than serve only have `dashboard`, so
+// spawns `stardust serve`; runtimes older than serve only have `dashboard`, so
 // main.ts routes those through the legacy `dashboard --no-open` form instead
 // of crashing on an unknown subcommand.
 //
 // Fast path: read the runtime's own dashboard.py (instant, covers managed
 // installs, dev checkouts, and the Windows venv). Fallback: probe the CLI once
-// (covers a bare `hermes` resolved from PATH with no known source root). Result
+// (covers a bare `stardust` resolved from PATH with no known source root). Result
 // is cached per resolved runtime so we probe at most once per backend — except
 // a probe that failed by timeout, which is evicted so the next start re-probes
 // rather than pinning a cold-AV false negative for the process lifetime.
@@ -61,7 +61,7 @@ export function createBackendServeSupportResolver(hermesHome: string, rememberLo
           const prefix = backend.args && backend.args[0] === '-m' ? backend.args.slice(0, 2) : []
           // Same cold-Windows Python-startup class as the runtime probes
           // (#61764/#72632/#72707): `serve --help` imports at least as much as
-          // `hermes --version` (~10.5s measured cold), and a false negative here
+          // `stardust --version` (~10.5s measured cold), and a false negative here
           // is cached for the process lifetime, silently routing a modern
           // runtime through the legacy `dashboard` form. Share the probe budget
           // and its timeout-only retry instead of a thinner local bound.

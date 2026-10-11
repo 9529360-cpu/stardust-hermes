@@ -211,7 +211,7 @@ def test_ensure_browser_no_longer_npm_installs_agent_browser() -> None:
     (tools/browser_tool.py::_find_agent_browser); this was the last place
     that still eagerly npm-installed a second, separately version-pinned
     copy of it. Removed: agent-browser acquisition now happens only via
-    `hermes update`'s npx cache warm or an actual browser-tool call's lazy
+    `stardust update`'s npx cache warm or an actual browser-tool call's lazy
     npx resolution (PR #44772 review)."""
     body = _extract_function_body(INSTALL_SH.read_text(), "ensure_browser")
 

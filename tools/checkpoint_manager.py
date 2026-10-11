@@ -2,7 +2,7 @@
 
 Snapshots a working directory before file-mutating tool calls (once per directory per turn)
 and restores any previous checkpoint.  Not a model tool; controlled by the ``checkpoints``
-config / ``--checkpoints`` flag.  One store under ``~/.hermes/checkpoints/`` so git dedupes
+config / ``--checkpoints`` flag.  One store under ``~/.stardust/checkpoints/`` so git dedupes
 blobs across projects (pre-v2 one-repo-per-workdir re-stored ~40 MB each): ``store/`` bare
 repo with per-project ``refs/hermes/<hash16>``, ``indexes/<hash16>``, ``projects/<hash16>.json``
 (workdir, timestamps, parent identity), ``ledgers/<hash16>.json`` (agent-write ledger), shared
@@ -365,7 +365,7 @@ def _shrink_store_to_cap(store: Path, working_dir: str, cap_bytes: int) -> bool:
 
 def _migrate_legacy_store(base: Path) -> Optional[Path]:
     """Archive pre-v2 per-project shadow repos into ``legacy-<ts>/`` (moved, not deleted —
-    users may want to recover; the archive falls under retention and ``hermes checkpoints
+    users may want to recover; the archive falls under retention and ``stardust checkpoints
     clear-legacy``).  Returns the archive path or None."""
     if not base.exists():
         return None
@@ -385,7 +385,7 @@ def _migrate_legacy_store(base: Path) -> Optional[Path]:
         except OSError as exc:
             logger.warning("Could not archive legacy checkpoint %s: %s", child, exc)
     logger.info("Migrated pre-v2 checkpoint repos to %s. "
-                "Clear with `hermes checkpoints clear-legacy` when safe.", legacy_root)
+                "Clear with `stardust checkpoints clear-legacy` when safe.", legacy_root)
     return legacy_root
 
 

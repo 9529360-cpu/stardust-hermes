@@ -28,5 +28,5 @@ suggest:
 
 post_install: |
   On first connection Hermes opens a browser to authorize with
-  Algolia (or run `hermes mcp login algolia`). Approve access,
+  Algolia (or run `stardust mcp login algolia`). Approve access,
   then restart the session so tools load.

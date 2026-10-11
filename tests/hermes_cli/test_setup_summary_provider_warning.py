@@ -41,9 +41,9 @@ def _summary_output(capsys, provider_ready: bool):
 def test_summary_warns_when_no_provider(capsys):
     out = _summary_output(capsys, provider_ready=False)
     assert "No inference provider is configured" in out
-    assert "hermes model" in out
-    assert "hermes auth" in out
-    assert "hermes setup --portal" not in out
+    assert "stardust model" in out
+    assert "stardust auth" in out
+    assert "stardust setup --portal" not in out
 
 
 def test_summary_quiet_when_provider_ready(capsys):

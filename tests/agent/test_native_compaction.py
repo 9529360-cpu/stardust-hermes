@@ -466,7 +466,7 @@ class TestAgentInitConfig:
     ):
         from run_agent import AIAgent
 
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".stardust"
         home.mkdir()
         lines = ["compression:", "  codex_responses_native: true"]
         if threshold_yaml is not None:

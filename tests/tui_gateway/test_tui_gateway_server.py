@@ -93,7 +93,7 @@ def _reap_leaked_notification_pollers():
 
 
 def test_session_slot_is_claimed_on_first_turn_not_on_create(monkeypatch, tmp_path):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     (home / "config.yaml").write_text("max_concurrent_sessions: 1\n", encoding="utf-8")
     token = set_hermes_home_override(home)
@@ -4376,7 +4376,7 @@ def test_config_sync_config_wins_over_env_seed(monkeypatch):
 
 
 def test_config_sync_ignores_env_seed_without_config_model(monkeypatch):
-    # `hermes --tui -m <model>` sets STARDUST_MODEL/STARDUST_INFERENCE_MODEL as a
+    # `stardust --tui -m <model>` sets STARDUST_MODEL/STARDUST_INFERENCE_MODEL as a
     # launch-scoped seed. When config.yaml has NO model.default (typical
     # custom-provider-only setup), the sync must NOT adopt the env seed as a
     # config target — doing so replayed the -m flag as a /model switch and
@@ -8618,7 +8618,7 @@ def test_config_get_approval_mode_uses_smart_default_when_key_is_missing(
     monkeypatch.setattr(server, "_hermes_home", tmp_path)
     # Point the canonical resolver (load_config → env STARDUST_HOME) at the
     # temp home too, so the smart default is asserted against THIS config
-    # rather than whatever the developer's real ~/.hermes happens to hold.
+    # rather than whatever the developer's real ~/.stardust happens to hold.
     monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     (tmp_path / "config.yaml").write_text(
         yaml.safe_dump({"approvals": {"timeout": 15}})
@@ -9298,7 +9298,7 @@ def test_setup_status_reports_provider_config(monkeypatch):
 
 
 def test_setup_status_answers_from_the_bootstrap_record_once_it_exists(monkeypatch):
-    """Under ``hermes serve`` the boot bootstrap owns the free-tier identity; ``setup.status`` reports
+    """Under ``stardust serve`` the boot bootstrap owns the free-tier identity; ``setup.status`` reports
     its record (blocking for it while it is in flight) instead of re-probing, so a client's first poll
     sees the identity that exists rather than racing the mint."""
     import threading
@@ -9332,13 +9332,13 @@ def test_invalid_params_and_unknown_method_name_the_version_skew_fix():
     resp = server.handle_request({"id": "1", "method": "no.such.method", "params": {}})
     assert resp["error"]["code"] == -32601
     assert resp["error"]["message"].startswith("unknown method: no.such.method")
-    assert "hermes update" in resp["error"]["message"]
+    assert "stardust update" in resp["error"]["message"]
 
     resp = server.handle_request(
         {"id": "2", "method": "session.status", "params": {"session_id": "x", "turn_author": "y"}})
     assert resp["error"]["code"] == 4000
     assert resp["error"]["message"].startswith("invalid params for session.status: turn_author")
-    assert "hermes update" in resp["error"]["message"]
+    assert "stardust update" in resp["error"]["message"]
 
 
 def test_probe_credentials_emits_exact_empty_key_warning():
@@ -11629,7 +11629,7 @@ def test_file_attach_uses_in_workspace_file_without_copying(monkeypatch, tmp_pat
         assert resp["result"]["ref_text"] == "@file:data/exam.csv"
         # No copy: nothing staged under desktop-attachments or the home
         # attachments dir.
-        assert not (workspace / ".hermes" / "desktop-attachments").exists()
+        assert not (workspace / ".stardust" / "desktop-attachments").exists()
         assert not (tmp_path / "home" / "attachments").exists()
     finally:
         server._sessions.pop("sid", None)
@@ -11733,10 +11733,10 @@ def test_file_attach_workspace_storage_follows_owning_profile_config(monkeypatch
     try:
         server._sessions["sid-a"] = _session(cwd=str(workspace_a), profile_home=str(home_a))
         result_a = attach("sid-a")["result"]
-        staged_a = workspace_a / ".hermes" / "attachments" / "report.txt"
+        staged_a = workspace_a / ".stardust" / "attachments" / "report.txt"
         assert result_a["attached"] is True
         assert result_a["path"] == str(staged_a)
-        assert result_a["ref_text"] == "@file:.hermes/attachments/report.txt"
+        assert result_a["ref_text"] == "@file:.stardust/attachments/report.txt"
         assert staged_a.read_text(encoding="utf-8") == "hello"
         assert not (home_a / "attachments").exists()
 
@@ -11745,7 +11745,7 @@ def test_file_attach_workspace_storage_follows_owning_profile_config(monkeypatch
         staged_b = home_b / "attachments" / "report.txt"
         assert result_b["path"] == str(staged_b)
         assert staged_b.read_text(encoding="utf-8") == "hello"
-        assert not (workspace_b / ".hermes").exists()
+        assert not (workspace_b / ".stardust").exists()
     finally:
         server._sessions.pop("sid-a", None)
         server._sessions.pop("sid-b", None)
@@ -11785,7 +11785,7 @@ def test_file_attach_workspace_storage_falls_back_for_ssh_profile(monkeypatch, t
         assert resp["result"]["path"] == str(stored)
         assert resp["result"]["ref_text"] == f"@file:{stored}"
         assert stored.read_text(encoding="utf-8") == "hello"
-        assert not (workspace / ".hermes").exists()
+        assert not (workspace / ".stardust").exists()
     finally:
         server._sessions.pop("sid", None)
 
@@ -15363,7 +15363,7 @@ def test_prompt_submit_fails_loudly_when_store_unavailable(monkeypatch):
 
     assert resp["error"]["code"] == 5072
     msg = resp["error"]["message"]
-    assert "not saved" in msg and "hermes doctor --fix" in msg
+    assert "not saved" in msg and "stardust doctor --fix" in msg
     assert "utf-8 decode failure" not in msg  # raw cause rides `data.details`, never the lead
     assert resp["error"]["data"]["code"] == "storage_unavailable"
     assert "utf-8 decode failure" in resp["error"]["data"]["details"]
@@ -15485,7 +15485,7 @@ def test_session_list_returns_clean_error_when_state_db_is_unavailable(monkeypat
     assert "error" in resp
     # Plain cause + repair command; the machine-readable code lets a GUI attach "Run doctor".
     assert "Session storage is unavailable" in resp["error"]["message"]
-    assert "hermes doctor --fix" in resp["error"]["message"]
+    assert "stardust doctor --fix" in resp["error"]["message"]
     assert resp["error"]["data"]["code"] == "storage_unavailable"
     assert resp["error"]["data"]["details"] == "locking protocol"
 
@@ -16855,13 +16855,13 @@ def test_pending_title_finalizer_uses_session_profile_db(monkeypatch, tmp_path):
 
 
 # --------------------------------------------------------------------------
-# model.options — curated-list parity with `hermes model` and classic /model
+# model.options — curated-list parity with `stardust model` and classic /model
 # --------------------------------------------------------------------------
 
 
 def test_model_options_does_not_overwrite_curated_models(monkeypatch):
     """The TUI model.options handler must surface the same curated model
-    list as `hermes model` and the classic CLI /model picker.
+    list as `stardust model` and the classic CLI /model picker.
 
     Regression: earlier versions of this handler unconditionally replaced
     each provider's curated ``models`` field with ``provider_model_ids()``
@@ -17360,7 +17360,7 @@ def test_session_active_list_excludes_finalized_sessions(monkeypatch):
     that window ``session.active_list`` would otherwise still report the dead
     session, which is exactly the footer "N sessions" count that only ever grew
     until a gateway restart. A live session on the real stdio transport (the
-    standalone ``hermes --tui`` case) must still be reported.
+    standalone ``stardust --tui`` case) must still be reported.
     """
     class _DB:
         def get_session_title(self, key):
@@ -17721,7 +17721,7 @@ def test_verification_status_outside_workspace_is_not_applicable(monkeypatch, tm
 
     monkeypatch.setattr(coding_context, "project_facts_for", lambda _cwd=None: None)
 
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     token = set_hermes_home_override(home)
     try:
@@ -18546,7 +18546,7 @@ def test_config_set_indicator_none_keeps_blank_repr(monkeypatch):
 
 
 def test_reload_env_rpc_calls_hermes_cli_reload_env(monkeypatch):
-    """reload.env mirrors classic CLI's `/reload` — re-reads ~/.hermes/.env
+    """reload.env mirrors classic CLI's `/reload` — re-reads ~/.stardust/.env
     into the gateway process and reports the count of vars updated."""
     calls = {"n": 0}
 
@@ -18956,7 +18956,7 @@ def test_session_save_writes_under_hermes_home_with_system_prompt(monkeypatch, t
     ``os.path.abspath(...)`` (the workspace CWD) and only exported ``model``
     and ``messages``, so ``system_prompt`` was missing.
     """
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     monkeypatch.setenv("STARDUST_HOME", str(home))
 
@@ -21582,7 +21582,7 @@ def test_session_branch_keeps_reasoning_fields(monkeypatch, tmp_path):
 #
 # Until ~mid-2026 _save_cfg used yaml.safe_dump on a deep-loaded config dict.
 # Every /personality (or /reasoning, /details_mode, /prompt, ...) write
-# silently rewrote ~/.hermes/config.yaml top-to-bottom — top-level keys
+# silently rewrote ~/.stardust/config.yaml top-to-bottom — top-level keys
 # reordered alphabetically, comments stripped, kaomoji/Chinese in stored
 # personality prompts mangled to \uXXXX escapes. These tests pin the
 # user-visible behavior of the comment-preserving replacement so we don't

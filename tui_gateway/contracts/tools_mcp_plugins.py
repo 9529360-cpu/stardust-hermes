@@ -106,7 +106,7 @@ class ReloadEnvResult(Result):
 
 
 method("reload.env", params=ReloadEnvParams, result=ReloadEnvResult,
-       doc="Re-read ~/.hermes/.env (CLI /reload parity); built agents keep their pool until /new.")
+       doc="Re-read ~/.stardust/.env (CLI /reload parity); built agents keep their pool until /new.")
 
 
 class ReloadMcpParams(Params):

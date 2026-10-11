@@ -13,7 +13,7 @@ from hermes_constants import reset_hermes_home_override, set_hermes_home_overrid
 
 @pytest.fixture
 def two_homes(tmp_path, monkeypatch):
-    root = tmp_path / ".hermes"
+    root = tmp_path / ".stardust"
     alpha = root / "profiles" / "alpha"
     for home in (root, alpha):
         (home / "sessions").mkdir(parents=True)

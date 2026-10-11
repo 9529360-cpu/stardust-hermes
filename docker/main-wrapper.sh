@@ -13,9 +13,9 @@
 # re-exec and continue directly.
 #
 # Routing:
-#   no args                       → exec `hermes` (the default)
+#   no args                       → exec `stardust` (the default)
 #   first arg is an executable    → exec it directly (sleep, bash, sh, …)
-#   first arg is anything else    → exec `hermes <args>` (subcommand passthrough)
+#   first arg is anything else    → exec `stardust <args>` (subcommand passthrough)
 #
 # Drop to hermes via s6-setuidgid, but skip it when already non-root.
 set -e
@@ -74,7 +74,7 @@ cd /opt/data
 . /opt/hermes/.venv/bin/activate
 
 # Restore the original working directory before handing off to
-# the user's command so `hermes chat` starts in the Docker -w
+# the user's command so `stardust chat` starts in the Docker -w
 # directory, not /opt/data.
 cd "$_hermes_orig_cwd"
 

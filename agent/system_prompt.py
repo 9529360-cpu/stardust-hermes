@@ -449,8 +449,8 @@ def _ambient_file_safety_profile_name() -> str:
 
 
 def _active_profile_line(agent: Any) -> str:
-    """Name the running profile so the agent doesn't conflate ``~/.hermes/skills``
-    (default) with ``~/.hermes/profiles/<active>/skills``.  Resolved from the
+    """Name the running profile so the agent doesn't conflate ``~/.stardust/skills``
+    (default) with ``~/.stardust/profiles/<active>/skills``.  Resolved from the
     agent's OWN home first (a build thread that lost the ContextVar would
     otherwise print "default" for a bot profile)."""
     _agent_home_path = _agent_home(agent)

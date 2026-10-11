@@ -79,7 +79,7 @@ def test_guest_identity_shows_free_tier_row_with_only_welcome_model(guest_home, 
     rendered = repr(row).lower()
     assert "guest" not in rendered and "anonymous" not in rendered
 
-    # The `hermes model` provider picker applies the same rule from the same helper.
+    # The `stardust model` provider picker applies the same rule from the same helper.
     cli_rows = _cli_nous_rows({})
     assert len(cli_rows) == 1
     assert "free tier" in cli_rows[0][1]

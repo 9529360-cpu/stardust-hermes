@@ -28,7 +28,7 @@ import pytest
 from tui_gateway import server as srv
 
 
-PROFILE_HOME = str(Path("/home/user/.hermes/profiles/work"))
+PROFILE_HOME = str(Path("/home/user/.stardust/profiles/work"))
 
 
 class _InlineThread:

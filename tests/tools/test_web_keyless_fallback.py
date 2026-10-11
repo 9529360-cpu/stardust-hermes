@@ -374,7 +374,7 @@ class TestResolutionOrder:
 
 
 # ---------------------------------------------------------------------------
-# hermes tools picker: tier variant rows
+# stardust tools picker: tier variant rows
 # ---------------------------------------------------------------------------
 
 

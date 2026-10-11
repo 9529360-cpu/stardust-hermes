@@ -57,14 +57,14 @@ class TestGatewayConnectionErrorReply:
     def test_auth_and_rate_limit_preserved(self):
         auth_reply = _gateway_provider_error_reply("provider authentication failed")
         assert "authentication" in auth_reply.lower() and "/model" in auth_reply
-        assert "/login" not in auth_reply and "`hermes auth`" in auth_reply
+        assert "/login" not in auth_reply and "`stardust auth`" in auth_reply
         assert "rate-limiting" in _gateway_provider_error_reply(
             "rate limited after 3 retries"
         ).lower()
 
     def test_every_reply_names_a_slash_command_and_no_jargon(self):
         """Each shaped reply must give the chat user something they can run; 'provider' and
-        'gateway logs' are operator words (the log pointer is the `hermes logs` command)."""
+        'gateway logs' are operator words (the log pointer is the `stardust logs` command)."""
         from gateway.run import _PROVIDER_ERROR_REPLIES
         replies = [reply for _, reply in _PROVIDER_ERROR_REPLIES] + [_gateway_provider_error_reply("zzz")]
         for reply in replies:

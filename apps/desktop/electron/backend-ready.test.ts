@@ -88,7 +88,7 @@ test('falls back to the default for malformed / non-positive overrides', () => {
 test('resolves with the announced port', async () => {
   const child = makeFakeChild()
   const p = waitForDashboardPort(child, 1000)
-  child.stdout.emit('data', 'noise before\nHERMES_DASHBOARD_READY port=54321\n')
+  child.stdout.emit('data', 'noise before\nSTARDUST_DASHBOARD_READY port=54321\n')
   assert.equal(await p, 54321)
 })
 
@@ -273,7 +273,7 @@ test('resolves from bufferedOutput when the sentinel was consumed before the wai
 
   // Simulate the spawn-time output tail: it consumed the READY line already,
   // and no further stdout data will ever arrive.
-  const alreadyConsumed = 'boot noise\nHERMES_BACKEND_READY port=43211\n'
+  const alreadyConsumed = 'boot noise\nSTARDUST_BACKEND_READY port=43211\n'
 
   const port = await waitForDashboardPortAnnouncement(child, {
     bufferedOutput: () => alreadyConsumed,

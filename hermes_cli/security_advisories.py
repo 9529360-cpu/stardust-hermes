@@ -69,7 +69,7 @@ ADVISORIES: tuple[Advisory, ...] = (
             "and any other credential files for tokens that may have been read.",
             "Check GitHub for unexpected new SSH keys, deploy keys, or webhook "
             "additions on repos you have admin on.",
-            "After cleanup: hermes doctor --ack shai-hulud-2026-05  to dismiss "
+            "After cleanup: stardust doctor --ack shai-hulud-2026-05  to dismiss "
             "this warning.",
         ),
         published="2026-05-12",
@@ -171,7 +171,7 @@ def short_banner_lines(hits: list[AdvisoryHit]) -> list[str]:
     lines = [
         f"SECURITY ADVISORY [{primary.advisory.id}]: {primary.advisory.title}",
         f"  Detected: {primary.package}=={primary.installed_version}",
-        "  Run 'hermes doctor' for remediation steps.",
+        "  Run 'stardust doctor' for remediation steps.",
     ]
     if len(hits) > 1:
         lines.insert(1, f"  ({len(hits) - 1} additional advisor{'ies' if len(hits) > 2 else 'y'} also active.)")
@@ -195,7 +195,7 @@ def full_remediation_text(hit: AdvisoryHit) -> list[str]:
 
 
 # ─── Startup-banner gating ────────────────────────────────────────────────────
-# Once the banner is seen we cache that in ``~/.hermes/cache/advisory_banner_seen`` (one
+# Once the banner is seen we cache that in ``~/.stardust/cache/advisory_banner_seen`` (one
 # ``<id> <timestamp>`` line per advisory). Acked advisories never re-banner; cached-but-not-acked
 # ones re-banner after 24h so the user doesn't fully forget.
 
@@ -276,4 +276,4 @@ def gateway_log_message(hits: list[AdvisoryHit]) -> Optional[str]:
         return (f"Security advisory [{h.advisory.id}] active: {h.package}=={h.installed_version} "
                 f"matches {h.advisory.title}. See {h.advisory.url}")
     return (f"{len(fresh)} security advisories active (IDs: {', '.join(h.advisory.id for h in fresh)}). "
-            "Run `hermes doctor` on the gateway host for details.")
+            "Run `stardust doctor` on the gateway host for details.")

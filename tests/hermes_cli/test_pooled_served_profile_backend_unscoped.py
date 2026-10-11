@@ -1,6 +1,6 @@
-"""A pooled Desktop backend (``hermes --profile X serve``, STARDUST_HOME=<root>/profiles/X) answers its
+"""A pooled Desktop backend (``stardust --profile X serve``, STARDUST_HOME=<root>/profiles/X) answers its
 REST without ``?profile=``. Those UNSCOPED reads/verbs are about X — a profile the live default
-multiplexer serves — and must agree with the scoped ``?profile=X`` answer and with ``hermes -p X status``:
+multiplexer serves — and must agree with the scoped ``?profile=X`` answer and with ``stardust -p X status``:
 running-via-multiplexer, start/stop refused, restart addressed to the multiplexer's home.
 
 Live repro (Desktop over a multiplexed HOME): Command Center said "Messaging gateway stopped" for X,
@@ -34,7 +34,7 @@ def pooled_served_process(tmp_path, monkeypatch):
     import gateway.status as status
     # Liveness is a verified identity; this pytest process passes as the default gateway only by
     # wearing a gateway command line.
-    monkeypatch.setattr(status, "_read_process_cmdline", lambda pid: "hermes gateway run")
+    monkeypatch.setattr(status, "_read_process_cmdline", lambda pid: "stardust gateway run")
     monkeypatch.setattr(hermes_constants, "_default_hermes_root_memo", None)
     from hermes_cli import profiles as profiles_mod
     monkeypatch.setattr(profiles_mod, "_check_gateway_running", lambda home: False)

@@ -16,7 +16,7 @@ import hermes_cli.update_receipt as ur
 
 
 def _setup(monkeypatch, tmp_path, record: dict):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir(exist_ok=True)
     monkeypatch.setattr(
         "hermes_cli.build_info.get_code_identity",
@@ -148,4 +148,4 @@ def test_down_and_stale_both_escalate_with_remediation(capsys):
     out = capsys.readouterr().out
     assert "STALE" in out
     assert "DOWN" in out
-    assert "hermes gateway restart" in out
+    assert "stardust gateway restart" in out

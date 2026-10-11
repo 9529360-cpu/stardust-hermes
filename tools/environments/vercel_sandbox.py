@@ -162,7 +162,7 @@ class VercelSandboxEnvironment(BaseEnvironment):
         return self._sandbox
 
     def _remote_hermes_dir(self) -> str:
-        return f"{self._remote_home.rstrip('/')}/.hermes"
+        return f"{self._remote_home.rstrip('/')}/.stardust"
 
     def _create_sandbox(self) -> Sandbox:
         _ensure_vercel_sdk()

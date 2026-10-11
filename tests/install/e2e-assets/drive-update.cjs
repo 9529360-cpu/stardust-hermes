@@ -127,7 +127,7 @@ async function main() {
   log('[zoom] app window prepared at 100%')
 
   // Boot: wait for the composer to exist — the shell is mounted by then.
-  // The real backend (`hermes serve`) is booting underneath; give it time.
+  // The real backend (`stardust serve`) is booting underneath; give it time.
   await page.waitForSelector('textarea, [contenteditable="true"]', {
     state: 'attached',
     timeout: 300_000
@@ -271,7 +271,7 @@ async function main() {
   // and then the desktop quits. We do NOT rely on Playwright's app 'close'
   // event: when the app self-quits for the hand-off that event is
   // unreliable (attempt 8 timed out on it even though the hand-off log
-  // proved the desktop had exited and `hermes update` was already running).
+  // proved the desktop had exited and `stardust update` was already running).
   //
   // The authoritative "hand-off started" signal is the marker file (or the
   // result JSON, if the whole update finished fast). Poll for either, and

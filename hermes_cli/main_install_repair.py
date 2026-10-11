@@ -152,7 +152,7 @@ def _claim_recovery_lock(lock_path: Path) -> bool:
 @contextlib.contextmanager
 def _stdout_to_stderr():
     """Route Python prints AND the fd 1 that pip/uv inherit to stderr: launches whose stdout is
-    a protocol stream (``hermes acp`` speaks JSON-RPC on stdout) must never get install noise."""
+    a protocol stream (``stardust acp`` speaks JSON-RPC on stdout) must never get install noise."""
     saved_stdout_fd = None
     saved_sys_stdout = sys.stdout
     try:
@@ -174,7 +174,7 @@ def _stdout_to_stderr():
 
 
 def _recover_from_interrupted_install() -> None:
-    """Finish update work left half-done by a prior ``hermes update``.
+    """Finish update work left half-done by a prior ``stardust update``.
 
     ``.update-incomplete`` recovers via full quarantined reinstall; ``.lazy-refresh-incomplete``
     via package-only import probes (cleared only when probes confirm healthy/repaired). Never
@@ -244,10 +244,10 @@ def _recover_core_update_marker_locked() -> None:
     """
     from hermes_cli.main import PROJECT_ROOT
     print(
-        "⚠ A previous `hermes update` was interrupted mid-install — "
+        "⚠ A previous `stardust update` was interrupted mid-install — "
         "finishing dependency installation now...")
 
-    # Windows: a ``hermes.exe`` launch has the launcher as an ancestor; the quarantined full
+    # Windows: a ``stardust.exe`` launch has the launcher as an ancestor; the quarantined full
     # reinstall can still replace it. Package-only repair is first aid and NEVER clears the marker.
     # Full editable reinstall uses quarantine so the live shim can still be replaced. Package-only import
     # repair may help as first aid but must NEVER clear this core marker on its own (#58004 review).
@@ -255,7 +255,7 @@ def _recover_core_update_marker_locked() -> None:
     if self_locked:
         install_prefix, install_env = _default_venv_install_target()
         print(
-            "  → Running from hermes.exe; applying package-only first aid, "
+            "  → Running from stardust.exe; applying package-only first aid, "
             "then quarantined full reinstall (core marker stays until that "
             "succeeds)...")
         _repair_venv_via_import_probes(install_prefix, env=install_env)
@@ -302,11 +302,11 @@ def _norm_exe_path(path) -> str:
 def _windows_shim_in_process_chain() -> Path | None:
     """The venv console shim this process runs from or under, if any.
 
-    ``venv\\Scripts\\hermes.exe`` holds itself open (no ``FILE_SHARE_DELETE``) for the whole
+    ``venv\\Scripts\\stardust.exe`` holds itself open (no ``FILE_SHARE_DELETE``) for the whole
     process lifetime, so an editable install run from one can never rewrite it. Two probes, since
     either can come up empty: own launch paths (argv[0], ``__main__`` file/spec origin — runpy/
     zipapp puts ``<shim>\\__main__.py`` there) and psutil ancestry. Candidates are intersected
-    with the project venv's own shims so a foreign ``hermes.exe`` never matches.
+    with the project venv's own shims so a foreign ``stardust.exe`` never matches.
 
     See #88838, #89599.
     """
@@ -368,7 +368,7 @@ def _reexec_dependency_sync_off_windows_shim() -> bool:
     ``Already up to date!`` no-op) and take the prompts along. Waiting on the child deadlocks
     (we hold the handle it needs) and Windows has no exec, so the shell returns; the child keeps
     the console, prints its own result, and ``--gateway`` writes the true exit code to
-    ``.update_exit_code``. The child re-runs ``hermes update`` so the sync and its tail happen
+    ``.update_exit_code``. The child re-runs ``stardust update`` so the sync and its tail happen
     exactly once; ``_UPDATE_REEXEC_ENV`` stops it spawning again and stops the "already up to
     date" early return from swallowing the sync. ``.update-incomplete`` is already written, so
     a child that dies mid-install is finished by the next launch's recovery.
@@ -379,7 +379,7 @@ def _reexec_dependency_sync_off_windows_shim() -> bool:
     all, and it takes the interactive prompts with it. By the time we reach here the code swap is done and
     every question — stash, branch switch, config migration — has already been asked and answered in the
     user's own console.
-    ``venv\\Scripts\\hermes.exe`` is a launcher that runs the interpreter with the shim as its script and
+    ``venv\\Scripts\\stardust.exe`` is a launcher that runs the interpreter with the shim as its script and
     holds it open without ``FILE_SHARE_DELETE`` for the whole command, so the quarantine rename is refused
     and uv fails to replace it with os error 32 (#88838, #89599).
     """
@@ -457,7 +457,7 @@ def _run_install_with_heartbeat(
         # both pipes) only drain the child's stdout, so a full stderr
         # pipe (~64KB) blocks the installer forever. Merged into stdout,
         # the output rides the pipe old hand-offs DO drain. This module
-        # is imported when `hermes update` starts, so an update running
+        # is imported when `stardust update` starts, so an update running
         # from an old base executes the old copy regardless of the git
         # reset — this protects updates initiated from bases that ship
         # it. (managed_uv.py gets the same fix AND is imported lazily
@@ -533,7 +533,7 @@ def _rename_with_backoff(source: Path, target: Path, attempts: int) -> OSError |
 def _quarantine_running_hermes_exe(
     scripts_dir: Path, *, max_attempts: int = 4, failed_out: list[str] | None = None
 ) -> list[tuple[Path, Path]]:
-    """Pre-empt the Windows file lock on the running ``hermes.exe``.
+    """Pre-empt the Windows file lock on the running ``stardust.exe``.
 
     Windows allows RENAMING a running executable but blocks DELETE/REPLACE (uv fails with
     ``Access is denied. (os error 5)``), so live shims are renamed to ``<shim>.old.<unix-ms>``
@@ -567,8 +567,8 @@ def _quarantine_running_hermes_exe(
             f"  ⚠ Could not quarantine {shim.name} ({last_exc.__class__.__name__}: "
             f"another process is holding it open).")
         print(
-            "    Close Hermes Desktop, exit other `hermes` REPLs, stop the "
-            "gateway, or pause AV scanning, then re-run `hermes update`.")
+            "    Close Hermes Desktop, exit other `stardust` REPLs, stop the "
+            "gateway, or pause AV scanning, then re-run `stardust update`.")
         if failed_out is not None:
             failed_out.append(shim.name)
 
@@ -635,7 +635,7 @@ def _cleanup_pending_shim_renames(scripts_dir: Path) -> int:
 
 def _restore_quarantined_exes(moved: list[tuple[Path, Path]]) -> None:
     """Roll back ``_quarantine_running_hermes_exe`` if uv didn't write replacements. Safety-
-    critical: a failed quarantine only aborts an update; a failed restore leaves no ``hermes``
+    critical: a failed quarantine only aborts an update; a failed restore leaves no ``stardust``
     on PATH. Delegates to the stdlib-only retrying helper shared with ``_install_repair``.
 
     The outbound rename already retries a lock, so this one must too rather than swallow the first
@@ -661,10 +661,10 @@ def _run_quarantined_install(
     cmd: list[str], *, env: dict[str, str] | None = None, scripts_dir: Path | None = None,
     strict_quarantine: bool = False,
 ) -> None:
-    """Run an editable install, quarantining the running ``hermes.exe`` first.
+    """Run an editable install, quarantining the running ``stardust.exe`` first.
 
-    Every editable install rewrites the entry-point shims; on Windows the live ``hermes.exe``
-    can be neither deleted nor overwritten, so without quarantine ``hermes`` drops off PATH.
+    Every editable install rewrites the entry-point shims; on Windows the live ``stardust.exe``
+    can be neither deleted nor overwritten, so without quarantine ``stardust`` drops off PATH.
     ``strict_quarantine=True`` (the update dependency sync): a shim whose rename failed every
     retry proves a hard venv hold — the install WILL hit the same lock on .pyd files — so roll
     back and raise :class:`ShimQuarantineError` without installing. Non-strict callers already
@@ -692,7 +692,7 @@ def _run_quarantined_install(
 # another process, whose restore step still needs it — the only copy of that shim.
 # Restore shims when the installer didn't write replacements — on FAILURE (install died before the
 # entry-points step) and on SUCCESS too: uv audits an already-satisfied editable install as a no-op and
-# rewrites no entry points, which would otherwise leave the shims quarantined aside and `hermes` missing
+# rewrites no entry points, which would otherwise leave the shims quarantined aside and `stardust` missing
 # from PATH after a green install (#75584). _restore_quarantined_exes skips any shim the installer actually
 # replaced, so this never clobbers fresh output. Errors are not swallowed — the finally re-raises whatever
 # escaped.
@@ -710,10 +710,10 @@ def _quarantine_stamp_ms(stale: Path) -> int | None:
 
 
 def _cleanup_quarantined_exes(scripts_dir: Path | None = None) -> None:
-    """Sweep — and where necessary RESCUE — ``hermes.exe.old.*`` from updates.
+    """Sweep — and where necessary RESCUE — ``stardust.exe.old.*`` from updates.
 
     Called early on every invocation. Two cases an unconditional ``unlink()`` gets wrong:
-    (1) orphan rescue — ``hermes.exe`` missing while ``hermes.exe.old.*`` exists means the .old
+    (1) orphan rescue — ``stardust.exe`` missing while ``stardust.exe.old.*`` exists means the .old
     file is the ONLY surviving copy (update died between rename and uv's write); put it back via
     the same retry-and-report helper the update-time restore uses. (2) concurrency — a fresh
     quarantine file may belong to an update in flight in another process; leave anything inside
@@ -761,7 +761,7 @@ _LAZY_REFRESH_REPAIR_PACKAGES: dict[str, str] = _early_recovery_mod.LAZY_REFRESH
 
 def _run_package_only_install(cmd: list[str], *, env: dict[str, str] | None = None) -> None:
     """Package-only pip/uv install — no shim quarantine: ``--force-reinstall <pkg>`` never rewrites
-    ``hermes.exe``, and the quarantine path would rename shims uv then never recreates.
+    ``stardust.exe``, and the quarantine path would rename shims uv then never recreates.
 
     See #57828.
     """
@@ -863,7 +863,7 @@ def _repair_venv_via_import_probes(
 
     Real ``import`` checks (not distribution metadata) catch a venv where METADATA remains
     but ``.py`` files were wiped mid-install. Package-only reinstall — never rewrites
-    ``hermes.exe``. Never raises. Returns ``"healthy"``, ``"repaired"``, ``"failed"``
+    ``stardust.exe``. Never raises. Returns ``"healthy"``, ``"repaired"``, ``"failed"``
     (repair did not confirm clean) or ``"indeterminate"`` (probes could not run; NOT healthy).
 
     See #57828.
@@ -881,7 +881,7 @@ def _repair_venv_via_import_probes(
         print("  ✓ Venv repair succeeded")
         return "repaired"
     manual = " ".join(shlex.quote(s) for s in _lazy_refresh_repair_specs(broken))
-    print("  ⚠ Venv repair incomplete. Run manually, then `hermes update`:")
+    print("  ⚠ Venv repair incomplete. Run manually, then `stardust update`:")
     print(f"    {' '.join(install_cmd_prefix)} install --force-reinstall {manual}")
     return "failed"
 
@@ -948,7 +948,7 @@ def _install_python_dependencies_with_optional_fallback(
         env = {**env}
         env.pop("VIRTUAL_ENV", None)
         # Pinned to sys.executable, the shims uv rewrites live in THAT interpreter's Scripts
-        # dir, not PROJECT_ROOT/venv; quarantining the wrong dir leaves hermes.exe locked.
+        # dir, not PROJECT_ROOT/venv; quarantining the wrong dir leaves stardust.exe locked.
         if scripts_dir is None and _is_windows():
             scripts_dir = _interpreter_scripts_dir()
 
@@ -1055,12 +1055,12 @@ def _verify_console_scripts_installed(
     install_cmd_prefix: list[str], *, env: dict[str, str] | None = None) -> None:
     """Ensure every declared console_script shim exists on disk after install.
 
-    On Windows ``uv pip install -e .`` can register ``hermes.exe`` in the wheel RECORD while the
-    file never lands (live shim locked, launcher write skipped), so ``hermes`` drops off PATH
+    On Windows ``uv pip install -e .`` can register ``stardust.exe`` in the wheel RECORD while the
+    file never lands (live shim locked, launcher write skipped), so ``stardust`` drops off PATH
     after a "successful" install. Missing shims get ``--reinstall -e .`` under quarantine.
 
-    The symptom is ``hermes-agent.exe`` and ``hermes-acp.exe`` present but ``hermes.exe`` missing, so
-    ``hermes`` drops off PATH even though the install reported success (issue #52931).
+    The symptom is ``hermes-agent.exe`` and ``hermes-acp.exe`` present but ``stardust.exe`` missing, so
+    ``stardust`` drops off PATH even though the install reported success (issue #52931).
     """
     if not _is_windows():
         return
@@ -1084,7 +1084,7 @@ def _verify_console_scripts_installed(
         env=env, scripts_dir=scripts_dir,
         log_msg="console script verification: repair install failed: %s",
         fail_msg=(
-            "  ⚠ Entry point repair failed; try `hermes update --force` after "
+            "  ⚠ Entry point repair failed; try `stardust update --force` after "
             "closing other hermes processes.")):
         return
     _report_still_missing(
@@ -1133,7 +1133,7 @@ def _verify_core_dependencies_installed(
     if not applicable:
         return
     # Probe inside the venv Python — sys.executable may be the outer Python that drove
-    # ``hermes update``; the install prefix/env encode which environment we targeted.
+    # ``stardust update``; the install prefix/env encode which environment we targeted.
     venv_python = _resolve_install_target_python(install_cmd_prefix, env)
     if venv_python is None:
         return
@@ -1160,7 +1160,7 @@ def _verify_core_dependencies_installed(
         _run_quarantined_install, install_cmd_prefix + ["install", "--reinstall", "-e", "."],
         env=env, scripts_dir=scripts_dir,
         log_msg="dep verification: repair install failed: %s",
-        fail_msg="  ⚠ Repair install failed; check `hermes update` output above."):
+        fail_msg="  ⚠ Repair install failed; check `stardust update` output above."):
         return
     still_missing = _missing_deps()
     if not still_missing:
@@ -1177,10 +1177,10 @@ def _verify_core_dependencies_installed(
         log_msg="dep verification: per-package repair failed: %s",
         fail_msg=(
             f"  ⚠ Could not install: {', '.join(still_missing)}. "
-            "Run `hermes update --force` after closing other hermes processes.")):
+            "Run `stardust update --force` after closing other hermes processes.")):
         return
     _report_still_missing(
-        _missing_deps(), "Run `hermes update --force` after closing other hermes processes.",
+        _missing_deps(), "Run `stardust update --force` after closing other hermes processes.",
         ok="  ✓ All declared core dependencies now installed")
 
 

@@ -1,4 +1,4 @@
-"""Host-platform checks for hermes doctor: interpreter, SQLite, certificates, macOS TCC, gateway supervision, command install.
+"""Host-platform checks for stardust doctor: interpreter, SQLite, certificates, macOS TCC, gateway supervision, command install.
 Split out of ``hermes_cli/doctor.py``, which re-exports every name so ``hermes_cli.doctor.<name>`` keeps resolving (and monkeypatching)."""
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ def _sqlite_upgrade_hint(install_method: str | None = None) -> str:
     method = install_method or detect_install_method(PROJECT_ROOT)
     cmd = recommended_update_command_for_method(method)
     action = cmd if is_nix_install_method(method) else {  # nix: prose guidance, not a shell command
-        "docker": f"run `{cmd}`, then recreate all Hermes containers", "apt": f"run `{cmd}`"}.get(method, "run `hermes update`")
+        "docker": f"run `{cmd}`, then recreate all Hermes containers", "apt": f"run `{cmd}`"}.get(method, "run `stardust update`")
     return f"({action}; fixed versions: 3.51.3+ / 3.50.7 / 3.44.6 — see https://sqlite.org/wal.html#walresetbug)"
 
 
@@ -160,7 +160,7 @@ def _check_version_consistency(issues: list[str]) -> None:
     if pyproject_version == init_version:
         return check_ok("Version files consistent", f"({init_version})")
     _fail_and_issue("Version mismatch between source files", f"(pyproject.toml {pyproject_version} != hermes_cli/__init__.py {init_version})",
-                    "Re-sync version files (e.g. run 'hermes update', or set hermes_cli/__init__.py __version__ to match pyproject.toml)", issues)
+                    "Re-sync version files (e.g. run 'stardust update', or set hermes_cli/__init__.py __version__ to match pyproject.toml)", issues)
 
 
 def _check_s6_supervision(issues: list[str]) -> None:
@@ -179,7 +179,7 @@ def _check_s6_supervision(issues: list[str]) -> None:
         (check_ok if up else check_info)(f"{static}: up" if up else f"{static}: down (expected if not enabled via env)")
     profiles = mgr.list_profile_gateways()
     if not profiles:
-        return check_info("No per-profile gateways registered yet — create one with `hermes profile create <name>`")
+        return check_info("No per-profile gateways registered yet — create one with `stardust profile create <name>`")
     up_count = sum(1 for p in profiles if mgr.is_running(f"gateway-{p}"))
     check_ok(f"Per-profile gateways: {up_count}/{len(profiles)} supervised up"
              + (f" ({', '.join(sorted(profiles))})" if len(profiles) <= 8 else ""))
@@ -208,7 +208,7 @@ def check_certificates(should_fix: bool = False, issues: "list | None" = None) -
     check_fail("SSL CA certificate bundle is broken", first_error)
     pip_cmd = f"{sys.executable} -m pip install --force-reinstall certifi"
     if not should_fix:
-        issues.append(f"Repair the CA bundle: run `hermes doctor --fix`, or `{pip_cmd}`")
+        issues.append(f"Repair the CA bundle: run `stardust doctor --fix`, or `{pip_cmd}`")
         return
     print("    → Repairing: force-reinstalling certifi...")
     try:
@@ -254,11 +254,11 @@ def _check_gateway_service_linger(issues: list[str]) -> None:
 
 _TCC_CDHASH_DETAIL = (
     "the desktop bundle's designated requirement is cdhash-pinned (pre-#73681 build) — rebuilds invalidate "
-    "all permission grants. Run `hermes update` to get the stable identifier-pinned signing identity, "
+    "all permission grants. Run `stardust update` to get the stable identifier-pinned signing identity, "
     "then re-grant permissions once.")
 _TCC_STABLE_DETAIL = {
     True: "(certificate-anchored DR; grants survive rebuilds)",
-    False: "(identifier-pinned DR; grants survive rebuilds — for the strongest anchor, see `hermes desktop --setup-tcc-identity`)",
+    False: "(identifier-pinned DR; grants survive rebuilds — for the strongest anchor, see `stardust desktop --setup-tcc-identity`)",
 }
 
 
@@ -368,7 +368,7 @@ def _check_security_advisories(should_fix: bool, f: Finding) -> None:
         # Fail row + remediation text indented under it as one section; also into the summary action list.
         _fail_and_issue(f"{hit.advisory.title}", f"({hit.package}=={hit.installed_version})",
                         f"Resolve security advisory {hit.advisory.id}: uninstall {hit.package}=={hit.installed_version} "
-                        f"and rotate credentials, then run `hermes doctor --ack {hit.advisory.id}`.", f.manual_issues)
+                        f"and rotate credentials, then run `stardust doctor --ack {hit.advisory.id}`.", f.manual_issues)
         for line in full_remediation_text(hit):
             print(f"    {color(line, Colors.YELLOW)}" if line else "")
     acked_ids = get_acked_ids()  # acked-but-still-installed stays visible
@@ -450,35 +450,35 @@ def _check_command_installation(should_fix: bool, f: Finding) -> None:
     if sys.platform == "win32":
         return
     _section("Command Installation")
-    venv_bin = next((c for c in (PROJECT_ROOT / n / "bin" / "hermes" for n in ("venv", ".venv")) if c.exists()), None)
+    venv_bin = next((c for c in (PROJECT_ROOT / n / "bin" / "stardust" for n in ("venv", ".venv")) if c.exists()), None)
     if venv_bin is None:
-        check_warn("Venv entry point not found", "(hermes not in venv/bin/ or .venv/bin/ — reinstall with pip install -e '.[all]')")
+        check_warn("Venv entry point not found", "(stardust not in venv/bin/ or .venv/bin/ — reinstall with pip install -e '.[all]')")
         return f.manual_issues.append(f"Reinstall entry point: cd {PROJECT_ROOT} && source venv/bin/activate && pip install -e '.[all]'")
     check_ok(f"Venv entry point exists ({venv_bin.relative_to(PROJECT_ROOT)})")
     # Expected command link directory (mirrors install.sh logic).
     prefix = os.environ.get("PREFIX", "")
     termux = prefix and (os.environ.get("TERMUX_VERSION") or "com.termux/files/usr" in prefix)
     link_dir, display = (Path(prefix) / "bin", "$PREFIX/bin") if termux else (Path.home() / ".local" / "bin", "~/.local/bin")
-    link = link_dir / "hermes"
+    link = link_dir / "stardust"
     if link.is_symlink():
         target, expected = link.resolve(), venv_bin.resolve()
         if target == expected:
-            return check_ok(f"{display}/hermes → correct target")
-        check_warn(f"{display}/hermes points to wrong target", f"(→ {target}, expected → {expected})")
+            return check_ok(f"{display}/stardust → correct target")
+        check_warn(f"{display}/stardust points to wrong target", f"(→ {target}, expected → {expected})")
         if not should_fix:
-            return f.issues.append(f"Broken symlink at {display}/hermes — run 'hermes doctor --fix'")
+            return f.issues.append(f"Broken symlink at {display}/stardust — run 'stardust doctor --fix'")
         link.unlink()
         verb = "Fixed"
     elif link.exists():  # regular file (wrapper script), not a symlink
-        return check_ok(f"{display}/hermes exists (non-symlink)")
+        return check_ok(f"{display}/stardust exists (non-symlink)")
     else:
-        check_fail(f"{display}/hermes not found", "(hermes command may not work outside the venv)")
+        check_fail(f"{display}/stardust not found", "(stardust command may not work outside the venv)")
         if not should_fix:
-            return f.issues.append(f"Missing {display}/hermes symlink — run 'hermes doctor --fix'")
+            return f.issues.append(f"Missing {display}/stardust symlink — run 'stardust doctor --fix'")
         link_dir.mkdir(parents=True, exist_ok=True)
         verb = "Created"
     link.symlink_to(venv_bin)
-    check_ok(f"{verb} symlink: {display}/hermes → {venv_bin}")
+    check_ok(f"{verb} symlink: {display}/stardust → {venv_bin}")
     f.fixed += 1
     if verb == "Created" and str(link_dir) not in os.environ.get("PATH", "").split(os.pathsep):
         check_warn(f"{display} is not on your PATH", "(add it to your shell config: export PATH=\"$HOME/.local/bin:$PATH\")")

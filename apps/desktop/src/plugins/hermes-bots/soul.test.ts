@@ -82,7 +82,7 @@ describe('appending the protocol to an existing SOUL', () => {
     const { ensureMessagingProtocol } = await loadSoul()
     const soul = ensureMessagingProtocol('', 'default', roster)
 
-    expect(soul).toMatch(/run `hermes profile list` for the LIVE/)
+    expect(soul).toMatch(/run `stardust profile list` for the LIVE/)
     expect(soul).not.toMatch(/hermes profiles list/)
   })
 

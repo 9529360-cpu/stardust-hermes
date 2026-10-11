@@ -2,7 +2,7 @@
 
 Providers register via ``PluginContext.register_video_gen_provider()`` and live
 in ``<repo>/plugins/video_gen/<name>/`` (built-in) or
-``~/.hermes/plugins/video_gen/<name>/``; mirrors ``agent/image_gen_provider.py``.
+``~/.stardust/plugins/video_gen/<name>/``; mirrors ``agent/image_gen_provider.py``.
 One tool covers text-to-video and image-to-video: ``image_url`` present routes to
 the provider's image-to-video endpoint. Video edit/extend are deliberately NOT
 exposed — backends are too inconsistent for one unified tool.

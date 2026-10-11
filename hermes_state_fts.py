@@ -233,7 +233,7 @@ class SessionFtsSetupMixin:
         self._fts_unavailable_warned = True
         logger.warning(
             "SQLite FTS5 unavailable for %s; full-text session search "
-            "disabled. Run `hermes update` to rebuild the venv with a "
+            "disabled. Run `stardust update` to rebuild the venv with a "
             "current Python (managed uv guarantees FTS5). (underlying error: %s)",
             self.db_path,
             exc,
@@ -263,7 +263,7 @@ class SessionFtsSetupMixin:
                             "cjk_unicode61 tokenizer is unavailable (%s) — "
                             "dropping the cjk triggers so message writes keep "
                             "working. CJK search falls back to trigram/LIKE; "
-                            "run `hermes sessions optimize-storage` on a host "
+                            "run `stardust sessions optimize-storage` on a host "
                             "with the extension to rebuild.",
                             fts5_cjk_so_path(),
                         )

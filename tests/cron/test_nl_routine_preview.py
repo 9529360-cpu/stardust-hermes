@@ -18,7 +18,7 @@ import pytest
 @pytest.fixture
 def hermes_env(tmp_path, monkeypatch):
     """Isolate STARDUST_HOME per test and reload the modules that cache it."""
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     (home / "cron").mkdir(parents=True)
     (home / "scripts").mkdir()
     monkeypatch.setenv("STARDUST_HOME", str(home))

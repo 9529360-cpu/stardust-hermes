@@ -39,7 +39,7 @@ suggest:
 
 post_install: |
   On first connection Hermes opens a browser to authorize with
-  Robinhood (or run `hermes mcp login robinhood`). Approve access,
+  Robinhood (or run `stardust mcp login robinhood`). Approve access,
   then restart the session so tools load.
 
   CAUTION: this server can place REAL trades (equities, options, crypto)

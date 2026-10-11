@@ -1,9 +1,9 @@
 """A one-shot run stops the background processes it still owns when it exits.
 
-Field failure (2026-09-30, maintainer's Windows machine): a Kanban worker (``hermes chat -q ... -Q``)
+Field failure (2026-09-30, maintainer's Windows machine): a Kanban worker (``stardust chat -q ... -Q``)
 started ``python -m http.server 8765`` in the background, reported the page as served and exited. The
 server outlived it on a dead stdout pipe — still bound to its port hours later, failing every request.
-``hermes -z`` (``agent.close()``) and delegated children already stop what they own; the quiet ``-q``
+``stardust -z`` (``agent.close()``) and delegated children already stop what they own; the quiet ``-q``
 exit (``cli._finalize_single_query``) did not.
 """
 

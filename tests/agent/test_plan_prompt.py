@@ -32,7 +32,7 @@ class TestBuildPlanPrompt:
 
     def test_save_location_contract(self):
         prompt = build_plan_prompt("anything")
-        assert ".hermes/plans/" in prompt
+        assert ".stardust/plans/" in prompt
         assert "YYYY-MM-DD_HHMMSS-<slug>.md" in prompt
 
     def test_authoring_craft_travels_with_every_prompt(self):

@@ -42,7 +42,7 @@ NEW_URL = "https://new-endpoint.invalid/v1"
 def live_home(monkeypatch):
     """A REAL isolated STARDUST_HOME with a config.yaml + state.db on disk."""
     tmp = Path(tempfile.mkdtemp(prefix="hermes-live-staleprov-"))
-    home = tmp / ".hermes"
+    home = tmp / ".stardust"
     home.mkdir(parents=True)
     config = {
         "model": {"default": "test-model-live", "provider": "custom:newone"},

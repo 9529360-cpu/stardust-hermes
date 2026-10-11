@@ -1,4 +1,4 @@
-"""Tests for hermes_cli/terminal_breadcrumbs.py — per-terminal ``hermes -c``.
+"""Tests for hermes_cli/terminal_breadcrumbs.py — per-terminal ``stardust -c``.
 
 Covers terminal id derivation (tty vs env vars vs none), breadcrumb
 write/read roundtrip under a temp STARDUST_HOME, stale-session fallback
@@ -28,7 +28,7 @@ TERMINAL_ENV_VARS = (
 
 @pytest.fixture
 def hermes_home(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     monkeypatch.setenv("STARDUST_HOME", str(home))
     return home

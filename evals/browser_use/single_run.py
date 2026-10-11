@@ -43,7 +43,7 @@ TASKS = json.load(open(TASKS_PATH, encoding="utf-8"))
 task = TASKS[TASK_KEY]
 
 home = tempfile.mkdtemp(prefix=f"buhome-{ARM}-")
-hh = os.path.join(home, ".hermes")
+hh = os.path.join(home, ".stardust")
 os.makedirs(os.path.join(hh, "logs"), exist_ok=True)
 cdp = os.environ.get("BENCH_CDP_URL", "http://127.0.0.1:9333")
 browser_cfg = (

@@ -5,7 +5,7 @@ Bug shape (live-reproduced on main @1c5ee5815f): /handoff poll-waited a flat
 60s for a TERMINAL state. The gateway watcher claims within seconds, but the
 dispatch is a FULL synthetic agent turn (whole transcript replay + delivery)
 that routinely exceeds 60s. The CLI then printed "Timed out waiting for the
-gateway. Is `hermes gateway` running?" (false diagnosis), called
+gateway. Is `stardust gateway` running?" (false diagnosis), called
 fail_handoff() on the RUNNING row (stomping the gateway's claim), and claimed
 "Your CLI session is intact" after switch_session had already re-pointed the
 session. The gateway later overwrote failed -> completed: split-brain.
@@ -31,7 +31,7 @@ from hermes_state import SessionDB
 
 @pytest.fixture()
 def db(tmp_path, monkeypatch):
-    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
     d = SessionDB(db_path=tmp_path / "state.db")
     yield d
     d.close()
@@ -166,7 +166,7 @@ class TestCLIWaitLoop:
         keep, printed, _ = _run_handoff(db_proxy, "cli-sess-b", monkeypatch)
         out = "\n".join(printed)
         assert keep is True
-        assert "Is `hermes gateway` running?" not in out
+        assert "Is `stardust gateway` running?" not in out
         assert "taking unusually long" in out
         # The row is still owned by the gateway — untouched by the CLI.
         assert db.get_handoff_state("cli-sess-b")["state"] == "running"

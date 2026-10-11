@@ -27,7 +27,7 @@ if not os.environ.get("OPENROUTER_API_KEY"):
     print("ABORT: OPENROUTER_API_KEY missing", file=sys.stderr)
     sys.exit(3)
 
-# --- hermetic env BEFORE any hermes import -------------------------------
+# --- hermetic env BEFORE any stardust import -------------------------------
 for var in list(os.environ):
     if var.endswith(("_API_KEY", "_TOKEN")) and var != "OPENROUTER_API_KEY":
         os.environ.pop(var, None)
@@ -35,7 +35,7 @@ os.environ.pop("FAL_KEY", None)
 os.environ.pop("STARDUST_PROFILE", None)
 
 tmp_root = tempfile.mkdtemp(prefix=f"ab-{ARM}-{TASK_ID}-")
-hermes_home = os.path.join(tmp_root, ".hermes")
+hermes_home = os.path.join(tmp_root, ".stardust")
 workspace = os.path.join(tmp_root, "ws")
 os.makedirs(hermes_home)
 os.makedirs(workspace)

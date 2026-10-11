@@ -41,12 +41,12 @@ def test_cli_keeps_discovered_home_when_launch_selection_changes(tmp_path, monke
         return subprocess.CompletedProcess(argv, 0, "", "")
 
     monkeypatch.setattr("tools.bot_live_delivery.find_canonical_live_owner", discover)
-    monkeypatch.setattr(delivery.shutil, "which", lambda _: "/bin/hermes")
+    monkeypatch.setattr(delivery.shutil, "which", lambda _: "/bin/stardust")
     monkeypatch.setattr(delivery.subprocess, "run", run)
     try:
         assert delivery._deliver_to_bot_chat({"id": "job"}, "output", profile) is None
         assert seen == [home]
-        assert not (tmp_path / ".hermes").exists()
+        assert not (tmp_path / ".stardust").exists()
     finally:
         reset_hermes_home_override(token)
 

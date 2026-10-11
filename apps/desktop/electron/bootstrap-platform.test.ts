@@ -19,12 +19,12 @@ test('isWslEnvironment detects WSL2 env vars on linux', () => {
 })
 
 test('isWindowsBinaryPathInWsl blocks Windows binary types on WSL', () => {
-  assert.equal(isWindowsBinaryPathInWsl('/mnt/c/Tools/hermes.exe', { isWsl: true }), true)
-  assert.equal(isWindowsBinaryPathInWsl('/mnt/c/Tools/hermes.cmd', { isWsl: true }), true)
+  assert.equal(isWindowsBinaryPathInWsl('/mnt/c/Tools/stardust.exe', { isWsl: true }), true)
+  assert.equal(isWindowsBinaryPathInWsl('/mnt/c/Tools/stardust.cmd', { isWsl: true }), true)
   assert.equal(isWindowsBinaryPathInWsl('/mnt/c/Tools/hermes.bat', { isWsl: true }), true)
   assert.equal(isWindowsBinaryPathInWsl('/mnt/c/Tools/install.ps1', { isWsl: true }), true)
-  assert.equal(isWindowsBinaryPathInWsl('/usr/local/bin/hermes', { isWsl: true }), false)
-  assert.equal(isWindowsBinaryPathInWsl('/mnt/c/Tools/hermes.exe', { isWsl: false }), false)
+  assert.equal(isWindowsBinaryPathInWsl('/usr/local/bin/stardust', { isWsl: true }), false)
+  assert.equal(isWindowsBinaryPathInWsl('/mnt/c/Tools/stardust.exe', { isWsl: false }), false)
 })
 
 test('bundledRuntimeImportCheck selects platform-specific import checks', () => {
@@ -88,10 +88,13 @@ test('detectRemoteDisplay honors the STARDUST_DESKTOP_DISABLE_GPU override both 
 
 test('resolveLinuxPasswordStore applies known backends on linux', () => {
   for (const store of ['gnome-libsecret', 'kwallet', 'kwallet5', 'kwallet6', 'basic']) {
-    assert.deepEqual(resolveLinuxPasswordStore({ env: { STARDUST_DESKTOP_PASSWORD_STORE: store }, platform: 'linux' }), {
-      store,
-      warning: null
-    })
+    assert.deepEqual(
+      resolveLinuxPasswordStore({ env: { STARDUST_DESKTOP_PASSWORD_STORE: store }, platform: 'linux' }),
+      {
+        store,
+        warning: null
+      }
+    )
   }
 })
 

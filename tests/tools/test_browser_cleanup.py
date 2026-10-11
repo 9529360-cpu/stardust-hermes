@@ -18,9 +18,9 @@ class TestScreenshotPathRecovery:
 
         assert (
             _extract_screenshot_path_from_text(
-                "Screenshot saved to '/Users/david/.hermes/browser_screenshots/shot.png'"
+                "Screenshot saved to '/Users/david/.stardust/browser_screenshots/shot.png'"
             )
-            == "/Users/david/.hermes/browser_screenshots/shot.png"
+            == "/Users/david/.stardust/browser_screenshots/shot.png"
         )
 
 

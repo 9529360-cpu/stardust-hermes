@@ -115,7 +115,7 @@ def _profile_home(profile: str) -> Optional[str]:
         from hermes_cli.profiles import get_profile_dir
         return str(get_profile_dir(profile))
     if profile and profile != "default":
-        return os.path.expanduser(f"~/.hermes/profiles/{profile}")
+        return os.path.expanduser(f"~/.stardust/profiles/{profile}")
     with contextlib.suppress(Exception):
         from hermes_cli.config import get_hermes_home
         return str(get_hermes_home())
@@ -590,7 +590,7 @@ class A2AAdapter(BasePlatformAdapter):
         return None, {"task_id": task_id, "context_id": context_id, "peer": peer, "future": fut, "created_iso": rec["created_iso"], "started": time.time()}
 
     def _forward_to_profile(self, agent: dict, peer: str, context_id: str, framed_text: str) -> tuple[str, str]:
-        """Forward a routed task to another local profile via ``hermes chat``. First contact creates a
+        """Forward a routed task to another local profile via ``stardust chat``. First contact creates a
         ``source=a2a`` session and titles it deterministically; later turns ``--resume`` that id."""
         profile = str(agent.get("profile") or agent.get("slug") or "").strip()
         slug = str(agent.get("slug") or profile or "agent")

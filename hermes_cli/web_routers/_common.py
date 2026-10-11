@@ -65,7 +65,7 @@ def http_failure(log_msg: str, status: int, prefix: Optional[str] = None, *, det
 def spawn_profile_action(
     profile: Optional[str], argv: list, name: str, *, log_msg: str, prefix: str
 ) -> dict:
-    """Spawn a background ``hermes -p <profile> <argv>`` action; a spawn
+    """Spawn a background ``stardust -p <profile> <argv>`` action; a spawn
     failure is logged and becomes ``500 "<prefix>: <exc>"``."""
     with http_failure(log_msg, 500, prefix):
         proc = _spawn_hermes_action(_profile_cli_args(profile) + argv, name)
@@ -83,13 +83,13 @@ def require(value: Optional[str], detail: str) -> str:
 # Corrupt-store reporting for polled read endpoints. The dashboard polls analytics every few
 # seconds; a persistently malformed state.db once produced ~520K identical tracebacks in 24 h
 # (#96591). One WARNING per store per interval, then debug; the caller gets an explicit status
-# instead of a 500. The file is never quarantined or renamed from here — that is `hermes doctor`'s job.
+# instead of a 500. The file is never quarantined or renamed from here — that is `stardust doctor`'s job.
 _CORRUPT_STORE_WARN_INTERVAL_S = 300.0
 _corrupt_store_warned_at: Dict[str, float] = {}  # {db path: monotonic}
 
 CORRUPT_STORE_DETAIL = {
     "error": "state_db_corrupt",
-    "message": "state.db corrupt — run `hermes doctor` (then `hermes doctor --fix` or `hermes sessions repair`).",
+    "message": "state.db corrupt — run `stardust doctor` (then `stardust doctor --fix` or `stardust sessions repair`).",
 }
 
 
@@ -110,7 +110,7 @@ def corrupt_store_as_status(db_path):
         if last is None or now - last >= _CORRUPT_STORE_WARN_INTERVAL_S:
             _corrupt_store_warned_at[key] = now
             log.warning("state.db at %s is corrupt (%s); dashboard reads return a status payload until it is "
-                        "repaired — run `hermes doctor`", db_path, exc)
+                        "repaired — run `stardust doctor`", db_path, exc)
         else:
             log.debug("state.db at %s still corrupt: %s", db_path, exc)
         raise HTTPException(status_code=503, detail={**CORRUPT_STORE_DETAIL, "path": key}) from exc

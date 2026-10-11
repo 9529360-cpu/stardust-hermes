@@ -236,7 +236,7 @@ contextBridge.exposeInMainWorld('stardustDesktop', {
     setLastUsed: id => ipcRenderer.invoke('stardust:connections:set-last-used', id),
     test: id => ipcRenderer.invoke('stardust:connections:test', id),
     updateManaged: id => ipcRenderer.invoke('stardust:connections:update-managed', id),
-    // Fan out `hermes update` to every eligible registered connection.
+    // Fan out `stardust update` to every eligible registered connection.
     // Optional excludeIds skips rows the caller updates through another path.
     updateAll: options => ipcRenderer.invoke('stardust:connections:update-all', options),
     // Registry lifecycle push (main → renderer): a connection was removed or

@@ -27,7 +27,7 @@ def _fallback_chain_phrase() -> str:
     if chain:
         return "No backup provider succeeded either."
     return (
-        "No backup provider is configured — add one with `hermes fallback add`, "
+        "No backup provider is configured — add one with `stardust fallback add`, "
         "or set a cron-wide default via `cron.model` + `cron.model_provider` in config.yaml."
     )
 
@@ -56,7 +56,7 @@ def _failure_streak_nudge(job: dict) -> str:
     job_ref = job.get("name") or job.get("id") or "this job"
     return (
         f"\nThis job has failed {streak} runs in a row — worth a review. "
-        f"Fix its prompt/config, or pause it with `hermes cron pause {job_ref}` "
+        f"Fix its prompt/config, or pause it with `stardust cron pause {job_ref}` "
         "(resume/remove also available) to stop the noise."
     )
 
@@ -107,7 +107,7 @@ def _summarize_cron_failure_for_delivery(job: dict, error: str | None) -> str:
     message = generic_failure_notice(job_name, job_id, cleaned)
 
     # Import-class failures (#95294 part 3): a long-lived gateway whose checkout was updated
-    # underneath it (interrupted `hermes update`, manual git pull) serves MIXED modules and every
+    # underneath it (interrupted `stardust update`, manual git pull) serves MIXED modules and every
     # agent cron job dies with `cannot import name X`. The error reads like a code bug, so APPEND
     # cause + fix — never replace the raw error, which carries the failing symbol. Fail-safe: skew
     # is None on non-git/no-fingerprint; no_agent jobs excluded (a fresh subprocess resolves
@@ -124,7 +124,7 @@ def _summarize_cron_failure_for_delivery(job: dict, error: str | None) -> str:
             message += (
                 f" Likely cause: the gateway is running stale code (booted "
                 f"on {boot_rev}, disk is at {disk_rev}) — run "
-                "`hermes gateway restart` to fix it."
+                "`stardust gateway restart` to fix it."
             )
 
     return message

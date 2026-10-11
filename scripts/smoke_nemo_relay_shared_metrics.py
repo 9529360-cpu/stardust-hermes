@@ -30,12 +30,12 @@ INSTALLED_SKILL_CANARY = "relay-smoke-private-installed-skill"
 def _resolve_hermes_executable(hermes_repo: Path) -> Path:
     for relative_path in (
         Path(".venv") / "bin" / "hermes",
-        Path(".venv") / "Scripts" / "hermes.exe",
+        Path(".venv") / "Scripts" / "stardust.exe",
     ):
         candidate = hermes_repo / relative_path
         if candidate.is_file():
             return candidate
-    discovered = shutil.which("hermes")
+    discovered = shutil.which("stardust")
     if discovered:
         return Path(discovered)
     raise SystemExit(
@@ -238,7 +238,7 @@ def _arguments() -> argparse.Namespace:
         "--hermes-repo",
         type=Path,
         default=Path.cwd(),
-        help="Hermes source checkout containing .venv/bin/hermes",
+        help="Hermes source checkout containing .venv/bin/stardust",
     )
     parser.add_argument(
         "--relay-python",

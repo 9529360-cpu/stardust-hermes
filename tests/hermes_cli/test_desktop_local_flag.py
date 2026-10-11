@@ -1,6 +1,6 @@
 """The desktop subcommand's --local launch flag.
 
-Local models ship on main behind this flag: `hermes desktop --local` (or
+Local models ship on main behind this flag: `stardust desktop --local` (or
 `Stardust.exe --local` directly) shows the local-models GUI surfaces; without
 it the desktop hides them all, even when local models are configured. These
 tests pin the argparse contract; the pass-through to the Electron argv lives
@@ -13,7 +13,7 @@ from hermes_cli.subcommands.gui import build_gui_parser
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="hermes")
+    parser = argparse.ArgumentParser(prog="stardust")
     subparsers = parser.add_subparsers(dest="command")
     build_gui_parser(subparsers, cmd_gui=lambda args: None)
 

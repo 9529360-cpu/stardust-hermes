@@ -63,7 +63,7 @@ export function mcpOAuthRpc(scope?: ProfileScope) {
 
 // ---------------------------------------------------------------------------
 // MCP servers — structured list / test / enable toggle / catalog (parity with
-// `hermes mcp` and the dashboard MCP page). Raw JSON editing stays in
+// `stardust mcp` and the dashboard MCP page). Raw JSON editing stays in
 // config.yaml via saveHermesConfig.
 // ---------------------------------------------------------------------------
 

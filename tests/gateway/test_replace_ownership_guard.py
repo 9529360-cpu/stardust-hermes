@@ -33,7 +33,7 @@ import pytest
 def profile_env(tmp_path, monkeypatch):
     """Isolated STARDUST_HOME mirroring tests/hermes_cli/test_profiles.py."""
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    default_home = tmp_path / ".hermes"
+    default_home = tmp_path / ".stardust"
     default_home.mkdir(exist_ok=True)
     monkeypatch.setenv("STARDUST_HOME", str(default_home))
     return tmp_home if (tmp_home := default_home) else default_home
@@ -56,11 +56,11 @@ class TestRecordAuthority:
         with (
             patch(
                 "gateway.status._read_pid_record",
-                return_value=_record(home=str(profile_env / ".hermes")),
+                return_value=_record(home=str(profile_env / ".stardust")),
             ),
             patch(
                 "gateway.status._get_pid_path",
-                return_value=profile_env / ".hermes" / "gateway.pid",
+                return_value=profile_env / ".stardust" / "gateway.pid",
             ),
             patch(
                 "gateway.status._get_process_start_time",
@@ -69,7 +69,7 @@ class TestRecordAuthority:
             patch("gateway.status._read_process_cmdline", return_value=None),
             patch(
                 "gateway.status._get_process_hermes_home",
-                return_value=profile_env / ".hermes",
+                return_value=profile_env / ".stardust",
             ),
         ):
             assert _replace_target_belongs_to_other_profile(424242) is False
@@ -83,12 +83,12 @@ class TestRecordAuthority:
             patch(
                 "gateway.status._read_pid_record",
                 return_value=_record(
-                    home="/home/other/.hermes/profiles/timothy"
+                    home="/home/other/.stardust/profiles/timothy"
                 ),
             ),
             patch(
                 "gateway.status._get_pid_path",
-                return_value=profile_env / ".hermes" / "gateway.pid",
+                return_value=profile_env / ".stardust" / "gateway.pid",
             ),
             patch(
                 "gateway.status._get_process_start_time",
@@ -97,7 +97,7 @@ class TestRecordAuthority:
             patch("gateway.status._read_process_cmdline", return_value=None),
             patch(
                 "gateway.status._get_process_hermes_home",
-                return_value=profile_env / ".hermes" / "profiles" / "tim",
+                return_value=profile_env / ".stardust" / "profiles" / "tim",
             ),
         ):
             assert _replace_target_belongs_to_other_profile(424242) is True
@@ -110,11 +110,11 @@ class TestRecordAuthority:
             patch("gateway.status._read_pid_record", return_value=None),
             patch(
                 "gateway.status._get_pid_path",
-                return_value=profile_env / ".hermes" / "gateway.pid",
+                return_value=profile_env / ".stardust" / "gateway.pid",
             ),
             patch(
                 "gateway.status._get_process_hermes_home",
-                return_value=profile_env / ".hermes",
+                return_value=profile_env / ".stardust",
             ),
         ):
             assert _replace_target_belongs_to_other_profile(424242) is True
@@ -133,7 +133,7 @@ class TestRecordAuthority:
             ),
             patch(
                 "gateway.status._get_pid_path",
-                return_value=profile_env / ".hermes" / "gateway.pid",
+                return_value=profile_env / ".stardust" / "gateway.pid",
             ),
             patch(
                 "gateway.status._get_process_start_time",
@@ -141,7 +141,7 @@ class TestRecordAuthority:
             ),
             patch(
                 "gateway.status._get_process_hermes_home",
-                return_value=profile_env / ".hermes",
+                return_value=profile_env / ".stardust",
             ),
         ):
             assert _replace_target_belongs_to_other_profile(424242) is True
@@ -153,11 +153,11 @@ class TestRecordAuthority:
         with (
             patch(
                 "gateway.status._read_pid_record",
-                return_value=_record(pid=999999, home=str(profile_env / ".hermes")),
+                return_value=_record(pid=999999, home=str(profile_env / ".stardust")),
             ),
             patch(
                 "gateway.status._get_pid_path",
-                return_value=profile_env / ".hermes" / "gateway.pid",
+                return_value=profile_env / ".stardust" / "gateway.pid",
             ),
             patch(
                 "gateway.status._get_process_start_time",
@@ -165,7 +165,7 @@ class TestRecordAuthority:
             ),
             patch(
                 "gateway.status._get_process_hermes_home",
-                return_value=profile_env / ".hermes",
+                return_value=profile_env / ".stardust",
             ),
         ):
             assert _replace_target_belongs_to_other_profile(424242) is True
@@ -178,11 +178,11 @@ class TestRecordAuthority:
         with (
             patch(
                 "gateway.status._read_pid_record",
-                return_value=_record(start=1, home=str(profile_env / ".hermes")),
+                return_value=_record(start=1, home=str(profile_env / ".stardust")),
             ),
             patch(
                 "gateway.status._get_pid_path",
-                return_value=profile_env / ".hermes" / "gateway.pid",
+                return_value=profile_env / ".stardust" / "gateway.pid",
             ),
             patch(
                 "gateway.status._get_process_start_time",
@@ -190,7 +190,7 @@ class TestRecordAuthority:
             ),
             patch(
                 "gateway.status._get_process_hermes_home",
-                return_value=profile_env / ".hermes",
+                return_value=profile_env / ".stardust",
             ),
         ):
             assert _replace_target_belongs_to_other_profile(424242) is True
@@ -215,7 +215,7 @@ class TestArgvConsistencyCheck:
             _looks_like_profile_conflict_from_cmdline as conflict,
         )
 
-        tim_home = Path("/home/x/.hermes/profiles/tim")
+        tim_home = Path("/home/x/.stardust/profiles/tim")
         # Foreign target advertising timothy — NOT ours.
         assert (
             conflict("python -m hermes_cli.main --profile timothy gateway run", tim_home)
@@ -237,17 +237,17 @@ class TestArgvConsistencyCheck:
             _looks_like_profile_conflict_from_cmdline as conflict,
         )
 
-        tim_home = Path("/home/x/.hermes/profiles/tim")
+        tim_home = Path("/home/x/.stardust/profiles/tim")
         assert (
             conflict(
-                "python -m hermes_cli.main STARDUST_HOME=/home/x/.hermes/profiles/timothy gateway run",
+                "python -m hermes_cli.main STARDUST_HOME=/home/x/.stardust/profiles/timothy gateway run",
                 tim_home,
             )
             is True
         )
         assert (
             conflict(
-                "python -m hermes_cli.main --hermes-home /home/x/.hermes/profiles/tim/ gateway run",
+                "python -m hermes_cli.main --hermes-home /home/x/.stardust/profiles/tim/ gateway run",
                 tim_home,
             )
             is False  # trailing slash normalizes away
@@ -258,7 +258,7 @@ class TestArgvConsistencyCheck:
             _looks_like_profile_conflict_from_cmdline as conflict,
         )
 
-        root = Path("/home/x/.hermes")
+        root = Path("/home/x/.stardust")
         assert conflict("python -m x --profile sam run", root) is True
         assert conflict("python -m x -p sam run", root) is True
         assert conflict("python -m x run", root) is False
@@ -273,11 +273,11 @@ class TestArgvConsistencyCheck:
         with (
             patch(
                 "gateway.status._read_pid_record",
-                return_value=_record(home=str(profile_env / ".hermes")),
+                return_value=_record(home=str(profile_env / ".stardust")),
             ),
             patch(
                 "gateway.status._get_pid_path",
-                return_value=profile_env / ".hermes" / "gateway.pid",
+                return_value=profile_env / ".stardust" / "gateway.pid",
             ),
             patch(
                 "gateway.status._get_process_start_time",
@@ -289,7 +289,7 @@ class TestArgvConsistencyCheck:
             ),
             patch(
                 "gateway.status._get_process_hermes_home",
-                return_value=profile_env / ".hermes",
+                return_value=profile_env / ".stardust",
             ),
         ):
             assert _replace_target_belongs_to_other_profile(424242) is True

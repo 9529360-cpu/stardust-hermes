@@ -202,12 +202,12 @@ LAZY_DEPS: dict[str, tuple[str, ...]] = {
         "starlette==1.3.1",
     ),
     # huggingface-hub is SHARED with transformers (>=1.5.0,<2 via Hindsight) and marked active
-    # on mere presence, so `hermes update` re-asserts this pin everywhere hub exists. MUST stay
+    # on mere presence, so `stardust update` re-asserts this pin everywhere hub exists. MUST stay
     # inside transformers' window and match uv.lock (tests/test_project_metadata.py enforces).
     # HF Agent Trace Viewer upload (hermes trace upload / /upload-trace). huggingface-hub is a SHARED
     # dependency: transformers (pulled by sentence-transformers for local Hindsight embeddings) requires
     # >=1.5.0,<2, and faster-whisper/tokenizers depend on it transitively. Because active_features() marks a
-    # feature active from mere package presence, the `hermes update` lazy-refresh pass re-asserts THIS pin
+    # feature active from mere package presence, the `stardust update` lazy-refresh pass re-asserts THIS pin
     # on every install where hub is present — so an exact pin below 1.5.0 force-downgrades the shared
     # package and breaks Hindsight startup (#60783). Policy: keep the exact pin (no ranges — security
     # posture), but it MUST stay inside transformers' accepted window and MUST match uv.lock so the whole
@@ -375,7 +375,7 @@ def _installed_version(spec: str) -> Optional[str]:
 
 
 def _is_satisfied(spec: str) -> bool:
-    """Present AND inside the spec's version range, so ``hermes update`` propagates pin bumps to
+    """Present AND inside the spec's version range, so ``stardust update`` propagates pin bumps to
     installed backends. Unparseable specs/versions or a missing ``packaging`` count as satisfied — err
     toward "don't churn"."""
     installed = _installed_version(spec)
@@ -681,12 +681,12 @@ def install_specs(specs: list[str] | tuple[str, ...], *, timeout: int = 300) -> 
 
 def active_features() -> list[str]:
     """Features whose ANCHOR package (first spec) is present at any version — shared helpers like
-    asyncpg are deliberately not proof a backend was enabled. Drives ``hermes update``."""
+    asyncpg are deliberately not proof a backend was enabled. Drives ``stardust update``."""
     return [f for f, specs in LAZY_DEPS.items() if specs and _is_present(specs[0])]
 
 
 def refresh_active_features(*, prompt: bool = False) -> dict[str, str]:
-    """Re-run ``ensure`` for every active feature (``hermes update``); returns
+    """Re-run ``ensure`` for every active feature (``stardust update``); returns
     ``{feature: "current" | "refreshed" | "failed: <reason>" | "skipped: <reason>"}``. Never raises."""
     return _refresh_features(active_features(), prompt=prompt, restoring=False)
 

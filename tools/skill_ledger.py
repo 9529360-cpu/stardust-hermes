@@ -1,9 +1,9 @@
 """Per-mutation skill audit ledger + single-edit rollback.
 
 Every skill mutation (any actor) appends one JSONL entry to
-``~/.hermes/skills/.curator_ledger.jsonl`` with before/after file manifests whose
+``~/.stardust/skills/.curator_ledger.jsonl`` with before/after file manifests whose
 contents are stored content-addressed (sha256-deduped) under
-``~/.hermes/.curator_backups/blobs/``. JSONL, not the state DB: durable, greppable,
+``~/.stardust/.curator_backups/blobs/``. JSONL, not the state DB: durable, greppable,
 survives DB resets. TELEMETRY, NOT A GATE: every public write path swallows and
 logs — except ``rollback_entry``, which FAILS CLOSED when its safety capture fails.
 """

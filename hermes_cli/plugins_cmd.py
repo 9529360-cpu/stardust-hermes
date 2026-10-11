@@ -1,4 +1,4 @@
-"""``hermes plugins`` CLI subcommand — install, update, remove, and list plugins."""
+"""``stardust plugins`` CLI subcommand — install, update, remove, and list plugins."""
 
 from __future__ import annotations
 
@@ -323,7 +323,7 @@ def _copy_example_files(plugin_dir: Path, console) -> None:
 
 def _missing_env_specs(manifest: dict) -> list[dict]:
     """``requires_env`` entries (plain names or ``{name, description, url, secret}`` dicts,
-    normalised to dicts; nameless entries dropped) whose variable is unset in ``~/.hermes/.env``."""
+    normalised to dicts; nameless entries dropped) whose variable is unset in ``~/.stardust/.env``."""
     env_specs = [
         {"name": entry} if isinstance(entry, str) else entry
         for entry in manifest.get("requires_env") or []
@@ -411,7 +411,7 @@ def _clone_failure_message(git_url: str, git_error: str) -> str:
     not parsed as markup."""
     from rich.markup import escape
     return (f"Could not download the plugin from {git_url}. Check the address (browse the catalog "
-            "with `hermes plugins search`), check your internet connection, or, if the repository "
+            "with `stardust plugins search`), check your internet connection, or, if the repository "
             "is private, sign in first with `gh auth login` (or set GITHUB_TOKEN in your .env).\n"
             f"Details: {escape(git_error.strip())}")
 
@@ -431,9 +431,9 @@ def _unknown_plugin_message(name: str, *, downloaded_only: bool = False) -> str:
     """``No plugin named ...`` with the exact-name rule and the two commands that resolve it."""
     scope = (" This command only works on downloaded plugins; bundled ones can only be enabled or disabled."
              if downloaded_only else " Bundled plugins can only be enabled or disabled.")
-    return (f"[red]No plugin named '{name}'.[/red] Run `hermes plugins list` to see the exact names "
+    return (f"[red]No plugin named '{name}'.[/red] Run `stardust plugins list` to see the exact names "
             f"(nested plugins use their full key, e.g. web/firecrawl).{scope} "
-            "To add one: `hermes plugins install <owner/repo>`.")
+            "To add one: `stardust plugins install <owner/repo>`.")
 
 
 # ── Install metadata + git plumbing ─────────────────────────────────────────────────────────
@@ -675,7 +675,7 @@ def _install_plugin_core(
         if target.exists() and not force:
             raise PluginOperationError(
                 f"Plugin '{plugin_name}' already exists. Use force reinstall "
-                f"or run `hermes plugins update {plugin_name}`.")
+                f"or run `stardust plugins update {plugin_name}`.")
         prior = old_metadata.get(plugin_name)
         if target.exists() and requested_revision is None and isinstance(prior, dict) and prior.get("pinned") is True:
             raise PluginOperationError(
@@ -770,14 +770,14 @@ def cmd_install(
     else:
         console.print(
             f"[dim]Plugin installed but not enabled. "
-            f"Run `hermes plugins enable {installed_name}` to activate.[/dim]")
+            f"Run `stardust plugins enable {installed_name}` to activate.[/dim]")
 
     # Non-interactive installs and declines leave declared capabilities ungranted (fail closed).
     declared_caps = _declared_capabilities_from_manifest(installed_manifest, installed_name)
     if declared_caps:
         _run_capability_consent(console, installed_name, declared_caps, context="install")
     console.print("[dim]Restart the gateway for the plugin to take effect:[/dim]")
-    console.print("[dim]  hermes gateway restart[/dim]")
+    console.print("[dim]  stardust gateway restart[/dim]")
     console.print()
 
 
@@ -820,7 +820,7 @@ def cmd_update(name: str) -> None:
             target,
             lambda rec: (
                 f"Plugin '{name}' is pinned to {rec.get('revision')}. To move it, run "
-                f"`hermes plugins install {escape(str(rec.get('source', '<source>')))} --force "
+                f"`stardust plugins install {escape(str(rec.get('source', '<source>')))} --force "
                 "--ref <40-character commit SHA>`."),
             lambda: f"Plugin '{name}' was not installed from git (no .git directory). Cannot update.",
             before_pull=lambda: console.print(f"[dim]Updating {name}...[/dim]"))
@@ -866,7 +866,7 @@ def _rescan_after_update(target: Path, name: str, console) -> None:
             _set_plugin_enabled(name, enable=False)
         console.print(
             f"[red]Plugin '{name}' has been disabled.[/red] Review the "
-            f"findings, then re-enable with `hermes plugins enable {name}` "
+            f"findings, then re-enable with `stardust plugins enable {name}` "
             f"if you trust them.")
 
 
@@ -941,7 +941,7 @@ _BASIC_AUTH_PLUGIN_KEYS = frozenset({"basic", "dashboard_auth/basic"})
 def ensure_basic_auth_plugin_enabled_in_config(cfg: dict) -> bool:
     """Drop the bundled basic dashboard-auth plugin from ``plugins.disabled`` in *cfg*.
 
-    ``hermes setup`` / ``hermes plugins disable basic`` can park it there while
+    ``stardust setup`` / ``stardust plugins disable basic`` can park it there while
     ``dashboard.basic_auth`` is configured, and password auth then silently fails.
     Returns True when modified.
     """
@@ -1112,8 +1112,8 @@ def _run_capability_consent(console, plugin_id: str, declared: list, *, context:
         console.print(
             "  [yellow]Non-interactive session: capabilities NOT granted "
             "(fail closed).[/yellow] Run "
-            f"`hermes plugins capabilities {plugin_id}` to review and "
-            f"`hermes plugins enable {plugin_id}` to grant interactively.")
+            f"`stardust plugins capabilities {plugin_id}` to review and "
+            f"`stardust plugins enable {plugin_id}` to grant interactively.")
         return False
 
     if _ask_yes("  Grant these capabilities? [y/N] ", console.input):
@@ -1126,12 +1126,12 @@ def _run_capability_consent(console, plugin_id: str, declared: list, *, context:
     console.print(
         f"  [dim]Declined. {plugin_id} stays enabled with these capabilities "
         "off; it should degrade gracefully (ctx.has_capability()). Re-run "
-        f"`hermes plugins enable {plugin_id}` to grant later.[/dim]")
+        f"`stardust plugins enable {plugin_id}` to grant later.[/dim]")
     return False
 
 
 def cmd_capabilities(name: Optional[str] = None) -> None:
-    """``hermes plugins capabilities [<id>]`` — declared vs granted."""
+    """``stardust plugins capabilities [<id>]`` — declared vs granted."""
     from hermes_cli.plugin_capabilities import (
         CAPABILITY_REGISTRY,
         granted_capabilities,
@@ -1194,7 +1194,7 @@ def _resolve_tool_override_grant(console, key: str, allow_tool_override: Optiona
     else:
         console.print(
             f"[dim]{key} may not override built-in tools. Re-run "
-            f"`hermes plugins enable {key} --allow-tool-override` to grant "
+            f"`stardust plugins enable {key} --allow-tool-override` to grant "
             "this later.[/dim]")
 
 
@@ -1313,7 +1313,7 @@ def _plugin_status(name: str, enabled: set, disabled: set, key: str = "") -> str
 
 
 def _filter_plugin_entries(entries: list, args: Any, enabled: set, disabled: set) -> list:
-    """Apply ``hermes plugins list`` CLI filters."""
+    """Apply ``stardust plugins list`` CLI filters."""
     filtered = entries
     if getattr(args, "no_bundled", False) or getattr(args, "user", False):
         filtered = [entry for entry in filtered if entry[3] != "bundled"]
@@ -1334,7 +1334,7 @@ def cmd_list(args: Any | None = None) -> None:
     entries = _discover_all_plugins()
     if not entries:
         console.print("[dim]No plugins installed.[/dim]")
-        console.print("[dim]Install with:[/dim] hermes plugins install owner/repo")
+        console.print("[dim]Install with:[/dim] stardust plugins install owner/repo")
         return
 
     enabled = _get_enabled_set()
@@ -1380,9 +1380,9 @@ def cmd_list(args: Any | None = None) -> None:
     for line in removed_lines:
         console.print(line)
     console.print()
-    console.print("[dim]Compact view:[/dim] hermes plugins list --plain --no-bundled")
-    console.print("[dim]Interactive toggle:[/dim] hermes plugins")
-    console.print("[dim]Enable/disable:[/dim] hermes plugins enable/disable <name>")
+    console.print("[dim]Compact view:[/dim] stardust plugins list --plain --no-bundled")
+    console.print("[dim]Interactive toggle:[/dim] stardust plugins")
+    console.print("[dim]Enable/disable:[/dim] stardust plugins enable/disable <name>")
     console.print("[dim]Plugins are opt-in by default — only 'enabled' plugins load.[/dim]")
 
 
@@ -1471,7 +1471,7 @@ def cmd_show(name: str) -> None:
     match = _find_plugin_entry(name)
     if match is None:
         console.print(f"[red]Plugin '{name}' not found.[/red]")
-        _fail(console, "[dim]List installed plugins:[/dim] hermes plugins list")
+        _fail(console, "[dim]List installed plugins:[/dim] stardust plugins list")
 
     pname, version, description, source, dir_path, key = match
     manifest = _read_manifest(Path(dir_path)) if dir_path else {}
@@ -1843,7 +1843,7 @@ def dashboard_set_agent_plugin_enabled(name: str, *, enabled: bool) -> dict[str,
 
 
 def _user_installed_plugin_dir(name: str) -> Optional[Path]:
-    """Resolved path under ``~/.hermes/plugins/<name>`` if it exists."""
+    """Resolved path under ``~/.stardust/plugins/<name>`` if it exists."""
     try:
         target = _sanitize_plugin_name(name, _plugins_dir(), allow_subdir=True)
     except ValueError:
@@ -1852,7 +1852,7 @@ def _user_installed_plugin_dir(name: str) -> Optional[Path]:
 
 
 def dashboard_update_user_plugin(name: str) -> dict[str, Any]:
-    """``git pull`` inside ``~/.hermes/plugins/<name>``."""
+    """``git pull`` inside ``~/.stardust/plugins/<name>``."""
     from hermes_cli import plugins_cmd_catalog as catalog
     target = _user_installed_plugin_dir(name)
     if target is None:
@@ -1866,7 +1866,7 @@ def dashboard_update_user_plugin(name: str) -> dict[str, Any]:
             target,
             lambda rec: (
                 f"Plugin '{name}' is pinned to {rec.get('revision')}; "
-                f"run `hermes plugins install {rec.get('source', '<source>')} --force "
+                f"run `stardust plugins install {rec.get('source', '<source>')} --force "
                 "--ref <40-character commit SHA>` to move it."),
             lambda: f"Plugin '{name}' is not a git checkout; cannot pull updates.")
     except PluginOperationError as exc:
@@ -1954,7 +1954,7 @@ def _git_pull_plugin_dir(target: Path) -> tuple[bool, str]:
     Users tweak installed plugins in place (config constants, small patches), and a plain ``pull --ff-only``
     then aborts with "Your local changes ... would be overwritten by merge" — making the plugin permanently
     un-updatable until they hand-run git. Same UX class Factory Droid fixed in v0.188 ("Updating a plugin
-    marketplace now succeeds when its checkout has local changes"), and the same autostash approach ``hermes
+    marketplace now succeeds when its checkout has local changes"), and the same autostash approach ``stardust
     update`` already uses for the main checkout (PR #70161).
     """
     git_exe = _resolve_git_executable()
@@ -1998,7 +1998,7 @@ def _git_pull_plugin_dir(target: Path) -> tuple[bool, str]:
 
 
 def dashboard_remove_user_plugin(name: str) -> dict[str, Any]:
-    """Delete a plugin tree under ``~/.hermes/plugins/`` only."""
+    """Delete a plugin tree under ``~/.stardust/plugins/`` only."""
     plugins_dir = _plugins_dir()
     if any(n == name and src == "bundled" for n, _ver, _d, src, _path, _key in _discover_all_plugins()):
         return {"ok": False, "error": "Bundled plugins cannot be removed from the dashboard."}
@@ -2068,7 +2068,7 @@ _PLUGIN_ACTIONS = {
 
 
 def plugins_command(args) -> None:
-    """Dispatch hermes plugins subcommands."""
+    """Dispatch stardust plugins subcommands."""
     action = getattr(args, "plugins_action", None)
     handler = _PLUGIN_ACTIONS.get(action)
     if handler is None:

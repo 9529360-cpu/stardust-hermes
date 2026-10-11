@@ -264,7 +264,7 @@ class TestThirdPartyAnthropicGateway:
         agent and the policy loads config itself."""
         import textwrap
 
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         (hermes_home / "config.yaml").write_text(
             textwrap.dedent(
@@ -437,7 +437,7 @@ class TestCustomProviderOpenAIWireCapability:
     ):
         import textwrap
 
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         (hermes_home / "config.yaml").write_text(
             textwrap.dedent(

@@ -93,7 +93,7 @@ def _strip_console_status_footer(text: str) -> str:
     if len(lines) < 2:
         return text.rstrip()
     last, prev = (_strip_ansi(lines[i]).strip() for i in (-1, -2))
-    if not (prev.startswith("Run 'hermes doctor'") and last.startswith("Run 'hermes setup'")):
+    if not (prev.startswith("Run 'stardust doctor'") and last.startswith("Run 'stardust setup'")):
         return text.rstrip()
     lines = lines[:-2]
     _drop_trailing_blank(lines)
@@ -200,7 +200,7 @@ class _CliSurface:
 
     def build(self, root: str, *, live: bool) -> _ArgumentParser:
         """Build a throwaway parser; ``live=False`` wires no-op handlers (summary extraction)."""
-        parser = _ArgumentParser(prog="hermes", add_help=False)
+        parser = _ArgumentParser(prog="stardust", add_help=False)
         subparsers = parser.add_subparsers(dest="_console_command")
         module = importlib.import_module(self.module)
         entry = getattr(module, self.builder)
@@ -373,7 +373,7 @@ class HermesConsoleEngine:
             return ConsoleResult("ok")
         try:
             tokens = _split_line(raw_line)
-            if tokens and tokens[0] == "hermes":
+            if tokens and tokens[0] in ("hermes", "stardust"):
                 tokens = tokens[1:]
             if not tokens:
                 return ConsoleResult("ok", output=self.help_text())
@@ -748,7 +748,7 @@ def _cron_pause(_engine: HermesConsoleEngine, args: list[str]) -> str:
     from cron.jobs import pause_job
     return _cron_job_action(
         args, "cron pause <job>", "Paused",
-        lambda ref: pause_job(ref, reason="paused from hermes console"))
+        lambda ref: pause_job(ref, reason="paused from stardust console"))
 
 
 def _cron_resume(_engine: HermesConsoleEngine, args: list[str]) -> str:
@@ -810,7 +810,7 @@ _BUILTIN_COMMANDS = (
 
 def run_console_repl(
     *, stdin=None, stdout=None, stderr=None, interactive: bool | None = None) -> int:
-    """Run the local ``hermes console`` REPL."""
+    """Run the local ``stardust console`` REPL."""
     stdin, stdout, stderr = stdin or sys.stdin, stdout or sys.stdout, stderr or sys.stderr
     if interactive is None:
         interactive = bool(getattr(stdin, "isatty", lambda: False)())

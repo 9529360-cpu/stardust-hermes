@@ -1,6 +1,6 @@
 """Feishu document comment access-control rules: exact doc > wildcard "*" > top-level > code defaults, each field
-(enabled/policy/allow_from) falling back independently. Config ~/.hermes/feishu_comment_rules.json (mtime-cached,
-hot-reload); pairing store ~/.hermes/feishu_comment_pairing.json."""
+(enabled/policy/allow_from) falling back independently. Config ~/.stardust/feishu_comment_rules.json (mtime-cached,
+hot-reload); pairing store ~/.stardust/feishu_comment_pairing.json."""
 
 from __future__ import annotations
 

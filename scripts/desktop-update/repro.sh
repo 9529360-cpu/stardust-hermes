@@ -1,9 +1,9 @@
 #!/bin/bash
 # repro.sh -- reproduce desktop-update paths against a sandboxed STARDUST_HOME.
 #
-# Nothing here touches your real ~/.hermes or checkout. Each mode builds (or
+# Nothing here touches your real ~/.stardust or checkout. Each mode builds (or
 # reuses) a disposable install under /tmp and drives the REAL code path --
-# the actual installer, the actual orchestrator, the actual `hermes update`.
+# the actual installer, the actual orchestrator, the actual `stardust update`.
 #
 #   repro.sh shim          shim UI only: success event after 6s
 #   repro.sh shim-fail     shim UI only: error event after 6s
@@ -37,7 +37,7 @@ SANDBOX_ROOT="$SANDBOX/hermes-agent"
 say() { printf '\n\033[1m== %s ==\033[0m\n' "$1"; }
 
 ensure_sandbox_install() {
-  if [ -x "$SANDBOX_ROOT/venv/bin/hermes" ]; then
+  if [ -x "$SANDBOX_ROOT/venv/bin/stardust" ]; then
     say "reusing sandbox install at $SANDBOX_ROOT"
     return
   fi
@@ -62,7 +62,7 @@ case "$MODE" in
   fresh)
     rm -rf "$SANDBOX"
     ensure_sandbox_install
-    say "fresh install OK: $("$SANDBOX_ROOT/venv/bin/hermes" --version 2>/dev/null || echo '?')"
+    say "fresh install OK: $("$SANDBOX_ROOT/venv/bin/stardust" --version 2>/dev/null || echo '?')"
     ;;
   behind)
     N="${2:-25}"
@@ -134,7 +134,7 @@ case "$MODE" in
   launch)
     # Terminal-lifecycle matrix (gille round 2): launch acceptance is part
     # of the outcome. Each case runs the REAL orchestrator (--no-ui) against
-    # a fake install whose `hermes` stub exits 0 instantly, so the flow
+    # a fake install whose `stardust` stub exits 0 instantly, so the flow
     # reaches finish() with FINAL_CODE=0 and exercises the launch leg.
     L="/tmp/hermes-launch-test.$$"
     fails=0
@@ -145,10 +145,10 @@ case "$MODE" in
         printf 'FAIL %s -> %s\n' "$1" "$(cat "$L/.hermes-update-result.json" 2>/dev/null)"; fails=$((fails+1))
       fi
     }
-    stub_install() { # creates a fake install whose hermes update succeeds
+    stub_install() { # creates a fake install whose stardust update succeeds
       rm -rf "$L"; mkdir -p "$L/hermes-agent/venv/bin"
-      printf '#!/bin/sh\nexit 0\n' > "$L/hermes-agent/venv/bin/hermes"
-      chmod +x "$L/hermes-agent/venv/bin/hermes"
+      printf '#!/bin/sh\nexit 0\n' > "$L/hermes-agent/venv/bin/stardust"
+      chmod +x "$L/hermes-agent/venv/bin/stardust"
     }
 
     # 1. linux relaunch target dies instantly -> manual downgrade in result

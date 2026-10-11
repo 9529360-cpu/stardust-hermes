@@ -103,7 +103,7 @@ _PLUGIN_PIN_FILES = (("requirements.txt", _parse_requirements), ("requirements-d
 
 
 def _discover_plugins(hermes_home: Path) -> list[Component]:
-    """Python deps declared by plugins under ``~/.hermes/plugins``. Plugins typically don't install
+    """Python deps declared by plugins under ``~/.stardust/plugins``. Plugins typically don't install
     into the venv, so their stated requirements are audit surface the venv scan misses.
     """
     plugins_dir = hermes_home / "plugins"
@@ -284,7 +284,7 @@ def _render_json(findings: list[Finding], total_components: int) -> str:
 
 
 def cmd_security_audit(args: argparse.Namespace) -> int:
-    """Implementation of `hermes security audit`."""
+    """Implementation of `stardust security audit`."""
     home = Path(get_hermes_home())
     output_json = bool(getattr(args, "json", False))
     fail_on = (getattr(args, "fail_on", None) or "critical").upper()

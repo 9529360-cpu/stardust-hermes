@@ -1,6 +1,6 @@
 """Regression tests for /model support of config.yaml custom_providers.
 
-The terminal `hermes model` flow already exposes `custom_providers`, but the
+The terminal `stardust model` flow already exposes `custom_providers`, but the
 shared slash-command pipeline (`/model` in CLI/gateway/Telegram) historically
 only looked at `providers:`.
 
@@ -603,7 +603,7 @@ def test_custom_provider_no_key_singular_model_still_probes_live_models(monkeypa
     """A singular ``model:`` is the active selection, not an explicit catalog.
 
     No-key local OpenAI-compatible endpoints such as llama.cpp should still be
-    probed so /model matches the terminal ``hermes model`` flow. Ollama-native
+    probed so /model matches the terminal ``stardust model`` flow. Ollama-native
     discovery is covered separately with a fake ``/api/tags`` server.
     """
     monkeypatch.setattr("agent.models_dev.fetch_models_dev", lambda: {})
@@ -1564,14 +1564,14 @@ def test_save_discovered_models_preserves_dict_form(monkeypatch):
 
 
 def test_model_flow_named_custom_persists_discovered_models(monkeypatch):
-    """The ``hermes model`` named-custom-provider flow persists the discovered
+    """The ``stardust model`` named-custom-provider flow persists the discovered
     catalog back to the entry's ``models:`` list.
 
     No-probe surfaces (dashboard, desktop, ACP) call
     ``build_models_payload(..., probe_custom_providers=False)`` and only show
     the configured ``models:`` list. The CLI flow probes and shows the full
     catalog but (before this fix) never saved it, so a provider added via
-    ``hermes model`` collapsed to the single ``model:`` default everywhere but
+    ``stardust model`` collapsed to the single ``model:`` default everywhere but
     the CLI. It must persist discovered models the same way the picker path in
     ``_save_discovered_models_to_config`` does.
     """
@@ -1713,7 +1713,7 @@ def test_excluded_providers_hides_builtin_row(monkeypatch):
 def test_custom_provider_context_length_models_dict_still_probes(monkeypatch):
     """Dict-shaped ``models:`` from ``_save_custom_provider`` is metadata.
 
-    ``hermes model`` writes ``models: {default: {context_length: N}}`` for
+    ``stardust model`` writes ``models: {default: {context_length: N}}`` for
     local Ollama. That must not suppress live /v1/models discovery — otherwise
     Desktop/Telegram only show the saved default and Refresh does nothing.
     """

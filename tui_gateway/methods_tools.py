@@ -227,7 +227,7 @@ def _(rid, params: dict) -> dict:
 # One-expression handlers: name → (fail_code, payload builder(params)).
 _SIMPLE_RPCS = {
     # Session-scoped view of the background process registry (desktop status stack).
-    # Re-read ``~/.hermes/.env`` (CLI ``/reload`` parity); built agents keep their pool, ``/new`` resolves fresh.
+    # Re-read ``~/.stardust/.env`` (CLI ``/reload`` parity); built agents keep their pool, ``/new`` resolves fresh.
     "reload.env": (5015, lambda params: {"updated": int(_tools_mod("hermes_cli.config").reload_env())}),
     "plugins.list": (5032, lambda params: {"plugins": [
         {"name": n, "version": getattr(i, "version", "?"), "enabled": getattr(i, "enabled", True)}
@@ -1540,7 +1540,7 @@ _PLUGINS_ACTIONS = {"list": _plugins_list, "toggle": _plugins_toggle, "install":
 
 @_scoped_rpc("plugins.manage", 5026, catch_resolve=False)
 def _(rid, params: dict) -> dict:
-    """TUI Plugins Hub backend (shares primitives with ``hermes plugins`` / the dashboard):
+    """TUI Plugins Hub backend (shares primitives with ``stardust plugins`` / the dashboard):
     ``list`` → {plugins, user_count, bundled_count}; ``toggle`` flips ``key``/``name`` per ``enable``;
     ``install`` git-clones ``identifier``/``repo`` or a curated ``catalog_name`` (``force``, ``enable``
     default True); ``update`` re-pins a catalog install to the current catalog SHA."""

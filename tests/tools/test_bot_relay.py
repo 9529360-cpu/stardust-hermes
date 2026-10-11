@@ -259,7 +259,7 @@ import textwrap
 
 
 def _managed_home(tmp_path, *, legacy_soul=False):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir(exist_ok=True)
     d = home / "profiles" / "researcher"
     d.mkdir(parents=True, exist_ok=True)

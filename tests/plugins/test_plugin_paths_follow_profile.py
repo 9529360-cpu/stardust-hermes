@@ -1,6 +1,6 @@
 """Plugin data paths follow the active profile's STARDUST_HOME, including the ContextVar override.
 
-Several plugins carried a ``~/.hermes`` fallback (guarding an ImportError of ``hermes_constants``
+Several plugins carried a ``~/.stardust`` fallback (guarding an ImportError of ``hermes_constants``
 that cannot happen for a bundled plugin) or resolved the home at import time. Both are wrong on
 Windows and under multiplex profile overrides. Every resolver below must land inside the override.
 """

@@ -97,8 +97,8 @@ def test_child_tree_prefix_without_batch_id_is_unchanged():
 
 def test_batch_completion_lines_are_attributable_across_two_batches(monkeypatch, tmp_path):
     """Two interleaved batches: every ✓ line names its own ``set N``."""
-    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
-    (tmp_path / ".hermes").mkdir()
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+    (tmp_path / ".stardust").mkdir()
     lines = []
     parent = types.SimpleNamespace(
         session_id="root", model="m", tool_progress_callback=None, _delegate_spinner=None,

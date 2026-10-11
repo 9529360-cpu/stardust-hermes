@@ -236,7 +236,7 @@ def test_bot_capability_rebuild_stays_on_the_profile_store(homes, monkeypatch):
     ``_sync_bot_capabilities`` swaps in a fresh agent for a LIVE session at turn start. It used to call
     ``_make_agent`` with neither the session's ``state.db`` handle nor its STARDUST_HOME, so the replacement
     agent bound the launch ``_get_db()`` handle and built its prompt/skills from the launch profile: every
-    later turn of a named-profile bot appended to ``~/.hermes/state.db`` under the same session id while the
+    later turn of a named-profile bot appended to ``~/.stardust/state.db`` under the same session id while the
     desktop replayed ``profiles/<bot>/state.db`` and showed a stale transcript (#104079).
     """
     root, profile = homes

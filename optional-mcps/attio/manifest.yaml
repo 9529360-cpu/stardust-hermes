@@ -36,5 +36,5 @@ suggest:
 
 post_install: |
   On first connection Hermes opens a browser to authorize with
-  Attio (or run `hermes mcp login attio`). Approve access,
+  Attio (or run `stardust mcp login attio`). Approve access,
   then restart the session so tools load.

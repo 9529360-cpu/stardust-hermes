@@ -53,7 +53,7 @@ describe('persisted preview migration', () => {
   })
 
   it('upgrades a pre-PDF remote tab from binary to pdf', () => {
-    const source = '/remote/.hermes/desktop-attachments/spec.pdf'
+    const source = '/remote/.stardust/desktop-attachments/spec.pdf'
 
     const [restored] = decodePreviewTabs(
       JSON.stringify([

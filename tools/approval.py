@@ -613,7 +613,7 @@ _CRON_CTX = _Unattended(
 
 
 def _unattended_contexts() -> list[_Unattended]:
-    """Active unattended contexts in evaluation order: single-query first (``hermes chat -q``
+    """Active unattended contexts in evaluation order: single-query first (``stardust chat -q``
     exports STARDUST_INTERACTIVE=1 but nobody answers); cron beats a platform marker because
     cron binds the platform for delivery routing only."""
     contexts = []
@@ -957,7 +957,7 @@ def _human_decision_impl(spec: _GateSpec, *, command: str, description: str,
 def _presence(approval_callback=None) -> tuple:
     """``(approval_callback, is_cli, is_gateway, is_ask)`` for the current context.
 
-    Single-query ``-q`` and cron clear the presence trio: ``hermes chat -q`` exports
+    Single-query ``-q`` and cron clear the presence trio: ``stardust chat -q`` exports
     STARDUST_INTERACTIVE=1 for sudo prompts, and a gateway sets STARDUST_EXEC_ASK=1 at startup and
     passes its environ to every external cron worker (#110932) — in neither can a human answer
     the card, so the gate must resolve from ``approvals.<ctx>_mode`` instead of parking on a

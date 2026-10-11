@@ -1,7 +1,7 @@
 """Timezone-aware clock for Hermes.
 
 ``now()`` returns a tz-aware datetime in the user's configured IANA timezone. Resolution order:
-``STARDUST_TIMEZONE`` env var, then ``timezone`` in ``~/.hermes/config.yaml``, else server-local
+``STARDUST_TIMEZONE`` env var, then ``timezone`` in ``~/.stardust/config.yaml``, else server-local
 time. Invalid timezone values log a warning and fall back — never crash.
 """
 

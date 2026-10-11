@@ -22,7 +22,7 @@ import fcntl
 
 def run_case(root, output, name, behind, early=False, cancel=False):
     with tempfile.TemporaryDirectory(prefix="hermes_test_notice_") as home:
-        hh = Path(home) / ".hermes"
+        hh = Path(home) / ".stardust"
         hh.mkdir()
         (hh / "config.yaml").write_text(
             "model:\n  default: test-model\n  provider: custom\n"

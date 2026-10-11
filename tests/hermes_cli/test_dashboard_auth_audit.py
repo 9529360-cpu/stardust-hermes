@@ -15,7 +15,7 @@ from hermes_cli.dashboard_auth.audit import audit_log, AuditEvent
 @pytest.fixture
 def profile_home(tmp_path, monkeypatch):
     """Redirect $STARDUST_HOME and ~ to a tmp dir for the duration of the test."""
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     monkeypatch.setenv("STARDUST_HOME", str(home))
     # Some code paths fall back to Path.home() — patch that too.

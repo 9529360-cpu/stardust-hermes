@@ -52,7 +52,7 @@ class TestDiscovery:
         from hermes_cli import plugins as plugins_mod
 
         # Isolated STARDUST_HOME so we don't read the developer's config.yaml.
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".stardust"
         home.mkdir()
         monkeypatch.setenv("STARDUST_HOME", str(home))
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -1691,7 +1691,7 @@ class TestMoAReferenceGenerations:
         assert gens == []
 
 class TestAtexitFinalization(TestTurnTraceIsolation):
-    """Short-lived processes (kanban workers, `hermes chat -q`, cron) can exit
+    """Short-lived processes (kanban workers, `stardust chat -q`, cron) can exit
     with tool calls still queued — the root span never ends and the backend
     shows an anonymous trace (no name/session/metadata). _finalize_all_traces
     (registered atexit after client construction) must end every open root."""

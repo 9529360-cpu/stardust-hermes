@@ -93,7 +93,7 @@ describe('DesktopInstallOverlay first-run setup', () => {
   it('shows the remote/local choice without installer progress', async () => {
     installDesktopMock(
       bootstrapState({
-        setupChoice: { platform: 'win32', activeRoot: 'C:\\Users\\me\\AppData\\Local\\hermes\\hermes-agent' }
+        setupChoice: { platform: 'win32', activeRoot: 'C:\\Users\\me\\AppData\\Local\\stardust\\hermes-agent' }
       })
     )
 
@@ -109,7 +109,7 @@ describe('DesktopInstallOverlay first-run setup', () => {
   it('continues local bootstrap only when Install Stardust locally is selected', async () => {
     const desktop = installDesktopMock(
       bootstrapState({
-        setupChoice: { platform: 'win32', activeRoot: 'C:\\Users\\me\\AppData\\Local\\hermes\\hermes-agent' }
+        setupChoice: { platform: 'win32', activeRoot: 'C:\\Users\\me\\AppData\\Local\\stardust\\hermes-agent' }
       })
     )
 
@@ -131,7 +131,7 @@ describe('DesktopInstallOverlay first-run setup', () => {
   it('surfaces a recoverable error when the local-bootstrap bridge is unavailable', async () => {
     const desktop = installDesktopMock(
       bootstrapState({
-        setupChoice: { platform: 'win32', activeRoot: 'C:\\Users\\me\\AppData\\Local\\hermes\\hermes-agent' }
+        setupChoice: { platform: 'win32', activeRoot: 'C:\\Users\\me\\AppData\\Local\\stardust\\hermes-agent' }
       })
     )
 
@@ -150,7 +150,7 @@ describe('DesktopInstallOverlay first-run setup', () => {
   it('keeps the local-start error when the first snapshot commits under the click', async () => {
     const desktop = installDesktopMock(
       bootstrapState({
-        setupChoice: { platform: 'win32', activeRoot: 'C:\\Users\\me\\AppData\\Local\\hermes\\hermes-agent' }
+        setupChoice: { platform: 'win32', activeRoot: 'C:\\Users\\me\\AppData\\Local\\stardust\\hermes-agent' }
       })
     )
 
@@ -173,7 +173,7 @@ describe('DesktopInstallOverlay first-run setup', () => {
   it('clears a stale local-start error when a repair presents a different root', async () => {
     const desktop = installDesktopMock(
       bootstrapState({
-        setupChoice: { platform: 'win32', activeRoot: 'C:\\Users\\me\\AppData\\Local\\hermes\\hermes-agent' }
+        setupChoice: { platform: 'win32', activeRoot: 'C:\\Users\\me\\AppData\\Local\\stardust\\hermes-agent' }
       })
     )
 
@@ -190,7 +190,7 @@ describe('DesktopInstallOverlay first-run setup', () => {
         type: 'setup-choice',
         active: false,
         platform: 'win32',
-        activeRoot: 'C:\\Users\\me\\AppData\\Local\\hermes\\hermes-agent-repaired'
+        activeRoot: 'C:\\Users\\me\\AppData\\Local\\stardust\\hermes-agent-repaired'
       })
     })
 
@@ -200,7 +200,7 @@ describe('DesktopInstallOverlay first-run setup', () => {
   it('opens the remote connection form from the first-run choice', async () => {
     installDesktopMock(
       bootstrapState({
-        setupChoice: { platform: 'linux', activeRoot: '/home/me/.hermes/hermes-agent' }
+        setupChoice: { platform: 'linux', activeRoot: '/home/me/.stardust/hermes-agent' }
       })
     )
 
@@ -216,7 +216,7 @@ describe('DesktopInstallOverlay first-run setup', () => {
   it('returns from the remote connection form to the first-run choice', async () => {
     installDesktopMock(
       bootstrapState({
-        setupChoice: { platform: 'linux', activeRoot: '/home/me/.hermes/hermes-agent' }
+        setupChoice: { platform: 'linux', activeRoot: '/home/me/.stardust/hermes-agent' }
       })
     )
 
@@ -234,7 +234,7 @@ describe('DesktopInstallOverlay first-run setup', () => {
   it('requires a successful token connection test before applying remote config', async () => {
     const desktop = installDesktopMock(
       bootstrapState({
-        setupChoice: { platform: 'linux', activeRoot: '/home/me/.hermes/hermes-agent' }
+        setupChoice: { platform: 'linux', activeRoot: '/home/me/.stardust/hermes-agent' }
       })
     )
 
@@ -304,7 +304,7 @@ describe('DesktopInstallOverlay first-run setup', () => {
   it('ignores a completed probe after the gateway URL becomes invalid', async () => {
     const desktop = installDesktopMock(
       bootstrapState({
-        setupChoice: { platform: 'linux', activeRoot: '/home/me/.hermes/hermes-agent' }
+        setupChoice: { platform: 'linux', activeRoot: '/home/me/.stardust/hermes-agent' }
       })
     )
 
@@ -348,7 +348,7 @@ describe('DesktopInstallOverlay first-run setup', () => {
   it('does not enable Apply when credentials change during a connection test', async () => {
     const desktop = installDesktopMock(
       bootstrapState({
-        setupChoice: { platform: 'linux', activeRoot: '/home/me/.hermes/hermes-agent' }
+        setupChoice: { platform: 'linux', activeRoot: '/home/me/.stardust/hermes-agent' }
       })
     )
 
@@ -401,7 +401,7 @@ describe('DesktopInstallOverlay first-run setup', () => {
   it('restores remote apply controls when applying the tested connection fails', async () => {
     const desktop = installDesktopMock(
       bootstrapState({
-        setupChoice: { platform: 'linux', activeRoot: '/home/me/.hermes/hermes-agent' }
+        setupChoice: { platform: 'linux', activeRoot: '/home/me/.stardust/hermes-agent' }
       })
     )
 
@@ -448,7 +448,7 @@ describe('DesktopInstallOverlay first-run setup', () => {
   it('signs in, tests, and applies a password-style remote gateway', async () => {
     const desktop = installDesktopMock(
       bootstrapState({
-        setupChoice: { platform: 'linux', activeRoot: '/home/me/.hermes/hermes-agent' }
+        setupChoice: { platform: 'linux', activeRoot: '/home/me/.stardust/hermes-agent' }
       })
     )
 
@@ -521,7 +521,7 @@ describe('DesktopInstallOverlay first-run setup', () => {
       bootstrapState({
         unsupportedPlatform: {
           platform: 'darwin',
-          activeRoot: '/Users/me/.hermes/hermes-agent',
+          activeRoot: '/Users/me/.stardust/hermes-agent',
           installCommand: 'curl -fsSL https://example.invalid/install.sh | sh',
           docsUrl: 'https://example.invalid/docs'
         }

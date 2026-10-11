@@ -1,4 +1,4 @@
-"""Tests for ``hermes gui`` desktop launcher wiring."""
+"""Tests for ``stardust gui`` desktop launcher wiring."""
 
 from __future__ import annotations
 
@@ -783,7 +783,7 @@ def test_setup_tcc_identity_non_macos_skips(tmp_path, monkeypatch, capsys):
 
 
 def test_cmd_gui_setup_tcc_identity_exits_before_build(tmp_path, monkeypatch):
-    """`hermes desktop --setup-tcc-identity` calls the setup and exits 0/1
+    """`stardust desktop --setup-tcc-identity` calls the setup and exits 0/1
     without building or launching the app."""
     root = _make_desktop_tree(tmp_path)
     monkeypatch.setattr(cli_main, "PROJECT_ROOT", root)
@@ -974,7 +974,7 @@ def test_relaunchable_fixup_legacy_adhoc_success_still_verifies_and_never_delete
 
 @pytest.mark.linux_only
 def test_gui_registers_linux_desktop_entry_before_launch(tmp_path, monkeypatch):
-    """`hermes desktop` gives the app a launcher presence on Linux."""
+    """`stardust desktop` gives the app a launcher presence on Linux."""
     root = _make_desktop_tree(tmp_path)
     monkeypatch.setattr(cli_main, "PROJECT_ROOT", root)
     packaged_exe = _make_packaged_executable(root, monkeypatch)

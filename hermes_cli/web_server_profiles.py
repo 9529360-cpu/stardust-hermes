@@ -393,7 +393,7 @@ def _aux_task_summary(aux_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 def _profile_cli_args(profile: Optional[str]) -> List[str]:
     """``["-p", <name>]`` for a validated non-default profile, else ``[]``. Hub actions run in
-    a fresh ``hermes`` subprocess whose ``_apply_profile_override()`` reads ``-p`` from argv —
+    a fresh ``stardust`` subprocess whose ``_apply_profile_override()`` reads ``-p`` from argv —
     the only mechanism that reaches import-time-bound globals like ``skills_hub.SKILLS_DIR``."""
     requested = (profile or "").strip()
     if not requested or requested.lower() in {"current", "default"}:

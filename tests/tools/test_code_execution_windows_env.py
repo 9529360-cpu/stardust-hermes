@@ -303,7 +303,7 @@ class TestPosixEquivalence:
         "CONDA_PREFIX": "/opt/conda",
         # STARDUST_* handling (#27303): only the operational allowlist passes;
         # every other STARDUST_* is dropped (the broad prefix was removed).
-        "STARDUST_HOME": "/home/alice/.hermes",        # allowlisted → kept
+        "STARDUST_HOME": "/home/alice/.stardust",        # allowlisted → kept
         "STARDUST_PROFILE": "default",                 # allowlisted → kept
         "STARDUST_INTERACTIVE": "1",                   # not allowlisted → dropped
         "STARDUST_BASE_URL": "https://api.internal",   # not allowlisted → dropped

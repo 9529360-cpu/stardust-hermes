@@ -43,7 +43,7 @@ from tools import browser_tool_install as bt_install
 def isolated_home(monkeypatch):
     """Temp STARDUST_HOME with config + clean credential env vars."""
     test_home = tempfile.mkdtemp(prefix="hermes_test_31179_")
-    hermes_home = os.path.join(test_home, ".hermes")
+    hermes_home = os.path.join(test_home, ".stardust")
     os.makedirs(hermes_home)
     monkeypatch.setenv("STARDUST_HOME", hermes_home)
 

@@ -94,7 +94,7 @@ class TestWabaIdValidator:
 def isolated_home(tmp_path, monkeypatch):
     """Redirect STARDUST_HOME so save_env_value writes into a temp .env."""
     home = tmp_path / "home"
-    hermes = home / ".hermes"
+    hermes = home / ".stardust"
     hermes.mkdir(parents=True)
     monkeypatch.setattr(Path, "home", lambda: home)
     monkeypatch.setenv("STARDUST_HOME", str(hermes))

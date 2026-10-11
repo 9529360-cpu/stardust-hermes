@@ -37,5 +37,5 @@ suggest:
 
 post_install: |
   On first connection Hermes opens a browser to authorize with
-  Gamma (or run `hermes mcp login gamma`). Approve access,
+  Gamma (or run `stardust mcp login gamma`). Approve access,
   then restart the session so tools load.

@@ -1,4 +1,4 @@
-"""``hermes profile create --clone`` leaves messaging channels behind (``hermes_cli.profile_channels``).
+"""``stardust profile create --clone`` leaves messaging channels behind (``hermes_cli.profile_channels``).
 
 Invariant, not snapshot: the clone's credential fingerprint set — computed by the gateway's own
 ``_adapter_credential_fingerprint`` through the migrate preflight — is DISJOINT from the source's,
@@ -45,7 +45,7 @@ _SOURCE_CONFIG = {
 
 @pytest.fixture
 def home(tmp_path, monkeypatch):
-    root = tmp_path / ".hermes"
+    root = tmp_path / ".stardust"
     root.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     monkeypatch.setenv("STARDUST_HOME", str(root))

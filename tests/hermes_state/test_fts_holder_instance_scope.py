@@ -2,8 +2,8 @@
 
 Field-verified 2026-09-07 on a production host running TWO independent
 Hermes instances: a main gateway (user ``ubuntu``,
-STARDUST_HOME=/home/ubuntu/.hermes) and a demo gateway (user ``demo``,
-STARDUST_HOME=/home/demo/.hermes).  The demo gateway runs as another user, so
+STARDUST_HOME=/home/ubuntu/.stardust) and a demo gateway (user ``demo``,
+STARDUST_HOME=/home/demo/.stardust).  The demo gateway runs as another user, so
 its ``/proc/<pid>/fd`` table is unreadable from the main instance and the
 holder scan falls back to ``/proc/<pid>/cmdline`` + ``_looks_like_hermes``.
 The demo process's argv matches the Hermes patterns exactly, so the fallback
@@ -38,18 +38,18 @@ _REAL_READLINK = os.readlink
 
 
 # Representative demo-gateway argv on the two-instance host: every absolute
-# token lives under /home/demo/.hermes, the binary name matches the Hermes
+# token lives under /home/demo/.stardust, the binary name matches the Hermes
 # patterns, and nothing references the main instance's home or state.db.
 DEMO_HOME_ARGV = [
-    "/home/demo/.hermes/hermes-agent/hermes",
+    "/home/demo/.stardust/hermes-agent/hermes",
     "gateway",
     "run",
 ]
 
 # Same, spelled through the venv interpreter + hermes launcher script.
 DEMO_VENV_ARGV = [
-    "/home/demo/.hermes/hermes-agent/venv/bin/python",
-    "/home/demo/.hermes/hermes-agent/hermes_cli/main.py",
+    "/home/demo/.stardust/hermes-agent/venv/bin/python",
+    "/home/demo/.stardust/hermes-agent/hermes_cli/main.py",
     "gateway",
 ]
 

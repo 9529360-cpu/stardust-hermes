@@ -1,4 +1,4 @@
-"""CLI commands for the google_meet plugin (``hermes meet <subcommand>``).
+"""CLI commands for the google_meet plugin (``stardust meet <subcommand>``).
 
   setup / install — preflight and install prerequisites
   auth            — open a browser to sign into Google, save storage state
@@ -32,7 +32,7 @@ def _auth_state_path() -> Path:
     return Path(get_hermes_home()) / "workspace" / "meetings" / "auth.json"
 
 
-# ``hermes meet <sub>`` in help order.
+# ``stardust meet <sub>`` in help order.
 _SUBCOMMAND_HELP = (
     ("setup", "Preflight: playwright, chromium, auth"),
     ("install", "Install prerequisites (pip deps, Chromium, platform audio tools)"),
@@ -46,7 +46,7 @@ _SUBCOMMAND_HELP = (
 
 
 def register_cli(subparser: argparse.ArgumentParser) -> None:
-    """Build the ``hermes meet`` argparse tree (called at plugin load time)."""
+    """Build the ``stardust meet`` argparse tree (called at plugin load time)."""
     subs = subparser.add_subparsers(dest="meet_command")
     p = {name: subs.add_parser(name, help=help_) for name, help_ in _SUBCOMMAND_HELP}
     p["install"].add_argument("--realtime", action="store_true",
@@ -77,14 +77,14 @@ _DISPATCH = {
     "status": lambda a: _print_result(pm.status()),
     "transcript": lambda a: _cmd_transcript(last=a.last),
     "say": lambda a: _cmd_say(text=a.text, node=a.node),
-    "stop": lambda a: _print_result(pm.stop(reason="hermes meet stop")),
+    "stop": lambda a: _print_result(pm.stop(reason="stardust meet stop")),
     "node": node_command}  # node subparsers are required=True, so a sub-command is always present
 
 
 def meet_command(args: argparse.Namespace) -> int:
     sub = args.meet_command
     if not sub:
-        print("usage: hermes meet {setup,auth,join,status,transcript,say,stop,node}")
+        print("usage: stardust meet {setup,auth,join,status,transcript,say,stop,node}")
         return 2
     handler = _DISPATCH.get(sub)
     if handler is None:
@@ -112,10 +112,10 @@ def _cmd_setup() -> int:
             chromium_msg = f"probe failed: {e}"
     print(f"  chromium       : {chromium_msg}")
     auth_path = _auth_state_path()
-    print("  google auth    : " + (f"ok ({auth_path})" if auth_path.is_file() else "not saved — run: hermes meet auth"))
+    print("  google auth    : " + (f"ok ({auth_path})" if auth_path.is_file() else "not saved — run: stardust meet auth"))
     print()
     all_ok = system_ok and pw_ok and chromium_ok
-    print("ready. Join a meeting:  hermes meet join https://meet.google.com/abc-defg-hij" if all_ok
+    print("ready. Join a meeting:  stardust meet join https://meet.google.com/abc-defg-hij" if all_ok
           else "not ready yet — fix the items above.")
     return 0 if all_ok else 1
 
@@ -191,7 +191,7 @@ def _cmd_install(*, realtime: bool, assume_yes: bool) -> int:
             print("\n  NOTE: macOS does not auto-route audio. Open\n    System Settings → Sound → "
                   "Input\n  and select 'BlackHole 2ch' before starting a realtime meeting.\n  "
                   "hermes will not switch your default input for you.")
-    print("\ndone. verify with: hermes meet setup")
+    print("\ndone. verify with: stardust meet setup")
     return 0
 
 
@@ -219,7 +219,7 @@ def _cmd_auth() -> int:
     except Exception as e:
         print(f"auth failed: {e}")
         return 1
-    print("saved. you can now run: hermes meet join <url>")
+    print("saved. you can now run: stardust meet join <url>")
     return 0
 
 
@@ -278,6 +278,6 @@ def _cmd_transcript(last: Optional[int]) -> int:
 
 
 if __name__ == "__main__":  # pragma: no cover
-    parser = argparse.ArgumentParser(prog="hermes meet")
+    parser = argparse.ArgumentParser(prog="stardust meet")
     register_cli(parser)
     sys.exit(meet_command(parser.parse_args()))

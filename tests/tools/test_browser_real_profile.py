@@ -1,7 +1,7 @@
 """Tests for real-profile browsing: resolvers, snapshot, launch routing, consent.
 
 The consent path never drives the live default profile: it snapshots into
-``~/.hermes/browser-profile/<browser>/`` and launches the user's real binary
+``~/.stardust/browser-profile/<browser>/`` and launches the user's real binary
 on the copy with a devtools port (see hermes_cli.browser_connect). These tests
 exercise the real functions with real file I/O wherever possible — the mocks
 are limited to OS detection and process launch.
@@ -644,7 +644,7 @@ class TestSnapshotIsCredentialStore:
 
     def test_read_guard_blocks_snapshot(self, tmp_path, monkeypatch):
         import agent.file_safety as fs
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".stardust"
         (home / "browser-profile" / "chrome" / "Default").mkdir(parents=True)
         cookies = home / "browser-profile" / "chrome" / "Default" / "Cookies"
         cookies.write_text("secret-cookie-db")
@@ -654,7 +654,7 @@ class TestSnapshotIsCredentialStore:
 
     def test_read_guard_allows_normal_file(self, tmp_path, monkeypatch):
         import agent.file_safety as fs
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".stardust"
         home.mkdir(parents=True)
         monkeypatch.setenv("STARDUST_HOME", str(home))
         normal = tmp_path / "notes.txt"

@@ -15,7 +15,7 @@ import pytest
 @pytest.fixture
 def isolated_home(tmp_path, monkeypatch):
     """Fresh STARDUST_HOME with an empty local skills dir."""
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     (home / "skills").mkdir(parents=True)
     monkeypatch.setenv("STARDUST_HOME", str(home))
 

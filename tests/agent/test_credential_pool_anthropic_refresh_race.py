@@ -64,7 +64,7 @@ def _entry(*, id: str, access_token: str, refresh_token: str, source: str) -> Po
 def _fake_pool_store(monkeypatch):
     """Back write/read_credential_pool with a shared in-memory dict.
 
-    This stands in for ``~/.hermes/auth.json`` so the two "process-local"
+    This stands in for ``~/.stardust/auth.json`` so the two "process-local"
     CredentialPool instances used by the race tests can actually see each
     other's persisted writes (exactly what the real cross-process recovery
     path depends on), without touching the real filesystem.

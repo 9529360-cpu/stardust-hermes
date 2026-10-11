@@ -47,7 +47,7 @@
       effectivePackage = common.effectivePackage cfg;
       hermes-agent = inputs.self.packages.${pkgs.stdenv.hostPlatform.system}.default;
 
-      hermesHome = "${cfg.stateDir}/.hermes";
+      hermesHome = "${cfg.stateDir}/.stardust";
 
       # In container mode, the agent uses the mount path in the container.
       effectiveWorkDir = if cfg.container.enable then containerWorkDir else cfg.workingDirectory;
@@ -197,7 +197,7 @@
         backend=${cfg.container.backend}
         container_name=${containerName}
         exec_user=${cfg.user}
-        hermes_bin=${containerDataDir}/current-package/bin/hermes
+        hermes_bin=${containerDataDir}/current-package/bin/stardust
       '';
 
       # Default: /var/lib/hermes/workspace → /data/workspace.
@@ -282,14 +282,14 @@
             stateDir = mkOption {
               type = types.str;
               default = "/var/lib/hermes";
-              description = "State directory. Contains .hermes/ subdir (STARDUST_HOME).";
+              description = "State directory. Contains .stardust/ subdir (STARDUST_HOME).";
             };
 
             addToSystemPackages = mkOption {
               type = types.bool;
               default = false;
               description = ''
-                Add the hermes CLI to environment.systemPackages and export
+                Add the stardust CLI to environment.systemPackages and export
                 STARDUST_HOME system-wide (via environment.variables) so interactive
                 shells share state with the gateway service.
               '';
@@ -331,7 +331,7 @@
                 type = types.listOf types.str;
                 default = [ ];
                 description = ''
-                  Interactive users who get a ~/.hermes symlink to the service
+                  Interactive users who get a ~/.stardust symlink to the service
                   stateDir. These users are automatically added to the hermes group.
                 '';
                 example = [ "sidbin" ];
@@ -371,9 +371,9 @@
           })
 
           # ── Host CLI ──────────────────────────────────────────────────────
-          # Add the hermes CLI to system PATH and export STARDUST_HOME system-wide
+          # Add the stardust CLI to system PATH and export STARDUST_HOME system-wide
           # so interactive shells share state (sessions, skills, cron) with the
-          # gateway service instead of creating a separate ~/.hermes/.
+          # gateway service instead of creating a separate ~/.stardust/.
           (lib.mkIf cfg.addToSystemPackages {
             environment.systemPackages = [ effectivePackage ];
             environment.variables.STARDUST_HOME = hermesHome;
@@ -515,7 +515,7 @@
                             user:
                             let
                               userHome = config.users.users.${user}.home;
-                              symlinkPath = "${userHome}/.hermes";
+                              symlinkPath = "${userHome}/.stardust";
                             in
                             ''
                               if [ -L "${symlinkPath}" ] && [ "$(readlink "${symlinkPath}")" = "${hermesHome}" ]; then
@@ -529,7 +529,7 @@
                   }
 
                   # ── Symlink bridge for interactive users ───────────────────────
-                  # Create ~/.hermes -> stateDir/.hermes for each hostUser so the
+                  # Create ~/.stardust -> stateDir/.stardust for each hostUser so the
                   # host CLI shares state with the container service.
                   # Only runs when container mode is enabled.
                   ${lib.optionalString cfg.container.enable (
@@ -538,7 +538,7 @@
                         user:
                         let
                           userHome = config.users.users.${user}.home;
-                          symlinkPath = "${userHome}/.hermes";
+                          symlinkPath = "${userHome}/.stardust";
                         in
                         ''
                           if [ -d "${symlinkPath}" ] && [ ! -L "${symlinkPath}" ]; then
@@ -610,7 +610,7 @@
             };
           })
 
-          # ── The backend: hermes serve or hermes dashboard ─────────────────
+          # ── The backend: stardust serve or stardust dashboard ─────────────────
           # This is a different process from the gateway. Both use one
           # STARDUST_HOME.
           (lib.mkIf (!cfg.container.enable && cfg.backend.mode != "none") {
@@ -682,12 +682,12 @@
                     ${lib.concatStringsSep " " (map (v: "--volume ${v}") cfg.container.extraVolumes)} \
                     --env STARDUST_UID="$STARDUST_UID" \
                     --env STARDUST_GID="$STARDUST_GID" \
-                    --env STARDUST_HOME=${containerDataDir}/.hermes \
+                    --env STARDUST_HOME=${containerDataDir}/.stardust \
                     --env STARDUST_MANAGED=true \
                     --env HOME=${containerHomeDir} \
                     ${lib.concatStringsSep " " cfg.container.extraOptions} \
                     ${cfg.container.image} \
-                    ${containerDataDir}/current-package/bin/hermes gateway run --replace ${lib.concatStringsSep " " cfg.extraArgs}
+                    ${containerDataDir}/current-package/bin/stardust gateway run --replace ${lib.concatStringsSep " " cfg.extraArgs}
 
                   echo "${containerIdentity}" > ${identityFile}
                 fi

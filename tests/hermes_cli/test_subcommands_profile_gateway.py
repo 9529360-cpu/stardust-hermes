@@ -31,14 +31,14 @@ def _h_profile(args):  # pragma: no cover - identity only
 
 
 def _profile_parser():
-    p = argparse.ArgumentParser(prog="hermes")
+    p = argparse.ArgumentParser(prog="stardust")
     sub = p.add_subparsers(dest="command")
     build_profile_parser(sub, cmd_profile=_h_profile)
     return p
 
 
 def _gateway_parser():
-    p = argparse.ArgumentParser(prog="hermes")
+    p = argparse.ArgumentParser(prog="stardust")
     sub = p.add_subparsers(dest="command")
     build_gateway_parser(
         sub,

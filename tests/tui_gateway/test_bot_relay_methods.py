@@ -23,7 +23,7 @@ from tools import bot_relay
 
 @pytest.fixture
 def home(tmp_path, monkeypatch):
-    h = tmp_path / ".hermes"
+    h = tmp_path / ".stardust"
     (h / "profiles" / "ops").mkdir(parents=True)
     monkeypatch.setenv("STARDUST_HOME", str(h))
     return h
@@ -89,7 +89,7 @@ def test_deliver_validates_profile_and_runs_transport(home, monkeypatch):
     argv = calls["argv"]
     # argv[0] may be a resolved venv path (#93590) — match by basename.
     assert argv[1:3] == ["-p", "ops"]
-    assert argv[0].rsplit("\\", 1)[-1].rsplit("/", 1)[-1] in ("hermes", "hermes.exe")
+    assert argv[0].rsplit("\\", 1)[-1].rsplit("/", 1)[-1].lower() in ("hermes", "hermes.exe")
     assert "Bot Chat" in argv and "--query-file" in argv
 
     # 'hermes' alias resolves to default
@@ -337,12 +337,12 @@ def test_gateway_drains_the_mailbox_the_tools_write_to(tmp_path, monkeypatch, su
     """Both ends of the relay mailbox derive the install root from STARDUST_HOME with ONE formula.
     The writer side (``message_agent``'s ``_hermes_root``) and the drain side
     (``methods_bot_relay._relay_root``) must agree for a ``profiles/<name>`` home AND for an
-    arbitrary subdir of the native ``~/.hermes`` — a split here is silent non-delivery."""
+    arbitrary subdir of the native ``~/.stardust`` — a split here is silent non-delivery."""
     from tools.bot_mode_probe import _default_home, _hermes_root
     from tui_gateway import methods_bot_relay
 
     monkeypatch.setenv("HOME", str(tmp_path))
-    home = tmp_path / ".hermes" / subdir
+    home = tmp_path / ".stardust" / subdir
     home.mkdir(parents=True)
     monkeypatch.setenv("STARDUST_HOME", str(home))
 

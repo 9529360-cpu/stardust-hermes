@@ -212,7 +212,7 @@ def test_background_review_whitelist_includes_configured_extra_tools(
     thread-local whitelist.  This config hook lets profiles grant a narrowly
     scoped, human-gated proposal tool without enabling unrelated side effects.
     """
-    hermes_home = tmp_path / ".hermes"
+    hermes_home = tmp_path / ".stardust"
     hermes_home.mkdir()
     (hermes_home / "config.yaml").write_text(
         "auxiliary:\n"

@@ -1,8 +1,8 @@
-"""Uninstall must not leave a dangling ``hermes`` command on Windows.
+"""Uninstall must not leave a dangling ``stardust`` command on Windows.
 
 Every uninstall mode deletes the code checkout, but the launchers install.ps1
 staged in the managed binary dir (the default Hermes root's ``bin``, shared
-with the managed uv) live outside it. A surviving launcher makes ``hermes``
+with the managed uv) live outside it. A surviving launcher makes ``stardust``
 in a new terminal resolve and then error on its missing venv target — worse
 than command-not-found. The managed uv next to them must survive keep-data
 uninstalls, so the PATH sweep takes the ``bin`` entry only on a full wipe.
@@ -25,7 +25,7 @@ def managed_bin(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     home = tmp_path / "hermes"
     bin_dir = home / "bin"
     bin_dir.mkdir(parents=True)
-    (bin_dir / "hermes.exe").write_bytes(b"MZ launcher")
+    (bin_dir / "stardust.exe").write_bytes(b"MZ launcher")
     (bin_dir / "hermes-acp.cmd").write_text("@echo off\r\n", encoding="ascii")
     (bin_dir / "uv.exe").write_bytes(b"MZ managed uv")
     (bin_dir / "uvx.exe").write_bytes(b"MZ managed uvx")
@@ -36,8 +36,8 @@ def managed_bin(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 def test_removes_both_launcher_forms_and_keeps_managed_uv(managed_bin: Path):
     removed = uninstall.remove_windows_bin_launchers(windows=True)
 
-    assert sorted(p.name for p in removed) == ["hermes-acp.cmd", "hermes.exe"]
-    assert not (managed_bin / "hermes.exe").exists()
+    assert sorted(p.name for p in removed) == ["hermes-acp.cmd", "stardust.exe"]
+    assert not (managed_bin / "stardust.exe").exists()
     assert not (managed_bin / "hermes-acp.cmd").exists()
     # The managed uv stays — keep-data reinstalls still need it.
     assert (managed_bin / "uv.exe").exists()
@@ -54,13 +54,13 @@ def test_anchors_on_default_root_not_profile_home(
 
     removed = uninstall.remove_windows_bin_launchers(windows=True)
 
-    assert sorted(p.name for p in removed) == ["hermes-acp.cmd", "hermes.exe"]
-    assert not (managed_bin / "hermes.exe").exists()
+    assert sorted(p.name for p in removed) == ["hermes-acp.cmd", "stardust.exe"]
+    assert not (managed_bin / "stardust.exe").exists()
 
 
 def test_noop_on_posix(managed_bin: Path):
     assert uninstall.remove_windows_bin_launchers(windows=False) == []
-    assert (managed_bin / "hermes.exe").exists()
+    assert (managed_bin / "stardust.exe").exists()
 
 
 def test_noop_when_no_launchers_staged(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -97,8 +97,8 @@ class TestManagedBinPathMarker:
     ``tmp_path`` would make the test pass only on Windows hosts.
     """
 
-    HOME = r"C:\Users\me\AppData\Local\hermes"
-    BIN_ENTRY = r"C:\Users\me\AppData\Local\hermes\bin"
+    HOME = r"C:\Users\me\AppData\Local\stardust"
+    BIN_ENTRY = r"C:\Users\me\AppData\Local\stardust\bin"
 
     def test_keep_data_markers_spare_the_managed_bin(self):
         markers = [m.lower() for m in uninstall._hermes_path_markers(Path(self.HOME))]

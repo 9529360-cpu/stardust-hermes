@@ -22,7 +22,7 @@ method = _registry.method
 def _relay_root() -> Path:
     """Install root shared by every profile (relay state is install-wide). Same formula as the
     writers (``tools/bot_relay``, ``tools/bot_mode_dm``): both ends of the mailbox must agree for
-    every STARDUST_HOME, including non-``profiles/`` subdirs of ``~/.hermes``."""
+    every STARDUST_HOME, including non-``profiles/`` subdirs of ``~/.stardust``."""
     from tools.bot_mode_probe import _default_home, _hermes_root
     return _hermes_root(Path(_default_home()))
 
@@ -59,7 +59,7 @@ def _(rid, params: dict, _root=_relay_root) -> dict:
 @method("bot_relay.deliver")
 def _(rid, params: dict, _root=_relay_root, _run=_run_delivery) -> dict:
     """Deliver a relayed DM (``profile``, attribution-prefixed ``message``) into a Bot Chat ON THIS
-    GATEWAY via the one-turn ``hermes -p <profile> chat -c "Bot Chat"`` transport local DMs use →
+    GATEWAY via the one-turn ``stardust -p <profile> chat -c "Bot Chat"`` transport local DMs use →
     ``{reply}``. Blocking by design (Desktop relay worker; the RPC pool keeps it off the reader)."""
     import tempfile
     profile = str(params.get("profile") or "").strip()

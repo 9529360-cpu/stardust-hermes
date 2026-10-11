@@ -253,7 +253,7 @@ def _display_system_platform(*, system: str, release: str, version: str, platfor
 
 # Gateway + update actions (invoked from the Status page). Spawned detached so the request
 # returns immediately; stdin is DEVNULL so stray input() fails fast; stdout/stderr stream to
-# ~/.hermes/logs/<action>.log which the dashboard tails.
+# ~/.stardust/logs/<action>.log which the dashboard tails.
 
 _ACTION_LOG_DIR: Path = get_hermes_home() / "logs"
 
@@ -342,7 +342,7 @@ def _profile_action_environment(
     """Environment for a detached ``hermes <subcommand>`` action.
 
     The dashboard loads its own profile's ``.env`` into process-global ``os.environ``. Copying
-    that mapping verbatim into ``hermes -p <other> ...`` lets the named child see the dashboard
+    that mapping verbatim into ``stardust -p <other> ...`` lets the named child see the dashboard
     profile's platform credentials and ports *before* its own dotenv loads (``load_hermes_dotenv``
     does not override keys already present): a supposedly A2A-only profile then claims the default
     Discord token and binds the default API/BlueBubbles ports.
@@ -410,7 +410,7 @@ def _action_targets_system_gateway(subcommand: List[str]) -> bool:
     Scope is decided by the CLI's own picker (``_select_systemd_scope``) evaluated for the profile
     the action addresses, not by "a system unit exists": a host carrying both units resolves to the
     user unit, which the dashboard user operates unelevated. Same root/sudo posture as the
-    ``hermes update`` fleet restart (``update_cmd_fleet._needs_sudo`` / ``_sudo_noninteractive_ok``).
+    ``stardust update`` fleet restart (``update_cmd_fleet._needs_sudo`` / ``_sudo_noninteractive_ok``).
     """
     from hermes_cli.update_cmd_fleet import _needs_sudo
 
@@ -457,7 +457,7 @@ def _spawn_hermes_action(
         # STARDUST_HOME past sudo's env_reset and reads SUDO_USER for the service identity.
         # ``-n`` never prompts (stdin is DEVNULL anyway); without a passwordless path the
         # REQUEST fails instead of reporting a started action whose child refuses. Same
-        # two-step gate as the ``hermes update`` fleet restart: a refused blanket probe falls
+        # two-step gate as the ``stardust update`` fleet restart: a refused blanket probe falls
         # back to ``sudo -l`` on the exact argv, so a command-scoped NOPASSWD entry qualifies.
         from hermes_cli.update_cmd_fleet import _sudo_noninteractive_ok
 
@@ -493,7 +493,7 @@ def _spawn_hermes_action(
 
 def _own_profile_selector(profile: Optional[str]) -> Optional[str]:
     """The profile a lifecycle verb addresses: the explicit selector, else the process's own named
-    profile (a pooled Desktop ``hermes --profile X serve`` answers ``/api/gateway/*`` without
+    profile (a pooled Desktop ``stardust --profile X serve`` answers ``/api/gateway/*`` without
     ``?profile=``; an unscoped verb there is about X, not about the default home)."""
     requested = (profile or "").strip()
     if requested:
@@ -527,7 +527,7 @@ def _profile_is_multiplexed(profile: str) -> bool:
 def multiplexed_profile_refusal(profile: Optional[str], verb: str) -> Optional[str]:
     """Refusal text for ``gateway start``/``stop`` on a profile the live default multiplexer serves and
     that has no gateway of its own (a ``--force``-started separate one is managed normally), else None.
-    The spawned ``hermes -p X gateway <verb>`` would only print exit-78 / "no gateway running for this
+    The spawned ``stardust -p X gateway <verb>`` would only print exit-78 / "no gateway running for this
     profile" into an action log nobody reads while the UI shows the verb as done."""
     requested = _own_profile_selector(profile) or ""
     if not requested or requested.lower() in {"current", "default"} or not _profile_is_multiplexed(requested):

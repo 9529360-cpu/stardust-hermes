@@ -15,7 +15,7 @@ import time
 repo = Path(sys.argv[1]).resolve()
 home = tempfile.mkdtemp(prefix="hermes-orphan-wire-")
 os.environ.clear()
-os.environ.update(HOME=home, STARDUST_HOME=home + "/.hermes", PATH="/usr/bin:/bin")
+os.environ.update(HOME=home, STARDUST_HOME=home + "/.stardust", PATH="/usr/bin:/bin")
 sys.path.insert(0, str(repo))
 from tui_gateway import server as s
 from tui_gateway.ws import handle_ws

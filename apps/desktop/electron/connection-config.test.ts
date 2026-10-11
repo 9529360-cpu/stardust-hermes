@@ -1096,7 +1096,7 @@ test('cookiesHavePrivySession is false for an empty value', () => {
   assert.equal(cookiesHavePrivySession([{ name: 'privy-token', value: '' }]), false)
 })
 
-test('cookiesHavePrivySession does NOT treat hermes gateway cookies as a portal session', () => {
+test('cookiesHavePrivySession does NOT treat stardust gateway cookies as a portal session', () => {
   // The whole point of Q7: a gateway session cookie is NOT a portal sign-in.
   assert.equal(cookiesHavePrivySession([{ name: 'hermes_session_at', value: 'x' }]), false)
   assert.equal(cookiesHavePrivySession([{ name: '__Host-hermes_session_rt', value: 'x' }]), false)

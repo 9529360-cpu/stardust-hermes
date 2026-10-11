@@ -119,7 +119,7 @@ def main() -> None:
         pid, fd = pty.fork()
         if pid == 0:
             os.environ.clear()
-            os.environ.update(HOME=home, STARDUST_HOME=home + "/.hermes", PATH="/usr/bin:/bin", TERM="dumb", NO_COLOR="1")
+            os.environ.update(HOME=home, STARDUST_HOME=home + "/.stardust", PATH="/usr/bin:/bin", TERM="dumb", NO_COLOR="1")
             try:
                 child(out)
             finally:

@@ -12,15 +12,15 @@ metadata:
     related_skills: [claude-design, popular-web-designs]
     upstream:
       repo: pbakaus/impeccable
-      path: .hermes/skills/impeccable
+      path: .stardust/skills/impeccable
 ---
 
 # Impeccable (upstream-maintained)
 
 > **Catalog stub.** This entry is maintained upstream at
 > [pbakaus/impeccable](https://github.com/pbakaus/impeccable): the project
-> ships and verifies a Hermes-native skill bundle under `.hermes/skills/`.
-> `hermes skills install impeccable` pulls the current bundle live from that
+> ships and verifies a Hermes-native skill bundle under `.stardust/skills/`.
+> `stardust skills install impeccable` pulls the current bundle live from that
 > repo (quarantined and scanned like any hub install) — this directory holds
 > only the catalog metadata, so the vendored copy can never go stale.
 

@@ -282,7 +282,7 @@ def _ordered_enabled_sources(secrets_cfg: dict, *, scope: Optional[str] = None) 
 
 
 def _active_profile_name(home_path: Optional[Path]) -> str:
-    """Active profile name (``~/.hermes/profiles/<name>``); "" for the default profile."""
+    """Active profile name (``~/.stardust/profiles/<name>``); "" for the default profile."""
     if home_path is not None:
         resolved = Path(home_path)
         if resolved.parent.name == "profiles" and resolved.name:

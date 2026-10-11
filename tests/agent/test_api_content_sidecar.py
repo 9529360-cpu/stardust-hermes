@@ -435,9 +435,9 @@ def wire_env():
     t.start()
 
     test_home = tempfile.mkdtemp(prefix="hermes_api_content_")
-    os.makedirs(os.path.join(test_home, ".hermes"))
+    os.makedirs(os.path.join(test_home, ".stardust"))
     prev_home = os.environ.get("STARDUST_HOME")
-    os.environ["STARDUST_HOME"] = os.path.join(test_home, ".hermes")
+    os.environ["STARDUST_HOME"] = os.path.join(test_home, ".stardust")
 
     from run_agent import AIAgent
 

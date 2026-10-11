@@ -35,7 +35,7 @@ def fake_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: home))
-    monkeypatch.setenv("STARDUST_HOME", str(home / ".hermes"))
+    monkeypatch.setenv("STARDUST_HOME", str(home / ".stardust"))
     return home
 
 

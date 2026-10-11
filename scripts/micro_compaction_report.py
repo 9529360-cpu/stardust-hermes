@@ -9,7 +9,7 @@ Usage:
   python scripts/micro_compaction_report.py [LOGFILE ...]
   python scripts/micro_compaction_report.py --per-session
 
-With no LOGFILE, reads ``$STARDUST_HOME/logs/agent.log`` (default ~/.hermes).
+With no LOGFILE, reads ``$STARDUST_HOME/logs/agent.log`` (default ~/.stardust).
 
 What to look at
 ---------------
@@ -44,7 +44,7 @@ BATCH_MARKER = "context compression attempt telemetry: "
 
 
 def default_log() -> Path:
-    home = os.environ.get("STARDUST_HOME") or str(Path.home() / ".hermes")
+    home = os.environ.get("STARDUST_HOME") or str(Path.home() / ".stardust")
     return Path(home) / "logs" / "agent.log"
 
 

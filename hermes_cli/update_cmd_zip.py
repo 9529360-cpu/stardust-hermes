@@ -1,4 +1,4 @@
-"""ZIP-download fallback for ``hermes update`` (Windows with broken git): two-phase stage/commit swap, dirty-tree guard.
+"""ZIP-download fallback for ``stardust update`` (Windows with broken git): two-phase stage/commit swap, dirty-tree guard.
 
 Split out of ``update_cmd.py``; every name is re-imported there so ``hermes_cli.update_cmd.<name>`` keeps
 resolving/monkeypatching. Origin helpers are imported lazily per function (no cycle; test patches stay effective).
@@ -29,13 +29,13 @@ def _zip_archive_url(branch: str) -> str:
 
     Resolves through the same repo authority as the git update path (``update_cmd_git.OFFICIAL_REPO_URL``)
     rather than a separately hardcoded literal, so this fallback can never drift onto a different
-    repository than ``hermes update``'s primary git path.
+    repository than ``stardust update``'s primary git path.
     """
     from hermes_cli.update_cmd_git import OFFICIAL_REPO_URL
     return f"{OFFICIAL_REPO_URL.removesuffix('.git')}/archive/refs/heads/{branch}.zip"
 
 
-_STASH_HINT = "  Stash or commit your changes, then rerun `hermes update`."
+_STASH_HINT = "  Stash or commit your changes, then rerun `stardust update`."
 
 
 def _remove_path(path: str, *, ignore_errors: bool = False) -> None:
@@ -322,7 +322,7 @@ def _download_and_swap_zip(branch: str, zip_url: str) -> None:
         print(f"✗ ZIP update failed: {e}")
         # Two-phase replace commits all or rolls all back, so no mixed tree here — don't push a needless reinstall.
         print("  Your existing install was left in place.")
-        print("  Re-run `hermes update` to retry; if the agent won't start, reinstall with:")
+        print("  Re-run `stardust update` to retry; if the agent won't start, reinstall with:")
         print("  iex (irm https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust.ps1)")
         _m().sys.exit(1)
     finally:
@@ -387,8 +387,8 @@ def _update_via_zip(args, *, had_desktop_app_before_update: bool = False) -> boo
         print(
             "  This path runs when git file I/O is broken on the system. "
             "Either resolve the git-side breakage (typically an antivirus "
-            "or NTFS filter holding files open) and rerun `hermes update "
-            f"--branch {branch}`, or update against main with `hermes update`."
+            "or NTFS filter holding files open) and rerun `stardust update "
+            f"--branch {branch}`, or update against main with `stardust update`."
         )
         _m().sys.exit(1)
     _abort_zip_update_if_dirty_tree()
@@ -412,7 +412,7 @@ def _update_via_zip(args, *, had_desktop_app_before_update: bool = False) -> boo
         print(f"  {failing_module}: {import_error}")
         print()
         print("  This usually means the copy was interrupted partway through.")
-        print("  Re-run `hermes update` to complete it.")
+        print("  Re-run `stardust update` to complete it.")
         _m().sys.exit(1)
     node_failures = _update_node_dependencies()
     _m()._build_web_ui(_m().PROJECT_ROOT / "web")

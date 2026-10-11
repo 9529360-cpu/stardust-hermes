@@ -18,7 +18,7 @@
 #   update   advance served main to HEAD, apply ONE update method:
 #              open-app-update            launch the installed app binary
 #                                         under Playwright, click Update now
-#              hermes-desktop-app-update  capture `hermes desktop`'s spawn,
+#              hermes-desktop-app-update  capture `stardust desktop`'s spawn,
 #                                         launch the spec under Playwright,
 #                                         click Update now
 #              hermes-update              CLI update from the installed venv
@@ -156,7 +156,7 @@ EOF
   # -------
   export HOME="$HOME_SANDBOX"
   export PATH="$HOME/.local/bin:$PATH"
-  export STARDUST_HOME="$HOME/.hermes"
+  export STARDUST_HOME="$HOME/.stardust"
   export INSTALL_DIR="$STARDUST_HOME/hermes-agent"
 }
 
@@ -248,10 +248,10 @@ phase_install() {
   got="$(git -C "$INSTALL_DIR" rev-parse HEAD)"
   [ "$got" = "$OLD_SHA" ] || fail "installed checkout is $got, expected OLD ($OLD_SHA)"
   ok "checkout is OLD ($OLD_SHA)"
-  local hermes="$INSTALL_DIR/venv/bin/hermes"
-  [ -x "$hermes" ] || fail "no hermes console script at $hermes"
-  "$hermes" --version 2>&1 | ts_prefix > "$LOG_DIR/version-old.log" || fail "hermes --version failed after install"
-  ok "hermes --version works: $(head -c 120 "$LOG_DIR/version-old.log" | tr -d '\n')"
+  local hermes="$INSTALL_DIR/venv/bin/stardust"
+  [ -x "$hermes" ] || fail "no stardust console script at $hermes"
+  "$hermes" --version 2>&1 | ts_prefix > "$LOG_DIR/version-old.log" || fail "stardust --version failed after install"
+  ok "stardust --version works: $(head -c 120 "$LOG_DIR/version-old.log" | tr -d '\n')"
   find_installed_app >/dev/null || fail "no installed Stardust.app after the dmg bootstrap"
   ok "installed app: $(find_installed_app)"
 }
@@ -338,15 +338,15 @@ phase_update() {
     hermes-update)
       # The CLI route a dmg user takes from a terminal. `--yes` reaches the
       # update subcommand only in later releases; ask the installed hermes.
-      local hermes="$INSTALL_DIR/venv/bin/hermes"
+      local hermes="$INSTALL_DIR/venv/bin/stardust"
       local update_cmd=("$hermes" update)
       if "$hermes" update --help 2>&1 | grep -qF -- --yes; then
         update_cmd=("$hermes" update --yes)
       fi
       local rc=0
       (cd "$INSTALL_DIR" && "${update_cmd[@]}" < /dev/null 2>&1 | ts_prefix > "$LOG_DIR/update.log") || rc=$?
-      log_group "hermes update transcript" "$LOG_DIR/update.log"
-      [ "$rc" -eq 0 ] || fail "hermes update exited $rc; transcript above"
+      log_group "stardust update transcript" "$LOG_DIR/update.log"
+      [ "$rc" -eq 0 ] || fail "stardust update exited $rc; transcript above"
       ;;
     installer-script)
       # A dmg user re-running today's install one-liner.
@@ -367,7 +367,7 @@ phase_update() {
     open-app-update)
       # The installed app IS the user surface here (double-click the .app);
       # hand-build the spec Playwright launches from. Env: the redirect set,
-      # which is exactly what the app's children (git, hermes update) need.
+      # which is exactly what the app's children (git, stardust update) need.
       local app app_bin
       app="$(find_installed_app)" || fail "no installed app to launch"
       app_bin="$(find "$app/Contents/MacOS" -type f -perm +111 | head -1)"
@@ -386,16 +386,16 @@ PYEOF
       ;;
     hermes-desktop-app-update)
       # The product's own launch, captured at its spawn site.
-      local hermes="$INSTALL_DIR/venv/bin/hermes"
+      local hermes="$INSTALL_DIR/venv/bin/stardust"
       local spec="$WORK_ROOT/launch-spec.json"
       local rc=0
       (cd "$INSTALL_DIR" && \
         PYTHONPATH="$ASSETS/launch-capture${PYTHONPATH:+:$PYTHONPATH}" \
         STARDUST_E2E_CAPTURE_LAUNCH="$spec" \
         "$hermes" desktop < /dev/null 2>&1 | ts_prefix > "$LOG_DIR/desktop-launch-capture.log") || rc=$?
-      log_group "hermes desktop (launch capture) transcript" "$LOG_DIR/desktop-launch-capture.log"
-      [ "$rc" -eq 0 ] || fail "hermes desktop exited $rc during launch capture"
-      [ -f "$spec.captured" ] || fail "hermes desktop exited 0 but no launch was captured"
+      log_group "stardust desktop (launch capture) transcript" "$LOG_DIR/desktop-launch-capture.log"
+      [ "$rc" -eq 0 ] || fail "stardust desktop exited $rc during launch capture"
+      [ -f "$spec.captured" ] || fail "stardust desktop exited 0 but no launch was captured"
       ok "captured $(cat "$spec.captured") launch spec"
       run_playwright_update "$spec"
       ;;
@@ -414,7 +414,7 @@ PYEOF
   # evidence must already be on disk when it does.
   local ildest="$LOG_DIR/install-logs"
   mkdir -p "$ildest"
-  cp -R "$HOME_SANDBOX/.hermes/logs" "$ildest/hermes-logs" 2>/dev/null || true
+  cp -R "$HOME_SANDBOX/.stardust/logs" "$ildest/hermes-logs" 2>/dev/null || true
   local ud="$HOME_SANDBOX/Library/Application Support/Hermes"
   [ -d "$ud" ] && cp -R "$ud" "$ildest/desktop-userdata" 2>/dev/null || true
   cp "$STARDUST_HOME/.hermes-update-result.json" "$ildest" 2>/dev/null || true
@@ -423,9 +423,9 @@ PYEOF
   ls -la "$INSTALL_DIR/venv" > "$ildest/venv-ls.txt" 2>/dev/null || true
   ok "collected install-side logs to $ildest"
 
-  "$INSTALL_DIR/venv/bin/hermes" --version 2>&1 | ts_prefix > "$LOG_DIR/version-head.log" \
-    || fail "hermes --version failed after update"
-  ok "hermes --version works post-update"
+  "$INSTALL_DIR/venv/bin/stardust" --version 2>&1 | ts_prefix > "$LOG_DIR/version-head.log" \
+    || fail "stardust --version failed after update"
+  ok "stardust --version works post-update"
   step "PASS: $OLD_REF -> HEAD via $UPDATE_METHOD"
 }
 

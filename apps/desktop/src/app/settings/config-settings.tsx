@@ -131,7 +131,7 @@ function ConfigSettingsInner({
   const profileRefreshGeneration = useRef(0)
   // Snapshot of the record as it was when the draft was seeded. Autosave
   // diffs the draft against this (not against disk) so a field the user
-  // never touched — possibly changed out-of-band by `hermes config set`
+  // never touched — possibly changed out-of-band by `stardust config set`
   // while this page sat open — is never resent with its stale value.
   const configBaselineRef = useRef<HermesConfigRecord | null>(null)
   // Serializes autosave requests so an older save that's still in flight can't

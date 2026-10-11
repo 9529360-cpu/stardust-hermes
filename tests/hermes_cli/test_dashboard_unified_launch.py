@@ -56,7 +56,7 @@ class TestUnifiedDashboardRouting:
         assert argv[argv.index("--open-profile") + 1] == "worker_x"
         # The child is pinned to the machine ROOT, not the launching profile's
         # STARDUST_HOME.  For a standard install (STARDUST_HOME unset) that root is
-        # the platform-native default (~/.hermes), NOT dropped — see the Docker
+        # the platform-native default (~/.stardust), NOT dropped — see the Docker
         # test below for why we resolve explicitly instead of popping.
         from hermes_constants import get_default_hermes_root
         assert env.get("STARDUST_HOME") == str(get_default_hermes_root())

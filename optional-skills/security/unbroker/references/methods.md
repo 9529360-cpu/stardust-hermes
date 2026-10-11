@@ -283,7 +283,7 @@ run stalling in Phase 2.
   binding).
 - **How to drive the operator's browser (CDP).** Point Hermes's browser tools at the operator's real
   Chrome over the DevTools protocol: launch
-  `chrome --remote-debugging-port=9222 --user-data-dir="$HOME/.hermes/chrome-debug"` and connect the
+  `chrome --remote-debugging-port=9222 --user-data-dir="$HOME/.stardust/chrome-debug"` and connect the
   browser backend to `127.0.0.1:9222`. Use a **dedicated debug profile** (`chrome-debug`), NOT the
   operator's Default Chrome profile, and have the operator sign into their webmail (and any needed
   broker accounts) in that profile once. That single browser then carries residential IP + real

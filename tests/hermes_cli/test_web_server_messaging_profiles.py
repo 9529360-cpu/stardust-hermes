@@ -311,7 +311,7 @@ def test_scoped_enablement_uses_only_own_credentials(client, isolated_profiles, 
 def test_credential_write_hot_serves_a_multiplexed_profile(client, isolated_profiles, monkeypatch, topology):
     """A token saved for a profile the live multiplexer serves is handed to the multiplexer right
     away (``hot_served``), so the UI skips its restart banner. Both Desktop topologies: the dashboard's
-    ``?profile=`` and a pooled ``hermes --profile X serve`` that receives the PUT unscoped (#109088)."""
+    ``?profile=`` and a pooled ``stardust --profile X serve`` that receives the PUT unscoped (#109088)."""
     import hermes_cli.gateway as gateway_cli
     import hermes_cli.gateway_multiplex_served as served_mod
     notified = []

@@ -58,7 +58,7 @@ def turn_env(monkeypatch, tmp_path):
 
 
 def test_live_relay_stamps_the_sender_as_a_delivery_author(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     (home / "profiles" / "ops").mkdir(parents=True)
     monkeypatch.setenv("STARDUST_HOME", str(home))
     submitted = []

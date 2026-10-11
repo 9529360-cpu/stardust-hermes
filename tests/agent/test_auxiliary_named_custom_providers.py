@@ -9,7 +9,7 @@ import pytest
 @pytest.fixture(autouse=True)
 def _isolate(tmp_path, monkeypatch):
     """Redirect STARDUST_HOME and clear module caches."""
-    hermes_home = tmp_path / ".hermes"
+    hermes_home = tmp_path / ".stardust"
     hermes_home.mkdir()
     monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     # Write a minimal config so load_config doesn't fail
@@ -19,7 +19,7 @@ def _isolate(tmp_path, monkeypatch):
 def _write_config(tmp_path, config_dict):
     """Write a config.yaml to the test STARDUST_HOME."""
     import yaml
-    config_path = tmp_path / ".hermes" / "config.yaml"
+    config_path = tmp_path / ".stardust" / "config.yaml"
     config_path.write_text(yaml.dump(config_dict))
 
 
@@ -133,7 +133,7 @@ class TestResolveProviderClientNamedCustom:
                 },
             },
         })
-        auth_path = tmp_path / ".hermes" / "auth.json"
+        auth_path = tmp_path / ".stardust" / "auth.json"
         auth_path.write_text(json.dumps({
             "version": 1,
             "providers": {},

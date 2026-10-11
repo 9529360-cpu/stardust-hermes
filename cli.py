@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Hermes Agent CLI — interactive terminal interface (``python cli.py --help`` for usage)."""
 
-# Must be the very first import (UTF-8 stdio on Windows). Missing only mid-``hermes update``.
+# Must be the very first import (UTF-8 stdio on Windows). Missing only mid-``stardust update``.
 try:
     import hermes_bootstrap  # noqa: F401
 except ModuleNotFoundError:
@@ -167,7 +167,7 @@ from hermes_cli.banner import format_banner_version_label
 _COMMAND_SPINNER_FRAMES = ("⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏")
 
 
-# ~/.hermes/.env first, project .env as dev fallback; user env files override stale shell exports.
+# ~/.stardust/.env first, project .env as dev fallback; user env files override stale shell exports.
 from hermes_constants import get_hermes_home
 from hermes_state_ids import new_session_id
 from hermes_cli.env_loader import load_hermes_dotenv
@@ -235,7 +235,7 @@ def _assistant_copy_text(content: Any) -> str:
 
 
 def _load_prefill_messages(file_path: str) -> List[Dict[str, Any]]:
-    """Load prefill messages (JSON array) from *file_path*; relative to ~/.hermes/; missing/empty -> []."""
+    """Load prefill messages (JSON array) from *file_path*; relative to ~/.stardust/; missing/empty -> []."""
     if not file_path:
         return []
     path = Path(file_path).expanduser()
@@ -460,7 +460,7 @@ def _merge_file_config(defaults: Dict[str, Any], file_config: Dict[str, Any]) ->
 
 
 def load_cli_config() -> Dict[str, Any]:
-    """~/.hermes/config.yaml (else ./cli-config.yaml) over built-in defaults; env vars win.
+    """~/.stardust/config.yaml (else ./cli-config.yaml) over built-in defaults; env vars win.
 
     ``STARDUST_IGNORE_USER_CONFIG=1`` skips the user config entirely (``.env`` still loads).
     """
@@ -490,7 +490,7 @@ def load_cli_config() -> Dict[str, Any]:
     defaults = _expand_env_vars(defaults)
 
     # Administrator-pinned (managed scope) values overlay LAST; cli.py builds its config
-    # independently of hermes_cli.config, so this keeps parity with `hermes config`. Fail-open.
+    # independently of hermes_cli.config, so this keeps parity with `stardust config`. Fail-open.
     from hermes_cli import managed_scope
 
     defaults = managed_scope.apply_managed_overlay(defaults)
@@ -739,7 +739,7 @@ def _arm_exit_watchdog_on_shutdown_signal() -> None:
     several wedge points BEFORE ``_run_cleanup`` arms the normal watchdog: a main thread parked in a syscall
     that never observes the unwind, a prompt_toolkit teardown that never returns, or an agent worker
     blocking the ``finally``. When that happens the process has NO backstop and a "dead" CLI lingers
-    (observed: ``hermes --tui`` alive ~47 min at 4% CPU after terminal close — the #65998 class).
+    (observed: ``stardust --tui`` alive ~47 min at 4% CPU after terminal close — the #65998 class).
     """
     global _signal_watchdog_armed
     if _signal_watchdog_armed:
@@ -981,7 +981,7 @@ def _stop_oneshot_owned_processes(cli) -> None:
 
     They would otherwise outlive it on a dead stdout pipe: 2026-09-30 a kanban worker's
     ``python -m http.server`` stayed bound to its port for hours, failing every request. Same
-    ownership contract as ``hermes -z`` (``agent.close()``) and delegated children.
+    ownership contract as ``stardust -z`` (``agent.close()``) and delegated children.
     """
     agent = getattr(cli, "agent", None)
     if agent is not None:
@@ -1070,7 +1070,7 @@ def _cleanup_worktree(info: Dict[str, str] = None) -> None:
         if _repo_is_shallow(repo_root):
             # Shallow boundary makes the unpushed verdict unreliable; the startup pruner reaps later.
             _cprint(f"\n\033[33m⚠ Shallow clone — cannot verify push state, keeping: {wt_path}\033[0m")
-            print("  The next `hermes -w` session deepens the clone and prunes merged worktrees automatically.")
+            print("  The next `stardust -w` session deepens the clone and prunes merged worktrees automatically.")
         else:
             _cprint(f"\n\033[33m⚠ Worktree has unpushed commits, keeping: {wt_path}\033[0m")
             print(f"  To clean up manually: git worktree remove --force {wt_path}")
@@ -1148,7 +1148,7 @@ def _run_checkpoint_auto_maintenance() -> None:
             return
         from tools.checkpoint_manager import maybe_auto_prune_checkpoints
         # delete_orphans stays False: a missing workdir at startup is ambiguous (unmounted
-        # volume / VPN down); orphans are only reclaimed by `hermes checkpoints prune`.
+        # volume / VPN down); orphans are only reclaimed by `stardust checkpoints prune`.
         maybe_auto_prune_checkpoints(
             retention_days=int(cfg.get("retention_days", 7)),
             min_interval_hours=int(cfg.get("min_interval_hours", 24)),
@@ -2427,7 +2427,7 @@ def save_config_value(key_path: str, value: any) -> bool:
             os.chmod(config_path, 0o600)
         except (OSError, NotImplementedError):
             pass
-        # Same unpinned-cron notice as `hermes config set` for every model switch.
+        # Same unpinned-cron notice as `stardust config set` for every model switch.
         from hermes_cli.config import warn_unpinned_cron_jobs_after_model_config_change
 
         warn_unpinned_cron_jobs_after_model_config_change(key_path, value)
@@ -2441,7 +2441,7 @@ def _normalize_moa_model(model: Optional[str]) -> tuple[Optional[str], Optional[
     """``moa:<preset>`` -> ``("moa", preset)`` (same routing as ``/moa``); anything else -> ``(None, model)``.
 
     Returns ``("moa", "<preset>")`` when *model* selects the MoA virtual provider, otherwise ``(None,
-    model)`` unchanged. This gives non-interactive ``hermes chat -Q -m moa:<preset>`` the same routing the
+    model)`` unchanged. This gives non-interactive ``stardust chat -Q -m moa:<preset>`` the same routing the
     interactive ``/moa`` command and the model picker already use: ``resolve_runtime_provider`` handles
     ``requested_provider == "moa"`` and ``agent_init`` builds the MoAClient off ``provider == "moa"``.
     Without this the raw ``moa:<preset>`` string is sent to the real provider and rejected with a 401/400
@@ -3111,7 +3111,7 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
                 logger.warning(
                     "Unknown skill(s) requested, skipping: %s. "
                     "Continuing with: %s. "
-                    "List available skills with `hermes skills list`.",
+                    "List available skills with `stardust skills list`.",
                     missing_display,
                     ", ".join(loaded_skills),
                 )
@@ -3841,7 +3841,7 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
             print(
                 "Error: stdin (fd 0) is not available.\n"
                 "This can happen with certain Python installations (e.g. uv-managed cPython on macOS).\n"
-                "Try reinstalling Python via pyenv or Homebrew, then re-run: hermes setup"
+                "Try reinstalling Python via pyenv or Homebrew, then re-run: stardust setup"
             )
             return False
         if sys.platform == "darwin":
@@ -3961,7 +3961,7 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
                     f"\nError: stdin is not usable ({_stdin_err}).\n"
                     "This can happen with certain Python installations (e.g. uv-managed cPython on macOS)\n"
                     "where kqueue cannot register fd 0.\n"
-                    "Try reinstalling Python via pyenv or Homebrew, then re-run: hermes setup"
+                    "Try reinstalling Python via pyenv or Homebrew, then re-run: stardust setup"
                 )
             else:
                 raise
@@ -4301,7 +4301,7 @@ def _start_worktree_setup(list_tools, list_toolsets, worktree, w):
     if list_tools or list_toolsets or not (worktree or w or CLI_CONFIG.get("worktree", False)):
         return None
     # Overlap tool discovery with the I/O-bound worktree setup so show_banner() hits a warm
-    # cache (~0.4s). Only on the -w path: plain `hermes` has no I/O wait to hide.
+    # cache (~0.4s). Only on the -w path: plain `stardust` has no I/O wait to hide.
     def _prewarm_tools() -> None:
         try:
             import model_tools as _mt
@@ -4509,7 +4509,7 @@ def main(
 
     _join_worktree = _start_worktree_setup(list_tools, list_toolsets, worktree, w)
     query = query or q
-    # ``hermes chat`` already validated this; the direct Fire entry point gets the same contract.
+    # ``stardust chat`` already validated this; the direct Fire entry point gets the same contract.
     if output_format == "stream-json":
         if not query:
             raise ValueError("--format stream-json requires -q/--query")

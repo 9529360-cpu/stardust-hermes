@@ -388,7 +388,7 @@ def _text_names_hermes(text: str) -> bool:
     A bare ``"hermes" in text`` substring test would also match unrelated processes whose paths
     merely contain the letters (``...\shermesa\...``) — the false-positive class this prevents.
     """
-    return any(token.startswith(("hermes", ".hermes"))
+    return any(token.startswith(("hermes", ".stardust"))
                for token in re.split(r"[\\/\s=,;\"']+", text.lower()))
 
 
@@ -511,7 +511,7 @@ def bounded_probe_run(
     ``communicate()`` after killing the direct child. Killing it can leave a descendant (``git.exe`` under a
     launcher shim, ``conhost.exe`` under wmic/powershell) holding duplicates of the captured stdout/stderr
     handles, so the pipes never reach EOF and the reader-thread join blocks forever. The wmic /
-    ``Get-CimInstance Win32_Process`` gateway scan hit exactly this during ``hermes update`` on slow-WMI
+    ``Get-CimInstance Win32_Process`` gateway scan hit exactly this during ``stardust update`` on slow-WMI
     machines (#87134); the git probes hit it first (#68609 / #66037).
     """
     _popen_kwargs: dict = {"creationflags": windows_hide_flags()} if IS_WINDOWS else {"process_group": 0}

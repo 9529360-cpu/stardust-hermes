@@ -14,7 +14,7 @@ arm = sys.argv[2]
 home = tempfile.mkdtemp(prefix="named-wire-")
 os.environ.clear()
 os.environ.update(
-    HOME=home, STARDUST_HOME=home + "/.hermes", PATH="/usr/bin:/bin", NO_PROXY="*"
+    HOME=home, STARDUST_HOME=home + "/.stardust", PATH="/usr/bin:/bin", NO_PROXY="*"
 )
 os.chdir(home)
 sys.dont_write_bytecode = True

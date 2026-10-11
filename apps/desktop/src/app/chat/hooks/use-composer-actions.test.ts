@@ -10,8 +10,8 @@ import {
   attachmentPreviewDataUrl,
   type DroppedFile,
   extractDroppedFiles,
-  STARDUST_PATHS_MIME,
   partitionDroppedFiles,
+  STARDUST_PATHS_MIME,
   useComposerActions
 } from './use-composer-actions'
 
@@ -615,7 +615,7 @@ describe('attachImagePath thumbnail separation', () => {
       ...original,
       attachedSessionId: 'session-1',
       label: 'photo.png',
-      path: '/root/.hermes/attachments/photo.png',
+      path: '/root/.stardust/attachments/photo.png',
       uploadState: undefined
     })
 
@@ -627,7 +627,7 @@ describe('attachImagePath thumbnail separation', () => {
 
     expect($composerAttachments.get()[0]).toMatchObject({
       attachedSessionId: 'session-1',
-      path: '/root/.hermes/attachments/photo.png',
+      path: '/root/.stardust/attachments/photo.png',
       thumbnailUrl: expect.stringMatching(/^data:image\/png;base64,/)
     })
   })

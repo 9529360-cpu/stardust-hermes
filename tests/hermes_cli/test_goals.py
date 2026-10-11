@@ -19,7 +19,7 @@ def hermes_home(tmp_path, monkeypatch):
     """Isolated STARDUST_HOME so SessionDB.state_meta writes don't clobber the real one."""
     from pathlib import Path
 
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     monkeypatch.setenv("STARDUST_HOME", str(home))
@@ -273,7 +273,7 @@ class TestMigrateGoalToSession:
 
 
 class TestSessionDbCacheAfterProfileDelete:
-    """``hermes profile delete`` force-closes every registry handle under the profile home
+    """``stardust profile delete`` force-closes every registry handle under the profile home
     (``close_all_under``) and rmtrees it; recreating the same name in the long-lived dashboard
     process must not keep persisting goals into the torn-down handle."""
 

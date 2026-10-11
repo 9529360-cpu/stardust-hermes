@@ -785,7 +785,7 @@ def test_session_resume_rejects_runaway_transcript_before_history_load(
 
     assert response["error"]["code"] == 4130
     assert "limit 20000" in response["error"]["message"]
-    assert "hermes sessions export" in response["error"]["message"]
+    assert "stardust sessions export" in response["error"]["message"]
 
 
 def test_session_resume_deferred_and_omitted_paths_guard_the_tip_only(server, monkeypatch):
@@ -1053,7 +1053,7 @@ def test_idle_reaper_rearms_missing_ws_orphan_timer(server, monkeypatch, tmp_pat
         try_acquire_active_session,
     )
 
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     monkeypatch.setenv("STARDUST_HOME", str(home))
     sid = "detached-without-reaper"
     sibling_sid = "live-sibling"
@@ -1142,7 +1142,7 @@ def test_idle_reaper_rearms_missing_ws_orphan_timer(server, monkeypatch, tmp_pat
 def test_sync_session_key_after_compress_reanchors_active_session_lease(
     server, monkeypatch, tmp_path
 ):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     monkeypatch.setenv("STARDUST_HOME", str(home))
 
     from hermes_cli.active_sessions import (
@@ -1481,7 +1481,7 @@ def test_voice_and_wake_handlers_are_pool_routed(voice_or_wake_method, server):
 
 
 def test_skin_live_switch_end_to_end(server, tmp_path, monkeypatch):
-    """Real config + skin files: activating a skin (as `hermes config set` does)
+    """Real config + skin files: activating a skin (as `stardust config set` does)
     makes the per-tool reconcile broadcast skin.changed with the resolved palette.
     Exercises _load_cfg → _skin_sig → resolve_skin → _emit with no mocks in between."""
     import hermes_cli.skin_engine as skin_engine
@@ -1503,7 +1503,7 @@ def test_skin_live_switch_end_to_end(server, tmp_path, monkeypatch):
     server._broadcast_skin_if_changed()
     emitted.clear()
 
-    # Activate midnight, as `hermes config set display.skin midnight` would.
+    # Activate midnight, as `stardust config set display.skin midnight` would.
     time.sleep(0.01)  # ensure the config mtime moves
     (tmp_path / "config.yaml").write_text("display:\n  skin: midnight\n", encoding="utf-8")
     server._broadcast_skin_if_changed()

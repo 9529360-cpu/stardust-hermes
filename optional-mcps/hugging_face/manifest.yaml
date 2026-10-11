@@ -30,5 +30,5 @@ suggest:
 
 post_install: |
   On first connection Hermes opens a browser to authorize with
-  Hugging Face (or run `hermes mcp login hugging_face`). Approve access,
+  Hugging Face (or run `stardust mcp login hugging_face`). Approve access,
   then restart the session so tools load.

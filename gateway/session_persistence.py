@@ -25,9 +25,9 @@ _DB_UNPINNED = object()
 # Self-documenting sentinel written first into sessions.json; "_" keys are skipped on load.
 _SESSIONS_JSON_README = (
     "LEGACY MIRROR of the gateway routing index (the primary copy lives in the gateway_routing "
-    "table in ~/.hermes/state.db). Maps messaging session keys (agent:main:<platform>:...) to "
+    "table in ~/.stardust/state.db). Maps messaging session keys (agent:main:<platform>:...) to "
     "active session IDs. This is NOT the session list. ALL sessions (CLI, TUI, and gateway) live "
-    "in ~/.hermes/state.db and are shown by `hermes sessions list` and `/sessions`. Disable this "
+    "in ~/.stardust/state.db and are shown by `stardust sessions list` and `/sessions`. Disable this "
     "file with `gateway.write_sessions_json: false` in config.yaml."
 )
 

@@ -436,7 +436,7 @@ describe('settings helpers', () => {
   describe('diffConfig', () => {
     it('omits a top-level key the draft never touched', () => {
       // The autosave baseline is a snapshot taken when Settings opened. A key
-      // an agent set via `hermes config set` while the page sat open must not
+      // an agent set via `stardust config set` while the page sat open must not
       // come back in the patch just because it's still present in the draft.
       const baseline: HermesConfigRecord = { fallback_providers: ['nara1'], timezone: 'UTC' }
       const draft: HermesConfigRecord = { fallback_providers: ['nara1'], timezone: 'America/New_York' }

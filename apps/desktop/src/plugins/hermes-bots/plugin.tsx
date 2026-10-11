@@ -12,7 +12,7 @@
  *
  * Bots message each other straight into each bot's ONE canonical "Bot
  * Chat" — @-mentions deliver over gateway RPCs (no CLI relay), and
- * bot-initiated sends use `hermes -p <bot> chat --in ~ -c "Bot Chat"`.
+ * bot-initiated sends use `stardust -p <bot> chat --in ~ -c "Bot Chat"`.
  */
 
 import {

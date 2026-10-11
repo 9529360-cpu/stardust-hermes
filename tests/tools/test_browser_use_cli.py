@@ -3,7 +3,7 @@
 Covers the three seams the integration relies on:
 
 * Mode detection — ``browser.backend: browser-use`` in config (set via the
-  ``hermes tools`` picker); off by default.
+  ``stardust tools`` picker); off by default.
 * Tool-surface swap — when the mode is on, ``check_browser_requirements``
   returns False so every legacy ``browser_*`` tool (including
   browser_cdp/browser_dialog, whose check_fns funnel through it) is hidden,
@@ -618,7 +618,7 @@ class TestBackendCdpResolution:
         assert "BU_CDP_WS" not in env and "BU_CDP_URL" not in env
 
     def test_picker_managed_selection_resolves_gateway_provider(self, monkeypatch):
-        """``cloud_provider: nous`` (the `hermes tools` managed row) must resolve through the
+        """``cloud_provider: nous`` (the `stardust tools` managed row) must resolve through the
         provider: the picker never writes the legacy ``use_gateway`` flag, and the direct-API
         branch leaves browser_exec with no CDP endpoint at all (#108310)."""
         import tools.browser_tool as bt  # noqa: F401 — imported for parity with sibling tests
@@ -722,7 +722,7 @@ class TestOwnTabPreamble:
 
 
 class TestProviderPickerIntegration:
-    """The `hermes tools` Browser Automation picker row (browser_backend
+    """The `stardust tools` Browser Automation picker row (browser_backend
     marker) must enter/leave CLI mode cleanly and highlight correctly."""
 
     def _rows(self):
@@ -1328,7 +1328,7 @@ class TestDefaultDowngradeNotice:
         monkeypatch.setattr(bu_cli, "_find_cli", lambda: None)
         notice = bu_cli.default_downgrade_notice()
         assert notice is not None
-        assert "hermes tools" in notice
+        assert "stardust tools" in notice
 
     def test_rate_limited_within_24h(self, tmp_path, monkeypatch):
         self._isolate(tmp_path, monkeypatch)

@@ -17,7 +17,7 @@ import pytest
 
 @pytest.fixture()
 def _bridge_env(monkeypatch, tmp_path):
-    hermes_home = tmp_path / ".hermes"
+    hermes_home = tmp_path / ".stardust"
     hermes_home.mkdir()
     monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     monkeypatch.setenv("OPENCODE_GO_BRIDGE_API_KEY", "sk-test-bridge")

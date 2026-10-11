@@ -57,7 +57,7 @@ asyncio.run(main())
 
 @pytest.fixture()
 def live_server(tmp_path: Path):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     proc = subprocess.Popen(
         [sys.executable, "-c", _CHILD_CODE, str(PROJECT_ROOT), str(home)],

@@ -22,7 +22,7 @@ def boba_like(tmp_path, monkeypatch):
     """Install a synthetic pet into a temp STARDUST_HOME and return its slug."""
     from PIL import Image
 
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     monkeypatch.setenv("STARDUST_HOME", str(home))
 

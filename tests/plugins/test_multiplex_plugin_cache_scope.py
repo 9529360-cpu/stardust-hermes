@@ -28,7 +28,7 @@ REPO = Path(__file__).resolve().parents[2]
 @pytest.fixture
 def homes(tmp_path, monkeypatch):
     """Profile A (launch home, ``STARDUST_HOME``) and profile B with different config/.env values."""
-    root = tmp_path / ".hermes"
+    root = tmp_path / ".stardust"
     a, b = root, root / "profiles" / "B"
     for home, tag in ((a, "A"), (b, "B")):
         home.mkdir(parents=True)

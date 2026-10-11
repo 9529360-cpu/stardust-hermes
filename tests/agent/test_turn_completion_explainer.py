@@ -129,7 +129,7 @@ def test_explanation_persistence_turn_lease_cause_is_specific():
     assert "not saved" in lower
     assert "disk" not in lower
     assert "compression" not in lower
-    assert "hermes doctor" not in lower
+    assert "stardust doctor" not in lower
 
 
 def test_explanation_persistence_disk_cause_keeps_disk_wording():
@@ -150,16 +150,16 @@ def test_explanation_persistence_corrupt_cause_never_says_free_space():
     )
     lower = out.lower()
     assert "corrupt" in lower
-    assert "hermes doctor" in lower
+    assert "stardust doctor" in lower
     assert "free some space" not in lower
     assert "full disk" not in lower
 
 
 def test_explanation_persistence_corrupt_backups_dir_follows_hermes_home(monkeypatch, tmp_path):
-    """Step 3 must name the backups dir under the ACTIVE home, not ~/.hermes (#104250).
+    """Step 3 must name the backups dir under the ACTIVE home, not ~/.stardust (#104250).
 
     Pre-update backups live at ``<hermes_root>/backups`` (``hermes_cli/backup.py``), so a
-    custom-STARDUST_HOME deployment told to restore from ``~/.hermes/backups/`` is misdirected
+    custom-STARDUST_HOME deployment told to restore from ``~/.stardust/backups/`` is misdirected
     mid data-loss incident: that directory may not exist at all, or may hold an unrelated
     install's backups.
     """
@@ -169,7 +169,7 @@ def test_explanation_persistence_corrupt_backups_dir_follows_hermes_home(monkeyp
         "session_persistence_failed", "corrupt"
     )
     assert f"{custom_home / 'backups'}" in out
-    assert "~/.hermes/backups" not in out
+    assert "~/.stardust/backups" not in out
     assert "{backups_dir}" not in out
 
 
@@ -188,7 +188,7 @@ def test_explanation_persistence_fts_index_never_advises_recovery():
     assert "restore from a backup" not in lower and "backups/" not in lower
     assert "would have been lost" not in lower
     assert "free" not in lower  # never disk-space advice
-    assert "hermes doctor" in lower
+    assert "stardust doctor" in lower
     assert "search index" in lower and "not damaged" in lower
     assert "send your message again" in lower  # the handle stays live
 
@@ -213,11 +213,11 @@ def test_deleted_wal_cause_is_plain_first_steps_not_a_forensic_runbook():
         "session_persistence_failed", "deleted_wal"
     ).lower()
     assert "deleted_wal" in PERSISTENCE_ERROR_CAUSES
-    assert "hermes gateway stop" in out and "hermes doctor" in out
+    assert "stardust gateway stop" in out and "stardust doctor" in out
     assert "send your message once more" in out
     for jargon in ("manifest", "state.db-wal", "sidecar", "header_only", "--inspect-only", "generation"):
         assert jargon not in out, jargon
-    assert "~/.hermes" not in out  # display_hermes_home(), never a hardcoded path
+    assert "~/.stardust" not in out  # display_hermes_home(), never a hardcoded path
 
 
 def test_explanation_persistence_unknown_cause_is_neutral():
@@ -230,7 +230,7 @@ def test_explanation_persistence_unknown_cause_is_neutral():
         assert out.strip() != ""
         assert "disk space" not in lower
         assert "full disk" not in lower
-        assert "hermes doctor" in lower
+        assert "stardust doctor" in lower
         assert "again" in lower
 
 
@@ -238,7 +238,7 @@ def test_explanation_persistence_one_arg_backward_compat():
     """Existing one-arg callers must keep working (optional second param)."""
     out = AIAgent._format_turn_completion_explanation("session_persistence_failed")
     assert out.strip() != ""
-    assert "couldn't save" in out.lower() and "hermes doctor" in out.lower()
+    assert "couldn't save" in out.lower() and "stardust doctor" in out.lower()
 
 
 def test_explanation_cause_ignored_for_other_reasons():

@@ -21,7 +21,7 @@ logger = logging.getLogger("agent.auxiliary_client")  # log-record parity with t
 
 
 def _read_nous_auth() -> Optional[dict]:
-    """Nous provider state dict from the credential pool or ~/.hermes/auth.json; None when not active with tokens."""
+    """Nous provider state dict from the credential pool or ~/.stardust/auth.json; None when not active with tokens."""
     pool_present, entry = _aux._select_pool_entry("nous")
     if pool_present:
         if entry is None:
@@ -554,7 +554,7 @@ def _validate_base_url(base_url: str) -> None:
     except ValueError as exc:
         raise RuntimeError(
             f"Malformed custom endpoint URL: {candidate!r}. "
-            "Run `hermes setup` or `hermes model` and enter a valid http(s) base URL."
+            "Run `stardust setup` or `stardust model` and enter a valid http(s) base URL."
         ) from exc
 
 

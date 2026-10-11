@@ -111,7 +111,7 @@ class RateLimitCreditsMixin:
 
         _adopt_credits_state(self, state)
         if dev:
-            # STARDUST_DEV_CREDITS streams each capture to agent.log (`hermes logs -f`, grep 'credits ▸').
+            # STARDUST_DEV_CREDITS streams each capture to agent.log (`stardust logs -f`, grep 'credits ▸').
             spent = self.get_credits_spent_micros()
             logger.info(
                 "credits ▸ remaining=%d (%s) · paid=%s · denom=%s · used=%s · Δspent=%s · age=%s%s",

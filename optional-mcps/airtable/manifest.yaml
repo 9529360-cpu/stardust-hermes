@@ -27,5 +27,5 @@ suggest:
 
 post_install: |
   On first connection Hermes opens a browser to authorize with
-  Airtable (or run `hermes mcp login airtable`). Approve access,
+  Airtable (or run `stardust mcp login airtable`). Approve access,
   then restart the session so tools load.

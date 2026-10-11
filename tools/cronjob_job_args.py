@@ -207,7 +207,7 @@ def _validate_bot_chat_deliver(deliver: Optional[str]) -> Optional[str]:
             return (
                 f"bot-chat delivery profile '{profile_arg}' not found on this "
                 "gateway's machine. Bot Chat delivery is machine-local — use a "
-                "profile that exists here (hermes profile list), or omit the "
+                "profile that exists here (stardust profile list), or omit the "
                 "name (deliver='bot-chat') for the job's own profile.")
     return None
 
@@ -425,7 +425,7 @@ def _gateway_liveness_notice(plural: bool = False) -> dict:
             "warning": (
                 f"The Hermes gateway is not running — {subject} "
                 "but will NOT fire until the gateway is started "
-                "(hermes gateway install / hermes gateway start). "
+                "(stardust gateway install / stardust gateway start). "
                 "Tell the user the task is scheduled but not active yet."),
         }
     return {"gateway_running": None if _gw is None else True}

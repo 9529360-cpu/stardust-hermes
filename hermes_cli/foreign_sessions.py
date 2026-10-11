@@ -281,7 +281,7 @@ def pick_foreign_session(source: Optional[str] = None, *, limit: int = 25) -> Op
         print(f"  {i:>2}. {datetime.fromtimestamp(s.mtime):%Y-%m-%d %H:%M}  {s.label}{ws}  [{s.turn_count} turns]")
     if not sys.stdin.isatty():
         print("Non-interactive terminal — pass the file path directly:\n"
-              "  hermes sessions import --from claude|codex <path>")
+              "  stardust sessions import --from claude|codex <path>")
         return None
     try:
         raw = input(f"Import which session? [1-{len(sessions)}, empty to cancel] ").strip()
@@ -299,7 +299,7 @@ def pick_foreign_session(source: Optional[str] = None, *, limit: int = 25) -> Op
 
 
 def run_sessions_import(args, db=None) -> Optional[str]:
-    """`hermes sessions import` entry point. Returns new session id or None."""
+    """`stardust sessions import` entry point. Returns new session id or None."""
     source = getattr(args, "from_source", None)
     path = getattr(args, "path", None)
     if path:
@@ -327,5 +327,5 @@ def run_sessions_import(args, db=None) -> Optional[str]:
         print(f"Error: {e}")
         return None
     print(f"✓ Imported {_SOURCE_LABELS.get(source, source)} session as {session_id}")
-    print(f"  Continue it with:  hermes --resume {session_id}")
+    print(f"  Continue it with:  stardust --resume {session_id}")
     return session_id

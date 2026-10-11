@@ -33,7 +33,7 @@ def secondary_profile(monkeypatch, tmp_path):
     own API keys (no identity/tenant/endpoint vars)."""
     for k, v in _DEFAULT_ENV.items():
         monkeypatch.setenv(k, v)
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     prof_b = home / "profiles" / "b"
     prof_b.mkdir(parents=True)
     (prof_b / "config.yaml").write_text("{}\n")

@@ -175,7 +175,7 @@ export async function fetchJSON<T>(
       return new Promise<T>(() => {});
     }
     // Loopback mode: ``_SESSION_TOKEN`` rotates on every server restart
-    // (``hermes update``, ``hermes gateway restart``, etc.). A tab kept
+    // (``stardust update``, ``stardust gateway restart``, etc.). A tab kept
     // open across the restart holds the OLD token in
     // ``window.__HERMES_SESSION_TOKEN__`` from the previous HTML render,
     // so every fetch returns 401. The HTML is served ``Cache-Control:
@@ -1379,7 +1379,7 @@ export interface AuthMeResponse {
   expires_at: number;
 }
 
-/** Preflight for `hermes gateway migrate --multiplex` (mirrors the CLI plan JSON). */
+/** Preflight for `stardust gateway migrate --multiplex` (mirrors the CLI plan JSON). */
 export interface GatewayMigratePlan {
   already_multiplexed: boolean;
   blockers: string[];
@@ -1920,7 +1920,7 @@ export interface StatusResponse {
    * desktop falls back to the embedded-webview flow. */
   auth_flows?: string[];
   /** False when the dashboard is running in a hosted/managed layout where
-   * updates are handled by the outer launcher instead of ``hermes update``. */
+   * updates are handled by the outer launcher instead of ``stardust update``. */
   can_update_hermes?: boolean;
   config_path: string;
   config_version: number;

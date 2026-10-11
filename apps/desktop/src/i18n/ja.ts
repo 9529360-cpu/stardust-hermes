@@ -1609,7 +1609,7 @@ export const ja = defineLocale({
     edit: '編集',
     archive: 'アーカイブ',
     skillArchivedTitle: 'スキルをアーカイブしました',
-    skillArchivedMessage: 'hermes curator restore で復元できます。',
+    skillArchivedMessage: 'stardust curator restore で復元できます。',
     officialCatalog: 'インストール可能',
     officialPill: '公式'
   },
@@ -3706,7 +3706,7 @@ export const ja = defineLocale({
       errorSetUpFallback: 'フォールバックモデルを設定',
       errorSignInAgain: provider => `${provider} に再度サインイン`,
       errorOauthExpired: provider =>
-        `${provider} のサインインが期限切れか取り消されました。ターミナルで hermes model を実行して ${provider} を選び、再度サインインするか、「設定 → モデルサービス」でモデル API に切り替えてください。`,
+        `${provider} のサインインが期限切れか取り消されました。ターミナルで stardust model を実行して ${provider} を選び、再度サインインするか、「設定 → モデルサービス」でモデル API に切り替えてください。`,
       errorChooseModel: 'モデルを選ぶ',
       errorCompressConversation: '会話を圧縮',
       errorCompressFailed: '会話を圧縮できませんでした',
@@ -3767,7 +3767,7 @@ export const ja = defineLocale({
       reject: '拒否',
       alwaysTitle: 'このコマンドを常に許可しますか？',
       alwaysDescription: pattern =>
-        `これにより "${pattern}" パターンが永続的な許可リスト (~/.hermes/config.yaml) に追加されます。Stardust はこのチャットや将来のチャットで、このようなコマンドについて再度尋ねません。`,
+        `これにより "${pattern}" パターンが永続的な許可リスト (~/.stardust/config.yaml) に追加されます。Stardust はこのチャットや将来のチャットで、このようなコマンドについて再度尋ねません。`,
       alwaysAllow: '常に許可'
     },
     clarify: {
@@ -4107,7 +4107,7 @@ export const ja = defineLocale({
       success: platform => `${platform} に引き継ぎました。いつでもここで再開できます。`,
       systemNote: platform => `↻ ${platform} に引き継ぎました — いつでもここで再開できます。`,
       failed: error => `引き継ぎに失敗しました: ${error}`,
-      timedOut: 'ゲートウェイの待機がタイムアウトしました。`hermes gateway` は起動していますか？'
+      timedOut: 'ゲートウェイの待機がタイムアウトしました。`stardust gateway` は起動していますか？'
     }
   },
 

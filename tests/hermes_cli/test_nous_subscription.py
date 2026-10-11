@@ -192,7 +192,7 @@ def test_logged_in_entitled_account_yields_a_state_for_every_feature(monkeypatch
     """The logged-in + entitled branch must produce a state for EVERY feature, including
     those with no config selection field (modal). Regression: the managed-availability
     table indexed the selection map by every feature key and raised KeyError('modal'),
-    crashing `hermes status`, `hermes tools`, and the dashboard toolsets API."""
+    crashing `stardust status`, `stardust tools`, and the dashboard toolsets API."""
     monkeypatch.setattr(ns, "get_nous_portal_account_info", lambda **kw: _pool_account())
     monkeypatch.setattr(ns, "is_managed_tool_gateway_ready", lambda gateway: True)
     monkeypatch.setattr(ns, "get_env_value", lambda name: "")
@@ -251,7 +251,7 @@ def test_gateway_direct_credentials_helper_keeps_direct_local_detection(monkeypa
     assert direct["image_gen"] is False
 
 # ---------------------------------------------------------------------------
-# ensure_nous_portal_access — inline login gate for `hermes tools`
+# ensure_nous_portal_access — inline login gate for `stardust tools`
 # ---------------------------------------------------------------------------
 
 

@@ -2,7 +2,7 @@
 the FULL runtime scope of the requested profile (home + secrets + terminal), the launch profile
 included once the process multiplexes.
 
-Regression for the silent cross-profile secret leak class: ``hermes serve`` hosted many profile
+Regression for the silent cross-profile secret leak class: ``stardust serve`` hosted many profile
 homes but never called ``set_multiplex_active(True)``, so every unscoped ``get_secret`` read for a
 secondary silently returned the LAUNCH profile's ``os.environ`` value; ``@_profile_scoped`` bound
 only STARDUST_HOME. And the launch-profile asymmetry: a default-member hosted-room turn in a

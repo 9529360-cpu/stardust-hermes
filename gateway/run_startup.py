@@ -797,7 +797,7 @@ class GatewayStartupMixin:
             _adv_msg = gateway_log_message(detect_compromised())
             if _adv_msg:
                 logger.warning("%s", _adv_msg)
-                logger.warning("Run `hermes doctor` on the gateway host for full remediation steps.")
+                logger.warning("Run `stardust doctor` on the gateway host for full remediation steps.")
 
     def _start_log_systemd_timing_alignment(self) -> None:
         """Warn when systemd's TimeoutStopSec does not cover the drain window (a unit file from before
@@ -812,7 +812,7 @@ class GatewayStartupMixin:
                 logger.warning(
                     "Stale systemd unit detected: %s has TimeoutStopSec=%.0fs but drain_timeout=%.0fs "
                     "cron_drain_timeout=%.0fs (expected >=%.0fs). systemd may SIGKILL the gateway "
-                    "mid-drain. Run `hermes gateway install --force` to regenerate the unit, or shorten "
+                    "mid-drain. Run `stardust gateway install --force` to regenerate the unit, or shorten "
                     "agent.restart_drain_timeout / agent.cron_drain_timeout.",
                     _alignment.get("unit", "(unknown)"), _alignment["timeout_stop_sec"],
                     _alignment["drain_timeout"],
@@ -1371,7 +1371,7 @@ class GatewayStartupMixin:
         if self._start_check_access_policy():
             return True
         await self._start_recover_previous_run()
-        # The gateway is a boot owner of the Nous free tier, beside `cmd_chat` and `hermes serve`: every
+        # The gateway is a boot owner of the Nous free tier, beside `cmd_chat` and `stardust serve`: every
         # demand-time site (provider resolution, /login, the connector token) is a read that needs the
         # identity to already exist. Blocking here, before any adapter connects, is what keeps a fast
         # first DM from arriving with nothing to resolve. With the launch gate unset this is a local

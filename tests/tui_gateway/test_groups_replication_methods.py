@@ -13,7 +13,7 @@ MEMBERS = [{"kind": "bot", "id": "planner"}]
 
 @pytest.fixture
 def home(tmp_path, monkeypatch):
-    path = tmp_path / ".hermes"
+    path = tmp_path / ".stardust"
     path.mkdir()
     (path / "profiles" / "ops").mkdir(parents=True)
     monkeypatch.setenv("STARDUST_HOME", str(path))

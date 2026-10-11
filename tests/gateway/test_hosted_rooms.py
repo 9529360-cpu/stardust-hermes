@@ -1356,7 +1356,7 @@ def test_default_db_path_never_names_the_master_session_store(tmp_path, monkeypa
     is shared across profiles (one file at the install root) but is not the
     SessionDB file the root gateway owns.
     """
-    root = tmp_path / ".hermes"
+    root = tmp_path / ".stardust"
     profile_home = root / "profiles" / "bot1"
     profile_home.mkdir(parents=True)
 

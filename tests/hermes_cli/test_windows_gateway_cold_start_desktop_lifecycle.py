@@ -200,9 +200,9 @@ def test_attested_dead_gateway_survives_desktop_ownership_and_marker_is_consumed
 def test_cold_start_is_authorized_by_the_token_generation_not_the_mutable_marker(
     monkeypatch, tmp_path, capsys
 ):
-    """#110020 review (a): the marker is a one-shot that a concurrent ``hermes gateway status``
+    """#110020 review (a): the marker is a one-shot that a concurrent ``stardust gateway status``
     consumes between plan and execution. The spawn must still happen (authority lives on the
-    token), and a *newer* marker written by a concurrent ``hermes gateway start`` must not be
+    token), and a *newer* marker written by a concurrent ``stardust gateway start`` must not be
     consumed as if it were ours."""
     monkeypatch.setattr("hermes_cli.config.get_hermes_home", lambda: str(tmp_path))
     monkeypatch.setattr(cli_main, "_is_windows", lambda: True)
@@ -217,10 +217,10 @@ def test_cold_start_is_authorized_by_the_token_generation_not_the_mutable_marker
     token = update_cmd._pause_windows_gateways_for_update()
     assert token["attested_generation"]
 
-    # Concurrent ``hermes gateway status`` consumed the marker...
+    # Concurrent ``stardust gateway status`` consumed the marker...
     assert gateway_windows.check_start_attestation(current_pids=[]) is not None
     assert not marker.exists()
-    # ...and a concurrent ``hermes gateway start`` wrote a fresh one for its own PID.
+    # ...and a concurrent ``stardust gateway start`` wrote a fresh one for its own PID.
     gateway_windows._write_start_attestation([777], "direct spawn (PID 777)")
     newer = json.loads(marker.read_text(encoding="utf-8"))["generation"]
     assert newer != token["attested_generation"]

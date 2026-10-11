@@ -6,7 +6,7 @@ request that carries it, so the cost is observable: with a fresh usage anchor (r
 the previous response), the residual between the next real ``prompt_tokens`` and
 ``anchor + text-only delta`` is the price of the N images that delta introduced (#70328).
 
-The learned value is kept per ``model@host`` in ``~/.hermes/cache/image_token_costs.json`` so a new
+The learned value is kept per ``model@host`` in ``~/.stardust/cache/image_token_costs.json`` so a new
 session starts calibrated, and bound per turn through a ContextVar so every estimator
 (preflight trigger, tail-budget walk, gateway hygiene) prices images the same way.
 """

@@ -21,7 +21,7 @@ from hermes_constants import get_hermes_home, reset_hermes_home_override, set_he
 
 @pytest.fixture
 def served_home(tmp_path, monkeypatch):
-    a = tmp_path / ".hermes"
+    a = tmp_path / ".stardust"
     b = a / "profiles" / "b"
     b.mkdir(parents=True)
     (a / ".env").write_text("TITLE_KEY=a-key\n", encoding="utf-8")

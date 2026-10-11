@@ -1,7 +1,7 @@
 """A child spawned FOR a served profile carries that profile's env, never the launch profile's.
 
 Under ``gateway.multiplex_profiles`` one process serves several profiles and ``os.environ`` holds the
-LAUNCH profile's ``.env``. Every ``hermes -p X`` / helper child (slash worker, relay delivery, A2A
+LAUNCH profile's ``.env``. Every ``stardust -p X`` / helper child (slash worker, relay delivery, A2A
 forward, ``key_cmd`` helper, browser driver) must start from X's env: X's home pinned, X's own
 secrets, and none of the launch profile's residue. The same build reaches every site through
 ``served_profile_child_env``; the slash worker is spawned through its production class here.
@@ -25,10 +25,10 @@ _PROBE = ("import json,os;print(json.dumps({k:os.environ.get(k) for k in "
 @pytest.fixture
 def mux_homes(tmp_path, monkeypatch):
     """Launch home A (its .env mirrored into os.environ, as the multiplexer loads it) and served home B."""
-    a = tmp_path / ".hermes"
+    a = tmp_path / ".stardust"
     b = a / "profiles" / "b"
     b.mkdir(parents=True)
-    (a / ".env").write_text("A_MARKER=a\nHERMES_MODEL=a-model\nTERMINAL_ENV=docker\nFIRECRAWL_API_KEY=a-fc\n", encoding="utf-8")
+    (a / ".env").write_text("A_MARKER=a\nSTARDUST_MODEL=a-model\nTERMINAL_ENV=docker\nFIRECRAWL_API_KEY=a-fc\n", encoding="utf-8")
     (b / ".env").write_text("B_MARKER=b\nFIRECRAWL_API_KEY=b-fc\n", encoding="utf-8")
     monkeypatch.setenv("STARDUST_HOME", str(a))
     for key, val in (("A_MARKER", "a"), ("STARDUST_MODEL", "a-model"), ("TERMINAL_ENV", "docker"),

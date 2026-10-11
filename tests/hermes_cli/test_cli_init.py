@@ -543,7 +543,7 @@ class TestRootLevelProviderOverride:
         """model.provider takes priority — root-level provider is only a fallback."""
         import yaml
 
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
@@ -566,7 +566,7 @@ class TestRootLevelProviderOverride:
         """Legacy root-level provider still populates model.provider in the CLI loader."""
         import yaml
 
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
@@ -589,7 +589,7 @@ class TestRootLevelProviderOverride:
         """Legacy root-level base_url still populates model.base_url in the CLI loader."""
         import yaml
 
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
@@ -611,7 +611,7 @@ class TestRootLevelProviderOverride:
         """Classic CLI must expose terminal.vercel_runtime to terminal_tool.py."""
         import yaml
 
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         monkeypatch.delenv("TERMINAL_VERCEL_RUNTIME", raising=False)

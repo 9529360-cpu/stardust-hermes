@@ -204,7 +204,7 @@ class TestClientShape:
         self, monkeypatch
     ):
         """The Anthropic SDK fills api_key from ANTHROPIC_API_KEY when the
-        constructor omits it. Hermes loads that env from ~/.hermes/.env, so
+        constructor omits it. Hermes loads that env from ~/.stardust/.env, so
         without an explicit clear every Portal request would dual-auth as
         X-Api-Key: sk-ant-… + Authorization: Bearer portal.jwt."""
         from agent.anthropic_adapter import build_anthropic_client

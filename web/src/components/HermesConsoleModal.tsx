@@ -440,7 +440,7 @@ export function HermesConsoleModal({ open, onClose }: HermesConsoleModalProps) {
           console.warn(`[console] websocket closed code=${ev.code}${ev.reason ? ` reason=${ev.reason}` : ""}`);
           const message =
             ev.code === 1006 && !hasReadyFrameRef.current
-              ? "Console could not connect to the dashboard server. Check that `hermes dashboard` is running, then click Reconnect."
+              ? "Console could not connect to the dashboard server. Check that `stardust dashboard` is running, then click Reconnect."
               : ev.code === 1000
                 ? "Console closed."
                 : "Console disconnected from the dashboard server. Click Reconnect to try again.";
@@ -452,7 +452,7 @@ export function HermesConsoleModal({ open, onClose }: HermesConsoleModalProps) {
         console.warn(`[console] connect failed: ${errorMessage(err)}`);
         writeLine(
           term,
-          "\x1b[31mConsole could not connect to the dashboard server. Check that `hermes dashboard` is running, then click Reconnect.\x1b[0m",
+          "\x1b[31mConsole could not connect to the dashboard server. Check that `stardust dashboard` is running, then click Reconnect.\x1b[0m",
         );
       }
     })();

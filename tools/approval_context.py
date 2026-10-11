@@ -151,7 +151,7 @@ def _is_unattended_platform_approval_context() -> bool:
 
 
 def _is_single_query_approval_context() -> bool:
-    """True for a single-query (-q) session: ``hermes chat -q`` exports
+    """True for a single-query (-q) session: ``stardust chat -q`` exports
     ``STARDUST_INTERACTIVE=1`` (so sudo password prompts work) but nobody is waiting
     to answer approvals; without this marker the gate would wait the full timeout,
     fail closed and push the agent toward workarounds (e.g. execute_code).
@@ -278,7 +278,7 @@ def format_approval_window(seconds: int) -> str:
 
 def approval_timeout_notice_kwargs() -> dict:
     """``{waited, suggested}`` for the ``approval.timeout`` copy: how long we waited (``5 minutes`` /
-    ``90 seconds``) and a tripled ``approvals.timeout`` value the user can paste into ``hermes config set``."""
+    ``90 seconds``) and a tripled ``approvals.timeout`` value the user can paste into ``stardust config set``."""
     seconds = _get_approval_timeout()
     return {"waited": format_approval_window(seconds), "suggested": seconds * 3}
 

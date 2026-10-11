@@ -688,7 +688,7 @@ class CLISessionMixin:
             # tools/subprocesses on this thread resolve STARDUST_SESSION_ID to the child id after an
             # out-of-place rotation (idempotent when no rotation happened).
             if self.session_id:
-                print(f"       Resume the live session with: hermes --resume {self.session_id}")
+                print(f"       Resume the live session with: stardust --resume {self.session_id}")
         except Exception as e:
             print(f"(x_x) Failed to save: {e}")
 
@@ -831,7 +831,7 @@ class CLISessionMixin:
         return ""
 
     def _write_terminal_breadcrumb(self) -> None:
-        """Record this terminal's live session for bare ``hermes -c``. Called whenever
+        """Record this terminal's live session for bare ``stardust -c``. Called whenever
         ``self.session_id`` is (re)assigned so a later bare ``-c`` in THIS terminal resumes
         this conversation's live tip. Best-effort; no-op without a terminal identity."""
         with contextlib.suppress(Exception):
@@ -1157,9 +1157,9 @@ class CLISessionMixin:
         except Exception:
             _active_profile = "default"
         profile_flag = "" if _active_profile in ("default", "custom") else f" -p {_active_profile}"
-        print(f"  hermes --resume {self.session_id}{profile_flag}")
+        print(f"  stardust --resume {self.session_id}{profile_flag}")
         if session_title:
-            print(f"  hermes -c \"{session_title}\"{profile_flag}")
+            print(f"  stardust -c \"{session_title}\"{profile_flag}")
         print()
         print(f"Session:        {self.session_id}")
         if session_title:

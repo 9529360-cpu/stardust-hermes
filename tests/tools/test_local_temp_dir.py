@@ -63,10 +63,10 @@ def test_default_is_hermes_cache_not_tmp(tmp_path, monkeypatch):
 
     for var in ("TERMINAL_TEMP_DIR", "TMPDIR", "TMP", "TEMP"):
         monkeypatch.delenv(var, raising=False)
-    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
     env = _make_local_env({})
     result = env.get_temp_dir()
-    assert result == str(tmp_path / ".hermes" / "cache" / "terminal")
+    assert result == str(tmp_path / ".stardust" / "cache" / "terminal")
     assert os.path.isdir(result)
 
 

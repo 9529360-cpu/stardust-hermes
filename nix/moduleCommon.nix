@@ -276,7 +276,7 @@ let
 
           The merge into the config.yaml on disk is also a deep merge. These
           keys replace the keys on disk. The module keeps all other keys,
-          which includes the keys that `hermes config set` and the settings
+          which includes the keys that `stardust config set` and the settings
           panes of the TUI and the desktop app write at runtime.
         '';
         example = literalExpression ''
@@ -420,7 +420,7 @@ let
         type = types.listOf types.package;
         default = [ ];
         description = ''
-          Directory-based plugin packages to symlink into the hermes plugins
+          Directory-based plugin packages to symlink into the stardust plugins
           directory. Each package must contain a plugin.yaml and __init__.py
           at its root. Hermes discovers these automatically on startup.
         '';
@@ -481,7 +481,7 @@ let
       extraArgs = mkOption {
         type = types.listOf types.str;
         default = [ ];
-        description = "Extra command-line arguments for `hermes gateway`.";
+        description = "Extra command-line arguments for `stardust gateway`.";
       };
 
       restart = mkOption {
@@ -496,8 +496,8 @@ let
         description = "The systemd RestartSec= value. Darwin does not use this option.";
       };
 
-      # ── The backend: `hermes serve` or `hermes dashboard` ──────────────
-      # `hermes serve` and `hermes dashboard` are the same entry point,
+      # ── The backend: `stardust serve` or `stardust dashboard` ──────────────
+      # `stardust serve` and `stardust dashboard` are the same entry point,
       # hermes_cli.main:cmd_dashboard, with one flag of difference. serve runs
       # without a user interface. dashboard also serves the web application.
       # Both give the /api/ws and /api/pty sockets that Hermes Desktop
@@ -505,7 +505,7 @@ let
       # Thus this option is an enum and not two booleans.
       #
       # The backend does not run the messaging gateway. web_server.py only
-      # controls an external gateway, with `hermes gateway restart`. It does
+      # controls an external gateway, with `stardust gateway restart`. It does
       # not contain a gateway.
       backend = {
         mode = mkOption {
@@ -652,7 +652,7 @@ let
   # ── The removal of installPackage ───────────────────────────────────────
   # The programs./services. split replaced this option. It defaulted to true,
   # so a person who never named it still got the command line, and a silent
-  # removal leaves them with no `hermes` on the PATH and no message. The
+  # removal leaves them with no `stardust` on the PATH and no message. The
   # module refuses the configuration with this text.
   #
   # A function, and not a literal in the module, so a check can call the same
@@ -665,7 +665,7 @@ let
       separates the installation from the services, which is the
       Home Manager convention:
 
-        programs.hermes-agent.enable = ${lib.boolToString (value != false)};  # the hermes CLI, and STARDUST_HOME for your shells
+        programs.hermes-agent.enable = ${lib.boolToString (value != false)};  # the stardust CLI, and STARDUST_HOME for your shells
         programs.hermes-agent.desktop.enable = true;  # the desktop application
 
       `services.hermes-agent` keeps the state, the configuration and
@@ -721,7 +721,7 @@ let
           if builtins.isPath value || lib.isStorePath value then
             "${mkdir}\ncp ${value} $out/${name}"
           else
-            "${mkdir}\ncat > $out/${name} <<'STARDUST_DOC_EOF'\n${value}\nHERMES_DOC_EOF"
+            "${mkdir}\ncat > $out/${name} <<'STARDUST_DOC_EOF'\n${value}\nSTARDUST_DOC_EOF"
         ) documents
       )
     );
@@ -893,7 +893,7 @@ let
   gatewayArgv =
     cfg:
     [
-      "${effectivePackage cfg}/bin/hermes"
+      "${effectivePackage cfg}/bin/stardust"
       "gateway"
     ]
     ++ cfg.extraArgs;
@@ -902,7 +902,7 @@ let
   backendCommand =
     cfg: host:
     [
-      "${effectivePackage cfg}/bin/hermes"
+      "${effectivePackage cfg}/bin/stardust"
       cfg.backend.mode
       "--host"
       host

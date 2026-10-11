@@ -23,7 +23,7 @@ def _exe(path: Path, content: str) -> Path:
 def _run_prerequisites(tmp_path: Path, *, uv_find_script: str) -> subprocess.CompletedProcess[str]:
     """Run the real ``--stage prerequisites`` with a stub managed uv whose ``python find`` we script."""
     home = tmp_path / "home"
-    hermes_home = home / ".hermes"
+    hermes_home = home / ".stardust"
     (hermes_home / "bin").mkdir(parents=True)
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()

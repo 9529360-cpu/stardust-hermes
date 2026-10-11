@@ -3,7 +3,7 @@
  *
  * Cheap "does this candidate backend actually work" checks used by
  * resolveHermesBackend (main.ts). The resolver walks a ladder of
- * candidates -- bootstrap marker, `hermes` on PATH, system Python with
+ * candidates -- bootstrap marker, `stardust` on PATH, system Python with
  * hermes_cli installed -- and historically returned the first candidate
  * whose binary existed on disk. That assumption breaks when a user has
  * a pre-installed Python 3.11-3.13 (so findSystemPython() returns a
@@ -183,9 +183,9 @@ async function canImportHermesCli(pythonPath: string, opts: { env?: Record<strin
 /**
  * Return true iff `<hermesCommand> --version` exits 0.
  *
- * Used to gate the "existing `hermes` on PATH" rung. Without this, a
- * stale hermes.cmd shim left behind by an uninstalled pip install (or
- * a half-built venv whose `hermes` entry-point points at a deleted
+ * Used to gate the "existing `stardust` on PATH" rung. Without this, a
+ * stale stardust.cmd shim left behind by an uninstalled pip install (or
+ * a half-built venv whose `stardust` entry-point points at a deleted
  * Python) survives findOnPath() and gets selected as the backend.
  *
  * We intentionally avoid invoking the command with the dashboard args

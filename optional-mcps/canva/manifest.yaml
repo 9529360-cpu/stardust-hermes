@@ -29,5 +29,5 @@ suggest:
 
 post_install: |
   On first connection Hermes opens a browser to authorize with
-  Canva (or run `hermes mcp login canva`). Approve access,
+  Canva (or run `stardust mcp login canva`). Approve access,
   then restart the session so tools load.

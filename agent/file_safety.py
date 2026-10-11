@@ -14,13 +14,13 @@ from typing import Optional
 
 
 def _constants_path(getter_name: str) -> Path:
-    """Call ``hermes_constants.<getter_name>()`` (local import avoids cycles); ``~/.hermes`` on any failure."""
+    """Call ``hermes_constants.<getter_name>()`` (local import avoids cycles); ``~/.stardust`` on any failure."""
     try:
         import hermes_constants
 
         return getattr(hermes_constants, getter_name)()
     except Exception:
-        return Path(os.path.expanduser("~/.hermes"))
+        return Path(os.path.expanduser("~/.stardust"))
 
 
 def _hermes_home_path() -> Path:
@@ -378,8 +378,8 @@ def raise_if_read_blocked(path: str) -> None:
 
 
 def _resolve_active_profile_name() -> str:
-    """Active profile name from STARDUST_HOME: ``~/.hermes`` -> ``"default"``,
-    ``~/.hermes/profiles/X`` -> ``"X"``; ``"default"`` on any resolution failure."""
+    """Active profile name from STARDUST_HOME: ``~/.stardust`` -> ``"default"``,
+    ``~/.stardust/profiles/X`` -> ``"X"``; ``"default"`` on any resolution failure."""
     try:
         parts = _hermes_home_path().resolve().relative_to(_hermes_root_path().resolve() / "profiles").parts
     except (OSError, RuntimeError, ValueError):
@@ -389,7 +389,7 @@ def _resolve_active_profile_name() -> str:
 
 # --- Sandbox-mirror write guard ---
 # Non-local terminal backends bind a sandbox-local dir to the container's $HOME:
-#   <STARDUST_HOME>/profiles/<name>/sandboxes/<backend>/<task>/home/.hermes/...
+#   <STARDUST_HOME>/profiles/<name>/sandboxes/<backend>/<task>/home/.stardust/...
 # A host-side write there lands on a mirror the host never reads: silent success,
 # divergent copies. Path-shape-only detection, independent of the active profile;
 # the inner-container case (bind mount strips the prefix) is classify_container_mirror_target.
@@ -411,13 +411,13 @@ def _mirror_info(target: Path, mirror_root: Path, inner_path: str) -> dict:
 def classify_sandbox_mirror_target(path: str) -> Optional[dict]:
     """Classify a write target as a sandbox-mirror of authoritative Hermes state: ``None``
     for non-mirror paths, else ``target_path`` (resolved), ``mirror_root`` (the
-    ``…/home/.hermes`` prefix) and ``inner_path`` (what the agent meant on the host)."""
+    ``…/home/.stardust`` prefix) and ``inner_path`` (what the agent meant on the host)."""
     target = _resolve_target(path)
     parts = target.parts if target is not None else ()
-    # Need at least: sandboxes / <backend> / <task> / home / .hermes / <thing>; inner_idx = the .hermes part.
+    # Need at least: sandboxes / <backend> / <task> / home / .stardust / <thing>; inner_idx = the .stardust part.
     inner_idx = next(
         (i + 4 for i, part in enumerate(parts)
-         if part == "sandboxes" and i + 5 < len(parts) and parts[i + 3] == "home" and parts[i + 4] == ".hermes"),
+         if part == "sandboxes" and i + 5 < len(parts) and parts[i + 3] == "home" and parts[i + 4] == ".stardust"),
         None,
     )
     if inner_idx is None:
@@ -447,7 +447,7 @@ def get_sandbox_mirror_warning(path: str) -> Optional[str]:
 
 def classify_container_mirror_target(path: str, mirror_prefix: str | None = None) -> Optional[dict]:
     """Classify a write target as a container-side sandbox mirror. Inside the container
-    the bind mount strips the ``sandboxes/`` prefix (the agent sees plain ``/root/.hermes/…``),
+    the bind mount strips the ``sandboxes/`` prefix (the agent sees plain ``/root/.stardust/…``),
     so the caller supplies ``mirror_prefix`` once it knows file tools run in a docker sandbox.
     ``None`` without a prefix or outside it, else ``target_path``/``mirror_root``/``inner_path``."""
     target, mirror = _resolve_target(path), _resolve_target(mirror_prefix) if mirror_prefix else None

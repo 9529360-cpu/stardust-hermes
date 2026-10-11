@@ -4135,7 +4135,7 @@ _MIGRATION_AUDIO_EXTS = {".ogg", ".opus", ".mp3", ".wav", ".m4a", ".flac"}
 async def _standalone_send(pconfig, chat_id, message, *, thread_id=None, media_files=None, force_document=False):
     """standalone_sender_fn: out-of-process delivery (cron without gateway) via a transient adapter."""
     if not await asyncio.to_thread(_load_lark_oapi):
-        return send_error("Feishu dependencies not installed. Run `hermes setup` to install Feishu support.")
+        return send_error("Feishu dependencies not installed. Run `stardust setup` to install Feishu support.")
     try:
         adapter = FeishuAdapter(pconfig)
         adapter._client = adapter._build_lark_client(_sdk_domain(getattr(adapter, "_domain_name", "feishu")))
@@ -4260,7 +4260,7 @@ def interactive_setup() -> None:
         save_env_value("FEISHU_ALLOWED_USERS", "")
         if access_idx == 0:
             print_success("DM pairing enabled.")
-            print_info("Unknown users can request access; approve with `hermes pairing approve`.")
+            print_info("Unknown users can request access; approve with `stardust pairing approve`.")
         else:
             print_warning("Open DM access enabled for Feishu / Lark.")
 
@@ -4308,7 +4308,7 @@ def register(ctx) -> None:
         check_fn=feishu_deps_present, ensure_deps_fn=check_feishu_requirements,
         is_connected=_is_connected, validate_config=_is_connected,
         required_env=["FEISHU_APP_ID", "FEISHU_APP_SECRET"],
-        install_hint="Run `hermes setup` to install Feishu support.", setup_fn=interactive_setup,
+        install_hint="Run `stardust setup` to install Feishu support.", setup_fn=interactive_setup,
         apply_yaml_config_fn=_apply_yaml_config, allowed_users_env="FEISHU_ALLOWED_USERS",
         allow_all_env="FEISHU_ALLOW_ALL_USERS", cron_deliver_env_var="FEISHU_HOME_CHANNEL",
         standalone_sender_fn=_standalone_send, max_message_length=8000, emoji="🪽",

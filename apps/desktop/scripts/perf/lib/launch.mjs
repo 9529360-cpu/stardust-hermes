@@ -188,7 +188,7 @@ export async function startIsolatedInstance({
   const devUrl = prod ? null : `http://127.0.0.1:${devPort}`
 
   if (seedConfig && !hermesHome) {
-    seedConfigFrom(join(homedir(), '.hermes'), home)
+    seedConfigFrom(join(homedir(), '.stardust'), home)
   }
 
   const teardown = () => {
@@ -346,7 +346,7 @@ export async function coldStartSamples({ runs = 3, port = 9222, devPort = 5174, 
     // runs 1..N are the representative warm samples.
     const home = mkdtempSync(join(tmpdir(), 'hermes-perf-cold-home-'))
     const userDataDir = mkdtempSync(join(tmpdir(), 'hermes-perf-cold-ud-'))
-    seedConfigFrom(join(homedir(), '.hermes'), home)
+    seedConfigFrom(join(homedir(), '.stardust'), home)
 
     try {
       for (let i = 0; i <= runs; i++) {

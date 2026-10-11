@@ -13,7 +13,7 @@ def _response(content="done", *, tool_calls=None):
 
 
 def test_moa_virtual_provider_aggregator_is_actor(monkeypatch, tmp_path):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     (home / "config.yaml").write_text(
         """
@@ -89,7 +89,7 @@ def test_moa_primary_restore_rebuilds_virtual_facade(monkeypatch, tmp_path):
     client from MoA's empty client_kwargs, raising "api_key client option must be
     set" and then "Failed to recreate closed OpenAI client".
     """
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     (home / "config.yaml").write_text(
         """
@@ -150,7 +150,7 @@ def test_moa_restored_facade_still_emits_reference_events(monkeypatch, tmp_path)
     display events for the rest of the session. The shared ``build_moa_facade``
     factory rewires the relay to ``agent.tool_progress_callback`` on restore.
     """
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     (home / "config.yaml").write_text(
         """
@@ -225,7 +225,7 @@ def test_moa_generic_client_rebuild_preserves_virtual_facade(monkeypatch, tmp_pa
     from agent.chat_completion_helpers import _dispatch_nonstreaming_api_request
     from agent.moa_loop import MoAClient
 
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     (home / "config.yaml").write_text(
         """
@@ -1021,7 +1021,7 @@ def _facade_all_failed_fixture(monkeypatch, tmp_path, policy):
     from agent import moa_loop
     from agent.usage_pricing import CanonicalUsage
 
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     (home / "config.yaml").write_text(
         f"""
@@ -1183,7 +1183,7 @@ def test_facade_does_not_cache_interrupted_reference_results(monkeypatch, tmp_pa
     from agent import moa_loop
     from agent.usage_pricing import CanonicalUsage
 
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     (home / "config.yaml").write_text(
         """

@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 
-// `hermes serve` announces STARDUST_BACKEND_READY; the legacy `hermes dashboard`
+// `stardust serve` announces STARDUST_BACKEND_READY; the legacy `stardust dashboard`
 // backend announces STARDUST_DASHBOARD_READY. Accept either so the desktop spawn
 // works against both the headless backend and old/dashboard runtimes.
 const _READY_RE = /^STARDUST_(?:BACKEND|DASHBOARD)_READY port=(\d+)/m

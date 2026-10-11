@@ -139,7 +139,7 @@ def _report_runtime_repair_failure(repair: RuntimeRepairResult) -> None:
         print("  ℹ Managed Python runtime was not replaced; "
               f"the existing venv is unchanged ({repair.detail}).")
         print("    Sessions stay protected meanwhile: Hermes keeps databases "
-              "out of WAL mode on this SQLite build. The next `hermes update` "
+              "out of WAL mode on this SQLite build. The next `stardust update` "
               "will retry.")
         return
     print(f"  ✗ Managed Python runtime cutover needs manual recovery: {repair.detail}")
@@ -234,7 +234,7 @@ def _uv_self_update_stamp() -> Path:
 def _uv_self_update_is_fresh(now: float | None = None) -> bool:
     """True when ``uv self update`` ran recently enough to skip.
 
-    uv releases roughly weekly while many users run ``hermes update`` daily; a blocking network
+    uv releases roughly weekly while many users run ``stardust update`` daily; a blocking network
     self-update on every run is waste and, offline, an unbounded hang risk.
     """
     try:
@@ -522,7 +522,7 @@ def _install_safe_python_generation(
     if result is not None:
         return result
     # All patches on the current minor line are vulnerable or rejected. Fall forward to the next
-    # supported minor (e.g. 3.11 → 3.12) so the user isn't stuck on every `hermes update`. The
+    # supported minor (e.g. 3.11 → 3.12) so the user isn't stuck on every `stardust update`. The
     # requires-python window (>=3.11,<3.14) and the import smoke-test gate compatibility.
     # See #76106.
     cur_major, cur_minor = current.python_version[:2]
@@ -729,12 +729,12 @@ def _windows_runtime_self_lock(live: Path) -> tuple[bool, str]:
     """Detect the one holder the generic scan is blind to: THIS process.
 
     ``_detect_venv_python_processes`` excludes the calling process and its ancestors on purpose
-    (``hermes update`` itself runs from the venv python), which is correct for the dependency-sync
+    (``stardust update`` itself runs from the venv python), which is correct for the dependency-sync
     path where only a *loaded* ``.pyd`` image blocks the rewrite and a fresh child dodges it.
 
     For the whole-venv park rename that exemption is fatal: Windows keeps the image of any executable a
     running process was started from mapped until that process exits, so a directory containing the
-    updater's own ``python.exe`` (or a waiting ``hermes.exe`` launcher ancestor) can never be renamed from
+    updater's own ``python.exe`` (or a waiting ``stardust.exe`` launcher ancestor) can never be renamed from
     inside the updater. The retry loop in ``_cut_over_candidate`` cannot help against that — the lock is
     structural, not transient (#93032).
     """
@@ -759,7 +759,7 @@ def _windows_runtime_self_lock(live: Path) -> tuple[bool, str]:
     exe = sys.executable
     if _under_live(exe):
         return True, f"the updater itself runs from the live venv it must replace ({exe}); {why}"
-    # Belt-and-braces: the venv\Scripts\hermes.exe launcher stays mapped while it waits for this
+    # Belt-and-braces: the venv\Scripts\stardust.exe launcher stays mapped while it waits for this
     # child, so an ancestor started from the venv blocks the rename too.
     with contextlib.suppress(Exception):
         import psutil
@@ -871,7 +871,7 @@ def _repair_windows_preflight(
         for line in (
             f"  ⚠ SQLite runtime repair deferred: {self_detail}.",
             # See #93032.
-            "    Retrying `hermes update` from inside this venv cannot help: "
+            "    Retrying `stardust update` from inside this venv cannot help: "
             "the mapped executable is released only when this process exits.",
             "    To complete the repair, run the updater from an interpreter "
             "that lives outside this venv, e.g.:",

@@ -282,12 +282,12 @@ class TestResolveConfigPath:
         assert result == local_cfg
 
     def test_falls_back_to_default_profile_when_no_local(self, tmp_path, monkeypatch):
-        # Profile mode: STARDUST_HOME points at ~/.hermes/profiles/<name>, so
-        # _get_default_hermes_home() must resolve back to ~/.hermes — that's
+        # Profile mode: STARDUST_HOME points at ~/.stardust/profiles/<name>, so
+        # _get_default_hermes_home() must resolve back to ~/.stardust — that's
         # the bug the HOME-anchored helper fixes (vs. blindly using Path.home()).
         fake_home = tmp_path / "fakehome"
         fake_home.mkdir()
-        default_home = fake_home / ".hermes"
+        default_home = fake_home / ".stardust"
         profile_home = default_home / "profiles" / "work"
         profile_home.mkdir(parents=True)
         default_cfg = default_home / "honcho.json"

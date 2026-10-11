@@ -32,7 +32,7 @@ def hermes_home(tmp_path, monkeypatch):
     """Point STARDUST_HOME at a tmp dir so we never touch the real auth store.
 
     Required because ``_auth_file_path()`` has a seat belt that refuses to
-    resolve to the real user's ~/.hermes/auth.json under pytest.
+    resolve to the real user's ~/.stardust/auth.json under pytest.
     """
     monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     return tmp_path
@@ -185,10 +185,10 @@ class TestExplicitEncodingPassed:
             assert "utf-8" in str(call.kwargs["encoding"]).lower()
 
 
-# --- sibling readers of the same ~/.hermes/auth.json in other modules -------
+# --- sibling readers of the same ~/.stardust/auth.json in other modules -------
 #
 # _load_auth_store lives in hermes_cli/auth.py, but several other modules read
-# the same ~/.hermes/auth.json directly. They had the same UTF-8-vs-cp1252
+# the same ~/.stardust/auth.json directly. They had the same UTF-8-vs-cp1252
 # asymmetry on Windows — these tests pin the sibling reads too.
 
 class TestAuthJsonSiblingReaders:

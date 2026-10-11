@@ -51,7 +51,7 @@ class _Args:
 def pin_env(tmp_path, monkeypatch):
     """Isolated STARDUST_HOME with freshly reloaded modules (same pattern as
     tests/agent/test_curator.py::curator_env but scoped for the CLI layer)."""
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     skills = home / "skills"
     skills.mkdir(parents=True)
     monkeypatch.setattr(Path, "home", lambda: tmp_path)

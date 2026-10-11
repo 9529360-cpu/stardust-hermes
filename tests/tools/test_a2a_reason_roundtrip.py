@@ -21,7 +21,7 @@ from tools import bot_relay
 
 @pytest.fixture
 def home(tmp_path, monkeypatch):
-    h = tmp_path / ".hermes"
+    h = tmp_path / ".stardust"
     h.mkdir()
     monkeypatch.setenv("STARDUST_HOME", str(h))
     return h

@@ -1,25 +1,25 @@
 #!/bin/sh
 # shellcheck shell=sh
-# /opt/hermes/bin/hermes — `docker exec` privilege-drop shim.
+# /opt/hermes/bin/stardust — `docker exec` privilege-drop shim.
 #
 # Background
 # ----------
 # The s6 image runs the supervised gateway/main process as the unprivileged
-# `hermes` user (UID 10000). When an operator runs `docker exec <c> hermes ...`
+# `hermes` user (UID 10000). When an operator runs `docker exec <c> stardust ...`
 # the default UID is root (0), and any file the command writes under
 # $STARDUST_HOME — auth.json, .env, config.yaml — ends up root-owned and
 # unreadable to the supervised gateway. The most common manifestation: the
-# user runs `docker exec <c> hermes login`, this writes
+# user runs `docker exec <c> stardust login`, this writes
 # /opt/data/auth.json as root:root mode 0600, and from then on the gateway
 # returns "Provider authentication failed: Hermes is not logged into Nous
-# Portal" on every incoming message — even though `docker exec <c> hermes
+# Portal" on every incoming message — even though `docker exec <c> stardust
 # chat -q ping` (also running as root) succeeds because root happens to be
 # able to read its own root-owned file. See systematic-debugging skill
 # notes attached to this fix.
 #
 # Fix
 # ---
-# This shim sits at /opt/hermes/bin/hermes and is placed earliest on PATH.
+# This shim sits at /opt/hermes/bin/stardust and is placed earliest on PATH.
 # When invoked as root, it drops to the hermes user (via s6-setuidgid)
 # before exec'ing the real venv binary, so anything that writes under
 # $STARDUST_HOME is uid-aligned with the supervised processes. When invoked
@@ -30,17 +30,17 @@
 # other path.
 #
 # Recursion safety: the shim exec's the venv binary by *absolute path*
-# (/opt/hermes/.venv/bin/hermes), so the second hop cannot re-enter this
+# (/opt/hermes/.venv/bin/stardust), so the second hop cannot re-enter this
 # shim regardless of PATH state. No sentinel env var needed.
 #
 # Opt-out: set STARDUST_DOCKER_EXEC_AS_ROOT=1 (1/true/yes, case-insensitive)
 # to keep running as root. Reserved for diagnostic sessions where the
 # operator deliberately wants root semantics — e.g. inspecting root-only
-# state via the hermes CLI. Default is to drop.
+# state via the stardust CLI. Default is to drop.
 
 set -e
 
-REAL=/opt/hermes/.venv/bin/hermes
+REAL=/opt/hermes/.venv/bin/stardust
 
 # Defensive: if the venv binary is missing (corrupted image, partial
 # install), fail loudly rather than silently masking it.

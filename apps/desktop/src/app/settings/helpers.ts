@@ -108,7 +108,7 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> =>
  * values.
  *
  * The autosave path sends this instead of the full draft so a field the user
- * never touched — one an agent may have changed via `hermes config set`
+ * never touched — one an agent may have changed via `stardust config set`
  * while Settings was open with a stale snapshot — is never resent with its
  * now-stale value. `PUT /api/config` deep-merges onto disk, so an omitted
  * key keeps whatever is currently there.

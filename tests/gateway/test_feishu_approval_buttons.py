@@ -614,8 +614,8 @@ class TestResolveUpdatePrompt:
     @pytest.mark.asyncio
     async def test_writes_response_file(self, tmp_path, monkeypatch):
         adapter = _make_adapter()
-        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
-        (tmp_path / ".hermes").mkdir()
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+        (tmp_path / ".stardust").mkdir()
         adapter._update_prompt_state[1] = {
             "session_key": "sess-up-1",
             "message_id": "msg_up_003",
@@ -624,14 +624,14 @@ class TestResolveUpdatePrompt:
 
         await adapter._resolve_update_prompt(1, "y", "Alice", open_id="ou_user1", chat_id="oc_12345")
 
-        assert (tmp_path / ".hermes" / ".update_response").read_text() == "y"
+        assert (tmp_path / ".stardust" / ".update_response").read_text() == "y"
         assert 1 not in adapter._update_prompt_state
 
     @pytest.mark.asyncio
     async def test_unauthorized_operator_does_not_write_response(self, tmp_path, monkeypatch):
         adapter = _make_adapter()
-        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
-        (tmp_path / ".hermes").mkdir()
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+        (tmp_path / ".stardust").mkdir()
         adapter._allowed_group_users = {"ou_allowed"}
         adapter._group_policy = "open"
         adapter._default_group_policy = "open"
@@ -643,14 +643,14 @@ class TestResolveUpdatePrompt:
 
         await adapter._resolve_update_prompt(2, "y", "Mallory", open_id="ou_intruder", chat_id="oc_12345")
 
-        assert not (tmp_path / ".hermes" / ".update_response").exists()
+        assert not (tmp_path / ".stardust" / ".update_response").exists()
         assert 2 in adapter._update_prompt_state
 
     @pytest.mark.asyncio
     async def test_missing_operator_identity_does_not_write_response(self, tmp_path, monkeypatch):
         adapter = _make_adapter()
-        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
-        (tmp_path / ".hermes").mkdir()
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+        (tmp_path / ".stardust").mkdir()
         adapter._allowed_group_users = {"ou_allowed"}
         adapter._update_prompt_state[3] = {
             "session_key": "sess-up-3",
@@ -660,7 +660,7 @@ class TestResolveUpdatePrompt:
 
         await adapter._resolve_update_prompt(3, "y", "Anonymous", open_id="", chat_id="oc_12345")
 
-        assert not (tmp_path / ".hermes" / ".update_response").exists()
+        assert not (tmp_path / ".stardust" / ".update_response").exists()
         assert 3 in adapter._update_prompt_state
 
 

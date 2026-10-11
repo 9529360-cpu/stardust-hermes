@@ -1,5 +1,5 @@
-"""Cron job storage: ~/.hermes/cron/jobs.json; output in
-~/.hermes/cron/output/{job_id}/{timestamp}.md
+"""Cron job storage: ~/.stardust/cron/jobs.json; output in
+~/.stardust/cron/output/{job_id}/{timestamp}.md
 
 Schedule grammar, record edits, run claims, the due scan and ticker markers live in the
 ``cron.jobs_*`` siblings, re-exported at the bottom of this file; they reach this module
@@ -69,7 +69,7 @@ def _ensure_croniter() -> bool:
 # and run them under the ticker's STARDUST_HOME, leaking config/credentials/skills across profiles.
 # Each profile owns its own cron store under its own STARDUST_HOME, and a profile-scoped gateway runs that
 # profile's jobs under that same STARDUST_HOME — so a job authored in profile `coder` lives in
-# `~/.hermes/profiles/coder/cron/jobs.json` and executes with `coder`'s `.env`, `config.yaml`, and skills.
+# `~/.stardust/profiles/coder/cron/jobs.json` and executes with `coder`'s `.env`, `config.yaml`, and skills.
 # Do NOT change this to the default root: that re-breaks per-profile isolation. See also the dynamic
 # `_get_hermes_home()` / `_get_lock_paths()` resolution in cron/scheduler.py. See #4707.
 STARDUST_DIR = get_hermes_home().resolve()
@@ -77,15 +77,15 @@ STARDUST_DIR = get_hermes_home().resolve()
 # scope paths with use_cron_store() instead of mutating these process-wide.
 CRON_DIR = STARDUST_DIR / "cron"
 JOBS_FILE = CRON_DIR / "jobs.json"
-# Heartbeat: touched every ticker loop so `hermes cron status` can tell the ticker THREAD is alive,
+# Heartbeat: touched every ticker loop so `stardust cron status` can tell the ticker THREAD is alive,
 # not just the gateway PROCESS; success = last tick that completed WITHOUT raising.
-# The gateway process and the (separate) ``hermes cron status`` process share it so status can tell whether
+# The gateway process and the (separate) ``stardust cron status`` process share it so status can tell whether
 # the ticker THREAD is alive, not just whether the gateway PROCESS exists — a ticker that dies silently
 # inside a live gateway would otherwise report healthy (#32612, #32895).
 TICKER_HEARTBEAT_FILE = CRON_DIR / "ticker_heartbeat"
 TICKER_SUCCESS_FILE = CRON_DIR / "ticker_last_success"
 # Single source of truth for the ticker interval (scheduler_provider.py) and the staleness
-# threshold in `hermes cron status` (hermes_cli/cron.py), so they never drift apart.
+# threshold in `stardust cron status` (hermes_cli/cron.py), so they never drift apart.
 TICKER_INTERVAL_SECONDS = 60
 
 # In-process lock for load_jobs→modify→save_jobs cycles; without it, parallel tick threads'

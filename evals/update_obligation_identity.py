@@ -11,7 +11,7 @@ repo = pathlib.Path(sys.argv[1])
 sys.path.insert(0, str(repo))
 root = pathlib.Path(tempfile.mkdtemp(prefix="obligations-live-"))
 os.environ["HOME"] = str(root)
-os.environ["STARDUST_HOME"] = str(root / ".hermes")
+os.environ["STARDUST_HOME"] = str(root / ".stardust")
 from hermes_cli import update_cmd_fleet as fleet, update_receipt as receipts
 
 print("MODULE", fleet.__file__)
@@ -20,7 +20,7 @@ children = []
 rows = []
 try:
     for name in ["alpha", "beta"]:
-        home = root / ".hermes" / "profiles" / name
+        home = root / ".stardust" / "profiles" / name
         home.mkdir(parents=True)
         code = "import sys,time; sys.path.insert(0,sys.argv[1]); from gateway.status import write_runtime_status; write_runtime_status(gateway_state='running'); print('ready',flush=True); time.sleep(120)"
         p = subprocess.Popen(
@@ -34,7 +34,7 @@ try:
         )
         children.append(p)
         assert p.stdout.readline().strip() == "ready", p.stderr.read()
-    d = root / ".hermes/logs/update_receipts"
+    d = root / ".stardust/logs/update_receipts"
     d.mkdir(parents=True)
     receipt = {
         "outcome": "failed",
@@ -57,7 +57,7 @@ try:
         print(json.dumps(row))
 
     observe("current-successors")
-    home = root / ".hermes/profiles/beta"
+    home = root / ".stardust/profiles/beta"
     state = home / "gateway_state.json"
     payload = json.loads(state.read_text())
     payload["code_sha"] = "old"

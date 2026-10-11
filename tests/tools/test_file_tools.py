@@ -498,7 +498,7 @@ class TestSensitivePathCheck:
 
     @patch("tools.file_tools._get_file_ops")
     def test_normal_file_not_blocked(self, mock_get, monkeypatch):
-        monkeypatch.setattr("tools.file_tools_write_guards._hermes_config_resolved", "/home/user/.hermes/config.yaml")
+        monkeypatch.setattr("tools.file_tools_write_guards._hermes_config_resolved", "/home/user/.stardust/config.yaml")
         monkeypatch.setattr("tools.file_tools_write_guards._hermes_config_resolved_loaded", True)
         mock_ops = MagicMock()
         result_obj = MagicMock()
@@ -1084,7 +1084,7 @@ class TestSecretFileReadRedaction:
 
     @pytest.fixture
     def hermes_home(self, tmp_path, monkeypatch):
-        """A Hermes home with no ``.hermes`` segment, like ``%LOCALAPPDATA%\\hermes``."""
+        """A Hermes home with no ``.stardust`` segment, like ``%LOCALAPPDATA%\\stardust``."""
         import agent.file_safety as file_safety
 
         home = tmp_path / "hermes"

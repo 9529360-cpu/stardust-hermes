@@ -95,7 +95,7 @@ class TestResolveAutoCustomEndToEnd:
         for var in ("OPENROUTER_API_KEY", "NOUS_API_KEY", "OPENAI_API_KEY",
                     "OPENAI_BASE_URL"):
             monkeypatch.delenv(var, raising=False)
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         (hermes_home / "config.yaml").write_text(
             "model:\n"
@@ -134,7 +134,7 @@ class TestResolveAutoCustomEndToEnd:
         for var in ("OPENROUTER_API_KEY", "NOUS_API_KEY", "OPENAI_API_KEY",
                     "OPENAI_BASE_URL"):
             monkeypatch.delenv(var, raising=False)
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         (hermes_home / "config.yaml").write_text(
             "model:\n"
@@ -175,7 +175,7 @@ class TestResolveAutoCustomEndToEnd:
         for var in ("OPENROUTER_API_KEY", "NOUS_API_KEY", "OPENAI_API_KEY",
                     "OPENAI_BASE_URL"):
             monkeypatch.delenv(var, raising=False)
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         proxy_base = "https://acme.palantirfoundry.com/api/v2/llm/proxy/anthropic"
         (hermes_home / "config.yaml").write_text(

@@ -1,4 +1,4 @@
-"""``hermes journey`` — what Hermes has learned, on a timeline."""
+"""``stardust journey`` — what Hermes has learned, on a timeline."""
 
 from __future__ import annotations
 
@@ -374,7 +374,7 @@ def register_cli(parent: argparse.ArgumentParser) -> None:
 
 
 if __name__ == "__main__":
-    _p = argparse.ArgumentParser(prog="hermes journey")
+    _p = argparse.ArgumentParser(prog="stardust journey")
     register_cli(_p)
     _a = _p.parse_args()
     sys.exit(_a.func(_a))

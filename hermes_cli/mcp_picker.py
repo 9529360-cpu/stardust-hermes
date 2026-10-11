@@ -1,4 +1,4 @@
-"""MCP picker — interactive `hermes mcp picker` (also the default `hermes mcp`)."""
+"""MCP picker — interactive `stardust mcp picker` (also the default `stardust mcp`)."""
 
 from __future__ import annotations
 
@@ -159,7 +159,7 @@ def _handle_row(row: _Row) -> None:
 
 
 def _print_rows_text(rows: List[_Row]) -> None:
-    """Plain-text catalog dump: `hermes mcp catalog` output and the non-curses fallback."""
+    """Plain-text catalog dump: `stardust mcp catalog` output and the non-curses fallback."""
     print()
     if not rows:
         _say("  No MCPs in the catalog or configured.", Colors.DIM)
@@ -173,24 +173,24 @@ def _print_rows_text(rows: List[_Row]) -> None:
     for row in rows:
         print(f"  {_format_row(row)}")
     print()
-    _say("  Install: hermes mcp install <name>    Picker: hermes mcp", Colors.DIM)
+    _say("  Install: stardust mcp install <name>    Picker: stardust mcp", Colors.DIM)
     # Manifest-version warnings: the user's Hermes is too old to install everything listed.
     future = [d for d in catalog_diagnostics() if d[1] == "future_manifest"]
     if future:
         print()
         for name, _, _msg in future:
-            _say(f"  ⚠ '{name}' requires a newer Hermes — run `hermes update` to install this entry.", Colors.YELLOW)
+            _say(f"  ⚠ '{name}' requires a newer Hermes — run `stardust update` to install this entry.", Colors.YELLOW)
         print()
     print()
 
 
 def show_catalog() -> None:
-    """`hermes mcp catalog` — print the curated list + custom servers, no interaction."""
+    """`stardust mcp catalog` — print the curated list + custom servers, no interaction."""
     _print_rows_text(_build_rows())
 
 
 def run_picker() -> None:
-    """`hermes mcp picker` (and default `hermes mcp`) — interactive selector; re-renders after each
+    """`stardust mcp picker` (and default `stardust mcp`) — interactive selector; re-renders after each
     action until ESC/q."""
     while True:
         rows = _build_rows()
@@ -207,13 +207,13 @@ def run_picker() -> None:
 
 
 def install_by_name(identifier: str) -> int:
-    """`hermes mcp install <name>` — non-interactive entry-point."""
+    """`stardust mcp install <name>` — non-interactive entry-point."""
     from hermes_cli.mcp_catalog import get_entry
 
     entry = get_entry(identifier)
     if entry is None:
         _say(
-            f"  ✗ '{identifier}' is not in the catalog. Run `hermes mcp catalog` to see available entries.",
+            f"  ✗ '{identifier}' is not in the catalog. Run `stardust mcp catalog` to see available entries.",
             Colors.RED,
         )
         return 1

@@ -1,6 +1,6 @@
 """Gateway lifecycle guard for cron job creation.
 
-A cron job that restarts/stops the gateway from inside the gateway (``hermes gateway restart``,
+A cron job that restarts/stops the gateway from inside the gateway (``stardust gateway restart``,
 ``launchctl kickstart ai.hermes.gateway``, ``systemctl restart hermes-gateway``) kills the process,
 the supervisor revives it, auto-resume re-runs the turn: a SIGTERM-respawn loop.
 ``cron.jobs.create_job`` rejects such specs on every creation path. Patterns are command-shaped —
@@ -28,13 +28,13 @@ class GatewayLifecycleBlocked(ValueError):
 # concrete command identifier so it fires only on command-shaped strings, never prose.
 _GATEWAY_LIFECYCLE_PATTERN = re.compile(
     r"(?i)"
-    # Branch A: destructive `hermes gateway` ops. `start` is excluded: starting from inside a
+    # Branch A: destructive `stardust gateway` ops. `start` is excluded: starting from inside a
     # gateway is benign and a job may legitimately start a sibling profile. The lookbehind keeps
     # `hermes` from being a path component or word tail (`/docs/hermes gateway restart-notes.md`)
     # while every real command position (text start, whitespace, `;`/`&`/`|`, `$(`, backtick,
     # U+FFFD) still matches.
     # See #77173.
-    r"(?:(?<![/\w.\-])hermes\s+gateway\s+(?:restart|stop|uninstall)\b)"
+    r"(?:(?<![/\w.\-])(?:hermes|stardust)\s+gateway\s+(?:restart|stop|uninstall)\b)"
     # Branch B: launchctl ops anchored on a hermes-gateway label so unrelated hermes services stay
     # unblocked. `submit`/`bootstrap` register a NEW keepalive job wrapping an arbitrary helper (a
     # laundered restart); neutral-label submissions are caught by
@@ -56,8 +56,8 @@ _GATEWAY_LIFECYCLE_PATTERN = re.compile(
     r"|(?:systemctl\s+(?:-\S+\s+)*(?:restart|stop|start)\b[^\n]*\bhermes[.\-]?gateway)"
     # Branch D: pkill/kill of the gateway process, both token orders. Leading \b keeps "skill" from
     # matching as "kill".
-    r"|(?:\bp?kill\b[^\n]*\bhermes\b[^\n]*\bgateway)"
-    r"|(?:\bp?kill\b[^\n]*\bgateway\b[^\n]*\bhermes)"
+    r"|(?:\bp?kill\b[^\n]*\b(?:hermes|stardust)\b[^\n]*\bgateway)"
+    r"|(?:\bp?kill\b[^\n]*\bgateway\b[^\n]*\b(?:hermes|stardust))"
 )
 
 # Every branch uses `[^\n]*` between verb and label so matches cannot span unrelated lines. A POSIX
@@ -76,17 +76,17 @@ _SHELL_LINE_CONTINUATION = re.compile(r"\\\r?\n[ \t]*")
 # See #68289.
 _ARGV_LIST_PUNCTUATION = re.compile(r"[\[\],]+")
 
-# Branch A2: `hermes -p <profile> gateway restart|stop` (also `--profile <name>` /
+# Branch A2: `stardust -p <profile> gateway restart|stop` (also `--profile <name>` /
 # `--profile=<name>`). The selector breaks Branch A's adjacency. A sibling-profile restart is a
 # legitimate fleet operation, so the profile name is captured and blocked only when it equals the
 # profile running the guard. `start` stays excluded as in Branch A.
 # Unlike Branch A this form is NOT unconditionally self-targeting: issued from inside gateway `zeus`,
-# `hermes -p venus gateway restart` operates on a sibling profile's gateway and is a legitimate fleet
+# `stardust -p venus gateway restart` operates on a sibling profile's gateway and is a legitimate fleet
 # operation. The pattern captures the named profile so `contains_gateway_lifecycle_command` can block only
 # the self-targeting shape (named profile == the profile running the guard). See #78028.
 _PROFILE_FLAG_LIFECYCLE_PATTERN = re.compile(
     r"(?i)"
-    r"hermes\s+"
+    r"(?:hermes|stardust)\s+"
     # Any global flags before the profile selector (each may carry a value).
     r"(?:-{1,2}\S+(?:\s+\S+)?\s+)*"
     # The selector: exactly the shapes the CLI's `_apply_profile_override` accepts.
@@ -262,7 +262,7 @@ def contains_gateway_lifecycle_command(text: str) -> bool:
     # are documentation, not commands. The stripper fails open on ANY ambiguity (unquoted delimiter,
     # shell consumer, unterminated body), so executable heredocs are still scanned.
     # Heredoc bodies that are provably inert data (quoted delimiter, data-sink consumer like `cat > file
-    # <<'EOF'`) are masked before scanning (#88336): a runbook line "a human can run: hermes gateway
+    # <<'EOF'`) are masked before scanning (#88336): a runbook line "a human can run: stardust gateway
     # restart" inside such a body is documentation, not a command this shell will execute.
     from tools.shell_heredoc import strip_inert_heredoc_bodies
 
@@ -271,7 +271,7 @@ def contains_gateway_lifecycle_command(text: str) -> bool:
     if _GATEWAY_LIFECYCLE_PATTERN.search(normalized):
         return True
     # Profile-flag form: blocked only when the named profile IS the one running the guard.
-    # Profile-flag form (#78028): `hermes -p <profile> gateway restart|stop` bypasses Branch A because the
+    # Profile-flag form (#78028): `stardust -p <profile> gateway restart|stop` bypasses Branch A because the
     # selector sits between `hermes` and `gateway`. It is only the same foot-gun when the named profile IS
     # the profile running the guard — sibling-profile restarts are legitimate fleet operations and stay
     # allowed.
@@ -897,7 +897,7 @@ def _read_script_for_scanning(script_path: str) -> str:
         return ""
     script_text, unsafe = _read_referenced_script(resolved)
     if unsafe:
-        return "hermes gateway restart"
+        return "stardust gateway restart"
     return script_text or ""
 
 
@@ -1033,7 +1033,7 @@ def check_gateway_lifecycle(prompt: Optional[str], script: Optional[str] = None)
                 "evicted FileProvider placeholder can hang the guard's "
                 "preflight scan indefinitely, so it is refused without "
                 "being read. Move the script to a local, non-cloud path "
-                "(e.g. ~/.hermes/scripts/) and recreate the job."
+                "(e.g. ~/.stardust/scripts/) and recreate the job."
             )
         python_script = resolved_script is not None and resolved_script.suffix == ".py"
         script_text = _read_script_for_scanning(script)
@@ -1045,7 +1045,7 @@ def check_gateway_lifecycle(prompt: Optional[str], script: Optional[str] = None)
         # false-positive generator on Python sources (pathlib "/" resolves to the filesystem root).
         # The regex still scans the full text; non-regular/oversized files fail closed (sentinel).
         # The data-exemption masker tokenizes with shlex, so it is charged against the walk budget.
-        # The direct command regex below still scans the full text, so a literal `hermes gateway restart`
+        # The direct command regex below still scans the full text, so a literal `stardust gateway restart`
         # embedded in a .py script is still blocked. See #77131, #78398.
         if not _LifecycleScanBudget().charge_text(combined):
             unsafe = _budget_exhausted("text", 0)
@@ -1060,6 +1060,6 @@ def check_gateway_lifecycle(prompt: Optional[str], script: Optional[str] = None)
             "Blocked: cron job contains a gateway lifecycle command or persistent "
             "launchctl submit operation. This is blocked to prevent agent-driven "
             "SIGTERM-respawn loops under launchd/systemd supervision "
-            "(#30719). Run `hermes gateway restart` from a shell outside "
+            "(#30719). Run `stardust gateway restart` from a shell outside "
             "the running gateway instead."
         )

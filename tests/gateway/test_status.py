@@ -324,7 +324,7 @@ class TestGatewayRuntimeStatus:
 
         Per-profile Docker supervision: ``coder``'s gateway died leaving a
         ``gateway_state=running`` record at PID 139.  The OS then recycled 139
-        onto the live *default* gateway (``hermes gateway run``).  The recorded
+        onto the live *default* gateway (``stardust gateway run``).  The recorded
         ``start_time`` is absent (older state file), so the start-time PID-reuse
         guard does not catch it.  Without the profile scope the live command
         line still ``looks_like_gateway`` and ``coder`` is wrongly reported up.
@@ -341,7 +341,7 @@ class TestGatewayRuntimeStatus:
         monkeypatch.setattr(status, "_get_process_start_time", lambda pid: None)
         # PID 139 is now the live DEFAULT gateway (bare, no -p coder).
         monkeypatch.setattr(
-            status, "_read_process_cmdline", lambda pid: "hermes gateway run --replace"
+            status, "_read_process_cmdline", lambda pid: "stardust gateway run --replace"
         )
 
         assert (
@@ -364,9 +364,9 @@ class TestGatewayRuntimeStatus:
         monkeypatch.setattr(status, "_pid_exists", lambda pid: True)
         monkeypatch.setattr(status, "_get_process_start_time", lambda pid: 1000)
         for cmdline in (
-            "hermes -p coder gateway run --replace",
-            "/opt/hermes/.venv/bin/hermes --profile coder gateway run --replace",
-            "hermes_home=/opt/data/profiles/coder hermes gateway run --replace",
+            "stardust -p coder gateway run --replace",
+            "/opt/hermes/.venv/bin/stardust --profile coder gateway run --replace",
+            "hermes_home=/opt/data/profiles/coder stardust gateway run --replace",
         ):
             monkeypatch.setattr(status, "_read_process_cmdline", lambda pid, c=cmdline: c)
             assert (
@@ -380,7 +380,7 @@ class TestGatewayRuntimeStatus:
         profile's Path may carry forward slashes (and, on Windows, vice
         versa).  The separator difference must not defeat the match."""
         home = Path("c:/opt/data/profiles/coder")
-        cmdline = r"hermes_home=c:\opt\data\profiles\coder hermes gateway run --replace"
+        cmdline = r"hermes_home=c:\opt\data\profiles\coder stardust gateway run --replace"
         assert status._command_line_belongs_to_profile(cmdline, home) is True
 
 
@@ -579,7 +579,7 @@ class TestScopedLocks:
             "pid": 873,
             "start_time": None,
             "kind": "hermes-gateway",
-            "argv": ["/Users/user/.hermes/hermes-agent/hermes_cli/main.py", "gateway", "run", "--replace"],
+            "argv": ["/Users/user/.stardust/hermes-agent/hermes_cli/main.py", "gateway", "run", "--replace"],
         }))
 
         # Post-#21561 the liveness probe routes through
@@ -934,7 +934,7 @@ class TestTakeoverMarker:
     def test_consume_rejects_marker_from_different_profile(self, tmp_path, monkeypatch):
         """Regression (#29092): a marker written by a gateway under a DIFFERENT
         STARDUST_HOME must be rejected even when PID + start_time coincidentally
-        match — otherwise two profile services sharing a default ~/.hermes flap
+        match — otherwise two profile services sharing a default ~/.stardust flap
         each other in an infinite SIGTERM/Restart loop. The mismatched marker is
         left in place so the profile it was actually meant for can consume it.
         """
@@ -1087,7 +1087,7 @@ class TestPlannedStopMarker:
         ``_get_process_start_time`` returns None on macOS / native Windows
         (no ``/proc/<pid>/stat``). The planned-stop watcher only runs there,
         so if the authoritative consume required a non-None start_time match
-        it would always return False — and ``hermes gateway stop`` would be
+        it would always return False — and ``stardust gateway stop`` would be
         misclassified as an unexpected ``UNKNOWN`` exit, exit 1, and revived
         by the service manager (the very crash loop #34597 set out to fix).
         With start_time unavailable on BOTH sides we fall back to PID

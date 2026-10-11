@@ -55,7 +55,7 @@ from hermes_cli.update_inventory import (
 @pytest.fixture()
 def receipt_home(tmp_path, monkeypatch):
     """Hermetic STARDUST_HOME so receipts never touch the real profile."""
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     monkeypatch.setattr(
         "hermes_cli.config.get_hermes_home", lambda: home, raising=False
@@ -267,7 +267,7 @@ class TestRefusalIsNotFailure:
         """#91439: the refused run's receipt keeps the evidence of WHY —
         the failing preflight step is preserved, not lost."""
         ur.begin_update_receipt()
-        ur.record_step("windows_preflight", False, "hermes.exe running")
+        ur.record_step("windows_preflight", False, "stardust.exe running")
         path = ur.finalize_pending_update_receipt(2, "concurrent instance")
         payload = json.loads(path.read_text(encoding="utf-8"))
         assert payload["steps"][0]["name"] == "windows_preflight"

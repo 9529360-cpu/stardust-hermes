@@ -21,7 +21,7 @@ STAGED = {"Qwen-A-UD-Q4_K_M", "Qwen-B-UD-Q4_K_M"}
 
 @pytest.fixture
 def ctx(tmp_path, monkeypatch):
-    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
     import hermes_cli.inventory as inv
 
     monkeypatch.setattr("hermes_cli.local_runtime.bootstrap.staged_model_ids",

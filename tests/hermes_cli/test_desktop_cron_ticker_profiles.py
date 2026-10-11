@@ -142,7 +142,7 @@ def test_desktop_ticker_serves_every_profile_and_yields_to_owning_gateway(monkey
     import yaml
 
     _sp, builtin = _providers
-    root = tmp_path / ".hermes"
+    root = tmp_path / ".stardust"
     for name in ("worker", "guest", "solo"):
         (root / "profiles" / name).mkdir(parents=True)
     (root / "config.yaml").write_text(yaml.safe_dump({"gateway": {"multiplex_profiles": True}}))

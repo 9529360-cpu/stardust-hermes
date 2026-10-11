@@ -5,7 +5,7 @@ Usage:
   scripts/profile-tui.py [--session SID] [--hold KEY] [--seconds N] [--rate HZ]
 
 Defaults: picks the session with the most messages, holds PageUp for 8s at
-~30 Hz (matching xterm key-repeat), summarizes ~/.hermes/perf.log on exit.
+~30 Hz (matching xterm key-repeat), summarizes ~/.stardust/perf.log on exit.
 
 The --tui build must exist (run `npm run build` in ui-tui first). This script
 launches `node dist/entry.js` directly with STARDUST_TUI_RESUME set so it
@@ -13,7 +13,7 @@ bypasses the hermes_cli wrapper — we want repeatable timing, not the CLI's
 session-picker flow.
 
 Environment overrides:
-  STARDUST_PERF_LOG     (default ~/.hermes/perf.log)
+  STARDUST_PERF_LOG     (default ~/.stardust/perf.log)
   STARDUST_PERF_NODE    (default node from $PATH)
   STARDUST_TUI_DIR      (default: <repo>/ui-tui relative to this script)
 
@@ -42,7 +42,7 @@ try:
 except ImportError:
     def get_hermes_home() -> Path:  # type: ignore[misc]
         val = (os.environ.get("STARDUST_HOME") or "").strip()
-        return Path(val) if val else Path.home() / ".hermes"
+        return Path(val) if val else Path.home() / ".stardust"
 
 DEFAULT_TUI_DIR = Path(
     os.environ.get("STARDUST_TUI_DIR")

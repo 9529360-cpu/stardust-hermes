@@ -448,13 +448,13 @@ def test_auth_add_nous_api_key_shortcut_is_retired(tmp_path, monkeypatch):
 
 
 def test_auth_add_codex_oauth_keeps_distinct_pool_accounts(tmp_path, monkeypatch):
-    """Two ``hermes auth add openai-codex`` runs for different ChatGPT
+    """Two ``stardust auth add openai-codex`` runs for different ChatGPT
     accounts must produce two independent pool entries with distinct tokens.
 
     Regression for #39236: the add path used to route through the singleton
     ``_save_codex_tokens`` save, so the second login overwrote the first
     account's singleton-mirrored ``device_code`` entry instead of adding a
-    second independent one. ``hermes auth list`` showed two labels sharing
+    second independent one. ``stardust auth list`` showed two labels sharing
     one token pair, and rotation silently always used the latest account.
     """
     monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "hermes"))
@@ -545,7 +545,7 @@ def test_codex_runtime_pool_only_rate_limit_is_not_missing_auth(tmp_path, monkey
 
 
 def test_auth_add_xai_oauth_sets_active_provider(tmp_path, monkeypatch):
-    """hermes auth add xai-oauth must set active_provider and write a pool entry.
+    """stardust auth add xai-oauth must set active_provider and write a pool entry.
 
     Regression history:
     - Early path called ``pool.add_entry()`` without ``active_provider``, so
@@ -600,7 +600,7 @@ def test_auth_add_xai_oauth_sets_active_provider(tmp_path, monkeypatch):
 
 
 def test_auth_add_xai_oauth_keeps_distinct_pool_accounts(tmp_path, monkeypatch):
-    """Two ``hermes auth add xai-oauth`` runs must produce independent pool entries.
+    """Two ``stardust auth add xai-oauth`` runs must produce independent pool entries.
 
     Regression for the same collapse class as #39236 / #42316 for Codex: the
     add path used to route through the singleton ``_save_xai_oauth_tokens``
@@ -817,7 +817,7 @@ def test_clear_provider_auth_removes_provider_pool_entries(tmp_path, monkeypatch
 
 
 def test_logout_resets_codex_config_when_auth_state_already_cleared(tmp_path, monkeypatch, capsys):
-    """`hermes logout --provider openai-codex` must still clear model.provider.
+    """`stardust logout --provider openai-codex` must still clear model.provider.
 
     Users can end up with auth.json already cleared but config.yaml still set to
     openai-codex.  Previously logout reported no auth state and left the agent
@@ -895,7 +895,7 @@ def test_unsuppress_credential_source_preserves_other_markers(tmp_path, monkeypa
 
 
 def test_seed_from_singletons_respects_hermes_pkce_suppression(tmp_path, monkeypatch):
-    """anthropic hermes_pkce must not re-seed from ~/.hermes/.anthropic_oauth.json when suppressed."""
+    """anthropic hermes_pkce must not re-seed from ~/.stardust/.anthropic_oauth.json when suppressed."""
     hermes_home = tmp_path / "hermes"
     hermes_home.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
@@ -949,7 +949,7 @@ def test_credential_sources_registry_has_expected_steps():
         "gh auth token / COPILOT_GITHUB_TOKEN / GH_TOKEN",
         "Any env-seeded credential (XAI_API_KEY, DEEPSEEK_API_KEY, etc.)",
         "~/.claude/.credentials.json",
-        "~/.hermes/.anthropic_oauth.json",
+        "~/.stardust/.anthropic_oauth.json",
         "auth.json providers.nous",
         "auth.json providers.openai-codex + ~/.codex/auth.json",
         "auth.json providers.minimax-oauth",
@@ -1079,7 +1079,7 @@ def test_qwen_oauth_login_marks_active_through_moved_owner(monkeypatch):
 
 
 def test_auth_add_openrouter_oauth_persists_pkce_key_without_touching_api_key_default(tmp_path, monkeypatch):
-    """`hermes auth add openrouter --type oauth` stores the PKCE-minted key as an ``api_key`` pool row
+    """`stardust auth add openrouter --type oauth` stores the PKCE-minted key as an ``api_key`` pool row
     (OpenRouter returns a plain key, no refresh pair) that ``resolve_provider("auto")`` picks up with no
     env var — same as a pasted key; the bare `--api-key` path keeps its API-key default."""
     monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "hermes"))

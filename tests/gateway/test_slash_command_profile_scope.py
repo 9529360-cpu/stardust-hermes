@@ -23,7 +23,7 @@ import pytest
 
 @pytest.fixture
 def profile_home(tmp_path, monkeypatch):
-    root = tmp_path / ".hermes"
+    root = tmp_path / ".stardust"
     home = root / "profiles" / "coder"
     home.mkdir(parents=True)
     monkeypatch.setattr(Path, "home", lambda: tmp_path)

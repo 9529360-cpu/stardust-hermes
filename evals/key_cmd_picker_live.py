@@ -126,7 +126,7 @@ def main():
                 phase = f"{schema}/{surface}"
                 with tempfile.TemporaryDirectory(prefix="hermes-keycmd-live-") as tmp:
                     home = Path(tmp)
-                    state = home / ".hermes"
+                    state = home / ".stardust"
                     state.mkdir()
                     mint_log = home / "helper-invocations"
                     helper = home / "mint.py"

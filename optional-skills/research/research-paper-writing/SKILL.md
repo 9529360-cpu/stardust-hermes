@@ -1376,7 +1376,7 @@ Compose this skill with other Hermes skills for specific phases:
 |-------|-------------|-------------|
 | **arxiv** | Phase 1 (Literature Review): searching arXiv, generating BibTeX, finding related papers via Semantic Scholar | `skill_view("arxiv")` |
 | **subagent-driven-development** | Phase 5 (Drafting): parallel section writing with 2-stage review (spec compliance then quality) | `skill_view("subagent-driven-development")` |
-| **plan** | Phase 0 (Setup): creating structured plans before execution. Writes to `.hermes/plans/` | `skill_view("plan")` |
+| **plan** | Phase 0 (Setup): creating structured plans before execution. Writes to `.stardust/plans/` | `skill_view("plan")` |
 | **qmd** | Phase 1 (Literature): searching local knowledge bases (notes, transcripts, docs) via hybrid BM25+vector search | Install: `skill_manage("install", "qmd")` |
 | **diagramming** | Phase 4-5: creating Excalidraw-based figures and architecture diagrams | `skill_view("diagramming")` |
 | **data-science** | Phase 4 (Analysis): Jupyter live kernel for interactive analysis and visualization | `skill_view("data-science")` |
@@ -1399,7 +1399,7 @@ Compose this skill with other Hermes skills for specific phases:
 | **`memory`** | Persist only cross-project lessons or user-wide conventions; do not use it as this paper project's state store. |
 | **`cronjob`** | Schedule experiment monitoring, deadline countdowns, automated arXiv checks. |
 | **`clarify`** | Ask the user targeted questions when blocked (venue choice, contribution framing). |
-| **cron `deliver:`** | Notify the user when experiments complete or drafts are ready even if they're not in chat — schedule the check as a cron job with a messaging `deliver:` target (the agent no longer has a `send_message` tool; outbound delivery is handled by cron/`hermes send`). |
+| **cron `deliver:`** | Notify the user when experiments complete or drafts are ready even if they're not in chat — schedule the check as a cron job with a messaging `deliver:` target (the agent no longer has a `send_message` tool; outbound delivery is handled by cron/`stardust send`). |
 
 ### Tool Usage Patterns
 
@@ -1446,7 +1446,7 @@ for paper in results:
 
 ### State Management with Project facts and `todo`
 
-**Project facts** — persist paper-specific decisions in the attached Project, not global `MEMORY.md`. In GUI sessions use `desktop_project` with `fact_add`; from the CLI use `hermes project facts <project> add ...`. Keep `memory` for reusable cross-project lessons or user-wide conventions.
+**Project facts** — persist paper-specific decisions in the attached Project, not global `MEMORY.md`. In GUI sessions use `desktop_project` with `fact_add`; from the CLI use `stardust project facts <project> add ...`. Keep `memory` for reusable cross-project lessons or user-wide conventions.
 
 ```text
 desktop_project({"action":"fact_add",

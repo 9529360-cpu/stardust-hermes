@@ -973,11 +973,11 @@ def _start_local_openviking_server(endpoint: str) -> tuple[str, str]:
         log_path.parent.mkdir(parents=True, exist_ok=True)
         # Strip PYTHONPATH: the Desktop backend puts the Hermes venv on it, which
         # would shadow openviking-server's own site-packages (and on Windows lock
-        # the Hermes venv's .pyd files, breaking `hermes update`).
+        # the Hermes venv's .pyd files, breaking `stardust update`).
         # Do not let the server child inherit this process's PYTHONPATH. If inherited, openviking-server
         # would import aiohttp and friends from the Hermes venv instead of its own (its venv's site-packages
         # are shadowed because PYTHONPATH precedes them) — and on Windows the loaded DLLs then lock the
-        # Hermes venv, aborting `hermes update` with access-denied on .pyd files. (#78153)
+        # Hermes venv, aborting `stardust update` with access-denied on .pyd files. (#78153)
         child_env = os.environ.copy()
         child_env.pop("PYTHONPATH", None)
         with log_path.open("ab") as log_file:
@@ -1438,7 +1438,7 @@ class OpenVikingMemoryProvider(MemoryProvider):
         health-check only when a value changed (hot path: one tuple compare).
 
         ``/reload`` only refreshes ``os.environ`` — the existing provider instance is not re-initialized —
-        so OPENVIKING_* values added to ``~/.hermes/.env`` after startup never reach the live client and
+        so OPENVIKING_* values added to ``~/.stardust/.env`` after startup never reach the live client and
         tools keep running against stale auth until the user restarts hermes (#21130).
         """
         if not self._env_refresh_enabled:

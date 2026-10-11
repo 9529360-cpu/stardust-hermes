@@ -346,11 +346,11 @@ class TestSpawnEnvIsolation:
 
         monkeypatch.setattr(subprocess, "Popen", FakePopen)
         monkeypatch.setenv("HOME", "/users/alice")
-        monkeypatch.setenv("STARDUST_HOME", "/users/alice/.hermes/profiles/backend-worker")
+        monkeypatch.setenv("STARDUST_HOME", "/users/alice/.stardust/profiles/backend-worker")
         monkeypatch.setenv("STARDUST_KANBAN_TASK", "t_smoke")
         monkeypatch.setenv(
             "STARDUST_KANBAN_DB",
-            "/users/alice/.hermes/kanban/boards/smoke/kanban.db",
+            "/users/alice/.stardust/kanban/boards/smoke/kanban.db",
         )
 
         client = cas.CodexAppServerClient(codex_bin="codex")

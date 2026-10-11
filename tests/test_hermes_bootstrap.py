@@ -196,7 +196,7 @@ class TestEntryPointsImportBootstrap:
     # Entry points that invoke Hermes as a process.  Each one must
     # import hermes_bootstrap before doing any file I/O or stdout writes.
     ENTRY_POINTS = [
-        "hermes_cli/main.py",   # hermes CLI (console_script)
+        "hermes_cli/main.py",   # stardust CLI (console_script)
         "run_agent.py",          # hermes-agent (console_script)
         "acp_adapter/entry.py",  # hermes-acp (console_script)
         "gateway/run.py",        # gateway
@@ -215,7 +215,7 @@ class TestEntryPointsImportBootstrap:
 
         Also lenient about a try/except wrapper around the import: entry
         points may guard the import against ``ModuleNotFoundError`` so a
-        half-finished ``hermes update`` (git-reset landed new code but
+        half-finished ``stardust update`` (git-reset landed new code but
         ``uv pip install -e .`` didn't finish re-registering
         ``hermes_bootstrap`` as a top-level module) leaves hermes
         recoverable instead of crashing on every invocation.  When the

@@ -515,7 +515,7 @@ def _billing_or_entitlement_message(
                 "at https://claude.ai/settings/usage",
                 switch,
                 # The exhaustion latch replays the stored error without a request.
-                "Retry with a fresh credential state: `hermes auth reset anthropic`. Until that "
+                "Retry with a fresh credential state: `stardust auth reset anthropic`. Until that "
                 "cooldown clears, this error can be replayed from cache without contacting the API.",
             ])
         return "\n".join([
@@ -1455,7 +1455,7 @@ def _run_conversation_turn(
     agent._last_compression_attempt_in_place = None
     begin_fast_mode_turn(agent, conversation_history)
 
-    # Adopt ~/.hermes/.env credential/base-url edits made since the last turn — a
+    # Adopt ~/.stardust/.env credential/base-url edits made since the last turn — a
     # Settings save updates .env, not this worker's client (#67821). No-op if unchanged.
     try:
         agent._try_refresh_env_client_credentials()

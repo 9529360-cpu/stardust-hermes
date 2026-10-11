@@ -1,4 +1,4 @@
-"""Tests for ``hermes honcho peers map``: account discovery, the resolution preview, and alias writes."""
+"""Tests for ``stardust honcho peers map``: account discovery, the resolution preview, and alias writes."""
 
 import json
 import sqlite3

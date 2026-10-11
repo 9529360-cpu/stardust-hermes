@@ -69,7 +69,7 @@ async def _quiet(call, default=None):
 
 
 HISTORY_UNREADABLE = ("⚠️ I can't read this conversation's history right now (your earlier messages "
-                      "exist but cannot be loaded). Run `hermes doctor --fix` on the host, or use /new "
+                      "exist but cannot be loaded). Run `stardust doctor --fix` on the host, or use /new "
                       "to start fresh.")
 
 

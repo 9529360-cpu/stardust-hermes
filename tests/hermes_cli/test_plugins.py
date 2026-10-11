@@ -2085,7 +2085,7 @@ class TestPluginManagerList:
         already-loaded plugins, so when a later plugin registered a hook name
         an earlier plugin had already used, the shared name was attributed to
         the first plugin only and the later plugin reported 0 hooks in
-        `hermes plugins list`. Attribution now counts what each plugin's own
+        `stardust plugins list`. Attribution now counts what each plugin's own
         register() added (per-registration delta), so both get credit.
         """
         plugins_dir = tmp_path / "hermes_test" / "plugins"
@@ -2542,7 +2542,7 @@ class TestPluginContextProfileName:
 
     def test_default_profile(self, tmp_path, monkeypatch):
         """STARDUST_HOME at the root resolves to 'default'."""
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".stardust"
         home.mkdir()
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
         monkeypatch.setenv("STARDUST_HOME", str(home))
@@ -2550,7 +2550,7 @@ class TestPluginContextProfileName:
 
     def test_named_profile(self, tmp_path, monkeypatch):
         """STARDUST_HOME under profiles/<name> resolves to that name."""
-        prof = tmp_path / ".hermes" / "profiles" / "coder"
+        prof = tmp_path / ".stardust" / "profiles" / "coder"
         prof.mkdir(parents=True)
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
         monkeypatch.setenv("STARDUST_HOME", str(prof))

@@ -20,7 +20,7 @@ def _missing_and_installable(monkeypatch):
     """Reach the guard: deps missing, installs allowed, no durable target.
 
     ``_allow_lazy_installs`` is patched explicitly so the suite does not
-    depend on the host's ~/.hermes/config.yaml (a local
+    depend on the host's ~/.stardust/config.yaml (a local
     ``allow_lazy_installs: false`` otherwise short-circuits with a different
     rejection reason).
     """

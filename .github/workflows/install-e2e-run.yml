@@ -5,7 +5,7 @@ name: Install & Update E2E (reusable)
 # it.
 #
 # Reusable so callers can fan out over the combinations that matter --
-# update from the tip vs. from an older release, `hermes update` vs.
+# update from the tip vs. from an older release, `stardust update` vs.
 # re-running the installer -- without duplicating the runner setup. Each leg
 # is independent: its own isolated HOME, its own install, nothing rewound
 # or shared.
@@ -42,7 +42,7 @@ on:
         required: true
         type: string
       update-method:
-        description: 'How the install updates to HEAD. Supported: hermes-update (the updater), installer-script (re-run the one-liner), installer-script+desktop (re-run with --include-desktop), hermes-desktop-app-update (launch via hermes desktop under Playwright, click Update now). open-app-update runs only where an OS entry point exists (see the per-OS run workflows); pairs without one skip.'
+        description: 'How the install updates to HEAD. Supported: hermes-update (the updater), installer-script (re-run the one-liner), installer-script+desktop (re-run with --include-desktop), hermes-desktop-app-update (launch via stardust desktop under Playwright, click Update now). open-app-update runs only where an OS entry point exists (see the per-OS run workflows); pairs without one skip.'
         required: true
         type: string
       install-ref:

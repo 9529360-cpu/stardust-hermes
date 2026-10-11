@@ -135,12 +135,12 @@ def _argv_scoped_to_other_home(argv: Sequence[str], db_path: Path) -> bool:
     """Return whether argv proves the process belongs to a DIFFERENT instance.
 
     ``state.db`` lives at the STARDUST_HOME root, so an absolute-path token
-    containing a ``/.hermes`` segment (or naming a ``state.db``/WAL/SHM under
+    containing a ``/.stardust`` segment (or naming a ``state.db``/WAL/SHM under
     some other parent) identifies that token's own Hermes home.  When at least
     one such token exists AND no token references this instance's state.db,
     its sidecars, or its home directory, the process provably works on a
     different generation and must not be counted as an uninspectable holder
-    of ours (issue #92401: a second gateway under /home/demo/.hermes deferred
+    of ours (issue #92401: a second gateway under /home/demo/.stardust deferred
     this instance's stale-FTS rebuild forever despite lsof proving zero open
     handles).  Ambiguous argv without absolute-path tokens returns False and
     keeps the fail-closed suspicion.
@@ -173,7 +173,7 @@ def _argv_scoped_to_other_home(argv: Sequence[str], db_path: Path) -> bool:
             normalized = os.path.normcase(os.path.normpath(path_token))
             if normalized in ours or normalized.startswith(this_home + os.sep):
                 return False
-            if "/.hermes" in normalized or normalized.endswith("/.hermes"):
+            if "/.stardust" in normalized or normalized.endswith("/.stardust"):
                 other_home_seen = True
             elif os.path.basename(normalized) in (
                 "state.db",

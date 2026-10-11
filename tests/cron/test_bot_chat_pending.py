@@ -21,7 +21,7 @@ def test_cli_owner_deferral_and_attempt_fence(tmp_path, monkeypatch, error):
     assert refusal is None and lease is not None
     run = Mock(side_effect=error, return_value=subprocess.CompletedProcess([], 0, "", ""))
     monkeypatch.setattr(delivery.subprocess, "run", run)
-    monkeypatch.setattr(delivery.shutil, "which", lambda _: "/bin/hermes")
+    monkeypatch.setattr(delivery.shutil, "which", lambda _: "/bin/stardust")
     job = {"id": "job", "execution_id": "execution"}
     try:
         assert "queued" in delivery._deliver_to_bot_chat(job, "output", "")
@@ -60,7 +60,7 @@ def test_delivery_exception_retains_attempt_and_continues_siblings(tmp_path, mon
     def resolve_cli(_):
         nonlocal armed
         armed = True
-        return "/bin/hermes"
+        return "/bin/stardust"
 
     def is_dir(self):
         if armed and self == blocked_home:

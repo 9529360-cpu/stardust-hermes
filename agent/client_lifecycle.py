@@ -734,7 +734,7 @@ class ClientLifecycleMixin:
         return (base_url, api_key) != prev and current_base in {default_base, prev[0]} and not unchanged
 
     def _try_refresh_env_client_credentials(self) -> bool:
-        """Adopt ``~/.hermes/.env`` credential/base-url edits at the turn boundary (a Settings save updates ``.env``
+        """Adopt ``~/.stardust/.env`` credential/base-url edits at the turn boundary (a Settings save updates ``.env``
         but a live worker keeps init-time values). Adoption rule: ``_should_adopt_env_credentials``.
 
         Covers api-key registry providers and named custom providers with a ``key_env`` (#67935) — the

@@ -37,5 +37,5 @@ suggest:
 
 post_install: |
   On first connection Hermes opens a browser to authorize with
-  Fireflies (or run `hermes mcp login fireflies`). Approve access,
+  Fireflies (or run `stardust mcp login fireflies`). Approve access,
   then restart the session so tools load.

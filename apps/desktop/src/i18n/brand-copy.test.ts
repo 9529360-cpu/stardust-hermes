@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 // The desktop speaks as Stardust. The inherited name survives only where it still
 // names something real upstream (the hosted Hermes Cloud service) or an executable
-// that is still called `hermes` (the SSH path field and its recovery copy).
+// that is still called `stardust` (the SSH path field and its recovery copy).
 
 const LOCALES = ['en', 'zh', 'zh-hant', 'ja', 'ru', 'ar'] as const
 

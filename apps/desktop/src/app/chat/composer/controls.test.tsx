@@ -189,7 +189,7 @@ describe('wake-word ear visibility', () => {
 
   it('surfaces the backend refusal reason in the tooltip, still visible', () => {
     applyWakeStatus({ available: false, enabled: false, listening: false, phrase: 'hey hermes' })
-    applyWakeStartResult({ hint: 'run `hermes tools` (Voice section)', reason: 'unavailable', started: false })
+    applyWakeStartResult({ hint: 'run `stardust tools` (Voice section)', reason: 'unavailable', started: false })
     renderControls()
 
     const ear = screen.getByLabelText('Wake word: "hey hermes" — off')

@@ -28,5 +28,5 @@ suggest:
 
 post_install: |
   On first connection Hermes opens a browser to authorize with
-  WordPress.com (or run `hermes mcp login wordpress-com`). Approve access,
+  WordPress.com (or run `stardust mcp login wordpress-com`). Approve access,
   then restart the session so tools load.

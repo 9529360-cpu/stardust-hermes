@@ -335,7 +335,7 @@ class CLITerminalMixin:
         app._on_resize = lambda: self._schedule_resize_recovery(app, original_on_resize)
 
     def _try_attach_clipboard_image(self) -> bool:
-        """Save a clipboard image to ~/.hermes/images/ and attach it; True if attached."""
+        """Save a clipboard image to ~/.stardust/images/ and attach it; True if attached."""
         from cli import datetime
         from hermes_cli.clipboard import save_clipboard_image
         self._image_counter += 1

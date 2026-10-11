@@ -109,7 +109,7 @@ test('hermes runtime import probe checks config dependencies', () => {
 })
 
 test('explicit Hermes override is authoritative', () => {
-  assert.equal(shouldTrustHermesOverride('/nix/store/abc/bin/hermes'), true)
+  assert.equal(shouldTrustHermesOverride('/nix/store/abc/bin/stardust'), true)
 })
 
 test('empty Hermes override is not authoritative', () => {

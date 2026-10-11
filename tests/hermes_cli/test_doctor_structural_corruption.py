@@ -61,7 +61,7 @@ def _run_doctor(db_path, should_fix):
 
 def test_doctor_routes_structural_damage_to_recover_not_fts_rebuild(tmp_path, monkeypatch):
     """Real torn ``sessions`` b-tree: doctor --fix must not run the FTS repair ladder (no
-    .malformed-backup, nothing fixed) and must point at `hermes sessions recover` for THIS
+    .malformed-backup, nothing fixed) and must point at `stardust sessions recover` for THIS
     database with the profile pinned; a real FTS-only stomp still takes the FTS path."""
     monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     db_path, page_size, root = _seed(tmp_path)

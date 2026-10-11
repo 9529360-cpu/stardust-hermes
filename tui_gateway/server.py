@@ -243,7 +243,7 @@ class _SlashWorker:
         # The worker runs the agent → needs provider credentials; tier-1 secrets (gateway/GitHub/
         # infra) are still stripped. A served profile's worker gets THAT profile's home + secrets and
         # none of the launch profile's .env / TERMINAL_* residue, exactly what a standalone
-        # `hermes -p X` would load itself.
+        # `stardust -p X` would load itself.
         env = _prepend_tool_paths(served_profile_child_env(target_home=profile_home, inherit_credentials=True))
         # Internal slash workers must import the same checkout as their parent.
         module_root = str(Path(__file__).resolve().parent.parent)
@@ -463,10 +463,10 @@ def _canonical_profile_request(name: str) -> str:
     """Canonicalize profile basenames emitted by older session-info payloads.
 
     ``Path(default_home).name`` was historically sent as a profile id. Those basenames are
-    installation details — unless a real named profile of that name exists (``hermes`` is a legal
+    installation details — unless a real named profile of that name exists (``stardust`` is a legal
     id), in which case it wins; other unknown names keep failing closed in ``_profile_home``.
     """
-    if name.casefold() in {".hermes", "hermes"}:
+    if name.casefold() in {".stardust", "hermes"}:
         from hermes_cli import profiles as profiles_mod
         # Check the profiles root directly: get_profile_dir rejects "hermes" as a
         # reserved name, but a pre-reserved-list install may still carry that dir.
@@ -839,7 +839,7 @@ def handle_request(req: dict) -> dict | None:
     rid, method, params = normalized
     if not (fn := _methods.get(method)):
         return _err(rid, -32601, f"unknown method: {method} — the client and the Hermes backend are out of sync "
-                    "(different versions); run `hermes update` and restart both")
+                    "(different versions); run `stardust update` and restart both")
     # Test doubles register straight into ``_methods`` without a contract; every production
     # handler comes through ``register_method`` and therefore has one.
     contract = _contracts.METHODS.get(method)
@@ -1448,7 +1448,7 @@ def _clear_pending(sid: str | None = None) -> None:
 
 
 def _env_model_seed() -> str:
-    """The launch-scoped model seed (``hermes --tui -m``, hosted provisioning); "" when unset."""
+    """The launch-scoped model seed (``stardust --tui -m``, hosted provisioning); "" when unset."""
     return (os.environ.get("STARDUST_MODEL", "") or os.environ.get("STARDUST_INFERENCE_MODEL", "")).strip()
 
 
@@ -1469,7 +1469,7 @@ def _resolve_model() -> str:
 
 def _resolve_session_platform() -> str:
     """``STARDUST_DESKTOP=1`` without ``STARDUST_DESKTOP_TERMINAL`` → "desktop" (chat panel; the agent then
-    suggests TUI-only slash commands), else "tui" (embedded terminal pane or standalone ``hermes --tui``)."""
+    suggests TUI-only slash commands), else "tui" (embedded terminal pane or standalone ``stardust --tui``)."""
     desktop = is_truthy_value(os.environ.get("STARDUST_DESKTOP"))
     return "desktop" if desktop and not is_truthy_value(os.environ.get("STARDUST_DESKTOP_TERMINAL")) else "tui"
 
@@ -2351,7 +2351,7 @@ def _startup_system_prompt(cfg: dict, task_id: str) -> str:
         if not loaded_skills:
             raise ValueError(f"Unknown skill(s): {missing_display}")
         logger.warning("Unknown skill(s) requested, skipping: %s. Continuing with: %s. "
-                       "List available skills with `hermes skills list`.", missing_display, ", ".join(loaded_skills))
+                       "List available skills with `stardust skills list`.", missing_display, ", ".join(loaded_skills))
     if skills_prompt:
         system_prompt = "\n\n".join(part for part in (system_prompt, skills_prompt) if part).strip()
     return system_prompt
@@ -3278,17 +3278,17 @@ def _rank_slash_completions(items: list[dict], usage, origin_of, *, browsing: bo
 
 # argv shapes that must not run headless in the gateway process → user hint.
 _CLI_EXEC_BLOCKED = {
-    ("setup",): "`hermes setup` needs a full terminal — run it outside the TUI",
-    ("gateway",): "`hermes gateway` is long-running — run it in another terminal",
-    ("sessions", "browse"): "`hermes sessions browse` is interactive — use /resume here, or run browse in another terminal",
-    ("config", "edit"): "`hermes config edit` needs $EDITOR in a real terminal",
+    ("setup",): "`stardust setup` needs a full terminal — run it outside the TUI",
+    ("gateway",): "`stardust gateway` is long-running — run it in another terminal",
+    ("sessions", "browse"): "`stardust sessions browse` is interactive — use /resume here, or run browse in another terminal",
+    ("config", "edit"): "`stardust config edit` needs $EDITOR in a real terminal",
 }
 
 
 def _cli_exec_blocked(argv: list[str]) -> str | None:
     """Return user hint if this argv must not run headless in the gateway process."""
     if not argv:
-        return "bare `hermes` is interactive — use `/hermes chat -q …` or run `hermes` in another terminal"
+        return "bare `stardust` is interactive — use `/hermes chat -q …` or run `stardust` in another terminal"
     head = tuple(a.lower() for a in argv[:2])
     return _CLI_EXEC_BLOCKED.get(head[:1]) or _CLI_EXEC_BLOCKED.get(head)
 

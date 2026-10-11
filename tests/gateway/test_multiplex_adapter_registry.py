@@ -868,7 +868,7 @@ class TestSecondaryProfileConfigHandling:
     @pytest.mark.asyncio
     async def test_single_profile_start_clears_inherited_served_profiles(self, monkeypatch, tmp_path):
         """``write_runtime_status`` re-stamps the previous writer's record in place, so a multiplexer's
-        ``served_profiles`` survived into a later single-profile run and every `hermes -p X` surface
+        ``served_profiles`` survived into a later single-profile run and every `stardust -p X` surface
         kept treating X as served (exit 78 on start, "running via multiplexer" on status)."""
         import json
         from gateway.status import read_runtime_status
@@ -1092,7 +1092,7 @@ class TestSecondaryProfileHookRegistration:
         profile_cfg = {
             "hooks": {
                 "pre_tool_call": [
-                    {"matcher": "write_file", "command": "~/.hermes/deny.sh"}
+                    {"matcher": "write_file", "command": "~/.stardust/deny.sh"}
                 ],
                 "outbound": [
                     {"url": "http://127.0.0.1:9000/hook", "events": ["on_session_end"]}

@@ -220,7 +220,7 @@ def ack_incident(incident_id: str) -> bool:
 def close_incidents_for_recovered_job(job_id: str) -> int:
     """Mark every open incident for ``job_id`` ``resolved`` after a successful run; returns how many.
     Without this the ledger only ever grows: a one-off failure (a config drift skip, a provider
-    outage) stayed ``detected``/``alerted`` forever after the job recovered, so ``hermes cron
+    outage) stayed ``detected``/``alerted`` forever after the job recovered, so ``stardust cron
     incidents`` showed dozens of "open" incidents for jobs that had been green for weeks (32 of 32 on
     one install). ``resolved`` is distinct from the operator's ``closed`` on purpose: a repeat of the
     same error re-opens a resolved incident and alerts again (see ``upsert_incident``), whereas

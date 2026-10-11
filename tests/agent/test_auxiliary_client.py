@@ -277,7 +277,7 @@ class TestMoaAggregatorSharedResolution:
     def _write_moa_config(tmp_path, monkeypatch, default_preset="opus-gpt"):
         import yaml
 
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".stardust"
         home.mkdir(exist_ok=True)
         (home / "config.yaml").write_text(
             yaml.safe_dump(
@@ -585,7 +585,7 @@ class TestResolveXaiOAuthForAux:
     def test_uses_pool_backed_credentials_without_singleton(self, tmp_path, monkeypatch):
         """Auxiliary xAI OAuth must see pool-only credentials.
 
-        ``hermes auth status`` already reports these as logged in; compression
+        ``stardust auth status`` already reports these as logged in; compression
         should not fall through to "no auxiliary provider configured" just
         because the singleton auth-store entry is absent.
         """
@@ -820,7 +820,7 @@ class TestResolveProviderClientUniversalModelFallback:
 
     Aux tasks (title generation, vision, session search, etc.) routinely
     reach this function without an explicit model — the user's main
-    provider was picked via ``hermes model``, no per-task override is
+    provider was picked via ``stardust model``, no per-task override is
     set, and the expectation is "just use my main model for side tasks
     too."  The resolver fills in ``model`` from a 3-step universal
     fallback before any provider branch runs:

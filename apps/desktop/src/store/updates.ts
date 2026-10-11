@@ -155,7 +155,7 @@ function isInstallMethodToastSnoozed(): boolean {
  * Guard against a desktop GUI talking to a backend that predates its contract
  * (for example, an older remote checkout). Stardust owns backend maintenance
  * outside the inherited desktop updater, so this is deliberately warning-only:
- * it must never offer the old one-click `hermes update` action.
+ * it must never offer the old one-click `stardust update` action.
  *
  * Runs on every session open; closing the toast snoozes it for a cooldown so it
  * doesn't nag on every thread switch.
@@ -466,15 +466,15 @@ export async function applyUpdates(opts: DesktopUpdateApplyOptions = {}): Promis
     const result = await bridge.apply(opts)
 
     // CLI install with no staged updater: not an error — the user just runs
-    // `hermes update` themselves. Land on a dedicated manual state so the
+    // `stardust update` themselves. Land on a dedicated manual state so the
     // overlay shows the command + copy button instead of a dead retry loop.
     if (result?.manual) {
       $updateApply.set({
         ...IDLE,
         applying: false,
         stage: 'manual',
-        message: result.command ?? 'hermes update',
-        command: result.command ?? 'hermes update'
+        message: result.command ?? 'stardust update',
+        command: result.command ?? 'stardust update'
       })
 
       return result
@@ -682,7 +682,7 @@ async function runBackendUpdate(): Promise<DesktopUpdateApplyResult> {
 
     if (!started.ok) {
       const message = (started as { message?: string }).message || translateNow('updates.applyStatus.notAvailable')
-      const command = (started as { update_command?: string }).update_command || 'hermes update'
+      const command = (started as { update_command?: string }).update_command || 'stardust update'
       $backendUpdateApply.set({ ...IDLE, applying: false, stage: 'manual', message, command })
 
       return { ok: false, error: 'manual', manual: true, message, command }

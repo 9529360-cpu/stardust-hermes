@@ -1876,7 +1876,7 @@ class TestSessionTitleLineage:
     def test_projected_tip_inherits_root_title_when_untitled(self, db):
         """A rotation that ended the root before the title carry ran leaves the name on the
         root only; the projected lineage row must still surface it (exact-title lookups such as
-        `hermes peer dm` -> canonical "Bot Chat", #106165). A titled tip keeps its own title."""
+        `stardust peer dm` -> canonical "Bot Chat", #106165). A titled tip keeps its own title."""
         import time as _time
         self._make_compression_chain(db, _time.time() - 3600)
         db.set_session_title("root", "Bot Chat")
@@ -2289,7 +2289,7 @@ class TestFtsRebuildLoopWithoutTrigram:
     single ``SessionDB`` open, holding the write lock, and never converged.
 
     The v23 repair also clears the deferred-rebuild resume markers, so an
-    interrupted ``hermes sessions optimize-storage`` silently lost its place
+    interrupted ``stardust sessions optimize-storage`` silently lost its place
     every time the store was reopened.
     """
 
@@ -5812,13 +5812,13 @@ class TestGatewayRoutingPkHeal:
 
     def test_legacy_pk_rebuilt_to_composite(self, tmp_path):
         db_path = self._make_legacy_db(
-            tmp_path, rows=[("/home/u/.hermes/sessions", "agent:main:telegram:dm:1", "{}", 1.0)]
+            tmp_path, rows=[("/home/u/.stardust/sessions", "agent:main:telegram:dm:1", "{}", 1.0)]
         )
         db = SessionDB(db_path=db_path)
         try:
             assert self._pk_cols(db) == ["scope", "session_key"]
             # Existing rows survive the rebuild.
-            entries = db.load_gateway_routing_entries(scope="/home/u/.hermes/sessions")
+            entries = db.load_gateway_routing_entries(scope="/home/u/.stardust/sessions")
             assert entries == {"agent:main:telegram:dm:1": "{}"}
         finally:
             db.close()

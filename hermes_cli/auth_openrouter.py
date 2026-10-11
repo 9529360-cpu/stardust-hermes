@@ -1,4 +1,4 @@
-"""OpenRouter OAuth PKCE login (``hermes auth add openrouter --type oauth``).
+"""OpenRouter OAuth PKCE login (``stardust auth add openrouter --type oauth``).
 
 Contract: https://openrouter.ai/docs/guides/overview/auth/oauth. The browser is sent to
 ``/auth?callback_url=...&code_challenge=...&code_challenge_method=S256``; the redirect carries

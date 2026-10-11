@@ -165,8 +165,8 @@ class TestFireOverdueJobs:
     def test_estop_skips_sweep_and_next_sweep_after_resume_catches_up(
         self, tmp_cron_dir, tmp_path, monkeypatch
     ):
-        """`hermes pause` must silence the backstop too — otherwise it force-fires every job
-        that ESTOP held back. Nothing to unwind: the first sweep after `hermes resume`
+        """`stardust pause` must silence the backstop too — otherwise it force-fires every job
+        that ESTOP held back. Nothing to unwind: the first sweep after `stardust resume`
         catches up through the ordinary claim_fire path."""
         from agent import estop
 

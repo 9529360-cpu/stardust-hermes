@@ -4,7 +4,7 @@ Regression for #108383: ``resolve_provider("auto")`` recognised only registry pr
 ``model.provider``, so the boot inventory (``free_tier_bootstrap``) read a llama.cpp / vLLM /
 ollama install as "nothing configured" and ``setup.status`` reported ``provider_configured:
 False`` — the dashboard's Ink chat parked every new session on "Setup Required" while
-``hermes chat`` (which resolves the runtime directly) worked against the same config.
+``stardust chat`` (which resolves the runtime directly) worked against the same config.
 """
 
 from __future__ import annotations

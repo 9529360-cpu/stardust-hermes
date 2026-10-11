@@ -10,7 +10,7 @@ this fixture covers both because they pull in opposite directions.
 it returns when the *pipe* reaches EOF. On Windows the write end of a redirected
 pipe is handed to the child as an inheritable handle, so every descendant
 spawned without its own redirection holds a duplicate, and EOF waits for the
-last of them to close it. ``hermes update`` deliberately runs build steps with
+last of them to close it. ``stardust update`` deliberately runs build steps with
 stdout inherited (the tee-stderr runner in ``hermes_cli/main.py``), so the
 process tree under a step is arbitrarily deep and not something the hand-off can
 enumerate. When one of those descendants is a resident gateway, the pipe never
@@ -28,7 +28,7 @@ is metered at one buffer per tick (16 KiB / 150ms ~ 107 KB/s), and because the
 pipe then backs up that is backpressure on the *running* step, not just a slow
 read -- a chatty step blocks on ``write()`` waiting for the reader. Measured on
 this fixture's own flood arm: 4 MiB took 39.1s metered vs 0.09s unmetered, and a
-step writing to both pipes took 18.3s vs 0.29s. ``hermes update`` is exactly this
+step writing to both pipes took 18.3s vs 0.29s. ``stardust update`` is exactly this
 shape; the Electron/vite build alone is megabytes.
 
 **Live child stall (#95589).** A step can also finish its visible update work
@@ -59,7 +59,7 @@ WINDOWS_PS1 = REPO_ROOT / "scripts" / "desktop-update" / "windows.ps1"
 class TestIdleWatchdogCountsUpdateLogGrowth:
     """The idle watchdog must count logs/update.log growth as progress.
 
-    Real updates are stdout-silent for 40+ minutes: ``hermes update`` captures
+    Real updates are stdout-silent for 40+ minutes: ``stardust update`` captures
     the (very loud) Electron/vite build into ``logs/update.log`` — NOT the
     child's stdout (``hermes_cli/update_cmd.py``, the update-log tee) — so the
     step's pipes go quiet for the whole build while the update is demonstrably
@@ -153,7 +153,7 @@ def test_update_step_survives_pipe_leak_flood_and_live_child_stall(
 
     *logstall* -- a step that is silent on its pipes but appends to the
     progress log (pointed at the fixture's own file) every second, exiting 3.
-    This is the shape of every real ``hermes update`` build: output streams to
+    This is the shape of every real ``stardust update`` build: output streams to
     ``logs/update.log``, not stdout, for 40+ minutes. The idle watchdog must
     count that growth as progress and let the step run to its natural exit
     instead of killing it at the ceiling with 124.

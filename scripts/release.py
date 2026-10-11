@@ -153,7 +153,7 @@ LEGACY_AUTHOR_MAP = {
     "ahmet.tunc@gmail.com": "Ahmett101",  # PR #58445 salvage (profiles: allowlist default-export roots + preserve symlinks)
     "ignaciopastorsan@gmail.com": "IpastorSan",  # PR #63690 salvage (codex: rescue reasoning-only turns that die after 3 continuation attempts)
     "Ahmett101@users.noreply.github.com": "Ahmett101",  # PR #59455 salvage (background-review: guard summarize against list-shaped tool responses; #59437)
-    "wyuebei@gmail.com": "wyuebei-cloud",  # PR #56640 salvage (hermes journey: replace GNU-only %-d strftime with dt.day for Windows)
+    "wyuebei@gmail.com": "wyuebei-cloud",  # PR #56640 salvage (stardust journey: replace GNU-only %-d strftime with dt.day for Windows)
     "yingwaizhiying@gmail.com": "msh01",  # PR #58250 salvage (telegram: wall-clock init timeout via daemon-thread deadline + abandon the shielded initialize task on timeout so the retry ladder advances instead of hanging on attempt 1/8 under s6 supervision; #58236). Also covers PR #58276 salvage (compression: preserve a real user turn after compaction; #55677).
     "danilo@falcao.org": "danilofalcao",  # PR #56674 salvage (update: skip unsupported platform.matrix lazy refresh on native Windows — python-olm has no Windows wheel)
     "huanshan5195@users.noreply.github.com": "huanshan5195",  # PR #57601 salvage (custom-provider: emit reasoning_effort at the live CustomProfile path so GLM-5.2/ARK/vLLM/Ollama endpoints receive it; + "max" reasoning level)
@@ -166,7 +166,7 @@ LEGACY_AUTHOR_MAP = {
     "ai-lab@foxmail.com": "CrazyBoyM",  # PR #55828 salvage (image_gen openai-codex: wire image-to-image / reference-image editing via Codex Responses input_image parts; magic-byte + read-guard + 25MB-cap + clamp-to-16 hardening)
     "r0gersm1th@users.noreply.github.com": "r0gersm1th",  # PR #3219 salvage (whatsapp bridge: resolve LID sender IDs to phone numbers in the message payload so phone-based allowlists match; commit authored by collaborator r0gersm1th, PR by @ajmeese7)
     "louis@letsfive.io": "Mibayy",  # PR #3296 salvage (status: provider label honors config.yaml model.base_url, not just OPENAI_BASE_URL env)
-    "me@keslerm.com": "keslerm",  # PR #3459 salvage (gateway: 'log' tool_progress mode — silent in chat, tool calls appended to ~/.hermes/logs/tool_calls.log via rotating handler; duplicate of #3458 by @dlkakbs who submitted 4 min earlier — both credited)
+    "me@keslerm.com": "keslerm",  # PR #3459 salvage (gateway: 'log' tool_progress mode — silent in chat, tool calls appended to ~/.stardust/logs/tool_calls.log via rotating handler; duplicate of #3458 by @dlkakbs who submitted 4 min earlier — both credited)
     "david.d.zhang@gmail.com": "Git-on-my-level",  # PR #3659 salvage (gateway: persist per-session /model overrides across gateway restarts)
     "tarunravi@gmail.com": "tarunravi",  # PR #2696 salvage (api-server: inline MEDIA:<path> image tags as base64 data URLs in final responses so remote OpenAI-compatible frontends can render server-local screenshots; the PR's tool-progress-streaming and SSE-sentinel pieces were independently superseded on main)
     "aqdrgg19@gmail.com": "VolodymyrBg",  # PR #2861 salvage (webhook: drop the unused full request payload from retained _delivery_info entries — up to ~1MB dead weight per delivery for the 1h idempotency TTL)
@@ -1376,7 +1376,7 @@ LEGACY_AUTHOR_MAP = {
     "84022+gnodet@users.noreply.github.com": "gnodet",  # PR #37598 salvage (MCP preflight POST probe fallback)
     "kaishi00@users.noreply.github.com": "kaishi00",  # PR #55203 salvage (skip_preflight opt-out)
     "setclock@Marins-Mac-mini.local": "setclock",  # PR #27052 salvage (MCP session-expired retry waits for a distinct fresh session)
-    "sberan@gmail.com": "sberan",  # PR #54494 salvage (--connect-timeout flag on hermes mcp add)
+    "sberan@gmail.com": "sberan",  # PR #54494 salvage (--connect-timeout flag on stardust mcp add)
     "michaelmusser@users.noreply.github.com": "labsobsidian",  # PR #56699 salvage (MCP OAuth login connect_timeout floor)
     "saul.jj.wu@gmail.com": "SaulJWu",
     "shenhaocheng19990111@gmail.com": "hcshen0111",

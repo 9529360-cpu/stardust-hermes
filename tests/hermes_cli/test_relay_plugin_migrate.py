@@ -1,4 +1,4 @@
-"""``hermes update`` / ``hermes migrate relay``: legacy ``STARDUST_NEMO_RELAY_ATIF_*``/``ATOF_*`` vars
+"""``stardust update`` / ``stardust migrate relay``: legacy ``STARDUST_NEMO_RELAY_ATIF_*``/``ATOF_*`` vars
 become a validated ``relay-plugins.toml`` per profile home, selected from ``.env``."""
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ def _parse_env(path: Path) -> dict[str, str]:
 
 @pytest.fixture
 def profile_env(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     monkeypatch.setenv("STARDUST_HOME", str(home))

@@ -1,4 +1,4 @@
-"""Tests for hermes backup and import commands."""
+"""Tests for stardust backup and import commands."""
 
 import json
 import os
@@ -57,7 +57,7 @@ def _advance_backup_clock(seconds: float = 1.1) -> None:
 
 
 def _make_hermes_tree(root: Path) -> None:
-    """Create a realistic ~/.hermes directory structure for testing."""
+    """Create a realistic ~/.stardust directory structure for testing."""
     (root / "config.yaml").write_text("model:\n  provider: openrouter\n")
     (root / ".env").write_text("OPENROUTER_API_KEY=sk-test-123\n")
     for db_name in ("memory_store.db", "hermes_state.db"):
@@ -222,7 +222,7 @@ class TestIterBackupFiles:
         this test pins the contract."""
         from hermes_cli.backup import _iter_backup_files
 
-        root = tmp_path / ".hermes"
+        root = tmp_path / ".stardust"
         root.mkdir()
         _make_hermes_tree(root)
 
@@ -247,7 +247,7 @@ class TestIterBackupFiles:
     def test_prunes_regenerable_caches_but_keeps_durable_and_nested(self, tmp_path):
         from hermes_cli.backup import _iter_backup_files
 
-        root = tmp_path / ".hermes"
+        root = tmp_path / ".stardust"
         root.mkdir()
         files = {
             "cache/model_catalog.json": False,
@@ -273,7 +273,7 @@ class TestIterBackupFiles:
     def test_skipped_dirs_collected_for_summary(self, tmp_path):
         from hermes_cli.backup import _iter_backup_files
 
-        root = tmp_path / ".hermes"
+        root = tmp_path / ".stardust"
         root.mkdir()
         _make_hermes_tree(root)
         (root / "models").mkdir()
@@ -288,7 +288,7 @@ class TestIterBackupFiles:
     def test_skips_unix_sockets(self, tmp_path, monkeypatch):
         from hermes_cli.backup import _iter_backup_files
 
-        root = tmp_path / ".hermes"
+        root = tmp_path / ".stardust"
         root.mkdir()
         # AF_UNIX paths are capped at ~108 bytes; pytest's tmp_path overflows that under the
         # test runner's deep temp root, so bind by a relative name from inside ``root``.
@@ -312,7 +312,7 @@ class TestBackup:
         """SQLite staging temp files must be created on the output zip's
         filesystem (dir=out_path.parent), NOT the system /tmp default — a
         small tmpfs there silently drops large DBs from the backup (#35376)."""
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         _make_hermes_tree(hermes_home)
 
@@ -343,7 +343,7 @@ class TestBackup:
     def test_pre_update_db_snapshots_staged_beside_output_zip(self, tmp_path, monkeypatch):
         """The pre-update/pre-migration zip path (_write_full_zip_backup) must
         also stage SQLite snapshots beside its output zip, not in /tmp."""
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         _make_hermes_tree(hermes_home)
 
@@ -375,7 +375,7 @@ class TestBackup:
 
     def test_skips_symlinked_files(self, tmp_path, monkeypatch):
         """Backup must not dereference symlinks and leak files outside STARDUST_HOME."""
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         _make_hermes_tree(hermes_home)
         outside = tmp_path / "outside-secret.txt"
@@ -400,7 +400,7 @@ class TestBackup:
         """A quick snapshot left under state-snapshots/ must not be re-shipped
         by the full backup — each snapshot already holds a copy of state.db, so
         nesting them multiplies the archive by (1 + retained snapshots)."""
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         _make_hermes_tree(hermes_home)
         with sqlite3.connect(hermes_home / "state.db") as conn:
@@ -466,7 +466,7 @@ class TestImport:
         (the install-then-import dead-gateway bug)."""
         import hermes_cli.gateway as gateway_mod
 
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -490,7 +490,7 @@ class TestImport:
         """A live gateway is left alone — no reinstall churn during import."""
         import hermes_cli.gateway as gateway_mod
 
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -513,7 +513,7 @@ class TestImport:
     def test_import_survives_service_layer_import_failure(self, tmp_path, monkeypatch, capsys):
         """If the service helpers can't even be reached, import still completes
         and prints the manual fallback."""
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -533,7 +533,7 @@ class TestImport:
 
         out = capsys.readouterr().out
         assert "Done. Your Hermes configuration has been restored." in out
-        assert "hermes gateway install" in out
+        assert "stardust gateway install" in out
 
 
 
@@ -545,7 +545,7 @@ class TestImport:
         """The skip is matched by basename, so a named profile's
         gateway_state.json (profiles/<name>/gateway_state.json) is preserved
         the same way the root profile's is."""
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         (hermes_home / "profiles" / "coder").mkdir(parents=True)
         monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -575,7 +575,7 @@ class TestImport:
         """gateway.pid / cron.pid / gateway.lock / processes.json from a backup
         reference the source machine's process namespace and must never be
         written over the target's."""
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -610,7 +610,7 @@ class TestImport:
     @pytest.mark.skipif(os.name != "posix", reason="POSIX file permissions only")
     def test_restores_secret_files_with_0600_perms(self, tmp_path, monkeypatch):
         """Secret files must end up at 0600 after restore (zipfile drops mode bits)."""
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -642,7 +642,7 @@ class TestRoundTrip:
     def test_backup_then_import(self, tmp_path, monkeypatch):
         """Full round-trip: backup -> import to a new location -> verify."""
         # Source
-        src_home = tmp_path / "source" / ".hermes"
+        src_home = tmp_path / "source" / ".stardust"
         src_home.mkdir(parents=True)
         _make_hermes_tree(src_home)
 
@@ -657,7 +657,7 @@ class TestRoundTrip:
         assert out_zip.exists()
 
         # Import into a different location
-        dst_home = tmp_path / "dest" / ".hermes"
+        dst_home = tmp_path / "dest" / ".stardust"
         dst_home.mkdir(parents=True)
         monkeypatch.setenv("STARDUST_HOME", str(dst_home))
         monkeypatch.setattr(Path, "home", lambda: tmp_path / "dest")
@@ -723,8 +723,8 @@ class TestValidation:
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w") as zf:
             # Only directory entries (trailing slash)
-            zf.writestr(".hermes/", "")
-            zf.writestr(".hermes/skills/", "")
+            zf.writestr(".stardust/", "")
+            zf.writestr(".stardust/skills/", "")
         buf.seek(0)
         with zipfile.ZipFile(buf, "r") as zf:
             assert _detect_prefix(zf) == ""
@@ -739,7 +739,7 @@ class TestBackupEdgeCases:
 
     def test_empty_hermes_home(self, tmp_path, monkeypatch):
         """Backup handles empty hermes home (no files to back up)."""
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         # Only excluded dirs, no actual files
         (hermes_home / "__pycache__").mkdir()
@@ -759,7 +759,7 @@ class TestBackupEdgeCases:
 
     def test_pre1980_timestamp_skipped(self, tmp_path, monkeypatch):
         """Backup skips files with pre-1980 timestamps (ZIP limitation)."""
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         (hermes_home / "config.yaml").write_text("model: test\n")
 
@@ -796,7 +796,7 @@ class TestImportEdgeCases:
 
     def test_eof_during_confirmation(self, tmp_path, monkeypatch):
         """Import handles EOFError during confirmation prompt."""
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         (hermes_home / "config.yaml").write_text("existing\n")
         monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
@@ -816,7 +816,7 @@ class TestImportEdgeCases:
 
     def test_progress_with_many_files(self, tmp_path, monkeypatch):
         """Import shows progress with 500+ files."""
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -872,7 +872,7 @@ def _break_member(monkeypatch, failing_member: str) -> None:
 
 
 class TestImportAtomicWrites:
-    """`hermes import` must never leave a user's file truncated.
+    """`stardust import` must never leave a user's file truncated.
 
     The pre-fix code did ``open(target, "wb")`` then ``dst.write(src.read())``,
     which zeroes the existing file *before* any replacement bytes exist. These
@@ -888,7 +888,7 @@ class TestImportAtomicWrites:
 
     def test_failed_member_leaves_existing_file_intact(self, tmp_path, monkeypatch):
         """A dying member must not destroy the file it was replacing."""
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         original = "model: original\napi_key: keep-me\n"
         (hermes_home / "config.yaml").write_text(original)
@@ -911,7 +911,7 @@ class TestImportAtomicWrites:
         """Same invariant on the `_external/` branch, which writes outside STARDUST_HOME."""
         dst_home = tmp_path / "dst"
         dst_home.mkdir()
-        hermes_home = dst_home / ".hermes"
+        hermes_home = dst_home / ".stardust"
         hermes_home.mkdir()
         honcho = dst_home / ".honcho"
         honcho.mkdir()
@@ -942,7 +942,7 @@ class TestImportAtomicWrites:
         detach dotfiles-managed deployments (GitHub #16743). ``atomic_replace``
         resolves the link first.
         """
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         store = hermes_home / "store"
         store.mkdir()
@@ -968,7 +968,7 @@ class TestImportAtomicWrites:
         """Same guard on the `_external/` branch — the realistic dotfiles case."""
         dst_home = tmp_path / "dst"
         dst_home.mkdir()
-        hermes_home = dst_home / ".hermes"
+        hermes_home = dst_home / ".stardust"
         hermes_home.mkdir()
         dotfiles = dst_home / "dotfiles"
         dotfiles.mkdir()
@@ -1002,7 +1002,7 @@ class TestImportAtomicWrites:
         replaced has to survive the publish, or Docker/NAS installs that rely
         on broader permissions break on restore.
         """
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         target = hermes_home / "config.yaml"
         target.write_text("model: original\n")
@@ -1024,11 +1024,11 @@ class TestImportAtomicWrites:
         """A root-run import must not re-own the user's files to root.
 
         ``os.replace`` swaps in a temp file owned by the *writing* user, so a
-        ``sudo hermes import`` onto a user-owned (or Docker/NAS volume-owned)
+        ``sudo stardust import`` onto a user-owned (or Docker/NAS volume-owned)
         STARDUST_HOME would hand every restored file to root. The uid/gid is
         forced so the assertion does not require running as root.
         """
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         target = hermes_home / "config.yaml"
         target.write_text("model: original\n")
@@ -1066,7 +1066,7 @@ class TestImportAtomicWrites:
         ``shutil.copystat`` fallback would copy 0600 onto the target. Mirrors
         the transit-window fix ``atomic_yaml_write`` already carries.
         """
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         target = hermes_home / "config.yaml"
         target.write_text("model: original\n")
@@ -1108,7 +1108,7 @@ class TestImportAtomicWrites:
         file whose contents now come from the zip.  Whoever produced the
         archive would then get whatever that file executes as.  The other
         ``utils`` writers can preserve the full mode safely because they
-        re-serialize content this process produced; ``hermes import`` is the
+        re-serialize content this process produced; ``stardust import`` is the
         one write path where the bytes are untrusted, and it is also the path
         that documents ``sudo`` use for owner preservation.
 
@@ -1116,7 +1116,7 @@ class TestImportAtomicWrites:
         discards exactly the bits at issue, so this failure is invisible to
         them.
         """
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         target = hermes_home / "helper.sh"
         target.write_text("#!/bin/sh\necho original\n")
@@ -1178,7 +1178,7 @@ class TestProfileRestoration:
 
     def test_import_skips_profile_dirs_without_config(self, tmp_path, monkeypatch):
         """Import doesn't create wrappers for profile dirs without config."""
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -1337,7 +1337,7 @@ class TestQuickSnapshot:
     @pytest.fixture
     def hermes_home(self, tmp_path):
         """Create a fake STARDUST_HOME with critical state files."""
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".stardust"
         home.mkdir()
         (home / "config.yaml").write_text("model:\n  provider: openrouter\n")
         (home / ".env").write_text("OPENROUTER_API_KEY=test-key-123\n")
@@ -1392,7 +1392,7 @@ class TestQuickSnapshot:
 
     def test_restore_refused_db_is_not_counted(self, hermes_home, monkeypatch):
         """A refused live-safe restore (holder detected, backup leg failed) must
-        not be counted as a restored file — `hermes import` reports it, and
+        not be counted as a restored file — `stardust import` reports it, and
         /snapshot restore must not claim success for that file either."""
         import hermes_cli.backup as backup_mod
         from hermes_cli.backup import create_quick_snapshot, restore_quick_snapshot
@@ -1508,7 +1508,7 @@ class TestQuickSnapshot:
 
 
 # ---------------------------------------------------------------------------
-# Pre-update backup (hermes update safety net)
+# Pre-update backup (stardust update safety net)
 # ---------------------------------------------------------------------------
 
     # -- security: path traversal regression coverage -----------------------
@@ -1580,7 +1580,7 @@ class TestQuickSnapshotProjectsKanban:
 
     @pytest.fixture
     def hermes_home(self, tmp_path):
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".stardust"
         home.mkdir()
         # Minimal critical file so the snapshot is non-empty.
         (home / "config.yaml").write_text("model:\n  provider: openrouter\n")
@@ -1667,13 +1667,13 @@ class TestQuickSnapshotProjectsKanban:
 
 
 class TestPreUpdateBackup:
-    """Tests for create_pre_update_backup — the auto-backup ``hermes update``
+    """Tests for create_pre_update_backup — the auto-backup ``stardust update``
     runs before touching anything."""
 
 
     @pytest.fixture
     def hermes_home(self, tmp_path):
-        root = tmp_path / ".hermes"
+        root = tmp_path / ".stardust"
         root.mkdir()
         _make_hermes_tree(root)
         return root
@@ -1681,7 +1681,7 @@ class TestPreUpdateBackup:
 
     def test_backup_contents_match_full_backup(self, hermes_home):
         """Pre-update backup should include the same user data that
-        ``hermes backup`` would, and should exclude the same directories."""
+        ``stardust backup`` would, and should exclude the same directories."""
         from hermes_cli.backup import create_pre_update_backup
         out = create_pre_update_backup(hermes_home=hermes_home)
         assert out is not None
@@ -1701,7 +1701,7 @@ class TestPreUpdateBackup:
         assert "gateway.pid" not in names
 
     def test_pre_update_zip_does_not_nest_the_pre_update_snapshot(self, hermes_home):
-        """``hermes update`` in ``full`` mode takes the quick snapshot *before*
+        """``stardust update`` in ``full`` mode takes the quick snapshot *before*
         the full zip, so the zip walk sees the snapshot it just made. It must
         skip it — otherwise every pre-update zip ships state.db twice."""
         from hermes_cli.backup import (
@@ -1773,7 +1773,7 @@ class TestRunPreUpdateBackup:
 
     @pytest.fixture
     def hermes_home(self, tmp_path, monkeypatch):
-        root = tmp_path / ".hermes"
+        root = tmp_path / ".stardust"
         root.mkdir()
         _make_hermes_tree(root)
         # Point STARDUST_HOME at the temp dir so config + backup paths resolve here
@@ -1834,16 +1834,16 @@ class TestRunPreUpdateBackup:
 
 
 # ---------------------------------------------------------------------------
-# Pre-migration backup (hermes claw migrate safety net)
+# Pre-migration backup (stardust claw migrate safety net)
 # ---------------------------------------------------------------------------
 
 class TestPreMigrationBackup:
     """Tests for create_pre_migration_backup — the auto-backup
-    ``hermes claw migrate`` runs before mutating ~/.hermes/."""
+    ``stardust claw migrate`` runs before mutating ~/.stardust/."""
 
     @pytest.fixture
     def hermes_home(self, tmp_path):
-        root = tmp_path / ".hermes"
+        root = tmp_path / ".stardust"
         root.mkdir()
         _make_hermes_tree(root)
         return root
@@ -1851,7 +1851,7 @@ class TestPreMigrationBackup:
 
     def test_restorable_with_hermes_import(self, hermes_home, tmp_path):
         """The zip produced by pre-migration backup must be a valid Hermes
-        backup — `hermes import` should accept it."""
+        backup — `stardust import` should accept it."""
         from hermes_cli.backup import create_pre_migration_backup, _validate_backup_zip
         out = create_pre_migration_backup(hermes_home=hermes_home)
         assert out is not None
@@ -1882,7 +1882,7 @@ class TestPreMigrationBackup:
 # ---------------------------------------------------------------------------
 
 class TestRestoreCronJobsIfEmptied:
-    """`hermes update` config migration can leave cron/jobs.json valid-but-empty,
+    """`stardust update` config migration can leave cron/jobs.json valid-but-empty,
     silently dropping every scheduled job. `restore_cron_jobs_if_emptied` is the
     post-migration safety net that restores from the pre-update snapshot."""
 
@@ -1897,7 +1897,7 @@ class TestRestoreCronJobsIfEmptied:
 
     def test_restores_when_emptied_after_migration(self, tmp_path):
         from hermes_cli.backup import restore_cron_jobs_if_emptied
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         jobs_path = hermes_home / "cron" / "jobs.json"
         # Pre-update: 3 real jobs.
         self._seed_jobs(jobs_path, [{"id": "a"}, {"id": "b"}, {"id": "c"}])
@@ -1922,7 +1922,7 @@ class TestRestoreCronJobsIfEmptied:
         """Desktop scheduler overwrites jobs.json with its own small set,
         losing tool-created crons while keeping desktop-tracked ones."""
         from hermes_cli.backup import restore_cron_jobs_if_emptied
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         jobs_path = hermes_home / "cron" / "jobs.json"
         # Pre-update: 19 jobs (18 tool-created + 1 desktop watchdog).
         self._seed_jobs(
@@ -1985,7 +1985,7 @@ class TestRestoreConfigModelSettingsIfRewritten:
         import yaml
         from hermes_cli.backup import restore_config_model_settings_if_rewritten
 
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         cfg = self._seed(hermes_home)
         snap_id = self._make_snapshot(hermes_home)
         assert snap_id
@@ -2019,7 +2019,7 @@ class TestRestoreConfigModelSettingsIfRewritten:
     def test_noop_when_config_untouched(self, tmp_path):
         from hermes_cli.backup import restore_config_model_settings_if_rewritten
 
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         cfg = self._seed(hermes_home)
         snap_id = self._make_snapshot(hermes_home)
         before = cfg.read_text(encoding="utf-8")
@@ -2036,7 +2036,7 @@ class TestRestoreConfigModelSettingsIfRewritten:
         import yaml
         from hermes_cli.backup import restore_config_model_settings_if_rewritten
 
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         cfg = self._seed(hermes_home)
         snap_id = self._make_snapshot(hermes_home)
 
@@ -2061,7 +2061,7 @@ class TestRestoreConfigModelSettingsIfRewritten:
         if the update writes those keys fresh — nothing of the user's was lost."""
         from hermes_cli.backup import restore_config_model_settings_if_rewritten
 
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir(parents=True)
         cfg = hermes_home / "config.yaml"
         cfg.write_text("_config_version: 39\nagent: {}\n", encoding="utf-8")
@@ -2080,7 +2080,7 @@ class TestRestoreConfigModelSettingsIfRewritten:
         the safety net leaves it alone (mirrors the cron net's posture)."""
         from hermes_cli.backup import restore_config_model_settings_if_rewritten
 
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         cfg = self._seed(hermes_home)
         snap_id = self._make_snapshot(hermes_home)
 
@@ -2095,7 +2095,7 @@ class TestRestoreConfigModelSettingsIfRewritten:
         from hermes_cli.backup import restore_config_model_settings_if_rewritten
 
         assert restore_config_model_settings_if_rewritten(
-            "", hermes_home=tmp_path / ".hermes"
+            "", hermes_home=tmp_path / ".stardust"
         ) is None
 
 
@@ -2121,7 +2121,7 @@ class TestMemoryProviderExternalPaths:
     def test_backup_skips_external_paths_outside_home(self, tmp_path, monkeypatch):
         """A declared path outside the home dir is not portable and must be
         skipped, never archived."""
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         self._make_min_tree(hermes_home)
         outside = tmp_path.parent / "outside-home-secret"
         outside.mkdir(exist_ok=True)
@@ -2150,7 +2150,7 @@ class TestMemoryProviderExternalPaths:
         and credential-shaped files get 0600."""
         dst_home = tmp_path / "dst"
         dst_home.mkdir()
-        hermes_home = dst_home / ".hermes"
+        hermes_home = dst_home / ".stardust"
         hermes_home.mkdir()
 
         zip_path = tmp_path / "backup.zip"
@@ -2181,7 +2181,7 @@ class TestMemoryProviderExternalPaths:
 
 
 class TestImportHonorsHermesHomeOverride:
-    """`hermes import` must restore into the home the command runs under.
+    """`stardust import` must restore into the home the command runs under.
 
     Resolving the target through get_default_hermes_root() maps a profile
     home (<root>/profiles/<name>) back to <root>: the import then overwrites
@@ -2339,7 +2339,7 @@ def _write_session_db(path: Path, sessions: int, messages_per_session: int) -> N
 
 
 class TestImportLiveSessionDatabase:
-    """`hermes import` must not swap the inode of a database Hermes holds open.
+    """`stardust import` must not swap the inode of a database Hermes holds open.
 
     Publishing state.db with a rename leaves any live gateway/dashboard/WebUI
     connection reading and writing the unlinked inode, so its sessions vanish
@@ -2351,7 +2351,7 @@ class TestImportLiveSessionDatabase:
             zf.write(db_path, "state.db")
 
     def _prepare(self, tmp_path, monkeypatch, live=(3, 4), backup=(2, 2)):
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".stardust"
         home.mkdir()
         monkeypatch.setenv("STARDUST_HOME", str(home))
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -2454,7 +2454,7 @@ class TestImportLiveSessionDatabase:
         """A fresh install has no inode to preserve; the member still lands."""
         from hermes_cli.backup import run_import
 
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".stardust"
         home.mkdir()
         monkeypatch.setenv("STARDUST_HOME", str(home))
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -2480,12 +2480,12 @@ def _count_rows(db_path: Path) -> tuple[int, int]:
 
 
 def test_run_backup_prunes_older_default_named_zips_but_not_others(tmp_path, monkeypatch):
-    """Hourly `hermes backup` callers accumulated 150+ zips; --keep bounds the default-named
+    """Hourly `stardust backup` callers accumulated 150+ zips; --keep bounds the default-named
     ones and leaves custom-named or foreign zips alone (#81317)."""
     from argparse import Namespace
     from hermes_cli import backup as backup_mod
 
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     (home / "config.yaml").write_text("model: x\n")
     monkeypatch.setenv("STARDUST_HOME", str(home))

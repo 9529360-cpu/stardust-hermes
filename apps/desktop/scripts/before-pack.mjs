@@ -23,7 +23,7 @@
  *   ENOENT: no such file or directory, rename
  *   '.../release/linux-unpacked/electron' -> '.../release/linux-unpacked/Hermes'
  *
- * This is a hard failure with no obvious cause for the user — `hermes desktop`
+ * This is a hard failure with no obvious cause for the user — `stardust desktop`
  * just prints "Desktop GUI build failed" and the only fix is to manually
  * `rm -rf` the release directory, which a normal user has no way to know.
  *
@@ -83,7 +83,7 @@ export function cleanStaleAppOutDir(appOutDir) {
  * cleanStaleAppOutDir exists to remove). If the fresh pack then produces a
  * Stardust.exe that Windows can't load (truncated PE from a corrupt cached
  * Electron zip, wrong arch), the updater's integrity gate in
- * `hermes desktop --build-only` (hermes_cli/main.py
+ * `stardust desktop --build-only` (hermes_cli/main.py
  * `_ensure_desktop_exe_launchable`) restores this .bak instead of leaving the
  * user with "This app can't run on your computer".
  *

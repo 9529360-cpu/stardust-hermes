@@ -56,14 +56,14 @@ def detect_service_manager() -> ServiceManagerKind:
     """Return "s6" (s6-svscan is PID 1), "windows", "launchd", "systemd" (working bus) or "none".
 
     Does NOT replace ``supports_systemd_services()`` for host call sites; it exists for
-    backend-agnostic code (profile hooks, the s6 dispatch in ``hermes gateway``).
+    backend-agnostic code (profile hooks, the s6 dispatch in ``stardust gateway``).
     """
     # Deferred so importing this module (Protocol type, validate_profile_name) doesn't drag in
     # the whole gateway dependency graph.
     from hermes_cli.gateway import is_macos, is_windows, supports_systemd_services
     # Gate on _s6_running() alone, NOT is_container(): the latter only detects Docker/Podman/lxc
     # and is False on Fly's Firecracker microVMs even though s6-overlay is PID 1 there — that
-    # made the s6 dispatch inert on Fly, so `hermes gateway start` spawned a foreground gateway
+    # made the s6 dispatch inert on Fly, so `stardust gateway start` spawned a foreground gateway
     # competing with the supervised one.
     if _s6_running():
         return "s6"
@@ -100,7 +100,7 @@ def _s6_running() -> bool:
 # ---------------------------------------------------------------------------
 # Host backends: thin facades over ``hermes_cli.gateway`` (systemd/launchd) and
 # ``hermes_cli.gateway_windows``. The protocol's ``name`` parameter is unused here — host backends
-# operate on the currently active profile (``hermes -p <profile>``); the shape exists for s6 where
+# operate on the currently active profile (``stardust -p <profile>``); the shape exists for s6 where
 # each profile maps to a distinct service directory.
 # ---------------------------------------------------------------------------
 
@@ -216,7 +216,7 @@ def get_service_manager() -> ServiceManager:
 
 # ---------------------------------------------------------------------------
 # S6ServiceManager (container-only). Per-profile gateways are registered dynamically by
-# `hermes profile create` inside the container. Static services (main-hermes, dashboard) live in
+# `stardust profile create` inside the container. Static services (main-hermes, dashboard) live in
 # /etc/s6-overlay/s6-rc.d/ as part of the image and are NOT managed here.
 # ---------------------------------------------------------------------------
 
@@ -286,7 +286,7 @@ def _s6_run(cmd: str, *args: str, timeout: float = 5, check: bool = False):
     )
 
 
-# UID/GID of the in-image ``hermes`` user; hardcoded to match what ``stage2-hook.sh`` enforces
+# UID/GID of the in-image ``stardust`` user; hardcoded to match what ``stage2-hook.sh`` enforces
 # (tests/docker/test_uid_remap.py). s6-supervise starts as root and drops via ``s6-setuidgid``.
 _HERMES_UID = 10000
 _HERMES_GID = 10000
@@ -365,7 +365,7 @@ class GatewayNotRegisteredError(S6Error):
         self.profile = profile
         super().__init__(
             f"no such gateway {profile!r}: register it with "
-            f"`hermes profile create {profile}` first, or pass "
+            f"`stardust profile create {profile}` first, or pass "
             "an existing profile name via `-p <name>`",
             service=f"gateway-{profile}",
         )
@@ -438,7 +438,7 @@ class S6ServiceManager:
         # hermes_cli.main._apply_profile_override; kept alongside the s6 one for back-compat.
         lines.append("export STARDUST_SUPERVISED_CHILD=1")
         # ``--replace`` makes the supervised gateway authoritative for its STARDUST_HOME. Without it
-        # a gateway started OUTSIDE s6 (stray ``hermes gateway run``, an agent action, the Open
+        # a gateway started OUTSIDE s6 (stray ``stardust gateway run``, an agent action, the Open
         # WebUI helper) grabs the PID lock first; the slot then hits "Another gateway instance is
         # already running", exits non-zero, and s6 restarts it forever — a log-flooding loop that
         # never binds. ``--replace`` reaps the stale holder (marker + SIGTERM→SIGKILL-with-
@@ -446,9 +446,9 @@ class S6ServiceManager:
         # above prevents the run→start→run recursion. s6 guarantees one supervised instance per
         # slot, so there is no legitimate sibling for ``--replace`` to clobber.
         if profile == "default":
-            gateway_cmd = "hermes gateway run --replace"
+            gateway_cmd = "stardust gateway run --replace"
         else:
-            gateway_cmd = f"hermes -p {shlex.quote(profile)} gateway run --replace"
+            gateway_cmd = f"stardust -p {shlex.quote(profile)} gateway run --replace"
         # Skip the drop when already non-root (setgroups() lacks CAP_SETGID → s6 boot-loop).
         lines.append(f'[ "$(id -u)" = 0 ] || exec {gateway_cmd}')
         lines.append(f"exec s6-setuidgid hermes {gateway_cmd}")

@@ -26,7 +26,7 @@ import { isCtrl } from './types.js'
  * production bundle can import it — no bundler, no JSX; `sdk.h` is
  * React.createElement.
  *
- * Trust model matches `~/.hermes/plugins/`: files under STARDUST_HOME execute
+ * Trust model matches `~/.stardust/plugins/`: files under STARDUST_HOME execute
  * with the TUI's privileges. Load errors log and skip — a broken widget
  * never takes the TUI down.
  */
@@ -58,7 +58,7 @@ export const widgetSdk = {
 
 export type WidgetSdk = typeof widgetSdk
 
-const widgetsDir = () => join(process.env.STARDUST_HOME?.trim() || join(homedir(), '.hermes'), 'tui-widgets')
+const widgetsDir = () => join(process.env.STARDUST_HOME?.trim() || join(homedir(), '.stardust'), 'tui-widgets')
 
 export interface UserWidgetLoadResult {
   /** App ids newly registered by this scan. */

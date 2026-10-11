@@ -253,7 +253,7 @@ class TestStreamRunMediaStripping:
 
         # Feed deltas
         consumer.on_delta("Here is your generated image\n")
-        consumer.on_delta("MEDIA:/home/user/.hermes/cache/images/abc123.png")
+        consumer.on_delta("MEDIA:/home/user/.stardust/cache/images/abc123.png")
         consumer.finish()
 
         await consumer.run()

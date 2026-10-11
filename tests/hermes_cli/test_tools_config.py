@@ -471,7 +471,7 @@ class TestAgentBrowserPostSetup:
         The install command must use that same resolved npx, not silently
         hand subprocess.run a None argument from a bare shutil.which('npx')
         re-derivation (#43564 regression — Copilot review, task #9)."""
-        hermes_npx = "/home/user/.hermes/node/bin/npx"
+        hermes_npx = "/home/user/.stardust/node/bin/npx"
         with patch("shutil.which", return_value=None), patch(
             "subprocess.run"
         ) as run, patch(
@@ -777,7 +777,7 @@ class TestImagegenModelPicker:
 def test_get_effective_configurable_toolsets_dedupes_bundled_plugins():
     """Bundled plugins (plugins/spotify) share their toolset key with the
     built-in CONFIGURABLE_TOOLSETS entry. The effective list must not list
-    them twice — otherwise `hermes tools` → "reconfigure existing" shows
+    them twice — otherwise `stardust tools` → "reconfigure existing" shows
     the same toolset two rows in a row.
     """
     from hermes_cli.tools_config import _get_effective_configurable_toolsets
@@ -897,7 +897,7 @@ def test_visible_video_providers_hide_all_nous_managed_rows():
 # ── Windows console-flash guard for post-setup subprocess spawns ──────────────
 #
 # The desktop GUI runs post-setup hooks through a detached, console-less
-# `hermes tools post-setup <key>` child. On Windows each console child (npm,
+# `stardust tools post-setup <key>` child. On Windows each console child (npm,
 # npx, pip, powershell) spawned without CREATE_NO_WINDOW materializes a brand
 # new console window — the "terminal flash" reported on the Capabilities
 # browser-setup journey. `_post_setup_no_window_flags` is the single wrapper
@@ -941,7 +941,7 @@ def test_agent_disabled_toolsets_still_wins():
 
 def test_agent_disabled_toolsets_json_array_string_form_still_wins():
     """#86661: the suppression list may arrive as a JSON-array string (e.g.
-    `hermes config set agent.disabled_toolsets '["memory"]'`). It must be
+    `stardust config set agent.disabled_toolsets '["memory"]'`). It must be
     parsed, not treated as one dead toolset name that filters nothing."""
     config = {"platform_toolsets": {"cli": ["memory"]}}
     import json as _json
@@ -969,7 +969,7 @@ def test_agent_disabled_toolsets_python_literal_string_form_still_wins():
 
 def test_disabled_composite_debugging_prunes_constituent_platform_toolsets():
     """#97015: ``agent.disabled_toolsets: [debugging]`` must hide member
-    toolsets on ``hermes tools --summary``, not only strip them at runtime."""
+    toolsets on ``stardust tools --summary``, not only strip them at runtime."""
     config = {
         "platform_toolsets": {"cli": ["hermes-cli"]},
         "agent": {"disabled_toolsets": ["debugging"]},

@@ -25,7 +25,7 @@ def profiles():
 def test_default_export_path_is_managed_and_outside_named_profiles(
     tmp_path, monkeypatch, profiles
 ):
-    default_home = tmp_path / ".hermes"
+    default_home = tmp_path / ".stardust"
     default_home.mkdir()
     monkeypatch.setattr(profiles, "_get_default_hermes_home", lambda: default_home)
 
@@ -84,7 +84,7 @@ def test_cli_export_rejects_bad_profile_name_without_traceback(
 ):
     """A bad name must print a clean error — the helper raises before export."""
     main_mod = importlib.import_module("hermes_cli.main")
-    default_home = tmp_path / ".hermes"
+    default_home = tmp_path / ".stardust"
     default_home.mkdir()
     monkeypatch.setattr(profiles, "_get_default_hermes_home", lambda: default_home)
 
@@ -105,7 +105,7 @@ def test_cli_export_default_does_not_write_into_the_current_checkout(
     tmp_path, monkeypatch, capsys, profiles
 ):
     main_mod = importlib.import_module("hermes_cli.main")
-    default_home = tmp_path / ".hermes"
+    default_home = tmp_path / ".stardust"
     default_home.mkdir()
     (default_home / "config.yaml").write_text("model: test\n", encoding="utf-8")
     checkout = tmp_path / "checkout"
@@ -135,7 +135,7 @@ def test_slash_export_uses_the_same_managed_destination(
     tmp_path, monkeypatch, profiles
 ):
     mixin_mod = importlib.import_module("hermes_cli.cli_commands_mixin")
-    default_home = tmp_path / ".hermes"
+    default_home = tmp_path / ".stardust"
     default_home.mkdir()
     monkeypatch.setattr(profiles, "_get_default_hermes_home", lambda: default_home)
     monkeypatch.setattr(profiles, "get_active_profile_name", lambda: "default")
@@ -218,7 +218,7 @@ def test_every_candidate_inside_a_checkout_fails_closed(
 def test_export_dir_symlink_is_rejected(tmp_path, monkeypatch, profiles):
     """A pre-created symlink at the managed export path (predictable-path
     attack on shared hosts) must be refused, not silently followed."""
-    default_home = tmp_path / ".hermes"
+    default_home = tmp_path / ".stardust"
     default_home.mkdir()
     elsewhere = tmp_path / "elsewhere"
     elsewhere.mkdir()

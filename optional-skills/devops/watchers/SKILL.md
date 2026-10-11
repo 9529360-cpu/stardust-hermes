@@ -62,7 +62,7 @@ python $STARDUST_HOME/skills/devops/watchers/scripts/watch_rss.py \
   --name hn --url https://news.ycombinator.com/rss --max 5
 ```
 
-Watch a GitHub repo (set `GITHUB_TOKEN` in `${STARDUST_HOME:-~/.hermes}/.env` to avoid the 60 req/hr anonymous rate limit):
+Watch a GitHub repo (set `GITHUB_TOKEN` in `${STARDUST_HOME:-~/.stardust}/.env` to avoid the 60 req/hr anonymous rate limit):
 
 ```bash
 python $STARDUST_HOME/skills/devops/watchers/scripts/watch_github.py \

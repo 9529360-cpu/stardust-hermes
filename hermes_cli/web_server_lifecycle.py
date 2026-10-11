@@ -261,7 +261,7 @@ def _is_serve_orphaned(
     """True when the exact Desktop process that owns this backend is gone.
 
     ``STARDUST_PARENT_PID`` is the Electron PID, not necessarily our PPID (the
-    Windows ``hermes.exe`` launcher adds shims), so never compare getppid().
+    Windows ``stardust.exe`` launcher adds shims), so never compare getppid().
     The start marker (newer Desktops) defeats PID recycling; PID-only probing
     stays for older ones. Any inconclusive failure keeps serving (fail-safe).
     """
@@ -422,7 +422,7 @@ def _report_port_in_use(host: str, port: int) -> None:
     _write_machine_sentinel_line(_PORT_IN_USE_SENTINEL.format(port=port))
     print(
         f"  Port {port} on {host} is already in use — likely another "
-        "'hermes serve' / 'hermes dashboard' backend or the Hermes gateway. "
+        "'stardust serve' / 'stardust dashboard' backend or the Hermes gateway. "
         "Stop the other process, or pass --port <other> "
         "(--port 0 picks a free ephemeral port).",
         flush=True,

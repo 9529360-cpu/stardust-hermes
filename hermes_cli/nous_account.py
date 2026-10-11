@@ -70,7 +70,7 @@ class NousToolAccessInfo:
 _ANON_ACCOUNT_TIER = "anonymous"
 # Every billing / top-up / entitlement surface says exactly this for the free tier (R-USR-1).
 FREE_TIER_NEEDS_ACCOUNT = (
-    "This capability needs provider credentials. Run `hermes auth` to configure a provider."
+    "This capability needs provider credentials. Run `stardust auth` to configure a provider."
 )
 FREE_TIER_NEEDS_ACCOUNT_CHAT = (
     "This capability needs provider credentials. Use /model to choose a configured model."
@@ -202,17 +202,17 @@ def format_nous_portal_entitlement_message(
     if account_info is None:
         return (
             f"Hermes could not verify your Nous Portal entitlement, so {capability} is unavailable. "
-            f"Run `hermes model` to refresh your login, or check billing at {billing_url}."
+            f"Run `stardust model` to refresh your login, or check billing at {billing_url}."
         )
     if not account_info.logged_in:
         if account_info.inference_credential_present:
             return (
                 f"Nous inference credentials are configured, but Hermes cannot verify your Nous Portal "
-                f"paid access for {capability}. Log in with `hermes model` to enable Portal-managed "
+                f"paid access for {capability}. Log in with `stardust model` to enable Portal-managed "
                 f"features. Billing and credits are managed at {billing_url}."
             )
         return (
-            f"Log in to Nous Portal to use {capability}: run `hermes model`. "
+            f"Log in to Nous Portal to use {capability}: run `stardust model`. "
             f"Billing and credits are managed at {billing_url}."
         )
     if account_info.paid_service_access is None:
@@ -220,19 +220,19 @@ def format_nous_portal_entitlement_message(
         if account_info.error:
             detail += f" Account lookup failed: {account_info.error}."
         if include_refresh_hint:
-            detail += " Run `hermes model` to refresh your session."
+            detail += " Run `stardust model` to refresh your session."
         return detail + f" Check billing at {billing_url}."
     access = account_info.paid_service_access_info
     reason = access.reason if access else None
     if reason == "account_missing":
         return (
             f"Hermes could not find a Nous Portal account or organisation for this login, so {capability} "
-            f"is unavailable. Run `hermes model` to authenticate again; if the problem persists, contact Nous support."
+            f"is unavailable. Run `stardust model` to authenticate again; if the problem persists, contact Nous support."
         )
     if reason == "no_usable_credits" or account_info.paid_service_access is False:
         message = _no_paid_access_message(account_info, capability, billing_url, in_chat=in_chat)
         if include_refresh_hint and not account_info.fresh:
-            message += " If you recently bought credits, run `hermes model` to refresh Hermes."
+            message += " If you recently bought credits, run `stardust model` to refresh Hermes."
         return message
     return (
         f"Your Nous Portal account does not currently have paid service access, "
@@ -264,7 +264,7 @@ def _no_paid_access_message(
         return (
             f"Your Nous Portal access is paused because you've exceeded the per-member spend cap set by "
             f"your organisation.{cap_detail}{credit_detail} Ask your organisation admin to raise the "
-            f"member spend cap at {billing_url}, then run `hermes model` to refresh."
+            f"member spend cap at {billing_url}, then run `stardust model` to refresh."
         )
     if active and paid:
         return (

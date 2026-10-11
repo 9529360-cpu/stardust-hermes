@@ -1,5 +1,5 @@
 """Cron job scheduler: tick() runs due jobs (gateway calls it every 60s from a background thread).
-A file lock (~/.hermes/cron/.tick.lock) keeps overlapping processes to one tick at a time.
+A file lock (~/.stardust/cron/.tick.lock) keeps overlapping processes to one tick at a time.
 """
 
 import atexit
@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Any, Callable, List, Optional, Protocol
 
 # Must precede repo-level imports: standalone invocations (e.g. module reload after
-# `hermes update`) otherwise fail with ModuleNotFoundError for hermes_time et al.
+# `stardust update`) otherwise fail with ModuleNotFoundError for hermes_time et al.
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from hermes_constants import get_hermes_home
@@ -113,7 +113,7 @@ class CronTickYielded(RuntimeError):
     Raised by ``tick()`` BEFORE the tick lock when boot fingerprint ≠ disk, this process does NOT
     own the runtime lock and a fresh process holds it — the stale process must stay out of the
     dispatch race (contention would starve the fresh ticker). Skew ``None`` never yields (fail
-    open). Raised, not returned, so ``record_ticker_error`` sees it and ``hermes cron status``
+    open). Raised, not returned, so ``record_ticker_error`` sees it and ``stardust cron status``
     isn't green.
     """
 
@@ -316,7 +316,7 @@ def get_running_job_ids() -> "frozenset[str]":
 
 def get_running_job_details() -> list[dict]:
     """Per in-flight job: ``{"job_id", "elapsed_s", "worker_pid"}`` (``worker_pid`` None for in-process
-    runs). The drain wait publishes this so ``hermes update`` can say WHICH job it is waiting on."""
+    runs). The drain wait publishes this so ``stardust update`` can say WHICH job it is waiting on."""
     now = time.time()
     with _running_lock:
         return [
@@ -761,7 +761,7 @@ def _interpreter_shutting_down(exc: Optional[BaseException] = None) -> bool:
     futures/asyncio refuse new work, so delivery attempts only pollute errors.log — callers skip
     with a warning. ``exc`` lets an already-raised scheduling error count as a shutdown signal.
 
-    A cron tick can fire while the gateway is tearing down — SIGTERM from ``hermes update`` / ``hermes
+    A cron tick can fire while the gateway is tearing down — SIGTERM from ``stardust update`` / ``stardust
     gateway stop`` / systemd restart, or an OOM-kill. Once finalization starts, ``concurrent.futures``
     refuses new work with ``RuntimeError: cannot schedule new futures after interpreter shutdown`` and
     asyncio's default executor is gone, so *any* attempt to schedule delivery (live-adapter,
@@ -1556,7 +1556,7 @@ def _worktree_maintenance_repos() -> List[str]:
 
 def _maybe_run_worktree_maintenance() -> None:
     """Throttled worktree prune from the cron tick, on a daemon thread so the tick never waits on
-    git. Same conservative pruner as ``hermes -w`` startup (dirty/unpushed/locked trees untouched).
+    git. Same conservative pruner as ``stardust -w`` startup (dirty/unpushed/locked trees untouched).
     Errors never propagate: GC is hygiene, not scheduling."""
     global _last_worktree_maintenance_at
     now = time.monotonic()
@@ -1637,7 +1637,7 @@ def _maybe_reap_dead_owners() -> None:
     """Dead-owner reclaim: a run that died mid-flight would leave its row 'claimed' forever. Only
     rows whose owner process is proved gone are touched (_owner_is_live). Throttled."""
     # Dead-owner claim reclaim (#86721): execution rows carry their owner pid + process start time, but
-    # recovery previously ran only at scheduler STARTUP. A one-shot `hermes cron run` that claimed a job and
+    # recovery previously ran only at scheduler STARTUP. A one-shot `stardust cron run` that claimed a job and
     # died mid-run (its runner thread lived in the exiting CLI process) left the row 'claimed' forever while
     # the long-lived gateway ticker kept running — blocking every future run of that job. Reap provably-dead
     # owners periodically so stale claims auto-clear without a gateway restart. Throttled so idle 60s ticks
@@ -1853,7 +1853,7 @@ def tick(
         return 0
 
     try:
-        # `hermes pause` ESTOP: skip dispatch, never touch in-flight runs; check_paused logs once.
+        # `stardust pause` ESTOP: skip dispatch, never touch in-flight runs; check_paused logs once.
         with contextlib.suppress(ImportError):
             from agent.estop import check_paused as _estop_check_paused
             if _estop_check_paused("cron", logger):

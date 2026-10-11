@@ -514,7 +514,7 @@ def finalize_turn(
             else getattr(agent.context_compressor, "last_prompt_tokens", 0)
         ) or 0,
         **{key: getattr(agent, f"session_{key}") for key in _SESSION_COST_KEYS},
-        # Requested service tier, for billing audits (`hermes -z --usage-file`).
+        # Requested service tier, for billing audits (`stardust -z --usage-file`).
         "service_tier": (
             (getattr(agent, "request_overrides", {}) or {}).get("extra_body") or {}
         ).get("service_tier"),
@@ -528,7 +528,7 @@ def finalize_turn(
     if failed and str(_turn_exit_reason) == "session_persistence_failed":
         result["error"] = final_response or (
             "session storage could not be written — check the state database "
-            "health (`hermes doctor`), then send your message again"
+            "health (`stardust doctor`), then send your message again"
         )
         _cause = getattr(agent, "_last_persistence_error_cause", None)
         result["failure_reason"] = "session_persistence_failed:" + (_cause or "unknown")

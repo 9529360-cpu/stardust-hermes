@@ -45,13 +45,13 @@ test('desktopBackendSpawnEnv stamps the launch decision last and never lets an i
 })
 
 test('remote SSH spawn command carries STARDUST_GUEST_ONBOARDING=1 only when the launch decided on', () => {
-  const on = buildSpawnCommand('/x/hermes', 'work', { logPath: '~/.hermes/log', guestOnboarding: true })
+  const on = buildSpawnCommand('/x/hermes', 'work', { logPath: '~/.stardust/log', guestOnboarding: true })
   assert.match(on, /exec env STARDUST_DESKTOP=1 STARDUST_GUEST_ONBOARDING=1 /)
 
-  const off = buildSpawnCommand('/x/hermes', 'work', { logPath: '~/.hermes/log', guestOnboarding: false })
+  const off = buildSpawnCommand('/x/hermes', 'work', { logPath: '~/.stardust/log', guestOnboarding: false })
   assert.match(off, /exec env STARDUST_DESKTOP=1 /)
   assert.doesNotMatch(off, /STARDUST_GUEST_ONBOARDING/)
 
-  const unset = buildSpawnCommand('/x/hermes', 'work', { logPath: '~/.hermes/log' })
+  const unset = buildSpawnCommand('/x/hermes', 'work', { logPath: '~/.stardust/log' })
   assert.doesNotMatch(unset, /STARDUST_GUEST_ONBOARDING/)
 })

@@ -92,7 +92,7 @@ class TestManagedDetection:
 
     @pytest.fixture
     def managed_tree(self, tmp_path, monkeypatch):
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".stardust"
         node = home / "node"
         (node / "bin").mkdir(parents=True)
         (node / "lib" / "node_modules" / "npm" / "bin").mkdir(parents=True)
@@ -132,7 +132,7 @@ class TestInUseDeferral:
 
     @pytest.fixture
     def managed_npm(self, tmp_path, monkeypatch):
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".stardust"
         bin_dir = home / "node" / "bin"
         bin_dir.mkdir(parents=True)
         npm = bin_dir / "npm"
@@ -183,7 +183,7 @@ class TestRepairDecision:
 
     @pytest.fixture
     def managed_npm(self, tmp_path, monkeypatch):
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".stardust"
         bin_dir = home / "node" / "bin"
         bin_dir.mkdir(parents=True)
         npm = bin_dir / "npm"
@@ -246,7 +246,7 @@ class TestRepairDecision:
     ):
         """A system/nvm/brew/Nix npm is never modified — Hermes provisions its
         own managed tree, upgrades THAT npm into range, and returns it."""
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".stardust"
         monkeypatch.setenv("STARDUST_HOME", str(home))
         system_npm = tmp_path / "usr-bin-npm"
         system_npm.write_text("#!/bin/sh\n", encoding="utf-8")
@@ -283,7 +283,7 @@ class TestRepairDecision:
     def test_foreign_npm_failed_bootstrap_prints_manual_fix(
         self, tmp_path, monkeypatch, capsys
     ):
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".stardust"
         monkeypatch.setenv("STARDUST_HOME", str(home))
         system_npm = tmp_path / "usr-bin-npm"
         system_npm.write_text("#!/bin/sh\n", encoding="utf-8")
@@ -312,7 +312,7 @@ class TestRepairDecision:
         """A too-old system NODE can't be fixed by any npm upgrade, but the
         managed tree ships a supported Node — provisioning covers it. The
         managed npm is still upgraded to the repo's own engines.npm range."""
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".stardust"
         monkeypatch.setenv("STARDUST_HOME", str(home))
         system_npm = tmp_path / "usr-bin-npm"
         system_npm.write_text("#!/bin/sh\n", encoding="utf-8")

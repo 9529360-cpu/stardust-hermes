@@ -58,7 +58,7 @@ class GatewayConfigLoadersMixin:
         """Load ephemeral prefill messages from config or env var.
 
         STARDUST_PREFILL_MESSAGES_FILE env wins, then top-level prefill_messages_file in config.yaml,
-        then legacy agent.prefill_messages_file. Relative paths resolve from ~/.hermes/.
+        then legacy agent.prefill_messages_file. Relative paths resolve from ~/.stardust/.
         """
         from gateway.run import _gateway_config_home, _load_gateway_config
         file_path = os.getenv("STARDUST_PREFILL_MESSAGES_FILE", "")
@@ -427,7 +427,7 @@ class GatewayConfigLoadersMixin:
         chain; only a successful read that genuinely lacks the key clears it.
 
         Cron already does this per job via ``get_fallback_chain``; the gateway previously froze
-        ``self._fallback_model`` at process start, so a chain configured (or changed) after ``hermes
+        ``self._fallback_model`` at process start, so a chain configured (or changed) after ``stardust
         gateway`` was running never reached messaging sessions even though the same process's cron jobs fell
         back correctly. Fixes #60955.
 

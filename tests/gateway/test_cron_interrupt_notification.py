@@ -74,7 +74,7 @@ class TestNotifyInterruptedCronJobs:
         body = adapter.sent[0]
         assert "daily-digest" in body
         assert "cut short" in body.lower()
-        assert "hermes cron run daily-digest" in body
+        assert "stardust cron run daily-digest" in body
         assert adapter.sent_calls[0][0] == "123456"
 
     @pytest.mark.asyncio

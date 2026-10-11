@@ -79,7 +79,7 @@ def _hermes_home() -> Path:
 def _preserve_hermes_home_path(path: str | Path) -> str:
     r"""Render Hermes-owned paths under the configured STARDUST_HOME spelling.
 
-    ``%LOCALAPPDATA%\hermes`` may be a symlink/junction to another drive; launcher files must not
+    ``%LOCALAPPDATA%\stardust`` may be a symlink/junction to another drive; launcher files must not
     bake in the resolved target for paths under STARDUST_HOME.
     """
     candidate = Path(path)
@@ -727,7 +727,7 @@ def _install_startup_fallback(script_path: Path, start_now: bool, detail: str) -
         from hermes_cli.gateway import _profile_arg
 
         profile_arg = _profile_arg()
-        start_cmd = f"hermes {profile_arg} gateway start" if profile_arg else "hermes gateway start"
+        start_cmd = f"hermes {profile_arg} gateway start" if profile_arg else "stardust gateway start"
         print("ℹ Startup fallback installed; gateway not started now.")
         print(f"  Start manually with: {start_cmd}")
     _print_next_steps()
@@ -745,7 +745,7 @@ def _offer_elevated_install(headline: str, force: bool, start_now: bool, start_o
             if start_now:
                 print("  Approve the Windows UAC prompt; the elevated install will start the gateway afterwards.")
             else:
-                print("  Approve the Windows UAC prompt, then run: hermes gateway status")
+                print("  Approve the Windows UAC prompt, then run: stardust gateway status")
             return True
         print("⚠ Falling back to Startup folder because elevation was unavailable or cancelled.")
     else:
@@ -768,7 +768,7 @@ def install(
             _start_or_report_running()
         else:
             print("ℹ Gateway not started and no auto-start service installed.")
-            print("  Run later with: hermes gateway start")
+            print("  Run later with: stardust gateway start")
         return
 
     task_name = get_task_name()
@@ -794,7 +794,7 @@ def install(
             _start_or_report_running()
         else:
             print("ℹ Gateway not started now.")
-            print("  Start manually with: hermes gateway start")
+            print("  Start manually with: stardust gateway start")
         _print_next_steps()
         return
 
@@ -890,7 +890,7 @@ def _write_start_attestation(pids: list[int], via: str, home: Path | None = None
 
     ``generation`` identifies this marker instance: the update resume token records the generation
     whose death authorized a cold-start, so execution consumes exactly that marker and never a
-    newer one written by a concurrent ``hermes gateway start`` (#110020 review)."""
+    newer one written by a concurrent ``stardust gateway start`` (#110020 review)."""
     try:
         path = _start_attestation_path(home)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -919,7 +919,7 @@ def _clear_start_attestation(home: Path | None = None) -> None:
 
 
 # A start attestation older than this is no authority (#110020 review (d)): the marker is a one-shot
-# meant to bridge the seconds between a ✓ and the next ``hermes gateway status``/``update``; a
+# meant to bridge the seconds between a ✓ and the next ``stardust gateway status``/``update``; a
 # historical marker must never later override Desktop ownership into a duplicate gateway (#76129).
 START_ATTESTATION_MAX_AGE_S = 24 * 3600
 # Same slack process_identity uses for psutil create_time comparisons (PID reuse disambiguation).
@@ -1025,7 +1025,7 @@ def attested_death_generation(current_pids: list[int], home: Path | None = None)
     or ``None``.
 
     Read-only twin of :func:`check_start_attestation` for callers that must not consume the
-    one-shot marker — ``hermes update`` consults it to decide whether a Desktop-owned install
+    one-shot marker — ``stardust update`` consults it to decide whether a Desktop-owned install
     still owes a gateway cold-start (#109538) and records the generation in its resume token so the
     execution step consumes exactly the marker it was authorized by. Callers pass the liveness they
     already established (``[]`` after their own discovery came back empty) so the process table is
@@ -1071,7 +1071,7 @@ def _format_attestation_warning(attested: list[int], data: dict) -> str:
         f"⚠ The previous gateway start ({via}, {ts}) reported success, but the "
         f"process (PID {', '.join(map(str, attested))}) died without a clean "
         "shutdown record.",
-        "  This usually means the shell that ran `hermes gateway start` was inside "
+        "  This usually means the shell that ran `stardust gateway start` was inside "
         "a Windows Job Object that killed the gateway on exit (#91675).",
     ]
     hint = _task_run_hint("  Recovery: schtasks /Run /TN {}   (Task Scheduler starts the gateway outside any Job Object)")
@@ -1122,7 +1122,7 @@ def _report_gateway_start(via: str) -> None:
 
 
 def _print_next_steps() -> None:
-    print("\nNext steps:\n  hermes gateway status                      # Check status")
+    print("\nNext steps:\n  stardust gateway status                      # Check status")
     print(f"  type {_hermes_home()}\\logs\\gateway.log       # View logs")
 
 
@@ -1147,7 +1147,7 @@ def uninstall() -> None:
             if prompt_yes_no("  Open the UAC prompt now?", False):
                 if _launch_elevated_gateway_command("uninstall"):
                     print("✓ Launched elevated Hermes gateway uninstall prompt.")
-                    print("  Approve the Windows UAC prompt, then run: hermes gateway status")
+                    print("  Approve the Windows UAC prompt, then run: stardust gateway status")
                     return
                 print("⚠ Elevated uninstall prompt was unavailable or cancelled.")
             else:
@@ -1360,7 +1360,7 @@ def status(deep: bool = False) -> None:
         _print_deep_probes()
 
     if not task_installed and not startup_installed and not pids:
-        print("\nTo install:\n  hermes gateway install")
+        print("\nTo install:\n  stardust gateway install")
 
 
 def start() -> None:
@@ -1377,12 +1377,12 @@ def start() -> None:
 
         print("✗ Gateway service is not installed")
         if not prompt_yes_no("  Install it now so the gateway starts on login?", True):
-            print("  Run: hermes gateway install")
+            print("  Run: stardust gateway install")
             return
         install(force=False)
         if not is_task_registered() and not is_startup_entry_installed():
             print("⚠ Gateway install did not complete in this process.")
-            print("  If a UAC prompt opened, approve it, then run: hermes gateway start")
+            print("  If a UAC prompt opened, approve it, then run: stardust gateway start")
             return
 
     # Manual starts use the same console-less direct spawn as restart() and install --start-now;
@@ -1541,5 +1541,5 @@ def restart() -> None:
     if not _wait_for_gateway_ready(timeout_s=15.0):
         raise RuntimeError(
             "Gateway restart did not produce a running gateway process. "
-            "Check logs/gateway.log and run `hermes gateway status`."
+            "Check logs/gateway.log and run `stardust gateway status`."
         )

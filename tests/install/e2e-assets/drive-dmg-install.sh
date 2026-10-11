@@ -92,7 +92,7 @@ click_install() {
   echo "clicked ${cx},${cy} (window ${x},${y} ${wd}x${ht})"
 }
 
-STARDUST_BIN="$INSTALL_DIR/venv/bin/hermes"
+STARDUST_BIN="$INSTALL_DIR/venv/bin/stardust"
 # The bootstrap runs 11 stages; checkout + venv land in the first few and
 # the desktop app build is near the end, so success requires all three or
 # the EXIT trap kills the installer mid-build.
@@ -115,7 +115,7 @@ install_complete() {
 # watch for new failure lines, let the regular click drive the retry, and
 # give up after a few so a persistent failure reports the real error
 # instead of burning the whole install timeout.
-BOOTSTRAP_LOG="$HOME/.hermes/logs/bootstrap-installer.log"
+BOOTSTRAP_LOG="$HOME/.stardust/logs/bootstrap-installer.log"
 bootstrap_error() {
   [ -f "$BOOTSTRAP_LOG" ] || return 0
   # Match REAL failure shapes only: the structured stage log's state=Failed,

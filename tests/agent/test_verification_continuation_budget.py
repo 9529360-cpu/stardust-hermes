@@ -19,7 +19,7 @@ def _response(content="composed report"):
 
 @pytest.fixture
 def agent(tmp_path, monkeypatch):
-    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
     with (
         patch("model_tools.get_tool_definitions", return_value=[]),
         patch("model_tools.check_toolset_requirements", return_value={}),

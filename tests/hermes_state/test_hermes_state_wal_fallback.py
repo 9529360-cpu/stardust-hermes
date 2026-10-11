@@ -590,7 +590,7 @@ class TestFormatSessionDbUnavailable:
         """No init error recorded → generic message."""
         hermes_state._set_last_init_error(None)
         msg = format_session_db_unavailable()
-        assert "hermes doctor" in msg
+        assert "stardust doctor" in msg
         assert "Details:" not in msg
 
     def test_adds_nfs_hint_for_locking_protocol(self):
@@ -598,12 +598,12 @@ class TestFormatSessionDbUnavailable:
         hermes_state._set_last_init_error("OperationalError: locking protocol")
         msg = format_session_db_unavailable(details=True)
         # The raw sqlite phrase stays in the Details line; the user gets the network-drive cause and
-        # a move-it action (`hermes doctor --fix` cannot repair a mount; a WAL-docs link is not
+        # a move-it action (`stardust doctor --fix` cannot repair a mount; a WAL-docs link is not
         # something a chat user can act on).
         lead, details = msg.splitlines()
         assert "network" in lead
         assert "local disk" in lead
-        assert "hermes doctor --fix" not in lead
+        assert "stardust doctor --fix" not in lead
         assert details.startswith("Details: ") and "locking protocol" in details
         assert "sqlite.org" not in msg
 

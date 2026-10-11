@@ -1699,7 +1699,7 @@ export const ru = defineLocale({
     edit: 'Изменить',
     archive: 'В архив',
     skillArchivedTitle: 'Навык в архиве',
-    skillArchivedMessage: 'Восстановить через hermes curator restore.',
+    skillArchivedMessage: 'Восстановить через stardust curator restore.',
     hub: {
       searchPlaceholder: 'Поиск в хабе навыков',
       search: 'Поиск',
@@ -3915,7 +3915,7 @@ export const ru = defineLocale({
       reject: 'Отклонить',
       alwaysTitle: 'Всегда разрешать эту команду?',
       alwaysDescription: pattern =>
-        `Это добавит паттерн «${pattern}» в ваш постоянный список разрешений (~/.hermes/config.yaml). Stardust больше не будет спрашивать о подобных командах — ни в этом чате, ни в будущем.`,
+        `Это добавит паттерн «${pattern}» в ваш постоянный список разрешений (~/.stardust/config.yaml). Stardust больше не будет спрашивать о подобных командах — ни в этом чате, ни в будущем.`,
       alwaysAllow: 'Всегда разрешать'
     },
     clarify: {
@@ -4231,7 +4231,7 @@ export const ru = defineLocale({
       success: platform => `Передаём в ${platform}. Возобновите здесь в любой момент.`,
       systemNote: platform => `↻ Передано в ${platform} — возобновите здесь в любой момент.`,
       failed: error => `Передача не удалась: ${error}`,
-      timedOut: 'Превышено время ожидания шлюза. Выполняется ли `hermes gateway`?'
+      timedOut: 'Превышено время ожидания шлюза. Выполняется ли `stardust gateway`?'
     }
   },
   errors: {

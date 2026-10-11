@@ -29,8 +29,8 @@ class TestHolderSubcommand:
             # -c consumes ONE value token; later bare tokens are (harmless,
             # unhinted) subcommand candidates — pin that shape honestly
             (r"python -m hermes_cli.main -c mysession serve", "serve"),
-            (r"C:\bin\hermes.exe dashboard", "dashboard"),
-            (r"/usr/local/bin/hermes serve", "serve"),
+            (r"C:\bin\stardust.exe dashboard", "dashboard"),
+            (r"/usr/local/bin/stardust serve", "serve"),
             # no hermes entry at all
             (r"python -c import time; time.sleep(3)", None),
             # entry but no subcommand
@@ -48,7 +48,7 @@ class TestHolderMessage:
     def test_dashboard_not_labeled_desktop_backend(self):
         message = self._msg(r"C:\v\Scripts\python.exe -m hermes_cli.main dashboard")
         assert "close the desktop app" not in message.lower()
-        assert "hermes dashboard" in message
+        assert "stardust dashboard" in message
 
     def test_preserve_cache_not_labeled_serve(self):
         message = self._msg(r"python -m hermes_cli.main kanban --preserve-cache")

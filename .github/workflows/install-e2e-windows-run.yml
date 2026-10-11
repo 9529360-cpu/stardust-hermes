@@ -14,7 +14,7 @@
 #   installer-script+desktop    the same one-liner with -IncludeDesktop:
 #                               builds Stardust.exe AND registers Start Menu /
 #                               Desktop shortcuts.
-#   hermes-update               venv hermes.exe update.
+#   hermes-update               venv stardust.exe update.
 #   open-app-update             the app's own Update button, app launched
 #                               from the installed exe under Playwright's
 #                               Electron driver (Settings -> About ->
@@ -50,7 +50,7 @@ on:
         required: true
         type: string
       update-method:
-        description: 'How the install updates to HEAD. Supported: open-app-update (Update button under Playwright, from a desktop-bearing install), hermes-desktop-app-update (same button, app launched via hermes desktop), hermes-update, installer-script, installer-script+desktop, desktop-installer@latest (re-download Hermes-Setup.exe, AHK clicks Install over the existing install).'
+        description: 'How the install updates to HEAD. Supported: open-app-update (Update button under Playwright, from a desktop-bearing install), hermes-desktop-app-update (same button, app launched via stardust desktop), hermes-update, installer-script, installer-script+desktop, desktop-installer@latest (re-download Hermes-Setup.exe, AHK clicks Install over the existing install).'
         required: true
         type: string
       install-ref:

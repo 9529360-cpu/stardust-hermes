@@ -87,7 +87,7 @@ class TestSurfaceResolution:
     def test_desktop_env_alone_does_not_grant_them(self, no_desktop_env):
         """A desktop-spawned backend serving a TUI session stays clean.
 
-        The embedded terminal pane runs `hermes --tui` against this same
+        The embedded terminal pane runs `stardust --tui` against this same
         backend; env-keyed gating handed it GUI tools it cannot answer.
         """
         no_desktop_env.setenv("STARDUST_DESKTOP", "1")

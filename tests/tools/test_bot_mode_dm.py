@@ -27,7 +27,7 @@ def _fresh_probe_cache():
 
 
 def _managed_home(tmp_path, *, teammates=("researcher",), peers=()) -> Path:
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir(exist_ok=True)
     for name in teammates:
         d = home / "profiles" / name
@@ -101,7 +101,7 @@ def test_never_injects_outside_bot_chat(tmp_path, title):
 
 def test_never_injects_on_unmanaged_install(tmp_path):
     """A 'Bot Chat'-titled session on a plain install stays tool-free."""
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     agent = _FakeAgent(home, title="Bot Chat")
     assert bot_mode_dm.ensure_message_agent_tool(agent) is False
@@ -141,7 +141,7 @@ def test_tool_refuses_outside_bot_chat(tmp_path):
 
 
 def test_tool_refuses_on_unmanaged_install(tmp_path):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     agent = _FakeAgent(home, title="Bot Chat")
     result = json.loads(
@@ -292,7 +292,7 @@ def test_peer_delivery_command_pins_registry_profile_for_secondary_bots(
     tmp_path, monkeypatch
 ):
     """A secondary-profile bot's peer DM must run in the registry-owning
-    profile (#93935). `hermes peer` resolves bot_peers through
+    profile (#93935). `stardust peer` resolves bot_peers through
     profile-scoped load_config(); unpinned, the subprocess inherits the
     calling bot's profile and dies with "No peer named" even though the
     tool-side roster (read from the machine-root config) validated the
@@ -348,12 +348,12 @@ def test_peer_delivery_command(tmp_path, monkeypatch):
 
 def test_delivery_pins_the_hermes_entrypoint_beside_this_interpreter(tmp_path, monkeypatch):
     """A background delivery must not rely on PATH: the runner's service context
-    lacks the gateway's venv bin dir, so a bare ``hermes`` resolves to a system
+    lacks the gateway's venv bin dir, so a bare ``stardust`` resolves to a system
     install whose shebang picks the wrong interpreter and dies on import (#108628).
     Both transports must invoke the entrypoint beside this interpreter instead."""
     venv_bin = tmp_path / "venv" / ("Scripts" if sys.platform == "win32" else "bin")
     venv_bin.mkdir(parents=True)
-    hermes_entry = venv_bin / ("hermes.exe" if sys.platform == "win32" else "hermes")
+    hermes_entry = venv_bin / ("stardust.exe" if sys.platform == "win32" else "hermes")
     hermes_entry.write_text("#!/bin/sh\n", encoding="utf-8")
     monkeypatch.setattr(sys, "executable", str(venv_bin / "python3"))
 
@@ -594,7 +594,7 @@ def test_delivery_runner_surfaces_live_owner_refusal(tmp_path, capsys):
 
 
 def test_local_turn_reemits_empty_stdout_for_a_bare_silence_marker(tmp_path, capsys):
-    """#110782: the one-shot ``hermes chat -c "Bot Chat"`` transport applies the gateway's
+    """#110782: the one-shot ``stardust chat -c "Bot Chat"`` transport applies the gateway's
     silence rule — a successful bare marker reaches the sender as "", prose stays verbatim."""
     dm_file = tmp_path / "message.txt"
     dm_file.write_text("thanks, bye", encoding="utf-8")

@@ -10,7 +10,7 @@
 
 /** The dashboard's own backend could not be reached at all (fetch rejected). */
 export const API_UNREACHABLE_MESSAGE =
-  "Hermes dashboard cannot reach the Hermes service. Is `hermes dashboard` still running?";
+  "Hermes dashboard cannot reach the Hermes service. Is `stardust dashboard` still running?";
 
 /** Status → plain sentence, used when the body carries no usable `detail`. */
 const STATUS_COPY: Record<number, string> = {

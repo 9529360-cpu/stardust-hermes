@@ -67,7 +67,7 @@ class TestProfileScopedDiscovery:
         ):
             store = PairingStore(profile="alice")
             # Scoped under the mocked root's profile dir, using the same
-            # consolidated layout a standalone `hermes -p alice` resolves —
+            # consolidated layout a standalone `stardust -p alice` resolves —
             # and provably distinct from the module-global PAIRING_DIR.
             assert store._dir == home / "profiles" / "alice" / "platforms" / "pairing"
             assert store._dir != global_dir
@@ -581,7 +581,7 @@ class TestProfileScopedStorage:
 
     def test_default_store_uses_global_dir(self, tmp_path, monkeypatch):
         """PairingStore() (no profile) keeps the legacy global path so the
-        ``hermes pairing`` CLI continues to work without a profile context."""
+        ``stardust pairing`` CLI continues to work without a profile context."""
         from hermes_constants import get_hermes_home
         monkeypatch.setattr("hermes_constants.get_hermes_home", lambda: tmp_path)
         # Re-import PAIRING_DIR (it's a module-level constant resolved at
@@ -630,7 +630,7 @@ class TestProfileScopedStorage:
         assert expected.is_dir()
 
     def test_profile_store_matches_profile_cli_home(self, tmp_path, monkeypatch):
-        """Gateway and ``hermes -p`` must resolve the same pairing store."""
+        """Gateway and ``stardust -p`` must resolve the same pairing store."""
         from hermes_constants import get_hermes_dir
 
         monkeypatch.setenv("STARDUST_HOME", str(tmp_path))

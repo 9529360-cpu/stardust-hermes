@@ -662,7 +662,7 @@ export function createGatewayEventHandler(ctx: GatewayEventHandlerContext): (ev:
       }
 
       // Startup queries are arbitrary launcher/script text (Omarchy prompted
-      // launches, `hermes --tui -q "…"`) — submit LITERALLY, bypassing the
+      // launches, `stardust --tui -q "…"`) — submit LITERALLY, bypassing the
       // slash/!/interpolation dispatcher, matching one-shot's semantics.
       submitLiteralRef.current(STARTUP_QUERY || 'What do you see in this image?')
     }, 0)
@@ -742,8 +742,8 @@ export function createGatewayEventHandler(ctx: GatewayEventHandlerContext): (ev:
 
     // Opt-in: when `display.tui_auto_resume_recent` is true, look up
     // the most recent human-facing session and resume it instead of
-    // forging a brand-new one.  Mirrors classic CLI's `hermes -c` /
-    // `hermes --tui` muscle memory and addresses the audit's "session
+    // forging a brand-new one.  Mirrors classic CLI's `stardust -c` /
+    // `stardust --tui` muscle memory and addresses the audit's "session
     // unrecoverable after disconnection" gap.  Default off so existing
     // users aren't surprised.  (Shares the memoized full-config read.)
     getFullConfigOnce()
@@ -1093,7 +1093,7 @@ export function createGatewayEventHandler(ctx: GatewayEventHandlerContext): (ev:
           const ownProfile = getUiState().info?.profile_name || 'default'
 
           if (wakeProfile && wakeProfile !== ownProfile) {
-            sys(`wake phrase for profile '${wakeProfile}' — run: hermes -p ${wakeProfile} --tui`)
+            sys(`wake phrase for profile '${wakeProfile}' — run: stardust -p ${wakeProfile} --tui`)
             await rpc('wake.resume', {}).catch(() => undefined)
 
             return

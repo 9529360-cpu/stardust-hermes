@@ -7,8 +7,8 @@ from hermes_state import SessionResumeTooLargeError, format_session_db_unavailab
 def test_resume_too_large_names_export_and_config_commands():
     text = str(SessionResumeTooLargeError(4312, 4000))
     assert "4312" in text and "4000" in text
-    assert "hermes sessions export" in text
-    assert "hermes config set sessions.max_resume_messages 0" in text
+    assert "stardust sessions export" in text
+    assert "stardust config set sessions.max_resume_messages 0" in text
     for jargon in ("lineage", "guard", "safe resume limit"):
         assert jargon not in text
 
@@ -52,12 +52,12 @@ def test_db_unavailable_unknown_cause_on_network_drive_points_at_moving_not_doct
         hermes_state._set_last_init_error(None)
     assert "network" in text
     assert "local disk" in text
-    assert "hermes doctor --fix" not in text
+    assert "stardust doctor --fix" not in text
 
 
 def test_db_unavailable_without_cause_still_names_doctor():
     hermes_state._set_last_init_error(None)
     text = format_session_db_unavailable(details=True)
-    assert "hermes doctor" in text
+    assert "stardust doctor" in text
     assert "will not be saved" in text.lower()
     assert "Details:" not in text

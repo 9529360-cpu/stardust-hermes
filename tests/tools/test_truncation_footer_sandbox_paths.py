@@ -1,5 +1,5 @@
 """Truncation footers tell the AGENT where the full text lives, and the agent's read_file runs inside
-the active terminal backend: under docker the mounted cache is at /root/.hermes, so a host path in the
+the active terminal backend: under docker the mounted cache is at /root/.stardust, so a host path in the
 footer is unreadable from the sandbox (#72389, #81984, #77015)."""
 
 import os
@@ -16,7 +16,7 @@ def _footer_path(text: str) -> str:
 
 
 def test_truncation_footers_render_the_sandbox_visible_cache_path(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     monkeypatch.setenv("STARDUST_HOME", str(home))
     monkeypatch.setenv("TERMINAL_ENV", "docker")
     body = "\n".join(f"row {i}" for i in range(5000))
@@ -27,13 +27,13 @@ def test_truncation_footers_render_the_sandbox_visible_cache_path(tmp_path, monk
 
     for text, subdir in ((web_out, "cache/web"), (snap_out, "cache/web"), (deleg_out, "cache/delegation")):
         path = _footer_path(text)
-        assert path.startswith(f"/root/.hermes/{subdir}/"), path
+        assert path.startswith(f"/root/.stardust/{subdir}/"), path
         # The bytes still live on the host under STARDUST_HOME; only the rendered path is translated.
         assert os.path.exists(str(home / subdir / os.path.basename(path)))
 
 
 def test_local_backend_footer_keeps_the_host_path(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     monkeypatch.setenv("STARDUST_HOME", str(home))
     monkeypatch.setenv("TERMINAL_ENV", "local")
     body = "\n".join(f"row {i}" for i in range(5000))

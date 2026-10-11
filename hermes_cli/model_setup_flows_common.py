@@ -161,15 +161,15 @@ def _login_retry_context(args) -> tuple[str, str]:
     """(retry_command, service_host) for a provider login helper's failure copy.
 
     Every provider, including Nous, retries through the generic provider-auth surface; Stardust has
-    no first-party account/portal login command. Falls back to ``hermes model`` when no provider
+    no first-party account/portal login command. Falls back to ``stardust model`` when no provider
     config is in play.
     """
     pconfig = next((a for a in args if hasattr(a, "id") and hasattr(a, "portal_base_url")), None)
     if pconfig is None:
-        return "hermes model", "the sign-in service"
+        return "stardust model", "the sign-in service"
     provider_id = str(getattr(pconfig, "id", "") or "")
     host = urlparse(str(getattr(pconfig, "portal_base_url", "") or "")).hostname or "the sign-in service"
-    return (f"hermes auth add {provider_id}" if provider_id else "hermes model"), host
+    return (f"stardust auth add {provider_id}" if provider_id else "stardust model"), host
 
 
 def _run_login(login_fn, *args, **kwargs) -> bool:

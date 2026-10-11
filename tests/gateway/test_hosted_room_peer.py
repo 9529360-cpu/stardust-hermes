@@ -34,7 +34,7 @@ EXECUTION_POLICY = execution_policy_mapping(target_profile="reviewer")
 def test_gateway_room_grant_secret_is_private_persistent_and_not_an_api_key(
     tmp_path, monkeypatch
 ):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     profile_home = home / "profiles" / "reviewer"
     profile_home.mkdir(parents=True)
     monkeypatch.setenv("STARDUST_HOME", str(home))
@@ -57,7 +57,7 @@ def test_gateway_room_grant_secret_is_private_persistent_and_not_an_api_key(
 def test_gateway_room_grant_secret_is_atomic_across_concurrent_workers(
     tmp_path, monkeypatch
 ):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     monkeypatch.setenv("STARDUST_HOME", str(home))
 
     with ThreadPoolExecutor(max_workers=8) as pool:
@@ -70,7 +70,7 @@ def test_gateway_room_grant_secret_is_atomic_across_concurrent_workers(
 def test_gateway_room_grant_secret_is_cached_by_installation_root(
     tmp_path, monkeypatch
 ):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     monkeypatch.setenv("STARDUST_HOME", str(home))
 
     first = gateway_room_grant_secret()
@@ -99,7 +99,7 @@ def test_room_link_protocol_fixture_matches_backend_contract():
 def test_room_link_endpoint_reads_supported_config_with_env_override(
     tmp_path, monkeypatch
 ):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     (home / "config.yaml").write_text(
         "gateway:\n  room_link_url: https://configured.example.test/hermes\n",

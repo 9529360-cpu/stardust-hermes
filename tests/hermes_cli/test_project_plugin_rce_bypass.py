@@ -5,7 +5,7 @@ server's dashboard plugin loader.
 Two primitives combined into the original advisory chain:
 
 1. ``hermes_cli.web_server_dashboard._discover_dashboard_plugins`` opted into
-   the untrusted ``./.hermes/plugins/`` source via
+   the untrusted ``./.stardust/plugins/`` source via
    ``os.environ.get("STARDUST_ENABLE_PROJECT_PLUGINS")`` — truthy for
    any non-empty string, so ``=0`` / ``=false`` / ``=no`` (all of
    which the agent loader treats as off, and which operators set to
@@ -73,7 +73,7 @@ class TestProjectPluginsEnvGate:
 
     @pytest.fixture
     def project_plugin(self, tmp_path, monkeypatch):
-        """Plant a project-source plugin under CWD's ``.hermes/plugins``
+        """Plant a project-source plugin under CWD's ``.stardust/plugins``
         and isolate the user-plugins dir to an empty tmp tree."""
         monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "home"))
         (tmp_path / "home").mkdir()
@@ -81,7 +81,7 @@ class TestProjectPluginsEnvGate:
         cwd.mkdir()
         monkeypatch.chdir(cwd)
         _write_plugin_manifest(
-            cwd / ".hermes" / "plugins",
+            cwd / ".stardust" / "plugins",
             "evil",
             {
                 "name": "evil",
@@ -278,7 +278,7 @@ class TestEndToEndPocBlocked:
         payload_py = tmp_path / "payload.py"
         payload_py.write_text("OWNED = True\n")
         _write_plugin_manifest(
-            cwd / ".hermes" / "plugins",
+            cwd / ".stardust" / "plugins",
             "evil",
             {
                 "name": "evil",

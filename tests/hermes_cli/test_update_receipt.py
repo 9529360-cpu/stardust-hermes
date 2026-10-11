@@ -23,7 +23,7 @@ from hermes_cli import update_cmd
 @pytest.fixture()
 def receipt_home(tmp_path, monkeypatch):
     """Isolated STARDUST_HOME for receipt writes."""
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     monkeypatch.setattr(
         "hermes_cli.config.get_hermes_home", lambda: home, raising=False
@@ -171,7 +171,7 @@ class TestCommandBoundaryFinalization:
 
     def test_pending_receipt_persisted_on_exit_2_refusal(self, receipt_home):
         ur.begin_update_receipt()
-        ur.record_step("windows_preflight", False, "another hermes.exe running")
+        ur.record_step("windows_preflight", False, "another stardust.exe running")
         path = ur.finalize_pending_update_receipt(2, "sys.exit(2)")
         assert path is not None and path.is_file()
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -215,7 +215,7 @@ class TestCommandBoundaryFinalization:
 
         def _fake_impl(args, gateway_mode):
             ur.begin_update_receipt()
-            ur.record_step("windows_preflight", False, "hermes.exe holds venv")
+            ur.record_step("windows_preflight", False, "stardust.exe holds venv")
             sys.exit(2)
 
         monkeypatch.setattr(update_cmd, "_cmd_update_impl", _fake_impl)
@@ -417,7 +417,7 @@ class TestFleetClassification:
         assert stale is True
         out = capsys.readouterr().out
         assert "STALE" in out
-        assert "hermes -p <profile> gateway restart" in out
+        assert "stardust -p <profile> gateway restart" in out
 
     def test_unknown_does_not_fail_update(self, capsys):
         ok = ur.print_fleet_version_matrix(

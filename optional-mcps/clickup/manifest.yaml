@@ -29,5 +29,5 @@ suggest:
 
 post_install: |
   On first connection Hermes opens a browser to authorize with
-  ClickUp (or run `hermes mcp login clickup`). Approve access,
+  ClickUp (or run `stardust mcp login clickup`). Approve access,
   then restart the session so tools load.

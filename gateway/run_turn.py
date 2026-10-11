@@ -158,7 +158,7 @@ class GatewayTurnMixin:
         if override and skey:
             model, runtime_kwargs = self._apply_session_model_override(skey, model, runtime_kwargs)
 
-        # Provider resolved but no model.default (`hermes auth add` without `hermes model`): use the
+        # Provider resolved but no model.default (`stardust auth add` without `stardust model`): use the
         # provider's first catalog model.
         if not model and runtime_kwargs.get("provider"):
             with suppress(Exception):
@@ -1096,7 +1096,7 @@ class GatewayTurnMixin:
                     source, attempt.meta,
                     "⚠️ Shortening the conversation history failed, so I kept everything as-is. "
                     "Run /compress to try again or /new to start fresh. If this keeps happening, "
-                    "run `hermes doctor` on the host.",
+                    "run `stardust doctor` on the host.",
                     "compression-failure warning",
                 )
         # Configured aux model failed, recovered on the main model: only the user can fix that config.
@@ -1826,7 +1826,7 @@ class GatewayTurnMixin:
     # on the provider-config path instead of exposing the inherited Nous account login.
     _STATUS_HINTS = {
         401: (" Your AI model credential has expired or the API key is wrong. "
-              "Use /model to choose a configured model, or run `hermes auth` on the host."),
+              "Use /model to choose a configured model, or run `stardust auth` on the host."),
         402: " Your AI model service balance or quota is used up. Top it up on the service's website, or use /model to switch models.",
         529: " The AI model service is temporarily overloaded. Wait a moment, then use /retry.",
     }
@@ -1879,7 +1879,7 @@ class GatewayTurnMixin:
         return self._hmwa_add_failed_turn_notice(
             f"⚠️ Something went wrong and I couldn't finish this reply.{status_hint}\n"
             "Use /retry to try again, or /new to start a fresh conversation. "
-            "Technical details are in the gateway log (`hermes logs`).",
+            "Technical details are in the gateway log (`stardust logs`).",
             self._PARTIAL_FAILED_TURN_NOTICE,
         )
 
@@ -2226,7 +2226,7 @@ class GatewayTurnMixin:
                     source.chat_id,
                     "❌ The background task couldn't start because no AI model credential is "
                     "configured. Use /model to choose a configured model, or run "
-                    "`hermes auth` on the host.",
+                    "`stardust auth` on the host.",
                     metadata=_thread_metadata,
                 )
                 return
@@ -2401,7 +2401,7 @@ class GatewayTurnMixin:
             # Explicit reload also re-probes tool availability (check_fn).
             reprobe_tool_availability()
             # Reconnect by discovering tools (reads config.yaml fresh). A chat command cannot finish
-            # a browser OAuth flow either: an expired token parks with a `hermes mcp login` hint.
+            # a browser OAuth flow either: an expired token parks with a `stardust mcp login` hint.
             from tools.mcp_oauth import suppress_interactive_oauth
             with suppress_interactive_oauth():
                 new_tools = await self._run_in_executor_with_context(discover_mcp_tools)
@@ -2797,7 +2797,7 @@ class GatewayTurnMixin:
         _live_status_adapter = (
             adapter if getattr(adapter, "supports_status_text", False) and _live_status_mode != "off" else None
         )
-        # "log" mode: tool calls go to ~/.hermes/logs/tool_calls.log instead of the chat. Gateway-only.
+        # "log" mode: tool calls go to ~/.stardust/logs/tool_calls.log instead of the chat. Gateway-only.
         log_mode_enabled = progress_mode == "log" and not is_webhook
         # Interim assistant messages and thinking_progress are independent of tool progress (same
         # queue). Mattermost requires a per-platform opt-in: scratch text leaks into public threads.

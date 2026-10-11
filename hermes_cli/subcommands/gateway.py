@@ -1,4 +1,4 @@
-"""``hermes gateway`` and ``hermes proxy`` subcommand parsers."""
+"""``stardust gateway`` and ``stardust proxy`` subcommand parsers."""
 
 from __future__ import annotations
 
@@ -152,7 +152,7 @@ def build_gateway_parser(
 
     proxy_start = proxy_subparsers.add_parser("start", help="Run the proxy in the foreground")
     proxy_start.add_argument("--provider", default="xai",
-        help="Upstream provider (currently: xai; default: xai). See `hermes proxy providers`.")
+        help="Upstream provider (currently: xai; default: xai). See `stardust proxy providers`.")
     proxy_start.add_argument("--host", default=None,
         help="Bind address (default: 127.0.0.1). Use 0.0.0.0 to expose on LAN.")
     proxy_start.add_argument("--port", type=int, default=None, help="Bind port (default: 8645)")

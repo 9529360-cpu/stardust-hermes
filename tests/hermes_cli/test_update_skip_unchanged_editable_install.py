@@ -1,8 +1,8 @@
-"""``hermes update`` skips the editable reinstall when the pull can't affect it.
+"""``stardust update`` skips the editable reinstall when the pull can't affect it.
 
 ``uv pip install -e .`` never audits an editable target — it reinstalls on
 every invocation and rewrites the console-script shims each time. On Windows
-that rewrite is the only reason the running ``hermes.exe`` gets quarantined,
+that rewrite is the only reason the running ``stardust.exe`` gets quarantined,
 and a quarantine that loses its race is the ``os error 32`` family. The gate
 under test removes the reinstall (and therefore the rename) for any update
 that touches none of the files defining the install.

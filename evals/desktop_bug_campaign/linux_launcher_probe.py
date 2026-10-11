@@ -27,7 +27,7 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     root = Path(tempfile.mkdtemp(prefix="linux-launcher-", dir=args.output))
     env = {"PATH": "/usr/bin:/bin", "HOME": str(root / "home"),
-           "STARDUST_HOME": str(root / "home/.hermes"),
+           "STARDUST_HOME": str(root / "home/.stardust"),
            "XDG_DATA_HOME": str(root / "xdg"), "LANG": "C.UTF-8",
            "STARDUST_NONINTERACTIVE": "1"}
     Path(env["STARDUST_HOME"]).mkdir(parents=True)

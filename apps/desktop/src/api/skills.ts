@@ -89,7 +89,7 @@ export function editLearningNode(
 }
 
 // ---------------------------------------------------------------------------
-// Skills hub — search / preview / scan / install (parity with `hermes skills`
+// Skills hub — search / preview / scan / install (parity with `stardust skills`
 // and the dashboard's Browse-hub tab). Installs spawn background actions whose
 // logs are tailed via getActionStatus().
 // ---------------------------------------------------------------------------

@@ -15,7 +15,7 @@ import yaml
 @pytest.fixture()
 def voice_home(tmp_path, monkeypatch):
     """Isolated STARDUST_HOME + reloaded config modules; yields a config writer."""
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     monkeypatch.setenv("STARDUST_HOME", str(home))
     # Hermetic: no ambient provider keys may leak into resolution.

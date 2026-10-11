@@ -9,7 +9,7 @@ from gateway.readiness import collect_runtime_readiness
 
 
 def test_collect_runtime_readiness_reports_healthy_local_runtime(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     (home / "config.yaml").write_text(
         "model:\n  provider: openrouter\n  model: test/model\n",
@@ -42,7 +42,7 @@ def test_collect_runtime_readiness_reports_healthy_local_runtime(tmp_path, monke
 def test_collect_runtime_readiness_degrades_on_invalid_config_and_stopped_gateway(
     tmp_path, monkeypatch
 ):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     (home / "config.yaml").write_text("model: [unterminated", encoding="utf-8")
     monkeypatch.setenv("STARDUST_HOME", str(home))
@@ -63,7 +63,7 @@ def test_collect_runtime_readiness_degrades_on_invalid_config_and_stopped_gatewa
 def test_readiness_uses_running_session_store_state_over_independent_probe(
     tmp_path, monkeypatch
 ):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     with sqlite3.connect(home / "state.db") as conn:
         conn.execute("CREATE TABLE probe (id INTEGER PRIMARY KEY)")

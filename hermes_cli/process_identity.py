@@ -1,6 +1,6 @@
 """Process identity: spawn tags, the machine-wide spawn ledger, and the Windows job-object self-attach.
 
-Three layers make every long-lived Hermes process positively identifiable, so reapers (``hermes
+Three layers make every long-lived Hermes process positively identifiable, so reapers (``stardust
 update``, Desktop startup sweeps) never guess lineage from PPID archaeology or cmdline matching:
 1. spawn tags (``STARDUST_SPAWN`` env stamped by the spawner); 2. a ``(pid, create_time)`` ledger;
 3. Windows job-object self-attach with ``KILL_ON_JOB_CLOSE`` so the whole child tree dies with the
@@ -210,7 +210,7 @@ def register_self(purpose: str, *, project_root: Optional[Path] = None, detail: 
     try:
         import sys as _sys
 
-        # 10 tokens: enough for `hermes serve --host X --port N --profile P` while bounding
+        # 10 tokens: enough for `stardust serve --host X --port N --profile P` while bounding
         # pathological argv. Structured detail is canonical; argv is the human-readable fallback.
         entry.argv = " ".join(_sys.argv[:10])
     except Exception:

@@ -5,7 +5,7 @@ from typing import Dict, Type
 from hermes_cli.proxy.adapters.base import UpstreamAdapter
 from hermes_cli.proxy.adapters.xai import XAIGrokAdapter
 
-# Keyed by the ``hermes proxy start --provider <name>`` value.
+# Keyed by the ``stardust proxy start --provider <name>`` value.
 ADAPTERS: Dict[str, Type[UpstreamAdapter]] = {"xai": XAIGrokAdapter}
 
 

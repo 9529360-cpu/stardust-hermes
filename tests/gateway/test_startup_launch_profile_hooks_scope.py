@@ -30,7 +30,7 @@ def _capture_registration(monkeypatch, hooks_cfg):
 
 
 def test_launch_profile_webhooks_register_signed_under_multiplex(tmp_path, monkeypatch, caplog):
-    launch_home = tmp_path / ".hermes"
+    launch_home = tmp_path / ".stardust"
     launch_home.mkdir()
     (launch_home / ".env").write_text("MY_HOOK_SECRET=s3cret-of-launch\n")
     monkeypatch.setenv("STARDUST_HOME", str(launch_home))

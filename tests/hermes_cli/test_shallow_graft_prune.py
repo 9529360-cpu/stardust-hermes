@@ -3,9 +3,9 @@
 Every ``git fetch --depth 1`` appends the fetched tip to ``.git/shallow`` as a
 new graft and never removes the previous one, so a long-lived shallow installer
 checkout accumulates one line per update check (57 observed in the wild). The
-stale grafts break ``merge-base`` and push ``hermes update`` into the
+stale grafts break ``merge-base`` and push ``stardust update`` into the
 orphan-divergence reset path. ``prune_stale_shallow_grafts()`` drops grafts no
-live ref points at; ``hermes update --check`` calls it after its successful
+live ref points at; ``stardust update --check`` calls it after its successful
 depth-1 fetch, clearing the grafts accumulated by past checks (the passive
 banner check no longer git-fetches since #107648).
 """
@@ -91,7 +91,7 @@ def test_prune_is_idempotent_and_noop_without_grafts(tmp_path):
 
 
 def test_update_check_prunes_and_reports_count(tmp_path, monkeypatch, capsys):
-    """`hermes update --check` prunes grafts after its depth-1 fetch and reports the prune."""
+    """`stardust update --check` prunes grafts after its depth-1 fetch and reports the prune."""
     import hermes_cli.update_cmd as update_cmd
 
     fake_root = SimpleNamespace(PROJECT_ROOT=tmp_path)

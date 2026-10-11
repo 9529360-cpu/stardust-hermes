@@ -190,7 +190,7 @@ class CLIInfoMixin:
             self._console_print("[dim]   Switch with: /model sonnet  or  /model gpt5[/]")
 
         # Project-local skills one-liner: trusted → count; untrusted-with-skills → point at
-        # `hermes skills trust`. Never raises.
+        # `stardust skills trust`. Never raises.
         try:
             from agent.skill_utils import (
                 get_project_skills_dirs, get_untrusted_project_skills_root, iter_skill_index_files)
@@ -205,7 +205,7 @@ class CLIInfoMixin:
                     _root, _n = _untrusted
                     self._console_print(
                         f"[yellow]◆ {_n} project skill(s) found in {_root} but not "
-                        f"loaded — run `hermes skills trust` to enable them.[/]")
+                        f"loaded — run `stardust skills trust` to enable them.[/]")
         except Exception:
             logger.debug("project skills banner notice failed", exc_info=True)
 
@@ -595,7 +595,7 @@ class CLIInfoMixin:
         """`/usage reset [--force]` — redeem one banked Codex reset credit."""
         if str(self._agent_or_self("provider") or "").strip().lower() != "openai-codex":
             print("  Banked usage resets are only available on the openai-codex provider.")
-            print("  Switch with `/model` or `hermes auth` first.")
+            print("  Switch with `/model` or `stardust auth` first.")
             return
         from agent.account_usage import redeem_codex_reset_credit
 
@@ -935,7 +935,7 @@ class CLIInfoMixin:
             print(f"  ❌ MCP reload failed: {e}")
 
     def _reload_skills(self) -> None:
-        """Reload skills: rescan ~/.hermes/skills/ and queue a note for the next user turn.
+        """Reload skills: rescan ~/.stardust/skills/ and queue a note for the next user turn.
 
         Skills are invoked at runtime (``/skill-name``, ``skills_list``, ``skill_view``), not from
         the system prompt, so this does NOT clear the prompt cache. If anything was added/removed

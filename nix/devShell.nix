@@ -25,7 +25,7 @@
         packages = with pkgs; [
           (pkgs.runCommand "hermes" { } ''
             mkdir -p $out/bin
-            install -Dm755 ${../hermes} $out/bin/hermes
+            install -Dm755 ${../hermes} $out/bin/stardust
           '')
           self'.packages.sandbox
           uv

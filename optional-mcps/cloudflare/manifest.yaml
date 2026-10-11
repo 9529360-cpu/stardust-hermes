@@ -116,11 +116,11 @@ post_install: |
 
   Run a Zero Trust org or want Radar/Magic/API-Shield surfaces back?
   Delete their patterns from mcp_servers.cloudflare.tools.exclude in
-  ~/.hermes/config.yaml.
+  ~/.stardust/config.yaml.
 
   Headless / CI alternative: instead of OAuth, create a Cloudflare API token
   at https://dash.cloudflare.com/profile/api-tokens and configure the server
-  with a bearer header in ~/.hermes/config.yaml:
+  with a bearer header in ~/.stardust/config.yaml:
 
     mcp_servers:
       cloudflare:
@@ -134,7 +134,7 @@ post_install: |
   tool_search — you'd be stacking two tool-discovery layers.
 
   Cloudflare also runs product-specific MCP servers (same OAuth flow, add
-  manually via `hermes mcp add <name> --url <url>` if you want a narrower
+  manually via `stardust mcp add <name> --url <url>` if you want a narrower
   surface): docs search (https://docs.mcp.cloudflare.com/mcp, no auth),
   Workers observability (https://observability.mcp.cloudflare.com/mcp),
   Browser Rendering (https://browser.mcp.cloudflare.com/mcp), Radar
@@ -144,4 +144,4 @@ post_install: |
   source URL above.
 
   Re-run the tool checklist any time with:
-    hermes mcp configure cloudflare
+    stardust mcp configure cloudflare

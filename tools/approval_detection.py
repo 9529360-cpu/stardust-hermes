@@ -19,12 +19,12 @@ logger = logging.getLogger("tools.approval")
 # import-time path snapshot (stale once STARDUST_HOME is set after import) lives in the patterns.
 _SSH_SENSITIVE_PATH = r'(?:~|\$home|\$\{home\})/\.ssh(?:/|$)'
 _HERMES_ENV_PATH = (
-    r'(?:~\/\.hermes/|(?:\$home|\$\{home\})/\.hermes/|(?:\$hermes_home|\$\{hermes_home\})/)' r'\.env\b'
+    r'(?:~\/\.stardust/|(?:\$home|\$\{home\})/\.stardust/|(?:\$hermes_home|\$\{hermes_home\}|\$stardust_home|\$\{stardust_home\})/)' r'\.env\b'
 )
-# ~/.hermes/config.yaml IS the security policy (approvals.mode, yolo, allowlist) and the config cache is mtime-keyed,
+# ~/.stardust/config.yaml IS the security policy (approvals.mode, yolo, allowlist) and the config cache is mtime-keyed,
 # so a write takes effect mid-session. Terminal-side coverage (sed -i, tee, >, cp) pairs the file_tools deny.
 _HERMES_CONFIG_PATH = (
-    r'(?:~\/\.hermes/|(?:\$home|\$\{home\})/\.hermes/|(?:\$hermes_home|\$\{hermes_home\})/)' r'config\.yaml\b'
+    r'(?:~\/\.stardust/|(?:\$home|\$\{home\})/\.stardust/|(?:\$hermes_home|\$\{hermes_home\}|\$stardust_home|\$\{stardust_home\})/)' r'config\.yaml\b'
 )
 _PROJECT_ENV_PATH = r'(?:(?:/|\.{1,2}/)?(?:[^\s/"\'`]+/)*\.env(?:\.[^/\s"\'`]+)*)'
 _PROJECT_CONFIG_PATH = r'(?:(?:/|\.{1,2}/)?(?:[^\s/"\'`]+/)*config\.yaml)'
@@ -257,7 +257,7 @@ DANGEROUS_PATTERNS = [
     (r'\bsc(?:\.exe)?\s+(?:stop|delete)\b', "stop/delete service (sc)"),
     # Windows-form credential paths; the POSIX ~/.ssh patterns never match drive-letter or backslash spellings.
     (r'\busers[\\/][^\\/\s]+[\\/]\.ssh\b', "access to SSH keys (Windows path)"),
-    (r'\bappdata[\\/](?:local|roaming)[\\/]hermes[^\n]*\.env\b', "access to Hermes secrets (Windows path)"),
+    (r'\bappdata[\\/](?:local|roaming)[\\/](?:hermes|stardust)[^\n]*\.env\b', "access to Hermes secrets (Windows path)"),
     # ── end of Windows tier
     (r'\bchmod\s+(-[^\s]*\s+)*(777|666|o\+[rwx]*w|a\+[rwx]*w)\b', "world/other-writable permissions"),
     (r'\bchmod\s+--recursive\b.*(777|666|o\+[rwx]*w|a\+[rwx]*w)', "recursive world/other-writable (long flag)"),
@@ -332,9 +332,9 @@ DANGEROUS_PATTERNS = [
     (r'\b(?:rg|sort|ag|man)\b[^;|&\n]*(?<!\S)--(?:pre|hostname-bin|compress-program|pager|html)(?:\{|[*?\[])',
      "dynamic shell word may expand to arbitrary program execution flag"),
     # Gateway lifecycle: stopping/restarting the gateway kills all running agents. Global flags
-    # between `hermes` and `gateway` (`hermes -p ade gateway restart`) are allowed so a profile flag can't slip past.
-    (r'\bhermes\s+(?:-{1,2}\S+(?:\s+\S+)?\s+)*gateway\s+(stop|restart)\b', "stop/restart hermes gateway (kills running agents)"),
-    (r'\bhermes\s+update\b', "hermes update (restarts gateway, kills running agents)"),
+    # between `stardust` and `gateway` (`stardust -p ade gateway restart`) are allowed so a profile flag can't slip past.
+    (r'\b(?:hermes|stardust)\s+(?:-{1,2}\S+(?:\s+\S+)?\s+)*gateway\s+(stop|restart)\b', "stop/restart stardust gateway (kills running agents)"),
+    (r'\b(?:hermes|stardust)\s+update\b', "stardust update (restarts gateway, kills running agents)"),
     # Docker/Podman daemon redirect — global flags or env that point the CLI at a DIFFERENT (often remote) daemon:
     # `docker -H ssh://prod stop app` looks local but operates on remote infra, so any redirect requires approval
     # regardless of subcommand. The flag must be in global position (before the subcommand) and -H/--host/--context
@@ -355,7 +355,7 @@ DANGEROUS_PATTERNS = [
     (r'gateway\s+run\b.*(&\s*$|&\s*;|\bdisown\b|\bsetsid\b)', "start gateway outside systemd (use 'systemctl --user restart hermes-gateway')"),
     (r'\bnohup\b.*gateway\s+run\b', "start gateway outside systemd (use 'systemctl --user restart hermes-gateway')"),
     # Self-termination protection: prevent agent from killing its own process
-    (r'\b(pkill|killall)\b.*\b(hermes|gateway|cli\.py)\b', "kill hermes/gateway process (self-termination)"),
+    (r'\b(pkill|killall)\b.*\b(hermes|stardust|gateway|cli\.py)\b', "kill hermes/gateway process (self-termination)"),
     # Self-termination via kill + $(pgrep/pidof): the substitution is opaque to the name-based
     # pattern above, so catch the structural form.
     (r'\bkill\b.*\$\(\s*(pgrep|pidof)\b', "kill process via pgrep/pidof expansion (self-termination)"),
@@ -374,7 +374,7 @@ DANGEROUS_PATTERNS = [
     # DESTINATION fires; reading OUT of a sensitive path (`cp ~/.ssh/config /tmp/x`) stays safe.
     # The trailing `[^\s"\']*` consumes the rest of the destination filename.
     # The tee/redirection patterns above already gate _SENSITIVE_WRITE_TARGET (~/.ssh/*,
-    # ~/.netrc/.pgpass/.npmrc/.pypirc, shell rc files, ~/.hermes/config.yaml/.env), but cp/mv/install was
+    # ~/.netrc/.pgpass/.npmrc/.pypirc, shell rc files, ~/.stardust/config.yaml/.env), but cp/mv/install was
     # only paired for /etc and project-relative env/config — so `cp evil ~/.ssh/authorized_keys` (key
     # implant), `cp creds ~/.netrc`, and `cp evil ~/.bashrc` (login-time command injection) slipped through
     # with auto-approve. Same unpaired-door rationale as #14639 / the sed-tee-redirect pairing on these
@@ -389,7 +389,7 @@ DANGEROUS_PATTERNS = [
     (rf'\bsed\s+--in-place\b.*\s{_SYSTEM_CONFIG_PATH}', "in-place edit of system config (long flag)"),
     # sed -i on Hermes config/.env bypasses the redirection/tee rules; pairs the file_tools
     # write_file/patch deny so the terminal side is not an open door.
-    # In-place edit of a Hermes-managed security file (~/.hermes/config.yaml or .env). sed -i bypasses the
+    # In-place edit of a Hermes-managed security file (~/.stardust/config.yaml or .env). sed -i bypasses the
     # redirection/tee patterns above because it mutates the file directly. See #14639.
     (rf'\bsed\s+-[^\s]*i.*(?:{_HERMES_CONFIG_PATH}|{_HERMES_ENV_PATH})', "in-place edit of Hermes config/env"),
     (rf'\bsed\s+--in-place\b.*(?:{_HERMES_CONFIG_PATH}|{_HERMES_ENV_PATH})', "in-place edit of Hermes config/env (long flag)"),
@@ -478,7 +478,7 @@ def _normalize_command_for_detection(command: str) -> str:
     # precede the generic escape strip below, whose [^\n] class skips newlines and would leave the
     # backslash wedged between tokens, defeating the structured rm/mkfs/dd patterns incl. the HARDLINE floor.
     command = re.sub(r'\\\r?\n', '', command)
-    # Fold absolute user/Hermes home prefixes to ~/ and ~/.hermes/ so the static patterns catch /home/alice/.bashrc
+    # Fold absolute user/Hermes home prefixes to ~/ and ~/.stardust/ so the static patterns catch /home/alice/.bashrc
     # and C:\Users\alice\.bashrc. Resolved at detection time (not import time) so it tracks HOME/STARDUST_HOME set
     # later. MUST run before the backslash strip (which would dissolve C:\Users\alice to C:Usersalice). Hermes home
     # first: on Windows it nests under the user home, and folding the user home first would eat the prefix it needs.
@@ -533,7 +533,7 @@ def _rewrite_resolved_user_home(command: str) -> str:
 
 
 def _rewrite_resolved_hermes_home(command: str) -> str:
-    """Resolved STARDUST_HOME (and its realpath) -> ``~/.hermes/`` so the _HERMES_CONFIG_PATH /
+    """Resolved STARDUST_HOME (and its realpath) -> ``~/.stardust/`` so the _HERMES_CONFIG_PATH /
     _HERMES_ENV_PATH rules match Docker/gateway deployments that spell the absolute path."""
     try:
         from hermes_constants import get_hermes_home
@@ -541,7 +541,7 @@ def _rewrite_resolved_hermes_home(command: str) -> str:
         paths = [str(home), str(home.resolve(strict=False))]
     except Exception:
         return command
-    return _fold_home_prefixes(command, paths, "~/.hermes")
+    return _fold_home_prefixes(command, paths, "~/.stardust")
 
 
 _PARAM_REPLACEMENT_RE = re.compile(r"\$\{[^}/\s]+/[^}/]*/(?P<replacement>[^}]*)\}")
@@ -632,7 +632,7 @@ _BASH_SHORT_OPTION_LETTERS = frozenset("ilrsDcabefhkmnptuvxBCEHPTOo")
 _MAX_DETECTION_COMMAND_CHARS, _MAX_SEPARATOR_FREE_COMMAND_CHARS, _MAX_DETECTION_SEGMENTS = 128_000, 4_096, 25_000
 _PARSER_LIMIT_DESCRIPTION = "command parser limit exceeded"
 _MALFORMED_EXEC_DESCRIPTION = "command parser limit or malformed executable payload"
-_GATEWAY_LIFECYCLE_SPLICE_DESCRIPTION = "stop/restart hermes gateway via shell-spliced verb (kills running agents)"
+_GATEWAY_LIFECYCLE_SPLICE_DESCRIPTION = "stop/restart stardust gateway via shell-spliced verb (kills running agents)"
 
 
 def _command_parser_limit_exceeded(command: str) -> bool:

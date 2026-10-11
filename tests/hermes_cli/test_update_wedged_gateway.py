@@ -2,7 +2,7 @@
 
 A gateway whose event loop is stalled cannot process a graceful shutdown, so
 the updater's drain wait used to burn the full 180s budget ("Gateway PID X
-still running after 180.0s — restart may fail") and could deadlock `hermes
+still running after 180.0s — restart may fail") and could deadlock `stardust
 update`. The fix probes the loop-liveness heartbeat file BEFORE draining and,
 only when the loop is provably dead, escalates SIGTERM → SIGKILL bounded to
 seconds. A busy-but-alive gateway (fresh heartbeat) must keep the full drain

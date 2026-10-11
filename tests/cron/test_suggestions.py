@@ -18,7 +18,7 @@ import pytest
 @pytest.fixture
 def store(tmp_path, monkeypatch):
     """A cron.suggestions module bound to an isolated STARDUST_HOME."""
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     monkeypatch.setenv("STARDUST_HOME", str(home))
     import hermes_constants

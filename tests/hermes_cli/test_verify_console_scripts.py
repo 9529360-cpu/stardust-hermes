@@ -65,5 +65,5 @@ class TestVerifyConsoleScriptsInstalled:
         with patch("hermes_cli.main_install_repair._is_windows", return_value=True):
             names = {path.name for path in main_install_repair._hermes_exe_shims(fake_scripts_dir)}
 
-        assert {"hermes.exe", "hermes-agent.exe", "hermes-acp.exe"} <= names
+        assert {"stardust.exe", "hermes-agent.exe", "hermes-acp.exe"} <= names
         assert "hermes-gateway.exe" in names

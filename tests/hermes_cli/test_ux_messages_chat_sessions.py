@@ -20,11 +20,11 @@ class _StatusError(Exception):
 # ── cli-02: failed model request in the chat panel ──────────────────────────
 
 @pytest.mark.parametrize("exc, pointer, absent", [
-    (_StatusError("HTTP 401: Invalid API key", 401), "hermes model", "HTTP 401"),
+    (_StatusError("HTTP 401: Invalid API key", 401), "stardust model", "HTTP 401"),
     (Exception("Error code: 402 - insufficient credits"), "/model", "402"),
     (Exception("HTTP 404: model not found"), "/model", "HTTP 404"),
     (_StatusError("rate limit exceeded", 429), "/model", "429"),
-    (Exception("Unknown error"), "hermes doctor", "Unknown error"),
+    (Exception("Unknown error"), "stardust doctor", "Unknown error"),
 ])
 def test_chat_error_response_leads_with_plain_copy_and_pointer(exc, pointer, absent):
     text = chat_error_response(exc, provider="openrouter", model="foo/bar")
@@ -43,7 +43,7 @@ def test_chat_error_response_names_provider_and_model():
 
 def test_chat_error_response_accepts_plain_string_summary():
     text = chat_error_response("HTTP 401: Invalid API key", provider="nous", model="m")
-    assert "hermes model" in text.splitlines()[0]
+    assert "stardust model" in text.splitlines()[0]
 
 
 def test_chat_error_response_trusts_stamped_provider_verdict_over_reclassifying_text():
@@ -66,7 +66,7 @@ def test_agent_init_failure_message_says_message_not_sent_and_points_to_doctor()
     exc = RuntimeError("Unsupported api_mode 'weird' for provider x\nsecond line of traceback noise " + "x" * 300)
     text = agent_init_failure_message(exc)
     assert "not sent" in text
-    assert "hermes doctor" in text and "/model" in text
+    assert "stardust doctor" in text and "/model" in text
     assert not text.startswith("Failed to initialize agent")
     assert "second line" not in text, "only the first line of the exception is shown"
     assert len(text) < 400, "the exception summary is truncated"
@@ -87,14 +87,14 @@ def test_owned_message_first_line_is_plain_and_details_follow():
     assert "desktop" in rest[0]
 
 
-# ── cli-30: hermes sessions with a bad id / unopenable DB ──────────────────
+# ── cli-30: stardust sessions with a bad id / unopenable DB ──────────────────
 
 def test_sessions_not_found_points_to_list(capsys):
     from hermes_cli.sessions_cmd import _not_found
     assert _not_found("abc") == 1
     out = capsys.readouterr().out
     assert "No session 'abc'" in out
-    assert "hermes sessions list" in out
+    assert "stardust sessions list" in out
 
 
 def test_sessions_db_open_failure_points_to_repair(monkeypatch, capsys):
@@ -117,7 +117,7 @@ def test_sessions_db_open_failure_points_to_repair(monkeypatch, capsys):
     code = sessions_cmd.cmd_sessions(args, parser)
     out = capsys.readouterr().out
     assert code == 1
-    assert "hermes sessions repair" in out
+    assert "stardust sessions repair" in out
     assert out.splitlines()[0].startswith("Could not open your session history database")
     assert "Details: database disk image is malformed" in out
 

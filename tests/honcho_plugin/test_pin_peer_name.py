@@ -569,7 +569,7 @@ class TestPinTransition:
         assert sig_user_only != sig_both
 
     def test_identity_signature_reflects_a_repointed_host_workspace(self, tmp_path, monkeypatch):
-        """``hermes honcho peers map`` can repoint a host block's workspace; the cached agent's manager
+        """``stardust honcho peers map`` can repoint a host block's workspace; the cached agent's manager
         is bound to the old one until the signature changes."""
         from plugins.memory.honcho import HonchoMemoryProvider
 
@@ -590,7 +590,7 @@ class TestProfilePeerUniqueness:
     """Each Hermes profile can pin to its own unique peerName.
 
     Profile cloning copies host blocks, but operators routinely diverge them
-    afterwards (e.g. `hermes -p partner` pinned to a different person's peer).
+    afterwards (e.g. `stardust -p partner` pinned to a different person's peer).
     The resolver must honor host-level ``peerName`` so two profiles in the
     same workspace stay scoped to different Honcho peers.
     """

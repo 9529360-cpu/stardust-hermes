@@ -16,7 +16,7 @@ from cron.jobs import create_job, get_job, mark_job_run
 
 @pytest.fixture
 def tmp_cron_home(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     monkeypatch.setenv("STARDUST_HOME", str(home))
     return home

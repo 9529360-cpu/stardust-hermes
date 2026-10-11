@@ -40,7 +40,7 @@ class TestGetHermesHome:
             os.environ.pop("STARDUST_HOME", None)
             home = get_hermes_home()
             if sys.platform == "win32":
-                # Windows default is %LOCALAPPDATA%\hermes — see
+                # Windows default is %LOCALAPPDATA%\stardust — see
                 # hermes_constants._get_platform_default_hermes_home.
                 local_appdata = os.environ.get("LOCALAPPDATA", "").strip()
                 base = (
@@ -50,7 +50,7 @@ class TestGetHermesHome:
                 )
                 assert home == base / "hermes"
             else:
-                assert home == Path.home() / ".hermes"
+                assert home == Path.home() / ".stardust"
 
 
 class TestEnsureHermesHome:
@@ -198,7 +198,7 @@ class TestLoadConfigParseFailure:
     Before issue #23570 this was a single ``print(...)`` that scrolled past
     on the first invocation — users saw aux-fallback misbehavior with no clue
     their config.yaml was being ignored. The helper must:
-      * log at WARNING (so ``hermes logs`` surfaces it)
+      * log at WARNING (so ``stardust logs`` surfaces it)
       * also write to stderr (so it's visible at startup even before
         ``setup_logging()`` has wired up file handlers)
       * dedup on (path, mtime_ns, size) so concurrent loads don't spam
@@ -750,7 +750,7 @@ class TestOptionalEnvVarsRegistry:
     def test_max_iterations_not_offered_as_env_var(self):
         """STARDUST_MAX_ITERATIONS must NOT be in OPTIONAL_ENV_VARS (issue #17534).
 
-        Offering it as an editable env var (dashboard, `hermes setup`) lets a
+        Offering it as an editable env var (dashboard, `stardust setup`) lets a
         user write it to .env, recreating the stale ghost that shadows
         config.yaml's agent.max_turns. The iteration budget is configured ONLY
         via config.yaml; STARDUST_MAX_ITERATIONS remains a read-only backward-compat
@@ -763,7 +763,7 @@ class TestOptionalEnvVarsRegistry:
 class TestMemoryProviderEnvVarsRegistry:
     """Every memory provider that reads an API key from the environment must
     have that key catalogued in OPTIONAL_ENV_VARS so the dashboard Keys page
-    and `hermes setup` surface it (previously only Honcho was listed, leaving
+    and `stardust setup` surface it (previously only Honcho was listed, leaving
     Hindsight/Supermemory/Mem0/RetainDB/ByteRover/OpenViking invisible).
 
     This is a behavior contract, not a snapshot: it asserts each provider's
@@ -934,7 +934,7 @@ class TestConfigSupportFloor:
         )
         assert expected_fragment in captured.out
         assert expected_fragment in captured.err
-        assert "run `hermes setup` to regenerate" in captured.out
+        assert "run `stardust setup` to regenerate" in captured.out
         assert "_config_version: 12" in captured.out
         assert any(expected_fragment in w for w in results["warnings"])
         # No 'Config version: X → Y' line — nothing was migrated.
@@ -1956,7 +1956,7 @@ def test_default_config_has_no_duplicate_top_level_keys():
 
 
 class TestConfigCommandFailClosedSurface:
-    """`hermes config set/unset` must exit cleanly (no traceback) when the
+    """`stardust config set/unset` must exit cleanly (no traceback) when the
     fail-closed write guard refuses an unparseable config.yaml."""
 
     def _args(self, **kw):
@@ -1983,7 +1983,7 @@ class TestConfigCommandFailClosedSurface:
 
         assert excinfo.value.code == 1
         err = capsys.readouterr().err
-        assert "formatting error" in err and "`hermes config edit`" in err
+        assert "formatting error" in err and "`stardust config edit`" in err
         assert config_path.read_text(encoding="utf-8") == original
 
     def test_config_command_unset_exits_cleanly_on_broken_yaml(self, tmp_path, capsys):
@@ -2003,7 +2003,7 @@ class TestConfigCommandFailClosedSurface:
 
 
 def test_gateway_multiplex_keys_are_recognized_config_keys():
-    """``hermes config set gateway.multiplex_profiles true`` used to warn 'not a recognized config
+    """``stardust config set gateway.multiplex_profiles true`` used to warn 'not a recognized config
     key' although gateway/config.py reads it; the key (and profile_routes) live in DEFAULT_CONFIG."""
     from hermes_cli.config import _validate_config_key
     from hermes_cli.config_defaults import DEFAULT_CONFIG

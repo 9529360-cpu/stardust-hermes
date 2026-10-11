@@ -2726,7 +2726,7 @@
     },
     {
       "name": "reload.env",
-      "summary": "Re-read ~/.hermes/.env (CLI /reload parity); built agents keep their pool until /new.",
+      "summary": "Re-read ~/.stardust/.env (CLI /reload parity); built agents keep their pool until /new.",
       "params": [
         {
           "name": "params",
@@ -3230,7 +3230,7 @@
     },
     {
       "name": "session.save",
-      "summary": "Export the transcript to ~/.hermes/sessions/saved (classic /save).",
+      "summary": "Export the transcript to ~/.stardust/sessions/saved (classic /save).",
       "params": [
         {
           "name": "params",

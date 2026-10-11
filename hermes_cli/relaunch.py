@@ -1,5 +1,5 @@
 """Unified self-relaunch for Hermes CLI: preserves inherited flags (--tui, --dev, --profile, --model…)
-across process replacement so ``hermes sessions browse`` / post-setup relaunch keep the user's mode."""
+across process replacement so ``stardust sessions browse`` / post-setup relaunch keep the user's mode."""
 
 import os
 import pathlib
@@ -93,7 +93,7 @@ def resolve_hermes_bin() -> Optional[str]:
         abs_path = os.path.abspath(argv0)
         if os.access(abs_path, os.X_OK) and not _is_unsafe_python_launcher(abs_path):
             return abs_path
-    path_bin = shutil.which("hermes")
+    path_bin = shutil.which("stardust")
     if path_bin and not _is_unsafe_python_launcher(path_bin):
         return path_bin
     return None
@@ -129,7 +129,7 @@ def relaunch(
         except KeyboardInterrupt:
             sys.exit(130)
         except OSError as exc:
-            # Raw ``[Errno 8] Exec format error`` is cryptic; usual causes are ``hermes`` not on
+            # Raw ``[Errno 8] Exec format error`` is cryptic; usual causes are ``stardust`` not on
             # PATH yet (install hasn't propagated User PATH into this shell) or a stale shim.
             print(
                 f"\nHermes relaunch failed: {exc}\n"

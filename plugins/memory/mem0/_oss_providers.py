@@ -19,7 +19,7 @@ EMBEDDER_PROVIDERS: dict[str, dict[str, Any]] = {
 
 VECTOR_PROVIDERS: dict[str, dict[str, Any]] = {
     # Resolved lazily (see ``vector_default_config``): the profile home is a ContextVar at call time,
-    # not an import-time constant, and ``~/.hermes`` is wrong on Windows and under profiles.
+    # not an import-time constant, and ``~/.stardust`` is wrong on Windows and under profiles.
     "qdrant": {"label": "Qdrant", "default_config": {"path": lambda: str(get_hermes_home() / "mem0_qdrant")}, "pip_dep": "qdrant-client"},
     "pgvector": {
         "label": "PGVector",

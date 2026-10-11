@@ -61,7 +61,7 @@ class Run:
     @classmethod
     def parser(cls, description: str = "") -> argparse.ArgumentParser:
         ap = argparse.ArgumentParser(description=description)
-        ap.add_argument("--db", required=True, help="path to a COPY of ~/.hermes/state.db")
+        ap.add_argument("--db", required=True, help="path to a COPY of ~/.stardust/state.db")
         ap.add_argument("--root", default=None, help="root session id (default: the session with the most descendants)")
         ap.add_argument("--out", default="postmortem_out", help="directory for JSON/markdown outputs")
         return ap

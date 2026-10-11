@@ -1,4 +1,4 @@
-"""Tests for the Command Installation check in hermes doctor."""
+"""Tests for the Command Installation check in stardust doctor."""
 
 import sys
 import types
@@ -12,7 +12,7 @@ import hermes_cli.doctor as doctor_mod
 
 def _setup_doctor_env(monkeypatch, tmp_path, venv_name="venv"):
     """Create a minimal STARDUST_HOME + PROJECT_ROOT for doctor tests."""
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir(parents=True, exist_ok=True)
     (home / "config.yaml").write_text("memory: {}\n", encoding="utf-8")
 
@@ -96,7 +96,7 @@ class TestDoctorCommandInstallation:
 
     @pytest.mark.skipif(sys.platform == "win32", reason="Symlink check is Unix-only")
     def test_missing_venv_entry_point_shows_warn(self, monkeypatch, tmp_path):
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".stardust"
         home.mkdir(parents=True, exist_ok=True)
         (home / "config.yaml").write_text("memory: {}\n", encoding="utf-8")
 

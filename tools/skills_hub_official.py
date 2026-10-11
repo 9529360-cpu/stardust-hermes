@@ -33,7 +33,7 @@ def _entry_provider(entry: dict) -> str:
 
 class OptionalSkillSource(SkillSource):
     """Skills from the repo's ``optional-skills/`` directory: official (Stardust-maintained) but not
-    activated by default — absent from the system prompt and not copied to ~/.hermes/skills/ at
+    activated by default — absent from the system prompt and not copied to ~/.stardust/skills/ at
     setup. Discoverable via the Skills Hub as source "official" with "builtin" trust."""
 
     SOURCE_ID = "official"
@@ -155,7 +155,7 @@ class OptionalSkillSource(SkillSource):
 
     def _fetch_from_live_repo(self, rel: str) -> Optional[SkillBundle]:
         """Fetch an optional skill straight from the live default branch. Local installs lag
-        ``main``; rather than demanding ``hermes update`` first, resolve against the live repo.
+        ``main``; rather than demanding ``stardust update`` first, resolve against the live repo.
         ``rel`` is ``category/skill`` (used verbatim) or a bare skill name (located via the repo tree)."""
         parts = _clean_rel_parts(rel.strip("/"))
         if parts is None:

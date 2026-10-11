@@ -385,7 +385,7 @@ class TestBomHandling:
 class TestProtectedInstructionFiles:
     """Protected instruction writes require approval in manual/smart modes.
 
-    AGENTS.md / CLAUDE.md / SOUL.md / .cursorrules / project-local .hermes
+    AGENTS.md / CLAUDE.md / SOUL.md / .cursorrules / project-local .stardust
     config steer future agent behavior, so a prompt-injected agent writing
     them is a persistence vector. The gate asks the human in manual/smart modes
     even under session yolo/auto-approve, and fails closed when no human channel
@@ -557,17 +557,17 @@ class TestProtectedInstructionFiles:
         assert res.get("error") and "BLOCKED" in res["error"]
 
     def test_project_local_hermes_dir_is_gated(self, tmp_path, approvals):
-        proj = tmp_path / "proj" / ".hermes"
+        proj = tmp_path / "proj" / ".stardust"
         proj.mkdir(parents=True)
         approvals["answer"] = "deny"
         res = self._write(proj / "config.yaml")
         assert res.get("error") and "BLOCKED" in res["error"]
 
     def test_checkout_nested_under_hermes_dir_not_gated(self, tmp_path, approvals):
-        """A repo living UNDER a .hermes dir (e.g. ~/.hermes/hermes-agent)
+        """A repo living UNDER a .stardust dir (e.g. ~/.stardust/hermes-agent)
         must not have every write gated — only files directly inside a
-        .hermes dir count as project config."""
-        repo = tmp_path / ".hermes" / "some-repo" / "src"
+        .stardust dir count as project config."""
+        repo = tmp_path / ".stardust" / "some-repo" / "src"
         repo.mkdir(parents=True)
         res = self._write(repo / "module.py", "x = 1\n")
         assert not res.get("error"), res
@@ -576,9 +576,9 @@ class TestProtectedInstructionFiles:
     def test_real_hermes_home_not_gated_by_this_check(
         self, tmp_path, approvals, monkeypatch
     ):
-        """~/.hermes itself is governed by existing guards, not this gate."""
+        """~/.stardust itself is governed by existing guards, not this gate."""
         import tools.file_tools_write_guards as ft
-        fake_home = tmp_path / ".hermes"
+        fake_home = tmp_path / ".stardust"
         (fake_home / "notes").mkdir(parents=True)
         monkeypatch.setattr(
             ft, "_get_real_hermes_home", lambda: str(fake_home.resolve())
@@ -706,10 +706,10 @@ class TestProtectedInstructionFiles:
 
 
 class TestProfileHomeExemptsHermesRoot:
-    """issue #60: under ``hermes -p <name>`` (``STARDUST_HOME=<root>/profiles/<name>``)
+    """issue #60: under ``stardust -p <name>`` (``STARDUST_HOME=<root>/profiles/<name>``)
     the exemption used to cover ONLY the profile dir, so the ROOT's direct files
-    (LEDGER.md / MEMORY.md / SOUL.md ...) fell through to the ``.hermes`` component
-    rule, were read as project-local ``.hermes`` config, and — having no approval
+    (LEDGER.md / MEMORY.md / SOUL.md ...) fell through to the ``.stardust`` component
+    rule, were read as project-local ``.stardust`` config, and — having no approval
     channel headless — failed closed. That blocked #54 (LEDGER.md edit). The gate
     must exempt the whole Hermes tree, exactly like the default profile does.
     """
@@ -753,7 +753,7 @@ class TestProfileHomeExemptsHermesRoot:
 
     def test_named_profile_scope_exempts_root_direct_files(self, tmp_path, monkeypatch, approvals):
         """Under a named profile bound by the per-turn scope (multiplex path), the ROOT's own store is
-        not project-local ``.hermes`` config: the write lands with no approval prompt."""
+        not project-local ``.stardust`` config: the write lands with no approval prompt."""
         import tools.file_tools_write_guards as ft
         from hermes_constants import reset_hermes_home_override, set_hermes_home_override
 
@@ -772,7 +772,7 @@ class TestProfileHomeExemptsHermesRoot:
         assert approvals["calls"] == []
 
     def test_only_a_real_hermes_root_is_exempt(self, tmp_path, monkeypatch, approvals):
-        """Negatives hold with a named profile active: a checkout's ``.hermes/config.yaml`` and
+        """Negatives hold with a named profile active: a checkout's ``.stardust/config.yaml`` and
         protected basenames stay gated (fail-closed, unwritten), and a coincidental
         ``.../profiles/<name>`` tree that is NOT a Hermes root never exempts its parent."""
         import tools.file_tools_write_guards as ft
@@ -780,13 +780,13 @@ class TestProfileHomeExemptsHermesRoot:
 
         root, profile = self._profile_layout(tmp_path)
         repo = tmp_path / "repo"
-        (repo / ".hermes").mkdir(parents=True)
+        (repo / ".stardust").mkdir(parents=True)
         monkeypatch.delenv("STARDUST_HOME", raising=False)
         token = set_hermes_home_override(str(profile))
         try:
-            assert ft._protected_instruction_reason(str(repo / ".hermes" / "config.yaml"))
+            assert ft._protected_instruction_reason(str(repo / ".stardust" / "config.yaml"))
             assert ft._protected_instruction_reason(str(repo / "AGENTS.md")) == "AGENTS.md"
-            target = repo / ".hermes" / "config.yaml"
+            target = repo / ".stardust" / "config.yaml"
             res = self._write(target, "gate: off\n")
         finally:
             reset_hermes_home_override(token)

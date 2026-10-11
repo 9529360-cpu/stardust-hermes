@@ -1,7 +1,7 @@
 """A fresh process recovers the last successfully parsed config.yaml when the file is broken.
 
 The in-process last-known-good (#31188 port) only helps a long-running gateway. A CLI restart or
-``hermes config get`` against broken YAML used to run on ``DEFAULT_CONFIG`` — dropping every
+``stardust config get`` against broken YAML used to run on ``DEFAULT_CONFIG`` — dropping every
 override, including ``approvals.deny`` (#102945). Successful loads now leave a ``good`` copy in
 ``backups/config/`` and the fallback reads it.
 """

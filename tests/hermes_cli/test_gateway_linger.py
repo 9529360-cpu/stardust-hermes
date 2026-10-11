@@ -144,7 +144,7 @@ def test_systemd_install_calls_linger_helper(monkeypatch, tmp_path, capsys):
         gateway,
         "generate_systemd_unit",
         lambda system=False, run_as_user=None: (
-            '[Service]\nEnvironment="STARDUST_HOME=/home/alice/.hermes"\n'
+            '[Service]\nEnvironment="STARDUST_HOME=/home/alice/.stardust"\n'
         ),
     )
 

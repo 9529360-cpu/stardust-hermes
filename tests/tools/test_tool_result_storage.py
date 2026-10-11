@@ -385,7 +385,7 @@ class TestPerToolThresholds:
 class TestSpillover:
     @pytest.fixture(autouse=True)
     def _isolated_home(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
         # Reset the once-per-process prune flag so each test is independent.
         import tools.tool_result_storage as trs
         monkeypatch.setattr(trs, "_spillover_pruned_homes", set())

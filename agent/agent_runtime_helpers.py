@@ -1727,7 +1727,7 @@ def create_openai_client(agent, client_kwargs: dict, *, reason: str, shared: boo
     _validate_base_url(client_kwargs.get("base_url"))
     # Provider-supplied client (registration seam): a provider whose wire protocol is not
     # OpenAI-over-HTTP supplies its own client from ProviderProfile.create_client(). Consulted
-    # before the built-in ladder so a profile registered from ~/.hermes/plugins/ or a pip entry
+    # before the built-in ladder so a profile registered from ~/.stardust/plugins/ or a pip entry
     # point can ship a transport without editing this function (what makes an out-of-tree ACP
     # provider possible). None (the default) falls through, so existing providers are unaffected.
     provider_client = _provider_supplied_client(agent, client_kwargs)

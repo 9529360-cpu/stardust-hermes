@@ -16,7 +16,7 @@ import pytest
 @pytest.fixture()
 def hermes_home(tmp_path, monkeypatch):
     """Give the persisted control managers an isolated database for every test."""
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
     monkeypatch.setenv("STARDUST_HOME", str(home))

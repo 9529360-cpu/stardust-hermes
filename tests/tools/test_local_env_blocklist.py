@@ -67,7 +67,7 @@ def _run_with_env(extra_os_env=None, self_env=None):
 
 
 class TestProviderEnvBlocklist:
-    """Provider env vars loaded from ~/.hermes/.env must not leak."""
+    """Provider env vars loaded from ~/.stardust/.env must not leak."""
 
     def test_blocked_vars_are_stripped(self):
         """OPENAI_BASE_URL and other provider vars must not appear in subprocess env."""
@@ -564,7 +564,7 @@ class TestActiveVenvMarkerStripping:
 
     def test_virtualenv_marker_stripped_end_to_end(self):
         result_env = _run_with_env(extra_os_env={
-            "VIRTUAL_ENV": "/home/user/.hermes/hermes-agent/venv",
+            "VIRTUAL_ENV": "/home/user/.stardust/hermes-agent/venv",
         })
         assert "VIRTUAL_ENV" not in result_env
 
@@ -746,7 +746,7 @@ class TestPythonpathSelectiveStrip:
         import sys
 
         pyver = f"python{sys.version_info[0]}.{sys.version_info[1]}"
-        hermes_win = f"C:\\\\Users\\\\u\\\\.hermes\\\\hermes-agent\\\\venv\\\\lib\\\\{pyver}\\\\site-packages"
+        hermes_win = f"C:\\\\Users\\\\u\\\\.stardust\\\\hermes-agent\\\\venv\\\\lib\\\\{pyver}\\\\site-packages"
         user_win = "D:\\\\user\\\\lib"
         env = {
             "PYTHONPATH": ";".join([hermes_win, user_win]),
@@ -1564,7 +1564,7 @@ class TestSanePathIncludesHomebrew:
     def _disable_hermes_bin_injection(self):
         """These tests assert the sane-path merge in isolation. Disable the
         hermes-install-dir prepend (a separate concern, covered by
-        TestHermesBinDirOnPath) so a real ``hermes`` on the test runner's PATH
+        TestHermesBinDirOnPath) so a real ``stardust`` on the test runner's PATH
         doesn't shift the asserted PATH layout."""
         from tools.environments import local as local_mod
         saved = local_mod._HERMES_BIN_DIR
@@ -1641,7 +1641,7 @@ class TestSanePathIncludesHomebrew:
 class TestHermesBinDirOnPath:
     """The hermes install dir is reachable in the terminal subshell PATH.
 
-    Plugins shelling out to bare ``hermes`` via the terminal tool must work
+    Plugins shelling out to bare ``stardust`` via the terminal tool must work
     even when the gateway was launched without the hermes install dir on
     PATH (systemd, service managers, cron). See the discussion that motivated
     _resolve_hermes_bin_dir / _prepend_hermes_bin_dir.
@@ -1655,7 +1655,7 @@ class TestHermesBinDirOnPath:
         from tools.environments import local as local_mod
         self._reset_cache()
         monkeypatch.setattr(local_mod.shutil, "which",
-                            lambda name: "/opt/hermes/bin/hermes" if name == "hermes" else None)
+                            lambda name: "/opt/hermes/bin/stardust" if name == "stardust" else None)
         monkeypatch.setattr(local_mod.os.path, "isdir", lambda p: p == "/opt/hermes/bin")
         assert local_mod._resolve_hermes_bin_dir() == "/opt/hermes/bin"
 

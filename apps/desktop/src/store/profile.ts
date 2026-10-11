@@ -50,7 +50,7 @@ export function profileLabel(profile: Pick<ProfileInfo, 'display_name' | 'name'>
 }
 
 // The profile the running local backend is actually scoped to (mirrors
-// /api/profiles/active `current`). "default" is the root ~/.hermes. This is the
+// /api/profiles/active `current`). "default" is the root ~/.stardust. This is the
 // display source of truth for the statusbar pill; the desktop's *stored*
 // preference (which may be unset) lives in the Electron main process.
 export const $activeProfile = atom<string>('default')
@@ -1058,7 +1058,7 @@ function orderedProfileKeys(): string[] {
   return hasDefault ? ['default', ...named] : named
 }
 
-// Switch to the default (root ~/.hermes) profile — bound to ⌘1.
+// Switch to the default (root ~/.stardust) profile — bound to ⌘1.
 export function switchToDefaultProfile(): void {
   const def = $profiles.get().find(profile => profile.is_default)
 

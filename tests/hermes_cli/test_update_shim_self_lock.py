@@ -1,12 +1,12 @@
 """The Windows console-shim update self-lock (#88838, #89599, #86093).
 
-``venv\\Scripts\\hermes.exe`` is a launcher that runs the interpreter with the
+``venv\\Scripts\\stardust.exe`` is a launcher that runs the interpreter with the
 shim itself as its script, keeping the file open without FILE_SHARE_DELETE for
 the whole command. An update started that way must therefore replace a file it
 is holding, which Windows refuses — so the DEPENDENCY SYNC re-runs itself under
 ``venv\\Scripts\\python.exe``.
 
-The hand-off sits at the sync boundary, not at the top of ``hermes update``:
+The hand-off sits at the sync boundary, not at the top of ``stardust update``:
 everything before it (the fetch, the stash question, the branch switch) runs
 in the user's own console, and an up-to-date run that never syncs never hands
 off at all.
@@ -26,7 +26,7 @@ from hermes_cli import main as cli_main
 from hermes_cli import update_cmd
 from hermes_cli import main_install_repair
 
-SHIM_NAMES = ["hermes.exe", "hermes-agent.exe", "hermes-acp.exe", "hermes-gateway.exe"]
+SHIM_NAMES = ["stardust.exe", "hermes-agent.exe", "hermes-acp.exe", "hermes-gateway.exe"]
 
 
 @pytest.fixture
@@ -90,43 +90,43 @@ def test_detects_shim_as_argv0(venv, monkeypatch, shim_name):
 
 def test_detects_shim_from_zipapp_main_py(venv, monkeypatch):
     """runpy/zipapp launches put ``<shim>\\__main__.py`` in argv[0]."""
-    monkeypatch.setattr(sys, "argv", [str(venv / "hermes.exe" / "__main__.py")])
-    assert main_install_repair._windows_shim_in_process_chain() == venv / "hermes.exe"
+    monkeypatch.setattr(sys, "argv", [str(venv / "stardust.exe" / "__main__.py")])
+    assert main_install_repair._windows_shim_in_process_chain() == venv / "stardust.exe"
 
 
 def test_detects_shim_from_main_module_spec_origin(venv, monkeypatch):
     fake_main = types.SimpleNamespace(
         __file__=None,
-        __spec__=types.SimpleNamespace(origin=str(venv / "hermes.exe")),
+        __spec__=types.SimpleNamespace(origin=str(venv / "stardust.exe")),
     )
     monkeypatch.setitem(sys.modules, "__main__", fake_main)
-    assert main_install_repair._windows_shim_in_process_chain() == venv / "hermes.exe"
+    assert main_install_repair._windows_shim_in_process_chain() == venv / "stardust.exe"
 
 
 def test_detects_shim_in_ancestor_chain(venv, monkeypatch):
     """The launcher is usually a separate parent process, not argv[0]."""
-    _fake_psutil(monkeypatch, [str(venv / "hermes.exe")])
-    assert main_install_repair._windows_shim_in_process_chain() == venv / "hermes.exe"
+    _fake_psutil(monkeypatch, [str(venv / "stardust.exe")])
+    assert main_install_repair._windows_shim_in_process_chain() == venv / "stardust.exe"
 
 
 def test_ignores_hermes_exe_outside_the_project_venv(venv, monkeypatch, tmp_path):
     """A shim from some other install must never trigger a re-exec."""
     other = tmp_path / "other" / "Scripts"
     other.mkdir(parents=True)
-    monkeypatch.setattr(sys, "argv", [str(other / "hermes.exe"), "update"])
-    _fake_psutil(monkeypatch, [str(other / "hermes.exe")])
+    monkeypatch.setattr(sys, "argv", [str(other / "stardust.exe"), "update"])
+    _fake_psutil(monkeypatch, [str(other / "stardust.exe")])
     assert main_install_repair._windows_shim_in_process_chain() is None
 
 
 def test_no_shim_off_windows(venv, monkeypatch):
     monkeypatch.setattr(main_install_repair, "_is_windows", lambda: False)
-    monkeypatch.setattr(sys, "argv", [str(venv / "hermes.exe"), "update"])
+    monkeypatch.setattr(sys, "argv", [str(venv / "stardust.exe"), "update"])
     assert main_install_repair._windows_shim_in_process_chain() is None
 
 
 def test_no_shim_without_a_venv(venv, monkeypatch):
     monkeypatch.setattr(main_install_repair, "_venv_scripts_dir", lambda: None)
-    monkeypatch.setattr(sys, "argv", [str(venv / "hermes.exe"), "update"])
+    monkeypatch.setattr(sys, "argv", [str(venv / "stardust.exe"), "update"])
     assert main_install_repair._windows_shim_in_process_chain() is None
 
 
@@ -136,7 +136,7 @@ def test_no_shim_without_a_venv(venv, monkeypatch):
 
 
 def test_reexec_runs_same_args_under_venv_python(venv, monkeypatch, capsys):
-    monkeypatch.setattr(sys, "argv", [str(venv / "hermes.exe"), "update", "--yes"])
+    monkeypatch.setattr(sys, "argv", [str(venv / "stardust.exe"), "update", "--yes"])
     calls = _capture_popen(monkeypatch)
 
     assert cli_main._reexec_dependency_sync_off_windows_shim() is True
@@ -150,7 +150,7 @@ def test_reexec_runs_same_args_under_venv_python(venv, monkeypatch, capsys):
 
 def test_reexec_child_runs_unattended(venv, monkeypatch):
     """The parent exits, so a prompt in the child could never be answered."""
-    monkeypatch.setattr(sys, "argv", [str(venv / "hermes.exe"), "update"])
+    monkeypatch.setattr(sys, "argv", [str(venv / "stardust.exe"), "update"])
     calls = _capture_popen(monkeypatch)
 
     assert cli_main._reexec_dependency_sync_off_windows_shim() is True
@@ -158,7 +158,7 @@ def test_reexec_child_runs_unattended(venv, monkeypatch):
 
 
 def test_reexec_does_not_recurse(venv, monkeypatch):
-    monkeypatch.setattr(sys, "argv", [str(venv / "hermes.exe"), "update"])
+    monkeypatch.setattr(sys, "argv", [str(venv / "stardust.exe"), "update"])
     monkeypatch.setenv(cli_main._UPDATE_REEXEC_ENV, "1")
     calls = _capture_popen(monkeypatch)
 
@@ -174,14 +174,14 @@ def test_reexec_skipped_when_not_launched_from_a_shim(venv, monkeypatch):
 
 def test_reexec_falls_through_when_venv_python_is_missing(venv, monkeypatch, capsys):
     (venv / "python.exe").unlink()
-    monkeypatch.setattr(sys, "argv", [str(venv / "hermes.exe"), "update"])
+    monkeypatch.setattr(sys, "argv", [str(venv / "stardust.exe"), "update"])
 
     assert cli_main._reexec_dependency_sync_off_windows_shim() is False
     assert "-m hermes_cli.main update" not in capsys.readouterr().out
 
 
 def test_reexec_falls_through_when_spawn_fails(venv, monkeypatch, capsys):
-    monkeypatch.setattr(sys, "argv", [str(venv / "hermes.exe"), "update"])
+    monkeypatch.setattr(sys, "argv", [str(venv / "stardust.exe"), "update"])
     _capture_popen(monkeypatch, raises=OSError("no exec"))
 
     assert cli_main._reexec_dependency_sync_off_windows_shim() is False
@@ -196,14 +196,14 @@ def test_reexec_falls_through_when_spawn_fails(venv, monkeypatch, capsys):
 def test_up_to_date_run_never_hands_off(venv, monkeypatch, capsys):
     """The regression that started this: a no-op update must not detach.
 
-    The hand-off used to run before the fetch, so every ``hermes update`` —
+    The hand-off used to run before the fetch, so every ``stardust update`` —
     including the ``Already up to date!`` case that never touches the venv —
     spawned a child and returned to the shell, leaving the child printing
     into a console it no longer owned. ``--check`` is the cheapest real run
     that reaches ``cmd_update`` and exits without syncing; nothing may be
     spawned along the way.
     """
-    monkeypatch.setattr(sys, "argv", [str(venv / "hermes.exe"), "update", "--check"])
+    monkeypatch.setattr(sys, "argv", [str(venv / "stardust.exe"), "update", "--check"])
     calls = _capture_popen(monkeypatch)
     monkeypatch.setattr(update_cmd, "_cmd_update_check", lambda **kwargs: None)
 
@@ -216,7 +216,7 @@ def test_sync_guard_hands_off_when_only_the_shim_is_held(venv, monkeypatch):
     """No native module mapped, but we ARE the shim: hand off and exit 0."""
     from hermes_cli import update_cmd
 
-    monkeypatch.setattr(sys, "argv", [str(venv / "hermes.exe"), "update"])
+    monkeypatch.setattr(sys, "argv", [str(venv / "stardust.exe"), "update"])
     monkeypatch.setattr(cli_main, "_detect_self_loaded_native_modules", lambda: [])
     calls = _capture_popen(monkeypatch)
 
@@ -231,7 +231,7 @@ def test_sync_guard_defers_native_lock_before_considering_the_shim(venv, monkeyp
     """A mapped .pyd still exits 2 — the marker recovery owns that case."""
     from hermes_cli import update_cmd
 
-    monkeypatch.setattr(sys, "argv", [str(venv / "hermes.exe"), "update"])
+    monkeypatch.setattr(sys, "argv", [str(venv / "stardust.exe"), "update"])
     monkeypatch.setattr(
         cli_main, "_detect_self_loaded_native_modules", lambda: ["PyYAML (_yaml.pyd)"]
     )
@@ -267,11 +267,11 @@ def test_reboot_deferred_rename_fallback_is_gone():
 
 
 def test_pending_rename_filter_drops_only_our_shim_pairs():
-    shims = [Path(r"C:\hermes\venv\Scripts\hermes.exe")]
+    shims = [Path(r"C:\hermes\venv\Scripts\stardust.exe")]
     entries = [
         r"\??\C:\other\thing.dll", r"!\??\C:\other\thing.dll.bak",
-        r"\??\C:\hermes\venv\Scripts\hermes.exe",
-        r"!\??\C:\hermes\venv\Scripts\hermes.exe.old.1755624735000",
+        r"\??\C:\hermes\venv\Scripts\stardust.exe",
+        r"!\??\C:\hermes\venv\Scripts\stardust.exe.old.1755624735000",
     ]
     kept, removed = main_install_repair._filter_pending_shim_renames(entries, shims)
     assert removed == 1
@@ -279,9 +279,9 @@ def test_pending_rename_filter_drops_only_our_shim_pairs():
 
 
 def test_pending_rename_filter_keeps_a_shim_pair_with_a_foreign_target():
-    shims = [Path(r"C:\hermes\venv\Scripts\hermes.exe")]
+    shims = [Path(r"C:\hermes\venv\Scripts\stardust.exe")]
     entries = [
-        r"\??\C:\hermes\venv\Scripts\hermes.exe", r"!\??\C:\somewhere\else.exe",
+        r"\??\C:\hermes\venv\Scripts\stardust.exe", r"!\??\C:\somewhere\else.exe",
     ]
     kept, removed = main_install_repair._filter_pending_shim_renames(entries, shims)
     assert removed == 0

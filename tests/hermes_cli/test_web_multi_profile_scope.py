@@ -1,7 +1,7 @@
 """Dashboard routers that read a named profile's config/credentials run under that profile's FULL
 scope (home + secrets) and never mutate the dashboard process environment.
 
-Regression for the cross-profile leak class in ``hermes dashboard`` / ``hermes serve``:
+Regression for the cross-profile leak class in ``stardust dashboard`` / ``stardust serve``:
 ``_config_profile_scope`` bound only STARDUST_HOME, so ``GET /api/config?profile=B`` expanded B's
 ``${VAR}`` refs to the DEFAULT profile's plaintext credentials (its ``os.environ``), and console
 ``send`` for B (``send_cmd._load_hermes_env``) copied B's ``.env`` into the shared process env with

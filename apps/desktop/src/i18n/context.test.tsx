@@ -69,7 +69,7 @@ describe('I18nProvider', () => {
     expect(copy.tips.items.skills.text).toContain('Stardust')
     expect(copy.tips.items.artifacts.title).toContain('Stardust')
     expect(copy.tips.items.profiles.text).toContain('Stardust')
-    expect(copy.desktop.handoff.timedOut).toContain('hermes gateway')
+    expect(copy.desktop.handoff.timedOut).toContain('stardust gateway')
   })
 
   it('defaults to English without a config client', () => {

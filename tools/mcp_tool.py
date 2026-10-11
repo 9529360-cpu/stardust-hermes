@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """MCP (Model Context Protocol) client: connects to the ``mcp_servers`` configured in
-~/.hermes/config.yaml (stdio, Streamable HTTP or SSE), discovers their tools and registers them
+~/.stardust/config.yaml (stdio, Streamable HTTP or SSE), discovers their tools and registers them
 into the hermes tool registry. The ``mcp`` package is optional (no-op without it).
 
 One background event loop (``_mcp_loop``) in a daemon thread runs each server as a long-lived

@@ -177,7 +177,7 @@ def register_from_config(cfg: Optional[Dict[str, Any]], *, accept_hooks: bool = 
 
 
 def iter_configured_hooks(cfg: Optional[Dict[str, Any]]) -> List[ShellHookSpec]:
-    """Parse config hooks without registering (``hermes hooks list`` / doctor)."""
+    """Parse config hooks without registering (``stardust hooks list`` / doctor)."""
     return _parse_hooks_block(cfg.get("hooks")) if isinstance(cfg, dict) else []
 
 
@@ -559,7 +559,7 @@ def _resolve_effective_accept(cfg: Dict[str, Any], accept_hooks_arg: bool) -> bo
     return cfg_val if isinstance(cfg_val, bool) else isinstance(cfg_val, str) and cfg_val.strip().lower() in _TRUTHY
 
 
-# --- Introspection (used by `hermes hooks` CLI) ---
+# --- Introspection (used by `stardust hooks` CLI) ---
 
 def allowlist_entry_for(event: str, command: str) -> Optional[Dict[str, Any]]:
     """Return the allowlist record for this pair, if any."""
@@ -588,7 +588,7 @@ def script_is_executable(command: str) -> bool:
 
 
 def run_once(spec: ShellHookSpec, kwargs: Dict[str, Any]) -> Dict[str, Any]:
-    """Fire one hook with a synthetic payload (``hermes hooks test`` / doctor) through the production path."""
+    """Fire one hook with a synthetic payload (``stardust hooks test`` / doctor) through the production path."""
     result = _spawn(spec, _serialize_payload(spec.event, kwargs))
     result["parsed"] = _evaluate_result(spec, result)
     return result

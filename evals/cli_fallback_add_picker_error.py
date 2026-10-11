@@ -1,4 +1,4 @@
-"""Drive the real ``hermes fallback add`` under a Linux PTY into an ordinary picker error.
+"""Drive the real ``stardust fallback add`` under a Linux PTY into an ordinary picker error.
 
 Run from the checkout with the project Python. No provider requests are sent: the picker
 target is a saved custom provider with ``discover_models: false``. The auth store is made
@@ -46,7 +46,7 @@ def _persisted_model(root: Path, env: dict) -> dict:
 
 def run(root: Path, output: Path) -> dict:
     with tempfile.TemporaryDirectory(prefix="hermes_test_fallback_") as home:
-        hh = Path(home) / ".hermes"
+        hh = Path(home) / ".stardust"
         hh.mkdir()
         (hh / "config.yaml").write_text(CONFIG, encoding="utf-8")
         (hh / ".env").write_text("OPENROUTER_API_KEY=local-not-used\n", encoding="utf-8")

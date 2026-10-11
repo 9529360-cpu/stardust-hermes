@@ -24,7 +24,7 @@ def test_slash_worker_accepts_profile_home():
             worker = _SlashWorker(
                 session_key="test_key",
                 model="test-model",
-                profile_home="/home/luke/.hermes/profiles/work"
+                profile_home="/home/luke/.stardust/profiles/work"
             )
 
             # Verify Popen was called
@@ -33,6 +33,6 @@ def test_slash_worker_accepts_profile_home():
             # Check that STARDUST_HOME was set in the environment
             call_kwargs = mock_popen.call_args[1]
             assert "env" in call_kwargs
-            assert call_kwargs["env"]["STARDUST_HOME"] == "/home/luke/.hermes/profiles/work"
+            assert call_kwargs["env"]["STARDUST_HOME"] == "/home/luke/.stardust/profiles/work"
 
 

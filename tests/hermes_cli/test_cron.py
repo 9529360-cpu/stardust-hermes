@@ -24,7 +24,7 @@ class TestCronCommandLifecycle:
 
     def test_edit_persists_user_owned_inference_pins(self, tmp_cron_dir, capsys):
         job = create_job(prompt="Daily report", schedule="every 1h")
-        parser = argparse.ArgumentParser(prog="hermes")
+        parser = argparse.ArgumentParser(prog="stardust")
         subparsers = parser.add_subparsers(dest="command")
         build_cron_parser(subparsers, cmd_cron=cron_command)
 
@@ -132,7 +132,7 @@ class TestCronCommandLifecycle:
 class TestUnverifiedDeliveryVisibility:
     """An evidence-free live-adapter ack (Slack/Matrix/Mattermost bare
     ``SendResult(success=True)``) is accepted as delivered, but the UNVERIFIED
-    state must be visible in ``hermes cron list`` and ``hermes cron doctor``,
+    state must be visible in ``stardust cron list`` and ``stardust cron doctor``,
     not only in a WARNING log line."""
 
     def _seed(self):
@@ -184,7 +184,7 @@ class TestCronDoctor:
         assert job["id"] in out
         assert "last run failed: Provider returned error" in out
         assert "was not delivered (telegram timeout)" in out
-        assert "hermes cron edit" in out
+        assert "stardust cron edit" in out
         assert "script not found" in out
 
     def test_doctor_reports_healthy_jobs(self, tmp_cron_dir, capsys):
@@ -218,7 +218,7 @@ class TestCronDoctor:
         out = capsys.readouterr().out
         assert rc == 1
         assert "was not delivered (telegram timeout)" in out
-        assert "hermes cron edit" in out
+        assert "stardust cron edit" in out
         assert "last run failed" not in out
         assert "unknown error" not in out
 
@@ -430,7 +430,7 @@ def test_cron_create_failure_returns_nonzero(monkeypatch, capsys):
 
 
 class TestCronRunBackgroundDispatch:
-    """`hermes cron run` must not report 'failed' when the run was dispatched
+    """`stardust cron run` must not report 'failed' when the run was dispatched
     to the background delegation worker.
 
     The CLI process inherits the gateway/desktop session env, so a manual run

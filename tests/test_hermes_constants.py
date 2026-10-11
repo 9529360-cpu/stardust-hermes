@@ -35,11 +35,11 @@ class TestGetDefaultHermesRoot:
 
     @pytest.mark.linux_only
     def test_no_hermes_home_returns_native(self, tmp_path, monkeypatch):
-        """When STARDUST_HOME is not set, returns ~/.hermes."""
+        """When STARDUST_HOME is not set, returns ~/.stardust."""
         monkeypatch.delenv("STARDUST_HOME", raising=False)
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
 
-        assert get_default_hermes_root() == tmp_path / ".hermes"
+        assert get_default_hermes_root() == tmp_path / ".stardust"
 
 
 
@@ -57,13 +57,13 @@ class TestGetDefaultHermesRoot:
 
     @pytest.mark.windows_only
     def test_no_hermes_home_returns_localappdata_root_on_windows(self, tmp_path, monkeypatch):
-        """Native Windows falls back to %LOCALAPPDATA%\\hermes, not ~/.hermes."""
+        """Native Windows falls back to %LOCALAPPDATA%\\stardust, not ~/.hermes."""
         local_appdata = tmp_path / "LocalAppData"
         monkeypatch.delenv("STARDUST_HOME", raising=False)
         monkeypatch.setenv("LOCALAPPDATA", str(local_appdata))
         monkeypatch.setattr(Path, "home", lambda: tmp_path / "Home")
 
-        assert get_default_hermes_root() == local_appdata / "hermes"
+        assert get_default_hermes_root() == local_appdata / "stardust"
 
     def test_result_memoised_until_env_or_home_changes(self, tmp_path, monkeypatch):
         """Repeated calls reuse the memo; STARDUST_HOME / home changes invalidate.
@@ -137,7 +137,7 @@ class TestGetHermesHome:
         monkeypatch.setattr(Path, "home", lambda: tmp_path / "Home")
         monkeypatch.setattr(hermes_constants, "_profile_fallback_warned", False)
 
-        assert get_hermes_home() == local_appdata / "hermes"
+        assert get_hermes_home() == local_appdata / "stardust"
 
 
 class TestGetProcessHermesHome:
@@ -563,7 +563,7 @@ class TestSecureParentDir:
 
     def test_safe_path_calls_chmod(self, tmp_path, monkeypatch):
         """Normal nested path (depth >= 3) should call os.chmod."""
-        safe_dir = tmp_path / "home" / "user" / ".hermes"
+        safe_dir = tmp_path / "home" / "user" / ".stardust"
         safe_dir.mkdir(parents=True)
         target = safe_dir / "auth.json"
         target.touch()

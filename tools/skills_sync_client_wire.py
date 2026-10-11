@@ -1,6 +1,6 @@
 """Skill Sync wire model: content-addressed objects, the HTTP client, tree walks.
 
-Independent of local skill state (no ``~/.hermes`` reads); ``tools/skills_sync_client.py``
+Independent of local skill state (no ``~/.stardust`` reads); ``tools/skills_sync_client.py``
 orchestrates push/pull on top of it and re-exports these names. Wire contract version 1:
 ``hsp_version`` / ``X-HSP-Object-Type`` are deployed protocol identifiers and are NOT
 renamed with the product name "Skill Sync".

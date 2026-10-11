@@ -16,7 +16,7 @@ token acquisition (re-exchange the ``anon_`` credential; there is no refresh tok
 
 Users are never shown the internal guest / anonymous identity vocabulary for this state: surfaces
 say "Nous · free tier". Stardust does not expose the inherited account-login product; users choose
-configured models with ``/model`` and operators manage provider credentials through ``hermes auth``.
+configured models with ``/model`` and operators manage provider credentials through ``stardust auth``.
 
 Lifecycle lives in ONE primitive, :func:`ensure_portal_identity`: adopt what the shared store already
 holds, else mint under the shared-store lock. It is the only minter; nothing else calls
@@ -54,11 +54,11 @@ GUEST_MINT_TIMEOUT_SECONDS = 5.0
 # Copy shared by every surface that names the free tier (R-USR-1): never guest / anonymous / account.
 FREE_TIER_LABEL = "Nous · free tier"
 UPGRADE_HINT = (
-    "Use /model to choose a configured model, or run `hermes auth` on the host."
+    "Use /model to choose a configured model, or run `stardust auth` on the host."
 )
 FREE_TIER_NOT_SIGNED_IN = (
     "No paid account is attached to this compatibility tier. "
-    "Use /model to choose a configured model, or run `hermes auth` on the host.")
+    "Use /model to choose a configured model, or run `stardust auth` on the host.")
 
 
 class AnonCredentialDead(AuthError):
@@ -467,9 +467,9 @@ _WELCOME_ROUTE_COPY = {
     "tier_disabled": "The Nous free tier is switched off right now. {signin}",
 }
 _SIGNIN_CHAT = (
-    "Use /model to choose a configured model, or ask the host operator to run `hermes auth`."
+    "Use /model to choose a configured model, or ask the host operator to run `stardust auth`."
 )
-_SIGNIN_TERMINAL = "Configure a provider with `hermes auth add <provider>`."
+_SIGNIN_TERMINAL = "Configure a provider with `stardust auth add <provider>`."
 
 
 def parse_welcome_refusal(body: Any) -> Optional[Dict[str, Any]]:
@@ -573,7 +573,7 @@ def apply_model_switch(agent: Any) -> Optional[str]:
 
     Runs once per recorded header, between calls. The conversation keeps its history; only the id
     the next request carries changes, so a promoted account stops relying on the gateway's reverse
-    map. The config write is the same one a sign-in completion uses, so ``hermes model`` and the
+    map. The config write is the same one a sign-in completion uses, so ``stardust model`` and the
     gateway's config re-read agree with the live session.
     """
     pending = getattr(agent, "_nous_pending_model_switch", None)
@@ -648,7 +648,7 @@ def mark_guest_notice_shown() -> bool:
     return True
 
 
-# --- ``hermes auth upgrade``: sign the guest into a real Nous account, keeping its connectors ---------
+# --- ``stardust auth upgrade``: sign the guest into a real Nous account, keeping its connectors ---------
 #
 # Wire: the normal device-code flow, with a promotion intent registered on NAS BETWEEN the code
 # request and the token poll (``POST /api/anonymous/promotion-intent {token, user_code, device_code}``).
@@ -779,7 +779,7 @@ def settle_after_upgrade(account_state: Dict[str, Any]) -> Dict[str, Any]:
     same pick as ``GET /api/model/recommended-default``), through the same config write a plain Nous
     login uses. A config on the user's own model and host is left alone.
 
-    Every sign-in completion (CLI ``hermes auth upgrade``, the desktop poller) calls this once, after
+    Every sign-in completion (CLI ``stardust auth upgrade``, the desktop poller) calls this once, after
     ``persist_nous_credentials``. Returns ``{"model": str, "changed": bool}``: ``model`` is the default
     the config now carries (``""`` when it carries none); ``changed`` says whether this call wrote it.
     Never raises: a failed pick or write is logged and reported as ``changed: False`` so the sign-in
@@ -810,7 +810,7 @@ def settle_after_upgrade(account_state: Dict[str, Any]) -> Dict[str, Any]:
         # One write: host and default move together, so a failure leaves the config as it was
         # rather than the account host paired with the welcome model. No eligible recommendation
         # (Portal unreachable, or the plan and org policy admit nothing) clears the default in that
-        # same write; the runtime's silent default applies until the user picks one with `hermes model`.
+        # same write; the runtime's silent default applies until the user picks one with `stardust model`.
         _update_config_for_provider(
             "nous", str(account_state.get("inference_base_url") or ""),
             default_model=model if on_welcome_model else None,

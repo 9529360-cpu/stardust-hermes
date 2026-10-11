@@ -28,7 +28,7 @@ logger = logging.getLogger("hermes_cli.plugins")
 _VALID_PLUGIN_KINDS: Set[str] = {"standalone", "backend", "exclusive", "platform", "model-provider"}
 
 # Unknown plugin.yaml fields are forward-compat surface: warn (debug for v1 files, warning for v2+)
-# and continue loading. ``capabilities``/``emits``/``listens``/``hermes``/``depends`` are reserved.
+# and continue loading. ``capabilities``/``emits``/``listens``/``stardust``/``depends`` are reserved.
 # ── Manifest v2 (#64165) parsing helpers ──────────────────────────────────
 _KNOWN_MANIFEST_FIELDS: Set[str] = {
     "name", "version", "description", "author", "requires_env", "provides_tools", "provides_hooks",
@@ -223,7 +223,7 @@ def resolve_plugin_load_order(manifests: Mapping[str, "PluginManifest"]) -> List
                 logger.warning(
                     "Plugin %s requires plugin '%s' which is not enabled/"
                     "installed; loading anyway (probe availability at runtime "
-                    "via ctx.has_plugin). Run `hermes plugins enable %s` if it is installed.",
+                    "via ctx.has_plugin). Run `stardust plugins enable %s` if it is installed.",
                     k, dep_id, dep_id,
                 )
             elif resolved == k:
@@ -336,7 +336,7 @@ class PluginManifest:
     # <category>.provider; own discovery, general scanner skips) | ``platform`` (gateway adapter; bundled
     # auto-load, user-installed gated as untrusted code).
     kind: str = "standalone"
-    # Path-derived registry key used by plugins.enabled/disabled and `hermes plugins list`: ``disk-cleanup``
+    # Path-derived registry key used by plugins.enabled/disabled and `stardust plugins list`: ``disk-cleanup``
     # for a flat plugin, ``image_gen/openai`` for a category plugin. Empty -> name.
     key: str = ""
     # Hermes version requirement (``">=0.19"``, comma-separated clauses allowed). Unsatisfied plugins are

@@ -62,7 +62,7 @@ def main():
     server = ThreadingHTTPServer(('127.0.0.1', 0), Model)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     home = Path(tempfile.mkdtemp(prefix='hermes-acp-empty-'))
-    hermes = home / '.hermes'
+    hermes = home / '.stardust'
     hermes.mkdir()
     (hermes / 'config.yaml').write_text(
         'model:\n  provider: custom\n  default: fixture-model\n'

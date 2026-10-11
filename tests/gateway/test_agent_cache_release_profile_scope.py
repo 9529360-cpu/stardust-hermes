@@ -39,7 +39,7 @@ def _seen_after_release(runner, key, *, wait_scope=None) -> dict:
 
 
 def test_unscoped_housekeeping_sweep_enters_the_owning_profile_scope(tmp_path, monkeypatch):
-    default_home = tmp_path / ".hermes"
+    default_home = tmp_path / ".stardust"
     prof_b = default_home / "profiles" / "b"
     prof_b.mkdir(parents=True)
     (prof_b / ".env").write_text("HINDSIGHT_LLM_API_KEY=key-of-b\n")
@@ -72,7 +72,7 @@ def test_in_turn_cap_eviction_of_another_profiles_agent_enters_the_owners_scope(
     evicts may be profile B's. B's end-of-session commit must run under B, not under A."""
     from hermes_constants import reset_hermes_home_override, set_hermes_home_override
 
-    default_home = tmp_path / ".hermes"
+    default_home = tmp_path / ".stardust"
     prof_a, prof_b = default_home / "profiles" / "a", default_home / "profiles" / "b"
     prof_a.mkdir(parents=True), prof_b.mkdir(parents=True)
     (prof_b / ".env").write_text("HINDSIGHT_LLM_API_KEY=key-of-b\n")
@@ -95,7 +95,7 @@ def test_in_turn_cap_eviction_of_a_default_profile_agent_leaves_the_secondarys_s
     owner in the key). The commit runs under the default home, not under A."""
     from hermes_constants import reset_hermes_home_override, set_hermes_home_override
 
-    default_home = tmp_path / ".hermes"
+    default_home = tmp_path / ".stardust"
     prof_a = default_home / "profiles" / "a"
     prof_a.mkdir(parents=True)
     monkeypatch.setenv("STARDUST_HOME", str(default_home))
@@ -113,12 +113,12 @@ def test_in_turn_cap_eviction_of_a_default_profile_agent_leaves_the_secondarys_s
 
 
 def test_default_profile_owner_is_the_root_even_when_launched_under_a_named_profile(tmp_path, monkeypatch):
-    """``hermes -p x gateway`` sets STARDUST_HOME to x's home and serves the default profile as a
+    """``stardust -p x gateway`` sets STARDUST_HOME to x's home and serves the default profile as a
     secondary. An ``agent:main:`` session still belongs to the default profile at the ROOT, not to
     the launch profile x — otherwise x's turn would commit default's transcript under x."""
     from hermes_constants import reset_hermes_home_override, set_hermes_home_override
 
-    root = tmp_path / ".hermes"
+    root = tmp_path / ".stardust"
     prof_x = root / "profiles" / "x"
     prof_x.mkdir(parents=True)
     (root / ".env").write_text("MARKER=default-root\n")

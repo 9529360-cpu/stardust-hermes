@@ -173,7 +173,7 @@ def generate_launchd_plist() -> str:
     python_path = get_python_path()
     script_path = get_gateway_script_path()
     working_dir = str(PROJECT_DIR)
-    log_dir = Path.home() / ".hermes" / "logs"
+    log_dir = Path.home() / ".stardust" / "logs"
     
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -222,7 +222,7 @@ def install_launchd():
     plist_path.parent.mkdir(parents=True, exist_ok=True)
     
     # Ensure log directory exists
-    log_dir = Path.home() / ".hermes" / "logs"
+    log_dir = Path.home() / ".stardust" / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     
     print(f"Installing launchd service to: {plist_path}")
@@ -234,7 +234,7 @@ def install_launchd():
     print(f"✓ Service installed and loaded")
     print(f"")
     print(f"To view logs:")
-    print(f"  tail -f ~/.hermes/logs/gateway.log")
+    print(f"  tail -f ~/.stardust/logs/gateway.log")
     print(f"")
     print(f"To manage the service:")
     print(f"  launchctl start ai.hermes.gateway")
@@ -339,7 +339,7 @@ Configuration:
     - DISCORD_BOT_TOKEN
     - WHATSAPP_ENABLED
     
-    Or create ~/.hermes/gateway.json for advanced configuration.
+    Or create ~/.stardust/gateway.json for advanced configuration.
 """
     )
     

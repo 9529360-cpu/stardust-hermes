@@ -23,7 +23,7 @@ auth:
 # paginate layer duplicating lead_search/activity_search; AI field
 # enrichment; and the entire voice-agent cluster — schedule_voice_agent_call
 # places REAL outbound AI phone calls to contacts. Re-enable any with
-# `hermes mcp configure close`.
+# `stardust mcp configure close`.
 tools:
   default_excluded:
     - close_product_knowledge_search
@@ -50,5 +50,5 @@ suggest:
 
 post_install: |
   On first connection Hermes opens a browser to authorize with
-  Close (or run `hermes mcp login close`). Approve access,
+  Close (or run `stardust mcp login close`). Approve access,
   then restart the session so tools load.

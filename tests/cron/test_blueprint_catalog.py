@@ -141,7 +141,7 @@ class TestRenderers:
 
 @pytest.fixture
 def isolated_home(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     monkeypatch.setenv("STARDUST_HOME", str(home))
     import hermes_constants

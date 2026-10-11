@@ -20,7 +20,7 @@ from hermes_constants import reset_hermes_home_override, set_hermes_home_overrid
 @pytest.fixture
 def two_homes(tmp_path, monkeypatch):
     """Launch home A (STARDUST_HOME) and routed profile B, differing in every setting under test."""
-    a = tmp_path / ".hermes"
+    a = tmp_path / ".stardust"
     b = a / "profiles" / "b"
     b.mkdir(parents=True)
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -50,7 +50,7 @@ def test_routed_local_profile_cwd_matches_standalone_gateway(tmp_path, two_homes
     """A standalone gateway resolves an unset ``terminal.cwd`` on a local backend to ``$HOME`` at
     import; the routed profile's terminal scope must yield the same cwd, not the multiplexer's
     process cwd — otherwise the system prompt, context files and the terminal all start in
-    wherever ``hermes gateway`` happened to be launched from."""
+    wherever ``stardust gateway`` happened to be launched from."""
     from tools.terminal_scope import build_profile_terminal_scope, install_and_reset_profile_terminal_scope
     from agent.runtime_cwd import resolve_agent_cwd
 
@@ -74,17 +74,17 @@ def test_terminal_backend_consumers_read_the_routed_scope(two_homes):
         return (
             image_source._is_local_terminal_backend(),
             image_generation_tool._agent_cache_base_for_env(None),
-            credential_files.to_agent_visible_cache_path("/host/.hermes/x.png", "/root/.hermes"),
+            credential_files.to_agent_visible_cache_path("/host/.stardust/x.png", "/root/.stardust"),
             sorted(Path(m["host_path"]).name for m in credential_files.get_credential_file_mounts()),
         )
 
     with _profile_runtime_scope(a):
-        assert observe() == (True, None, "/host/.hermes/x.png", ["cred_a.txt"])
+        assert observe() == (True, None, "/host/.stardust/x.png", ["cred_a.txt"])
     with _profile_runtime_scope(b):
         local, cache_base, translated, mounts = observe()
     assert local is False
-    assert cache_base == "/root/.hermes"
-    assert translated != "/host/.hermes/x.png" or mounts == ["cred_b.txt"]
+    assert cache_base == "/root/.stardust"
+    assert translated != "/host/.stardust/x.png" or mounts == ["cred_b.txt"]
     assert mounts == ["cred_b.txt"]
 
 

@@ -21,7 +21,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 def _run_background_review(tmp_path):
     """One quiet one-shot CLI turn that starts a ``notify`` background child; only the LLM is local.
 
-    This is the kanban worker shape (``hermes chat -q ... -Q``): the turn ends, the CLI lingers for
+    This is the kanban worker shape (``stardust chat -q ... -Q``): the turn ends, the CLI lingers for
     the child's completion, injects it as a follow-up turn, then exits.
     """
     home = tmp_path / "profile"

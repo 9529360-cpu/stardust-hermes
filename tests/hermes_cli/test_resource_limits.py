@@ -35,7 +35,7 @@ class _FakeResource:
 
 def test_real_config_loader_reads_runtime_nofile_setting(monkeypatch, tmp_path):
     """The helper uses the canonical config loader, not a second YAML parser."""
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     (home / "config.yaml").write_text(
         "runtime:\n  nofile_soft_limit: 2048\n",

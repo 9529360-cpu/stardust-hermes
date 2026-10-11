@@ -32,7 +32,7 @@ describe('buildOpaqueProfileRoutes', () => {
         config({
           mode: 'ssh',
           sshHost: 'lab-a',
-          sshRemoteHermesPath: '~/.hermes',
+          sshRemoteHermesPath: '~/.stardust',
           sshRemoteProfile: 'remote-research'
         })
       ],
@@ -41,7 +41,7 @@ describe('buildOpaqueProfileRoutes', () => {
         config({
           mode: 'ssh',
           sshHost: 'lab-b',
-          sshRemoteHermesPath: '~/.hermes',
+          sshRemoteHermesPath: '~/.stardust',
           sshRemoteProfile: 'remote-writing'
         })
       ]
@@ -69,12 +69,12 @@ describe('buildOpaqueProfileRoutes', () => {
     expect(routes[0].connectionId).not.toBe(routes[1].connectionId)
     expect(JSON.stringify(routes)).not.toContain('gateway.example')
     expect(JSON.stringify(routes)).not.toContain('lab-a')
-    expect(JSON.stringify(routes)).not.toContain('.hermes')
+    expect(JSON.stringify(routes)).not.toContain('.stardust')
   })
 
   it('changes opaque IDs when the effective SSH destination changes', async () => {
     const options = {
-      getProfileConfig: () => config({ mode: 'ssh', sshHost: 'lab', sshRemoteHermesPath: '~/.hermes' }),
+      getProfileConfig: () => config({ mode: 'ssh', sshHost: 'lab', sshRemoteHermesPath: '~/.stardust' }),
       globalConfig: config(),
       installationId: 'install-a-secret',
       primaryProfile: 'default',

@@ -872,7 +872,7 @@ def build_execute_code_schema(enabled_sandbox_tools: set = None,
     if mode == "strict":
         cwd_note = (
             "Scripts run in their own temp dir, not the session's CWD — use absolute paths "
-            "(os.path.expanduser('~/.hermes/.env')) or terminal()/read_file() for user files."
+            "(os.path.expanduser('~/.stardust/.env')) or terminal()/read_file() for user files."
         )
     else:
         cwd_note = (

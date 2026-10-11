@@ -55,7 +55,7 @@ def _recording_agent(seen: dict):
 
 @pytest.mark.asyncio
 async def test_shutdown_teardown_commits_memory_under_the_owning_profile(tmp_path, monkeypatch):
-    default_home = tmp_path / ".hermes"
+    default_home = tmp_path / ".stardust"
     prof_b = default_home / "profiles" / "b"
     prof_b.mkdir(parents=True)
     (prof_b / ".env").write_text("OPENVIKING_API_KEY=key-of-b\n")

@@ -55,7 +55,7 @@ def home(tmp_path, monkeypatch):
     DB directly. ``profiles.list`` reads each profile dir's state.db itself
     and only needs the env override.
     """
-    h = tmp_path / ".hermes"
+    h = tmp_path / ".stardust"
     h.mkdir(parents=True)
     monkeypatch.setenv("STARDUST_HOME", str(h))
 

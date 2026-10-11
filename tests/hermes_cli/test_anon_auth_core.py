@@ -366,7 +366,7 @@ class TestModelSwitchCopy:
         result = model_switch.switch_model("gpt-5", "nous", anon_auth.GUEST_MODEL, WELCOME)
         assert not result.success
         msg = (result.error_message or "").lower()
-        assert "/model" in msg and "hermes auth add" in msg
+        assert "/model" in msg and "stardust auth add" in msg
         assert "/login" not in msg
         assert "openrouter" not in msg and "switching" not in msg
 

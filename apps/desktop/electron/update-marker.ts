@@ -9,7 +9,7 @@
  * Why: if the user relaunches the desktop mid-update — the window vanished with
  * no progress and looks crashed — a fresh instance must NOT spawn its own local
  * backend. That backend re-locks the venv shim, the updater's straggler cleanup
- * (`force_kill_other_hermes`, taskkill /IM hermes.exe) kills it, the launch
+ * (`force_kill_other_hermes`, taskkill /IM stardust.exe) kills it, the launch
  * fails with the 45s "backend didn't come up" timeout, and the user relaunches
  * into the same trap — an infinite respawn/kill loop. The desktop gates local
  * backend startup on this marker and parks until the update finishes.

@@ -117,14 +117,14 @@ _PERSISTENCE_CAUSE_EXPLANATIONS: Dict[str, str] = {
     "replaced": (
         "the session database file was replaced while Hermes was running, so this "
         "message was not saved (a copy is kept in {home}/sessions/). Stop Hermes "
-        "(`hermes gateway stop`), run `hermes doctor` — not `hermes doctor --fix`, which "
+        "(`stardust gateway stop`), run `stardust doctor` — not `stardust doctor --fix`, which "
         "would repair the wrong file in place — then start it again and send your message "
         "once more. Advanced recovery steps are in the log."
     ),
     "deleted_wal": (
         "the session database was changed or replaced while Hermes was running, so this "
         "message was not saved (a copy is kept in {home}/sessions/). Stop Hermes "
-        "(`hermes gateway stop`), run `hermes doctor`, then start it again and send your "
+        "(`stardust gateway stop`), run `stardust doctor`, then start it again and send your "
         "message once more. Advanced recovery steps are in the log."
     ),
     "corrupt": (
@@ -163,7 +163,7 @@ _PERSISTENCE_CAUSE_EXPLANATIONS: Dict[str, str] = {
 _PERSISTENCE_DEFAULT_EXPLANATION = (
     "Hermes couldn't save this conversation, so it stopped rather than lose your messages. "
     "Possible causes: the drive is out of room, or another Hermes process is holding the "
-    "database. Close other Hermes windows, run `hermes doctor` to check storage, then send "
+    "database. Close other Hermes windows, run `stardust doctor` to check storage, then send "
     "your message again."
 )
 
@@ -326,7 +326,7 @@ class TurnExplainersMixin:
             if persistence_cause in ("corrupt", "fts_index"):
                 # Copy-pasteable, so name the store that actually failed and pin the profile:
                 # a multi-profile backend (Desktop serve) hosts sessions whose state.db is NOT
-                # the process default, and a bare `hermes` follows active_profile (#105887).
+                # the process default, and a bare `stardust` follows active_profile (#105887).
                 from hermes_constants import get_default_hermes_root, profile_cli_selector
                 from hermes_state import _default_db_path
 

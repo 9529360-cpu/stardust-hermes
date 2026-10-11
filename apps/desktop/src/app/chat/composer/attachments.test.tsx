@@ -140,7 +140,7 @@ describe('AttachmentList', () => {
   })
 
   it('falls back to the original host path after an image was staged for a different filesystem', async () => {
-    const stagedPath = '/root/.hermes/attachments/photo.png'
+    const stagedPath = '/root/.stardust/attachments/photo.png'
     const hostPath = 'C:\\Users\\alice\\Pictures\\photo.png'
 
     const readFileDataUrl = vi.fn(async (path: string) => {

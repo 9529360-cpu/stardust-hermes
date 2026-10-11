@@ -42,18 +42,18 @@ class TestDoctorPlatformHints:
 
         assert "docker pull nousresearch/hermes-agent:latest" in hint
         assert "recreate all Hermes containers" in hint
-        assert "hermes update" not in hint
+        assert "stardust update" not in hint
 
     def test_sqlite_upgrade_hint_keeps_git_runtime_repair(self):
         hint = doctor_platform._sqlite_upgrade_hint("git")
 
-        assert "run `hermes update`" in hint
+        assert "run `stardust update`" in hint
 
     def test_sqlite_upgrade_hint_uses_pkg_for_apt_managed_install(self):
         hint = doctor_platform._sqlite_upgrade_hint("apt")
 
         assert "run `pkg upgrade hermes-agent`" in hint
-        assert "hermes update" not in hint
+        assert "stardust update" not in hint
 
     def test_sqlite_upgrade_hint_preserves_nix_guidance_as_prose(self):
         from hermes_cli.config import recommended_update_command_for_method
@@ -63,7 +63,7 @@ class TestDoctorPlatformHints:
 
         assert guidance in hint
         assert f"run `{guidance}`" not in hint
-        assert "hermes update" not in hint
+        assert "stardust update" not in hint
 
 
 class TestProviderEnvDetection:
@@ -92,7 +92,7 @@ class TestDoctorToolAvailabilitySummary:
     def test_image_gen_without_provider_reports_setup_hint_not_system_dependency(self, monkeypatch):
         """image_gen declares no single env var (FAL / managed Nous / plugin providers); an
         unconfigured backend is a setup problem and must say so, and it counts toward the
-        'run hermes setup' summary like any missing key (#9516)."""
+        'run stardust setup' summary like any missing key (#9516)."""
         unavailable = [{"name": "image_gen", "env_vars": [], "tools": ["image_generate"]},
                        {"name": "homeassistant", "env_vars": [], "tools": []}]
         monkeypatch.setattr(doctor_tools, "_enabled_cli_toolsets_for_doctor", lambda: {"image_gen"})
@@ -110,9 +110,9 @@ class TestDoctorToolAvailabilitySummary:
         out = buf.getvalue()
 
         image_line = next(line for line in out.splitlines() if "image_gen" in line)
-        assert "hermes tools" in image_line and "system dependency" not in image_line and "unavailable" in image_line
+        assert "stardust tools" in image_line and "system dependency" not in image_line and "unavailable" in image_line
         assert "system dependency not met" in next(line for line in out.splitlines() if "homeassistant" in line)
-        assert any("hermes setup" in issue for issue in f.issues)
+        assert any("stardust setup" in issue for issue in f.issues)
 
     def test_web_capability_rows_warn_when_selected_provider_not_ready(self, monkeypatch):
         """#78412: selected firecrawl with is_available=False must warn."""
@@ -162,7 +162,7 @@ class TestDoctorToolAvailabilitySummary:
 
 
 class TestDoctorEnvFileEncoding:
-    """Regression for #18637 (bug 3): `hermes doctor` crashed on Windows
+    """Regression for #18637 (bug 3): `stardust doctor` crashed on Windows
     Chinese locale (GBK) because `.env` was read with Path.read_text(encoding="utf-8") which
     defaults to the system locale encoding, not UTF-8."""
 
@@ -171,7 +171,7 @@ class TestDoctorEnvFileEncoding:
     ):
         import pathlib
 
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         # Write a UTF-8 .env containing an em dash (U+2014 = e2 80 94). The
         # 0x94 byte is exactly the one the issue reporter hit: it's invalid
@@ -216,7 +216,7 @@ class TestDoctorEnvFileEncoding:
         self, monkeypatch, tmp_path
     ):
         """cp1252/latin-1 .env with ASCII provider hints must not abort doctor."""
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         env_path = hermes_home / ".env"
         # 0xff is invalid UTF-8; latin-1 decodes it. Keep an ASCII provider key
@@ -287,7 +287,7 @@ class TestDoctorMemoryProviderSection:
 
     def _make_hermes_home(self, tmp_path, provider="", memory_config=None):
         """Create a minimal STARDUST_HOME with config.yaml."""
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".stardust"
         home.mkdir(parents=True, exist_ok=True)
         import yaml
         config = dict(memory_config or {})
@@ -409,7 +409,7 @@ def test_run_doctor_termux_treats_docker_and_browser_warnings_as_expected(monkey
 
 
 def test_run_doctor_accepts_named_provider_from_providers_section(monkeypatch, tmp_path):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir(parents=True, exist_ok=True)
 
     import yaml
@@ -463,7 +463,7 @@ def test_run_doctor_accepts_named_provider_from_providers_section(monkeypatch, t
 def test_run_doctor_accepts_stable_key_when_provider_name_differs(
     monkeypatch, tmp_path
 ):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir(parents=True, exist_ok=True)
     (home / "config.yaml").write_text(
         "model:\n"
@@ -509,7 +509,7 @@ def test_run_doctor_accepts_stable_key_when_provider_name_differs(
 
 
 def test_run_doctor_accepts_bare_custom_provider(monkeypatch, tmp_path):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir(parents=True, exist_ok=True)
     (home / "config.yaml").write_text(
         "model:\n"
@@ -547,7 +547,7 @@ def test_run_doctor_accepts_bare_custom_provider(monkeypatch, tmp_path):
 
 
 def test_run_doctor_flags_missing_credentials_for_active_openrouter_provider(monkeypatch, tmp_path):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir(parents=True, exist_ok=True)
     (home / "config.yaml").write_text(
         "model:\n"
@@ -602,7 +602,7 @@ def test_run_doctor_flags_missing_credentials_for_active_openrouter_provider(mon
 def test_run_doctor_accepts_hermes_provider_ids_that_catalog_aliases(
     monkeypatch, tmp_path, provider, default_model
 ):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir(parents=True, exist_ok=True)
     (home / "config.yaml").write_text(
         "model:\n"
@@ -645,7 +645,7 @@ def test_run_doctor_accepts_hermes_provider_ids_that_catalog_aliases(
 
 
 def test_run_doctor_accepts_vendor_slugs_for_named_custom_provider(monkeypatch, tmp_path):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir(parents=True, exist_ok=True)
     (home / "config.yaml").write_text(
         "model:\n"
@@ -693,7 +693,7 @@ def test_run_doctor_accepts_vendor_slugs_for_named_custom_provider(monkeypatch, 
 
 
 def test_run_doctor_accepts_kimi_coding_cn_provider(monkeypatch, tmp_path):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir(parents=True, exist_ok=True)
     (home / ".env").write_text("KIMI_CN_API_KEY=***\n", encoding="utf-8")
     (home / "config.yaml").write_text(
@@ -732,7 +732,7 @@ def test_run_doctor_accepts_kimi_coding_cn_provider(monkeypatch, tmp_path):
 
 
 def test_run_doctor_termux_does_not_mark_browser_available_without_agent_browser(monkeypatch, tmp_path):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir(parents=True, exist_ok=True)
     (home / "config.yaml").write_text("memory: {}\n", encoding="utf-8")
     project = tmp_path / "project"
@@ -778,7 +778,7 @@ def test_run_doctor_termux_does_not_mark_browser_available_without_agent_browser
 def _doctor_env_for_agent_browser(monkeypatch, tmp_path):
     """Shared non-Termux fixture setup for the agent-browser npx-resolution
     branch in run_doctor (hermes_cli/doctor.py ~1557-1605)."""
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir(parents=True, exist_ok=True)
     (home / "config.yaml").write_text("memory: {}\n", encoding="utf-8")
     project = tmp_path / "project"
@@ -838,7 +838,7 @@ def test_run_doctor_reports_agent_browser_resolves_via_npx(monkeypatch, tmp_path
 def test_run_doctor_fix_warms_npx_cache_when_agent_browser_resolves_via_npx(
     monkeypatch, tmp_path
 ):
-    """`hermes doctor --fix` must actually call warm_agent_browser_npx_cache()
+    """`stardust doctor --fix` must actually call warm_agent_browser_npx_cache()
     when agent-browser resolves via npx, and report success."""
     _doctor_env_for_agent_browser(monkeypatch, tmp_path)
 
@@ -877,7 +877,7 @@ def test_run_doctor_fix_reports_when_npx_warmup_fails(monkeypatch, tmp_path):
 
 
 def test_run_doctor_kimi_cn_env_is_detected_and_probe_is_null_safe(monkeypatch, tmp_path):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir(parents=True, exist_ok=True)
     (home / "config.yaml").write_text("memory: {}\n", encoding="utf-8")
     (home / ".env").write_text("KIMI_CN_API_KEY=sk-test\n", encoding="utf-8")
@@ -925,7 +925,7 @@ def test_run_doctor_kimi_cn_env_is_detected_and_probe_is_null_safe(monkeypatch, 
 
 
 def test_run_doctor_dashscope_retries_china_endpoint_after_intl_unauthorized(monkeypatch, tmp_path):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir(parents=True, exist_ok=True)
     (home / "config.yaml").write_text("memory: {}\n", encoding="utf-8")
     (home / ".env").write_text("DASHSCOPE_API_KEY=sk-test\n", encoding="utf-8")
@@ -981,7 +981,7 @@ def test_run_doctor_dashscope_retries_china_endpoint_after_intl_unauthorized(mon
 
 @pytest.mark.parametrize("base_url", [None, "https://opencode.ai/zen/go/v1"])
 def test_run_doctor_opencode_go_skips_invalid_models_probe(monkeypatch, tmp_path, base_url):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir(parents=True, exist_ok=True)
     (home / "config.yaml").write_text("memory: {}\n", encoding="utf-8")
     (home / ".env").write_text("OPENCODE_GO_API_KEY=***\n", encoding="utf-8")
@@ -1052,7 +1052,7 @@ class TestGitHubTokenCheck:
         monkeypatch.setenv("STARDUST_HOME", str(home))
 
     def test_no_token_and_not_gh_authenticated_shows_warn(self, monkeypatch, tmp_path):
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".stardust"
         home.mkdir(parents=True, exist_ok=True)
         self._isolate_home(monkeypatch, home)
         monkeypatch.setenv("PATH", "/nonexistent")  # gh not found
@@ -1070,7 +1070,7 @@ class TestGitHubTokenCheck:
 
 
     def test_gh_authenticated_without_env_token_shows_ok(self, monkeypatch, tmp_path):
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".stardust"
         home.mkdir(parents=True, exist_ok=True)
         self._isolate_home(monkeypatch, home)
         # No GITHUB_TOKEN or GH_TOKEN
@@ -1135,7 +1135,7 @@ def _run_doctor_with_healthy_oauth_fallback(
     minimax_oauth_status: dict,
     xai_oauth_status: dict | None = None,
 ) -> str:
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir(parents=True, exist_ok=True)
     (home / "config.yaml").write_text(
         "model:\n"
@@ -1264,7 +1264,7 @@ class TestDoctorXaiOAuthStatus:
 
     def _run(self, monkeypatch, tmp_path, *, xai_auth_fn) -> str:
         """Run doctor with a controlled xAI auth callable; return stdout."""
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".stardust"
         home.mkdir(parents=True, exist_ok=True)
         (home / "config.yaml").write_text("memory: {}\n", encoding="utf-8")
         project = tmp_path / "project"
@@ -1306,7 +1306,7 @@ class TestDoctorXaiOAuthStatus:
 
     def test_import_failure_does_not_affect_other_providers(self, monkeypatch, tmp_path):
         """Nous / Codex / Gemini / MiniMax rows must survive an xAI import failure."""
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".stardust"
         home.mkdir(parents=True, exist_ok=True)
         (home / "config.yaml").write_text("memory: {}\n", encoding="utf-8")
         project = tmp_path / "project"
@@ -1359,7 +1359,7 @@ class TestDoctorCodexCliHintPlacement:
     """
 
     def _run(self, monkeypatch, tmp_path, *, codex_logged_in: bool, codex_cli_present: bool) -> str:
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".stardust"
         home.mkdir(parents=True, exist_ok=True)
         (home / "config.yaml").write_text("memory: {}\n", encoding="utf-8")
         project = tmp_path / "project"
@@ -1430,7 +1430,7 @@ class TestDoctorStaleMaxIterationsDrift:
         import io
         from argparse import Namespace
 
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir(parents=True)
         (hermes_home / "config.yaml").write_text(
             f"agent:\n  max_turns: {cfg_turns}\n", encoding="utf-8"
@@ -1518,7 +1518,7 @@ class TestDoctorDeprecatedConfigAndEnv:
         assert mode["STARDUST_TOOL_PROGRESS_MODE"] == "display.tool_progress in config.yaml"
 
     def _run_doctor_with_config(self, monkeypatch, tmp_path, *, config_yaml: str, env_text: str = ""):
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir(parents=True)
         (hermes_home / "config.yaml").write_text(config_yaml, encoding="utf-8")
         env_body = env_text if env_text else "OPENAI_API_KEY=sk-test\n"
@@ -1601,7 +1601,7 @@ class TestMacOSTCCGrants:
         out = capsys.readouterr().out
         assert "TCC grants will reset after every update" in out
         assert "cdhash-pinned" in out
-        assert "hermes update" in out
+        assert "stardust update" in out
 
     def test_ok_and_repair_info_on_identifier_dr(self, monkeypatch, capsys, tmp_path):
         """Post-#73681 identifier-only DR → stable + stale-grant repair info."""
@@ -1628,7 +1628,7 @@ class TestMacOSTCCGrants:
         assert "relaunch" in out
 
     def test_ok_on_certificate_anchored_dr(self, monkeypatch, capsys, tmp_path):
-        """A cert-anchored DR (hermes desktop --setup-tcc-identity, or a
+        """A cert-anchored DR (stardust desktop --setup-tcc-identity, or a
         notarized release) classifies as stable in its own class — no upgrade
         hint, still prints the stale-grant repair info."""
         monkeypatch.setattr(doctor_mod.sys, "platform", "darwin")

@@ -5,7 +5,7 @@
  *
  *  1. `mockBackend` — starts a mock inference server, writes a config.yaml
  *     that points at it, and launches the desktop app so the full chain
- *     (electron → hermes serve → provider → inference → renderer) is
+ *     (electron → stardust serve → provider → inference → renderer) is
  *     exercised with a real backend but a fake LLM.
  *
  *  2. `noProvider` — launches the app with an empty config (no provider
@@ -14,7 +14,7 @@
  *
  * Both modes launch the *dev* Electron app (`electron .` against the built
  * `dist/`), not the packaged binary. This avoids the multi-minute
- * `electron-builder --dir` step and matches `hermes desktop --source`. The
+ * `electron-builder --dir` step and matches `stardust desktop --source`. The
  * packaged-binary path is already covered by `launch.spec.ts`.
  *
  * Prerequisite: `npm run build` must have been run so that `dist/` exists.
@@ -237,7 +237,7 @@ function writeEmptyConfig(hermesHome: string): void {
  * Key env vars:
  *  - STARDUST_HOME → sandbox hermes-home (isolated config/sessions)
  *  - STARDUST_DESKTOP_USER_DATA_DIR → sandbox electron-user-data
- *  - STARDUST_DESKTOP_IGNORE_EXISTING=1 → don't pick up `hermes` from PATH
+ *  - STARDUST_DESKTOP_IGNORE_EXISTING=1 → don't pick up `stardust` from PATH
  *    (we want the dev checkout at REPO_ROOT)
  *  - STARDUST_DESKTOP_HERMES_ROOT → REPO_ROOT (dev checkout resolution)
  *  - STARDUST_DESKTOP_APP_NAME → unique-ish per test (avoids single-instance lock)
@@ -473,7 +473,7 @@ export interface DeadBackendOptions {
 
 /**
  * Launch the app with a provider pointing at a dead endpoint (port 1, which
- * nothing listens on). By default the backend still boots (`hermes serve`
+ * nothing listens on). By default the backend still boots (`stardust serve`
  * starts fine — the dead endpoint only matters at chat time). Pass
  * `{ fakeError: true }` to inject a fake boot failure, triggering the
  * BootFailureOverlay.

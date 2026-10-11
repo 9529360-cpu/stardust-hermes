@@ -63,7 +63,7 @@ ARGS = _parse()
 REPO, PROVIDER, N, CALLS, OUT = ARGS.repo, ARGS.provider, ARGS.workers, ARGS.calls, ARGS.out
 SETTLE_S = ARGS.settle
 sys.path.insert(0, os.path.abspath(REPO))
-os.environ.setdefault("STARDUST_HOME", os.path.expanduser("~/.hermes"))
+os.environ.setdefault("STARDUST_HOME", os.path.expanduser("~/.stardust"))
 import anthropic
 from anthropic.resources.messages import Messages
 _orig_stream = Messages.stream

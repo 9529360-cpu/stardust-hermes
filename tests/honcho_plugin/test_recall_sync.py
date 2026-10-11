@@ -137,7 +137,7 @@ def test_missing_peer_notice_surfaces_once():
     provider._init_peer_failure = "No runtime identity or peerName"
     first = provider.prefetch("What did we decide about the schema?")
     assert "Honcho memory is off" in first
-    assert "hermes honcho peer --user" in first
+    assert "stardust honcho peer --user" in first
     assert provider.prefetch("And the index?") == ""
 
 

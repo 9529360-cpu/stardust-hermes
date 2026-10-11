@@ -33,7 +33,7 @@ class _FakeSessionStore:
 
 @pytest.fixture
 def loop_env(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     monkeypatch.setenv("STARDUST_HOME", str(home))
     goals._DB_CACHE.clear()

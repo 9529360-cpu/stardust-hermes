@@ -15,7 +15,7 @@ with tempfile.TemporaryDirectory(prefix="async-report-producer-") as temporary:
     for key in list(os.environ):
         if key.startswith("STARDUST_") or key.endswith(("_API_KEY", "_TOKEN")):
             os.environ.pop(key, None)
-    os.environ.update(HOME=str(home), STARDUST_HOME=str(home / ".hermes"))
+    os.environ.update(HOME=str(home), STARDUST_HOME=str(home / ".stardust"))
     from cron.jobs import create_job, save_job_output
     from gateway.wake import persist_delegation_delivery
     from hermes_state import SessionDB

@@ -9,21 +9,21 @@
 #
 # Usage:
 #   scripts/dev-sandbox.sh python -m hermes_cli.main
-#   scripts/dev-sandbox.sh hermes desktop
+#   scripts/dev-sandbox.sh stardust desktop
 #   scripts/dev-sandbox.sh electron .
 #   scripts/dev-sandbox.sh -- npm run dev   # from apps/desktop/
-#   scripts/dev-sandbox.sh --persistent hermes desktop
+#   scripts/dev-sandbox.sh --persistent stardust desktop
 #   scripts/dev-sandbox.sh --persistent -- npm run dev
 #
 # Seed the sandbox STARDUST_HOME from an existing directory (e.g. your main
-# ~/.hermes) so config, sessions, skills, etc. are pre-populated:
-#   scripts/dev-sandbox.sh --from ~/.hermes hermes desktop
+# ~/.stardust) so config, sessions, skills, etc. are pre-populated:
+#   scripts/dev-sandbox.sh --from ~/.stardust stardust desktop
 #
 # Override the app name (default: HermesSandbox):
-#   STARDUST_DEV_SANDBOX_NAME=Staging scripts/dev-sandbox.sh hermes desktop
+#   STARDUST_DEV_SANDBOX_NAME=Staging scripts/dev-sandbox.sh stardust desktop
 #
 # Override the persistent sandbox dir name (default: .hermes-sandbox):
-#   STARDUST_DEV_SANDBOX_DIR=.staging-sandbox scripts/dev-sandbox.sh --persistent hermes desktop
+#   STARDUST_DEV_SANDBOX_DIR=.staging-sandbox scripts/dev-sandbox.sh --persistent stardust desktop
 
 set -euo pipefail
 
@@ -51,9 +51,9 @@ Environment:
   STARDUST_DEV_SANDBOX_DIR   Override the persistent dir name (default: .hermes-sandbox)
 
 Examples:
-  dev-sandbox.sh hermes desktop
-  dev-sandbox.sh --persistent hermes desktop
-  dev-sandbox.sh --from ~/.hermes hermes desktop
+  dev-sandbox.sh stardust desktop
+  dev-sandbox.sh --persistent stardust desktop
+  dev-sandbox.sh --from ~/.stardust stardust desktop
   dev-sandbox.sh -- npm run dev
 EOF
 }

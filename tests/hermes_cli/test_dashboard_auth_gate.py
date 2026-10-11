@@ -447,7 +447,7 @@ def test_loopback_public_url_fail_closed_message_is_actionable(monkeypatch):
     assert "basic_auth" in msg
     assert "STARDUST_DASHBOARD_OIDC_ISSUER" in msg
     assert "STARDUST_DASHBOARD_OIDC_CLIENT_ID" in msg
-    assert "hermes dashboard register" not in msg
+    assert "stardust dashboard register" not in msg
     assert "Nous Portal" not in msg
     # Exit 2: remove public_url to restore local-only mode.
     assert "remove dashboard.public_url" in msg

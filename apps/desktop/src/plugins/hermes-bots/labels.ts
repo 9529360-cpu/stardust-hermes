@@ -36,7 +36,7 @@ export function displayName(bot: Partial<RosterRow>, meta?: BotMeta | null): str
     return meta.title.trim()
   }
 
-  // Core-profile display name (profile.yaml, set via `hermes profile rename
+  // Core-profile display name (profile.yaml, set via `stardust profile rename
   // default <name>` or the dashboard) — the CLI-level equivalent of a Bot
   // Mode title. Rides the profiles.list row; presentation-only.
   if (typeof bot?.display_name === 'string' && bot.display_name.trim()) {

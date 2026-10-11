@@ -91,7 +91,7 @@ _SENSITIVE_QUERY_PARAMS = frozenset({
 # ON by default — secure default per issue #17691. Users who need raw credential values in tool output (e.g.
 # working on the redactor itself) can opt out via `security.redact_secrets: false` in config.yaml (bridged
 # to this env var in hermes_cli/main.py, gateway/run.py, and cli.py) or `STARDUST_REDACT_SECRETS=false` in
-# ~/.hermes/.env. An opt-out warning is logged at gateway and CLI startup so operators see the downgrade —
+# ~/.stardust/.env. An opt-out warning is logged at gateway and CLI startup so operators see the downgrade —
 # see `_log_redaction_status()` in gateway/run.py and cli.py.
 _REDACT_ENABLED = os.getenv("STARDUST_REDACT_SECRETS", "true").lower() in {"1", "true", "yes", "on"}
 
@@ -588,7 +588,7 @@ _DISPLAY_CONTROL_RE = re.compile(r"[\x00-\x1f\x7f\x80-\x9f\u200b-\u200f\u202a-\u
 
 def mask_secret(value: str, *, head: int = 4, tail: int = 4, floor: int = 12,
                 placeholder: str = "***", empty: str = "") -> str:
-    """Mask a secret for display (``hermes config`` / ``status`` / ``dump``):
+    """Mask a secret for display (``stardust config`` / ``status`` / ``dump``):
     ``sk-p...7890``; shorter than ``floor`` (after control-byte stripping) →
     ``placeholder``; falsy → ``empty``."""
     value = _DISPLAY_CONTROL_RE.sub("", value) if value else value
@@ -942,7 +942,7 @@ _ENV_DUMP_COMMANDS = frozenset({"env", "printenv", "set", "export", "declare"})
 
 # Commands that read file contents to stdout, plus the filter readers (``grep``/``awk``/``sed``)
 # the model reaches for on config files. A secret-bearing target (``.env`` per AGENTS.md,
-# a shell rc/profile, Hermes' own ``config.yaml`` where ``hermes mcp add --env`` writes
+# a shell rc/profile, Hermes' own ``config.yaml`` where ``stardust mcp add --env`` writes
 # tokens) is a credential dump, so the ENV/YAML assignment pass must run. Arbitrary
 # ``config.yaml`` / source files stay on the code_file path (``MAX_TOKENS: 100``).
 _FILE_READ_COMMANDS = frozenset({
@@ -957,7 +957,7 @@ _SHELL_RC_BASENAMES = frozenset({
 # it are files, so ``grep .bashrc app.py`` must not gate on the pattern.
 _PATTERN_FIRST_COMMANDS = frozenset({"grep", "awk", "sed"})
 _HERMES_HOME_PREFIXES = ("$STARDUST_HOME/", "${STARDUST_HOME}/")
-# ``$HOME/.hermes/config.yaml`` keeps the ``.hermes`` segment, so stripping the prefix is
+# ``$HOME/.stardust/config.yaml`` keeps the ``.stardust`` segment, so stripping the prefix is
 # enough to gate it; ``~/`` already survives the ``$``-bearing-path bail-out.
 _HOME_PREFIXES = ("$HOME/", "${HOME}/")
 
@@ -995,7 +995,7 @@ def _command_segments(command: str) -> list[str]:
 def _is_under_hermes_home(path: str) -> bool:
     """True when an absolute ``config.yaml`` path sits under the active Hermes home or root.
 
-    The default home's basename is an installation detail — ``.hermes`` on POSIX, ``hermes``
+    The default home's basename is an installation detail — ``.stardust`` on POSIX, ``hermes``
     under ``AppData/Local`` on Windows — and a resolved path never spells ``$STARDUST_HOME``,
     so the literal-segment test in ``_is_secret_file_arg`` cannot see a native Windows path.
     Compare against the resolved homes instead. Only reached for a ``config.yaml`` basename,
@@ -1019,9 +1019,9 @@ def _is_under_hermes_home(path: str) -> bool:
 
 def _is_secret_file_arg(arg: str) -> bool:
     """``.env``-style or shell rc basename anywhere; ``config.yaml`` only under a
-    ``.hermes`` directory, ``$STARDUST_HOME``, or the resolved Hermes home (never arbitrary
+    ``.stardust`` directory, ``$STARDUST_HOME``, or the resolved Hermes home (never arbitrary
     YAML). The resolved-home arm is what covers native Windows, where the home directory
-    is ``%LOCALAPPDATA%\\hermes`` and carries no ``.hermes`` segment."""
+    is ``%LOCALAPPDATA%\\stardust`` and carries no ``.stardust`` segment."""
     path = arg.strip("\"'").replace("\\", "/")
     hermes_home = False
     for prefix in _HERMES_HOME_PREFIXES:
@@ -1044,7 +1044,7 @@ def _is_secret_file_arg(arg: str) -> bool:
     # writes under ``backups/config/`` — same contents, same secrets.
     if parts[-1] != "config.yaml" and not parts[-1].startswith(("config.yaml.good.", "config.yaml.corrupt.")):
         return False
-    return hermes_home or ".hermes" in parts[:-1] or _is_under_hermes_home(path)
+    return hermes_home or ".stardust" in parts[:-1] or _is_under_hermes_home(path)
 
 
 def _command_reads_secret_file(command: str | None) -> bool:

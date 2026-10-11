@@ -442,7 +442,7 @@ class TestLedgerReplaysDegradedDiscordSend:
         reconnect sweep; a generic 'Not connected' row (pre-fix error
         string) is stranded. This is the exact silent-loss mechanism from
         the #95382 field logs."""
-        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
         import gateway.delivery_ledger as dl
 
         importlib.reload(dl)

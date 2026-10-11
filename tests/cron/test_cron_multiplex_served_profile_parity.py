@@ -3,7 +3,7 @@
 A profile served by the default multiplexer runs its ticks inside the default profile's process:
 ``os.environ`` holds the DEFAULT profile's ``.env`` and the served profile's values exist only
 in its secret scope / home override. Every knob cron reads from ``.env`` and every child env it
-builds must resolve exactly as it would under a standalone ``hermes -p <name> gateway run``.
+builds must resolve exactly as it would under a standalone ``stardust -p <name> gateway run``.
 """
 
 from pathlib import Path
@@ -23,9 +23,9 @@ def two_homes(tmp_path, monkeypatch):
     for home in (root, alpha):
         (home / "cron").mkdir(parents=True)
     (root / ".env").write_text(
-        "STARDUST_CRON_TIMEOUT=111\nHERMES_MODEL=default-model\nTERMINAL_ENV=docker\n"
-        "TERMINAL_DOCKER_IMAGE=default-only-image\nHERMES_LANGUAGE=en\n")
-    (alpha / ".env").write_text("STARDUST_CRON_TIMEOUT=222\nHERMES_LANGUAGE=zh\n")
+        "STARDUST_CRON_TIMEOUT=111\nSTARDUST_MODEL=default-model\nTERMINAL_ENV=docker\n"
+        "TERMINAL_DOCKER_IMAGE=default-only-image\nSTARDUST_LANGUAGE=en\n")
+    (alpha / ".env").write_text("STARDUST_CRON_TIMEOUT=222\nSTARDUST_LANGUAGE=zh\n")
     # The launch (default) profile's .env is what the multiplexer process loaded into os.environ.
     monkeypatch.setenv("STARDUST_HOME", str(root))
     for key, val in (("STARDUST_CRON_TIMEOUT", "111"), ("STARDUST_MODEL", "default-model"),

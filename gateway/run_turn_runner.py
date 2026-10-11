@@ -973,7 +973,7 @@ class TurnRunner:
         """gateway.platforms.<plat>.skip_context_files: messaging platforms may opt out of
         filesystem-heavy context-file discovery (SOUL.md, AGENTS.md, .cursorrules)."""
         platforms_cfg = (self._ctx.user_config.get("gateway") or {}).get("platforms") or {}
-        # ``hermes gateway setup`` writes ``gateway.platforms`` as a LIST of enabled platform names,
+        # ``stardust gateway setup`` writes ``gateway.platforms`` as a LIST of enabled platform names,
         # not a dict; treat any non-dict shape as "no per-platform overrides" rather than crashing.
         if not isinstance(platforms_cfg, dict):
             return False
@@ -1819,8 +1819,8 @@ class TurnRunner:
                 "final_response": (
                     "⚠️ I couldn't connect to the AI model service, so this message wasn't processed. "
                     "Use /model to pick a configured model. If credentials need to be added or refreshed, "
-                    "run `hermes auth` on the host; if it keeps failing, run "
-                    "`hermes doctor` on the host."),
+                    "run `stardust auth` on the host; if it keeps failing, run "
+                    "`stardust doctor` on the host."),
                 "messages": [], "api_calls": 0, "tools": [],
             }
         pr = runner._provider_routing

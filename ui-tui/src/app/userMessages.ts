@@ -2,7 +2,7 @@
 // so the copy — and the "what happened / what to do" shape — is unit-testable
 // without rendering. Every slash command cited here exists in
 // ui-tui/src/app/slash/commands (/logs, /retry, /model, /update, /resume,
-// /sessions, /quit) and `hermes doctor` is a real subcommand.
+// /sessions, /quit) and `stardust doctor` is a real subcommand.
 
 import type { ErrorSurface } from '@stardust/shared/gateway-events'
 
@@ -47,7 +47,7 @@ export const backendGaveUp = (code: null | number, lastLine?: string): string =>
     `Hermes stopped${exit} and could not be restarted. Your chat is saved.`,
     detail,
     'Hermes keeps trying to reconnect in the background and reopens this chat when it succeeds; if it does not, type /resume.',
-    'Type /logs for the full log, or /quit and run `hermes doctor` to check the install.'
+    'Type /logs for the full log, or /quit and run `stardust doctor` to check the install.'
   ]
     .filter(Boolean)
     .join('\n')
@@ -71,7 +71,7 @@ export const backendReconnecting = (attempt: number | undefined, delayMs: number
 }
 
 export const BACKEND_SLOW_START =
-  'Hermes is taking longer than usual to start. Still waiting… If it never connects: /logs shows the last backend output; /quit and run `hermes doctor`.'
+  'Hermes is taking longer than usual to start. Still waiting… If it never connects: /logs shows the last backend output; /quit and run `stardust doctor`.'
 
 export const BACKEND_SLOW_START_STATUS = 'still starting…'
 
@@ -108,7 +108,7 @@ export const isVersionSkewError = (err: unknown): boolean => {
 }
 
 export const VERSION_SKEW_MESSAGE =
-  'The terminal UI and the Hermes backend are out of sync (different versions). Run /update, or exit and run `hermes update`, then start the TUI again.'
+  'The terminal UI and the Hermes backend are out of sync (different versions). Run /update, or exit and run `stardust update`, then start the TUI again.'
 
 const SESSION_NOT_FOUND_RE = /session not found/i
 const NOT_CONNECTED_RE = /^gateway not (?:connected|running)\b/

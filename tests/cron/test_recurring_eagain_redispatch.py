@@ -41,7 +41,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 @pytest.fixture
 def wedge_env(tmp_path, monkeypatch):
     """Isolated cron env + a recurring no_agent interval job, due NOW."""
-    hermes_home = tmp_path / ".hermes"
+    hermes_home = tmp_path / ".stardust"
     hermes_home.mkdir()
     (hermes_home / "cron").mkdir()
     (hermes_home / "cron" / "output").mkdir()

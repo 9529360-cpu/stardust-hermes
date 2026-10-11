@@ -31,7 +31,7 @@ def fleet(tmp_path, monkeypatch):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("STARDUST_HOME", str(root))
     # The pytest seat-belt in the root write-through compares the global path
-    # against $HOME/.hermes/auth.json; our root is elsewhere, so writes go.
+    # against $HOME/.stardust/auth.json; our root is elsewhere, so writes go.
     import hermes_constants
     hermes_constants._default_hermes_root_memo = None  # type: ignore[attr-defined]
 
@@ -409,7 +409,7 @@ def test_heal_is_idempotent_and_logs_once(fleet, caplog):
 
 
 def test_heal_never_deletes_the_only_surviving_copy(fleet):
-    """Root lost its grant (user ran `hermes auth remove` at root); the profile's
+    """Root lost its grant (user ran `stardust auth remove` at root); the profile's
     copy is the only one left — and an independent second account stays put."""
     from agent.credential_pool import load_pool
 
@@ -534,7 +534,7 @@ def test_heal_leaves_a_different_account_alone(fleet):
 
 
 def test_heal_pkce_singleton_shape_commits_live_pair_to_root_singleton(fleet):
-    """`hermes auth` PKCE shape: root + profile each have .anthropic_oauth.json +
+    """`stardust auth` PKCE shape: root + profile each have .anthropic_oauth.json +
     a hermes_pkce-seeded row; the profile's copy is the rotated (live) one."""
     from agent.credential_pool import load_pool
 
@@ -617,7 +617,7 @@ def _shared_profile(fleet, name, *, link):
 
 
 def test_heal_skips_profile_auth_json_symlinked_to_the_root_store(fleet):
-    """#101356: `ln -s ~/.hermes/auth.json <profile>/auth.json` shares ONE store.
+    """#101356: `ln -s ~/.stardust/auth.json <profile>/auth.json` shares ONE store.
     Both sides of the consolidation read the same file, so every row looks like
     a fork of itself — healing would strip the shared grant through the link."""
     from hermes_cli.auth import consume_oauth_heal_notices, heal_forked_single_use_oauth_grants
@@ -699,14 +699,14 @@ def test_heal_same_store_skip_is_memoized_off_the_hot_path(fleet, monkeypatch):
 # ── E. the clean mark outlives the process ──────────────────────────────
 #
 # The in-memory mark only silences the heal for one process, so every fresh
-# `hermes` invocation re-paid its two nested EXCLUSIVE auth-store locks to
+# `stardust` invocation re-paid its two nested EXCLUSIVE auth-store locks to
 # rediscover a store it had already cleared. Persisting the mark removes that,
 # but a mark that outlives the process must also invalidate on anything the
 # heal reads -- including the ROOT store, which the in-memory fingerprint
 # could safely ignore precisely because it died with the process.
 
 def _new_process(auth_mod):
-    """Simulate a fresh `hermes` invocation: in-memory state gone, disk kept."""
+    """Simulate a fresh `stardust` invocation: in-memory state gone, disk kept."""
     auth_mod._oauth_heal_clean_marks.clear()
     auth_mod._global_auth_store_cache = None
 

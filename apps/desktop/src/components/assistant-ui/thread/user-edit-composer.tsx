@@ -50,9 +50,9 @@ import { isRedoShortcut, isUndoShortcut } from '@/app/chat/composer/undo-history
 import { chipTypedUrlOnSpace, linkifyUrls } from '@/app/chat/composer/url-refs'
 import {
   extractDroppedFiles,
-  STARDUST_PATHS_MIME,
   isImagePath,
-  partitionDroppedFiles
+  partitionDroppedFiles,
+  STARDUST_PATHS_MIME
 } from '@/app/chat/hooks/use-composer-actions'
 import { uploadComposerAttachment } from '@/app/session/hooks/use-prompt-actions'
 import { hermesDirectiveFormatter } from '@/components/assistant-ui/directive-text'

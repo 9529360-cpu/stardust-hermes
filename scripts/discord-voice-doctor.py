@@ -19,7 +19,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-STARDUST_HOME = Path(os.getenv("STARDUST_HOME", Path.home() / ".hermes"))
+STARDUST_HOME = Path(os.getenv("STARDUST_HOME", Path.home() / ".stardust"))
 ENV_FILE = STARDUST_HOME / ".env"
 
 OK = "\033[92m\u2713\033[0m"
@@ -235,7 +235,7 @@ def check_env_vars():
 
 
 def check_config(groq_key, eleven_key):
-    """Check hermes config.yaml."""
+    """Check stardust config.yaml."""
     section("Configuration")
 
     config_path = STARDUST_HOME / "config.yaml"

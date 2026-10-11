@@ -53,7 +53,7 @@ class TransportSpec:
     url: Optional[str] = None
     version: Optional[str] = None  # informational, pinned
     # Static env for the stdio subprocess (telemetry opt-outs, mode flags). NOT for secrets — those
-    # go through auth.env so they are prompted for and land in ~/.hermes/.env.
+    # go through auth.env so they are prompted for and land in ~/.stardust/.env.
     env: Dict[str, str] = field(default_factory=dict)
 
 
@@ -361,7 +361,7 @@ def _run_bootstrap(cwd: Path, commands: List[str]) -> None:
 
 
 def _do_git_install(entry: CatalogEntry) -> Path:
-    """Clone the entry's repo into ``~/.hermes/mcp-installs/<name>`` and run bootstrap. Returns the dir."""
+    """Clone the entry's repo into ``~/.stardust/mcp-installs/<name>`` and run bootstrap. Returns the dir."""
     assert entry.install is not None and entry.install.type == "git"
     install = entry.install
     dest = _install_root() / entry.name
@@ -410,7 +410,7 @@ def _expand_install_dir(value: str, install_dir: Optional[Path]) -> str:
 
 
 def _prompt_env_vars(specs: List[EnvVarSpec]) -> Dict[str, str]:
-    """Prompt for each env spec; secrets and non-secrets alike go to ~/.hermes/.env."""
+    """Prompt for each env spec; secrets and non-secrets alike go to ~/.stardust/.env."""
     collected: Dict[str, str] = {}
     for spec in specs:
         existing = get_env_value(spec.name)
@@ -510,11 +510,11 @@ def _apply_tool_selection(
 
     Probe-success: curses checklist; pre-check priority *prior_selection* (reinstall) > manifest
     ``tools.default_enabled`` > all; all-on clears any filter. Probe-fail: keep the prior filter,
-    else apply ``default_enabled``, else no filter; point the user at ``hermes mcp configure``.
+    else apply ``default_enabled``, else no filter; point the user at ``stardust mcp configure``.
     """
     print()
     name = entry.name
-    configure_hint = f"`hermes mcp configure {name}`"
+    configure_hint = f"`stardust mcp configure {name}`"
 
     # Exclude-mode manifests never probe: the curated exclude list (names or globs) is written as-is
     # and everything else stays enabled, including tools the server adds later. A prior include
@@ -597,7 +597,7 @@ def _apply_tool_selection(
         return
     if len(chosen_indices) == len(probed):
         # Clear the filter: tools the server adds later are auto-enabled too. To pin the current set,
-        # re-run `hermes mcp configure <name>` and unselect a tool (switches to include-mode).
+        # re-run `stardust mcp configure <name>` and unselect a tool (switches to include-mode).
         _write_tools_filter(name, "include", None)
         _say(
             f"  ✓ All {len(probed)} tools enabled (no filter — new tools "
@@ -631,11 +631,11 @@ def install_entry(entry: CatalogEntry, *, enable: bool = True) -> None:
         _say("  Configure credentials:", Colors.CYAN)
         _prompt_env_vars(entry.auth.env)
     elif entry.auth.type == "oauth" and entry.auth.provider:
-        # Provider-mediated OAuth relies on the existing `hermes auth <provider>` flow; surface
+        # Provider-mediated OAuth relies on the existing `stardust auth <provider>` flow; surface
         # guidance rather than auto-running it to keep install decoupled from provider-auth lifecycle.
         _say(
             f"  This MCP uses {entry.auth.provider} OAuth. Run "
-            f"`hermes auth {entry.auth.provider}` if you have not "
+            f"`stardust auth {entry.auth.provider}` if you have not "
             "already authenticated.",
             Colors.YELLOW)
     elif entry.auth.type == "oauth":

@@ -85,14 +85,14 @@ def _cleanup_stale_sync_back_temp(temp_dir: Path | None = None) -> int:
     return removed
 
 
-def iter_sync_files(container_base: str = "/root/.hermes") -> list[tuple[str, str]]:
+def iter_sync_files(container_base: str = "/root/.stardust") -> list[tuple[str, str]]:
     """Enumerate all (host_path, remote_path) pairs to sync to a remote. Credential paths are
-    remapped from the hardcoded /root/.hermes to *container_base* (remote home may differ)."""
+    remapped from the hardcoded /root/.stardust to *container_base* (remote home may differ)."""
     # Late import: credential_files pulls in agent modules (circular at module level).
     from tools.credential_files import get_credential_file_mounts, iter_cache_files, iter_skills_files
 
     files = [
-        (entry["host_path"], entry["container_path"].replace("/root/.hermes", container_base, 1))
+        (entry["host_path"], entry["container_path"].replace("/root/.stardust", container_base, 1))
         for entry in get_credential_file_mounts()]
     files += [
         (entry["host_path"], entry["container_path"])
@@ -257,7 +257,7 @@ class FileSyncManager:
 
     # --- Sync-back: pull remote changes to host on teardown ---
     def sync_back(self, hermes_home: Path | None = None) -> None:
-        """Pull remote changes back to the host: download the remote ``.hermes/`` as a tar and
+        """Pull remote changes back to the host: download the remote ``.stardust/`` as a tar and
         apply only files whose SHA-256 differs from what was pushed. SIGINT is deferred until
         complete; concurrent gateway sandboxes are serialized via a file lock."""
         with self._transaction_lock:
@@ -269,7 +269,7 @@ class FileSyncManager:
             return
 
         # Nothing was ever committed (initial push failed or never ran): skip
-        # to avoid retry storms against an uninitialized remote .hermes/.
+        # to avoid retry storms against an uninitialized remote .stardust/.
         if not self._pushed_hashes and not self._synced_files:
             logger.debug("sync_back: no prior push state — skipping")
             return
@@ -430,7 +430,7 @@ class FileSyncManager:
                          upload_only_host_paths: set[str] | None = None) -> str | None:
         """Infer a host path for a new remote file by matching path prefixes: an existing
         remote->host pair whose parent directory prefixes *remote_path* gets the same
-        substitution (``/root/.hermes/skills/b.md`` -> ``~/.hermes/skills/b.md``)."""
+        substitution (``/root/.stardust/skills/b.md`` -> ``~/.stardust/skills/b.md``)."""
         upload_only_host_paths = upload_only_host_paths or set()
         for host, remote in file_mapping or []:
             if self._is_upload_only_host_path(host, upload_only_host_paths):

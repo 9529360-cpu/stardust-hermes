@@ -474,7 +474,7 @@ def test_get_nous_auth_status_empty_returns_not_logged_in(tmp_path, monkeypatch)
 
 
 class TestLoginNousSkipKeepsCurrent:
-    """When a user runs `hermes model` → Nous Portal → Skip (keep current) after
+    """When a user runs `stardust model` → Nous Portal → Skip (keep current) after
     a successful OAuth login, the prior provider and model MUST be preserved.
 
     Regression: previously, _update_config_for_provider was called
@@ -671,7 +671,7 @@ def _full_state_fixture() -> dict:
 def test_persist_nous_credentials_writes_both_pool_and_providers(tmp_path, monkeypatch):
     """Helper must populate BOTH credential_pool.nous AND providers.nous.
 
-    Regression guard: before this helper existed, `hermes auth add nous`
+    Regression guard: before this helper existed, `stardust auth add nous`
     wrote only the pool. After the Nous agent_key's 24h TTL expired, the
     401-recovery path in run_agent.py called resolve_nous_runtime_credentials
     which reads providers.nous, found it empty, raised AuthError, and the
@@ -822,7 +822,7 @@ def test_refresh_token_reuse_detection_surfaces_actionable_message():
     assert "refresh-token reuse" in message.lower() or "refresh token reuse" in message.lower()
     # The message must mention the external-process cause and give next steps.
     assert "external process" in message.lower() or "monitoring script" in message.lower()
-    assert "hermes auth add nous" in message.lower()
+    assert "stardust auth add nous" in message.lower()
     # Must still be classified as invalid_grant + relogin_required.
     assert exc_info.value.code == "invalid_grant"
     assert exc_info.value.relogin_required is True
@@ -894,7 +894,7 @@ def test_shared_store_seat_belt_refuses_real_home_under_pytest(monkeypatch):
 
     Mirrors the existing ``_auth_file_path`` seat belt: forgetting to
     redirect this store in a test must fail loudly instead of silently
-    writing to the user's real ``~/.hermes/shared/`` across CI runs.
+    writing to the user's real ``~/.stardust/shared/`` across CI runs.
     """
     from hermes_cli.auth import _nous_shared_store_path
 
@@ -938,7 +938,7 @@ def test_persist_nous_credentials_mirrors_to_shared_store(
     tmp_path, monkeypatch, shared_store_env,
 ):
     """persist_nous_credentials must populate BOTH per-profile auth.json
-    AND the shared store, so a future profile's `hermes auth add nous
+    AND the shared store, so a future profile's `stardust auth add nous
     --type oauth` can one-tap import instead of redoing device-code.
     """
     from hermes_cli.auth import (
@@ -1102,8 +1102,8 @@ class TestNousDeviceAuthTimeoutMessage:
 
         msg = _nous_device_auth_timeout_message("https://portal.nousresearch.com")
         assert "CAPTCHA" in msg
-        assert "hermes auth add nous" in msg
-        assert "hermes portal" not in msg
+        assert "stardust auth add nous" in msg
+        assert "stardust portal" not in msg
         assert "https://portal.nousresearch.com/login" in msg
         # Must NOT point at the nonexistent /device page (live Portal 404s it).
         assert "/device" not in msg
@@ -1150,8 +1150,8 @@ def test_poll_for_token_timeout_raises_actionable_message():
 
     msg = str(excinfo.value)
     assert "CAPTCHA" in msg
-    assert "hermes auth add nous" in msg
-    assert "hermes portal" not in msg
+    assert "stardust auth add nous" in msg
+    assert "stardust portal" not in msg
     assert "https://portal.nousresearch.com/login" in msg
 
 
@@ -1199,6 +1199,6 @@ def test_nous_device_code_login_timeout_raises_actionable_message(monkeypatch):
 
     msg = str(excinfo.value)
     assert "CAPTCHA" in msg
-    assert "hermes auth add nous" in msg
-    assert "hermes portal" not in msg
+    assert "stardust auth add nous" in msg
+    assert "stardust portal" not in msg
     assert "https://portal.nousresearch.com/login" in msg

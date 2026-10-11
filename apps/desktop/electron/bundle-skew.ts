@@ -2,7 +2,7 @@
  * Renderer-bundle skew detection.
  *
  * The desktop UI (including bundled plugins like Bot Mode) is compiled into
- * the app binary at build time, while `hermes update` only moves the source
+ * the app binary at build time, while `stardust update` only moves the source
  * tree. A user who updates from the terminal — or whose in-app update failed
  * on the bundle-swap leg — ends up running a NEW runtime under an OLD
  * renderer: About proudly reports the new Hermes version while the sidebar

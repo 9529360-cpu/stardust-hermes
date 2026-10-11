@@ -21,7 +21,7 @@ def _profile_db(home, name: str) -> SessionDB:
 
 
 def test_delete_against_default_does_not_remove_winefox_messaging_session(tmp_path):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     default_db = _profile_db(home, "default")
     winefox_db = _profile_db(home, "winefox")
     sid = "tg-winefox-realpath"

@@ -64,7 +64,7 @@ def _truncate(text: str, width: int) -> str:
 def _ident_col(style: str) -> tuple:
     # overflow="fold" keeps the full slug visible (wraps instead of ellipsis-truncating):
     # browse.sh slugs end in a `-XXXXXX` hash that is part of the identifier users must
-    # copy into `hermes skills install`.
+    # copy into `stardust skills install`.
     return "Identifier", {"style": style, "overflow": "fold", "no_wrap": False}
 
 
@@ -259,7 +259,7 @@ def _is_valid_installed_skill_name(name: str) -> bool:
 
 
 def _existing_categories() -> List[str]:
-    """Sorted category buckets under ``~/.hermes/skills/`` (children without their own SKILL.md)."""
+    """Sorted category buckets under ``~/.stardust/skills/`` (children without their own SKILL.md)."""
     from tools.skills_hub import SKILLS_DIR
     from tools.skills_hub_install import _category_skill_dirs
     try:
@@ -339,8 +339,8 @@ def do_search(query: str, source: str = "all", limit: int = 10, console: Optiona
         table.add_row(r.name, _truncate(r.description, 60), _display_source(r),
                       _trust_cell(r.trust_level, r.source), r.identifier)
     c.print(table)
-    c.print("[dim]Use: hermes skills inspect <identifier> to preview, "
-            "hermes skills install <identifier> to install "
+    c.print("[dim]Use: stardust skills inspect <identifier> to preview, "
+            "stardust skills install <identifier> to install "
             "(--json for scripting)[/]\n")
 
 
@@ -408,9 +408,9 @@ def _render_browse_page(c: Console, deduped, page_items, page: int, total_pages:
     if timed_out:
         c.print(f"  [yellow]⚡ Slow sources skipped: {', '.join(timed_out)} "
                 f"— run again for cached results[/]")
-    c.print("[dim]Tip: 'hermes skills inspect <identifier>' to preview, "
-            "'hermes skills install <identifier>' to install, "
-            "'hermes skills search <query>' to search deeper[/]\n")
+    c.print("[dim]Tip: 'stardust skills inspect <identifier>' to preview, "
+            "'stardust skills install <identifier>' to install, "
+            "'stardust skills search <query>' to search deeper[/]\n")
 
 
 def do_browse(page: int = 1, page_size: int = 20, source: str = "all",
@@ -471,7 +471,7 @@ def do_inspect(identifier: str, console: Optional[Console] = None) -> None:
     c.print(Panel("\n".join(info_lines), title=f"Skill: {meta.name}"))
     preview = _skill_md_preview(bundle)
     if preview is not None:
-        c.print(Panel(preview, title="SKILL.md Preview", subtitle="hermes skills install <id> to install"))
+        c.print(Panel(preview, title="SKILL.md Preview", subtitle="stardust skills install <id> to install"))
     c.print()
 
 
@@ -504,7 +504,7 @@ def _scan_block_message(result, identifier: str) -> str:
     """User-facing sentence for a scan-blocked install (the audit row keeps the scanner's raw reason).
 
     Says what happened (not installed), why in plain words (high-risk patterns), whether ``--force``
-    can help, and the read-only next step (``hermes skills inspect``). The hard-block rule mirrors
+    can help, and the read-only next step (``stardust skills inspect``). The hard-block rule mirrors
     ``tools.skills_guard.should_allow_install``: a dangerous verdict on a non-official source."""
     n = len(result.findings)
     findings = f"{n} high-risk pattern(s)" if n else "high-risk patterns"
@@ -513,7 +513,7 @@ def _scan_block_message(result, identifier: str) -> str:
               if hard_block else "Re-run with --force to install anyway.")
     return (f"the security scan found {findings} in '{identifier}' (listed above). "
             f"{policy} Review the findings or ask the author to fix them; to read the skill without "
-            f"installing, run `hermes skills inspect {identifier}`.")
+            f"installing, run `stardust skills inspect {identifier}`.")
 
 
 def _invalid_path(c: Console, bundle, exc: ValueError, q_path: Optional[Path] = None) -> None:
@@ -541,7 +541,7 @@ def _resolve_url_bundle_name(c: Console, bundle, meta, identifier: str,
                 "and the URL path doesn't produce a valid identifier.[/]\n\n"
                 "Retry with an explicit name:\n"
                 f"  [bold]/skills install {url} --name <your-name>[/]\n"
-                f"  [bold]hermes skills install {url} --name <your-name>[/]\n\n"
+                f"  [bold]stardust skills install {url} --name <your-name>[/]\n\n"
                 "[dim]Or ask the SKILL.md's author to add a `name:` field to "
                 "its YAML frontmatter.[/]\n")
         return False
@@ -582,7 +582,7 @@ def _announce_blueprint(c: Console, skill_name: str) -> None:
             c.print(f"{lead}, but it wasn't added to your suggestions (already offered/dismissed, "
                     "or the pending list is full — run [bold]/suggestions[/] to review).")
             c.print("[dim]You can still schedule it any time by asking the agent "
-                    "or via[/] [bold]hermes cron add[/][dim].[/]\n")
+                    "or via[/] [bold]stardust cron add[/][dim].[/]\n")
     except Exception:  # pragma: no cover - blueprint detection is best-effort
         pass
 
@@ -612,7 +612,7 @@ def _print_fetch_failure(c: Console, sources, identifier: str, meta=None, source
         c.print(f"[bold red]Error:[/] '{identifier}' is listed in the {src_id} index, "
                 f"but its files no longer exist upstream.")
         c.print("[dim]Stale index entry: the skill was likely renamed or removed by "
-                "its author. Try `hermes skills search` for an alternative.[/]\n")
+                "its author. Try `stardust skills search` for an alternative.[/]\n")
         return
     c.print(f"[bold red]Error:[/] Could not download '{identifier}'.")
     if rate_limited:
@@ -621,8 +621,8 @@ def _print_fetch_failure(c: Console, sources, identifier: str, meta=None, source
                 "Set [bold]GITHUB_TOKEN[/] in your .env or install the [bold]gh[/] CLI and run "
                 "[bold]gh auth login[/] to raise the limit to 5,000/hr.\n")
     else:
-        c.print(f"Check the name with [bold]hermes skills search {identifier.rsplit('/', 1)[-1]}[/] "
-                "and check your internet connection. If it keeps failing, run [bold]hermes doctor[/].\n")
+        c.print(f"Check the name with [bold]stardust skills search {identifier.rsplit('/', 1)[-1]}[/] "
+                "and check your internet connection. If it keeps failing, run [bold]stardust doctor[/].\n")
 
 
 def _scan_quarantined(c: Console, q_path: Path, bundle, meta, identifier: str):
@@ -838,7 +838,7 @@ def do_check(name: Optional[str] = None, console: Optional[Console] = None) -> N
     if orphaned:
         c.print(f"[yellow]Orphaned:[/] {', '.join(orphaned)} — lock-file entries whose local "
                 "directory is missing or replaced by a non-directory. For missing directories, "
-                "remove the stale entry with: hermes skills uninstall <name>\n")
+                "remove the stale entry with: stardust skills uninstall <name>\n")
 
 
 def _has_local_edits(installed: dict) -> bool:
@@ -862,7 +862,7 @@ def do_update(name: Optional[str] = None, console: Optional[Console] = None,
     Skills whose on-disk content no longer matches the hash recorded at install time have been edited
     locally; updating them would silently destroy the user's work (``do_install(force=True)``
     rmtree-replaces the directory). Those are skipped by default and only overwritten when ``force=True``.
-    Mirrors the user-modified protection bundled skills already get from ``hermes update`` (ported from
+    Mirrors the user-modified protection bundled skills already get from ``stardust update`` (ported from
     paperclipai/paperclip#10978's explicit-merge-mode rule: destructive replacement must be an explicit
     caller choice, never a rerun default).
     """
@@ -899,7 +899,7 @@ def do_update(name: Optional[str] = None, console: Optional[Console] = None,
     if skipped_local:
         c.print(f"[dim]{len(skipped_local)} skill(s) kept your local edits: "
                 f"{', '.join(sorted(skipped_local))}.[/]")
-        c.print("[dim]Overwrite with: hermes skills update <name> --force[/]\n")
+        c.print("[dim]Overwrite with: stardust skills update <name> --force[/]\n")
 
 
 def do_audit(name: Optional[str] = None, console: Optional[Console] = None,
@@ -964,7 +964,7 @@ def do_reset(name: str, restore: bool = False, console: Optional[Console] = None
 
 
 def do_list_modified(console: Optional[Console] = None, as_json: bool = False) -> None:
-    """List bundled skills the user has edited (which `hermes update` keeps)."""
+    """List bundled skills the user has edited (which `stardust update` keeps)."""
     from tools.skills_sync_bundled_ops import list_user_modified_bundled_skills
     c = console or _console
     modified = list_user_modified_bundled_skills()
@@ -975,13 +975,13 @@ def do_list_modified(console: Optional[Console] = None, as_json: bool = False) -
         c.print("[dim]No user-modified bundled skills — everything tracks upstream.[/]\n")
         return
     c.print(f"\n[bold]{len(modified)} user-modified bundled skill(s)[/] "
-            "[dim](kept as-is by `hermes update`):[/]")
+            "[dim](kept as-is by `stardust update`):[/]")
     for entry in modified:
         c.print(f"  [yellow]~[/] {entry['name']}")
     c.print()
-    c.print("[dim]See changes:   hermes skills diff <name>[/]")
-    c.print("[dim]Resume updates: hermes skills reset <name>          (keep your copy, re-baseline)[/]")
-    c.print("[dim]Revert to stock: hermes skills reset <name> --restore[/]\n")
+    c.print("[dim]See changes:   stardust skills diff <name>[/]")
+    c.print("[dim]Resume updates: stardust skills reset <name>          (keep your copy, re-baseline)[/]")
+    c.print("[dim]Revert to stock: stardust skills reset <name> --restore[/]\n")
 
 
 def _print_diff_line(c: Console, line: str) -> None:
@@ -1018,7 +1018,7 @@ def do_diff(name: str, console: Optional[Console] = None) -> None:
             line = _DIFF_STATUS_LINE.get(entry["status"], _DIFF_STATUS_LINE["binary"])
             c.print(line.format(**entry))
     c.print()
-    c.print(f"[dim]Revert with: hermes skills reset {name} --restore[/]\n")
+    c.print(f"[dim]Revert with: stardust skills reset {name} --restore[/]\n")
 
 
 def do_opt_out(remove: bool = False, console: Optional[Console] = None, skip_confirm: bool = False,
@@ -1123,7 +1123,7 @@ def do_tap(action: str, repo: str = "", console: Optional[Console] = None) -> No
     elif action in _TAP_OPS:
         method, ok_line, fail_line = _TAP_OPS[action]
         if not repo:
-            _print_error(c, f"Repo required. Usage: hermes skills tap {action} owner/repo")
+            _print_error(c, f"Repo required. Usage: stardust skills tap {action} owner/repo")
             return
         c.print((ok_line if getattr(mgr, method)(repo) else fail_line).format(repo=repo))
     else:
@@ -1170,7 +1170,7 @@ def do_publish(skill_path: str, target: str = "github", repo: str = "",
     if target == "github":
         if not repo:
             _print_error(c, "--repo required for GitHub publish.\n"
-                            "Usage: hermes skills publish <path> --to github --repo owner/repo")
+                            "Usage: stardust skills publish <path> --to github --repo owner/repo")
             return
         auth = GitHubAuth()
         if not auth.is_authenticated():
@@ -1321,18 +1321,18 @@ def _snapshot_cli(args) -> None:
     elif snap_action == "import":
         do_snapshot_import(args.input, force=getattr(args, "force", False))
     else:
-        _console.print("Usage: hermes skills snapshot [export|import]\n")
+        _console.print("Usage: stardust skills snapshot [export|import]\n")
 
 
 def _tap_cli(args) -> None:
     tap_action = getattr(args, "tap_action", None)
     if not tap_action:
-        _console.print("Usage: hermes skills tap [list|add|remove]\n")
+        _console.print("Usage: stardust skills tap [list|add|remove]\n")
         return
     do_tap(tap_action, repo=getattr(args, "repo", "") or getattr(args, "name", ""))
 
 
-# `hermes skills <action>` -> handler(args). Lambdas late-bind the do_* names so
+# `stardust skills <action>` -> handler(args). Lambdas late-bind the do_* names so
 # tests that patch("hermes_cli.skills_hub.do_install") still intercept.
 _CLI_ACTIONS = {
     "browse": lambda a: do_browse(page=a.page, page_size=a.size, source=a.source),
@@ -1363,11 +1363,11 @@ _CLI_ACTIONS = {
 
 
 def skills_command(args) -> None:
-    """Router for `hermes skills <subcommand>` — called from hermes_cli/main.py."""
+    """Router for `stardust skills <subcommand>` — called from hermes_cli/main.py."""
     handler = _CLI_ACTIONS.get(getattr(args, "skills_action", None))
     if handler is None:
-        _console.print("Usage: hermes skills [browse|search|install|inspect|list|list-modified|diff|check|update|audit|uninstall|reset|opt-out|opt-in|publish|snapshot|tap]\n")
-        _console.print("Run 'hermes skills <command> --help' for details.\n")
+        _console.print("Usage: stardust skills [browse|search|install|inspect|list|list-modified|diff|check|update|audit|uninstall|reset|opt-out|opt-in|publish|snapshot|tap]\n")
+        _console.print("Run 'stardust skills <command> --help' for details.\n")
         return
     handler(args)
 

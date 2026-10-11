@@ -200,7 +200,7 @@ def test_run_one_job_exception_delivers_failure_alert(monkeypatch):
     gloss = _provider_failure_cause(classify_cron_failure_reason("Gemini HTTP 503 (UNAVAILABLE)"))
     assert gloss and gloss in delivered[0][1]
     assert not delivered[0][1].lstrip("⚠️ ").startswith("Gemini HTTP 503")
-    assert "hermes cron run j3" in delivered[0][1]
+    assert "stardust cron run j3" in delivered[0][1]
     assert marked == [
         (("j3", False, "Gemini HTTP 503 (UNAVAILABLE)"), {"delivery_error": None})
     ]
@@ -296,7 +296,7 @@ def test_escaped_failure_delivery_carries_the_streak_nudge(monkeypatch):
     assert len(delivered) == 1
     assert "cannot import name X" in delivered[0]
     assert "failed 3 runs in a row" in delivered[0]
-    assert "hermes cron pause scout" in delivered[0]
+    assert "stardust cron pause scout" in delivered[0]
 
 
 def test_escaped_failure_delivery_stays_quiet_below_the_threshold(monkeypatch):
@@ -319,7 +319,7 @@ def test_escaped_failure_delivery_stays_quiet_below_the_threshold(monkeypatch):
     assert ok is False
     assert len(delivered) == 1
     assert delivered[0].startswith("⚠️ Cron 'scout' failed: provider failed")
-    assert "hermes cron runs j6" in delivered[0]
+    assert "stardust cron runs j6" in delivered[0]
 
 
 def test_run_one_job_exception_after_delivery_does_not_redeliver(monkeypatch):

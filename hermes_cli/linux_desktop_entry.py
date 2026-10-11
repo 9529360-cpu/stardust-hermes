@@ -93,9 +93,9 @@ def _running_interpreter_fallback() -> str:
 
 
 def resolve_exec_command(project_root: Optional[Path] = None) -> str:
-    """Build the absolute ``Exec=`` command line for ``hermes desktop``.
+    """Build the absolute ``Exec=`` command line for ``stardust desktop``.
 
-    Prefer the real ``hermes`` launcher; fall back to ``<python> -m hermes_cli.main desktop``.
+    Prefer the real ``stardust`` launcher; fall back to ``<python> -m hermes_cli.main desktop``.
     """
     from hermes_cli.relaunch import resolve_hermes_bin
 
@@ -114,7 +114,7 @@ def resolve_exec_command(project_root: Optional[Path] = None) -> str:
     argv = [interpreter, "-m", "hermes_cli.main", "desktop"]
     if bin_path:
         resolved = Path(bin_path).resolve()
-        # A Python launcher whose shebang points OUTSIDE the venv (e.g. the repo's `hermes` script
+        # A Python launcher whose shebang points OUTSIDE the venv (e.g. the repo's `stardust` script
         # with `#!/usr/bin/env python3`) would die silently on the first third-party import under
         # Terminal=false — run it under the venv interpreter explicitly.
         prefix = [interpreter] if _needs_interpreter(resolved) else []
@@ -142,7 +142,7 @@ def _inside_checkout(candidate: str, checkout_root: Path, original_argv0: str) -
         path = Path(candidate).resolve()
     except OSError:
         return False
-    # Anything shipped in the tree (e.g. the repo `hermes` script) is checkout-internal. Compare
+    # Anything shipped in the tree (e.g. the repo `stardust` script) is checkout-internal. Compare
     # against BOTH the lexical and resolved roots: candidates resolve, so a symlinked home needs
     # the resolved comparison too.
     try:
@@ -188,7 +188,7 @@ def _resolve_hermes_bin_for_desktop_entry(
     module_lexical_root = _project_root()
     original_argv0 = sys.argv[0]
 
-    # An external primary (another install's /opt/.../bin/hermes, a venv console script) wins
+    # An external primary (another install's /opt/.../bin/stardust, a venv console script) wins
     # BEFORE any known-location probing, which could silently switch the entry to a different
     # installation. Only rerun the resolver with argv[0] hidden when the primary could actually
     # be checkout-internal (also shortens the window a concurrent reader sees mutated sys.argv).
@@ -197,7 +197,7 @@ def _resolve_hermes_bin_for_desktop_entry(
         return primary
 
     # A primary that is NOT checkout-internal and not the invoking interpreter is an external launcher (e.g.
-    # /opt/.../bin/hermes from another install method, or a venv console script). It must be evaluated
+    # /opt/.../bin/stardust from another install method, or a venv console script). It must be evaluated
     # BEFORE any known-location probing: probing first could silently switch the entry to a different
     # installation (#94443 review case 3).
     # Only reroute when argv[0] actually drove the resolution: re-run the resolver with argv[0] hidden and
@@ -210,7 +210,7 @@ def _resolve_hermes_bin_for_desktop_entry(
         sys.argv[0] = original_argv0
 
     # A resolver miss (argv[0] is ``-c`` under ``python -m`` on a cold relaunch AND PATH has no
-    # ``hermes``) must NOT return None here: that skipped the durable-wrapper probe below and persisted
+    # ``stardust``) must NOT return None here: that skipped the durable-wrapper probe below and persisted
     # the module form, so the entry's bytes flipped on every alternating launch context — and
     # gnome-shell 50.x crashes when hermes.desktop changes while its ShellApp is STARTING (#110885).
     # ``primary is None`` implies ``rerouted is None`` (the rerun only hides argv[0]), so only the
@@ -218,7 +218,7 @@ def _resolve_hermes_bin_for_desktop_entry(
     if primary and rerouted is not None:
         return rerouted or primary
 
-    # argv[0] was checkout-internal AND PATH had no `hermes` — common in stripped systemd user
+    # argv[0] was checkout-internal AND PATH had no `stardust` — common in stripped systemd user
     # sessions and autostart relaunches. Probe the installer's known wrapper locations; each
     # candidate must be DE-safe and target THIS checkout (a foreign wrapper would make the entry
     # stable-but-wrong). No durable wrapper → None, so resolve_exec_command emits its runnable
@@ -320,15 +320,15 @@ def _known_wrapper_candidates():
     """Durable installed-launcher locations, most likely first.
 
     Mirrors the installer's ``get_command_link_dir()`` layouts: Termux (``$PREFIX/bin``), root FHS
-    (``/usr/local/bin``), and user (``~/.local/bin``). The wrapper is always named ``hermes``.
+    (``/usr/local/bin``), and user (``~/.local/bin``). The wrapper is always named ``stardust``.
     """
     candidates = []
     prefix = os.environ.get("PREFIX")
     if prefix:
-        candidates.append(Path(prefix) / "bin" / "hermes")
+        candidates.append(Path(prefix) / "bin" / "stardust")
     if hasattr(os, "geteuid") and os.geteuid() == 0:
-        candidates.append(Path("/usr/local/bin/hermes"))
-    candidates.append(Path.home() / ".local" / "bin" / "hermes")
+        candidates.append(Path("/usr/local/bin/stardust"))
+    candidates.append(Path.home() / ".local" / "bin" / "stardust")
     return candidates
 
 

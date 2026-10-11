@@ -11,7 +11,7 @@
 #   * Env vars blanked (conftest.py also does this, but this
 #     is belt-and-suspenders for anyone running pytest outside our
 #     conftest path — e.g. on a single file)
-#   * Proper venv activation (probes .venv, venv, then ~/.hermes/...)
+#   * Proper venv activation (probes .venv, venv, then ~/.stardust/...)
 #
 # Usage:
 #   scripts/run_tests.sh                            # full suite
@@ -43,7 +43,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 # pytest, pytest-asyncio, pytest-timeout, ruff, ty).
 #
 # A candidate must have pytest INSTALLED, not merely exist. The release venv
-# at ~/.hermes/hermes-agent/venv has bin/activate but no pytest, so an
+# at ~/.stardust/hermes-agent/venv has bin/activate but no pytest, so an
 # existence-only probe selected it in checkouts/worktrees without a local
 # .venv — every file then died with "No module named pytest" and the run
 # reported "0 tests passed" (which reads green at a glance even though the
@@ -51,7 +51,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 VENV=""
 VENV_PYTHON=""
 SKIPPED_VENVS=""
-for candidate in "$REPO_ROOT/.venv" "$REPO_ROOT/venv" "$HOME/.hermes/hermes-agent/venv"; do
+for candidate in "$REPO_ROOT/.venv" "$REPO_ROOT/venv" "$HOME/.stardust/hermes-agent/venv"; do
   if [ -f "$candidate/bin/activate" ]; then
     if "$candidate/bin/python" -c 'import pytest' 2>/dev/null; then
       VENV="$candidate"
@@ -85,7 +85,7 @@ if [ -n "$VENV" ]; then
 elif [ -n "${STARDUST_PYTHON:-}" ] && [ -x "$STARDUST_PYTHON" ] \
     && "$STARDUST_PYTHON" -c 'import pytest' 2>/dev/null; then
   # Guard with an import check: STARDUST_PYTHON may point at the RELEASE
-  # venv (no pytest) when inherited from a wrapped `hermes` binary rather
+  # venv (no pytest) when inherited from a wrapped `stardust` binary rather
   # than the devShell hook.
   PYTHON="$STARDUST_PYTHON"
   echo "▶ no local venv — using Nix dev venv via STARDUST_PYTHON: $PYTHON"
@@ -102,8 +102,8 @@ fi
 # ── Live-gateway plugin (computed before we drop env) ───────────────────────
 EXTRA_PYTHONPATH=""
 EXTRA_PYTEST_PLUGINS=""
-if [ -f "$HOME/.hermes/pytest_live_guard.py" ]; then
-  EXTRA_PYTHONPATH="$HOME/.hermes"
+if [ -f "$HOME/.stardust/pytest_live_guard.py" ]; then
+  EXTRA_PYTHONPATH="$HOME/.stardust"
   EXTRA_PYTEST_PLUGINS="pytest_live_guard"
 fi
 

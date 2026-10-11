@@ -41,5 +41,5 @@ suggest:
 
 post_install: |
   On first connection Hermes opens a browser to authorize with
-  monday.com (or run `hermes mcp login monday`). Approve access,
+  monday.com (or run `stardust mcp login monday`). Approve access,
   then restart the session so tools load.

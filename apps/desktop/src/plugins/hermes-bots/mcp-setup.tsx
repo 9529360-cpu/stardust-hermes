@@ -11,7 +11,7 @@ import { useEffect, useRef, useState } from 'react'
 
 // -- inline MCP setup (per-profile), driven by the mcp.servers.* gateway RPCs --
 // Feature-detected: if the gateway predates those RPCs the setup button hides
-// and the row falls back to the "run hermes mcp / Settings" hint. profile is
+// and the row falls back to the "run stardust mcp / Settings" hint. profile is
 // the target bot's profile name (its config is what we write).
 
 /** Body of an `mcp.servers.*` reply. Some gateway builds wrap it in a second

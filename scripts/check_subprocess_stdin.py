@@ -39,7 +39,7 @@ TUI_CONTEXT_DIRS = [
 ]
 
 # User plugin roots — scanned at runtime if they exist.  Plugins load from
-# ``get_hermes_home() / "plugins"`` (user) and ``./.hermes/plugins/`` (project,
+# ``get_hermes_home() / "plugins"`` (user) and ``./.stardust/plugins/`` (project,
 # gated behind ``STARDUST_ENABLE_PROJECT_PLUGINS``) — see
 # ``hermes_cli/plugins.py:10-12``.  The guard only checked the bundled
 # ``plugins/`` dir, missing user-installed code that spawns subprocesses
@@ -237,11 +237,11 @@ def main() -> int:
 
     # Scan user plugin directories (Gap 1: guard missed user-installed
     # plugins in get_hermes_home()/plugins/ and project plugins in
-    # ./.hermes/plugins/, where code like ori/hooks.py can spawn
+    # ./.stardust/plugins/, where code like ori/hooks.py can spawn
     # subprocesses with inherited stdin — #67639).
     plugin_roots: list[Path] = [get_hermes_home() / "plugins"]
     if os.environ.get("STARDUST_ENABLE_PROJECT_PLUGINS"):
-        plugin_roots.append(Path.cwd() / ".hermes" / "plugins")
+        plugin_roots.append(Path.cwd() / ".stardust" / "plugins")
     seen_roots: set[Path] = set()
     for plugin_root in plugin_roots:
         resolved = plugin_root.resolve()

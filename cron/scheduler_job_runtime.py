@@ -133,8 +133,8 @@ def _snapshot_pin(job: dict, axis: str, current: str, job_id: str) -> str:
     if snapshot and current and snapshot.lower() != current.lower():
         logger.info(
             "Job '%s': running on creation-snapshot %s %r (global default is now %r); "
-            "`hermes cron resnap %s` adopts the new default (stays unpinned), "
-            "`hermes cron edit %s --%s <value>` or cron.%s in config.yaml pins it.",
+            "`stardust cron resnap %s` adopts the new default (stays unpinned), "
+            "`stardust cron edit %s --%s <value>` or cron.%s in config.yaml pins it.",
             job_id, axis, snapshot, current, job_id, job_id, axis,
             "model" if axis == "model" else "model_provider")
     return snapshot
@@ -143,7 +143,7 @@ def _snapshot_pin(job: dict, axis: str, current: str, job_id: str) -> str:
 def _load_cron_job_config(job: dict, job_id: str, job_name: str) -> _CronJobConfig:
     """Load config.yaml and resolve the run's model: per-job override > cron.model (fleet default) >
     creation snapshot > STARDUST_MODEL > config ``model:``. Re-read every tick (no cache) so
-    ``hermes cron edit --model`` applies next tick."""
+    ``stardust cron edit --model`` applies next tick."""
     model = job.get("model") or _sched.cron_env_setting("STARDUST_MODEL") or ""
     _cron_default_provider = ""
     _cfg: dict = {}
@@ -179,8 +179,8 @@ def _load_cron_job_config(job: dict, job_id: str, job_name: str) -> _CronJobConf
             f"STARDUST_MODEL={_sched.cron_env_setting('STARDUST_MODEL')!r}, "
             "config.yaml model.default missing or empty). "
             f"Set a per-job model via "
-            f"`hermes cron edit {job_id} --model <name>` or set a "
-            "default with `hermes model <name>`."
+            f"`stardust cron edit {job_id} --model <name>` or set a "
+            "default with `stardust model <name>`."
         )
 
     with contextlib.suppress(Exception):
@@ -267,7 +267,7 @@ def _blocked_config_result(job_id: str, job_name: str, _pf_reason: str) -> tuple
         "(nothing was charged).\n\n"
         f"**Reason:** {_pf_reason}\n\n"
         "Hermes tries again at the next scheduled time and clears this state on the first healthy "
-        "run; this alert is not repeated. Check with `hermes cron doctor`. Set `cron.preflight: "
+        "run; this alert is not repeated. Check with `stardust cron doctor`. Set `cron.preflight: "
         "false` in config.yaml to disable this check."
     )
     return False, blocked_doc, "", f"{marker} {_pf_reason}"

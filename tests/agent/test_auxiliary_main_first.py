@@ -96,7 +96,7 @@ class TestResolveAutoMainFirst:
         """
         import yaml
 
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".stardust"
         home.mkdir()
         (home / "config.yaml").write_text(
             yaml.safe_dump(

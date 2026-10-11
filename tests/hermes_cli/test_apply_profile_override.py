@@ -1,7 +1,7 @@
 """Regression tests for _apply_profile_override STARDUST_HOME guard (issue #22502).
 
 When STARDUST_HOME is set to the hermes root (e.g. systemd hardcodes
-STARDUST_HOME=/root/.hermes), _apply_profile_override must still read
+STARDUST_HOME=/root/.stardust), _apply_profile_override must still read
 active_profile and update STARDUST_HOME to the profile directory.
 
 When STARDUST_HOME is already a profile directory (.../profiles/<name>),
@@ -26,7 +26,7 @@ def _run_apply_profile_override(
     Returns the value of os.environ["STARDUST_HOME"] after the call,
     or None if unset.
     """
-    hermes_root = tmp_path / ".hermes"
+    hermes_root = tmp_path / ".stardust"
     hermes_root.mkdir(parents=True, exist_ok=True)
 
     if active_profile is not None:
@@ -73,14 +73,14 @@ class TestApplyProfileOverrideHermesHomeGuard:
     def test_hermes_home_at_root_with_active_profile_is_redirected(
         self, tmp_path, monkeypatch
     ):
-        """STARDUST_HOME=/root/.hermes + active_profile=coder must redirect
+        """STARDUST_HOME=/root/.stardust + active_profile=coder must redirect
         STARDUST_HOME to .../profiles/coder.
 
         Bug scenario from #22502: systemd sets STARDUST_HOME to the hermes root
-        and the user switches to a profile via `hermes profile use`.
+        and the user switches to a profile via `stardust profile use`.
         Before the fix, the guard returned early and active_profile was ignored.
         """
-        hermes_root = tmp_path / ".hermes"
+        hermes_root = tmp_path / ".stardust"
         hermes_root.mkdir(parents=True, exist_ok=True)
 
         result = _run_apply_profile_override(
@@ -103,9 +103,9 @@ class TestApplyProfileOverrideHermesHomeGuard:
         """sudo elias ... should resolve `-p elias` under SUDO_USER, not root."""
         root_home = tmp_path / "root"
         user_home = tmp_path / "home" / "hermes"
-        profile_dir = user_home / ".hermes" / "profiles" / "elias"
+        profile_dir = user_home / ".stardust" / "profiles" / "elias"
         profile_dir.mkdir(parents=True, exist_ok=True)
-        (root_home / ".hermes").mkdir(parents=True, exist_ok=True)
+        (root_home / ".stardust").mkdir(parents=True, exist_ok=True)
 
         monkeypatch.setattr(Path, "home", lambda: root_home)
         monkeypatch.setenv("SUDO_USER", "hermes")
@@ -130,7 +130,7 @@ class TestSupervisedChildIgnoresStickyProfile:
     """The reserved default gateway s6 slot must not follow active_profile.
 
     Inside the Docker s6 image the ``gateway-default`` service slot runs a
-    bare ``hermes gateway run`` (no ``-p``) to mean "the root STARDUST_HOME
+    bare ``stardust gateway run`` (no ``-p``) to mean "the root STARDUST_HOME
     profile". The run-script exports ``STARDUST_S6_SUPERVISED_CHILD=1``.
     Without a guard, ``_apply_profile_override`` would read the sticky
     ``active_profile`` file (set by e.g. the dashboard profile switcher) and
@@ -142,7 +142,7 @@ class TestSupervisedChildIgnoresStickyProfile:
     def test_non_supervised_run_still_follows_active_profile(
         self, tmp_path, monkeypatch
     ):
-        """Without the sentinel, a normal `hermes gateway run` still honors
+        """Without the sentinel, a normal `stardust gateway run` still honors
         active_profile — the guard is scoped strictly to supervised children."""
         result = _run_apply_profile_override(
             tmp_path,
@@ -159,7 +159,7 @@ class TestSupervisedChildIgnoresStickyProfile:
         """A supervised named-profile slot passes ``-p <name>`` explicitly;
         that must still resolve (the sentinel guard only skips the sticky
         active_profile fallback, never an explicit flag)."""
-        hermes_root = tmp_path / ".hermes"
+        hermes_root = tmp_path / ".stardust"
         hermes_root.mkdir(parents=True, exist_ok=True)
         (hermes_root / "active_profile").write_text("briefer")
         (hermes_root / "profiles" / "briefer").mkdir(parents=True, exist_ok=True)
@@ -193,7 +193,7 @@ class TestGeneralizedSupervisorMarkers:
     """
 
     def _root_home(self, tmp_path):
-        hermes_root = tmp_path / ".hermes"
+        hermes_root = tmp_path / ".stardust"
         hermes_root.mkdir(parents=True, exist_ok=True)
         return hermes_root
 

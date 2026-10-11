@@ -16,7 +16,7 @@ from tools.send_message_senders import _live_adapter
 
 @pytest.fixture
 def mux_runner(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     (home / "profiles" / "sec").mkdir(parents=True)
     (home / "profiles" / "nobot").mkdir(parents=True)
     monkeypatch.setattr(Path, "home", lambda: tmp_path)

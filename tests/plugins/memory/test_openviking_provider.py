@@ -388,7 +388,7 @@ def test_start_local_openviking_server_strips_pythonpath_from_child_env(monkeypa
 
     Inheriting it makes openviking-server import packages from the Hermes
     venv instead of its own, and on Windows locks Hermes venv DLLs so the
-    venv cannot be rebuilt during `hermes update`.
+    venv cannot be rebuilt during `stardust update`.
     """
     popen_calls = []
 

@@ -171,7 +171,7 @@ class TestCronjobToolReasoningEffort:
     """The model tool READS the field (list surfacing) but must never WRITE
     it: models don't make model-configuration decisions (standing policy —
     the only exception is user-defined profile selection). The pin is set
-    via `hermes cron create/edit --reasoning-effort` only."""
+    via `stardust cron create/edit --reasoning-effort` only."""
 
     def test_format_job_surfaces_pin_when_set(self, tmp_cron_dir):
         import json

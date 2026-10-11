@@ -314,9 +314,9 @@ def main():
     if not args.isolated_worker:
         with tempfile.TemporaryDirectory(prefix="hermes-oauth-http-") as temp:
             home = Path(temp)
-            (home / ".hermes").mkdir()
+            (home / ".stardust").mkdir()
             env = {"PATH": os.environ.get("PATH", ""), "HOME": temp,
-                   "STARDUST_HOME": str(home / ".hermes"), "LANG": "C.UTF-8", "TZ": "UTC",
+                   "STARDUST_HOME": str(home / ".stardust"), "LANG": "C.UTF-8", "TZ": "UTC",
                    "PYTHONNOUSERSITE": "1"}
             completed = subprocess.run([sys.executable, str(Path(__file__).resolve()),
                 "--repo", str(repo), "--output", str(output), "--isolated-worker"],

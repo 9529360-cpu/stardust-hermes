@@ -201,7 +201,7 @@ class TestSkillManageCrossProfileErrorUX:
 class TestSystemPromptActiveProfile:
     def test_default_profile_line_in_prompt(self, tmp_path, monkeypatch):
         """When active profile is 'default', the prompt names it and warns
-        about ~/.hermes/profiles/<name>/."""
+        about ~/.stardust/profiles/<name>/."""
         # Don't set STARDUST_HOME — falls back to default.
         import agent.file_safety as fs
         monkeypatch.setattr(fs, "_hermes_home_path", lambda: tmp_path / "fake")
@@ -224,7 +224,7 @@ class TestSystemPromptActiveProfile:
         src = Path("agent/system_prompt.py").read_text()
         assert "Active Hermes profile" in src
         assert "cross_profile=True" not in src  # guard retired
-        assert "~/.hermes/profiles/" in src
+        assert "~/.stardust/profiles/" in src
         # Both branches present (default and named profile).
         assert "Active Hermes profile: default" in src
         assert "Active Hermes profile: {active_profile}" in src

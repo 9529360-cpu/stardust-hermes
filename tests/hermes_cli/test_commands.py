@@ -290,7 +290,7 @@ class TestSlackNativeSlashes:
 
 
 class TestSlackAppManifest:
-    """Generated Slack app manifest (used by `hermes slack manifest`)."""
+    """Generated Slack app manifest (used by `stardust slack manifest`)."""
 
 
     def test_each_slash_has_required_fields(self):

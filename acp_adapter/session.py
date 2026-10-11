@@ -1,6 +1,6 @@
 """ACP session manager — maps ACP sessions to Hermes AIAgent instances.
 
-Sessions are persisted to the shared SessionDB (``~/.hermes/state.db``) so they
+Sessions are persisted to the shared SessionDB (``~/.stardust/state.db``) so they
 survive process restarts and appear in ``session_search``; ``load_session`` /
 ``resume_session`` after an editor reconnect restore the full history from there.
 """
@@ -156,7 +156,7 @@ class SessionManager:
 
     def __init__(self, agent_factory=None, db=None):
         """``agent_factory``: AIAgent-like factory (tests); default builds a real AIAgent from
-        the runtime provider config. ``db``: SessionDB; default lazily opens ``~/.hermes/state.db``."""
+        the runtime provider config. ``db``: SessionDB; default lazily opens ``~/.stardust/state.db``."""
         self._sessions: Dict[str, SessionState] = {}
         self._lock = threading.Lock()
         self._agent_factory = agent_factory

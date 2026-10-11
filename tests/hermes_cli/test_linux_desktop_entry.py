@@ -1,4 +1,4 @@
-"""Tests for the Linux XDG desktop entry installed by ``hermes desktop``."""
+"""Tests for the Linux XDG desktop entry installed by ``stardust desktop``."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ def xdg_home(tmp_path, monkeypatch) -> Path:
     data_home = tmp_path / "xdg-data"
     monkeypatch.setenv("XDG_DATA_HOME", str(data_home))
     # Isolate the known-wrapper probe too: tests must never see the real
-    # ~/.local/bin/hermes on the dev machine.
+    # ~/.local/bin/stardust on the dev machine.
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setattr(lde.sys, "platform", "linux")
     return data_home
@@ -83,7 +83,7 @@ def test_install_writes_entry_with_absolute_exec_and_icon(
     values = _parse(entry.read_text(encoding="utf-8"))
 
     # Exec must be the absolute path of the resolved binary. The launcher
-    # runs with a minimal PATH, so a bare `hermes` would not resolve.
+    # runs with a minimal PATH, so a bare `stardust` would not resolve.
     assert values["Exec"] == f"{hermes_bin} desktop"
     assert Path(values["Exec"].split(" ")[0]).is_absolute()
 
@@ -154,7 +154,7 @@ def test_install_icon_copy_failure_falls_back_to_absolute(
 def test_installed_entry_is_executable(tmp_path, xdg_home, monkeypatch):
     root = _make_project(tmp_path)
     monkeypatch.setattr(
-        "hermes_cli.relaunch.resolve_hermes_bin", lambda: "/usr/bin/hermes"
+        "hermes_cli.relaunch.resolve_hermes_bin", lambda: "/usr/bin/stardust"
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -175,7 +175,7 @@ def test_exec_falls_back_to_interpreter_module(tmp_path, xdg_home, monkeypatch):
     assert Path(exec_line.split(" ")[0]).is_absolute()
 
 
-# #90292: the shell installer's bash wrapper makes argv[0] the repo `hermes`
+# #90292: the shell installer's bash wrapper makes argv[0] the repo `stardust`
 # python script whose `#!/usr/bin/env python3` shebang resolves to the SYSTEM
 # interpreter when the DE spawns the .desktop entry → ModuleNotFoundError,
 # silent (Terminal=false). The Exec line must prefix sys.executable for any
@@ -427,7 +427,7 @@ def test_exec_finds_known_wrapper_when_resolver_has_no_candidate(
     """`None` from the resolver must still probe known wrapper locations.
 
     A cold relaunch (argv[0] is not an executable file, e.g. `-c` under
-    `python -m`, and PATH has no `hermes`) makes resolve_hermes_bin return
+    `python -m`, and PATH has no `stardust`) makes resolve_hermes_bin return
     None outright. The early `return primary` that used to fire here skipped
     the durable-wrapper probe, so the persisted Exec flipped to the bare
     `<python> -m hermes_cli.main desktop` module form. Each flip between the
@@ -474,7 +474,7 @@ def test_exec_rejects_known_wrapper_from_another_checkout(
 ):
     """A known-location wrapper that targets a DIFFERENT checkout is skipped.
 
-    On machines with multiple installs over time, ~/.local/bin/hermes may
+    On machines with multiple installs over time, ~/.local/bin/stardust may
     belong to another checkout. Persisting it would make the entry stable
     but silently point at that other installation — the failure class the
     aidiyet check exists to prevent. The runnable module fallback must win
@@ -525,25 +525,25 @@ def test_exec_rejects_known_wrapper_from_another_checkout(
         pytest.param(
             "user",
             {},
-            "HOME-SET-BY-TEST/.local/bin/hermes",
+            "HOME-SET-BY-TEST/.local/bin/stardust",
             id="user-layout",
         ),
         pytest.param(
             "termux",
             {"PREFIX": "PREFIX-SET-BY-TEST"},
-            "PREFIX-SET-BY-TEST/bin/hermes",
+            "PREFIX-SET-BY-TEST/bin/stardust",
             id="termux-prefix-first",
         ),
         pytest.param(
             "root-fhs",
             {"__EUID0__": "1"},
-            "/usr/local/bin/hermes",
+            "/usr/local/bin/stardust",
             id="root-fhs",
         ),
         pytest.param(
             "non-root-no-fhs",
             {"__EUID0__": "0"},
-            "HOME-SET-BY-TEST/.local/bin/hermes",
+            "HOME-SET-BY-TEST/.local/bin/stardust",
             id="non-root-excludes-fhs",
         ),
     ],
@@ -577,18 +577,18 @@ def test_known_wrapper_candidates_cover_installer_layouts(
         assert candidates[0] == expected_resolved
     if layout == "root-fhs":
         # Root FHS outranks the user layout.
-        assert candidates.index("/usr/local/bin/hermes") < candidates.index(
-            f"{sentinel_home}/.local/bin/hermes"
+        assert candidates.index("/usr/local/bin/stardust") < candidates.index(
+            f"{sentinel_home}/.local/bin/stardust"
         )
     if layout == "non-root-no-fhs":
         # Non-root euid: /usr/local/bin must be excluded outright.
-        assert "/usr/local/bin/hermes" not in candidates
+        assert "/usr/local/bin/stardust" not in candidates
 
 
 def test_install_is_idempotent_and_skips_cache_refresh(tmp_path, xdg_home, monkeypatch):
     root = _make_project(tmp_path)
     monkeypatch.setattr(
-        "hermes_cli.relaunch.resolve_hermes_bin", lambda: "/usr/bin/hermes"
+        "hermes_cli.relaunch.resolve_hermes_bin", lambda: "/usr/bin/stardust"
     )
     calls: list[Path] = []
     monkeypatch.setattr(
@@ -607,7 +607,7 @@ def test_install_without_source_icon_uses_themed_name(tmp_path, xdg_home, monkey
     root = tmp_path / "hermes-agent"
     root.mkdir()
     monkeypatch.setattr(
-        "hermes_cli.relaunch.resolve_hermes_bin", lambda: "/usr/bin/hermes"
+        "hermes_cli.relaunch.resolve_hermes_bin", lambda: "/usr/bin/stardust"
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -1090,7 +1090,7 @@ def test_install_places_1024_png_in_256x256_not_scalable(
 
 
 def test_install_removes_stale_scalable_png(tmp_path, xdg_home, monkeypatch):
-    """v2026.8.31 wrote the PNG into scalable/. A later hermes desktop
+    """v2026.8.31 wrote the PNG into scalable/. A later stardust desktop
     must delete that leftover so Cinnamon does not keep using it."""
     root = _make_project(tmp_path)
     lde.icon_path(root).write_bytes(_png_ihdr(1024, 1024))

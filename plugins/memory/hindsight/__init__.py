@@ -808,7 +808,7 @@ class HindsightMemoryProvider(MemoryProvider):
             msg = ("Hindsight local_embedded mode cannot run as root "
                    "(PostgreSQL initdb refuses root). Skipping the embedded "
                    "memory daemon. Run Hermes as a non-root user, or switch "
-                   "to cloud / local_external mode via 'hermes memory setup'.")
+                   "to cloud / local_external mode via 'stardust memory setup'.")
             logger.warning(msg)
             # Also print: otherwise the user would only see Hermes get sluggish.
             with contextlib.suppress(Exception):

@@ -38,5 +38,5 @@ suggest:
 
 post_install: |
   On first connection Hermes opens a browser to authorize with
-  Twelve Data (or run `hermes mcp login twelve-data`). Approve access,
+  Twelve Data (or run `stardust mcp login twelve-data`). Approve access,
   then restart the session so tools load.

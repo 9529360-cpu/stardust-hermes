@@ -87,7 +87,7 @@ def container_name(request) -> Iterator[str]:
 # ---------------------------------------------------------------------------
 #
 # Background: every Hermes runtime path inside the container drops to UID
-# 10000 (the ``hermes`` user) via ``s6-setuidgid hermes``. ``docker exec``
+# 10000 (the ``stardust`` user) via ``s6-setuidgid hermes``. ``docker exec``
 # without ``-u`` runs as root, which is **not** representative of how
 # production code executes. PR #30136 review caught a real regression
 # this way — ``Path('/proc/1/exe').resolve()`` works as root and silently

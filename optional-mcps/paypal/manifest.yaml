@@ -27,5 +27,5 @@ suggest:
 
 post_install: |
   On first connection Hermes opens a browser to authorize with
-  Paypal (or run `hermes mcp login paypal`). Approve access,
+  Paypal (or run `stardust mcp login paypal`). Approve access,
   then restart the session so tools load.

@@ -318,6 +318,6 @@ export function formatProbeFailedMessage(error?: string): string {
     timeoutDetail +
     '\n\n' +
     'Close other Hermes windows and terminals, then retry.  If the problem\n' +
-    'persists, run `hermes update` in a terminal for detailed diagnostics.'
+    'persists, run `stardust update` in a terminal for detailed diagnostics.'
   )
 }

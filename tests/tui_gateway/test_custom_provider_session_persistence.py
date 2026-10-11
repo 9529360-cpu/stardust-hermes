@@ -9,7 +9,7 @@ or ``_reset_session_agent``, ``_stored_session_runtime_overrides`` fed
 provider="custom" back into ``_make_agent`` →
 ``resolve_runtime_provider(requested="custom")``, which cannot match an entry
 named "mimo-v2.5-pro". Depending on config the rebuild either raised
-"No LLM provider configured. Run `hermes model`..." (resume failed) or
+"No LLM provider configured. Run `stardust model`..." (resume failed) or
 silently resolved placeholder credentials ("no-key-required") against the
 patched-back base_url.
 
@@ -806,7 +806,7 @@ class TestRuntimeModelConfigDropsStaleKeys:
     def test_real_db_persist_heals_desynced_row(self, tmp_path, monkeypatch):
         """A row already desynced (fresh model column + stale model_config
         provider) self-heals on the next live metadata persist."""
-        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
         db = SessionDB(db_path=tmp_path / "state.db")
         db.create_session(session_id="desync1", source="desktop", model="old-model")
         db.update_session_meta(

@@ -98,7 +98,7 @@ def _cron_default_profile() -> str:
 
     A desktop pool backend runs one process per profile, but these endpoints route storage through
     the profiles tree via ``_cron_profile_home`` — a hardcoded "default" would write a non-default
-    profile's job into ~/.hermes. ``custom`` (STARDUST_HOME outside the profiles tree) has no
+    profile's job into ~/.stardust. ``custom`` (STARDUST_HOME outside the profiles tree) has no
     profile-dir equivalent, so it keeps the legacy "default" fallback.
     """
     try:

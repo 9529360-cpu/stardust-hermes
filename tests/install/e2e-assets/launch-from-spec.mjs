@@ -22,7 +22,7 @@
  *                 (STARDUST_HOME/.hermes-update-result.json)
  *   --expect-sha  the installed checkout reaching the expected commit -
  *                 the source-install signal, where the About pane's update
- *                 runs `hermes update` and no result file exists.
+ *                 runs `stardust update` and no result file exists.
  * The Playwright close event is unreliable across the update handoff, so
  * neither signal is an app event.
  */
@@ -385,7 +385,7 @@ async function main() {
       }
     }
     // Killing the Electron root does not cascade: the spawned backend
-    // (`hermes serve` python + node helpers) survives and keeps writing
+    // (`stardust serve` python + node helpers) survives and keeps writing
     // under the install dir. SIGTERM the snapshot first (orderly backend
     // shutdown), then SIGKILL stragglers.
     if (doomed.length) {

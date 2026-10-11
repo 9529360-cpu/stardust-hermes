@@ -60,7 +60,7 @@ def _contained_host_path(rel: str, hermes_home: Path, abs_msg: str, traversal_ms
     return host_path.resolve()
 
 
-def register_credential_file(relative_path: str, container_base: str = "/root/.hermes") -> bool:
+def register_credential_file(relative_path: str, container_base: str = "/root/.stardust") -> bool:
     """Register a STARDUST_HOME-relative credential file for mounting; True if it exists and was registered.
 
     Rejects absolute paths and traversal out of STARDUST_HOME. Containment alone is not
@@ -103,7 +103,7 @@ def register_credential_file(relative_path: str, container_base: str = "/root/.h
     return True
 
 
-def register_credential_files(entries: list, container_base: str = "/root/.hermes") -> List[str]:
+def register_credential_files(entries: list, container_base: str = "/root/.stardust") -> List[str]:
     """Register skill-frontmatter entries (str or dict with ``path``); return missing paths."""
     missing = []
     for entry in entries:
@@ -141,7 +141,7 @@ def _load_config_files() -> List[Dict[str, str]]:
                 "credential_files: rejected absolute config path %r",
                 "credential_files: rejected config path traversal %r (%s)")
             if resolved_path is not None and resolved_path.is_file():
-                result.append(_mount(resolved_path, f"/root/.hermes/{rel}"))
+                result.append(_mount(resolved_path, f"/root/.stardust/{rel}"))
     except Exception as e:
         logger.warning("Could not read terminal.credential_files from config: %s", e)
 
@@ -194,7 +194,7 @@ def _walk_skill_tree(root: Path) -> Iterator[Tuple[Path, List[Path]]]:
         yield base, [f for f in (base / n for n in filenames) if not f.is_symlink() and f.is_file()]
 
 
-def get_skills_directory_mount(container_base: str = "/root/.hermes") -> list[Dict[str, str]]:
+def get_skills_directory_mount(container_base: str = "/root/.stardust") -> list[Dict[str, str]]:
     """Directory mount entries for all skill dirs (local + external + project).
 
     Bind mounts follow symlinks, so a dir containing any symlink is replaced by a sanitized
@@ -231,7 +231,7 @@ def _safe_skills_path(skills_dir: Path) -> str:
     return str(safe_dir)
 
 
-def iter_skills_files(container_base: str = "/root/.hermes") -> List[Dict[str, str]]:
+def iter_skills_files(container_base: str = "/root/.stardust") -> List[Dict[str, str]]:
     """Per-file entries for all skills files (for backends that upload individually)."""
     return [_mount(item, f"{container_root}/{item.relative_to(host_dir)}")
             for host_dir, container_root in _skill_dir_roots(container_base)
@@ -285,7 +285,7 @@ def _cache_dir_roots(container_base: str, *, create_missing: bool) -> Iterator[T
         yield host_dir, f"{base}/{new_subpath}"
 
 
-def get_cache_directory_mounts(container_base: str = "/root/.hermes") -> List[Dict[str, str]]:
+def get_cache_directory_mounts(container_base: str = "/root/.stardust") -> List[Dict[str, str]]:
     """Bind-mount entries for each cache directory (host layout via ``get_hermes_dir``)."""
     return [_mount(h, c) for h, c in _cache_dir_roots(container_base, create_missing=True)]
 
@@ -298,12 +298,12 @@ def _remap_cache_path(path: str, container_base: str, src: str, dst: str, join: 
     return None
 
 
-def map_cache_path_to_container(host_path: str, container_base: str = "/root/.hermes") -> Optional[str]:
+def map_cache_path_to_container(host_path: str, container_base: str = "/root/.stardust") -> Optional[str]:
     """POSIX container path for a host path under an auto-mounted cache dir, else None."""
     return _remap_cache_path(host_path, container_base, "host_path", "container_path", lambda root, rel: posixpath.join(root, rel.as_posix()))
 
 
-def from_agent_visible_cache_path(container_path: str, container_base: str = "/root/.hermes") -> str:
+def from_agent_visible_cache_path(container_path: str, container_base: str = "/root/.stardust") -> str:
     """Inverse of :func:`to_agent_visible_cache_path`; unchanged unless Docker + cache dir."""
     if _terminal_backend() != "docker":
         return container_path
@@ -311,7 +311,7 @@ def from_agent_visible_cache_path(container_path: str, container_base: str = "/r
     return mapped if mapped is not None else container_path
 
 
-# Backends whose file-sync lands under the remote home: ``~/.hermes`` is
+# Backends whose file-sync lands under the remote home: ``~/.stardust`` is
 # expanded by the remote shell, so it resolves regardless of the actual home.
 _HOME_RELATIVE_BACKENDS = frozenset({"ssh", "daytona", "vercel_sandbox"})
 
@@ -323,23 +323,23 @@ def _terminal_backend() -> str:
     return (terminal_env("TERMINAL_ENV") or "local").strip().lower()
 
 
-def to_agent_visible_cache_path(host_path: str, container_base: str = "/root/.hermes") -> str:
+def to_agent_visible_cache_path(host_path: str, container_base: str = "/root/.stardust") -> str:
     """Translate a host cache path to where the active backend (TERMINAL_ENV) sees it.
 
     Mirrors ``_agent_cache_base_for_env`` in tools/image_generation_tool.py: docker/modal mount at
-    ``/root/.hermes``; ssh/daytona/vercel_sandbox under ``~/.hermes``; plugin backends declare
+    ``/root/.stardust``; ssh/daytona/vercel_sandbox under ``~/.stardust``; plugin backends declare
     ``cache_path_base`` (None = host paths stay correct); local/singularity/unknown unchanged
     (Apptainer auto-binds the host home, so translation would dangle).
 
-    * docker / modal — bind-mounted (docker) or per-file-synced (modal) at ``/root/.hermes`` (the
+    * docker / modal — bind-mounted (docker) or per-file-synced (modal) at ``/root/.stardust`` (the
     *container_base* default). * ssh / daytona / vercel_sandbox — file-synced under the remote user's home;
-    ``~/.hermes`` is shell-expanded by the remote shell, so tool commands resolve it regardless of the
+    ``~/.stardust`` is shell-expanded by the remote shell, so tool commands resolve it regardless of the
     actual remote home. Previously these backends synced the bytes but still rendered the dangling host path
     (#76577 gap).
     """
     backend = _terminal_backend()
     if backend in _HOME_RELATIVE_BACKENDS:
-        container_base = "~/.hermes"
+        container_base = "~/.stardust"
     elif backend not in ("docker", "modal"):
         try:
             from agent.terminal_env_registry import provider_flag
@@ -354,7 +354,7 @@ def to_agent_visible_cache_path(host_path: str, container_base: str = "/root/.he
     return mapped if mapped is not None else host_path
 
 
-def iter_cache_files(container_base: str = "/root/.hermes") -> List[Dict[str, str]]:
+def iter_cache_files(container_base: str = "/root/.stardust") -> List[Dict[str, str]]:
     """Per-file cache entries (Modal upload/resync); skips symlinks."""
     return [_mount(item, f"{root}/{item.relative_to(host_dir)}")
             for host_dir, root in _cache_dir_roots(container_base, create_missing=False)

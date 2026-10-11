@@ -174,7 +174,7 @@ def _refresh_spotify_oauth_state(state: Dict[str, Any], *, timeout_seconds: floa
     refresh_token = _clean(state.get("refresh_token"))
     if not refresh_token:
         raise _spotify_err(
-            "Spotify refresh token missing. Run `hermes auth spotify` again.",
+            "Spotify refresh token missing. Run `stardust auth spotify` again.",
             "spotify_refresh_token_missing", relogin=True,
         )
 
@@ -186,7 +186,7 @@ def _refresh_spotify_oauth_state(state: Dict[str, Any], *, timeout_seconds: floa
         timeout_seconds=timeout_seconds, what="token refresh", failed_code="spotify_refresh_failed",
         invalid_code="spotify_refresh_invalid",
         invalid_message="Spotify refresh response did not include an access_token.",
-        failed_suffix=" Run `hermes auth spotify` again.", relogin_required=True,
+        failed_suffix=" Run `stardust auth spotify` again.", relogin_required=True,
     )
 
     return _spotify_token_payload_to_state(
@@ -207,7 +207,7 @@ def resolve_spotify_runtime_credentials(
         state = _load_provider_state(auth_store, "spotify")
         if not state:
             raise _spotify_err(
-                "Spotify is not authenticated. Run `hermes auth spotify` first.", "spotify_auth_missing", relogin=True,
+                "Spotify is not authenticated. Run `stardust auth spotify` first.", "spotify_auth_missing", relogin=True,
             )
 
         should_refresh = bool(force_refresh)
@@ -231,7 +231,7 @@ def resolve_spotify_runtime_credentials(
     access_token = _clean(state.get("access_token"))
     if not access_token:
         raise _spotify_err(
-            "Spotify access token missing. Run `hermes auth spotify` again.",
+            "Spotify access token missing. Run `stardust auth spotify` again.",
             "spotify_access_token_missing", relogin=True,
         )
 
@@ -264,7 +264,7 @@ def get_spotify_auth_status() -> Dict[str, Any]:
 
 
 def _spotify_interactive_setup(redirect_uri_hint: str) -> str:
-    """Walk the user through creating a Spotify developer app; persist the client_id to ~/.hermes/.env."""
+    """Walk the user through creating a Spotify developer app; persist the client_id to ~/.stardust/.env."""
     from hermes_cli.auth import _is_remote_session
     from hermes_cli.config import save_env_value
     print(
@@ -307,7 +307,7 @@ def _spotify_interactive_setup(redirect_uri_hint: str) -> str:
     if redirect_uri_hint and redirect_uri_hint != DEFAULT_SPOTIFY_REDIRECT_URI:
         save_env_value("STARDUST_SPOTIFY_REDIRECT_URI", redirect_uri_hint)
 
-    print("\nSaved STARDUST_SPOTIFY_CLIENT_ID to ~/.hermes/.env\n")
+    print("\nSaved STARDUST_SPOTIFY_CLIENT_ID to ~/.stardust/.env\n")
     return raw
 
 

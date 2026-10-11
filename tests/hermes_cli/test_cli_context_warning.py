@@ -12,7 +12,7 @@ from agent.model_metadata import MINIMUM_CONTEXT_LENGTH
 @pytest.fixture
 def _isolate(tmp_path, monkeypatch):
     """Isolate STARDUST_HOME so tests don't touch real config."""
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     monkeypatch.setenv("STARDUST_HOME", str(home))
 

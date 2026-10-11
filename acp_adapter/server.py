@@ -297,7 +297,7 @@ class HermesACPAgent(SlashCommandsMixin, acp.Agent):
 
     def _build_model_state(self, state: SessionState) -> SessionModelState | None:
         """Authenticated providers + models, from the shared Hermes inventory (same substrate
-        as ``hermes model``/TUI/dashboard) so the selector isn't just the current curated list."""
+        as ``stardust model``/TUI/dashboard) so the selector isn't just the current curated list."""
         model = str(state.model or getattr(state.agent, "model", "") or "").strip()
         provider = getattr(state.agent, "provider", None) or detect_provider() or "openrouter"
         try:

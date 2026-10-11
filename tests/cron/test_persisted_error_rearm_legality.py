@@ -24,7 +24,7 @@ import cron.jobs as J
 
 @pytest.fixture
 def cron_store(tmp_path, monkeypatch):
-    hermes_home = tmp_path / ".hermes"
+    hermes_home = tmp_path / ".stardust"
     (hermes_home / "cron").mkdir(parents=True)
     monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     monkeypatch.setattr(J, "STARDUST_DIR", hermes_home)

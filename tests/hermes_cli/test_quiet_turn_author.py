@@ -1,4 +1,4 @@
-"""``hermes chat -Q`` passes the dispatcher's STARDUST_TURN_AUTHOR to ``run_conversation`` as ``turn_author``.
+"""``stardust chat -Q`` passes the dispatcher's STARDUST_TURN_AUTHOR to ``run_conversation`` as ``turn_author``.
 
 A bot-to-bot delivery runs the recipient's turn as a ``-Q`` subprocess with that variable set.
 A human's ``-Q`` run has it unset and the turn stays unattributed.

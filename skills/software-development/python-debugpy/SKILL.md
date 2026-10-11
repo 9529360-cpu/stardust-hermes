@@ -29,7 +29,7 @@ Three tools, picked by situation:
 
 - A test fails and the traceback doesn't reveal why a value is wrong
 - You need to step through a function and watch a collection mutate
-- A long-running process (hermes gateway, tui_gateway) misbehaves and you can't restart it
+- A long-running process (stardust gateway, tui_gateway) misbehaves and you can't restart it
 - Post-mortem: an exception fired in prod-ish code and you want to inspect locals at the crash site
 - A subprocess / child (Python `_SlashWorker`, PTY bridge worker) is the actual bug site
 
@@ -277,9 +277,9 @@ nc 127.0.0.1 4444
 See Recipe 3. The wrapper captures subprocess output, so run pytest directly for interactive pdb.
 
 ### `run_agent.py` / CLI — one-shot
-Easiest: add `breakpoint()` near the suspect line, then run `hermes` normally. Control returns to your terminal at the pause point.
+Easiest: add `breakpoint()` near the suspect line, then run `stardust` normally. Control returns to your terminal at the pause point.
 
-### `tui_gateway` subprocess (spawned by `hermes --tui`)
+### `tui_gateway` subprocess (spawned by `stardust --tui`)
 The gateway runs as a child of the Node TUI. Options:
 
 **A. Source-edit the gateway:**
@@ -289,7 +289,7 @@ import debugpy
 debugpy.listen(("127.0.0.1", 5678))
 debugpy.wait_for_client()
 ```
-Start `hermes --tui`. The TUI will appear frozen (its backend is waiting). Attach a client; execution resumes when you `continue`.
+Start `stardust --tui`. The TUI will appear frozen (its backend is waiting). Attach a client; execution resumes when you `continue`.
 
 **B. Use `remote-pdb` at a specific handler:**
 ```python

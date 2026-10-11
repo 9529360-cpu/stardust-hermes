@@ -83,7 +83,7 @@ function parseServersDoc(raw: string): McpServers {
   return Object.fromEntries(Object.entries(map).map(([name, entry]) => [name, normalizeEntry(entry)]))
 }
 
-// The runtime gate is `enabled: false` — the same flag `hermes mcp` and the
+// The runtime gate is `enabled: false` — the same flag `stardust mcp` and the
 // agent's MCP loader read.
 const serverEnabled = (server: Record<string, unknown>) => server.enabled !== false
 

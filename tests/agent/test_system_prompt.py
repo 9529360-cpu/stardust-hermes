@@ -403,7 +403,7 @@ class TestNamedProfileHintIntegration:
     def test_real_hermes_home_under_profiles_renders_correct_paths(
         self, tmp_path, monkeypatch
     ):
-        root = tmp_path / ".hermes"
+        root = tmp_path / ".stardust"
         profile_home = root / "profiles" / "coder"
         profile_home.mkdir(parents=True)
 
@@ -433,7 +433,7 @@ class TestNamedProfileHintIntegration:
 
     def test_real_default_home_renders_default_branch(self, tmp_path, monkeypatch):
         """STARDUST_HOME at the root resolves to the default profile, unchanged."""
-        root = tmp_path / ".hermes"
+        root = tmp_path / ".stardust"
         root.mkdir(parents=True)
 
         monkeypatch.setattr(Path, "home", lambda: tmp_path)

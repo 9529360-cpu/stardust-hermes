@@ -1,4 +1,4 @@
-"""``hermes pause`` / ``hermes resume`` — the global emergency stop.
+"""``stardust pause`` / ``stardust resume`` — the global emergency stop.
 
 ``pause`` writes the ESTOP sentinel at ``$STARDUST_HOME/ESTOP``; cron, kanban and new gateway
 turns halt on their next check (in-flight work is never killed). ``resume`` removes it and
@@ -24,7 +24,7 @@ def cmd_pause(args: argparse.Namespace) -> int:
     print(f"    sentinel: {path}")
     print(
         "    Cron dispatch and new gateway turns are on hold.\n"
-        "    In-flight work keeps running. Run `hermes resume` to lift the pause.")
+        "    In-flight work keeps running. Run `stardust resume` to lift the pause.")
     return 0
 
 
@@ -42,7 +42,7 @@ def cmd_resume(args: argparse.Namespace) -> int:
 
     print(
         "Resume incomplete — Hermes remains paused. "
-        "Check ESTOP sentinel permissions and retry hermes resume."
+        "Check ESTOP sentinel permissions and retry stardust resume."
     )
     return 1
 
@@ -53,12 +53,12 @@ def build_pause_parser(subparsers) -> None:
         "pause", help="Emergency stop: pause cron dispatch and new gateway turns",
         description="Engage the global emergency stop. Halts NEW work only — cron "
             "dispatch and new gateway turns — until "
-            "`hermes resume`. In-flight work is never killed.")
+            "`stardust resume`. In-flight work is never killed.")
     pause_parser.add_argument(
         "--reason", default=None, help="Optional reason stored in the sentinel and shown to users")
     pause_parser.set_defaults(func=cmd_pause)
 
     resume_parser = subparsers.add_parser(
-        "resume", help="Lift the emergency stop set by `hermes pause`",
+        "resume", help="Lift the emergency stop set by `stardust pause`",
         description="Remove the ESTOP sentinel; dispatch resumes on the next tick.")
     resume_parser.set_defaults(func=cmd_resume)

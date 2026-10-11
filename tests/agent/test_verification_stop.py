@@ -101,7 +101,7 @@ def test_verify_on_stop_default_path_through_load_config(tmp_path, clear_verify_
     # resolves through load_config() + DEFAULT_CONFIG. The default is now False
     # (opt-in): fresh installs must not fire the nudge on any surface. This is
     # the path the unit-level tests above cannot exercise.
-    clear_verify_env.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
+    clear_verify_env.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
 
     from hermes_cli.config import load_config
 
@@ -130,7 +130,7 @@ def test_verify_on_stop_missing_value_defaults_off(clear_verify_env):
 
 
 def test_nudge_checks_all_edited_workspaces(tmp_path, monkeypatch):
-    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
     project_a = tmp_path / "a"
     project_b = tmp_path / "b"
     _make_project(project_a)
@@ -167,7 +167,7 @@ def test_nudge_checks_all_edited_workspaces(tmp_path, monkeypatch):
     reason="Symlinks require elevated privileges on Windows",
 )
 def test_no_suite_nudge_uses_canonical_temp_dir(tmp_path, monkeypatch):
-    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
     project = tmp_path / "project"
     project.mkdir()
     (project / "package.json").write_text("{}", encoding="utf-8")
@@ -190,7 +190,7 @@ def test_no_suite_nudge_uses_canonical_temp_dir(tmp_path, monkeypatch):
 
 
 def test_ad_hoc_pass_satisfies_no_suite_stop_loop(tmp_path, monkeypatch):
-    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
     (tmp_path / "package.json").write_text("{}", encoding="utf-8")
     changed = str(tmp_path / "src" / "app.ts")
     script = Path(tempfile.gettempdir()) / f"hermes-ad-hoc-stop-{tmp_path.name}.py"
@@ -210,7 +210,7 @@ def test_ad_hoc_pass_satisfies_no_suite_stop_loop(tmp_path, monkeypatch):
 
 
 def test_nudge_attempts_are_bounded(tmp_path, monkeypatch):
-    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
     _node_project(tmp_path)
     changed = str(tmp_path / "src" / "app.ts")
     mark_workspace_edited(session_id="s1", cwd=tmp_path, paths=[changed])
@@ -231,7 +231,7 @@ def test_nudge_attempts_are_bounded(tmp_path, monkeypatch):
 
 
 def test_mixed_doc_and_code_edit_still_nudges(tmp_path, monkeypatch):
-    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
     _node_project(tmp_path)
     doc = str(tmp_path / "README.md")
     code = str(tmp_path / "src" / "app.ts")

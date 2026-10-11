@@ -192,7 +192,7 @@ stdenv.mkDerivation (finalAttrs: {
           --set STARDUST_OPTIONAL_MCPS $out/share/hermes-agent/optional-mcps \
           --set STARDUST_WEB_DIST $out/share/hermes-agent/web_dist \
           --set STARDUST_TUI_DIR $out/ui-tui \
-          --set-default STARDUST_BIN $out/bin/hermes \
+          --set-default STARDUST_BIN $out/bin/stardust \
           --set STARDUST_PYTHON ${hermesVenv}/bin/python3 \
           --set STARDUST_NODE ${lib.getExe hermesNpmLib.nodejs}${
             # Fold the line continuation INTO the optionalString: a bare
@@ -208,7 +208,7 @@ stdenv.mkDerivation (finalAttrs: {
           }
       '')
       [
-        "hermes"
+        "stardust"
         "hermes-agent"
         "hermes-acp"
       ]
@@ -239,7 +239,7 @@ stdenv.mkDerivation (finalAttrs: {
       # derivation, after all overrides are applied) so the desktop wrapper
       # can prepend its `/bin` to PATH.  The desktop's resolver step 4
       # ("existing hermes on PATH") then picks up the fully wrapped
-      # `hermes` binary — venv with all deps, bundled skills/plugins,
+      # `stardust` binary — venv with all deps, bundled skills/plugins,
       # runtime PATH (ripgrep/git/ffmpeg/etc).  No re-implementation
       # of the agent resolution in the desktop wrapper.
       hermesDesktop = callPackage ./desktop.nix {
@@ -264,7 +264,7 @@ stdenv.mkDerivation (finalAttrs: {
   meta = with lib; {
     description = "Stardust personal AI assistant built on the Hermes Agent foundation";
     homepage = "https://github.com/9529360-cpu/stardust-hermes";
-    mainProgram = "hermes";
+    mainProgram = "stardust";
     license = licenses.mit;
     platforms = platforms.unix;
   };

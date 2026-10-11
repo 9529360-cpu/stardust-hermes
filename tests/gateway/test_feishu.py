@@ -1356,7 +1356,7 @@ class TestAdapterBehavior(unittest.TestCase):
 
         content = (
             "确认已入库 ✓\n"
-            "文件路径：`/root/.hermes/profiles/agent_cto/cron/jobs.json`\n"
+            "文件路径：`/root/.stardust/profiles/agent_cto/cron/jobs.json`\n"
             "**解码后的内容：**\n"
             "```json\n"
             '{"cron": "list"}\n'
@@ -1382,7 +1382,7 @@ class TestAdapterBehavior(unittest.TestCase):
                 [
                     {
                         "tag": "md",
-                        "text": "确认已入库 ✓\n文件路径：`/root/.hermes/profiles/agent_cto/cron/jobs.json`\n**解码后的内容：**",
+                        "text": "确认已入库 ✓\n文件路径：`/root/.stardust/profiles/agent_cto/cron/jobs.json`\n**解码后的内容：**",
                     }
                 ],
                 [{"tag": "md", "text": "```json\n{\"cron\": \"list\"}\n```"}],
@@ -1710,7 +1710,7 @@ class TestDedupTTL(unittest.TestCase):
         from plugins.platforms.feishu.adapter import FeishuAdapter
 
         # The class-level env wipe drops the per-test STARDUST_HOME, so the adapter resolves
-        # its dedup store under the operator's real ~/.hermes and every id a live gateway
+        # its dedup store under the operator's real ~/.stardust and every id a live gateway
         # persisted leaks into writes[-1]. Pin the store to a scratch path instead.
         # Kept open for the whole test: _persist_seen_message_ids mkdirs the store's
         # parent back, so closing it early leaks an empty scratch dir per run.

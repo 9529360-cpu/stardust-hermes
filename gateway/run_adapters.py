@@ -661,7 +661,7 @@ class GatewayAdapterLifecycleMixin:
         logger.warning(
             "%s has been failing/reconnecting continuously for %.1f hours (%d attempts) — flagging "
             "NEEDS_ATTENTION. Retries continue, but this usually means a permanent problem (revoked "
-            "credentials, missing intents, broken sidecar). Check `hermes status` / `/platform list`.",
+            "credentials, missing intents, broken sidecar). Check `stardust status` / `/platform list`.",
             platform.value, queued_for / 3600.0, info.get("attempts", 0),
         )
         self._update_platform_runtime_status(
@@ -830,7 +830,7 @@ class GatewayAdapterLifecycleMixin:
         from gateway.run_profile_reconcile import profile_serve_signature
         if not self._multiplex_on():
             # ``write_runtime_status`` re-stamps the previous writer's record in place, so a multiplexer's
-            # ``served_profiles`` would outlive it into this single-profile run and `hermes -p X ...`
+            # ``served_profiles`` would outlive it into this single-profile run and `stardust -p X ...`
             # would keep refusing (exit 78) / reporting "served" for profiles nobody serves.
             with _log_suppressed(logging.DEBUG, "could not clear served_profiles", exc_info=True):
                 from gateway.status import write_runtime_status
@@ -878,7 +878,7 @@ class GatewayAdapterLifecycleMixin:
 
     def _record_served_profiles(self, active: str, profile_homes) -> None:
         """Record the served set (eligible for routing/HTTP prefixes/cron/runtime scope — broader
-        than "has a connected adapter") for `hermes status`; seed per-profile PairingStores."""
+        than "has a connected adapter") for `stardust status`; seed per-profile PairingStores."""
         with _log_suppressed(logging.DEBUG, "could not record served_profiles", exc_info=True):
             from gateway.status import write_runtime_status
             from gateway.pairing import PairingStore
@@ -958,7 +958,7 @@ class GatewayAdapterLifecycleMixin:
     def _note_unserved_secondary_platform(self, profile_name: str, platform: Platform) -> None:
         """A secondary enabled a shared-ingress platform (Relay, WhatsApp) the multiplexer only runs on
         the default profile. Log the reason + remedy once per (profile, platform) and stamp a
-        ``<profile>:<platform>`` status entry so ``hermes gateway status --profile X`` and the
+        ``<profile>:<platform>`` status entry so ``stardust gateway status --profile X`` and the
         dashboard show *why* the channel is dead instead of nothing at all."""
         noted = getattr(self, "_unserved_secondary_platforms", None)
         if noted is None:

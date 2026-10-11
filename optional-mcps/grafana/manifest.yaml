@@ -53,7 +53,7 @@ suggest:
 
 post_install: |
   On first connection Hermes opens a browser to authorize with Grafana Cloud
-  (or run `hermes mcp login grafana`). During authorization you'll enter your
+  (or run `stardust mcp login grafana`). During authorization you'll enter your
   Grafana Cloud stack URL (https://<your-stack>.grafana.net) and choose read
   or read+write access, then approve. Restart the session so tools load.
 

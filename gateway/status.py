@@ -329,7 +329,7 @@ def _gateway_command_subcommand(command: str | None) -> str | None:
         return "run"
     joined = " ".join(tokens)
     if "hermes_cli.main" not in joined and "hermes_cli/main.py" not in joined and not any(
-        b in ("hermes", "hermes.exe") for b in basenames
+        b in ("hermes", "hermes.exe", "stardust", "stardust.exe") for b in basenames
     ):
         return None
     # Drop --profile X / -p X / --profile=X / -p=X (consumes a VALUE of "gateway" too).
@@ -344,7 +344,7 @@ def _gateway_command_subcommand(command: str | None) -> str | None:
             filtered.append(token)
     for i, token in enumerate(filtered):
         if token == "gateway":
-            # Bare `hermes gateway` defaults to `run`.
+            # Bare `stardust gateway` defaults to `run`.
             return filtered[i + 1] if i + 1 < len(filtered) else "run"
     return None
 
@@ -440,7 +440,7 @@ def _get_code_identity_fields() -> dict[str, Any]:
     Lazy import keeps ``gateway.status`` free of ``hermes_cli`` at import time. Never raises.
 
     A gateway keeps serving the module versions it imported at startup, so stamping the identity into
-    ``gateway_state.json`` lets `hermes update` (and the dashboard) prove whether a running gateway actually
+    ``gateway_state.json`` lets `stardust update` (and the dashboard) prove whether a running gateway actually
     picked up new code after the restart phase — instead of assuming it did (#88654, #69754). Never raises;
     degrades to absent fields.
     """
@@ -943,7 +943,7 @@ def multiplexer_liveness_for_profile(profile_dir: Path) -> Optional[tuple[int, d
     ``profile_dir``; None for the default home itself, an unserved profile, or no live multiplexer.
 
     A served profile owns no ``gateway.pid``/``gateway_state.json`` (#97120), so every PID-file rung of the
-    dashboard ladder reports it stopped while ``hermes -p X status`` says running — the two must agree.
+    dashboard ladder reports it stopped while ``stardust -p X status`` says running — the two must agree.
     """
     name = _profile_name_for_home(Path(profile_dir))
     if not name:
@@ -1060,9 +1060,9 @@ def resolve_gateway_liveness(
             running=True, pid=runtime_pid, source="runtime_status", health_body=health_body
         )
     # (4) A named profile served by the live default multiplexer: no identity files of its own, but
-    # the multiplexer IS its gateway (mirrors `hermes -p X status` / `gateway list`). Unscoped, the
+    # the multiplexer IS its gateway (mirrors `stardust -p X status` / `gateway list`). Unscoped, the
     # question is about the process's OWN home — which is a named profile inside a pooled
-    # `hermes --profile X serve` (the Desktop's per-profile backend answers its REST without
+    # `stardust --profile X serve` (the Desktop's per-profile backend answers its REST without
     # `?profile=`), so it takes the same rung instead of reporting the served profile stopped.
     own_home = profile_dir if scoped else _get_process_hermes_home()
     served = guarded(multiplexer_liveness_for_profile, own_home)
@@ -1288,7 +1288,7 @@ def _pid_marker_names_self(target_pid: int, target_start_time: Any) -> bool:
     times known -> must match; either unknown -> PID equality decides (bounded by the marker TTL):
     ``_get_process_start_time`` is None without /proc (macOS, native Windows -- where the
     planned-stop watcher matters most) and requiring a match there would misclassify a legitimate
-    ``hermes gateway stop`` as an unexpected exit revived by the service manager."""
+    ``stardust gateway stop`` as an unexpected exit revived by the service manager."""
     if target_pid != os.getpid():
         return False
     our_start_time = _get_process_start_time(target_pid)

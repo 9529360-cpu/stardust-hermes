@@ -491,7 +491,7 @@ async def test_profile_command_reports_source_stamped_profile(monkeypatch, tmp_p
     source (source.profile — URL prefix / per-credential adapter / room map),
     not the multiplexer's active profile, which is always the default and
     made /profile answer "default" in every persona chat."""
-    hermes_home = tmp_path / ".hermes"
+    hermes_home = tmp_path / ".stardust"
     profile_home = hermes_home / "profiles" / "milo"
     profile_home.mkdir(parents=True)
 

@@ -30,7 +30,7 @@ suggest:
 
 post_install: |
   On first connection Hermes opens a browser to authorize with
-  Strava (or run `hermes mcp login strava`). Approve access,
+  Strava (or run `stardust mcp login strava`). Approve access,
   then restart the session so tools load.
 
   Requires a Strava subscription.

@@ -196,7 +196,7 @@ export function PetGenerateContent() {
     status === 'hatching' ? copy.spawning : status === 'preview' || status === 'adopting' ? copy.hatched : copy.title
 
   // Image backends are configured on the Image generation toolset — the same
-  // panel as `hermes tools` → Image Generation. That page is a workspace view,
+  // panel as `stardust tools` → Image Generation. That page is a workspace view,
   // not a route overlay this dialog yields to, so close first; nothing is lost
   // while no backend is available.
   const setupImageGen = () => {

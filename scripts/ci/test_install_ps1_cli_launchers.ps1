@@ -77,7 +77,7 @@ try {
     } catch {
         $missingThrew = $_.Exception.Message -like '*required launcher not found*'
     }
-    Assert-True $missingThrew 'missing hermes.exe fails the launcher stage'
+    Assert-True $missingThrew 'missing stardust.exe fails the launcher stage'
     Assert-True (-not (Test-Path -LiteralPath $binDir)) `
         'failure does not create an empty PATH directory'
 
@@ -86,23 +86,23 @@ try {
     $hermesV1 = [byte[]](77, 90, 1)
     $hermesV2 = [byte[]](77, 90, 2)
     $acp = [byte[]](77, 90, 3)
-    [System.IO.File]::WriteAllBytes((Join-Path $scriptsDir 'hermes.exe'), $hermesV1)
+    [System.IO.File]::WriteAllBytes((Join-Path $scriptsDir 'stardust.exe'), $hermesV1)
     Set-Content -Path (Join-Path $installRoot 'venv\pyvenv.cfg') `
         -Value "home = X" -Encoding Ascii
 
     $staged = Install-HermesCommandLaunchers -Root $installRoot -Destination $binDir
     Assert-True ($staged -eq $binDir) 'returns the destination it staged into'
     Assert-BytesEqual $hermesV1 `
-        ([System.IO.File]::ReadAllBytes((Join-Path $binDir 'hermes.exe'))) `
+        ([System.IO.File]::ReadAllBytes((Join-Path $binDir 'stardust.exe'))) `
         'normal venv: exe copy lands in the destination'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $binDir 'hermes-acp.exe'))) `
         'optional ACP launcher may be absent'
 
-    [System.IO.File]::WriteAllBytes((Join-Path $scriptsDir 'hermes.exe'), $hermesV2)
+    [System.IO.File]::WriteAllBytes((Join-Path $scriptsDir 'stardust.exe'), $hermesV2)
     [System.IO.File]::WriteAllBytes((Join-Path $scriptsDir 'hermes-acp.exe'), $acp)
     Install-HermesCommandLaunchers -Root $installRoot -Destination $binDir | Out-Null
     Assert-BytesEqual $hermesV2 `
-        ([System.IO.File]::ReadAllBytes((Join-Path $binDir 'hermes.exe'))) `
+        ([System.IO.File]::ReadAllBytes((Join-Path $binDir 'stardust.exe'))) `
         'installer refreshes an existing Hermes launcher'
     Assert-BytesEqual $acp `
         ([System.IO.File]::ReadAllBytes((Join-Path $binDir 'hermes-acp.exe'))) `
@@ -114,12 +114,12 @@ try {
     Set-Content -Path (Join-Path $installRoot 'venv\pyvenv.cfg') `
         -Value "home = X`r`nrelocatable = true" -Encoding Ascii
     Install-HermesCommandLaunchers -Root $installRoot -Destination $binDir | Out-Null
-    Assert-True (Test-Path -LiteralPath (Join-Path $binDir 'hermes.cmd')) `
+    Assert-True (Test-Path -LiteralPath (Join-Path $binDir 'stardust.cmd')) `
         'relocatable venv: .cmd delegator staged'
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $binDir 'hermes.exe'))) `
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $binDir 'stardust.exe'))) `
         'relocatable venv: stale exe copy removed'
-    $cmdBody = [System.IO.File]::ReadAllText((Join-Path $binDir 'hermes.cmd'))
-    Assert-True ($cmdBody.Contains((Join-Path $scriptsDir 'hermes.exe')) -and $cmdBody.Contains('%*')) `
+    $cmdBody = [System.IO.File]::ReadAllText((Join-Path $binDir 'stardust.cmd'))
+    Assert-True ($cmdBody.Contains((Join-Path $scriptsDir 'stardust.exe')) -and $cmdBody.Contains('%*')) `
         'delegator invokes the in-venv exe and forwards args'
 } finally {
     if (Test-Path -LiteralPath $caseRoot) {

@@ -692,7 +692,7 @@ def interactive_setup() -> None:
         save_env_value("MATTERMOST_HOME_CHANNEL", home_channel)
     elif remove_env_value("MATTERMOST_HOME_CHANNEL"):
         print_info("Home channel cleared.")
-    print_info("   Open config in your editor:  hermes config edit")
+    print_info("   Open config in your editor:  stardust config edit")
 
 
 # --- YAML → env config bridge (apply_yaml_config_fn) ---

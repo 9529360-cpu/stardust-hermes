@@ -40,10 +40,10 @@ When a user says "delegate is capped at N":
 
 ```bash
 # 1. What does the loaded config actually say?
-hermes config get delegation.max_concurrent_children
+stardust config get delegation.max_concurrent_children
 
 # 2. Did Hermes' truncator or rejector actually fire?
-grep -E "Truncated.*delegate_task|Too many tasks" ~/.hermes/logs/agent.log | tail
+grep -E "Truncated.*delegate_task|Too many tasks" ~/.stardust/logs/agent.log | tail
 # If neither line appears, neither cap path executed.
 
 # 3. Confirm the resolver returns what config says (in venv with hermes on path)

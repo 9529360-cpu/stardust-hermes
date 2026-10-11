@@ -89,6 +89,6 @@ body:
     attributes:
       label: Diagnostics (optional)
       description: |
-        If this request comes from a current failure, prefer `hermes doctor` and `hermes debug share --local`.
+        If this request comes from a current failure, prefer `stardust doctor` and `stardust debug share --local`.
         Review diagnostic output before posting and remove secrets or unrelated private content.
       render: shell

@@ -4,7 +4,7 @@ import type { OAuthProvider } from '@/types/hermes'
  *  `status.logged_in`; the rest is filler the UI only echoes. */
 export function makeOAuthProvider(id: string, name = id): OAuthProvider {
   return {
-    cli_command: `hermes login ${id}`,
+    cli_command: `stardust login ${id}`,
     docs_url: `https://example.com/${id}`,
     flow: 'pkce',
     id,

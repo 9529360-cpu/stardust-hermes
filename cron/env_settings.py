@@ -1,6 +1,6 @@
 """Profile-scoped reads of the ``STARDUST_*`` tuning settings cron honours from ``.env``.
 
-A standalone ``hermes -p X gateway run`` loads X's ``.env`` into ``os.environ``, so a bare
+A standalone ``stardust -p X gateway run`` loads X's ``.env`` into ``os.environ``, so a bare
 ``os.getenv("STARDUST_CRON_TIMEOUT")`` is X's value. Under ``gateway.multiplex_profiles`` the same
 tick runs inside the default profile's process, where ``os.environ`` holds the DEFAULT profile's
 ``.env``. With a secret scope installed (job run + delivery) the scope is authoritative; the tick

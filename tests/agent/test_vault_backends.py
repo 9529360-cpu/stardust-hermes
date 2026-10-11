@@ -60,7 +60,7 @@ def fake_bw(tmp_path, monkeypatch):
     exe.write_text(_FAKE_BW, encoding="utf-8")
     exe.chmod(exe.stat().st_mode | stat.S_IXUSR)
     log = tmp_path / "bw.log"  # the backend runs bw with an allowlisted env, so the fake logs beside itself
-    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
     unlock_mod.lock()
     yield exe, log
     unlock_mod.lock()

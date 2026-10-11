@@ -437,15 +437,15 @@ def streaming_tts_should_skip_whole_file(completed_turns: set[str], session_key:
 
 GATEWAY_SECRET_CAPTURE_UNSUPPORTED_MESSAGE = (
     "Secure secret entry is not supported over messaging. "
-    "Load this skill in the local CLI to be prompted, or add the key to ~/.hermes/.env manually.")
+    "Load this skill in the local CLI to be prompted, or add the key to ~/.stardust/.env manually.")
 
 # One sentence for every "you may not press/run this" refusal on every platform (slash commands,
 # approval buttons, pickers, prompts). ``{platform}`` is the ``Platform.value`` for the
-# ``hermes pairing approve`` command (hermes_cli/subcommands/pairing.py) that lets the owner fix it.
+# ``stardust pairing approve`` command (hermes_cli/subcommands/pairing.py) that lets the owner fix it.
 # Kept under 200 chars: Telegram's answerCallbackQuery truncates longer text.
 UNAUTHORIZED_ACTION_NOTICE = (
     "This bot is private and you're not on its allowed list. If you own it, run "
-    "`hermes pairing approve {platform} <request-id>` on the host (`hermes pairing list` shows the id).")
+    "`stardust pairing approve {platform} <request-id>` on the host (`stardust pairing list` shows the id).")
 
 
 def unauthorized_action_notice(platform: Any) -> str:
@@ -861,7 +861,7 @@ def _path_under_denied_prefix(resolved: Path) -> bool:
     """True if ``resolved`` lives under a deny-listed system path — except a denied prefix that
     IS the running user's own home: ``/root`` is listed so a non-root gateway can't deliver
     another user's home, but a root-run gateway's own deliverables live under ``$HOME=/root``.
-    Credential sub-dirs (``~/.ssh``, ``~/.hermes/.env``) stay blocked (more-specific entries)."""
+    Credential sub-dirs (``~/.ssh``, ``~/.stardust/.env``) stay blocked (more-specific entries)."""
     home = _resolve_path(Path(os.path.expanduser("~")))
     for denied in _media_delivery_denied_paths():
         resolved_denied = _resolve_path(denied, expand=True)
@@ -1002,7 +1002,7 @@ def _default_docker_workspace_host_roots(session_key: str = "") -> List[Path]:
 
 
 def _cache_dir_container_mounts() -> List[Tuple[Path, Path]]:
-    """(host, container) pairs for the auto-mounted Hermes cache dirs (``/root/.hermes/...`` in
+    """(host, container) pairs for the auto-mounted Hermes cache dirs (``/root/.stardust/...`` in
     MEDIA tags); longer prefixes than the ``/root`` home mount, so longest-prefix match wins."""
     if not _docker_env_active():
         return []
@@ -1029,10 +1029,10 @@ def _warn_unresolved_docker_media(candidate: Path, session_key: str, reason: str
 
 def _translate_docker_container_media_path(candidate: Path, session_key: str = "") -> Optional[Path]:
     """Container-absolute path -> host path via longest-prefix match over ``docker_volumes``, the
-    auto-mounted cache dirs (``/root/.hermes/...``), persistent ``/workspace`` and ``/root``."""
+    auto-mounted cache dirs (``/root/.stardust/...``), persistent ``/workspace`` and ``/root``."""
     if not candidate.is_absolute():
         return None
-    # In-process gateways (Desktop, `hermes serve`) may not have bridged terminal.* config into
+    # In-process gateways (Desktop, `stardust serve`) may not have bridged terminal.* config into
     # TERMINAL_* env yet; the bridge is idempotent.
     with contextlib.suppress(Exception):
         from tools.terminal_tool import _ensure_terminal_env_bridged
@@ -1043,9 +1043,9 @@ def _translate_docker_container_media_path(candidate: Path, session_key: str = "
     if "/workspace" not in mounted:
         mounts.extend((root, Path("/workspace")) for root in _default_docker_workspace_host_roots(session_key))
     # Synthetic /root mounts catch stray home writes (/root/out.png; cache mounts are longer
-    # prefixes). /root/.hermes/* that missed a cache mount is the container's credential surface —
+    # prefixes). /root/.stardust/* that missed a cache mount is the container's credential surface —
     # translating it via the home mount would dodge the host denylist.
-    if "/root" not in mounted and not candidate.as_posix().startswith("/root/.hermes"):
+    if "/root" not in mounted and not candidate.as_posix().startswith("/root/.stardust"):
         mounts.extend(
             (root, Path("/root")) for root in _docker_persistent_sandbox_roots(session_key, "home"))
     if not mounts:
@@ -1554,7 +1554,7 @@ class _ExtractedResponse:
 
 _PLAINTEXT_GATEWAY_RESTART_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"^(?:please\s+)?restart\s+(?:the\s+)?gateway[.!?\s]*$", re.IGNORECASE),
-    re.compile(r"^(?:please\s+)?restart\s+(?:the\s+)?hermes\s+gateway[.!?\s]*$", re.IGNORECASE),
+    re.compile(r"^(?:please\s+)?restart\s+(?:the\s+)?(?:hermes|stardust)\s+gateway[.!?\s]*$", re.IGNORECASE),
     re.compile(r"^(?:please\s+)?restart\s+hermes[.!?\s]*$", re.IGNORECASE))
 
 
@@ -1851,7 +1851,7 @@ class BasePlatformAdapter(ABC):
     interactive_resume: bool = True
     # Port-binding adapter that answers ``/p/<profile>/...`` for every served profile on the default
     # listener under ``gateway.multiplex_profiles``. Declared per adapter (not in a central list) so
-    # ``hermes gateway migrate`` can tell "URL changes" from "this profile would be skipped" as new
+    # ``stardust gateway migrate`` can tell "URL changes" from "this profile would be skipped" as new
     # HTTP-inbound adapters gain the prefix.
     serves_profile_prefix: bool = False
     # Back-reference to the running ``GatewayRunner`` (set by gateway/run.py); ``build_source``
@@ -2170,7 +2170,7 @@ class BasePlatformAdapter(ABC):
         owner_profile = scoped_lock_owner_label(existing)
         pid_part = f" (PID {owner_pid})" if owner_pid else ""
         holder = f" by the '{owner_profile}' profile gateway{pid_part}" if owner_profile else pid_part
-        remedy = (f" Stop that gateway first (hermes --profile {owner_profile} gateway stop)."
+        remedy = (f" Stop that gateway first (stardust --profile {owner_profile} gateway stop)."
                   if owner_profile else " Stop the other gateway first.")
         message = f"{resource_desc} already in use{holder}.{remedy}"
         logger.error('[%s] %s', self.name, message)

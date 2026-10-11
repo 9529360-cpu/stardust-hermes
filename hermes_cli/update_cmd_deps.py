@@ -1,4 +1,4 @@
-"""Post-``hermes update`` dependency sync: venv preflight, editable reinstall, lazy refresh,
+"""Post-``stardust update`` dependency sync: venv preflight, editable reinstall, lazy refresh,
 npm/Desktop rebuilds, self-lock deferral. Names are re-imported by ``update_cmd`` (so
 ``hermes_cli.update_cmd.<name>`` resolves/monkeypatches); origin helpers are imported lazily."""
 
@@ -24,7 +24,7 @@ _INSTALL_DEFINING_FILES = "pyproject.toml", "setup.py", "setup.cfg", "MANIFEST.i
 
 def _editable_install_is_current(git_cmd, cwd, pre_pull_sha: str | None) -> bool:
     """True when the pulled commits cannot have invalidated the editable install: ``uv pip install
-    -e .`` always rewrites console-script shims (Windows: ``hermes.exe`` quarantine, ``os error 32``
+    -e .`` always rewrites console-script shims (Windows: ``stardust.exe`` quarantine, ``os error 32``
     on a lost race), so skip it when only non-install files changed. Safe because the editable
     finder uses a *static* module list. Fails closed: no pre-pull SHA or failed diff -> False."""
     if not pre_pull_sha:
@@ -189,7 +189,7 @@ def _capture_active_lazy_features() -> list[str]:
 
 
 def _capture_active_tool_dependencies() -> list[str]:
-    """Snapshot Python dependencies installed explicitly through ``hermes tools``."""
+    """Snapshot Python dependencies installed explicitly through ``stardust tools``."""
     try:
         from hermes_cli import tools_config
         return tools_config.active_restorable_python_tool_dependencies()
@@ -215,7 +215,7 @@ def _module_importable_in(target_python, module_name: str, env) -> bool:
 def _restore_active_tool_dependencies(
     dependencies: list[str], install_cmd_prefix: list[str], *, env: dict[str, str] | None = None
 ) -> None:
-    """Restore allowlisted ``hermes tools`` dependencies (from a pre-rebuild probe) into a rebuilt
+    """Restore allowlisted ``stardust tools`` dependencies (from a pre-rebuild probe) into a rebuilt
     venv. Never raises: a failed optional tool must not block the update, but must be reported."""
     from hermes_cli.update_cmd import _m
     if not dependencies:
@@ -326,7 +326,7 @@ def _refresh_active_lazy_features(
         print(f"  ⚠ {feature} failed to refresh: {_clip(status.split(': ', 1)[-1])}")
 
     if install_cmd_prefix is None:
-        print("  ⚠ Lazy refresh failed; rerun `hermes update` once resolved.")
+        print("  ⚠ Lazy refresh failed; rerun `stardust update` once resolved.")
         return False
 
     # Import-based recovery: metadata-only verifiers miss dist-info intact but import files
@@ -338,7 +338,7 @@ def _refresh_active_lazy_features(
         return True
     if status == "healthy":
         print("  Lazy backend(s) keep their previous version; probed packages look intact.")
-        print("  Rerun `hermes update` once the upstream issue is resolved.")
+        print("  Rerun `stardust update` once the upstream issue is resolved.")
         return True
     if status == "indeterminate":
         print("  ⚠ Leaving `.lazy-refresh-incomplete` until import probes can confirm health.")
@@ -515,7 +515,7 @@ def _repair_node_deps_on_current_checkout(
     pre_update_snapshot_id: str | None = None,
     completion_message: str = "✓ Already up to date!",
     had_desktop_app_before_update: bool = False) -> bool:
-    """Repair Node deps on the ``commit_count == 0`` path: a failed npm install says "re-run hermes
+    """Repair Node deps on the ``commit_count == 0`` path: a failed npm install says "re-run stardust
     update" but the early return used to skip the refresh. ``_update_node_dependencies`` self-gates
     on the hash recorded only after a SUCCESSFUL install, so this is a cheap no-op when healthy.
 
@@ -526,7 +526,7 @@ def _repair_node_deps_on_current_checkout(
     node_failures = _update_node_dependencies()
     if node_failures:
         print(f"  ⚠ Node.js refresh failed for: {', '.join(node_failures)}")
-        print("    Fix npm and re-run `hermes update`.")
+        print("    Fix npm and re-run `stardust update`.")
         print_completion("⚠ Checkout is current, but Node.js dependencies could not be repaired.")
         return False
     # Pair with the web build like every other call site; it staleness-checks internally.
@@ -575,7 +575,7 @@ def _update_node_dependencies() -> list[str]:
             print("→ Updating Node.js dependencies...")
             print("  ⚠ Skipped: only a Windows npm is reachable from this WSL shell.")
             print("    Install Node.js inside the WSL distro (nvm, or your distro's")
-            print("    package manager), then re-run `hermes update`.")
+            print("    package manager), then re-run `stardust update`.")
             has_workspace = any(
                 (_m().PROJECT_ROOT / ws / "package.json").exists() for ws in ("ui-tui", "web"))
             return ["ui-tui, web workspaces"] if has_workspace else []
@@ -587,7 +587,7 @@ def _update_node_dependencies() -> list[str]:
 
     # Best-effort npx cache warm before the lockfile-unchanged early return. Can block
     # ~11s on a cold cache — print first so it doesn't look like a hang.
-    # Runs before the lockfile-unchanged early return below since that's the common `hermes update` case.
+    # Runs before the lockfile-unchanged early return below since that's the common `stardust update` case.
     # See #43564.
     print("→ Warming npx cache for agent-browser...")
     with suppress(Exception):
@@ -614,7 +614,7 @@ def _update_node_dependencies() -> list[str]:
 
     # capture_output=False is deliberate: postinstall scripts print download progress and
     # capturing makes a long download look hung.
-    # The chatty npm-deprecation noise during `hermes update` comes from the *desktop* build, not this step;
+    # The chatty npm-deprecation noise during `stardust update` comes from the *desktop* build, not this step;
     # that one is captured to update.log. See #18840.
     result = _m()._run_npm_install_deterministic(
         npm, _m().PROJECT_ROOT, extra_args=tuple(install_args), capture_output=False, env=nixos_env)
@@ -629,7 +629,7 @@ def _update_node_dependencies() -> list[str]:
     print()
     print("  ⚠ Node.js dependency refresh did not complete cleanly; the")
     print("    installation may be in a mixed state (updated code, stale Node")
-    print("    deps). Fix npm and re-run `hermes update`.")
+    print("    deps). Fix npm and re-run `stardust update`.")
     return ["ui-tui, web workspaces"]
 
 
@@ -772,7 +772,7 @@ def _detect_self_loaded_native_modules() -> list[str]:
 def _abort_dependency_sync_if_self_locked(gateway_resume=None) -> None:
     """Defer the venv rewrite when THIS process holds something it must replace (runs after the
     code swap, so a deferral leaves NEW code with only the install pending). Two hazards:
-    a mapped ``.pyd`` -> exit 2, next launch's marker recovery finishes; the ``hermes.exe`` shim
+    a mapped ``.pyd`` -> exit 2, next launch's marker recovery finishes; the ``stardust.exe`` shim
     we run from -> every launch is the shim so the marker would defer forever: hand the
     install to a child under the venv interpreter and exit 0.
 
@@ -803,7 +803,7 @@ def _defer_update_for_self_lock(loaded: list[str]) -> None:
     print()
     print("  On Windows a mapped extension cannot be replaced by the process")
     print("  holding it. The code update has been applied; only the dependency")
-    print("  sync has been deferred: the next `hermes` launch will complete it")
+    print("  sync has been deferred: the next `stardust` launch will complete it")
     print("  in a fresh process before anything imports these modules.")
     _m()._write_update_incomplete_marker()
 
@@ -857,7 +857,7 @@ def _rebuild_desktop_after_update(
         if build_result.returncode == 0:
             break
     if build_result.returncode != 0:
-        print("  ⚠ Desktop build failed (run `hermes desktop` to retry)")
+        print("  ⚠ Desktop build failed (run `stardust desktop` to retry)")
         tail = "\n".join((build_result.stdout or "").strip().splitlines()[-15:])
         if tail:
             print(tail)
@@ -880,14 +880,14 @@ def _path_uid(path) -> Optional[int]:
 def _venv_foreign_owned_paths(venv_root, limit: int = 5) -> list:
     """Up to ``limit`` ``(path_str, uid)`` venv entries not owned by the current user.
 
-    A venv touched by ``sudo pip``/``sudo hermes`` dies mid-update with ``venv/bin/hermes`` already
+    A venv touched by ``sudo pip``/``sudo hermes`` dies mid-update with ``venv/bin/stardust`` already
     deleted — never mutate a venv we can't safely mutate. Deliberately BOUNDED (venv root,
     ``venv/bin``, first site-packages top level, ``*.dist-info`` children; ~2000 stats). POSIX-only:
     ``[]`` on Windows and as root; ``[]`` on any surprise — must NEVER raise or add latency.
 
     See #83529.
-    A later normal ``hermes update`` then dies mid-mutation inside ``uv pip install -e .`` ("Permission
-    denied (os error 13)") with ``venv/bin/hermes`` already deleted — the CLI is bricked. Same philosophy as
+    A later normal ``stardust update`` then dies mid-mutation inside ``uv pip install -e .`` ("Permission
+    denied (os error 13)") with ``venv/bin/stardust`` already deleted — the CLI is bricked. Same philosophy as
     the contended-venv gate (#87331): a venv we cannot safely mutate is never mutated at all.
     """
     from hermes_cli.update_cmd import _path_uid
@@ -960,7 +960,7 @@ def _refuse_update_if_venv_foreign_owned(project_root) -> None:
         print(f"    - {p} (owner uid {uid})")
     print("\n  Fix ownership, then re-run the update:")
     print(f"    sudo chown -R $(id -un): {project_root}")
-    print("    hermes update")
+    print("    stardust update")
     print("\n  Nothing in the venv was modified.")
     sys.exit(1)
 
@@ -1040,7 +1040,7 @@ def _sync_python_dependencies_after_pull(
         _m()._clear_lazy_refresh_incomplete_marker()
     else:
         print(
-            "  ⚠ Lazy-refresh recovery incomplete — run `hermes` again "
+            "  ⚠ Lazy-refresh recovery incomplete — run `stardust` again "
             "to finish import-based venv repair.")
 
     _m()._restore_active_tool_dependencies(active_tool_dependencies, install_prefix, env=lazy_env)
@@ -1055,5 +1055,5 @@ def _sync_python_dependencies_after_pull(
         print()
         print(f"  ⚠ {failing_module} still fails to import after updating:")
         print(f"      {import_error}")
-        print("    Run `hermes update` again — if it persists, reinstall:")
+        print("    Run `stardust update` again — if it persists, reinstall:")
         print("    https://hermes-agent.nousresearch.com")

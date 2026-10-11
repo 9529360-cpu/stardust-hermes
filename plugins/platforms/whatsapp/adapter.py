@@ -342,7 +342,7 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
             print(f"[{self.name}] Failed to install dependencies: {e}")
             detail = f" ({e})"
         self._set_fatal_error("whatsapp_npm_install_failed", f"WhatsApp bridge npm install failed{detail}. Run `cd {bridge_dir} && {_npm_bin} install` "
-                              "manually, then restart `hermes gateway`.", retryable=False)
+                              "manually, then restart `stardust gateway`.", retryable=False)
         return False
 
     def _attach_to_bridge(self, managed_process) -> None:
@@ -397,7 +397,7 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
             bridge_env["WHATSAPP_ALLOWED_USERS"] = allowed
         else:
             bridge_env.pop("WHATSAPP_ALLOWED_USERS", None)
-        # Without these the bridge hardcodes ~/.hermes/{image,audio,document}_cache (wrong under STARDUST_HOME/profiles/cache layout).
+        # Without these the bridge hardcodes ~/.stardust/{image,audio,document}_cache (wrong under STARDUST_HOME/profiles/cache layout).
         img_dir, audio_dir, _video_dir, doc_dir = _cache_dirs()
         bridge_env.update(STARDUST_IMAGE_CACHE_DIR=str(img_dir), STARDUST_AUDIO_CACHE_DIR=str(audio_dir), STARDUST_DOCUMENT_CACHE_DIR=str(doc_dir))
         return bridge_env
@@ -444,7 +444,7 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
             if connected is None:
                 print(f"[{self.name}] ⚠ WhatsApp not connected after 30s")
                 print(f"[{self.name}]   Bridge log: {self._bridge_log}")
-                print(f"[{self.name}]   If session expired, re-pair: hermes whatsapp")
+                print(f"[{self.name}]   If session expired, re-pair: stardust whatsapp")
         return True
 
     def _preflight(self) -> bool:
@@ -453,12 +453,12 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
         creds_path = self._session_path / "creds.json"
         checks = (
             (check_whatsapp_requirements, ("[%s] Node.js not found. WhatsApp requires Node.js.", self.name),
-             "whatsapp_node_missing", "Node.js is not installed — install Node.js and re-run `hermes gateway`."),
+             "whatsapp_node_missing", "Node.js is not installed — install Node.js and re-run `stardust gateway`."),
             (bridge_path.exists, ("[%s] Bridge script not found: %s", self.name, bridge_path),
              "whatsapp_bridge_missing", f"WhatsApp bridge script missing at {bridge_path}."),
             (creds_path.exists, ("[%s] WhatsApp is enabled but not paired (no creds.json at %s). Pair from the dashboard or run "
-                                 "`hermes whatsapp`; remove WHATSAPP_ENABLED from your .env to disable.", self.name, creds_path),
-             "whatsapp_not_paired", "WhatsApp enabled but not paired — pair from the dashboard or run `hermes whatsapp`."),
+                                 "`stardust whatsapp`; remove WHATSAPP_ENABLED from your .env to disable.", self.name, creds_path),
+             "whatsapp_not_paired", "WhatsApp enabled but not paired — pair from the dashboard or run `stardust whatsapp`."),
         )
         for ok, warn_args, code, message in checks:
             if not ok():

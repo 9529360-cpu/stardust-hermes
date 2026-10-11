@@ -62,8 +62,8 @@ def test_build_welcome_banner_title_falls_back_when_no_tag():
 
 def test_build_welcome_banner_non_moa_unchanged(tmp_path, monkeypatch):
     """A normal provider still renders the bare model slug, no MoA prefix."""
-    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
-    (tmp_path / ".hermes").mkdir()
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+    (tmp_path / ".stardust").mkdir()
 
     with (
         patch.object(model_tools, "check_tool_availability", return_value=([], [])),
@@ -90,8 +90,8 @@ def test_empty_model_shows_the_free_tier_route_when_it_carries_inference(tmp_pat
     """The banner prints before credentials resolve, so ``model`` is empty on a fresh install. On the
     free tier the route is known locally (identity on disk + tier on): the banner shows its model.
     When nothing resolves the red "no model configured" line stays."""
-    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
-    (tmp_path / ".hermes").mkdir()
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+    (tmp_path / ".stardust").mkdir()
     import hermes_cli.anon_auth as anon_auth
 
     def render(carries: bool) -> str:

@@ -80,7 +80,7 @@ def test_same_name_different_sources_are_not_suppressed(tmp_path, monkeypatch):
     home = tmp_path / "home"
     manager = _install(home, monkeypatch)
     project = tmp_path / "project"
-    source = project / ".hermes" / "plugins" / "dual"
+    source = project / ".stardust" / "plugins" / "dual"
     shutil.copytree(home / "plugins" / "dual", source)
     (source / "values.py").write_text('LABEL = "project"\n')
     monkeypatch.chdir(project)

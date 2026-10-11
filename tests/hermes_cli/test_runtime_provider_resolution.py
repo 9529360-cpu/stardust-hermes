@@ -956,7 +956,7 @@ def test_explicit_openrouter_config_mirror_bypasses_pool(monkeypatch):
     assert resolved["api_key"] == "router-key"
     assert resolved.get("credential_pool") is None
 
-    # The canonical URL that `hermes setup` persists is NOT a mirror: the pool must still serve it.
+    # The canonical URL that `stardust setup` persists is NOT a mirror: the pool must still serve it.
     monkeypatch.setattr(rp, "_get_model_config", lambda: {"provider": "openrouter", "base_url": "https://openrouter.ai/api/v1"})
     canonical = rp.resolve_runtime_provider(requested="openrouter")
     assert canonical["api_key"] == "pool-key" and canonical.get("credential_pool") is not None

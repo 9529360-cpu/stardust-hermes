@@ -76,8 +76,8 @@ class _TinyImageHandler(http.server.BaseHTTPRequestHandler):
 @pytest.fixture
 def http_server(tmp_path, monkeypatch):
     """Spin up a localhost HTTP server and isolate STARDUST_HOME under tmp_path."""
-    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
-    (tmp_path / ".hermes").mkdir()
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+    (tmp_path / ".stardust").mkdir()
 
     # Force the constants/image cache helpers to re-read STARDUST_HOME.
     import sys

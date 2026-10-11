@@ -28,7 +28,7 @@ def _isolate_env(tmp_path, monkeypatch):
     but we want the plugin to work with a predictable subpath. We reset
     STARDUST_HOME here for clarity.
     """
-    hermes_home = tmp_path / ".hermes"
+    hermes_home = tmp_path / ".stardust"
     hermes_home.mkdir()
     monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     yield hermes_home

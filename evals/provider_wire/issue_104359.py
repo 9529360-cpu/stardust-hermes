@@ -9,7 +9,7 @@ home = tempfile.mkdtemp(prefix="hermes-104359-")
 os.environ.clear()
 os.environ.update(
     HOME=home,
-    STARDUST_HOME=home + "/.hermes",
+    STARDUST_HOME=home + "/.stardust",
     PATH="/usr/bin:/bin",
     PYTHONDONTWRITEBYTECODE="1",
     NO_PROXY="*",

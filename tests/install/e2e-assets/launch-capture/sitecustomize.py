@@ -1,9 +1,9 @@
-"""Driver-side spawn interception for hermes desktop E2E legs.
+"""Driver-side spawn interception for stardust desktop E2E legs.
 
-The installed ``hermes`` is a venv console script, so its interpreter
+The installed ``stardust`` is a venv console script, so its interpreter
 imports ``sitecustomize`` at startup when this directory is on
 ``PYTHONPATH``. Behind an explicit env-var opt-in the module wraps
-``subprocess.run`` so the FINAL electron launch call of ``hermes
+``subprocess.run`` so the FINAL electron launch call of ``stardust
 desktop`` is captured -- argv, cwd, and the fully-constructed ``env``
 kwarg written to a JSON spec -- and replaced with a fake success instead
 of spawning. Everything before the spawn (build, stamps, integrity gate,
@@ -17,7 +17,7 @@ shapes is the matcher's problem, which lives here, next to the driver
 (the same maintenance model as ``installer_supports()``).
 
 Opt-in: ``STARDUST_E2E_CAPTURE_LAUNCH=<path>`` -- the spec is written
-there, and the marker file ``<path>.captured`` distinguishes "hermes
+there, and the marker file ``<path>.captured`` distinguishes "stardust
 desktop exited 0 and we captured" from "exited 0 without reaching a
 launch" (a version that errors out earlier must FAIL the leg, loudly).
 

@@ -385,7 +385,7 @@ def test_install_with_junctioned_skills_dir(served_repo, monkeypatch, tmp_path):
     install_dir is resolved by _resolve_lock_install_path (following the
     redirect), so relative_to() must receive the resolved skills root or it
     raises ValueError after the files have already been moved, leaving a lock
-    entry without a content_hash (which then poisons 'hermes skills check').
+    entry without a content_hash (which then poisons 'stardust skills check').
     """
     from hermes_cli.skills_hub import do_install
 
@@ -521,7 +521,7 @@ metadata:
   hermes:
     upstream:
       repo: acme/design-skill
-      path: .hermes/skills/design
+      path: .stardust/skills/design
 ---
 # Stub
 """
@@ -560,7 +560,7 @@ def test_optional_source_upstream_stub_fetches_from_external_repo(tmp_path, monk
 
     bundle = source.fetch("official/creative/upstream-demo")
 
-    assert fetched_ids == ["acme/design-skill/.hermes/skills/design"]
+    assert fetched_ids == ["acme/design-skill/.stardust/skills/design"]
     assert bundle is not None
     assert bundle.source == "official"
     assert bundle.identifier == "official/creative/upstream-demo"

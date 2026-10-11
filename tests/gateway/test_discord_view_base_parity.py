@@ -72,7 +72,7 @@ async def test_unauthorized_click_uses_the_shared_notice(monkeypatch, name, call
     interaction = _interaction()
     await call(view, interaction)
     expected = unauthorized_action_notice("discord")
-    assert "hermes pairing approve discord" in expected
+    assert "stardust pairing approve discord" in expected
     interaction.response.send_message.assert_awaited_once_with(expected, ephemeral=True)
     interaction.response.edit_message.assert_not_called()
     assert view.resolved is False

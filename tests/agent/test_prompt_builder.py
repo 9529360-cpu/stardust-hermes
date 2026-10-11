@@ -1027,7 +1027,7 @@ class TestEnvironmentHints:
 
     def test_probe_remote_backend_ssh_is_probe_only_and_torn_down(self, monkeypatch):
         """SSH probe: a normal SSHEnvironment would create remote dirs, force-upload
-        ~/.hermes and snapshot a session just to run `uname`, and its __del__ would
+        ~/.stardust and snapshot a session just to run `uname`, and its __del__ would
         later sync_back() and close the ControlMaster shared with the agent's real
         environment. The probe must request a probe-only instance (own socket, no
         setup/sync) and tear it down itself."""

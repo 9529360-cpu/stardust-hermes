@@ -87,7 +87,7 @@ def _install_example_plugin(_isolate_hermes_home):
     # An installed-but-not-enabled user plugin has its API mount skipped
     # and its assets 404'd — which is the whole point of the gate. These
     # fixtures exist to exercise the *serving* paths, so opt the example
-    # plugin in exactly as a real operator would with `hermes plugins
+    # plugin in exactly as a real operator would with `stardust plugins
     # enable example`.
     from hermes_cli.config import load_config, save_config
     _cfg = load_config()
@@ -482,7 +482,7 @@ class TestWebServerEndpoints:
         The shipped regression (#72424 aftermath): a store predating
         ``sessions.last_activity_at`` made every per-profile read raise
         "no such column", which this endpoint swallowed into its ``errors``
-        array — the desktop rendered "No sessions yet" after `hermes update`
+        array — the desktop rendered "No sessions yet" after `stardust update`
         until the user's first message forced a writable open elsewhere.
         """
         import sqlite3
@@ -520,7 +520,7 @@ class TestWebServerEndpoints:
     def test_startup_eager_reconcile_heals_stale_store(self):
         """The lifespan's eager reconcile brings a stale store current.
 
-        #79531/#80037: after `hermes update` an old-schema state.db used to
+        #79531/#80037: after `stardust update` an old-schema state.db used to
         stay stale until the first NEW session forced a writable open —
         every /api/sessions poll 500ed with "no such column" in between.
         The lifespan now schedules one writable open at startup; this
@@ -1267,7 +1267,7 @@ class TestWebServerEndpoints:
         def fail_spawn(*_args, **_kwargs):
             nonlocal spawned
             spawned = True
-            raise AssertionError("docker update guard should not spawn hermes update")
+            raise AssertionError("docker update guard should not spawn stardust update")
 
         # Bypass the managed-externally gate so we reach the docker install check.
         monkeypatch.setattr(_web_server_files, "_dashboard_local_update_managed_externally", lambda: False)
@@ -1308,7 +1308,7 @@ class TestWebServerEndpoints:
         def fail_spawn(*_args, **_kwargs):
             nonlocal spawned
             spawned = True
-            raise AssertionError("APT-managed update guard should not spawn hermes update")
+            raise AssertionError("APT-managed update guard should not spawn stardust update")
 
         monkeypatch.setattr(_web_server_files, "_dashboard_local_update_managed_externally", lambda: False)
         # The shared admission gate (#91277 Phase 3) resolves the install
@@ -1350,7 +1350,7 @@ class TestWebServerEndpoints:
             encoding="utf-8",
         )
         (tmp_path / "update.log").write_text(
-            "=== hermes update started 2026-08-17T11:19:35 ===\n"
+            "=== stardust update started 2026-08-17T11:19:35 ===\n"
             "✓ Update complete!\n"
             f"=== hermes-update completed {action_id} ===\n",
             encoding="utf-8",
@@ -1736,7 +1736,7 @@ class TestWebServerEndpoints:
         """A custom endpoint that requires auth must persist model.api_key (where
         the runtime reads it) AND register a named custom_providers entry so the
         endpoint reappears as a ready row in the picker — matching the
-        ``hermes model`` custom flow. Regression for the desktop loop where a
+        ``stardust model`` custom flow. Regression for the desktop loop where a
         keyed custom endpoint could never be configured from the GUI."""
         from hermes_cli.config import load_config
 
@@ -4130,7 +4130,7 @@ class TestNormaliseThemeDefinition:
 
 
 class TestDiscoverUserThemes:
-    """Tests for _discover_user_themes() — scans ~/.hermes/dashboard-themes/."""
+    """Tests for _discover_user_themes() — scans ~/.stardust/dashboard-themes/."""
 
     def test_returns_empty_when_dir_missing(self, tmp_path, monkeypatch):
         monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
@@ -4810,7 +4810,7 @@ class TestDashboardPluginManifestExtensions:
 # /api/pty WebSocket — terminal bridge for the dashboard "Chat" tab.
 #
 # These tests drive the endpoint with a tiny fake command (typically ``cat``
-# or ``sh -c 'printf …'``) instead of the real ``hermes --tui`` binary.  The
+# or ``sh -c 'printf …'``) instead of the real ``stardust --tui`` binary.  The
 # endpoint resolves its argv through ``_resolve_chat_argv``, so tests
 # monkeypatch that hook.
 # ---------------------------------------------------------------------------
@@ -5411,7 +5411,7 @@ class TestServeIndexMissingIndex:
 
 
 class TestHeadlessServeTokenPage:
-    """Headless `hermes serve` must serve the Desktop token handshake page
+    """Headless `stardust serve` must serve the Desktop token handshake page
     at `/` when the dashboard auth gate is off (#94227).
 
     The Electron renderer boots by fetching `/` and extracting

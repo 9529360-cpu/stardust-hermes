@@ -2189,7 +2189,7 @@ export const zh = defineLocale({
     edit: '编辑',
     archive: '归档',
     skillArchivedTitle: '技能已归档',
-    skillArchivedMessage: '可通过 hermes curator restore 恢复。',
+    skillArchivedMessage: '可通过 stardust curator restore 恢复。',
     tabPlugins: '插件',
     plugins: {
       agentTitle: '智能体插件',
@@ -2792,7 +2792,7 @@ export const zh = defineLocale({
       wecom: '在企业微信中添加群机器人，复制其 webhook key 作为 WECOM_BOT_ID。仅可发送——双向请用企业微信 (应用) 选项。',
       wecom_callback: '设置一个企业微信自建应用，暴露其回调 URL，并提供 corp ID、secret、agent ID 和 AES key。',
       weixin:
-        '运行 `hermes gateway setup`，选择 Weixin，然后使用个人微信账号扫描并确认二维码。本应用会通过腾讯 iLink Bot API 连接并保存凭据。',
+        '运行 `stardust gateway setup`，选择 Weixin，然后使用个人微信账号扫描并确认二维码。本应用会通过腾讯 iLink Bot API 连接并保存凭据。',
       qqbot: '在 QQ 开放平台 (q.qq.com) 注册一个应用，复制 App ID 和 Client Secret。',
       api_server: '把助理暴露为兼容 OpenAI 的 API。设置一个鉴权密钥，然后把 Open WebUI / LobeChat 等指向 host:port。',
       webhook: '运行一个 HTTP 服务器，供其他工具 (GitHub、GitLab、自定义应用)POST。用 secret 验证签名。'
@@ -4749,7 +4749,7 @@ export const zh = defineLocale({
       errorSetUpFallback: '设置备用模型',
       errorSignInAgain: provider => `重新登录 ${provider}`,
       errorOauthExpired: provider =>
-        `您的 ${provider} 登录已过期或被撤销。请在终端运行 hermes model，选择 ${provider} 重新登录；或在“设置 → 模型服务”中改用模型 API。`,
+        `您的 ${provider} 登录已过期或被撤销。请在终端运行 stardust model，选择 ${provider} 重新登录；或在“设置 → 模型服务”中改用模型 API。`,
       errorChooseModel: '选择模型',
       errorCompressConversation: '压缩对话',
       errorCompressFailed: '无法压缩对话',
@@ -4812,7 +4812,7 @@ export const zh = defineLocale({
       reject: '拒绝',
       alwaysTitle: '始终允许此命令？',
       alwaysDescription: pattern =>
-        `这会将“${pattern}”模式加入永久允许列表 (~/.hermes/config.yaml)。Stardust 对类似命令将不再询问，包括当前对话和未来对话。`,
+        `这会将“${pattern}”模式加入永久允许列表 (~/.stardust/config.yaml)。Stardust 对类似命令将不再询问，包括当前对话和未来对话。`,
       alwaysAllow: '始终允许'
     },
     clarify: {
@@ -5132,7 +5132,7 @@ export const zh = defineLocale({
       success: platform => `已移交到 ${platform}。随时可在此处恢复。`,
       systemNote: platform => `↻ 已移交到 ${platform} — 随时可在此处恢复。`,
       failed: error => `移交失败：${error}`,
-      timedOut: '等待网关超时。`hermes gateway` 是否正在运行？'
+      timedOut: '等待网关超时。`stardust gateway` 是否正在运行？'
     }
   },
 

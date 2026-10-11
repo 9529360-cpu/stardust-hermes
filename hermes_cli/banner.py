@@ -85,7 +85,7 @@ STARDUST_CADUCEUS = """[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⡀⠀⣀⣀
 # === Skills scanning ===
 
 # Per-process caches: ``None`` until computed, then a 1-tuple ``(value,)`` so a computed ``None``
-# is distinguishable from "not yet computed". Reset by assigning ``None`` (tests, ``hermes skills``).
+# is distinguishable from "not yet computed". Reset by assigning ``None`` (tests, ``stardust skills``).
 _available_skills_cache: Optional[tuple] = None
 _git_banner_state_cache: Optional[tuple] = None
 _latest_release_cache: Optional[tuple] = None
@@ -186,7 +186,7 @@ def _git_run(args: list[str], *, cwd: Optional[Path] = None, timeout: int = 5, t
     from hermes_cli._subprocess_compat import noninteractive_git_env, windows_hide_flags
 
     # The banner/update probes run from GUI-hosted backends too (desktop-spawned
-    # ``hermes serve``), where a bare git child flashes a console window.
+    # ``stardust serve``), where a bare git child flashes a console window.
     kwargs: dict = {"creationflags": windows_hide_flags()}
     if network:
         kwargs.update({"stdin": subprocess.DEVNULL, "env": noninteractive_git_env()})
@@ -354,7 +354,7 @@ def _check_via_local_git(repo_dir: Path) -> Optional[int]:
     with GitHub, and across the install base that was tens of millions of fetch requests a day
     (GitHub asked us to poll the API instead). Two tip SHAs are enough — the remote one from the
     API, the local one from ``rev-parse`` — and ``_tips_behind`` recovers the exact count through
-    the compare API when they differ. ``git fetch`` happens only inside ``hermes update``.
+    the compare API when they differ. ``git fetch`` happens only inside ``stardust update``.
     """
     # Probe the origin URL under the config-isolated env: a global url.<https>.insteadOf rewrite
     # otherwise makes an SSH origin masquerade as HTTPS (#104591).
@@ -375,7 +375,7 @@ def _check_via_local_git(repo_dir: Path) -> Optional[int]:
     _last_target_rev = target_rev
     _last_repo_slug = repo_slug
     # Tip SHAs alone can't distinguish "behind" from a local commit AHEAD of origin/main, and
-    # misreporting an ahead checkout nudges the user into `hermes update`, which can wipe carried
+    # misreporting an ahead checkout nudges the user into `stardust update`, which can wipe carried
     # work — hence the ancestor check inside _tips_behind, against the FRESH upstream SHA.
     return _tips_behind(head_rev, target_rev, repo_dir, repo_slug=repo_slug)
 
@@ -411,7 +411,7 @@ def check_for_updates(*, passive: bool = False) -> Optional[int]:
     if _quiet(_install_method) in {"docker", "apt"}:
         return None
     # Cache is invalidated when the embedded rev OR installed version changed since the last check.
-    # For a git checkout the local HEAD is part of the key too: `hermes update` moves HEAD, and a
+    # For a git checkout the local HEAD is part of the key too: `stardust update` moves HEAD, and a
     # stale "3 behind" must not survive the update it just prompted.
     now = time.time()
     repo_dir = None if embedded_rev else _resolve_repo_dir()
@@ -775,8 +775,8 @@ def _mcp_failed_line(name: str, transport: str, error: Optional[str]) -> str:
     exact next command, so 'failed' is never the whole story."""
     from rich.markup import escape
     reason = escape(" ".join(str(error or "").split())[:120]) or "no details recorded"
-    next_cmd = (f"hermes mcp login {name}" if re.search(r"\b401\b|unauthori[sz]ed", reason, re.I)
-                else f"hermes mcp test {name}")
+    next_cmd = (f"stardust mcp login {name}" if re.search(r"\b401\b|unauthori[sz]ed", reason, re.I)
+                else f"stardust mcp test {name}")
     return (f"[red]{name}[/] [dim]({transport})[/] [red]— could not connect:[/] {reason} "
             f"[dim]— run `{next_cmd}`[/]")
 
@@ -883,7 +883,7 @@ def _banner_left_lines(model: str, cwd: str, session_id, context_length, provide
         lines.append(f"[{accent}]MoA: {_short_label(model)}[/]{agg_str}{ctx_str}{nous_str}")
     elif not (model or "").strip() or (model or "").strip().lower() == "unknown":
         # Unconfigured install: the clearest place to say what is wrong and how to fix it.
-        lines.append(f"[bold red]no model configured[/] [dim {dim}]— run /model or hermes setup[/]")
+        lines.append(f"[bold red]no model configured[/] [dim {dim}]— run /model or stardust setup[/]")
     else:
         model_short = model.split("/")[-1].removesuffix(".gguf")
         lines.append(f"[{accent}]{_short_label(model_short)}[/]{ctx_str}{nous_str}")

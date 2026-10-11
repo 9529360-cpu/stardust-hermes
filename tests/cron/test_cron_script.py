@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 @pytest.fixture
 def cron_env(tmp_path, monkeypatch):
     """Isolated cron environment with temp STARDUST_HOME."""
-    hermes_home = tmp_path / ".hermes"
+    hermes_home = tmp_path / ".stardust"
     hermes_home.mkdir()
     (hermes_home / "cron").mkdir()
     (hermes_home / "cron" / "output").mkdir()
@@ -115,7 +115,7 @@ class TestRunJobScript:
         assert success is False
         assert "Script not found" in output
         assert str(cron_env / "scripts") in output and "profile" in output
-        assert "hermes cron edit" in output
+        assert "stardust cron edit" in output
 
 
     def test_script_subprocess_env_sanitized(self, cron_env, monkeypatch):
@@ -505,7 +505,7 @@ class TestScriptPathContainment:
     """
 
     def test_absolute_path_outside_scripts_dir_blocked(self, cron_env):
-        """Absolute paths outside ~/.hermes/scripts/ must be rejected."""
+        """Absolute paths outside ~/.stardust/scripts/ must be rejected."""
         from cron.scheduler_script import _run_job_script
 
         # Create a script outside the scripts dir

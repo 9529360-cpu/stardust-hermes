@@ -185,7 +185,7 @@ export function closeHubLog(): void {
   $hubActiveLog.set(null)
 }
 
-// `hermes skills install` exits non-zero when the security scan gate refuses,
+// `stardust skills install` exits non-zero when the security scan gate refuses,
 // and its printed tail is the only signal the Desktop gets, so parse it into a
 // structured failure the toast can explain (tools-runtime-21). `--force` has
 // no Desktop route, so the remedy offered is reading the scan, not overriding

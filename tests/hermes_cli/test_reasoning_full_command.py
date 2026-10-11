@@ -34,7 +34,7 @@ def test_default_config_clamps_reasoning():
 
 
 def _seed_config(tmp_path, monkeypatch):
-    hh = tmp_path / ".hermes"
+    hh = tmp_path / ".stardust"
     hh.mkdir()
     (hh / "config.yaml").write_text("display:\n  show_reasoning: true\n")
     monkeypatch.setenv("STARDUST_HOME", str(hh))

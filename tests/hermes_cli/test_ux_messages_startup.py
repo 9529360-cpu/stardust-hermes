@@ -1,8 +1,8 @@
-"""Invariant tests for the plain-language startup messages of the ``hermes`` CLI.
+"""Invariant tests for the plain-language startup messages of the ``stardust`` CLI.
 
 Contracts (not snapshots): a mistyped subcommand names the typo, offers the closest
-match and ``hermes --help`` without dumping the 70-entry choice list; a rejected
-profile name explains the rule; missing optional dependencies point at ``hermes update``.
+match and ``stardust --help`` without dumping the 70-entry choice list; a rejected
+profile name explains the rule; missing optional dependencies point at ``stardust update``.
 """
 
 import io
@@ -31,23 +31,23 @@ def _parse_error(argv: list[str]) -> str:
 
 def test_unknown_subcommand_names_typo_suggests_closest_and_hides_choice_list():
     text = _parse_error(["sesions"])
-    assert "'sesions' is not a `hermes` command" in text
+    assert "'sesions' is not a `stardust` command" in text
     assert "Did you mean: sessions" in text
-    assert "hermes --help" in text
+    assert "stardust --help" in text
     assert "choose from" not in text
     assert "invalid choice" not in text
 
 
 def test_unknown_subcommand_without_close_match_still_points_at_help():
     text = _parse_error(["zzqx"])
-    assert "'zzqx' is not a `hermes` command" in text
+    assert "'zzqx' is not a `stardust` command" in text
     assert "Did you mean" not in text
-    assert "hermes --help" in text
+    assert "stardust --help" in text
 
 
 def test_nested_group_typo_names_the_group_and_suggests():
     text = _parse_error(["gateway", "stat"])
-    assert "'stat' is not a `hermes gateway` command" in text
+    assert "'stat' is not a `stardust gateway` command" in text
     assert "Did you mean:" in text and "status" in text
 
 
@@ -73,7 +73,7 @@ def test_invalid_profile_flag_value_explains_rule_and_exits(monkeypatch):
     assert exc.value.code == 2
     text = err.getvalue()
     assert "'Work Bot' is not a valid profile name" in text
-    assert "hermes profile list" in text
+    assert "stardust profile list" in text
     assert "Must match" not in text
 
 
@@ -104,7 +104,7 @@ def test_title_cased_profile_label_is_normalised_not_rejected(monkeypatch):
 def test_invalid_dash_p_after_a_subcommand_is_left_to_that_subcommand(monkeypatch):
     from hermes_cli import main as _main
 
-    # A plugin/subcommand flag such as `hermes kanban serve -p "Work Bot"` is not our profile selector.
+    # A plugin/subcommand flag such as `stardust kanban serve -p "Work Bot"` is not our profile selector.
     monkeypatch.setattr(sys, "argv", ["hermes", "kanban", "serve", "-p", "Work Bot"])
     assert _main._scan_profile_flag(sys.argv[1:]) == (None, 0, None)
 
@@ -121,7 +121,7 @@ def test_bare_continue_with_no_session_names_the_next_step(monkeypatch):
     with redirect_stdout(out), redirect_stderr(out), pytest.raises(SystemExit):
         _main._resolve_continue_arg(args, use_tui=False)
     text = out.getvalue()
-    assert "hermes sessions list" in text
+    assert "stardust sessions list" in text
     assert "No previous CLI session" in text
 
 
@@ -145,7 +145,7 @@ def test_missing_dashboard_deps_point_at_hermes_update():
     from hermes_cli.main_dep_hints import missing_optional_deps_message
 
     text = missing_optional_deps_message("dashboard", "its web-server packages", "all")
-    assert "hermes update" in text
+    assert "stardust update" in text
     assert "-m pip install -e '.[all]'" in text
     assert "metadata" not in text
 
@@ -159,5 +159,5 @@ def test_missing_node_message_names_cli_fallback(monkeypatch, capsys):
     with pytest.raises(SystemExit):
         _tui._tui_node_bin("node")
     text = capsys.readouterr().out
-    assert "hermes --cli" in text
+    assert "stardust --cli" in text
     assert "Node.js" in text

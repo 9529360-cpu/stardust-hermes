@@ -1,4 +1,4 @@
-"""Ticker liveness markers for ``hermes cron status``: heartbeat and last-success stamps, the
+"""Ticker liveness markers for ``stardust cron status``: heartbeat and last-success stamps, the
 last tick error and the stale-schedule catch-up counter.
 
 Split out of ``cron.jobs``, which re-exports every name here. Names this module
@@ -14,7 +14,7 @@ from typing import Optional
 logger = logging.getLogger("cron.jobs")  # log-record parity with the origin module
 
 
-# --- Ticker heartbeat (liveness signal for `hermes cron status`) ---
+# --- Ticker heartbeat (liveness signal for `stardust cron status`) ---
 
 def _write_marker(name: str, text: str, tmp_prefix: str) -> None:
     """Atomic (never torn) best-effort marker write; failures swallowed so markers never break the
@@ -31,7 +31,7 @@ def record_ticker_heartbeat(success: bool = False) -> None:
     "alive but failing" from "firing"; scoped per profile store.
 
     The ticker calls this once per loop iteration. ``success=True`` additionally bumps the *last successful
-    tick* marker. We track two distinct signals so `hermes cron status` can tell a thread that is merely
+    tick* marker. We track two distinct signals so `stardust cron status` can tell a thread that is merely
     *alive and looping* (heartbeat fresh, success stale) from one that is actually *firing jobs* (both
     fresh) — a ticker stuck failing every tick would otherwise keep the plain heartbeat fresh and falsely
     report healthy (#32612, #32895).
@@ -57,7 +57,7 @@ def get_ticker_heartbeat_age() -> Optional[float]:
     not "dead").
 
     Resolution uses ``_current_cron_store()`` so the heartbeat is correctly scoped to the active profile —
-    critical under multiplex_profiles where ``hermes cron status`` must report per-profile liveness
+    critical under multiplex_profiles where ``stardust cron status`` must report per-profile liveness
     (#69377).
     """
     return _epoch_file_age("ticker_heartbeat")
@@ -67,7 +67,7 @@ def get_ticker_success_age() -> Optional[float]:
     """Seconds since the ticker last completed a tick WITHOUT raising, or None.
 
     Resolution uses ``_current_cron_store()`` so the heartbeat is correctly scoped to the active profile —
-    critical under multiplex_profiles where ``hermes cron status`` must report per-profile liveness
+    critical under multiplex_profiles where ``stardust cron status`` must report per-profile liveness
     (#69377).
     """
     return _epoch_file_age("ticker_last_success")

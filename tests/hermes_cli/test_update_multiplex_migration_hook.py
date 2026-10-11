@@ -1,4 +1,4 @@
-"""``hermes update`` runs the multiplex auto-migration hook only after a verified-healthy fleet restart.
+"""``stardust update`` runs the multiplex auto-migration hook only after a verified-healthy fleet restart.
 
 Reuses the mocked-git ``cmd_update`` harness from ``test_update_fleet_restart_pending`` (network and
 restart stubbed). The hook itself is faked to a recorder: what is under test is its placement — it

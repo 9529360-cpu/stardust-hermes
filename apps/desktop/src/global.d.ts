@@ -71,7 +71,7 @@ declare global {
         sessionId: string,
         opts?: { profile?: null | string; watch?: boolean }
       ) => Promise<{ ok: boolean; error?: string }>
-      // Resume this session in the user's own terminal emulator (`hermes --tui
+      // Resume this session in the user's own terminal emulator (`stardust --tui
       // --resume <id>`) — the external terminal, not the in-app pane.
       openSessionInTerminal: (
         sessionId: string,
@@ -228,7 +228,7 @@ declare global {
         // Drain/update/restore one Desktop-managed SSH install. External URL
         // and cloud sources are refused without touching their processes.
         updateManaged?: (id: string) => Promise<DesktopManagedConnectionUpdateResult>
-        // Fan out `hermes update` to every eligible registered connection;
+        // Fan out `stardust update` to every eligible registered connection;
         // cloud entries are skipped (platform-managed), each row independent.
         // excludeIds skips connections the caller updates through another
         // path (the everything-update flow's active backend + local client).
@@ -741,7 +741,7 @@ export interface DesktopUpdateApplyResult {
   message?: string
   blockers?: DesktopUpdateBlocker[]
   /** True when no staged updater exists (CLI install) and the user should run
-   *  `hermes update` themselves. `command` is the exact line to run. */
+   *  `stardust update` themselves. `command` is the exact line to run. */
   manual?: boolean
   command?: string
   hermesRoot?: string

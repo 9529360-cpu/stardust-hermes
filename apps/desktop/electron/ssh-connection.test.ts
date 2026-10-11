@@ -34,7 +34,7 @@ import {
 const execFileAsync = promisify(execFile)
 
 test('redactSecrets scrubs the spawn-time session token env var', () => {
-  const line = 'setsid env STARDUST_DASHBOARD_SESSION_TOKEN=abc123deadbeef STARDUST_DESKTOP=1 hermes dashboard'
+  const line = 'setsid env STARDUST_DASHBOARD_SESSION_TOKEN=abc123deadbeef STARDUST_DESKTOP=1 stardust dashboard'
   const out = redactSecrets(line)
   assert.ok(!out.includes('abc123deadbeef'))
   assert.match(out, /STARDUST_DASHBOARD_SESSION_TOKEN=<redacted>/)
@@ -137,8 +137,8 @@ test('target builds user@host or bare host', () => {
 
 test('buildExecArgs ends with host then the remote command', () => {
   const conn = { user: 'me', host: 'box', port: 22, keyPath: '', controlPath: '/tmp/x.sock' }
-  const args = buildExecArgs(conn, 'command -v hermes', 15000)
-  assert.equal(args[args.length - 1], 'command -v hermes')
+  const args = buildExecArgs(conn, 'command -v stardust', 15000)
+  assert.equal(args[args.length - 1], 'command -v stardust')
   assert.equal(args[args.length - 2], 'me@box')
   assert.ok(args.includes('BatchMode=yes'))
 })
@@ -1082,7 +1082,7 @@ test('withRemoteTimeout kills a hung probe remotely instead of orphaning it (#11
   }
 
   // Shape: POSIX watchdog — macOS remotes have no GNU `timeout`.
-  const wrapped = withRemoteTimeout('hermes --version 2>&1', 15)
+  const wrapped = withRemoteTimeout('stardust --version 2>&1', 15)
 
   assert.ok(wrapped.includes('sleep 15'), 'watchdog duration honored')
   assert.ok(wrapped.includes('kill -9'), 'watchdog kills the hung child remotely')

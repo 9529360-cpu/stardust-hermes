@@ -1,4 +1,4 @@
-"""Backup and import commands for hermes CLI."""
+"""Backup and import commands for stardust CLI."""
 
 import json
 import logging
@@ -31,15 +31,15 @@ logger = logging.getLogger(__name__)
 
 # --- Exclusion rules ---
 
-# Where ``hermes backup --quick`` / ``/snapshot`` / the pre-update safety net write state
+# Where ``stardust backup --quick`` / ``/snapshot`` / the pre-update safety net write state
 # snapshots (see ``create_quick_snapshot``); defined here because the exclusion set needs it.
 _QUICK_SNAPSHOTS_DIR = "state-snapshots"
 
 
 def _snapshot_recovery_hint() -> str:
     """How to restore a state snapshot. There is no `hermes snapshot` subcommand — only the /snapshot
-    slash command inside a `hermes` session (hermes_cli/commands.py)."""
-    return ("To restore a newer snapshot, start `hermes` in a terminal and run `/snapshot list`, then "
+    slash command inside a `stardust` session (hermes_cli/commands.py)."""
+    return ("To restore a newer snapshot, start `stardust` in a terminal and run `/snapshot list`, then "
             "`/snapshot restore <id>` (CLI only).")
 
 # Directory names to skip (matched against each path component). ``hermes-agent`` only matches at
@@ -113,7 +113,7 @@ _EXCLUDED_PREFIXES = (
     f"state.db{RETIRED_GENERATION_DIR_SUFFIX}",
 )
 
-# Files ``hermes import`` must never overwrite, matched by basename so root and named profiles are
+# Files ``stardust import`` must never overwrite, matched by basename so root and named profiles are
 # both covered. They hold runtime state namespaced to the SOURCE machine: ``gateway_state.json``
 # drives the container-boot reconciler (a foreign value leaves the gateway stuck "starting" and
 # disconnected from the Nous portal); PID/lock/registry files reference source PIDs. Mirrors
@@ -278,7 +278,7 @@ def _iter_backup_files(hermes_root: Path, out_path: Path, skipped_dirs: Optional
 
     The one owner of the walk policy (directory pruning so os.walk never descends a multi-GB
     excluded tree, the root-only ``hermes-agent`` carve-out, root runtime trees, per-file rules),
-    shared by ``hermes backup`` and the pre-update / pre-migration path so they can never drift.
+    shared by ``stardust backup`` and the pre-update / pre-migration path so they can never drift.
     """
     for dirpath, dirnames, filenames in os.walk(hermes_root, followlinks=False):
         rel_dir = Path(dirpath).relative_to(hermes_root)
@@ -403,7 +403,7 @@ def is_zeroed_sqlite_file(path: Path, *, probe_bytes: int = 100, force: bool = F
 _SQLITE_HEADER = b"SQLite format 3\0"
 
 # Above this size ``PRAGMA integrity_check`` (walks every b-tree page — minutes of pegged CPU on a
-# 30 GB state.db, reading as a hung ``hermes update``) is replaced by the O(1) header+schema probe.
+# 30 GB state.db, reading as a hung ``stardust update``) is replaced by the O(1) header+schema probe.
 # Default ceiling above which ``PRAGMA integrity_check`` is skipped in favour of the (O(1)) header +
 # structural probe. Sessions databases in the tens of GB are normal for heavy users, so the size-unbounded
 # check is never an acceptable default on the update path. See #70553.
@@ -737,7 +737,7 @@ def _run_backup_locked(args, hermes_root: Path) -> None:
     if errors:
         _print_capped(f"\n  Warnings ({len(errors)} files skipped):", errors, "  ")
     else:
-        print(f"\nRestore with: hermes import {out_path.name}")
+        print(f"\nRestore with: stardust import {out_path.name}")
     keep = getattr(args, "keep", 0)  # 0 / absent: never prune (non-CLI callers)
     if keep and out_path.name.startswith(_RUN_BACKUP_PREFIX):
         pruned = _prune_prefixed_zips(out_path.parent, _RUN_BACKUP_PREFIX, keep, "backup")
@@ -762,7 +762,7 @@ def _detect_prefix(zf: zipfile.ZipFile) -> str:
     """Detect if the zip has a common directory prefix wrapping all entries."""
     names = [n for n in zf.namelist() if not n.endswith("/")]
     first_parts = {Path(n).parts[0] for n in names if len(Path(n).parts) > 1}
-    if len(first_parts) == 1 and first_parts <= {".hermes", "hermes"}:
+    if len(first_parts) == 1 and first_parts <= {".stardust", "hermes"}:
         return first_parts.pop() + "/"
     return ""
 
@@ -1018,11 +1018,11 @@ def run_import(args) -> None:
         print()
         if not (hermes_root / "hermes-agent").is_dir():
             print("Note: The hermes-agent codebase was not included in the backup.\n"
-                  "  If this is a fresh install, run: hermes update")
+                  "  If this is a fresh install, run: stardust update")
         if restored_profiles:
             print("\nTo re-enable gateway services for profiles:")
             for pname in restored_profiles:
-                print(f"  hermes -p {pname} gateway install")
+                print(f"  stardust -p {pname} gateway install")
         _revive_gateway_after_import(hermes_root)
         print("Done. Your Hermes configuration has been restored.")
 
@@ -1059,7 +1059,7 @@ def _restore_profile_wrappers(hermes_root: Path) -> List[str]:
     except ImportError:  # hermes_cli.profiles unavailable (fresh install)
         if any(profiles_dir.iterdir()):
             print("\n  Profiles detected but aliases could not be created.\n"
-                  "  Run: hermes profile list  (after installing hermes)")
+                  "  Run: stardust profile list  (after installing hermes)")
     return [n for n, _ in restored_profiles]
 
 
@@ -1076,7 +1076,7 @@ def _revive_gateway_after_import(hermes_root: Path) -> None:
             (native_default / marker).exists() for marker in ("config.yaml", ".env", "state.db")):
         print("\nRestored into a non-default home; leaving the gateway service alone to avoid clashing "
               f"with the install at {native_default}.\n"
-              "To start a gateway for this home, run:  hermes gateway install")
+              "To start a gateway for this home, run:  stardust gateway install")
         return
     try:
         from hermes_cli.gateway import ensure_gateway_service, _is_service_running
@@ -1084,15 +1084,15 @@ def _revive_gateway_after_import(hermes_root: Path) -> None:
             print()
             ensure_gateway_service(context="import")
     except Exception:
-        print("\nStart the gateway to activate cron jobs and messaging:\n  hermes gateway install")
+        print("\nStart the gateway to activate cron jobs and messaging:\n  stardust gateway install")
 
 
-# --- Quick state snapshots (used by /snapshot slash command and hermes backup --quick) ---
+# --- Quick state snapshots (used by /snapshot slash command and stardust backup --quick) ---
 
 # Critical state files (relative to STARDUST_HOME) for quick snapshots; everything else is
 # regeneratable or managed separately (skills, repo, sessions/). Entries may be files OR
 # directories (recursive); missing entries are skipped. Pairing data lives in platform JSON blobs
-# outside state.db, so it is listed explicitly — ``hermes update`` snapshots this set (#15733).
+# outside state.db, so it is listed explicitly — ``stardust update`` snapshots this set (#15733).
 _QUICK_STATE_FILES = (
     "state.db", "config.yaml", ".env", "auth.json", "cron/jobs.json", "cron/executions.db",
     "gateway_state.json", "channel_directory.json", "channel_aliases.json", "processes.json",
@@ -1214,7 +1214,7 @@ def _create_quick_snapshot_locked(
     """Copy the quick-snapshot set to a timestamped dir under state-snapshots/ and prune old ones.
 
     ``max_file_size`` skips (with a warning) larger files: the pre-update snapshot uses it so a
-    multi-GB ``state.db`` never stalls ``hermes update`` while the small files are always captured.
+    multi-GB ``state.db`` never stalls ``stardust update`` while the small files are always captured.
     """
     root = _quick_snapshot_root(home)
     ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
@@ -1368,7 +1368,7 @@ def _count_cron_jobs(path: Path) -> Optional[int]:
 
 
 def restore_cron_jobs_if_emptied(snapshot_id: str, hermes_home: Optional[Path] = None) -> Optional[Dict[str, Any]]:
-    """Safety net for silent cron-job loss across ``hermes update``.
+    """Safety net for silent cron-job loss across ``stardust update``.
 
     Conservative: restores only when the snapshot had MORE jobs than the live file (a user who
     deleted jobs is never second-guessed); an unreadable live file is left so corruption surfaces.
@@ -1483,7 +1483,7 @@ def _set_config_path_value(data: Dict[str, Any], dotted: Tuple[str, ...], value:
 
 def restore_config_model_settings_if_rewritten(
     snapshot_id: str, hermes_home: Optional[Path] = None) -> Optional[Dict[str, Any]]:
-    """Safety net for silent config.yaml model/MoA loss across ``hermes update``.
+    """Safety net for silent config.yaml model/MoA loss across ``stardust update``.
 
     Mirrors :func:`restore_cron_jobs_if_emptied`: restore only the protected keys — never the
     whole file — whose user-set value in the same-run pre-update snapshot changed or vanished.
@@ -1582,7 +1582,7 @@ def prune_quick_snapshots(keep: int = _QUICK_DEFAULT_KEEP, hermes_home: Optional
 
 
 def run_quick_backup(args) -> None:
-    """CLI entry point for hermes backup --quick."""
+    """CLI entry point for stardust backup --quick."""
     snap_id = create_quick_snapshot(label=getattr(args, "label", None))
     if snap_id:
         print(f"State snapshot created: {snap_id}\n"
@@ -1683,14 +1683,14 @@ def _create_prefixed_full_backup(
 def create_pre_update_backup(
     hermes_home: Optional[Path] = None, keep: int = _PRE_UPDATE_DEFAULT_KEEP) -> Optional[Path]:
     """Full zip backup to ``backups/pre-update-<timestamp>.zip``, auto-pruned; ``None`` if nothing
-    was found or the backup failed. Never raises — ``hermes update`` continues anyway."""
+    was found or the backup failed. Never raises — ``stardust update`` continues anyway."""
     return _create_prefixed_full_backup(hermes_home, _PRE_UPDATE_PREFIX, max(keep, 1), "pre-update", "backup")
 
 
 def create_pre_migration_backup(
     hermes_home: Optional[Path] = None, keep: int = _PRE_MIGRATION_DEFAULT_KEEP) -> Optional[Path]:
-    """Full zip backup to ``backups/pre-migration-<timestamp>.zip`` before ``hermes claw migrate``
-    (same dir as update backups so listings/``hermes import`` find it); ``None`` if nothing was
+    """Full zip backup to ``backups/pre-migration-<timestamp>.zip`` before ``stardust claw migrate``
+    (same dir as update backups so listings/``stardust import`` find it); ``None`` if nothing was
     found or the write failed. Never raises."""
     return _create_prefixed_full_backup(
         hermes_home, _PRE_MIGRATION_PREFIX, max(keep, 0), "pre-migration", "pre-migration backup")

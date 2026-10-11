@@ -47,12 +47,12 @@ def _get_platform_default_hermes_home() -> Path:
     if sys.platform == "win32":
         local_appdata = os.environ.get("LOCALAPPDATA", "").strip()
         base = Path(local_appdata) if local_appdata else Path.home() / "AppData" / "Local"
-        return base / "hermes"
-    return Path.home() / ".hermes"
+        return base / "stardust"
+    return Path.home() / ".stardust"
 
 
 def sudo_invoker_default_home() -> Path | None:
-    """The invoking user's native ``~/.hermes`` when this process is root under ``sudo``, else None.
+    """The invoking user's native ``~/.stardust`` when this process is root under ``sudo``, else None.
 
     sudo strips STARDUST_HOME and sets HOME=/root, so the process's own default is root's; the profile
     store and the system service being operated on belong to SUDO_USER.
@@ -65,7 +65,7 @@ def sudo_invoker_default_home() -> Path | None:
     import pwd
 
     try:
-        return Path(pwd.getpwnam(sudo_user).pw_dir) / ".hermes"
+        return Path(pwd.getpwnam(sudo_user).pw_dir) / ".stardust"
     except KeyError:  # SUDO_USER not in passwd (chroot/container)
         return None
 
@@ -174,7 +174,7 @@ def get_default_hermes_root() -> Path:
     if env_home:
         env_path = Path(env_home)
         try:
-            env_path.resolve().relative_to(native_home.resolve())  # under ~/.hermes (normal or profile mode)
+            env_path.resolve().relative_to(native_home.resolve())  # under ~/.stardust (normal or profile mode)
         except ValueError:  # Docker/custom root: <root>/profiles/<name> -> <root>, else STARDUST_HOME itself
             result = env_path.parent.parent if env_path.parent.name == "profiles" else env_path
     _default_hermes_root_memo = (str(native_home), env_home, result)
@@ -190,11 +190,11 @@ _HERMES_HOME_MARKERS = ("config.yaml", ".env", "state.db")
 def _is_hermes_profiles_root(profiles_dir: Path) -> bool:
     """True when *profiles_dir* is provably ``<hermes-home>/profiles``.
 
-    Accepts the classic ``~/.hermes`` layout, a root carrying Hermes-home marker files, a
+    Accepts the classic ``~/.stardust`` layout, a root carrying Hermes-home marker files, a
     ``profiles/.deleted`` tombstone dir (only ``profile delete`` creates it), or the default root.
     """
     root = profiles_dir.parent
-    if root.name == ".hermes":
+    if root.name == ".stardust":
         return True
     try:
         if (profiles_dir / _DELETED_PROFILES_DIR).is_dir() or any(
@@ -220,7 +220,7 @@ def named_profile_home(path: str | Path) -> Path | None:
         if (candidate.parent.name == "profiles" and not candidate.name.startswith(".")
                 and _is_hermes_profiles_root(candidate.parent)):
             return candidate
-        if candidate.name == ".hermes":  # default home: a coincidental profiles/ ancestor is not a root
+        if candidate.name == ".stardust":  # default home: a coincidental profiles/ ancestor is not a root
             return None
     return None
 
@@ -228,8 +228,8 @@ def named_profile_home(path: str | Path) -> Path | None:
 def profile_name_for_home(path: str | Path | None) -> str | None:
     """Return the canonical profile id owning *path*, or ``None`` when it is not a profile home.
 
-    The default home is the Hermes root itself, so its basename is an installation detail (``.hermes``
-    on POSIX and commonly ``hermes`` on Windows), not the profile id ``default``.
+    The default home is the Hermes root itself, so its basename is an installation detail (``.stardust``
+    on POSIX and commonly ``stardust`` on Windows), not the profile id ``default``.
     """
     if path is None or not str(path).strip():
         return None
@@ -484,7 +484,7 @@ def _print_managed_node_in_use_notice() -> None:
     _managed_node_in_use_notice_printed = True
     print(
         "→ Hermes-managed Node.js is in use by a running app; deferring its "
-        "upgrade until the app is closed (re-run `hermes update` afterwards).", flush=True,
+        "upgrade until the app is closed (re-run `stardust update` afterwards).", flush=True,
     )
 
 
@@ -582,7 +582,7 @@ def _heal_managed_node_windows(home: Path | None = None) -> bool | None:
     ``node.new-*`` directory, then the live tree is renamed aside (``node.old-*``) and the staged tree
     renamed into place. The live tree is never deleted before its replacement is ready, so an interrupted
     heal cannot gut the running installation. Windows allows renaming a tree whose executables are running
-    (images are mapped with ``FILE_SHARE_DELETE`` — the same mechanism as the hermes.exe quarantine); when
+    (images are mapped with ``FILE_SHARE_DELETE`` — the same mechanism as the stardust.exe quarantine); when
     the OS refuses the rename, that refusal *is* the in-use signal and the heal defers instead of forcing
     the write and crashing with ``PermissionError: [WinError 5]`` on ``npm.cmd`` (#80926).
     """
@@ -744,7 +744,7 @@ def agent_browser_runnable(path: str | None) -> bool:
 
     A bare presence check (``shutil.which`` / ``Path.exists``) is not enough: agent-browser's npm
     ``postinstall`` re-points a *global* install symlink (e.g. ``/opt/homebrew/bin/agent-browser``) at our
-    local ``node_modules/agent-browser/bin/...`` binary, which then disappears on the next ``hermes update``
+    local ``node_modules/agent-browser/bin/...`` binary, which then disappears on the next ``stardust update``
     — leaving a **dangling symlink** that ``which`` still reports but exec fails on with exit 127 (issue
     #48521). Callers that trust such a path silently break every browser tool.
     """
@@ -782,9 +782,9 @@ def _legacy_path_has_content(path: Path) -> bool:
 
 
 def display_hermes_home() -> str:
-    """User-facing ``~/`` display string for STARDUST_HOME (``~/.hermes/profiles/coder``)."""
+    """User-facing ``~/`` display string for STARDUST_HOME (``~/.stardust/profiles/coder``)."""
     home = get_hermes_home()
-    try:  # as_posix(): str() on Windows yields chimeras like ~/AppData\Local\hermes/skills/
+    try:  # as_posix(): str() on Windows yields chimeras like ~/AppData\Local\stardust/skills/
         return "~/" + home.relative_to(Path.home()).as_posix()
     except ValueError:
         return str(home)
@@ -792,7 +792,7 @@ def display_hermes_home() -> str:
 
 def profile_cli_selector() -> str:
     """``-p <name> `` (trailing space) pinning copy-pasteable ``hermes ...`` guidance to the
-    active NAMED profile, else ``""``: a bare ``hermes`` follows the sticky ``active_profile``
+    active NAMED profile, else ``""``: a bare ``stardust`` follows the sticky ``active_profile``
     file, which can name a different database than the one that failed (#105887). A custom
     home outside the profile tree has no selector (only STARDUST_HOME names it)."""
     name = profile_name_for_home(get_hermes_home())
@@ -1278,7 +1278,7 @@ def partial_update_hint(exc: BaseException) -> list[str]:
         "This looks like a partially-updated install: one module was refreshed "
         "and a related one was not.",
         "Re-run the update to bring the whole tree to the same version:",
-        "    hermes update",
+        "    stardust update",
         "If that also fails, reinstall: https://hermes-agent.nousresearch.com",
     ]
 

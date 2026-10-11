@@ -1,6 +1,6 @@
-"""Quiet ``hermes chat -Q`` helpers: bind this session's key and resume nested notifies.
+"""Quiet ``stardust chat -Q`` helpers: bind this session's key and resume nested notifies.
 
-Bot Mode delivers a local DM as ``hermes -p <bot> chat -Q --query-file``. Interactive
+Bot Mode delivers a local DM as ``stardust -p <bot> chat -Q --query-file``. Interactive
 chat binds ``set_current_session_key(self.session_id)`` around the turn; the quiet
 path did not, so a nested ``message_agent`` notify inherited the dispatcher's
 ``STARDUST_SESSION_KEY`` and never woke the recipient. Quiet also printed and exited

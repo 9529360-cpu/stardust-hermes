@@ -1,4 +1,4 @@
-"""``hermes config`` subcommand parser."""
+"""``stardust config`` subcommand parser."""
 
 from __future__ import annotations
 

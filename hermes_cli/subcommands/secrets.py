@@ -1,4 +1,4 @@
-"""``hermes secrets`` subcommand parser."""
+"""``stardust secrets`` subcommand parser."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ def build_secrets_parser(subparsers) -> None:
     secrets_parser = subparsers.add_parser(
         "secrets", help="Manage external secret sources (Bitwarden, 1Password)",
         description="Pull API keys from an external secret manager at process startup "
-            "instead of storing them in ~/.hermes/.env.  Supports Bitwarden "
+            "instead of storing them in ~/.stardust/.env.  Supports Bitwarden "
             "Secrets Manager and 1Password.  See: "
             "https://github.com/9529360-cpu/stardust-hermes/blob/main/website/docs/user-guide/secrets/index.md")
     secrets_subparsers = secrets_parser.add_subparsers(dest="secrets_command")

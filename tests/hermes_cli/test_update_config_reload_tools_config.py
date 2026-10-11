@@ -1,4 +1,4 @@
-"""``hermes update`` runs config migrations in the PRE-pull updater process. A migration step
+"""``stardust update`` runs config migrations in the PRE-pull updater process. A migration step
 that imports a helper at call time (``_migrate_to_45`` → ``hermes_cli.tools_config``) resolves
 against whatever OLD module object is still cached, and dies with ``cannot import name`` when the
 pull added that symbol — config silently stays behind while the code moves on (#111271).
@@ -72,7 +72,7 @@ def test_update_migration_survives_stale_module_missing_call_time_symbol(tmp_pat
 def test_update_migration_import_failure_after_purge_prints_fallback(tmp_path, monkeypatch, capsys):
     """The purge evicts ``hermes_cli.*`` but not root modules (``hermes_constants``, ...), so the
     post-purge ``from hermes_cli.config import ...`` re-executes NEW config.py against OLD root
-    modules and can raise ImportError. That must print the 'run hermes config migrate' fallback and
+    modules and can raise ImportError. That must print the 'run stardust config migrate' fallback and
     return — not escape and abort the rest of post-update maintenance (fleet restart)."""
     home = tmp_path / "flat-home"
     home.mkdir()
@@ -88,4 +88,4 @@ def test_update_migration_import_failure_after_purge_prints_fallback(tmp_path, m
 
     out = capsys.readouterr().out
     assert "Could not check config version" in out, out
-    assert "hermes config migrate" in out, out
+    assert "stardust config migrate" in out, out

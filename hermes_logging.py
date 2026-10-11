@@ -155,7 +155,7 @@ class _ComponentFilter(logging.Filter):
         return record.name.startswith(self._prefixes)
 
 
-# Logger name prefixes per component; used by _ComponentFilter and ``hermes logs --component``.
+# Logger name prefixes per component; used by _ComponentFilter and ``stardust logs --component``.
 COMPONENT_PREFIXES = {
     # ``plugins.platforms``: messaging adapters that migrated out of
     # ``gateway/platforms/`` into bundled plugins (#41112) are still gateway
@@ -219,7 +219,7 @@ def setup_logging(
     home = hermes_home or get_hermes_home()
     log_dir = mkdir_under_hermes_home(home / "logs")
     # A second Hermes home in a process that already logs for another one — a dashboard or
-    # ``hermes serve`` backend building agents for several profiles, a multiplexed gateway —
+    # ``stardust serve`` backend building agents for several profiles, a multiplexed gateway —
     # gets routed by record home. Stacking another file handler here would hand it EVERY
     # profile's records (the handlers carry no home filter), and a duplicate writer on top of
     # an existing router.

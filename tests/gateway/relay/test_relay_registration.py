@@ -59,7 +59,7 @@ class TestConfigRegistrationAgreementUnderMultiplexScope:
         from agent import secret_scope as ss
         from gateway.config import Platform, load_gateway_config
 
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         (hermes_home / "config.yaml").write_text(
             "gateway:\n"
@@ -106,7 +106,7 @@ class TestConfigRegistrationAgreementUnderMultiplexScope:
         from agent import secret_scope as ss
         from gateway.config import Platform, load_gateway_config
 
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         (hermes_home / "config.yaml").write_text(
             "gateway:\n"

@@ -1,6 +1,6 @@
 """Keyed ``providers.<key>`` entries must use the durable pool slug.
 
-``hermes auth add b-ai`` stores keys under ``credential_pool.b-ai``. Runtime
+``stardust auth add b-ai`` stores keys under ``credential_pool.b-ai``. Runtime
 used to look up ``custom:<display-name>`` (e.g. ``custom:b.ai`` from
 ``name: B.AI``), miss the pool, and send the ``no-key-required`` placeholder
 to an auth-required endpoint (HTTP 401 Invalid api_key format).
@@ -19,7 +19,7 @@ ENDPOINT = "https://api.b.ai/v1"
 
 
 def _write_keyed_provider_home(tmp_path, monkeypatch, *, pool_id="b-ai", extra_config=None):
-    hermes_home = tmp_path / ".hermes"
+    hermes_home = tmp_path / ".stardust"
     hermes_home.mkdir()
     monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     config = {
@@ -137,7 +137,7 @@ def test_prune_keeps_active_legacy_pool_for_keyed_provider(tmp_path, monkeypatch
         # an unrelated stale pool that SHOULD be pruned
         "custom:old-endpoint": [_model_config_entry("mc2", "sk-stale-key")],
     }
-    hermes_home = tmp_path / ".hermes"
+    hermes_home = tmp_path / ".stardust"
     hermes_home.mkdir(exist_ok=True)
     monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     (hermes_home / "config.yaml").write_text(yaml.safe_dump(config), encoding="utf-8")
@@ -161,7 +161,7 @@ def test_prune_keeps_active_legacy_pool_for_keyed_provider(tmp_path, monkeypatch
     )
 
     after = json.loads(
-        (tmp_path / ".hermes" / "auth.json").read_text(encoding="utf-8")
+        (tmp_path / ".stardust" / "auth.json").read_text(encoding="utf-8")
     )
     kept = (after.get("credential_pool") or {}).get("custom:b.ai")
     pruned = (after.get("credential_pool") or {}).get("custom:old-endpoint")
@@ -192,7 +192,7 @@ def test_seed_custom_pool_matches_legacy_named_pool(tmp_path, monkeypatch):
             }
         },
     }
-    hermes_home = tmp_path / ".hermes"
+    hermes_home = tmp_path / ".stardust"
     hermes_home.mkdir(exist_ok=True)
     monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     (hermes_home / "config.yaml").write_text(yaml.safe_dump(config), encoding="utf-8")

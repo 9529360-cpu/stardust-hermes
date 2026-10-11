@@ -1,4 +1,4 @@
-"""``hermes import-agent`` subcommand parser (logic lives in ``hermes_cli/agent_import.py``)."""
+"""``stardust import-agent`` subcommand parser (logic lives in ``hermes_cli/agent_import.py``)."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ def build_import_agent_parser(subparsers, *, cmd_import_agent: Callable) -> None
             "Maps CLAUDE.md/AGENTS.md instructions, permission allowlists, MCP "
             "servers, skills, and memories into their Hermes equivalents. "
             "Always shows a preview before making changes. API keys and "
-            "credentials are never imported — run 'hermes setup' for those.")
+            "credentials are never imported — run 'stardust setup' for those.")
     parser.add_argument(
         "agent", nargs="?", choices=["claude-code", "codex"],
         help="Which agent to import from (default: auto-detect ~/.claude or ~/.codex)")

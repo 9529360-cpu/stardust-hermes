@@ -1,11 +1,11 @@
 """Regression: the Windows Desktop update hand-off must run through python.exe.
 
-`scripts/desktop-update/windows.ps1` drives `hermes update` for the in-app
+`scripts/desktop-update/windows.ps1` drives `stardust update` for the in-app
 Desktop updater. It used to invoke the update through the venv's
-`venv\\Scripts\\hermes.exe` console-script launcher. On Windows that launcher is
-a real process that keeps `hermes.exe` mapped as its running image and spawns
+`venv\\Scripts\\stardust.exe` console-script launcher. On Windows that launcher is
+a real process that keeps `stardust.exe` mapped as its running image and spawns
 `python.exe` as a child. The update ends in `uv pip install -e .`, which rewrites
-the console-script shims -- including the `hermes.exe` the launcher still has
+the console-script shims -- including the `stardust.exe` the launcher still has
 mapped -- and Windows refuses to replace a file mapped as a running image
 ("os error 32"). The rename fallback then defers to next reboot via
 `MOVEFILE_DELAY_UNTIL_REBOOT`, which needs elevation a Desktop-driven update
@@ -21,7 +21,7 @@ ordinary unlocked file when uv rewrites it.
 This test is source-level because Linux CI cannot execute the PowerShell
 hand-off. The invariant it guards is that every `Invoke-HermesStep` call site
 (the update, its retry, and the desktop rebuild) drives `$pythonExe`, never the
-`$hermesExe` shim. `hermes.exe` may still be *named* in the file for the
+`$hermesExe` shim. `stardust.exe` may still be *named* in the file for the
 step-2 unlock preflight -- that is a lock probe, not an invocation -- so we
 assert against the invocation sites specifically.
 """
@@ -77,8 +77,8 @@ def test_invoke_hermes_step_calls_drive_python_not_the_shim() -> None:
     offenders = [exe for exe in invocations if exe != "$pythonExe"]
     assert not offenders, (
         "Every Invoke-HermesStep call in scripts/desktop-update/windows.ps1 "
-        "must drive $pythonExe, not the hermes.exe shim. Driving the update "
-        "through the shim keeps hermes.exe mapped as a running image, so uv's "
+        "must drive $pythonExe, not the stardust.exe shim. Driving the update "
+        "through the shim keeps stardust.exe mapped as a running image, so uv's "
         "final shim rewrite fails with os error 32 and the Desktop update can "
         "never complete. Offending target(s): "
         f"{sorted(set(offenders))}."
@@ -107,7 +107,7 @@ def test_update_no_longer_invokes_the_hermes_exe_shim() -> None:
 
     assert "Invoke-HermesStep $hermesExe" not in source, (
         "scripts/desktop-update/windows.ps1 still invokes the update through "
-        "the hermes.exe shim (`Invoke-HermesStep $hermesExe`). That is the "
+        "the stardust.exe shim (`Invoke-HermesStep $hermesExe`). That is the "
         "exact self-lock this fix removes -- route it through $pythonExe "
         "instead."
     )

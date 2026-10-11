@@ -1,4 +1,4 @@
-"""A provider installed by ``hermes plugins install`` must actually be found.
+"""A provider installed by ``stardust plugins install`` must actually be found.
 
 The installer clones into ``$STARDUST_HOME/plugins/<name>/`` (flat), provider
 discovery only scanned ``plugins/model-providers/<name>/``, and PluginManager

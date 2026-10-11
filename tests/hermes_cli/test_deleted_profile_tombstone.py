@@ -1,8 +1,8 @@
 """Deleted named profiles must stay gone until explicitly recreated.
 
 A live serve/logging process can mkdir ``profiles/<name>/logs`` after
-``hermes profile delete`` removes the tree. That empty shell then
-reappears in ``hermes profile list`` and Desktop Bot Mode. These tests
+``stardust profile delete`` removes the tree. That empty shell then
+reappears in ``stardust profile list`` and Desktop Bot Mode. These tests
 lock the tombstone + no-mkdir contract without depending on Desktop.
 """
 
@@ -31,7 +31,7 @@ from hermes_logging import setup_logging
 @pytest.fixture()
 def profile_env(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    default_home = tmp_path / ".hermes"
+    default_home = tmp_path / ".stardust"
     default_home.mkdir()
     monkeypatch.setenv("STARDUST_HOME", str(default_home))
     return tmp_path
@@ -64,7 +64,7 @@ class TestDeletedProfileTombstone:
             setup_logging(hermes_home=profile_dir, force=True)
 
         assert not profile_dir.exists()
-        monkeypatch.setenv("STARDUST_HOME", str(profile_env / ".hermes"))
+        monkeypatch.setenv("STARDUST_HOME", str(profile_env / ".stardust"))
         assert "worker" not in _named_homes(profile_env)
 
     def test_empty_shell_after_delete_is_not_listed_or_served(self, profile_env):
@@ -138,7 +138,7 @@ class TestDeletedProfileTombstone:
         profile_dir = create_profile("worker", no_alias=True, no_skills=True)
         _delete("worker")
         profile_dir.mkdir(parents=True)
-        (profile_env / ".hermes" / ".env").write_text(
+        (profile_env / ".stardust" / ".env").write_text(
             "OPENROUTER_API_KEY=root-key\n", encoding="utf-8"
         )
 
@@ -184,12 +184,12 @@ class TestNamedProfileHome:
         assert named_profile_home(worker) == worker
 
     def test_dot_hermes_layout_resolves_without_markers(self, tmp_path):
-        worker = tmp_path / ".hermes" / "profiles" / "worker"
+        worker = tmp_path / ".stardust" / "profiles" / "worker"
         assert named_profile_home(worker / "logs") == worker
         assert named_profile_home(worker) == worker
 
     def test_default_home_with_profiles_in_path_is_not_named(self, tmp_path):
-        default_home = tmp_path / "foo" / "profiles" / "notahome" / ".hermes"
+        default_home = tmp_path / "foo" / "profiles" / "notahome" / ".stardust"
         assert named_profile_home(default_home) is None
         assert named_profile_home(default_home / "logs") is None
 
@@ -220,7 +220,7 @@ class TestNamedProfileHome:
 
     def test_tombstone_dir_marks_profiles_root(self, tmp_path):
         # A profiles/.deleted directory is only ever created by
-        # `hermes profile delete` — its presence alone anchors recognition,
+        # `stardust profile delete` — its presence alone anchors recognition,
         # so tombstones are honored even when root markers are missing.
         profiles_dir = tmp_path / "opt" / "profiles"
         (profiles_dir / ".deleted").mkdir(parents=True)

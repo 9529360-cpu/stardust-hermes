@@ -36,7 +36,7 @@ returns thinner data (no scores, top-level comments only), which is fine for a f
 
 **Optional upgrade (app credentials, still no user login):** for sustained use or full
 data, register a free "script" type app at https://www.reddit.com/prefs/apps and put its
-two values in `~/.hermes/.env`:
+two values in `~/.stardust/.env`:
 
 ```
 REDDIT_CLIENT_ID=...

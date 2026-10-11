@@ -1,6 +1,6 @@
 """Fail-closed shim quarantine (#87331): a contended venv is never mutated.
 
-The bug class: on Windows, when `hermes.exe`/sibling shims could not be
+The bug class: on Windows, when `stardust.exe`/sibling shims could not be
 renamed aside (another process holds them without FILE_SHARE_DELETE), the
 updater printed a warning and ran the installer anyway — which then died
 partway on the same locks and stranded the venv between versions (3x field
@@ -51,11 +51,11 @@ def windows(monkeypatch):
 def test_strict_quarantine_refuses_before_install(windows, tmp_path, monkeypatch):
     scripts = tmp_path / "venv" / "Scripts"
     shims = _make_shims(scripts)
-    # hermes.exe cannot be renamed; hermes-gateway.exe can
+    # stardust.exe cannot be renamed; hermes-gateway.exe can
     real_rename = Path.rename
 
     def deny_hermes(self, target):
-        if self.name == "hermes.exe":
+        if self.name == "stardust.exe":
             raise PermissionError(13, "held open")
         return real_rename(self, target)
 
@@ -77,7 +77,7 @@ def test_strict_quarantine_refuses_before_install(windows, tmp_path, monkeypatch
 
     # The installer NEVER ran — that is the whole fix.
     assert install_ran == []
-    assert "hermes.exe" in exc_info.value.failed_shims
+    assert "stardust.exe" in exc_info.value.failed_shims
     # The successful rename (hermes-gateway.exe) was rolled back.
     assert (scripts / "hermes-gateway.exe").exists()
     assert not list(scripts.glob("hermes-gateway.exe.old.*"))
@@ -191,13 +191,13 @@ def test_refusal_writes_marker_and_exits_2(monkeypatch, capsys):
     monkeypatch.setattr(
         update_cmd, "_write_update_incomplete_marker", lambda: wrote.append(1)
     )
-    exc = main_install_repair.ShimQuarantineError(["hermes.exe"])
+    exc = main_install_repair.ShimQuarantineError(["stardust.exe"])
     with pytest.raises(SystemExit) as exit_info:
         update_cmd._refuse_update_for_contended_shims(exc)
     assert exit_info.value.code == 2
     assert wrote == [1]
     out = capsys.readouterr().out
-    assert "hermes.exe" in out
+    assert "stardust.exe" in out
     assert "deferred" in out
 
 
@@ -206,5 +206,5 @@ def test_shim_error_type_resolves_real_class():
 
 
 def test_shim_error_is_not_a_zip_fallback_trigger():
-    exc = main_install_repair.ShimQuarantineError(["hermes.exe"])
+    exc = main_install_repair.ShimQuarantineError(["stardust.exe"])
     assert update_cmd._should_zip_fallback_on_update_error(exc) is False

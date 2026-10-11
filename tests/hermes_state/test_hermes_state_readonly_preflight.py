@@ -37,7 +37,7 @@ pytestmark = [
 @pytest.fixture()
 def hermes_home(tmp_path, monkeypatch):
     """Isolated STARDUST_HOME so the repair scope covers tmp DBs."""
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     monkeypatch.setenv("STARDUST_HOME", str(home))
     return home

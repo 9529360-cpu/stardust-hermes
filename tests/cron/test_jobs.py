@@ -1689,7 +1689,7 @@ class TestJobsJsonIdKeyedMap:
     load_jobs() return a dict. Every consumer iterates it as a list, so
     ``list_jobs()`` → ``_normalize_job_record`` → ``dict(<id-string>)`` raised
     ``ValueError: dictionary update sequence element #0 has length 1; 2 is
-    required`` and took down ``hermes cron list``, the ``cronjob(action=
+    required`` and took down ``stardust cron list``, the ``cronjob(action=
     "list")`` tool, and the Dashboard cron view. The values already carry
     their own ``id`` matching the map key, so flattening is lossless.
     """
@@ -1728,7 +1728,7 @@ class TestJobsJsonIdKeyedMap:
         assert all(isinstance(j, dict) for j in loaded)
 
     def test_list_jobs_survives_id_keyed_map(self, tmp_cron_dir):
-        """The reported traceback path (hermes cron list / cronjob list tool)."""
+        """The reported traceback path (stardust cron list / cronjob list tool)."""
         import json
         from cron.jobs import JOBS_FILE, list_jobs
 

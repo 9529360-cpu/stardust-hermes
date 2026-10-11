@@ -68,7 +68,7 @@ for tgt in IMPORT_TARGETS:
                 "err": next((x["err"] for x in rows if x["err"]), None)}
 results["import"] = imp
 
-# 2. CLI end-to-end startup: `hermes --version`, `hermes --help`, `hermes doctor --help`, `hermes config get model` (no network)
+# 2. CLI end-to-end startup: `stardust --version`, `stardust --help`, `stardust doctor --help`, `stardust config get model` (no network)
 CLI = {"version": ["hermes_cli/main.py", "--version"], "help": ["hermes_cli/main.py", "--help"], "config_get": ["hermes_cli/main.py", "config", "get", "model"], "tools_list": ["hermes_cli/main.py", "tools", "--help"], "skills_help": ["hermes_cli/main.py", "skills", "--help"]}
 cli = {}
 for name, argv in CLI.items():

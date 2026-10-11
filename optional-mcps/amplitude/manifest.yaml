@@ -28,7 +28,7 @@ suggest:
 
 post_install: |
   On first connection Hermes opens a browser to authorize with
-  Amplitude (or run `hermes mcp login amplitude`). Approve access,
+  Amplitude (or run `stardust mcp login amplitude`). Approve access,
   then restart the session so tools load.
 
   EU-resident orgs: change mcp_servers.amplitude.url to

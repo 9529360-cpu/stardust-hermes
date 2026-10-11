@@ -206,7 +206,7 @@ def test_real_plugin_source_discovery_applies_dotenv(monkeypatch, tmp_path):
 
     reg._reset_registry_for_tests()
     env_loader.reset_secret_source_cache()
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     plugin_dir = home / "plugins" / "fixture-secret-source"
     plugin_dir.mkdir(parents=True)
     (home / "config.yaml").write_text(

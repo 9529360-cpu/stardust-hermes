@@ -70,9 +70,9 @@ def reconcile_profile_gateways(
 
     Always registers a ``gateway-default`` slot for the root profile (the implicit profile at
     the top of ``$STARDUST_HOME``): ``hermes_cli.gateway`` maps an empty profile suffix to it,
-    so it is what ``hermes gateway start`` (no ``-p``) targets.
+    so it is what ``stardust gateway start`` (no ``-p``) targets.
 
-    Without it, bare ``hermes gateway start`` inside the container would land on ``s6-svc -u
+    Without it, bare ``stardust gateway start`` inside the container would land on ``s6-svc -u
     /run/service/gateway-default`` → uncaught ``CalledProcessError`` → traceback to the user (PR #30136
     review).
     """
@@ -101,7 +101,7 @@ def reconcile_profile_gateways(
     profiles_root = hermes_home / "profiles"
     if profiles_root.is_dir():
         for entry in sorted(profiles_root.iterdir()):
-            # SOUL.md (seeded by `hermes profile create`) is the "real profile" marker.
+            # SOUL.md (seeded by `stardust profile create`) is the "real profile" marker.
             if not entry.is_dir() or not (entry / "SOUL.md").exists():
                 continue
             # "default" is reserved for the root profile slot above.
@@ -185,7 +185,7 @@ def _strip_container_argv_prefix(argv: Sequence[str]) -> list[str]:
         args = args[1:]
     if args and args[0].endswith("entrypoint-dispatch.sh"):  # non-PID-1 dispatch shim
         args = args[1:]
-    if args and Path(args[0]).name == "hermes":  # the wrapper re-execs `hermes <subcommand>`
+    if args and Path(args[0]).name in ("hermes", "stardust"):  # the wrapper re-execs `stardust <subcommand>`
         args = args[1:]
     return args
 
@@ -275,7 +275,7 @@ def _register_service(scandir: Path, profile: str, *, start: bool) -> None:
         _write_exec(tmp_dir / "finish", S6ServiceManager._render_finish_script())
         (tmp_dir / "log").mkdir()
         _write_exec(tmp_dir / "log" / "run", S6ServiceManager._render_log_run(profile))
-        if not start:  # `hermes -p <profile> gateway start` brings it up later (s6-svc -u)
+        if not start:  # `stardust -p <profile> gateway start` brings it up later (s6-svc -u)
             (tmp_dir / "down").touch()
         # Pre-create supervise/ with hermes ownership BEFORE publishing so s6-supervise inherits
         # it and runtime s6-svc calls as the hermes user won't EACCES.

@@ -139,7 +139,7 @@ def _report_binary(found: str | None, missing: str, install_hint: str, found_pre
 def _setup_backend_local(config: dict) -> None:
     _setup.print_success("Terminal backend: Local")
     _setup.print_info("Commands run directly on this machine.")
-    # Gateway cwd defaults to home; sudo stays off. Both configurable via `hermes setup terminal`.
+    # Gateway cwd defaults to home; sudo stays off. Both configurable via `stardust setup terminal`.
     config["terminal"].setdefault("cwd", str(Path.home()))
 
 
@@ -147,7 +147,7 @@ def _setup_backend_docker(config: dict) -> None:
     _setup.print_success("Terminal backend: Docker")
     _report_binary(shutil.which("docker"), "Docker not found in PATH!",
                    "Install Docker: https://docs.docker.com/get-docker/", "Docker found: ")
-    # Image and resource limits use defaults; tune via `hermes setup terminal`.
+    # Image and resource limits use defaults; tune via `stardust setup terminal`.
     config["terminal"].setdefault("docker_image", _SANDBOX_IMAGE)
     _setup._info(None, "Docker sandboxes can be protected with the egress credential firewall.",
                  "It routes sandbox traffic through iron-proxy so containers receive "
@@ -159,9 +159,9 @@ def _setup_backend_docker(config: dict) -> None:
         proxy_cfg.setdefault("enforce_on_docker", True)
         _setup.print_success("Egress firewall enabled in config")
         _setup.print_info(
-            "Run `hermes egress setup` then `hermes egress start` to mint tokens and launch the proxy.")
+            "Run `stardust egress setup` then `stardust egress start` to mint tokens and launch the proxy.")
     else:
-        _setup.print_info("Skipping egress firewall. You can enable it later with `hermes egress setup`.")
+        _setup.print_info("Skipping egress firewall. You can enable it later with `stardust egress setup`.")
 
 
 def _setup_backend_singularity(config: dict) -> None:
@@ -296,7 +296,7 @@ def setup_terminal_backend(config: dict):
     backends = list(_BUILTIN_TERMINAL_BACKENDS)
     if _platform.system() == "Linux":
         backends.append(("singularity", "Singularity/Apptainer - HPC-friendly container"))
-    # Plugin-registered backends (~/.hermes/plugins/). Fail-soft: a broken plugin must not take
+    # Plugin-registered backends (~/.stardust/plugins/). Fail-soft: a broken plugin must not take
     # the wizard down.
     plugin_backend_names = []
     try:

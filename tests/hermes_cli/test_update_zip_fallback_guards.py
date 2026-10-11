@@ -1,7 +1,7 @@
 """ZIP fallback must not fire on dependency failures or clobber a dirty tree.
 
 Issue #87304: on Windows the update ``try`` spans git pull *and* ``uv pip
-install``. A locked ``hermes.exe`` makes the install exit 2, the handler
+install``. A locked ``stardust.exe`` makes the install exit 2, the handler
 prints ``Git update failed``, and ``_update_via_zip`` replaces every
 top-level entry except ``venv`` / ``node_modules`` / ``.git`` / ``.env`` —
 permanently deleting uncommitted edits and untracked files. The git pull

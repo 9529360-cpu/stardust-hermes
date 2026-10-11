@@ -302,14 +302,14 @@ RUN uv pip install --no-cache-dir --no-deps -e "."
 
 USER root
 RUN mkdir -p /opt/hermes/bin && \
-    cp /opt/hermes/docker/hermes-exec-shim.sh /opt/hermes/bin/hermes && \
-    chmod 0755 /opt/hermes /opt/hermes/bin/hermes && \
+    cp /opt/hermes/docker/hermes-exec-shim.sh /opt/hermes/bin/stardust && \
+    chmod 0755 /opt/hermes /opt/hermes/bin/stardust && \
     printf 'docker\n' > /opt/hermes/.install_method
 # The ``.install_method`` stamp is baked next to the running code (the install
 # tree), NOT into $STARDUST_HOME. $STARDUST_HOME (/opt/data) is a shared data
 # volume that is commonly bind-mounted from the host and even shared with a
 # host-side Desktop/CLI install; stamping it at boot used to clobber that
-# host install's marker and wrongly block its ``hermes update``. A code-scoped
+# host install's marker and wrongly block its ``stardust update``. A code-scoped
 # stamp is read first by detect_install_method() and is immune to the share.
 # Start as root so the s6-overlay stage2 hook can usermod/groupmod and chown
 # the data volume. Each supervised service then drops to the hermes user via
@@ -322,14 +322,14 @@ RUN mkdir -p /opt/hermes/bin && \
 # lives outside both /opt/hermes (which operators sometimes bind-mount as a
 # checkout) and /opt/data (the mutable STARDUST_HOME volume).
 # .dockerignore excludes .git, so `git rev-parse HEAD` from inside the
-# container always returns nothing — meaning `hermes dump` reports
+# container always returns nothing — meaning `stardust dump` reports
 # "(unknown)" and the startup banner drops its `· upstream <sha>` suffix.
 # That makes support triage from container bug reports impossible:
 # we can't tell which commit the user is actually running.
 #
 # Fix: write the commit SHA passed via the STARDUST_GIT_SHA build-arg to
 # /opt/hermes/.hermes_build_sha at build time, and have
-# hermes_cli/build_info.py read it at runtime.  Both `hermes dump` and
+# hermes_cli/build_info.py read it at runtime.  Both `stardust dump` and
 # banner.get_git_banner_state() try the baked SHA first, then fall back
 # to live `git rev-parse` for source installs (unchanged behaviour).
 #
@@ -409,14 +409,14 @@ ENV STARDUST_LAZY_INSTALL_TARGET=/opt/data/lazy-packages
 # `docker exec <c> hermes ...` they default to root, and any file the
 # command writes under $STARDUST_HOME (auth.json, .env, config.yaml) ends
 # up root-owned and unreadable to the supervised gateway (UID 10000).
-# The shim lives at /opt/hermes/bin/hermes, sits earliest on PATH, and
+# The shim lives at /opt/hermes/bin/stardust, sits earliest on PATH, and
 # transparently re-exec's the real venv binary via `s6-setuidgid hermes`
 # when invoked as root. Non-root callers (supervised processes,
 # `--user hermes`, etc.) hit the short-circuit path with no overhead.
 # Recursion is impossible because the shim exec's the venv binary by
-# absolute path (/opt/hermes/.venv/bin/hermes). See the shim source for
+# absolute path (/opt/hermes/.venv/bin/stardust). See the shim source for
 # the opt-out env var (STARDUST_DOCKER_EXEC_AS_ROOT=1).
-COPY --chmod=0755 docker/hermes-exec-shim.sh /opt/hermes/bin/hermes
+COPY --chmod=0755 docker/hermes-exec-shim.sh /opt/hermes/bin/stardust
 COPY --chmod=0755 docker/entrypoint-dispatch.sh /opt/hermes/docker/entrypoint-dispatch.sh
 
 # Pre-s6 entrypoint.sh did `source .venv/bin/activate` which exported

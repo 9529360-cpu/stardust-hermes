@@ -85,8 +85,8 @@ _MESSAGING_ENV_FALLBACKS: dict[str, dict[str, Any]] = {
         ("WECOM_CALLBACK_AGENT_ID", "WeCom app agent ID", "WeCom Agent ID", {}),
         ("WECOM_CALLBACK_TOKEN", "WeCom callback verification token", "WeCom Token", {}),
         ("WECOM_CALLBACK_ENCODING_AES_KEY", "WeCom callback AES encoding key", "WeCom AES Key", {"password": True}),
-        ("WEIXIN_ACCOUNT_ID", "iLink Bot account ID obtained through QR login in hermes gateway setup", "iLink Bot account ID", {}),
-        ("WEIXIN_TOKEN", "iLink Bot token obtained through QR login in hermes gateway setup", "iLink Bot token", {"password": True}),
+        ("WEIXIN_ACCOUNT_ID", "iLink Bot account ID obtained through QR login in stardust gateway setup", "iLink Bot account ID", {}),
+        ("WEIXIN_TOKEN", "iLink Bot token obtained through QR login in stardust gateway setup", "iLink Bot token", {"password": True}),
         ("WEIXIN_BASE_URL", "iLink API base URL saved by QR login (default: https://ilinkai.weixin.qq.com)", "iLink API base URL", {}),
         ("FEISHU_APP_ID", "Feishu / Lark app ID", "App ID", {}),
         ("FEISHU_APP_SECRET", "Feishu / Lark app secret", "App secret", {"password": True}),
@@ -281,7 +281,7 @@ def _platform_payloads(scoped_dir: Optional[Path], entries) -> list[dict[str, An
     if runtime is None:
         # A profile served by the multiplexer writes no record of its own; its adapters live in the
         # multiplexer's record under ``<profile>:<platform>``. Unscoped, the profile is the process's
-        # own home (a pooled ``hermes --profile X serve``); the default home resolves to None here.
+        # own home (a pooled ``stardust --profile X serve``); the default home resolves to None here.
         own_home = scoped_dir if scoped_dir is not None else get_process_hermes_home()
         served = multiplexer_liveness_for_profile(own_home)
         if served is not None:
@@ -894,7 +894,7 @@ async def update_messaging_platform(platform_id: str, body: MessagingPlatformUpd
 def _notify_multiplexer_hot_serve(profile: Optional[str]) -> bool:
     """True when a live multiplexer serves the written profile and was told to rebuild its adapters.
     Unscoped (no ``?profile=``) means THIS process's profile: Desktop routes a pooled
-    ``hermes --profile X serve`` without the query (#109088), so X must resolve here too."""
+    ``stardust --profile X serve`` without the query (#109088), so X must resolve here too."""
     from hermes_cli.gateway import _current_profile_name, named_profile_served_by_running_multiplexer
     from hermes_cli.gateway_multiplex_served import notify_multiplexer_profiles_changed
     name = (profile or "").strip() or _current_profile_name()

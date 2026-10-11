@@ -3,7 +3,7 @@
  *
  * 1. Profile scope (#37). cron.manage is scoped to the bot's OWN cron store
  *    through the core RPC's optional `profile` param: a bot's profile can run
- *    a separate gateway, or keep cron in ~/.hermes/profiles/<name>/cron/.
+ *    a separate gateway, or keep cron in ~/.stardust/profiles/<name>/cron/.
  *    Older gateways ignore the unknown param, so the `[bot:]` tag filter in
  *    selectRoutineJobs stays the fallback.
  * 2. Legacy delegated routines are paused inline before the list returns —

@@ -1,6 +1,6 @@
 """Event hook system: fires handlers at gateway lifecycle points.
 
-Hooks live in ~/.hermes/hooks/<name>/ with HOOK.yaml (name, description, events) and
+Hooks live in ~/.stardust/hooks/<name>/ with HOOK.yaml (name, description, events) and
 handler.py (``def handle(event_type, context)``, sync or async); errors never block
 the pipeline.  Events: gateway:startup, session:start/end/reset, agent:start,
 agent:step (each tool-loop turn), agent:end, command:* (wildcard).  agent:* context:

@@ -69,7 +69,7 @@ class OwnedTwilioNumber:
 
 
 def _hermes_home() -> Path:
-    return Path(os.environ.get("STARDUST_HOME", "~/.hermes")).expanduser()
+    return Path(os.environ.get("STARDUST_HOME", "~/.stardust")).expanduser()
 
 
 def _env_path() -> Path:

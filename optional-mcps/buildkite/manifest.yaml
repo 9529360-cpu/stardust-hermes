@@ -36,5 +36,5 @@ suggest:
 
 post_install: |
   On first connection Hermes opens a browser to authorize with
-  Buildkite (or run `hermes mcp login buildkite`). Approve access,
+  Buildkite (or run `stardust mcp login buildkite`). Approve access,
   then restart the session so tools load.

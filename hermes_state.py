@@ -106,8 +106,8 @@ class SessionResumeTooLargeError(ValueError):
         self.scope = scope
         super().__init__(
             f"This session is too long to reload safely ({message_count} messages; limit {limit}). "
-            "Start a fresh chat and use `hermes sessions export` to keep a copy, or raise the limit "
-            "with `hermes config set sessions.max_resume_messages 0`."
+            "Start a fresh chat and use `stardust sessions export` to keep a copy, or raise the limit "
+            "with `stardust config set sessions.max_resume_messages 0`."
         )
 
 
@@ -230,7 +230,7 @@ def _secure_state_db_files(db_path: Path, *, create_main: bool = False) -> None:
     connection to the same database. A lock-losing close in one process lets a
     sibling's connection take the shared-memory DMS exclusively at its own
     close, checkpoint, and unlink the sidecars while long-lived holders
-    (gateway, desktop ``hermes serve``) keep using the deleted inodes.
+    (gateway, desktop ``stardust serve``) keep using the deleted inodes.
     """
     if os.name == "nt":
         return
@@ -347,7 +347,7 @@ _SESSION_DB_CONSEQUENCE = "Sessions will not be saved until this is fixed."
 _NETWORK_DRIVE_HINT = " If the database lives on a network drive, move it to a local disk."
 _NETWORK_DRIVE_GLOSS = "the session database could not be opened; it may be on a network or unsupported drive"
 _NETWORK_DRIVE_ACTION = (
-    "Move it to a local disk (`hermes doctor` shows where it is), then start Hermes again."
+    "Move it to a local disk (`stardust doctor` shows where it is), then start Hermes again."
 )
 
 
@@ -362,11 +362,11 @@ def format_session_db_unavailable(
     surfaces (gateway, TUI) get the one-liner; ``details=True`` (the CLI banner) appends a
     ``Details: <raw cause>`` line for the raw SQLite text. Network filesystems (NFS/SMB/FUSE/ZFS)
     cannot host SQLite's write-ahead log: when the raw cause carries one of those markers the
-    message names the network-drive suspicion, because ``hermes doctor --fix`` cannot repair a
+    message names the network-drive suspicion, because ``stardust doctor --fix`` cannot repair a
     mount — only moving the file can."""
     cause = get_last_init_error()
     if not cause:
-        return f"{prefix}. {_SESSION_DB_CONSEQUENCE} Run `hermes doctor` to check the storage location."
+        return f"{prefix}. {_SESSION_DB_CONSEQUENCE} Run `stardust doctor` to check the storage location."
     from hermes_state_user_copy import describe_storage_failure
     failure = describe_storage_failure(cause)
     gloss, action, hint = failure.gloss, failure.action, ""
@@ -705,8 +705,8 @@ class SessionDB(
         msg = (
             f"state.db was empty or damaged ({zsize} bytes) and has been {where}; Hermes started with a "
             "fresh, empty session database. To bring old sessions back, run "
-            f"`hermes sessions recover --source {qpath or self.db_path} --inspect-only`, or restore a "
-            "snapshot with `/snapshot list` then `/snapshot restore <id>` (terminal `hermes` chat only)."
+            f"`stardust sessions recover --source {qpath or self.db_path} --inspect-only`, or restore a "
+            "snapshot with `/snapshot list` then `/snapshot restore <id>` (terminal `stardust` chat only)."
         )
         logger.error(msg)
         _set_last_init_error(msg)
@@ -1245,7 +1245,7 @@ class SessionDB(
             "state.db %s reported structural corruption outside the FTS "
             "indexes (%s); quarantining this handle: no further writes, no "
             "automatic reopen, no explicit WAL checkpoint at close. Stop the "
-            "gateway and run `hermes sessions recover --source %s --inspect-only`.", self.db_path, exc,
+            "gateway and run `stardust sessions recover --source %s --inspect-only`.", self.db_path, exc,
             self.db_path,
         )
         err = self._corrupt_error()
@@ -1442,7 +1442,7 @@ class SessionDB(
                     logger.warning(
                         "Skipping the close-time WAL checkpoint for %s: this "
                         "handle observed %s. Take a snapshot of state.db, -wal and -shm "
-                        "before restarting, then run `hermes sessions recover --source %s --inspect-only`.",
+                        "before restarting, then run `stardust sessions recover --source %s --inspect-only`.",
                         self.db_path, quarantine_reason, self.db_path,
                     )
                 elif not self.read_only and not generation_lost:  # PASSIVE, not TRUNCATE (see docstring)

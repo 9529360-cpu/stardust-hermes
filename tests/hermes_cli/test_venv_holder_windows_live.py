@@ -10,7 +10,7 @@ the consolidation fix intentionally pin the CORRECT behavior, so on
 unfixed main the buggy ones fail — that failure on the Windows runner is
 the empirical premise-check for each issue:
 
-  #90778 — holder message mislabels `hermes dashboard` as the Desktop
+  #90778 — holder message mislabels `stardust dashboard` as the Desktop
            backend, and matches subcommands by substring ("--preserve"
            contains "serve").
   #78089 — pausable-gateway exemption vs. long managed-runtime
@@ -163,7 +163,7 @@ class TestHolderMessage:
             assert matches, "dashboard process not detected"
             message = _format_venv_python_holders_message(matches)
             assert "close the desktop app" not in message.lower(), (
-                "standalone `hermes dashboard` mislabeled as the Desktop "
+                "standalone `stardust dashboard` mislabeled as the Desktop "
                 f"backend (#90778):\n{message}"
             )
         finally:
@@ -297,9 +297,9 @@ class TestConcurrentGateClassification:
         _kill(dead)  # reaped → unreadable cmdline → unknown → kept
         try:
             matches = [
-                (gw.pid, "hermes.exe"),
-                (backend.pid, "hermes.exe"),
-                (dead.pid, "hermes.exe"),
+                (gw.pid, "stardust.exe"),
+                (backend.pid, "stardust.exe"),
+                (dead.pid, "stardust.exe"),
             ]
             kept = _filter_non_gateway_concurrent_instances(matches)
             kept_pids = {pid for pid, _ in kept}
@@ -313,7 +313,7 @@ class TestConcurrentGateClassification:
 class TestUpdaterOwnedBackendDeferral:
     """#98336 — ledger-verified serve/dashboard holders defer to the CLI
     updater's stop/relaunch rungs instead of dead-ending the Desktop
-    hand-off (and leaving hermes.exe locked → quarantine os error 32)."""
+    hand-off (and leaving stardust.exe locked → quarantine os error 32)."""
 
     @staticmethod
     def _ledger_write(pid: int, purpose: str, spawner_pid: int | None,

@@ -257,7 +257,7 @@ export function InlinePreviewDirective({
   // nothing to frame. (Remote gateways used to bail here too — that predates
   // the mode-aware fs bridge; the frame now reads through readDesktopFileText,
   // which fetches over the authenticated /api/fs bridge in remote mode, so a
-  // URL connection — including a same-machine `hermes serve` — renders live.)
+  // URL connection — including a same-machine `stardust serve` — renders live.)
   if (!file || !HTML_FILE_RE.test(file)) {
     return file ? <PreviewAttachment source="explicit-link" target={file} /> : null
   }

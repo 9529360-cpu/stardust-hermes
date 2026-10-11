@@ -28,5 +28,5 @@ suggest:
 
 post_install: |
   On first connection Hermes opens a browser to authorize with
-  Notion (or run `hermes mcp login notion`). Approve access,
+  Notion (or run `stardust mcp login notion`). Approve access,
   then restart the session so tools load.

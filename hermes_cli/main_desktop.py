@@ -1,4 +1,4 @@
-"""Desktop (Electron) app: build/stamp, stage-and-swap pack, exe integrity gate, macOS signing/TCC, Linux sandbox, launch (hermes gui/desktop).
+"""Desktop (Electron) app: build/stamp, stage-and-swap pack, exe integrity gate, macOS signing/TCC, Linux sandbox, launch (stardust gui/desktop).
 
 Split out of ``hermes_cli/main.py``. Names that still live in main (``PROJECT_ROOT``, ...)
 are imported lazily inside the functions that use them (avoids an import cycle).
@@ -164,7 +164,7 @@ def _desktop_packaged_executable_in(release_dir: Path) -> Optional[Path]:
 # ─── Desktop stage-and-swap pack (#86443) ─────────────────────────────────── electron-builder packs IN
 # PLACE: before-pack.mjs wipes ``release/<platform>- unpacked`` (or the mac ``Stardust.app``) and the Electron
 # unpack + asar + rename then rebuild it. Any failure after that wipe — corrupt cached zip, blocked
-# download, missing dep, disk full — leaves the user with NO app, and ``hermes update`` used to report
+# download, missing dep, disk full — leaves the user with NO app, and ``stardust update`` used to report
 # "partially complete" over an empty release/. Fix the class, not the predicate: build into a STAGING output
 # dir next to release/, verify the staged result, and only then swap it over the live tree with renames. On
 # any failure the live app is untouched.
@@ -233,7 +233,7 @@ def _discard_desktop_staging(staging_dir: Path) -> None:
 
 
 # ─── Desktop exe integrity gate (#69179) ──────────────────────────────────── The desktop self-update chain
-# (Desktop → hermes-setup --update → `hermes update` → `hermes desktop --build-only` → relaunch) rebuilds
+# (Desktop → hermes-setup --update → `stardust update` → `stardust desktop --build-only` → relaunch) rebuilds
 # Stardust.exe on the end user's machine and used to verify only that the file EXISTS before declaring
 # success. A corrupt cached Electron zip whose extraction produced a truncated electron.exe, an interrupted
 # rcedit resource rewrite, a disk-full pack, or a wrong-arch unpacked tree therefore shipped a broken binary
@@ -478,12 +478,12 @@ def _ensure_desktop_exe_launchable(desktop_dir: Path, packaged_executable: Optio
     restored = _rollback_desktop_from_backup(packaged_executable)
     if restored is not None:
         print("  ↩ Update aborted — restored the previous working Stardust.exe from backup.")
-        print("    Your existing version was kept and still works. Run `hermes desktop`")
+        print("    Your existing version was kept and still works. Run `stardust desktop`")
         print("    (or the in-app update) again to retry with a fresh Electron download.")
         return restored, True
 
     print("  ✗ No usable backup was found to restore.")
-    print("    Run `hermes desktop --force-build` to rebuild, or re-run the Hermes")
+    print("    Run `stardust desktop --force-build` to rebuild, or re-run the Hermes")
     print("    installer to repair the install.")
     return None, False
 
@@ -1231,7 +1231,7 @@ def _register_linux_desktop_entry() -> None:
     """Install the XDG desktop entry for Hermes Desktop (Linux only, best-effort).
 
     ``Exec`` and ``Icon`` are absolute so the entry works outside a login shell.
-    ``hermes uninstall --gui`` removes it.
+    ``stardust uninstall --gui`` removes it.
     """
     from hermes_cli.main import PROJECT_ROOT
     try:
@@ -1391,7 +1391,7 @@ def _build_desktop_app(desktop_dir: Path, *, source_mode: bool, npm: str, env: d
             print("  If this says \"Access is denied\" on Stardust.exe, close any")
             print("  running Hermes desktop window and retry.")
         print("  If the log shows Electron download retries, rebuild via a mirror:")
-        print("    ELECTRON_MIRROR=<mirror-base-url> hermes desktop --force-build")
+        print("    ELECTRON_MIRROR=<mirror-base-url> stardust desktop --force-build")
         sys.exit(build_result.returncode or 1)
 
     packaged_executable = None
@@ -1530,7 +1530,7 @@ def cmd_gui(args: argparse.Namespace):
         npm = _resolve_node_runtime_npm()
         if not npm:
             print("Desktop GUI requires Node.js/npm, but npm was not found on PATH.")
-            print("Install Node.js, then run:  hermes gui")
+            print("Install Node.js, then run:  stardust gui")
             sys.exit(1)
 
     if skip_build:

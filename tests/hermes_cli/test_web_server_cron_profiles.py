@@ -17,7 +17,7 @@ def isolated_profiles(tmp_path, monkeypatch):
     """Give profile discovery an isolated default home with one named profile."""
     from hermes_cli import profiles
 
-    default_home = tmp_path / ".hermes"
+    default_home = tmp_path / ".stardust"
     profiles_root = default_home / "profiles"
     worker_home = profiles_root / "worker_alpha"
 
@@ -1266,7 +1266,7 @@ async def test_create_cron_job_without_profile_uses_backend_own_profile(
     isolated_profiles, monkeypatch
 ):
     """A pool backend scoped to a named profile must not default creates to
-    ``~/.hermes`` when the request carries no explicit ``profile`` (the
+    ``~/.stardust`` when the request carries no explicit ``profile`` (the
     Desktop app's pre-profileScoped clients sent none)."""
     from hermes_cli import web_server
 

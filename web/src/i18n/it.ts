@@ -326,7 +326,7 @@ export const it: Translations = {
     enableRuntime: "Abilita",
     forceReinstall: "Forza reinstallazione (elimina prima la cartella esistente)",
     headline:
-      "Scopri, installa, abilita e aggiorna i plugin Hermes (parità con `hermes plugins`).",
+      "Scopri, installa, abilita e aggiorna i plugin Hermes (parità con `stardust plugins`).",
     identifierLabel: "URL Git o owner/repo",
     inactive: "inattivo",
     installBtn: "Installa",
@@ -343,8 +343,8 @@ export const it: Translations = {
     providersHint:
       "Scrive memory.provider (vuoto = integrato) e context.engine in config.yaml. Effetto dalla prossima sessione.",
     refreshDashboard: "Riscansiona estensioni dashboard",
-    removeConfirm: "Rimuovere questo plugin da ~/.hermes/plugins/?",
-    removeHint: "Solo i plugin installati dall'utente in ~/.hermes/plugins possono essere rimossi.",
+    removeConfirm: "Rimuovere questo plugin da ~/.stardust/plugins/?",
+    removeHint: "Solo i plugin installati dall'utente in ~/.stardust/plugins possono essere rimossi.",
     rescanHeading: "Registro plugin SPA",
     rescanHint: "Riscansiona dopo aver aggiunto file su disco affinché la barra laterale rilevi i nuovi manifest.",
     runtimeHeading: "Runtime gateway (plugin YAML)",
@@ -366,7 +366,7 @@ export const it: Translations = {
     all: "Tutti",
     categories: "Categorie",
     filters: "Filtri",
-    noSkills: "Nessuna competenza trovata. Le competenze vengono caricate da ~/.hermes/skills/",
+    noSkills: "Nessuna competenza trovata. Le competenze vengono caricate da ~/.stardust/skills/",
     noSkillsMatch: "Nessuna competenza corrisponde alla ricerca o al filtro.",
     skillCount: "{count} competenz{s}",
     resultCount: "{count} risultat{s}",
@@ -380,7 +380,7 @@ export const it: Translations = {
   },
 
   config: {
-    configPath: "~/.hermes/config.yaml",
+    configPath: "~/.stardust/config.yaml",
     filters: "Filtri",
     sections: "Sezioni",
     exportConfig: "Esporta configurazione come JSON",

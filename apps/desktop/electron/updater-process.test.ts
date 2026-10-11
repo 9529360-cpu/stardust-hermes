@@ -128,7 +128,7 @@ test('spawnUpdaterProcess preserves updater options off Windows', () => {
 })
 
 test('resolveStagedUpdaterBinary hands Windows the staged installer it finds', () => {
-  const home = 'C:\\Users\\hermes\\AppData\\Local\\hermes'
+  const home = 'C:\\Users\\hermes\\AppData\\Local\\stardust'
   const staged = path.join(home, 'hermes-setup.exe')
   const probed: string[] = []
 
@@ -146,7 +146,7 @@ test('resolveStagedUpdaterBinary hands Windows the staged installer it finds', (
 })
 
 test('resolveStagedUpdaterBinary returns null off Windows even when hermes-setup is staged (#74836)', () => {
-  const home = '/Users/hermes/.hermes'
+  const home = '/Users/hermes/.stardust'
   let probes = 0
 
   const resolved = resolveStagedUpdaterBinary(home, {
@@ -165,7 +165,7 @@ test('resolveStagedUpdaterBinary returns null off Windows even when hermes-setup
 })
 
 test('resolveStagedUpdaterBinary returns null on Windows when nothing is staged', () => {
-  const resolved = resolveStagedUpdaterBinary('C:\\Users\\hermes\\AppData\\Local\\hermes', {
+  const resolved = resolveStagedUpdaterBinary('C:\\Users\\hermes\\AppData\\Local\\stardust', {
     fileExists: () => false,
     isWindows: true
   })
@@ -174,7 +174,7 @@ test('resolveStagedUpdaterBinary returns null on Windows when nothing is staged'
 })
 
 test('resolveUpdateScriptHandoff prefers the repo script on Windows when present', () => {
-  const root = String.raw`C:\Users\hermes\AppData\Local\hermes\hermes-agent`
+  const root = String.raw`C:\Users\hermes\AppData\Local\stardust\hermes-agent`
   const expected = path.join(root, 'scripts', 'desktop-update', 'windows.ps1')
 
   const handoff = resolveUpdateScriptHandoff(root, {
@@ -189,7 +189,7 @@ test('resolveUpdateScriptHandoff prefers the repo script on Windows when present
 })
 
 test('resolveUpdateScriptHandoff falls back to the pre-reorg flat path', () => {
-  const root = String.raw`C:\Users\hermes\AppData\Local\hermes\hermes-agent`
+  const root = String.raw`C:\Users\hermes\AppData\Local\stardust\hermes-agent`
   const legacy = path.join(root, 'scripts', 'desktop-update.ps1')
 
   const handoff = resolveUpdateScriptHandoff(root, {
@@ -202,7 +202,7 @@ test('resolveUpdateScriptHandoff falls back to the pre-reorg flat path', () => {
 })
 
 test('resolveUpdateScriptHandoff returns null when the checkout predates the script', () => {
-  const handoff = resolveUpdateScriptHandoff(String.raw`C:\Users\hermes\AppData\Local\hermes\hermes-agent`, {
+  const handoff = resolveUpdateScriptHandoff(String.raw`C:\Users\hermes\AppData\Local\stardust\hermes-agent`, {
     isWindows: true,
     fileExists: () => false
   })
@@ -211,7 +211,7 @@ test('resolveUpdateScriptHandoff returns null when the checkout predates the scr
 })
 
 test('resolveUpdateScriptHandoff is Windows-only (POSIX updates in place)', () => {
-  const handoff = resolveUpdateScriptHandoff('/home/hermes/.hermes/hermes-agent', {
+  const handoff = resolveUpdateScriptHandoff('/home/hermes/.stardust/hermes-agent', {
     isWindows: false,
     fileExists: () => true
   })
@@ -220,7 +220,7 @@ test('resolveUpdateScriptHandoff is Windows-only (POSIX updates in place)', () =
 })
 
 test('wrapHandoffForDetachedConsole routes through cmd start with own console', () => {
-  const root = String.raw`C:\Users\hermes\AppData\Local\hermes\hermes-agent`
+  const root = String.raw`C:\Users\hermes\AppData\Local\stardust\hermes-agent`
   const expected = path.join(root, 'scripts', 'desktop-update', 'windows.ps1')
 
   const handoff = resolveUpdateScriptHandoff(root, {
@@ -253,7 +253,7 @@ test('wrapHandoffForDetachedConsole routes through cmd start with own console', 
 })
 
 test('resolvePosixScriptHandoff returns the bash recipe when the script exists', () => {
-  const root = '/home/hermes/.hermes/hermes-agent'
+  const root = '/home/hermes/.stardust/hermes-agent'
   const expected = path.join(root, 'scripts', 'desktop-update', 'posix.sh')
 
   const handoff = resolvePosixScriptHandoff(root, {
@@ -267,7 +267,7 @@ test('resolvePosixScriptHandoff returns the bash recipe when the script exists',
 })
 
 test('resolvePosixScriptHandoff is null when the checkout predates the script', () => {
-  const handoff = resolvePosixScriptHandoff('/home/hermes/.hermes/hermes-agent', {
+  const handoff = resolvePosixScriptHandoff('/home/hermes/.stardust/hermes-agent', {
     isWindows: false,
     fileExists: () => false
   })
@@ -276,7 +276,7 @@ test('resolvePosixScriptHandoff is null when the checkout predates the script', 
 })
 
 test('resolvePosixScriptHandoff is null on Windows', () => {
-  const handoff = resolvePosixScriptHandoff(String.raw`C:\Users\hermes\AppData\Local\hermes\hermes-agent`, {
+  const handoff = resolvePosixScriptHandoff(String.raw`C:\Users\hermes\AppData\Local\stardust\hermes-agent`, {
     isWindows: true,
     fileExists: () => true
   })
@@ -401,7 +401,7 @@ test('describeUpdaterHandoffFailure leads with plain copy and confines the raw o
 
     assert.match(lead, /Hermes keeps running/)
     assert.match(lead, /Try again/)
-    assert.doesNotMatch(lead, /exited|spawn|ENOENT|settle window|hermes update|\d/)
+    assert.doesNotMatch(lead, /exited|spawn|ENOENT|settle window|stardust update|\d/)
     assert.equal(details, raw)
   }
 

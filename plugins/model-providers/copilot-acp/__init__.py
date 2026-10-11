@@ -2,7 +2,7 @@
 
 copilot-acp does not speak OpenAI-over-HTTP: it drives an external ACP subprocess over
 stdio, so the profile supplies its own client via :meth:`ProviderProfile.create_client`.
-An out-of-tree ACP provider (``~/.hermes/plugins/model-providers/`` or a pip entry point)
+An out-of-tree ACP provider (``~/.stardust/plugins/model-providers/`` or a pip entry point)
 uses the same three lines without touching core.
 """
 

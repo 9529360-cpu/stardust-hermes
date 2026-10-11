@@ -1,8 +1,8 @@
 """Serve-kind runtime inventory + stop/relaunch rung (#63206, campaign #91277).
 
-A network-bound `hermes serve --host <ip>` powering a remote Desktop used to
+A network-bound `stardust serve --host <ip>` powering a remote Desktop used to
 be invisible to the update pipeline: not in the inventory, a dead-end at the
-venv-holder guard, and never relaunched after `hermes update` killed it. The
+venv-holder guard, and never relaunched after `stardust update` killed it. The
 fix threads the spawn ledger's structured launch identity (host/port/profile,
 registered at serve startup) through inventory → guard rung → relaunch.
 """
@@ -29,7 +29,7 @@ def _ledger_entry(**over):
         "spawner_pid": None,
         "spawner_create": None,
         "registered_at": 222.0,
-        "argv": "hermes serve --host 100.94.65.93 --port 9119",
+        "argv": "stardust serve --host 100.94.65.93 --port 9119",
         "host": "100.94.65.93",
         "port": 9119,
         "profile": "",
@@ -195,13 +195,13 @@ def test_relaunch_stopped_serves_untriggered_token_noop(monkeypatch):
 
 
 def test_scan_dashboard_processes_includes_ledger_only_serves(monkeypatch):
-    """A profiled serve (`hermes --profile p serve ...`) matches no scan
+    """A profiled serve (`stardust --profile p serve ...`) matches no scan
     pattern; the ledger row must still surface it."""
     import hermes_cli.dashboard_procs as dp
 
     profiled = _ledger_entry(
         pid=8123,
-        argv="hermes --profile work serve --host 100.94.65.93 --port 9119",
+        argv="stardust --profile work serve --host 100.94.65.93 --port 9119",
         profile="work",
     )
     fake_pi = SimpleNamespace(ledger_entries=lambda **k: [profiled])

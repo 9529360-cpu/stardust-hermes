@@ -6,9 +6,9 @@ Hermetic-test invariants enforced here (see AGENTS.md for rationale):
    (ending in _API_KEY, _TOKEN, _SECRET, _PASSWORD, _CREDENTIALS, etc.)
    are unset before every test. Local developer keys cannot leak in.
 2. **Isolated STARDUST_HOME.** STARDUST_HOME points to a per-test tempdir so
-   code reading ``~/.hermes/*`` via ``get_hermes_home()`` can't see the
+   code reading ``~/.stardust/*`` via ``get_hermes_home()`` can't see the
    real one. (We do NOT also redirect HOME — that broke subprocesses in
-   CI. Code using ``Path.home() / ".hermes"`` instead of the canonical
+   CI. Code using ``Path.home() / ".stardust"`` instead of the canonical
    ``get_hermes_home()`` is a bug to fix at the callsite.)
 3. **Deterministic runtime.** TZ=UTC, LANG=C.UTF-8, PYTHONHASHSEED=0.
 4. **No STARDUST_SESSION_* inheritance** — the agent's current gateway
@@ -43,7 +43,7 @@ if str(PROJECT_ROOT) not in sys.path:
 # `get_hermes_home()` and attaches rotating file handlers to the ROOT logger.
 # So merely importing it - which many test modules do, directly or
 # transitively - points the whole pytest session's logging at the operator's
-# real `~/.hermes/logs/agent.log` and `errors.log`.
+# real `~/.stardust/logs/agent.log` and `errors.log`.
 #
 # The `_isolate_env` fixture below also sandboxes STARDUST_HOME, but fixtures run
 # AFTER collection imports test modules, by which point the handler already
@@ -57,7 +57,7 @@ if str(PROJECT_ROOT) not in sys.path:
 # ORDER MATTERS: the kanban write guard's deny-list (further down) must know
 # the REAL Hermes root — capture it BEFORE the sandbox rewires STARDUST_HOME,
 # otherwise the deny-list would point at the throwaway tempdir and the guard
-# would silently stop protecting the operator's actual ~/.hermes (#69385).
+# would silently stop protecting the operator's actual ~/.stardust (#69385).
 _PRE_SANDBOX_KANBAN_OVERRIDE = os.environ.get("STARDUST_KANBAN_HOME", "").strip()
 _PRE_SANDBOX_HERMES_HOME = os.environ.get("STARDUST_HOME", "")
 
@@ -66,10 +66,10 @@ def _hermes_home_points_at_production(value: str) -> bool:
     """True when a pre-set STARDUST_HOME resolves to the real production root.
 
     Gateway-launched shells (and developer shells that ``export
-    STARDUST_HOME=~/.hermes``) hand pytest the PRODUCTION home. Historically
+    STARDUST_HOME=~/.stardust``) hand pytest the PRODUCTION home. Historically
     the session sandbox below honored any pre-set value, so collection-time
     imports (logging handlers, ``hermes_state.DEFAULT_DB_PATH``) froze paths
-    inside the real ``~/.hermes`` — the escape vector that landed pytest
+    inside the real ``~/.stardust`` — the escape vector that landed pytest
     fixture rows (chat-1 / wx-chat sessions, /tmp/pytest-of-* routing
     scopes) in the live state.db and flipped its journal mode under the
     WAL-mode gateway writer. Only a genuinely custom (non-production)
@@ -79,7 +79,7 @@ def _hermes_home_points_at_production(value: str) -> bool:
         return True
     try:
         resolved = Path(value).expanduser().resolve()
-        real_root = (Path.home() / ".hermes").resolve()
+        real_root = (Path.home() / ".stardust").resolve()
     except Exception:
         return True
     if resolved == real_root:
@@ -306,7 +306,7 @@ _HERMES_BEHAVIORAL_VARS = frozenset({
     "STARDUST_AGENT_USE_LEGACY_SESSION_KEYS",
     # Kanban path/board pins must never leak from a developer shell or
     # dispatched worker into tests; otherwise tests can write fake tasks to
-    # the real ~/.hermes/kanban.db instead of the per-test STARDUST_HOME.
+    # the real ~/.stardust/kanban.db instead of the per-test STARDUST_HOME.
     "STARDUST_KANBAN_DB",
     "STARDUST_KANBAN_BOARD",
     "STARDUST_KANBAN_HOME",
@@ -458,7 +458,7 @@ def _hermetic_environment(tmp_path, monkeypatch):
     """Blank out all credential/behavioral env vars so local and CI match.
 
     Also redirects HOME and STARDUST_HOME to per-test tempdirs so code that
-    reads ``~/.hermes/*`` can't touch the real one, and pins TZ/LANG so
+    reads ``~/.stardust/*`` can't touch the real one, and pins TZ/LANG so
     datetime/locale-sensitive tests are deterministic.
     """
     # 1. Blank every credential-shaped env var that's currently set.
@@ -478,14 +478,14 @@ def _hermetic_environment(tmp_path, monkeypatch):
     monkeypatch.setenv("STARDUST_HONCHO_HOST", "hermes")
 
     # 3. Redirect STARDUST_HOME to a per-test tempdir. Code that reads
-    #    ``~/.hermes/*`` via ``get_hermes_home()`` now gets the tempdir.
+    #    ``~/.stardust/*`` via ``get_hermes_home()`` now gets the tempdir.
     #
     #    NOTE: We do NOT also redirect HOME. Doing so broke CI because
     #    some tests (and their transitive deps) spawn subprocesses that
     #    inherit HOME and expect it to be stable. If a test genuinely
     #    needs HOME isolated, it should set it explicitly in its own
-    #    fixture. Any code in the codebase reading ``~/.hermes/*`` via
-    #    ``Path.home() / ".hermes"`` instead of ``get_hermes_home()``
+    #    fixture. Any code in the codebase reading ``~/.stardust/*`` via
+    #    ``Path.home() / ".stardust"`` instead of ``get_hermes_home()``
     #    is a bug to fix at the callsite.
     fake_hermes_home = tmp_path / "hermes_test"
     fake_hermes_home.mkdir()
@@ -561,7 +561,7 @@ def _hermetic_environment(tmp_path, monkeypatch):
     monkeypatch.setenv("STARDUST_DISABLE_LAZY_INSTALLS", "1")
 
     # 5. Reset plugin singleton so tests don't leak plugins from
-    #    ~/.hermes/plugins/ (which, per step 3, is now empty — but the
+    #    ~/.stardust/plugins/ (which, per step 3, is now empty — but the
     #    singleton might still be cached from a previous test).
     try:
         import hermes_cli.plugins as _plugins_mod
@@ -724,7 +724,7 @@ def _neutralize_macos_keychain_creds(request, monkeypatch):
 #   • honors ``@pytest.mark.live_system_guard_bypass`` (the established
 #     escape-hatch marker) by disabling the state-db guard for that test;
 #   • injects the pre-sandbox CUSTOM production root (Docker/portable
-#     installs where STARDUST_HOME is not ~/.hermes) into the guard's
+#     installs where STARDUST_HOME is not ~/.stardust) into the guard's
 #     deny-list, mirroring the kanban deny-list capture above.
 # The guard itself is env-activated (PYTEST_CURRENT_TEST / PYTEST_VERSION),
 # so subprocess children that import hermes_state directly are covered even
@@ -878,7 +878,7 @@ def tmp_dir(tmp_path):
 
 @pytest.fixture()
 def mock_config():
-    """Return a minimal hermes config dict suitable for unit tests."""
+    """Return a minimal stardust config dict suitable for unit tests."""
     return {
         "model": "test/mock-model",
         "toolsets": ["terminal", "file"],
@@ -998,7 +998,7 @@ def _wal_is_usable() -> bool:
     ``DEFAULT_DB_PATH`` from ``get_hermes_home()`` at import time, so importing
     it during collection — before the per-test ``_isolate_hermes_home`` fixture
     redirects ``STARDUST_HOME`` — permanently caches the DEVELOPER'S REAL
-    ``~/.hermes/state.db`` for the whole session. Tests then read live
+    ``~/.stardust/state.db`` for the whole session. Tests then read live
     production sessions instead of a tempdir. The version predicate is
     duplicated from ``hermes_state._is_sqlite_wal_reset_vulnerable`` (upstream
     fixed ranges, stable) rather than imported, and
@@ -1066,7 +1066,7 @@ _ALLOW_MACOS_KEYCHAIN_MARK = "allow_macos_keychain"
 #
 # Hermes runs on Linux, macOS and native Windows, and a lot of its behaviour
 # genuinely differs per host: PTY vs pywinpty, taskkill vs SIGTERM, launchd
-# vs systemd, Keychain vs libsecret, ``%LOCALAPPDATA%`` vs ``~/.hermes``.
+# vs systemd, Keychain vs libsecret, ``%LOCALAPPDATA%`` vs ``~/.stardust``.
 #
 # Historically those code paths were tested by *faking* the host — patching
 # ``sys.platform`` to ``"win32"`` inside a Linux CI job. That gives a green
@@ -1125,7 +1125,7 @@ def _relocate_basetemp_outside_operator_home(config) -> None:
 
     Every per-test sandbox is ``<basetemp>/.../hermes_test``. ``get_default_hermes_root()``
     prefers the platform-native home whenever ``STARDUST_HOME`` sits *under* it, so a basetemp
-    inside ``~/.hermes`` (or ``%LOCALAPPDATA%\\hermes``, where ``TEMP`` commonly lives on
+    inside ``~/.stardust`` (or ``%LOCALAPPDATA%\\stardust``, where ``TEMP`` commonly lives on
     Windows) turns the sandbox back into the live install and ``get_profile_dir("default")``
     writes fixtures over the operator's config.yaml / .env / MEMORY.md (#111101).
     """
@@ -1141,7 +1141,7 @@ def _relocate_basetemp_outside_operator_home(config) -> None:
         return
     # The system temp dir may itself be inside the home (Windows TEMP under the
     # Hermes home). The repo is no escape either: the default install checks it
-    # out *inside* the home (~/.hermes/hermes-agent). A sibling of the native
+    # out *inside* the home (~/.stardust/hermes-agent). A sibling of the native
     # home is outside it by construction.
     safe_root = None if not Path(tempfile.gettempdir()).resolve().is_relative_to(native) else native.parent
     safe = Path(tempfile.mkdtemp(prefix="hermes-pytest-basetemp-", dir=safe_root))
@@ -1434,7 +1434,7 @@ def _live_system_guard(request, monkeypatch):
         "hermes_cli.main gateway",
         "hermes_cli/main.py gateway",
         "gateway/run.py",
-        "hermes gateway",
+        "stardust gateway",
     )
     _MUTATING_VERBS = (
         "restart", "start", "stop", "kill", "reload",
@@ -1540,7 +1540,7 @@ def _live_system_guard(request, monkeypatch):
                 "Mark with @pytest.mark.live_system_guard_bypass if "
                 "intentional."
             )
-        # Block any subprocess that would run `hermes update` (or the
+        # Block any subprocess that would run `stardust update` (or the
         # equivalent `python -m hermes_cli.main update`).  These commands
         # run `git fetch origin + git pull` against the REAL checkout,
         # overwriting files like pyproject.toml mid-test-run and corrupting
@@ -1553,19 +1553,19 @@ def _live_system_guard(request, monkeypatch):
         cmd_str = _cmd_to_string(cmd)
         low = cmd_str.lower()
         if "update" in low and (
-            # hermes update / hermes update --gateway / setsid bash -c ... hermes update
+            # stardust update / stardust update --gateway / setsid bash -c ... stardust update
             ("hermes" in low and "update" in low.split())
             or
             # python -m hermes_cli.main update --gateway
             ("hermes_cli" in low and "update" in low.split())
             or
-            # venv/bin/hermes update  (absolute path variant used in tests)
-            (".venv/bin/hermes" in low and "update" in low)
+            # venv/bin/stardust update  (absolute path variant used in tests)
+            (".venv/bin/stardust" in low and "update" in low)
         ):
             raise RuntimeError(
                 f"tests/conftest.py live-system guard: blocked "
                 f"subprocess.{name}({cmd!r}) — this command would run "
-                "`hermes update` against the real checkout, fetching "
+                "`stardust update` against the real checkout, fetching "
                 "from origin and overwriting repo files (e.g. "
                 "pyproject.toml) mid-test-run. This corrupts every "
                 "subsequent subprocess in the same runner. "
@@ -1585,7 +1585,7 @@ def _live_system_guard(request, monkeypatch):
         # sibling refactor moved the spawn seam and left tests patching the
         # facade. The canonical matcher, never an argv substring.
         from gateway.status import _gateway_command_subcommand
-        # A gateway launched INSIDE a container (`docker exec … hermes gateway start`) cannot
+        # A gateway launched INSIDE a container (`docker exec … stardust gateway start`) cannot
         # reach the host's systemd unit or webhook port; tests/docker/ exists to exercise it.
         in_container = _first_token_basename(cmd_str) in _CONTAINER_RUNTIMES
         if (
@@ -1596,7 +1596,7 @@ def _live_system_guard(request, monkeypatch):
             raise RuntimeError(
                 f"tests/conftest.py live-system guard: blocked "
                 f"subprocess.{name}({cmd!r}) — this would spawn a REAL "
-                "hermes gateway runtime that outlives the test (it is "
+                "stardust gateway runtime that outlives the test (it is "
                 "detached), restarts the developer's live gateway, and "
                 "holds the webhook port. Patch the spawn seam where "
                 "production reads it (hermes_cli.web_server_gateway."

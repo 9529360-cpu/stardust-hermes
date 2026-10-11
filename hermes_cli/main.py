@@ -2,16 +2,16 @@
 """Hermes CLI - Main entry point.
 
 Usage:
-    hermes                     # Interactive chat (default)
-    hermes chat / gateway / setup / status / cron / doctor / update / ...
-    hermes --version           # Show version and update status
+    stardust                   # Interactive chat (default)
+    stardust chat / gateway / setup / status / cron / doctor / update / ...
+    stardust --version           # Show version and update status
     hermes <cmd> --help        # Per-command help
 """
 
 # hermes_bootstrap must be the very first import — it sets up UTF-8 stdio on
 # Windows (no-op on POSIX). Guarded: after a ``git pull`` / interrupted
-# ``hermes update`` the editable install's ``.pth`` may not list it yet; crashing
-# here would block ``hermes update``.
+# ``stardust update`` the editable install's ``.pth`` may not list it yet; crashing
+# here would block ``stardust update``.
 try:
     import hermes_bootstrap  # noqa: F401
 except ModuleNotFoundError:
@@ -36,7 +36,7 @@ if _bootstrap_root not in sys.path:
 from hermes_cli import _startup_fast  # noqa: E402
 
 # Early venv self-heal — MUST run before any third-party import below. A prior
-# ``hermes update`` may have left a recovery marker with a core package wiped;
+# ``stardust update`` may have left a recovery marker with a core package wiped;
 # the hermes_cli.config/env_loader imports further down would then crash before
 # main() reaches _recover_from_interrupted_install(). ``_early_recovery`` is
 # stdlib-only (safe on a corrupted venv) and repairs just enough to finish this
@@ -188,7 +188,7 @@ def _set_process_title() -> None:
 
     Order: opt-in ``setproctitle`` dep; ctypes ``prctl(PR_SET_NAME)`` (Linux,
     15-char limit); ``pthread_setname_np`` (macOS — lldb/top only, not ``ps
-    aux``); no-op on Windows (the .exe is already ``hermes.exe``). Never fatal.
+    aux``); no-op on Windows (the .exe is already ``stardust.exe``). Never fatal.
     """
     try:
         import setproctitle  # type: ignore[import-untyped]
@@ -231,7 +231,7 @@ def _config_default_interface_early() -> str:
         if home:
             cfg_path = os.path.join(home, "config.yaml")
         else:
-            cfg_path = os.path.join(os.path.expanduser("~"), ".hermes", "config.yaml")
+            cfg_path = os.path.join(os.path.expanduser("~"), ".stardust", "config.yaml")
         if os.path.exists(cfg_path):
             import yaml as _yaml_iface
 
@@ -303,7 +303,7 @@ _suppress_mouse_residue_early()
 
 _startup_fast.ensure_project_root_on_path()
 
-# ``hermes --version`` is answered before config/logging imports.
+# ``stardust --version`` is answered before config/logging imports.
 if _startup_fast.try_fast_version():
     raise SystemExit(0)
 
@@ -397,12 +397,12 @@ _startup_fast.ensure_project_root_on_path()
 # Profile override — MUST happen before any hermes module import: many modules
 # cache STARDUST_HOME at import time. --profile/-p is pre-parsed from sys.argv,
 # STARDUST_HOME set, and the flag stripped so argparse never sees it. Falls back
-# to ~/.hermes/active_profile for the sticky default.
+# to ~/.stardust/active_profile for the sticky default.
 _PROFILE_NAME_RE = r"^[a-z0-9][a-z0-9_-]{0,63}$"  # mirrors hermes_cli.profiles._PROFILE_ID_RE
 
 
 def _inside_mcp_add_args(argv: list, index: int) -> bool:
-    """True once argv reaches `hermes mcp add ... --args <command argv>`.
+    """True once argv reaches `stardust mcp add ... --args <command argv>`.
 
     ``mcp add --args`` is command-argv passthrough. Flags after that point
     belong to the child MCP command (for example Docker MCP Toolkit's
@@ -417,10 +417,10 @@ def _inside_mcp_add_args(argv: list, index: int) -> bool:
 
 
 def _looks_like_hermes_invocation() -> bool:
-    """False when ``sys.argv`` belongs to a test runner rather than a ``hermes`` run.
+    """False when ``sys.argv`` belongs to a test runner rather than a ``stardust`` run.
 
     pytest's own ``-p no:xdist`` reaches ``_scan_profile_flag`` through ``sys.argv`` at import
-    time; it must stay a silent skip, while a real ``hermes -p 'Work Bot'`` must fail loudly.
+    time; it must stay a silent skip, while a real ``stardust -p 'Work Bot'`` must fail loudly.
     """
     return "pytest" not in (sys.argv[0] or "")
 
@@ -429,7 +429,7 @@ def _exit_invalid_profile_name(value: str) -> None:
     from hermes_cli.profiles import _invalid_profile_name_error
 
     print(f"Error: {_invalid_profile_name_error(value)}", file=sys.stderr)
-    print("Run `hermes profile list` to see your profiles.", file=sys.stderr)
+    print("Run `stardust profile list` to see your profiles.", file=sys.stderr)
     sys.exit(2)
 
 
@@ -442,15 +442,15 @@ def _looks_like_option_value(value: str) -> bool:
 def _scan_profile_flag(argv: list) -> tuple:
     """Find -p/--profile/--profile= in argv -> (name, tokens_consumed, index).
 
-    Historically the flag worked even after the subcommand (`hermes chat -p
+    Historically the flag worked even after the subcommand (`stardust chat -p
     coder`), so scan broadly; stop at ``--`` and at the `mcp add --args`
     passthrough region. The value is normalised (strip + casefold, matching
     ``profiles.normalize_profile_name``) before validation so ``-p Work`` selects
     ``work``. A value that cannot be a profile name is rejected so
     resolve_profile_env never sys.exits on it; the rejection is explained (exit 2)
     only when the flag comes BEFORE the first subcommand token under a real
-    ``hermes`` run — after a subcommand, ``-p`` may belong to that subcommand or a
-    plugin (`hermes kanban ... -p 8080`), and option-looking values (``no:xdist``,
+    ``stardust`` run — after a subcommand, ``-p`` may belong to that subcommand or a
+    plugin (`stardust kanban ... -p 8080`), and option-looking values (``no:xdist``,
     ``--flag``) are always a silent skip.
     """
     from hermes_cli._parser import top_level_value_flag_sets
@@ -483,7 +483,7 @@ def _scan_profile_flag(argv: list) -> tuple:
 
 
 def _resolve_sudo_user_profile_env(name: str) -> str | None:
-    """Resolve `sudo hermes -p <name>` against the invoking user's home.
+    """Resolve `sudo stardust -p <name>` against the invoking user's home.
 
     This runs before argparse, so `--run-as-user` is not available yet. For
     sudo invocations the best signal is SUDO_USER: root is only doing the
@@ -507,7 +507,7 @@ def _under_gateway_supervisor(argv: list) -> bool:
     ``-p <name>`` or pin STARDUST_HOME to the profile dir; a bare invocation
     means "the root STARDUST_HOME profile". If a supervised default-profile
     child read active_profile, switching the active profile (dashboard,
-    ``hermes profile use``) would silently redirect the default gateway into
+    ``stardust profile use``) would silently redirect the default gateway into
     that profile — adopting its credentials and double-polling a Telegram
     token already owned by that profile's own gateway (#74872).
 
@@ -548,9 +548,9 @@ def _apply_profile_override() -> None:
 
     # STARDUST_HOME already set with no explicit flag: trust it only when it
     # points at a specific profile dir ("profiles" as immediate parent). If it
-    # points at the hermes root (systemd hardcodes STARDUST_HOME=/root/.hermes)
+    # points at the hermes root (systemd hardcodes STARDUST_HOME=/root/.stardust)
     # we must still read active_profile — the user may have run
-    # `hermes profile use` and the gateway should honour it (#22502).
+    # `stardust profile use` and the gateway should honour it (#22502).
     hermes_home_env = os.environ.get("STARDUST_HOME", "")
     if profile_name is None and hermes_home_env and Path(hermes_home_env).parent.name == "profiles":
         return
@@ -594,9 +594,9 @@ def _apply_profile_override() -> None:
 
 _apply_profile_override()
 
-# Windows launcher self-heal — the ``hermes`` command is a COPY of the venv
+# Windows launcher self-heal — the ``stardust`` command is a COPY of the venv
 # console script staged into the managed bin dir (outside the checkout, since
-# ``hermes update``'s autostash once swept ``<checkout>\bin`` copies off disk;
+# ``stardust update``'s autostash once swept ``<checkout>\bin`` copies off disk;
 # venv\Scripts must stay off PATH as it shadows the user's ``python``).
 # Re-staging at process start reaches already-broken installs via the desktop
 # app's ``python -m hermes_cli.main`` spawn. Gates fail toward inaction. Sits
@@ -604,8 +604,8 @@ _apply_profile_override()
 # profiles resolve; the helper anchors on the DEFAULT root, so profile
 # sessions heal the same shared dir.
 # That dir lives OUTSIDE the git checkout precisely because an earlier layout staged the copies at
-# ``<checkout>\bin``, where ``hermes update``'s autostash (``git stash push --include-untracked``) swept
-# them off disk; with the desktop updater's ``--keep-stash`` nothing restored them and ``hermes`` stopped
+# ``<checkout>\bin``, where ``stardust update``'s autostash (``git stash push --include-untracked``) swept
+# them off disk; with the desktop updater's ``--keep-stash`` nothing restored them and ``stardust`` stopped
 # resolving in every new terminal (venv\Scripts itself must stay off PATH — it shadows the user's
 # ``python``, #83797). Costs a few stat calls when healthy; gates fail toward inaction so source checkouts
 # are untouched.
@@ -617,7 +617,7 @@ if sys.platform == "win32":
     except Exception:
         pass
 
-# Load .env from ~/.hermes/.env first, then project root as dev fallback.
+# Load .env from ~/.stardust/.env first, then project root as dev fallback.
 # User-managed env files should override stale shell exports on restart.
 from hermes_cli.config import get_hermes_home
 from hermes_cli.env_loader import load_hermes_dotenv
@@ -868,7 +868,7 @@ def _read_git_revision_fingerprint(repo_root: Path) -> str | None:
                 return f"git:{ref}:{packed_sha}"
             # Ref name is known but unresolved — still stable across launches,
             # and the version/release fallback in the caller will invalidate
-            # after `hermes update`.
+            # after `stardust update`.
             return f"git:{ref}:unresolved"
         return f"git:HEAD:{head}"
     except OSError:
@@ -939,7 +939,7 @@ def _termux_should_prefetch_update_check() -> bool:
 
 
 def _dotenv_has_provider_key(env_file: Path, provider_env_vars: set) -> bool:
-    """True if ~/.hermes/.env assigns a non-empty value to any provider key."""
+    """True if ~/.stardust/.env assigns a non-empty value to any provider key."""
     if not env_file.exists():
         return False
     try:
@@ -1217,7 +1217,7 @@ def _resolve_last_session(source: str = "cli") -> Optional[str]:
     """Look up the most recently-used session ID for a source.
 
     Scoped to the current workspace first (git repo root, else cwd) so
-    ``hermes -c`` from repo A continues repo A's last session rather than the
+    ``stardust -c`` from repo A continues repo A's last session rather than the
     global MRU. Falls back to the unscoped MRU when no session matches the
     current workspace, preserving the old behaviour for fresh directories.
     """
@@ -1421,7 +1421,7 @@ def _resolve_continue_arg(args, *, use_tui: bool) -> None:
             else:
                 print(f"No session found matching '{continue_val}'.", file=sys.stderr)
                 print(
-                    "Use 'hermes sessions list' to see available sessions, or "
+                    "Use 'stardust sessions list' to see available sessions, or "
                     "pass --create-if-missing to start a new session with that title.",
                     file=sys.stderr,
                 )
@@ -1454,7 +1454,7 @@ def _resolve_continue_arg(args, *, use_tui: bool) -> None:
                     kind = "TUI" if use_tui else "CLI"
                     print(
                         f"No previous {kind} session to continue. Start a new one with "
-                        "`hermes`, or list sessions with `hermes sessions list`.",
+                        "`stardust`, or list sessions with `stardust sessions list`.",
                         file=sys.stderr,
                     )
                     sys.exit(1)
@@ -1506,7 +1506,7 @@ def _import_foreign_resume(args) -> None:
         print(f"Error: {e}")
         sys.exit(1)
     print(f"✓ Imported as {_imported_id} — resuming it now.")
-    print(f"  (later: hermes --resume {_imported_id})")
+    print(f"  (later: stardust --resume {_imported_id})")
     args.resume = _imported_id
 
 
@@ -1532,7 +1532,7 @@ def _resolve_chat_session_args(args, use_tui: bool) -> None:
         else:
             kind = "TUI" if use_tui else "CLI"
             print(f"No previous {kind} session found to resume.")
-            print("Use 'hermes sessions list' to see available sessions.")
+            print("Use 'stardust sessions list' to see available sessions.")
             sys.exit(1)
 
     _resolve_continue_arg(args, use_tui=use_tui)
@@ -1580,7 +1580,7 @@ def _warn_retired_xai_models() -> None:
             for _ref in _retired_xai_refs:
                 sys.stderr.write(f"  \033[33m⚠\033[0m {format_issue(_ref)}\n")
             sys.stderr.write(f"  \033[2mMigration guide: {MIGRATION_GUIDE_URL}\033[0m\n")
-            sys.stderr.write("  \033[2mRun 'hermes doctor' for details.\033[0m\n\n")
+            sys.stderr.write("  \033[2mRun 'stardust doctor' for details.\033[0m\n\n")
     except Exception:
         pass
 
@@ -1592,7 +1592,7 @@ def _start_chat_background_prefetch() -> None:
     foreground and competes for CPU on single-core devices). The skills sync
     is idempotent and hash-gated (~120-170ms of rglob/hashing) so it normally
     runs in a daemon thread — skill loading happens at agent init, long after.
-    The ONE exception is an unseeded ~/.hermes/skills: there the banner
+    The ONE exception is an unseeded ~/.stardust/skills: there the banner
     prefetch races the sync and caches an empty index ("No skills installed"
     on the very first launch), so the first run syncs in the foreground and
     drops the banner's skills cache.
@@ -1637,13 +1637,13 @@ def _start_chat_background_prefetch() -> None:
 
 
 def _first_run_setup_guard(args) -> None:
-    """No provider configured: offer `hermes setup` (TTY) or exit 1 with guidance."""
+    """No provider configured: offer `stardust setup` (TTY) or exit 1 with guidance."""
     print()
     print(
         "It looks like Hermes isn't configured yet -- no API keys or providers found."
     )
     print()
-    print("  Run:  hermes setup")
+    print("  Run:  stardust setup")
     print()
 
     from hermes_cli.setup import (
@@ -1665,7 +1665,7 @@ def _first_run_setup_guard(args) -> None:
         cmd_setup(args)
         return
     print()
-    print("You can run 'hermes setup' at any time to configure.")
+    print("You can run 'stardust setup' at any time to configure.")
     sys.exit(1)
 
 
@@ -1785,7 +1785,7 @@ def cmd_chat(args):
         # here — e.g. missing resolve_turn_limit / split_model_config_default
         # (#96900). The agent-setup mixin prints this hint too late: HermesCLI
         # construction already failed. Fast-chat launch also goes through
-        # cmd_chat, so this one catch covers `hermes` / `hermes chat`.
+        # cmd_chat, so this one catch covers `stardust` / `stardust chat`.
         from hermes_constants import emit_partial_update_hint
 
         if emit_partial_update_hint(e):
@@ -1939,8 +1939,8 @@ def _resolve_active_provider(config, model_cfg, effective_provider, custom_provi
                 )
         else:
             print(
-                f"Warning: Unknown provider '{effective_provider}'. Check 'hermes model' for "
-                "available providers, or run 'hermes doctor' to diagnose config "
+                f"Warning: Unknown provider '{effective_provider}'. Check 'stardust model' for "
+                "available providers, or run 'stardust doctor' to diagnose config "
                 "issues. Falling back to auto provider detection."
             )
     if not active:
@@ -1949,7 +1949,7 @@ def _resolve_active_provider(config, model_cfg, effective_provider, custom_provi
         except AuthError as exc:
             if exc.code == "no_provider_configured":
                 # The picker that is about to open IS the fix; a warning that says
-                # "run `hermes model`" from inside `hermes model` is circular.
+                # "run `stardust model`" from inside `stardust model` is circular.
                 print("No provider is set up yet — pick one below. (Nous Portal works without an API key.)")
             elif effective_provider == "auto":
                 print(f"Warning: {format_auth_error(exc)} Falling back to auto provider detection.")
@@ -1990,7 +1990,7 @@ def _pick_provider(config, active, provider_labels, custom_provider_map):
 def select_provider_and_model(args=None):
     """Core provider selection + model picking logic.
 
-    Shared by ``cmd_model`` (``hermes model``) and the setup wizard
+    Shared by ``cmd_model`` (``stardust model``) and the setup wizard
     (``setup_model_provider`` in setup.py).  Handles the full flow:
     provider picker, credential prompting, model selection, and config
     persistence.
@@ -2067,7 +2067,7 @@ def select_provider_and_model(args=None):
     _offer_reasoning_after_pick(current_model)
 
     # Post-switch cleanup: switching to a named provider (anything except
-    # "custom") leaves a stale OPENAI_BASE_URL in ~/.hermes/.env that poisons
+    # "custom") leaves a stale OPENAI_BASE_URL in ~/.stardust/.env that poisons
     # auxiliary clients using provider:auto — clear it proactively. (#5161)
     if selected_provider not in {
         "custom",
@@ -2079,7 +2079,7 @@ def select_provider_and_model(args=None):
 
 # Frozen updater surface (PEP 562 ``__getattr__`` below): the frozen
 # ``hermes_cli/update_cmd*.py`` files resolve these names via ``_m().<name>``
-# on hermes_cli.main; importing update_cmd eagerly would cost every ``hermes``
+# on hermes_cli.main; importing update_cmd eagerly would cost every ``stardust``
 # invocation ~50-100ms, so they resolve on first read. Nothing else may be
 # added here — internal import paths are not a stable API.
 _FROZEN_UPDATER_SURFACE: dict[str, tuple[str, ...]] = {
@@ -2134,7 +2134,7 @@ def cmd_verify(args):
 
 
 def cmd_security(args):
-    """Dispatch `hermes security <subcmd>`."""
+    """Dispatch `stardust security <subcmd>`."""
     sub = getattr(args, "security_command", None)
     if sub in ("audit", None):
         from hermes_cli.security_audit import cmd_security_audit
@@ -2147,7 +2147,7 @@ def cmd_security(args):
 
 
 def cmd_approvals(args):
-    """Dispatch `hermes approvals <subcmd>`."""
+    """Dispatch `stardust approvals <subcmd>`."""
     from hermes_cli.approvals_suggest import approvals_command
 
     status = approvals_command(args)
@@ -2177,7 +2177,7 @@ def cmd_backup(args):
 
 
 def _print_version_info(*, check_updates: bool = True) -> None:
-    # Shared with the `hermes --version` pre-import fast path.
+    # Shared with the `stardust --version` pre-import fast path.
     _startup_fast.print_fast_version_info(check_updates=check_updates)
 
 
@@ -2387,7 +2387,7 @@ def _run_update_transaction(args):
 def _coalesce_session_name_args(argv: list) -> list:
     """Join unquoted multi-word session names after -c/--continue and -r/--resume.
 
-    ``hermes -c Pokemon Agent Dev`` → ``['-c', 'Pokemon Agent Dev']``; tokens
+    ``stardust -c Pokemon Agent Dev`` → ``['-c', 'Pokemon Agent Dev']``; tokens
     are collected until the next flag (``-*``) or known top-level subcommand.
     """
     _SUBCOMMANDS = {
@@ -2435,9 +2435,9 @@ def _dashboard_lifecycle_flags(args, token_file) -> None:
         sys.exit(0)  # status is informational, always 0
     if getattr(args, "stop", False):
         if not _find_stale_dashboard_pids():
-            print("No hermes dashboard processes running.")
+            print("No stardust dashboard processes running.")
             sys.exit(0)
-        # Reuse the same SIGTERM-grace-SIGKILL path used after `hermes update`;
+        # Reuse the same SIGTERM-grace-SIGKILL path used after `stardust update`;
         # it prints outcomes itself. Exit 1 only if every pid was unkillable.
         from hermes_cli.dashboard_procs import _kill_stale_dashboard_processes
 
@@ -2447,7 +2447,7 @@ def _dashboard_lifecycle_flags(args, token_file) -> None:
 
 def _dashboard_validate_serve_args(args, headless_backend, token_file):
     """Headless-serve argument checks -> ssh_owner_nonce (or None)."""
-    # `hermes serve` is headless/non-interactive: fail closed on a corrupt
+    # `stardust serve` is headless/non-interactive: fail closed on a corrupt
     # config.yaml instead of silently starting on defaults where provider
     # auto-detection can adopt unnamed .env credentials (issue #81952).
     # Same policy + escape hatch as _guard_noninteractive_user_config.
@@ -2468,7 +2468,7 @@ def _dashboard_validate_serve_args(args, headless_backend, token_file):
     if ssh_owner_nonce and not re.fullmatch(r"[0-9a-f]{16}", ssh_owner_nonce):
         raise SystemExit("--ssh-owner-nonce must be 16 lowercase hex characters")
     if token_file and not headless_backend:
-        raise SystemExit("--ssh-session-token-file is only valid with hermes serve")
+        raise SystemExit("--ssh-session-token-file is only valid with stardust serve")
     return ssh_owner_nonce
 
 
@@ -2478,7 +2478,7 @@ def _dashboard_sanitize_desktop_env(headless_backend) -> None:
     Desktop Electron spawns its backend with STARDUST_DESKTOP=1 plus
     STARDUST_WEB_DIST=<packaged app.asar[/unpacked]/dist> (and often
     STARDUST_SERVE_HEADLESS=1). A shell inheriting those then running
-    `hermes dashboard` would serve the desktop renderer ("Desktop IPC bridge
+    `stardust dashboard` would serve the desktop renderer ("Desktop IPC bridge
     is unavailable", #52945) or disable the SPA. Only Electron-packaged
     WEB_DIST contamination is stripped — caller-managed overrides (dev /
     custom builds) must still work, and the desktop-spawned backend itself
@@ -2722,7 +2722,7 @@ def _plugin_cli_discovery_needed() -> bool:
     first token could be a plugin command OR a chat prompt — either way
     discovery is needed; for a prompt its cost amortizes over the agent run.
     """
-    first = _first_positional_argv()  # None = bare ``hermes`` → chat
+    first = _first_positional_argv()  # None = bare ``stardust`` → chat
     return first is not None and first not in _BUILTIN_SUBCOMMANDS
 
 
@@ -2731,12 +2731,12 @@ def _resolve_deferred_platform_cli_command(command_name: str | None) -> None:
 
     Bundled platforms are *deferred* entries (no gateway SDK imports at
     startup), so a platform's ``register_cli_command`` side effect only runs
-    on import; ``discover_plugins()`` alone leaves ``hermes photon`` failing
+    on import; ``discover_plugins()`` alone leaves ``stardust photon`` failing
     with ``invalid choice``. Importing just the matching platform keeps
     startup cheap.
 
     On the unknown-top-level-command slow path, ``discover_plugins()`` records the deferred loader but does
-    not import it, so the CLI registration never happens and ``hermes photon`` fails with argparse ``invalid
+    not import it, so the CLI registration never happens and ``stardust photon`` fails with argparse ``invalid
     choice`` (issue #54678).
     """
     if not command_name:
@@ -2766,7 +2766,7 @@ def _is_tui_chat_launch(args) -> bool:
         return True
     # The chat path decides TUI-vs-classic via _resolve_use_tui (--cli/--tui
     # flags, TTY gate, STARDUST_TUI env, display.interface config). Bare
-    # `hermes`/`hermes chat` with a TUI display config was previously missed
+    # `stardust`/`stardust chat` with a TUI display config was previously missed
     # here, so the wrapper pre-warmed its own MCP discovery while the TUI
     # gateway (spawned moments later) ran a second one — an idle stdio MCP
     # server copy held dead for the whole session. Only chat commands can
@@ -3136,7 +3136,7 @@ def _try_termux_fast_cli_launch() -> bool:
 def _try_termux_fast_tui_launch() -> bool:
     """Launch obvious Termux TUI invocations before building every subparser.
 
-    `hermes --tui` is the hot path on phones and the TUI immediately execs
+    `stardust --tui` is the hot path on phones and the TUI immediately execs
     Node, so the full parser's command-module imports are pure waste there.
     """
     if not _is_termux_startup_environment():
@@ -3227,16 +3227,16 @@ def _register_plugin_cli_commands(subparsers) -> None:
 
 
 def _cmd_sessions_lazy(args, **kwargs):
-    """``hermes sessions`` handler; sessions_cmd imports only when the subcommand runs."""
+    """``stardust sessions`` handler; sessions_cmd imports only when the subcommand runs."""
     from hermes_cli.sessions_cmd import cmd_sessions
 
     return cmd_sessions(args, **kwargs)
 
 
 def _build_cli_parser():
-    """Build the full ``hermes`` argparse tree -> ``(parser, subparsers)``.
+    """Build the full ``stardust`` argparse tree -> ``(parser, subparsers)``.
 
-    Registration ORDER is the ``hermes --help`` order; keep it stable. Groups
+    Registration ORDER is the ``stardust --help`` order; keep it stable. Groups
     live in ``hermes_cli/subcommands/<group>.py`` with handlers injected so
     those modules never import main.
     """
@@ -3251,7 +3251,7 @@ def _build_cli_parser():
     build_worktree_parser(subparsers)
     build_browser_parser(subparsers)
     build_secrets_parser(subparsers)
-    # OUTBOUND egress firewall; ``hermes proxy`` (gateway group) is the INBOUND one.
+    # OUTBOUND egress firewall; ``stardust proxy`` (gateway group) is the INBOUND one.
     build_egress_parser(subparsers)
     build_migrate_parser(subparsers)
     build_gateway_parser(
@@ -3345,7 +3345,7 @@ def _parse_cli_args(parser, subparsers, argv):
     On Python <3.11 argparse fails to route subcommand tokens when the parent
     has nargs='?' optionals (--continue): "unrecognized arguments: model". When
     argv holds a known subcommand token, set subparsers.required=True to force
-    routing; if that fails (``hermes -c model`` — 'model' is the session name)
+    routing; if that fails (``stardust -c model`` — 'model' is the session name)
     fall back to the default behaviour.
     """
     import io as _io
@@ -3385,7 +3385,7 @@ def _default_to_chat(args) -> None:
 
 
 def main():
-    """Main entry point for hermes CLI."""
+    """Main entry point for stardust CLI."""
     _set_process_title()
     _advertise_agent_env()
 
@@ -3396,7 +3396,7 @@ def main():
     except Exception:
         pass
 
-    # Sweep stale ``hermes.exe.old.*`` quarantine files from previous Windows
+    # Sweep stale ``stardust.exe.old.*`` quarantine files from previous Windows
     # updates (see ``_quarantine_running_hermes_exe``). No-op elsewhere.
     try:
         _cleanup_quarantined_exes()
@@ -3407,13 +3407,13 @@ def main():
     # process resolves fresh source against old bytecode. Never raises.
     _sweep_stale_bytecode_if_checkout_changed()
 
-    # Self-heal a venv left half-built by an interrupted ``hermes update``, and
+    # Self-heal a venv left half-built by an interrupted ``stardust update``, and
     # hint (never restart) about a fleet the interrupted update never
     # restarted. Both skipped while the user is *running* update — that flow
     # owns its marker and a recovery install must not race the real one. The
-    # substring match is deliberately loose: over-matching (``hermes skills
+    # substring match is deliberately loose: over-matching (``stardust skills
     # install update``) only defers recovery one launch; under-matching
-    # (``hermes -p work update``) would race. Never raises.
+    # (``stardust -p work update``) would race. Never raises.
     # See #95294.
     if "update" not in sys.argv[1:]:
         try:

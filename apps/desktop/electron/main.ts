@@ -556,7 +556,7 @@ if (IS_WSL && !REMOTE_DISPLAY_REASON && fs.existsSync('/dev/dxg')) {
 // Linux: point Chromium at the session's keychain backend so safeStorage can
 // encrypt remote gateway tokens (hardening.ts refuses to persist them without
 // it). The value arrives via STARDUST_DESKTOP_PASSWORD_STORE, bridged by the
-// `hermes desktop` launcher from detection or `desktop.password_store` in
+// `stardust desktop` launcher from detection or `desktop.password_store` in
 // config.yaml. Must run before app `ready` — the switch only applies pre-launch.
 const PASSWORD_STORE = resolveLinuxPasswordStore()
 
@@ -576,7 +576,7 @@ if (PASSWORD_STORE.store) {
 // 0x80000003. After enough GPU deaths the browser process FATAL-exits before the
 // UI is usable. Must run before app `ready` so `--no-sandbox` applies to child
 // processes. The sticky marker recovers Start Menu / shortcut launches that
-// never go through `hermes desktop`; it is version-scoped so an app update
+// never go through `stardust desktop`; it is version-scoped so an app update
 // re-probes the sandbox instead of degrading forever.
 //
 // `windowsSandboxFallbackActive` = this process runs without the Chromium
@@ -773,17 +773,17 @@ if (INSTALL_STAMP) {
 // scripts/install.ps1's $HermesHome and scripts/install.sh's $STARDUST_HOME.
 //
 // Defaults:
-//   Windows: %LOCALAPPDATA%\hermes (matches install.ps1)
-//   macOS / Linux: ~/.hermes (matches install.sh)
+//   Windows: %LOCALAPPDATA%\stardust (matches install.ps1)
+//   macOS / Linux: ~/.stardust (matches install.sh)
 //
-// Special case for Windows: if the user has a legacy ~/.hermes directory
+// Special case for Windows: if the user has a legacy ~/.stardust directory
 // (e.g., from a prior pip install or a manual setup) AND no
-// %LOCALAPPDATA%\hermes yet, prefer the legacy path so we don't orphan their
+// %LOCALAPPDATA%\stardust yet, prefer the legacy path so we don't orphan their
 // existing config / sessions / .env. New installs go to %LOCALAPPDATA%.
 //
 // STARDUST_DESKTOP_USER_DATA_DIR (used by test:desktop:fresh) puts the sandbox
 // STARDUST_HOME beneath the throwaway userData dir so a fresh-install run never
-// touches the user's real ~/.hermes / %LOCALAPPDATA%\hermes.
+// touches the user's real ~/.stardust / %LOCALAPPDATA%\hermes.
 function resolveHermesHome() {
   if (process.env.STARDUST_HOME) {
     return normalizeHermesHomeRoot(process.env.STARDUST_HOME)
@@ -797,7 +797,7 @@ function resolveHermesHome() {
     // A GUI app launched from Explorer inherits the environment block captured
     // at login, so a STARDUST_HOME set via `setx` AFTER login is invisible in
     // process.env even though the CLI (a fresh shell) sees it. Without this the
-    // backend silently falls back to %LOCALAPPDATA%\hermes and reports "No
+    // backend silently falls back to %LOCALAPPDATA%\stardust and reports "No
     // inference provider configured" despite a valid configured home (#45471).
     // Consult the live User-scoped registry value before the default below.
     const fromRegistry = readWindowsUserEnvVar('STARDUST_HOME')
@@ -808,11 +808,11 @@ function resolveHermesHome() {
   }
 
   if (IS_WINDOWS && process.env.LOCALAPPDATA) {
-    const localappdata = path.join(process.env.LOCALAPPDATA, 'hermes')
-    const legacy = path.join(app.getPath('home'), '.hermes')
+    const localappdata = path.join(process.env.LOCALAPPDATA, 'stardust')
+    const legacy = path.join(app.getPath('home'), '.stardust')
 
     // Migrate transparently to LOCALAPPDATA, but honour an existing legacy
-    // ~/.hermes setup (no LOCALAPPDATA install yet) so users don't lose state.
+    // ~/.stardust setup (no LOCALAPPDATA install yet) so users don't lose state.
     if (!directoryExists(localappdata) && directoryExists(legacy)) {
       return legacy
     }
@@ -820,7 +820,7 @@ function resolveHermesHome() {
     return localappdata
   }
 
-  return path.join(app.getPath('home'), '.hermes')
+  return path.join(app.getPath('home'), '.stardust')
 }
 
 const STARDUST_HOME = resolveHermesHome()
@@ -864,10 +864,10 @@ const DESKTOP_WINDOW_STATE_PATH = path.join(app.getPath('userData'), 'window-sta
 const DESKTOP_BACKEND_OWNERSHIP_PATH = path.join(app.getPath('userData'), 'backend-ownership.json')
 const DESKTOP_MANAGED_SSH_RECOVERY_PATH = path.join(app.getPath('userData'), 'managed-ssh-update-recovery.json')
 // active-profile.json records which Hermes profile the desktop launches its
-// local backend as. When set, startHermes() passes `hermes --profile <name>
+// local backend as. When set, startHermes() passes `stardust --profile <name>
 // dashboard …`, which deterministically pins STARDUST_HOME (see
 // _apply_profile_override in hermes_cli/main.py) and bypasses the sticky
-// ~/.hermes/active_profile file. Unset (null) preserves the legacy behavior:
+// ~/.stardust/active_profile file. Unset (null) preserves the legacy behavior:
 // no --profile flag, so the backend honors active_profile / default.
 const DESKTOP_PROFILE_CONFIG_PATH = path.join(app.getPath('userData'), 'active-profile.json')
 // Mirrors hermes_cli.profiles._PROFILE_ID_RE so we never hand the backend a
@@ -1341,7 +1341,7 @@ if (IS_WINDOWS) {
 
 // Seed the native About panel with the live Hermes version. This is refreshed
 // on every open via the explicit "About" menu handler (refreshAboutPanel), so
-// an in-place `hermes update` mid-session is reflected without an app restart;
+// an in-place `stardust update` mid-session is reflected without an app restart;
 // the seed here just covers the first open and any non-menu invocation path.
 app.setAboutPanelOptions({
   applicationName: APP_NAME,
@@ -1672,7 +1672,7 @@ const rendererReloadTimesRef: { current: number[] } = { current: [] }
 // the renderer's "Reload and retry" path or by quitting the app.
 let bootstrapFailure = null
 // Latched non-bootstrap backend spawn failure — stops getConnection() from
-// respawning hermes serve backend children in a tight loop while boot is broken.
+// respawning stardust serve backend children in a tight loop while boot is broken.
 let backendStartFailure = null
 // Latched CONFIRMED remote reauth failure. Remote failures deliberately do not
 // latch via backendStartFailure (they're usually transient and must stay
@@ -2341,7 +2341,7 @@ function directoryExists(filePath) {
 // relaunches the desktop mid-update — because the window vanished with no
 // progress and looks crashed — a fresh instance must NOT spawn its own local
 // backend: that backend re-locks the venv shim, the updater's straggler cleanup
-// (`force_kill_other_hermes`, taskkill /IM hermes.exe) kills it, the launch
+// (`force_kill_other_hermes`, taskkill /IM stardust.exe) kills it, the launch
 // fails with the 45s "backend didn't come up" error, and the relaunch/kill
 // cycle loops. Instead the fresh instance parks until the update finishes, then
 // brings the backend up itself (it is the surviving instance — the updater's
@@ -2386,7 +2386,7 @@ const BUNDLE_SWAP_RELAUNCH_FLAG = '--hermes-bundle-swap-relaunched'
 // banner than a window that never comes back.
 const BUNDLE_SWAP_RELAUNCH_FAILSAFE_MS = 15_000
 
-// The detached updater swaps the packaged bundle on disk AFTER `hermes update`
+// The detached updater swaps the packaged bundle on disk AFTER `stardust update`
 // exits (posix.sh mac_swap / windows.ps1). An instance reopened mid-update —
 // the #50238 gesture the gate above exists for — was launched from the
 // PRE-swap bundle, and the updater's `open` leg then merely focuses us (single
@@ -2560,7 +2560,7 @@ function findOnPath(command) {
   // On Windows, try PATHEXT extensions BEFORE the bare (empty-extension) name.
   // A real command must resolve via its .exe/.cmd (Windows command-resolution
   // semantics consult PATHEXT); an extensionless file — e.g. a Git-Bash
-  // shell-script shim named `hermes` — must not shadow `hermes.cmd`/`hermes.exe`.
+  // shell-script shim named `stardust` — must not shadow `stardust.cmd`/`stardust.exe`.
   // The empty entry is kept LAST so callers that already include the extension
   // (py.exe, pwsh.exe, powershell.exe) still resolve.
   const extensions = buildPathExtCandidates(process.env.PATHEXT, IS_WINDOWS)
@@ -2601,7 +2601,7 @@ async function unwrapWindowsVenvHermesCommand(command, backendArgs) {
 }
 
 // Does the resolved runtime understand the `serve` subcommand? The desktop
-// spawns `hermes serve`; runtimes older than serve only have `dashboard`. We
+// spawns `stardust serve`; runtimes older than serve only have `dashboard`. We
 // detect support so getBackendArgsForRuntime() can route old runtimes through
 // the legacy `dashboard --no-open` form instead of crashing on an unknown
 // subcommand (would brick every user mid-upgrade — #54568 follow-up).
@@ -2896,7 +2896,7 @@ function makeDashboardReadyFile() {
 }
 
 // resolveGitBinary — locate git.exe on Windows. A fresh installer-driven
-// install only has PortableGit under %LOCALAPPDATA%\hermes\git (never on
+// install only has PortableGit under %LOCALAPPDATA%\stardust\git (never on
 // PATH), so a bare spawn('git') ENOENTs and self-update checks fail with
 // "Couldn't check for updates". Mirror findGitBash: PortableGit first, then
 // standard Git-for-Windows locations, then PATH. Cached after first probe.
@@ -2917,8 +2917,8 @@ function resolveGitBinary() {
   const candidates = []
 
   if (localAppData) {
-    candidates.push(path.join(localAppData, 'hermes', 'git', 'cmd', 'git.exe'))
-    candidates.push(path.join(localAppData, 'hermes', 'git', 'bin', 'git.exe'))
+    candidates.push(path.join(localAppData, 'stardust', 'git', 'cmd', 'git.exe'))
+    candidates.push(path.join(localAppData, 'stardust', 'git', 'bin', 'git.exe'))
   }
 
   candidates.push(path.join(process.env['ProgramFiles'] || 'C:\\Program Files', 'Git', 'cmd', 'git.exe'))
@@ -3397,7 +3397,7 @@ let quitPromptOpen = false
 let quitConfirmedWithActiveWork = false
 
 // Resolve the staged updater binary the desktop may hand an update to. On
-// Windows that binary owns ALL repo mutation — running `hermes update` +
+// Windows that binary owns ALL repo mutation — running `stardust update` +
 // rebuilding the desktop — so the desktop never touches its own bits while
 // running. macOS/Linux stage the same binary but deliberately do not use it;
 // see resolveStagedUpdaterBinary for the policy and for #74836. Returns null
@@ -3434,13 +3434,13 @@ function repairMacUpdaterHelper(updater) {
   }
 }
 
-// Path to the venv shim whose lock decides whether `hermes update` can write
+// Path to the venv shim whose lock decides whether `stardust update` can write
 // fresh entry points. On Windows this is the file the running backend
-// `hermes.exe` holds open; on POSIX it's never mandatory-locked.
+// `stardust.exe` holds open; on POSIX it's never mandatory-locked.
 function venvHermesShimPath(updateRoot) {
   return IS_WINDOWS
-    ? path.join(updateRoot, 'venv', 'Scripts', 'hermes.exe')
-    : path.join(updateRoot, 'venv', 'bin', 'hermes')
+    ? path.join(updateRoot, 'venv', 'Scripts', 'stardust.exe')
+    : path.join(updateRoot, 'venv', 'bin', 'stardust')
 }
 
 // Best-effort lock probe mirroring the Rust updater's is_locked(): a running
@@ -3476,7 +3476,7 @@ function isShimLocked(shimPath) {
 // Kill only Hermes-OWNED venv daemons (the memory plugin's hindsight daemon:
 // exe under venv\Scripts AND cmdline referencing hindsight_api.main). The
 // daemon is spawned DETACHED, so it outlives the backend tree-kill and keeps
-// venv files mapped. External holders (a user terminal running `hermes`,
+// venv files mapped. External holders (a user terminal running `stardust`,
 // unrelated scripts) are NOT killed — scanVenvBlockers reports them and the
 // hand-off aborts, per existing design. Selection lives in the pure
 // venv-holder-select module (ordinal path-prefix, no PowerShell -like
@@ -3522,8 +3522,8 @@ function killHermesOwnedVenvDaemons(updateRoot) {
 }
 
 // Force-kill the entire process TREE rooted at each PID. Node's child.kill()
-// only signals the direct child, so on Windows a backend `hermes.exe` that
-// spawned its own grandchildren (a `hermes` REPL, a pty terminal session, the
+// only signals the direct child, so on Windows a backend `stardust.exe` that
+// spawned its own grandchildren (a `stardust` REPL, a pty terminal session, the
 // gateway) would survive and keep the venv shim locked. taskkill /T /F reaps
 // the whole tree synchronously. Windows-only: this is called solely from the
 // Windows shim-unlock path, and the backend is NOT spawned detached (so it's
@@ -3824,7 +3824,7 @@ function reapOrphanedBackendsOnce() {
 // it spawned and WAIT for the venv shim to actually unlock. The old code did
 // `hermesProcess.kill('SIGTERM')` + `app.quit()` fire-and-forget: SIGTERM on
 // Windows doesn't reap the backend's grandchildren, and quit didn't wait for
-// teardown, so the updater raced a still-locked `hermes.exe`, the quarantine
+// teardown, so the updater raced a still-locked `stardust.exe`, the quarantine
 // rename failed, uv's `pip install` hit "Access is denied", and the git path
 // bailed into a full ZIP re-download that ALSO couldn't write the locked shim —
 // a half-applied install (ryanc's update.log). Here we tree-kill the primary +
@@ -3843,7 +3843,7 @@ async function releaseBackendLockForUpdate(updateRoot) {
 // Shared backend teardown + venv-shim unlock wait. Used by BOTH the self-update
 // hand-off and the desktop uninstaller — they have the identical Windows
 // problem: the desktop's backend (and the grandchildren IT spawned — a hermes
-// REPL, a pty terminal, the gateway) keep `hermes.exe` and other files in the
+// REPL, a pty terminal, the gateway) keep `stardust.exe` and other files in the
 // venv mandatory-locked, so any in-place replace/delete of the install tree
 // races a live handle and half-fails (#37532). We tree-kill every backend PID
 // the desktop owns, then poll the shim until it's genuinely writable.
@@ -3860,7 +3860,7 @@ async function releaseBackendLock(updateRoot, tag) {
   // Seed the release gate with every PID we are about to signal: the
   // supervised primary backend and all pool backends. The gate waits for
   // these to actually LEAVE the process table, not just for the shim to
-  // unlock — the shim probe only covers venv\Scripts\hermes.exe, but the
+  // unlock — the shim probe only covers venv\Scripts\stardust.exe, but the
   // backend is `python.exe -m hermes_cli.main serve`, which need not hold
   // the shim at all (#74805 first-attempt race).
   const initialPids = []
@@ -3887,7 +3887,7 @@ async function releaseBackendLock(updateRoot, tag) {
   // launcher (venv\Scripts\python.exe) keeps the venv mandatory-locked and
   // the 15s gate aborts the hand-off before the venv-blocker scan's
   // pausable-gateway exemption ever gets a chance (#70337). Delegate to
-  // `hermes gateway stop --all`: the CLI discovers every profile's gateway
+  // `stardust gateway stop --all`: the CLI discovers every profile's gateway
   // (launcher + worker — gateway.pid records only the uv WORKER, and
   // taskkill /T from the worker never reaches its parent), drains in-flight
   // agents, and force-kills survivors. Best-effort; abort paths restore via
@@ -3955,8 +3955,8 @@ async function releaseBackendLock(updateRoot, tag) {
 //
 // The desktop is a pure consumer: it does NOT git pull / pip install / rebuild
 // itself (the old open-coded git dance lived here and drifted from
-// `hermes update`). Instead we spawn the staged Hermes-Setup binary with
-// --update and quit, so it can run `hermes update` (which refuses while we
+// `stardust update`). Instead we spawn the staged Hermes-Setup binary with
+// --update and quit, so it can run `stardust update` (which refuses while we
 // hold the venv shim) and rebuild the desktop with our exe already gone.
 //
 // Detection (checkUpdates / commit changelog / "N behind") stays in the UI;
@@ -3973,20 +3973,20 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
 
     if (!updater && !IS_WINDOWS) {
       // macOS/Linux: hand off to the repo-owned posix script — same shape as
-      // Windows (quit → detached orchestrator → `hermes update` → relaunch),
+      // Windows (quit → detached orchestrator → `stardust update` → relaunch),
       // minus the venv-lock gauntlet POSIX doesn't need. The old in-app
       // updater (applyUpdatesPosixInApp) is gone with everything it dragged
       // in: the STARDUST_DESKTOP_CHILD_PID reaper-exclusion dance (#37532),
       // the in-window rebuild retry, and the relaunch-outcome matrix — the
       // script owns swap/relaunch, and the app is DEAD during the update so
       // there is nothing to reap around. Checkouts that predate the script
-      // get the manual `hermes update` card once; their next update pulls it.
+      // get the manual `stardust update` card once; their next update pulls it.
       return await applyUpdatesPosixHandoff(opts)
     }
 
     if (!updater) {
       // No staged updater binary — this is a CLI-installed user (they ran
-      // `hermes desktop`, never the Tauri installer that self-copies
+      // `stardust desktop`, never the Tauri installer that self-copies
       // hermes-setup.exe into STARDUST_HOME). On Windows the repo hand-off
       // script serves them just as well as installer users — it only needs
       // PowerShell and the checkout — so fall through to the normal hand-off
@@ -3995,14 +3995,14 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
       const updateRoot = resolveUpdateRoot()
 
       if (!resolveUpdateScriptHandoff(updateRoot)) {
-        // They DO have a working `hermes` on PATH / in the venv, so the
+        // They DO have a working `stardust` on PATH / in the venv, so the
         // correct path is the one-liner in their native medium. We show the
         // EXACT command, branch-pinned to the checkout they're on — bare
-        // `hermes update` defaults to main and would silently switch a
+        // `stardust update` defaults to main and would silently switch a
         // bb/gui (or any non-main) install off-branch. Mirror the GUI
         // button's contract: append --branch <current> for non-main
         // checkouts, keep it bare for main so the card stays clean.
-        let command = 'hermes update'
+        let command = 'stardust update'
 
         try {
           const head = await runGit(['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: updateRoot })
@@ -4012,11 +4012,11 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
             const branch = await resolveHealedBranch(updateRoot, current)
 
             if (branch !== 'main') {
-              command = `hermes update --branch ${branch}`
+              command = `stardust update --branch ${branch}`
             }
           }
         } catch {
-          // Best-effort: fall back to bare `hermes update` if branch detection fails.
+          // Best-effort: fall back to bare `stardust update` if branch detection fails.
         }
 
         rememberLog(`[updates] no staged updater; surfacing manual \`${command}\` for CLI install at ${updateRoot}`)
@@ -4078,7 +4078,7 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
 
     // Stop our own backend(s) and wait for the venv shim to unlock BEFORE we
     // spawn the updater. Without this the updater races a still-locked
-    // hermes.exe (held by the backend child / its grandchildren) and the update
+    // stardust.exe (held by the backend child / its grandchildren) and the update
     // bricks. See releaseBackendLockForUpdate for the full failure analysis.
     const lock = await releaseBackendLockForUpdate(updateRoot)
 
@@ -4171,14 +4171,14 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
     }
 
     // Detached so the updater outlives this process — it needs us GONE before
-    // `hermes update` will run (the venv shim is locked while we live).
+    // `stardust update` will run (the venv shim is locked while we live).
     //
     // Prefer the repo-owned hand-off script over the staged Tauri binary.
     // The staged binary is frozen (no self-update path) and historically runs
     // months-stale updater logic — pre-#67369 cache resolver, pre-#74782
     // marker adoption — producing failures that were fixed on main long ago
     // (2026-08-09 incident). scripts/desktop-update/windows.ps1 ships WITH the
-    // checkout, so each `hermes update` refreshes the code that drives the
+    // checkout, so each `stardust update` refreshes the code that drives the
     // next one. Checkouts that predate the script fall back to the binary
     // path unchanged.
     const scriptHandoff = resolveUpdateScriptHandoff(updateRoot)
@@ -4222,7 +4222,7 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
       // the first moments of the hand-off — the script's step 0 overwrites it
       // with its own live $PID, and if the script never starts the wrapper's
       // dead pid makes the marker read as stale and self-delete (no wedge).
-      // The `hermes update` child adopts the SCRIPT's claim via
+      // The `stardust update` child adopts the SCRIPT's claim via
       // update_lock.py's process-ancestry rule; no mtime heuristics needed.
       if (Number.isInteger(child.pid)) {
         writeUpdateMarker(STARDUST_HOME, child.pid, { startedAt: updateStartedAt })
@@ -4352,7 +4352,7 @@ async function handOffWindowsBootstrapRecovery(reason) {
     : configuredBranch || DEFAULT_UPDATE_BRANCH
 
   const venvBin = path.join(updateRoot, 'venv', IS_WINDOWS ? 'Scripts' : 'bin')
-  const venvHermes = path.join(venvBin, IS_WINDOWS ? 'hermes.exe' : 'hermes')
+  const venvHermes = path.join(venvBin, IS_WINDOWS ? 'stardust.exe' : 'stardust')
   const venvPython = path.join(venvBin, IS_WINDOWS ? 'python.exe' : 'python')
 
   // The updater invokes the venv's Hermes launcher, which in turn requires the
@@ -4449,7 +4449,7 @@ function runningAppBundle() {
 // intact before any update process mutates the install.  Runs in the
 // desktop Electron process itself, before the backend is killed and
 // before the updater is spawned — a separate safety net from the
-// Python-level pre-update snapshot inside `hermes update`.
+// Python-level pre-update snapshot inside `stardust update`.
 function preflightStateDb(hermesHome, rememberLog) {
   const stateDbPath = path.join(hermesHome, 'state.db')
 
@@ -4532,7 +4532,7 @@ function preflightStateDb(hermesHome, rememberLog) {
 
 // macOS/Linux update hand-off: spawn the repo-owned posix orchestrator
 // (scripts/desktop-update/posix.sh) detached and QUIT. The script waits us
-// out, runs `hermes update`, swaps/relaunches the app bundle, and writes
+// out, runs `stardust update`, swaps/relaunches the app bundle, and writes
 // .hermes-update-result.json for the relaunched Desktop to surface. It shows
 // its own tiny shim window (or nothing, headless) — this process only needs
 // to leave. Checkouts that predate the script get the manual card once.
@@ -4541,9 +4541,9 @@ async function applyUpdatesPosixHandoff(opts: any) {
   const handoff = resolvePosixScriptHandoff(updateRoot)
 
   if (!handoff) {
-    emitUpdateProgress({ stage: 'manual', message: 'hermes update', percent: null })
+    emitUpdateProgress({ stage: 'manual', message: 'stardust update', percent: null })
 
-    return { ok: true, manual: true, command: 'hermes update', hermesRoot: updateRoot }
+    return { ok: true, manual: true, command: 'stardust update', hermesRoot: updateRoot }
   }
 
   const handoffConflict = updateHandoffConflict(STARDUST_HOME)
@@ -4808,7 +4808,7 @@ function resolveRendererIndex() {
     rememberLog(
       `[renderer] every renderer bundle is incomplete (${present.join(', ')}). ` +
         `The last update replaced the app while its files were locked. ` +
-        `Repair with: hermes desktop --force-build`
+        `Repair with: stardust desktop --force-build`
     )
 
     return present[0]
@@ -4820,7 +4820,7 @@ function resolveRendererIndex() {
   rememberLog(
     `[renderer] index.html not found — the desktop app was packaged without a ` +
       `renderer bundle. Tried: ${candidates.join(', ')}. ` +
-      `Rebuild with: hermes desktop --force-build`
+      `Rebuild with: stardust desktop --force-build`
   )
 
   return candidates[0]
@@ -5010,7 +5010,7 @@ async function resolveHermesBackend(backendArgs) {
 
   // 2. Development source -- when running `npm run dev` from a checkout, the
   //    cloned repo at SOURCE_REPO_ROOT takes precedence over ACTIVE and any
-  //    installed `hermes` on PATH so local Python edits are actually exercised.
+  //    installed `stardust` on PATH so local Python edits are actually exercised.
   //    (In dev with no checkout, SOURCE_REPO_ROOT won't pass isHermesSourceRoot.)
   if (!IS_PACKAGED && isHermesSourceRoot(SOURCE_REPO_ROOT)) {
     const backend = await createPythonBackend(SOURCE_REPO_ROOT, `Hermes source at ${SOURCE_REPO_ROOT}`, backendArgs)
@@ -5021,7 +5021,7 @@ async function resolveHermesBackend(backendArgs) {
   }
 
   // 3. ACTIVE_HERMES_ROOT — the canonical install at
-  //    %LOCALAPPDATA%\\hermes\\hermes-agent (Windows) or ~/.hermes/hermes-agent.
+  //    %LOCALAPPDATA%\\stardust\\hermes-agent (Windows) or ~/.stardust/hermes-agent.
   //    A valid bootstrap marker proves Desktop finished the first-run install
   //    flow, but marker provenance is NOT the same thing as runtime usability:
   //    the CLI can create the exact same repo+venv layout, and older desktop
@@ -5044,7 +5044,7 @@ async function resolveHermesBackend(backendArgs) {
     rememberLog('[bootstrap] repair requested; bypassing the usable active runtime to re-run the installer')
   }
 
-  // 4. Existing `hermes` on PATH -- installed via install.ps1 / install.sh from
+  // 4. Existing `stardust` on PATH -- installed via install.ps1 / install.sh from
   //    a previous tool-only setup, or pip-installed system-wide. Use it but
   //    do NOT write a bootstrap marker; the user did this themselves and we
   //    don't want to take ownership of an install we didn't perform.
@@ -5064,7 +5064,7 @@ async function resolveHermesBackend(backendArgs) {
         rememberLog(`Ignoring Windows Hermes override under WSL: ${hermesOverride}`)
       }
     } else {
-      hermesCommand = findOnPath('hermes')
+      hermesCommand = findOnPath('stardust')
     }
 
     if (hermesCommand) {
@@ -5081,7 +5081,7 @@ async function resolveHermesBackend(backendArgs) {
         return unwrapped
       }
 
-      // Smoke-test the candidate before trusting it. A `hermes` shim
+      // Smoke-test the candidate before trusting it. A `stardust` shim
       // left behind by a half-uninstalled pip install (or a venv
       // entry-point pointing at a deleted interpreter) still resolves
       // via findOnPath but explodes on spawn -- the user then sees a
@@ -5133,7 +5133,7 @@ async function resolveHermesBackend(backendArgs) {
     // backend hands the spawn step a guaranteed ModuleNotFoundError.
     // Verify the import works before trusting the candidate; on
     // failure, fall through to step 6 so the bootstrap runner pulls
-    // a uv-managed 3.11 into %LOCALAPPDATA%\hermes\hermes-agent\venv.
+    // a uv-managed 3.11 into %LOCALAPPDATA%\stardust\hermes-agent\venv.
     if (await canImportHermesCli(python)) {
       return {
         kind: 'python',
@@ -5309,9 +5309,9 @@ async function runEnsureRuntime(backend: any, assertStillOwned: () => void): Pro
   // On Windows, preflight Git Bash. Hermes' terminal tool calls bash.exe
   // directly (tools/environments/local.py); without it the agent can't run
   // terminal commands. install.ps1's Stage-Git puts PortableGit at
-  // %LOCALAPPDATA%\hermes\git\, which findGitBash() picks up, so for any
+  // %LOCALAPPDATA%\stardust\git\, which findGitBash() picks up, so for any
   // user who completed the bootstrap this is a no-op. For users who got
-  // here via an external `hermes` on PATH, this check still helps.
+  // here via an external `stardust` on PATH, this check still helps.
   if (IS_WINDOWS && !findGitBash()) {
     throw new Error(
       "Hermes needs a helper called Git for Windows, which isn't installed. " +
@@ -9055,7 +9055,7 @@ function isHermesProcess(pid) {
   try {
     const cmdline = fs.readFileSync(`/proc/${pid}/cmdline`, 'utf8')
 
-    return cmdline.includes('hermes')
+    return cmdline.includes('hermes') || /(^|[\\/\s])stardust(\.exe)?(\s|$)/.test(cmdline)
   } catch {
     // /proc not available (macOS) — fall back to ps. Use -o args= to inspect
     // the full command line, not just the process name.  -o comm= would return
@@ -9064,7 +9064,7 @@ function isHermesProcess(pid) {
       const { execSync } = require('child_process')
       const out = execSync(`ps -p ${pid} -o args=`, { encoding: 'utf8', timeout: 2000 })
 
-      return out.includes('hermes')
+      return out.includes('hermes') || /(^|[\\/\s])stardust(\.exe)?(\s|$)/.test(out)
     } catch {
       return false
     }
@@ -9073,7 +9073,7 @@ function isHermesProcess(pid) {
 
 // Seed active-profile.json from the best available signal when the file does
 // not yet exist.  Runs exactly once (no-op once the file exists).  Priority:
-//   1. Legacy ~/.hermes/active_profile (explicit CLI choice via hermes profile use)
+//   1. Legacy ~/.stardust/active_profile (explicit CLI choice via stardust profile use)
 //   2. Running gateway (gateway.pid with verified liveness + hermes identity)
 //   3. state.db heuristics (hybrid recency×size score picks the primary workspace)
 // The stored JSON includes _migrated:true so the renderer can optionally surface
@@ -12329,8 +12329,8 @@ async function runHermesStart() {
     // --port 0: the OS assigns an ephemeral port; the child announces it on stdout.
     const backendArgs = ['serve', '--host', '127.0.0.1', '--port', '0']
     // Pin the desktop's chosen profile via the global --profile flag. This is
-    // deterministic (it wins over the sticky ~/.hermes/active_profile file) and
-    // resolves STARDUST_HOME the same way `hermes -p <name>` does on the CLI. An
+    // deterministic (it wins over the sticky ~/.stardust/active_profile file) and
+    // resolves STARDUST_HOME the same way `stardust -p <name>` does on the CLI. An
     // unset preference keeps the legacy launch so existing installs are
     // unaffected.
     const activeProfile = readActiveDesktopProfile()
@@ -12406,9 +12406,9 @@ async function runHermesStart() {
             ...process.env,
             // Explicitly pin STARDUST_HOME for the child so Python's get_hermes_home()
             // resolves to the SAME location our resolveHermesHome() picked. Without
-            // this pin, Python falls back to ~/.hermes on every platform — fine on
+            // this pin, Python falls back to ~/.stardust on every platform — fine on
             // mac/linux (where our default matches), but on Windows our default is
-            // %LOCALAPPDATA%\hermes, which differs from C:\Users\<u>\.hermes.
+            // %LOCALAPPDATA%\stardust, which differs from C:\Users\<u>\.hermes.
             // Mismatch would split config / sessions / .env / logs across two
             // directories. install.ps1 sets STARDUST_HOME via setx; the desktop
             // can't reliably do that, so we set it inline for every spawn.
@@ -14183,7 +14183,7 @@ function createWindow() {
           errorCode: details?.errorCode,
           url: details?.url,
           errorDescription: 'The desktop renderer failed to load repeatedly after the update.',
-          repairHint: 'hermes desktop --force-build',
+          repairHint: 'stardust desktop --force-build',
           reloadUrl: DEV_SERVER || pathToFileURL(resolveRendererIndex()).toString()
         })
       }
@@ -14219,7 +14219,7 @@ function createWindow() {
       errorCode: 'ERR_FILE_NOT_FOUND',
       errorDescription: `The desktop renderer bundle is incomplete after the last update (${tornAssets.length} missing file(s)).`,
       missingAssets: tornAssets,
-      repairHint: 'hermes desktop --force-build',
+      repairHint: 'stardust desktop --force-build',
       reloadUrl: pathToFileURL(rendererIndex).toString()
     })
   } else {
@@ -14503,13 +14503,13 @@ ipcMain.handle('stardust:window:openBrowser', async (_event, tabId) => {
 })
 
 // Hand a session to the user's OWN terminal emulator, running the TUI against
-// it (`hermes --tui --resume <id>`). Not the in-app terminal pane: the point is
+// it (`stardust --tui --resume <id>`). Not the in-app terminal pane: the point is
 // to continue the chat in the terminal they already live in.
 //
 // The desktop's runtime is usually a venv Python invoked as
 // `python -m hermes_cli.main`, so we resolve the SAME backend the app itself
 // launches and carry its argv + PYTHONPATH into a launcher script rather than
-// hoping a `hermes` exists on the user's interactive PATH. Resolution only —
+// hoping a `stardust` exists on the user's interactive PATH. Resolution only —
 // never ensureRuntime(), which would kick off a first-run install from a menu
 // click; an unresolved runtime is reported instead.
 ipcMain.handle('stardust:window:openInTerminal', async (_event, sessionId, opts) => {
@@ -15318,7 +15318,7 @@ async function requestManagedSshUpdate(rawId) {
 
 ipcMain.handle('stardust:connections:update-managed', async (_event, rawId) => requestManagedSshUpdate(rawId))
 
-// Fan out `hermes update` to every eligible registered connection at once.
+// Fan out `stardust update` to every eligible registered connection at once.
 // Cloud entries are excluded (platform-managed); each dispatch reports
 // independently so one dead LAN box can't wedge the batch. Local reuses the
 // app's own update pipeline; Desktop-managed SSH uses the transactional
@@ -16589,7 +16589,7 @@ ipcMain.on('stardust:translucency:support', event => {
 
 // Launch-flag facts the renderer needs before first paint (same sendSync
 // pattern as translucency). `--local` gates every local-models GUI surface;
-// it arrives from `hermes desktop --local` or directly on Stardust.exe (a
+// it arrives from `stardust desktop --local` or directly on Stardust.exe (a
 // shortcut edit), and survives self-relaunches because collectRelaunchArgs
 // only strips internal flags.
 ipcMain.on('stardust:launch-flags', event => {
@@ -16989,7 +16989,7 @@ function resolveHermesVersion() {
   return app.getVersion()
 }
 
-// Renderer-bundle skew: `hermes update` moves the SOURCE TREE, but the UI
+// Renderer-bundle skew: `stardust update` moves the SOURCE TREE, but the UI
 // (including bundled plugins like Bot Mode) is compiled into this binary at
 // build time. A terminal-side update — or an in-app update whose bundle-swap
 // leg failed — leaves the new runtime running under an old renderer, so About
@@ -17003,7 +17003,7 @@ async function detectRendererSkew() {
 }
 
 // Re-resolve the live Hermes version and push it into the native About panel
-// just before showing it, so an in-place `hermes update` is reflected without
+// just before showing it, so an in-place `stardust update` is reflected without
 // an app restart. macOS only — `showAboutPanel()` is a no-op elsewhere, and the
 // other platforms don't use this menu item.
 function showAboutPanelFresh() {
@@ -17131,7 +17131,7 @@ async function hasNvidiaGpu(): Promise<boolean> {
 //
 // The renderer's About → Danger Zone surfaces three options that mirror the
 // CLI exactly: GUI only, Lite (keep user data), Full. We ask the agent to do
-// the actual removal via `hermes uninstall …` so the cross-platform PATH /
+// the actual removal via `stardust uninstall …` so the cross-platform PATH /
 // registry / service / node-symlink cleanup all lives in one place
 // (hermes_cli/uninstall.py + hermes_cli/gui_uninstall.py).
 //

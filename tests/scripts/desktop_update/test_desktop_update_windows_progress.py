@@ -1,7 +1,7 @@
 """The Windows hand-off keeps serving progress while its main thread blocks.
 
 windows.ps1 answers /progress from a dedicated runspace precisely so the
-window keeps moving through the long silent stretches (`hermes update`, pip,
+window keeps moving through the long silent stretches (`stardust update`, pip,
 the desktop rebuild) that made an 18-minute update look hung. This drives the
 real script and polls the real listener; the posix half of the same contract
 is covered in test_desktop_update_shim_progress.py.

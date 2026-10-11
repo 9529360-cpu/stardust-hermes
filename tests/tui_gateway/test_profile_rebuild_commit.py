@@ -11,7 +11,7 @@ def test_tools_configure_uses_live_session_profile(tmp_path, monkeypatch, explic
     from tui_gateway import server
     from hermes_constants import get_hermes_home
 
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     profile = home / "profiles" / "worker"
     profile.mkdir(parents=True)
     monkeypatch.setenv("STARDUST_HOME", str(home))
@@ -51,7 +51,7 @@ def test_rebuild_preparation_failure_keeps_reachable_owner(tmp_path, monkeypatch
     from hermes_state import SessionDB
     from hermes_constants import get_hermes_home
 
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     profile = home / "profiles" / "worker"
     profile.mkdir(parents=True)
     monkeypatch.setenv("STARDUST_HOME", str(home))

@@ -4,7 +4,7 @@
 //   logFrameEvent (ink.onFrame) → yoga / renderer / diff / optimize / write
 //                                 phases + yoga counters + scroll fast-path
 //
-// Both gate on STARDUST_DEV_PERF=1 and dump JSON-lines (default ~/.hermes/perf.log,
+// Both gate on STARDUST_DEV_PERF=1 and dump JSON-lines (default ~/.stardust/perf.log,
 // override STARDUST_DEV_PERF_LOG). Tagged { src: 'react' | 'frame' } for jq.
 // STARDUST_DEV_PERF_MS (default 2) skips sub-ms idle frames; set 0 to capture all.
 //
@@ -21,7 +21,7 @@ import { Profiler, type ProfilerOnRenderCallback, type ReactNode } from 'react'
 
 const ENABLED = /^(?:1|true|yes|on)$/i.test((process.env.STARDUST_DEV_PERF ?? '').trim())
 const THRESHOLD_MS = Number(process.env.STARDUST_DEV_PERF_MS ?? '2') || 0
-const LOG_PATH = process.env.STARDUST_DEV_PERF_LOG?.trim() || join(homedir(), '.hermes', 'perf.log')
+const LOG_PATH = process.env.STARDUST_DEV_PERF_LOG?.trim() || join(homedir(), '.stardust', 'perf.log')
 
 let logReady = false
 

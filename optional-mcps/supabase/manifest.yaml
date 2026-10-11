@@ -28,5 +28,5 @@ suggest:
 
 post_install: |
   On first connection Hermes opens a browser to authorize with
-  Supabase (or run `hermes mcp login supabase`). Approve access,
+  Supabase (or run `stardust mcp login supabase`). Approve access,
   then restart the session so tools load.

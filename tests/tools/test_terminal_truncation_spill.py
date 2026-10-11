@@ -11,7 +11,7 @@ from tools.terminal_tool import terminal_tool
 
 @pytest.fixture
 def small_cap(tmp_path, monkeypatch):
-    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
     from hermes_constants import hermes_home_key
     import tools.tool_output_limits as lim
     monkeypatch.setattr(lim, "_cached_limits", {hermes_home_key(): {
@@ -51,7 +51,7 @@ class TestTruncationSpill:
         assert "a1B2c3D4e5F6g7H8i9J0a1B2c3D4e5F6g7H8i9J0" not in full
 
     def test_old_spills_cleaned(self, small_cap, tmp_path):
-        spill_dir = tmp_path / ".hermes" / "cache" / "terminal-output"
+        spill_dir = tmp_path / ".stardust" / "cache" / "terminal-output"
         spill_dir.mkdir(parents=True, exist_ok=True)
         stale = spill_dir / "out-1-2-dead.log"
         stale.write_text("old")

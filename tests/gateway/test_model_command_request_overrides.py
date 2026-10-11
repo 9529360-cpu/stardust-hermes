@@ -43,7 +43,7 @@ async def test_handle_model_command_stores_request_overrides_for_named_custom_pr
     import gateway.run as gateway_run
     from hermes_cli.model_switch import ModelSwitchResult
 
-    hermes_home = tmp_path / ".hermes"
+    hermes_home = tmp_path / ".stardust"
     hermes_home.mkdir()
     (hermes_home / "config.yaml").write_text(
         """

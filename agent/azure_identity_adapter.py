@@ -301,7 +301,7 @@ def build_bearer_http_client(token_provider: Callable[[], str], **httpx_kwargs: 
             # WARNING so the misconfiguration is visible at default levels.
             logger.warning("Bearer hook: Entra ID token provider returned empty (%s) "
                            "— stripping Authorization headers. Azure will respond 401. "
-                           "Run `hermes doctor` or `az login` to recover.", exc)
+                           "Run `stardust doctor` or `az login` to recover.", exc)
             _strip_auth_headers(request)
             return
         _strip_auth_headers(request)

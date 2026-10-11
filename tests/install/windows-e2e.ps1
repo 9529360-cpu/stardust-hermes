@@ -23,7 +23,7 @@
 #                            target sha, marker cleanup, result JSON (when
 #                            the script path wrote one), working hermes,
 #                            and the relaunched app window.
-#                 update     run `hermes update` from the installed venv
+#                 update     run `stardust update` from the installed venv
 #                            (the CLI route a GUI user might take).
 #                 installer  re-run the bootstrap installer over the
 #                            existing install (download Hermes-Setup.exe
@@ -35,7 +35,7 @@
 #   canonical repo URLs, via a driver-owned gitconfig selected with
 #   GIT_CONFIG_GLOBAL. (NOT GIT_CONFIG_COUNT/KEY_n/VALUE_n env config --
 #   install.ps1 sets those itself and silently clobbers them.) The
-#   installer's `git clone` and `hermes update`'s `git fetch origin`
+#   installer's `git clone` and `stardust update`'s `git fetch origin`
 #   transparently hit OUR bare repo. Its `main` serves OLD for the install
 #   phase; the update phase advances it to HEAD -- an update becomes
 #   available exactly the way it does for a real user. Installer and
@@ -317,10 +317,10 @@ function Save-InstallSideState([string]$Label) {
 
 function Test-HermesRuns([string]$Label) {
     Save-InstallSideState $Label
-    $hermesExe = Join-Path $InstallDir "venv\Scripts\hermes.exe"
-    Assert-True (Test-Path -LiteralPath $hermesExe) "$Label -- venv\Scripts\hermes.exe exists"
-    & $hermesExe --version 2>&1 | ForEach-Object { Write-Host "    hermes --version| $_" }
-    Assert-True ($LASTEXITCODE -eq 0) "$Label -- hermes --version exits 0"
+    $hermesExe = Join-Path $InstallDir "venv\Scripts\stardust.exe"
+    Assert-True (Test-Path -LiteralPath $hermesExe) "$Label -- venv\Scripts\stardust.exe exists"
+    & $hermesExe --version 2>&1 | ForEach-Object { Write-Host "    stardust --version| $_" }
+    Assert-True ($LASTEXITCODE -eq 0) "$Label -- stardust --version exits 0"
 }
 
 # ----------------------------------------------------------------------------
@@ -370,7 +370,7 @@ function Assert-DesktopArtifact([string]$Label) {
 function Invoke-HermesUpdate {
     # The venv updater. --yes reaches the update subcommand only in later
     # releases; ask the installed binary, never parse its source.
-    $hermesExe = Join-Path $InstallDir "venv\Scripts\hermes.exe"
+    $hermesExe = Join-Path $InstallDir "venv\Scripts\stardust.exe"
     $updateArgs = @("update")
     $prevEap = $ErrorActionPreference; $ErrorActionPreference = "Continue"
     $helpText = & $hermesExe update --help 2>&1 | Out-String
@@ -385,16 +385,16 @@ function Invoke-HermesUpdate {
         Pop-Location
         $ErrorActionPreference = $prevEap
     }
-    Write-LogGroup "hermes update transcript" $log
-    Assert-True ($updateExit -eq 0) "hermes update exited $updateExit (expected 0)"
+    Write-LogGroup "stardust update transcript" $log
+    Assert-True ($updateExit -eq 0) "stardust update exited $updateExit (expected 0)"
 }
 
 function Invoke-HermesDesktopAppUpdate([string]$TargetSha) {
-    # The hermes-desktop launch surface: `hermes desktop` runs its whole
+    # The hermes-desktop launch surface: `stardust desktop` runs its whole
     # real pipeline; the driver intercepts the product's final spawn
     # (argv/cwd/env captured by e2e-assets/launch-capture/sitecustomize.py)
     # and re-executes it under Playwright, which clicks Update now.
-    $hermesExe = Join-Path $InstallDir "venv\Scripts\hermes.exe"
+    $hermesExe = Join-Path $InstallDir "venv\Scripts\stardust.exe"
     $spec = Join-Path $WorkRoot "launch-spec.json"
     New-Item -ItemType Directory -Path (Join-Path $WorkRoot "logs") -Force | Out-Null
     $log = Join-Path $WorkRoot "logs\desktop-launch-capture.log"
@@ -415,8 +415,8 @@ function Invoke-HermesDesktopAppUpdate([string]$TargetSha) {
         $env:PYTHONPATH = $prevPy
         $env:STARDUST_E2E_CAPTURE_LAUNCH = $prevCap
     }
-    Write-LogGroup "hermes desktop (launch capture) transcript" $log
-    Assert-True ($capExit -eq 0) "hermes desktop exited 0 during launch capture"
+    Write-LogGroup "stardust desktop (launch capture) transcript" $log
+    Assert-True ($capExit -eq 0) "stardust desktop exited 0 during launch capture"
     Assert-True (Test-Path -LiteralPath "$spec.captured") "a launch was actually captured (exit 0 without a launch must not pass)"
 
     $node = Get-ManagedNode
@@ -448,7 +448,7 @@ function Invoke-HermesDesktopAppUpdate([string]$TargetSha) {
         Pop-Location
         $ErrorActionPreference = $prevEap
     }
-    Assert-True ($driveExit -eq 0) "app driven via captured hermes desktop spec; update completed"
+    Assert-True ($driveExit -eq 0) "app driven via captured stardust desktop spec; update completed"
 }
 
 function Save-DesktopScreenshot([string]$OutFile) {
@@ -505,7 +505,7 @@ function Stop-DesktopRecorder($proc, [string]$OutDir) {
 
 function Stop-HermesAppProcesses([string]$Label) {
     # Close the desktop app the blunt way between phases (a user quitting).
-    # Only Stardust.exe (Electron) -- never hermes.exe (the venv CLI shim).
+    # Only Stardust.exe (Electron) -- never stardust.exe (the venv CLI shim).
     $procs = @(Get-Process -Name "Stardust" -ErrorAction SilentlyContinue)
     foreach ($p in $procs) {
         try { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } catch {}
@@ -517,7 +517,7 @@ function Stop-HermesAppProcesses([string]$Label) {
 }
 
 function Get-ManagedNode {
-    # `hermes update`/desktop builds use the Hermes-managed Node; use the same
+    # `stardust update`/desktop builds use the Hermes-managed Node; use the same
     # one to run the Playwright driver so no system Node is required.
     $candidates = @(
         (Join-Path $HermesHome "node\node.exe"),
@@ -779,7 +779,7 @@ function Invoke-GuiUpdateDesktopRoute([string]$TargetSha) {
         Assert-True ($driveExit -eq 0) "GUI driver clicked Update now and the app quit for hand-off"
 
         # The detached updater (spawned by the app, NOT by us) now runs
-        # `hermes update` + desktop rebuild + relaunch. Which updater depends
+        # `stardust update` + desktop rebuild + relaunch. Which updater depends
         # on the installed checkout, and BOTH are production paths:
         #   * checkouts shipping scripts/desktop-update.ps1 -> that script,
         #     which writes .hermes-update-result.json on every exit;

@@ -46,7 +46,7 @@ def test_computer_use_rejects_removed_browser_approve_command() -> None:
     result = _run("browser-approve", "--pid", "123")
 
     assert result.returncode == 2
-    assert "'browser-approve' is not a `hermes computer-use` command" in result.stderr
+    assert "'browser-approve' is not a `stardust computer-use` command" in result.stderr
     assert "choose from" not in result.stderr
 
 
@@ -119,7 +119,7 @@ def test_computer_use_status_returns_nonzero_for_incompatible_standard_driver(
     assert _invoke(monkeypatch, "status") == 1
     output = capsys.readouterr().out
     assert "Repair required" in output
-    assert "Run: hermes computer-use install" in output
+    assert "Run: stardust computer-use install" in output
 
 
 def test_computer_use_status_returns_nonzero_for_incompatible_custom_driver(

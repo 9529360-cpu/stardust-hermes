@@ -563,7 +563,7 @@ def _seed_terminal_home(tmp_path, monkeypatch, *, config_yaml=None, env_text=Non
 
 
 def test_config_yaml_terminal_backend_overrides_stale_env(tmp_path, monkeypatch):
-    """Regression for #29186: a leftover TERMINAL_ENV=docker in ~/.hermes/.env
+    """Regression for #29186: a leftover TERMINAL_ENV=docker in ~/.stardust/.env
     must not silently override the user's choice in config.yaml. config.yaml
     is the documented source of truth, so its value must win after load."""
     home = _seed_terminal_home(

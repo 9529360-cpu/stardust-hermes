@@ -139,7 +139,7 @@ def _nous_recommended_default() -> dict:
 @router.get("/api/model/recommended-default")
 def get_recommended_default_model(provider: str = ""):
     """Recommended default model for a freshly-authenticated provider, mirroring
-    ``hermes model``'s curation so GUI onboarding lands on a sensible default.
+    ``stardust model``'s curation so GUI onboarding lands on a sensible default.
     Nous honors the user's free/paid tier. Any other provider gets the preferred
     silent default when its curated list carries it, else the first curated model —
     aggregator lists lead with the priciest Anthropic flagship, which must never be
@@ -272,7 +272,7 @@ def set_moa_models(body: MoaConfigPayload, profile: Optional[str] = None):
 @router.post("/api/model/set")
 async def set_model_assignment(body: ModelAssignment, profile: Optional[str] = None):
     """Assign a model to the main slot or an auxiliary task slot. Writes
-    ``~/.hermes/config.yaml`` — applies to **new** sessions only; a running chat
+    ``~/.stardust/config.yaml`` — applies to **new** sessions only; a running chat
     PTY hot-swaps via the ``/model`` slash command instead."""
     scope, task = (body.scope or "").strip().lower(), (body.task or "").strip().lower()
     provider, model = (body.provider or "").strip(), (body.model or "").strip()

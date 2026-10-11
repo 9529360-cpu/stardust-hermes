@@ -98,7 +98,7 @@ class TestMetadata:
     def test_setup_schema_has_no_required_env_vars(self, provider):
         schema = provider.get_setup_schema()
         assert schema["env_vars"] == []
-        assert "hermes auth codex" in schema["post_setup_hint"]
+        assert "stardust auth codex" in schema["post_setup_hint"]
 
 
 # ── Availability ────────────────────────────────────────────────────────────

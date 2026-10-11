@@ -38,5 +38,5 @@ suggest:
 
 post_install: |
   On first connection Hermes opens a browser to authorize with
-  Todoist (or run `hermes mcp login todoist`). Approve access,
+  Todoist (or run `stardust mcp login todoist`). Approve access,
   then restart the session so tools load.

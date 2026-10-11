@@ -1633,7 +1633,7 @@ class CLITuiMixin:
         event.app.invalidate()
 
     def _tui_collapse_paste(self, text: str, line_count: int, *, fallback: bool) -> str:
-        """Save a large paste under ~/.hermes/pastes and return the placeholder for the buffer."""
+        """Save a large paste under ~/.stardust/pastes and return the placeholder for the buffer."""
         from cli import _hermes_home, datetime, logger
         self._tui_paste_counter += 1
         paste_dir = _hermes_home / "pastes"

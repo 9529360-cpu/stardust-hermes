@@ -105,7 +105,7 @@ def exit_reason_failure(turn_exit_reason: Any) -> Optional[ExitFailure]:
 _NEXT_STEPS_RETRY = "Wait a minute and send /retry, or switch models with /model."
 _NEXT_STEPS_LOOP = (
     "Your message is saved. Send `continue` to try again, or start a new session with /new. "
-    "If it happens again, run `hermes doctor` and share the error details."
+    "If it happens again, run `stardust doctor` and share the error details."
 )
 
 # Lead sentence per classifier reason once retries and fallback are exhausted.
@@ -122,11 +122,11 @@ _EXHAUSTED_DEFAULT_LEAD = "{label} didn't answer after {attempts} attempts"
 _NONRETRYABLE_COPY: Dict[str, str] = {
     FailoverReason.model_not_found.value: (
         "Model '{model}' isn't available on {label}. Pick a different model with /model "
-        "(or `hermes model` in a terminal).{prefix_hint}"
+        "(or `stardust model` in a terminal).{prefix_hint}"
     ),
     FailoverReason.format_error.value: (
         "{label} rejected this request as malformed, so the model didn't answer. Start a clean "
-        "session with /new or switch models with /model; if it keeps happening, run `hermes doctor`."
+        "session with /new or switch models with /model; if it keeps happening, run `stardust doctor`."
     ),
     FailoverReason.ssl_cert_verification.value: (
         "Hermes couldn't verify {label}'s security certificate, so the connection was refused. "
@@ -146,11 +146,11 @@ _NONRETRYABLE_DEFAULT_COPY = (
 _AUTH_COPY: Dict[str, str] = {
     "oauth": (
         "{label} rejected your sign-in, so the model can't be reached. Sign in again: "
-        "`hermes portal` for Nous, `hermes auth add <provider> --type oauth` for other accounts."
+        "`stardust portal` for Nous, `stardust auth add <provider> --type oauth` for other accounts."
     ),
     "api_key": (
         "{label} rejected your API key, so the model can't be reached. Update it in "
-        "Settings → Models, or run `hermes setup` in a terminal."
+        "Settings → Models, or run `stardust setup` in a terminal."
     ),
 }
 
@@ -251,7 +251,7 @@ _ONE_OFF_COPY: Dict[str, str] = {
     ),
     "nous_rate_limit": (
         "Wait for the reset and send /retry, or switch models with /model. To avoid waits, add "
-        "a backup provider with `hermes fallback add`."
+        "a backup provider with `stardust fallback add`."
     ),
 }
 _SITE_COPY: Dict[str, str] = {**_FAILURE_CODE_COPY, **_ONE_OFF_COPY}
@@ -268,7 +268,7 @@ def exhausted_copy(reason: str, *, label: str, attempts: int, summary: str) -> s
     lead = _EXHAUSTED_LEADS.get(reason, _EXHAUSTED_DEFAULT_LEAD).format(label=label, attempts=attempts)
     return (
         f"{lead} — it looks temporarily unavailable. {_NEXT_STEPS_RETRY} To avoid this in future, "
-        f"add a backup provider with `hermes fallback add`.\n\nProvider said: {summary}"
+        f"add a backup provider with `stardust fallback add`.\n\nProvider said: {summary}"
     )
 
 

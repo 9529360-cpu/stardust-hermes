@@ -1,4 +1,4 @@
-"""STARDUST_HOME state checks for hermes doctor: directories, memory files, state.db health, skills hub, memory provider, profiles.
+"""STARDUST_HOME state checks for stardust doctor: directories, memory files, state.db health, skills hub, memory provider, profiles.
 Split out of ``hermes_cli/doctor.py``, which re-exports every name so ``hermes_cli.doctor.<name>`` keeps resolving (and monkeypatching)."""
 
 from __future__ import annotations
@@ -87,7 +87,7 @@ def _render_state_db_stats(stats: dict, holders=None) -> list:
             lines.append(("warn", f"state.db FTS repair is blocked after {deferral.get('attempts') or '?'} deferral(s) "
                           f"by PID(s) {pids}",
                           "(stop the listed processes; the gateway's own retry then rebuilds, or run "
-                          "'hermes sessions optimize-storage' with every holder stopped)"))
+                          "'stardust sessions optimize-storage' with every holder stopped)"))
     # Oversized DB: suggest auto_prune, plus the offline optimize-storage pass when the FTS rebuild is
     # pending OR the DB predates the current trigram layout (fts_storage_version < FTS_STORAGE_VERSION).
     if logical is not None and logical > STATE_DB_SIZE_WARN_BYTES:
@@ -95,7 +95,7 @@ def _render_state_db_stats(stats: dict, holders=None) -> list:
         stale_trigram = (fts is not None and fts.get("messages_fts_trigram")
                          and (stats.get("fts_storage_version") or 0) < FTS_STORAGE_VERSION)
         if stats.get("fts_rebuild_pending") or stale_trigram:
-            detail += "; run 'hermes sessions optimize-storage' offline (with the gateway stopped) to compact FTS storage"
+            detail += "; run 'stardust sessions optimize-storage' offline (with the gateway stopped) to compact FTS storage"
         lines.append(("warn", f"state.db is large ({_human_bytes(logical)})", f"({detail})"))
     # WAL runaway is deliberately NOT warned here: _state_db_wal already warns above 50 MB and offers --fix.
     return lines
@@ -209,7 +209,7 @@ def _write_health_reason(state_db_path: Path, *, should_fix: bool):
         return _db_opens_cleanly(state_db_path)
     if not should_fix and state_db_path.stat().st_size > _WRITE_PROBE_SNAPSHOT_MAX_BYTES:
         check_info("state.db write-health probe skipped: store is held by a live writer and larger than 1 GB "
-                   "(run 'hermes doctor --fix' to probe it)")
+                   "(run 'stardust doctor --fix' to probe it)")
         return None
     import sqlite3
     import tempfile
@@ -234,11 +234,11 @@ _STATE_DB_REPAIRS = {
     "fts": ("Repaired state.db FTS write health",
             "state.db FTS write-health repair did not recover automatically",
             "state.db FTS write corruption and auto-repair failed — restore from the backup copy beside state.db",
-            "state.db FTS write corruption — run 'hermes doctor --fix' (or 'hermes sessions repair') to rebuild the FTS index"),
+            "state.db FTS write corruption — run 'stardust doctor --fix' (or 'stardust sessions repair') to rebuild the FTS index"),
     "schema": ("Repaired state.db schema ({count} sessions recovered)",
                "state.db schema repair did not recover automatically",
                "state.db schema malformed and auto-repair failed — restore from the backup copy beside state.db",
-               "state.db schema malformed — run 'hermes doctor --fix' (or 'hermes sessions repair') to recover hidden sessions"),
+               "state.db schema malformed — run 'stardust doctor --fix' (or 'stardust sessions repair') to recover hidden sessions"),
 }
 _STATE_DB_STRUCTURAL_ISSUE = (
     "state.db structural corruption (canonical tables/indexes damaged, not the FTS index) — an FTS rebuild "
@@ -325,7 +325,7 @@ def _state_db_stats(issues: list, state_db_path: Path) -> None:
             check_warn(_text, _detail)
             if "auto_prune" in _detail:
                 issues.append("state.db is large — enable sessions.auto_prune in config.yaml"
-                              + (" and run 'hermes sessions optimize-storage' offline (gateway stopped)" if "optimize-storage" in _detail else ""))
+                              + (" and run 'stardust sessions optimize-storage' offline (gateway stopped)" if "optimize-storage" in _detail else ""))
 
 
 def _state_db_wal(f: Finding, should_fix: bool, state_db_path: Path) -> None:
@@ -337,7 +337,7 @@ def _state_db_wal(f: Finding, should_fix: bool, state_db_path: Path) -> None:
         if size > 50 * 1024 * 1024:  # 50 MB
             check_warn(f"WAL file is large ({size // (1024*1024)} MB)", "(may indicate missed checkpoints)")
             if not should_fix:
-                return f.issues.append("Large WAL file — run 'hermes doctor --fix' to checkpoint")
+                return f.issues.append("Large WAL file — run 'stardust doctor --fix' to checkpoint")
             # Checkpoint-lock premise (#40177, #103339): a bare connect runs WAL recovery and the checkpoint
             # joins the live WAL — under a running gateway that second-writer handling corrupts state.db.
             # Holder scan first (any other process holding the DB, or an unknown, fails closed), then run the
@@ -345,18 +345,18 @@ def _state_db_wal(f: Finding, should_fix: bool, state_db_path: Path) -> None:
             from hermes_state_holders import live_writer_holds_db
             from hermes_state_repair import _connect_repair_durable, _exclusive_repair_db_guard
             _SKIP = ("Large WAL file — cannot prove state.db is quiet (stop the profile's gateway first, then "
-                     "re-run 'hermes doctor --fix' to checkpoint)")
+                     "re-run 'stardust doctor --fix' to checkpoint)")
             if live_writer_holds_db(state_db_path, connect_repair_durable=_connect_repair_durable):
                 # Honest disjunction (gate C1): a True here means "held OR unprovable" — never assert a live
                 # writer as fact.
                 check_warn("WAL checkpoint skipped: cannot prove state.db is quiet",
                            "(another process holds it, or it is unreadable — stop the profile's gateway "
-                           "and re-run 'hermes doctor --fix')")
+                           "and re-run 'stardust doctor --fix')")
                 return f.issues.append(_SKIP)
             with _exclusive_repair_db_guard(state_db_path) as (guard, guard_error):
                 if guard is None:
                     check_warn("WAL checkpoint skipped: could not take exclusive ownership of state.db",
-                               f"({guard_error}; stop the profile's gateway and re-run 'hermes doctor --fix')")
+                               f"({guard_error}; stop the profile's gateway and re-run 'stardust doctor --fix')")
                     return f.issues.append(_SKIP)
                 guard.execute("PRAGMA wal_checkpoint(PASSIVE)")
             check_ok(f"WAL checkpoint performed ({size // 1024}K → {wal_size() // 1024}K)")
@@ -396,7 +396,7 @@ def _gh_authenticated() -> bool:
 def _check_skills_hub(should_fix: bool, f: Finding) -> None:
     from hermes_cli.doctor import STARDUST_HOME, _DHH
     hub_dir = STARDUST_HOME / "skills" / ".hub"
-    if check_bool(hub_dir.exists(), "Skills Hub directory exists", ("Skills Hub directory not initialized", "(run: hermes skills list)")):
+    if check_bool(hub_dir.exists(), "Skills Hub directory exists", ("Skills Hub directory not initialized", "(run: stardust skills list)")):
         lock_file = hub_dir / "lock.json"
         if lock_file.exists():
             with warn_on_error("Lock file", "(corrupted or unreadable)"):
@@ -423,12 +423,12 @@ def _memory_provider_honcho(issues: list) -> None:
         # Config file missing — env-var fallback may still have resolved it.
         check_bool(hcfg.api_key or hcfg.base_url,
                    ("Honcho configured via environment variables", f"config file {cfg_path} not found, using HONCHO_API_KEY env var"),
-                   ("Honcho config not found", "run: hermes memory setup"))
+                   ("Honcho config not found", "run: stardust memory setup"))
     elif not hcfg.enabled:
         check_info(f"Honcho disabled (set enabled: true in {cfg_path} to activate)")
     elif not (hcfg.api_key or hcfg.base_url):
-        _fail_and_issue("Honcho API key or base URL not set", "run: hermes memory setup",
-                        "No Honcho API key — run 'hermes memory setup'", issues)
+        _fail_and_issue("Honcho API key or base URL not set", "run: stardust memory setup",
+                        "No Honcho API key — run 'stardust memory setup'", issues)
     else:
         from plugins.memory.honcho.client import get_honcho_client, reset_honcho_client
         reset_honcho_client()
@@ -446,7 +446,7 @@ def _memory_provider_mem0(issues: list) -> None:
         check_ok("Mem0 API key configured")
         check_info(f"user_id={mem0_cfg.get('user_id', '?')}  agent_id={mem0_cfg.get('agent_id', '?')}")
     else:
-        _fail_and_issue("Mem0 API key not set", "(set MEM0_API_KEY in .env or run hermes memory setup)",
+        _fail_and_issue("Mem0 API key not set", "(set MEM0_API_KEY in .env or run stardust memory setup)",
                         "Mem0 is set as memory provider but API key is missing", issues)
 
 
@@ -466,9 +466,9 @@ def _memory_provider_generic(name: str) -> None:
     if _provider and _provider.is_available():
         check_ok(f"{name} provider active")
     elif _provider:
-        check_warn(f"{name} configured but not available", "run: hermes memory status")
+        check_warn(f"{name} configured but not available", "run: stardust memory status")
     else:
-        check_warn(f"{name} plugin not found", "run: hermes memory setup")
+        check_warn(f"{name} plugin not found", "run: stardust memory setup")
 
 
 @doctor_check()
@@ -512,6 +512,6 @@ def _check_profiles(should_fix: bool, f: Finding) -> None:
             if not wrapper.is_file():
                 continue
             with warn_on_error(""):
-                _m = _re.search(r"hermes -p (\S+)", wrapper.read_text(encoding="utf-8"))
+                _m = _re.search(r"stardust -p (\S+)", wrapper.read_text(encoding="utf-8"))
                 if _m and not profile_exists(_m.group(1)):
                     check_warn(f"Orphan alias: {wrapper.name} → profile '{_m.group(1)}' no longer exists")

@@ -28,9 +28,9 @@ def _run_fallback_with_failed_extra(monkeypatch, capsys, *, extra_fails: str, mi
 def test_fallback_names_configured_platform_whose_extra_failed(monkeypatch, capsys):
     out = _run_fallback_with_failed_extra(
         monkeypatch, capsys, extra_fails="feishu",
-        missing_features=[("Feishu / Lark", "Run `hermes setup` to install Feishu support.")])
+        missing_features=[("Feishu / Lark", "Run `stardust setup` to install Feishu support.")])
     assert "fail to load them on restart" in out
-    assert "Feishu / Lark" in out and "hermes setup" in out
+    assert "Feishu / Lark" in out and "stardust setup" in out
     # Unconfigured features that failed stay a plain "skipped" line, no scary warning.
     quiet = _run_fallback_with_failed_extra(monkeypatch, capsys, extra_fails="feishu", missing_features=[])
     assert "Skipped optional extras that still failed: feishu" in quiet

@@ -2,7 +2,7 @@
 
 
 def _write_env(monkeypatch, tmp_path, content):
-    hermes_home = tmp_path / ".hermes"
+    hermes_home = tmp_path / ".stardust"
     hermes_home.mkdir()
     (hermes_home / ".env").write_text(content, encoding="utf-8")
     monkeypatch.setenv("STARDUST_HOME", str(hermes_home))

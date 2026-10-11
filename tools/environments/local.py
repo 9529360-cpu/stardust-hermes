@@ -278,13 +278,13 @@ def _finalize_child_env(env: dict) -> dict:
 
 def _scrubbed_env(parts, plugin_strip: frozenset, fix_path) -> dict:
     """Filter each ``(items, unwrap_force)`` in *parts* into one env, rewrite PATH via
-    *fix_path* (always prepending the hermes install dir so bare ``hermes`` resolves
+    *fix_path* (always prepending the hermes install dir so bare ``stardust`` resolves
     for children of a systemd/cron-launched gateway), then apply the shared guards."""
     out: dict[str, str] = {}
     for items, unwrap_force in parts:
         _filter_secret_env(items, out, unwrap_force=unwrap_force, plugin_strip=plugin_strip)
     path_key = _path_env_key(out)
-    # Keep bare ``hermes`` invocations available to child jobs even when the gateway was launched by a
+    # Keep bare ``stardust`` invocations available to child jobs even when the gateway was launched by a
     # service manager or cron without the console script's directory on PATH. The terminal environment
     # already applies this invariant; Cron scripts use this sanitizer directly (#92998).
     if path_key is not None:
@@ -341,13 +341,13 @@ def served_profile_child_env(
     base: "Mapping[str, str] | None" = None, *, target_home: "str | Path | None" = None,
     inherit_credentials: bool = False,
 ) -> dict[str, str]:
-    """Child env for a process that acts FOR the active (possibly served) profile: ``hermes -p X``
+    """Child env for a process that acts FOR the active (possibly served) profile: ``stardust -p X``
     workers, ``key_cmd`` helpers, browser drivers. The process env is the LAUNCH profile's, so its
     ``.env`` residue and bridged ``TERMINAL_*`` are dropped (``strip_launch_profile_env``; no-op
     outside multiplex) and the target home is pinned. ``inherit_credentials=True`` is for children
     that legitimately run with the profile's credentials (they run the agent or mint its token): the
     target profile's own secrets (its ``.env`` + hydrated sources, i.e. what a standalone
-    ``hermes -p X`` loads itself) are overlaid — never a sibling profile's. ``False`` keeps the
+    ``stardust -p X`` loads itself) are overlaid — never a sibling profile's. ``False`` keeps the
     provider scrub; the caller re-adds the few keys the child needs via ``get_secret``.
     ``target_home`` defaults to the active override; ``base`` replaces the ``hermes_subprocess_env``
     snapshot."""
@@ -368,7 +368,7 @@ def strip_launch_profile_env(env: dict, target_home: "str | Path | None" = None)
     """Drop the LAUNCH profile's residue from a child env built for another served profile.
     ``os.environ`` holds the default profile's ``.env`` and its bridged ``TERMINAL_*`` settings;
     the secret scrub removes credentials but not settings (``STARDUST_MODEL``, ``TERMINAL_ENV``,
-    ``STARDUST_LANGUAGE``...), so a standalone ``hermes -p X`` worker and a served one saw different
+    ``STARDUST_LANGUAGE``...), so a standalone ``stardust -p X`` worker and a served one saw different
     envs. The child re-loads X's own ``.env`` and bridges X's config itself. ``target_home``
     defaults to the active home override; no-op outside multiplex or when the target IS the
     launch profile."""
@@ -390,14 +390,14 @@ def strip_launch_profile_env(env: dict, target_home: "str | Path | None" = None)
 # --- Shell discovery ---
 def _windows_bash_candidates(custom: "str | None") -> list[str]:
     """Ordered bash.exe candidates on Windows: STARDUST_GIT_BASH_PATH, our portable Git
-    under %LOCALAPPDATA%\\hermes\\git (PortableGit ``bin`` and MinGit ``usr\\bin``),
+    under %LOCALAPPDATA%\\stardust\\git (PortableGit ``bin`` and MinGit ``usr\\bin``),
     known Git-for-Windows dirs, then PATH last — ``shutil.which`` may return WSL's
     bash, which fails silently on Windows paths."""
     getenv = os.environ.get
     lad = getenv("LOCALAPPDATA", "")
     roots = [
-        lad and os.path.join(lad, "hermes", "git", "bin"),
-        lad and os.path.join(lad, "hermes", "git", "usr", "bin"),
+        lad and os.path.join(lad, "stardust", "git", "bin"),
+        lad and os.path.join(lad, "stardust", "git", "usr", "bin"),
         os.path.join(getenv("ProgramFiles", r"C:\Program Files"), "Git", "bin"),
         os.path.join(getenv("ProgramFiles(x86)", r"C:\Program Files (x86)"), "Git", "bin"),
         lad and os.path.join(lad, "Programs", "Git", "bin"),
@@ -505,28 +505,28 @@ def _find_shell() -> str:
 _SANE_PATH = ("/opt/homebrew/bin:/opt/homebrew/sbin:"
               "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
 
-# Cached directory containing the ``hermes`` console-script.
+# Cached directory containing the ``stardust`` console-script.
 # ``_SENTINEL`` distinguishes "not resolved yet" from a resolved ``None``.
 _SENTINEL = object()
 _HERMES_BIN_DIR: "str | None | object" = _SENTINEL
 
 
 def _resolve_hermes_bin_dir() -> str | None:
-    """Directory holding the ``hermes`` console-script, or None (cached). A gateway
+    """Directory holding the ``stardust`` console-script, or None (cached). A gateway
     launched by systemd/cron/a desktop launcher lacks the install dir on PATH and bare
-    ``hermes`` exits 127. Order: ``which``; absolute ``sys.argv[0]`` naming a real
+    ``stardust`` exits 127. Order: ``which``; absolute ``sys.argv[0]`` naming a real
     hermes executable; ``sys.executable``'s dir if it holds the shim."""
     global _HERMES_BIN_DIR
     if _HERMES_BIN_DIR is not _SENTINEL:
         return _HERMES_BIN_DIR  # type: ignore[return-value]
-    which = shutil.which("hermes")
+    which = shutil.which("stardust")
     argv0 = sys.argv[0] if sys.argv else ""
     base = os.path.basename(argv0).lower()
     exe_dir = os.path.dirname(sys.executable) if sys.executable else ""
-    shim = "hermes.exe" if _IS_WINDOWS else "hermes"
+    shim = "stardust.exe" if _IS_WINDOWS else "stardust"
     if which:
         candidate = os.path.dirname(which)
-    elif (os.path.isabs(argv0) and (base == "hermes" or base.startswith("hermes."))
+    elif (os.path.isabs(argv0) and (base in ("hermes", "stardust") or base.startswith(("hermes.", "stardust.")))
             and os.path.isfile(argv0)):
         candidate = os.path.dirname(argv0)
     else:

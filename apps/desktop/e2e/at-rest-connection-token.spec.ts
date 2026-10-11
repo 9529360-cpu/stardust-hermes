@@ -361,7 +361,7 @@ function expectOwnerOnlyMode(filePath: string, why: string): void {
  *
  * The credential path we are testing is entirely main-process (IPC handler →
  * coerce → safeStorage → userData write) and does not need a live agent
- * backend, so we skip spawning `hermes serve` (no Python needed, ~3s launch,
+ * backend, so we skip spawning `stardust serve` (no Python needed, ~3s launch,
  * hermetic). This is also a real user situation rather than an artificial one:
  * the boot-failure overlay's own recovery affordance is "Connection settings",
  * i.e. pointing the app at a remote gateway is exactly what a user does from

@@ -17,7 +17,7 @@ from fastapi.testclient import TestClient
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
-    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
     from hermes_cli import web_server
 
     test_client = TestClient(web_server.app)
@@ -27,7 +27,7 @@ def client(tmp_path, monkeypatch):
 
 
 def test_local_models_routes_require_auth(tmp_path, monkeypatch):
-    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
     from hermes_cli import web_server
 
     unauth = TestClient(web_server.app)

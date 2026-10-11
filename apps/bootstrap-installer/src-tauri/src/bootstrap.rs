@@ -173,7 +173,7 @@ pub async fn launch_hermes_desktop(
     let exe_path = resolve_hermes_desktop_exe(&install_root).ok_or_else(|| {
         format!(
             "Couldn't find a built Hermes desktop at {}. The desktop build step \
-             may have been skipped or failed. Run `hermes desktop` from a \
+             may have been skipped or failed. Run `stardust desktop` from a \
              terminal to build and launch it.",
             install_root.join("apps").join("desktop").join("release").display()
         )

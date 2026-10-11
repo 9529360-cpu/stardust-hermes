@@ -1,4 +1,4 @@
-"""Dump command for hermes CLI."""
+"""Dump command for stardust CLI."""
 
 import json
 import os
@@ -14,10 +14,10 @@ from agent.skill_utils import is_excluded_skill_path
 
 
 def _dotenv_key_names() -> set[str]:
-    """Env-var names assigned a non-empty value in ~/.hermes/.env — what the managed backends (launchd /
+    """Env-var names assigned a non-empty value in ~/.stardust/.env — what the managed backends (launchd /
     systemd / desktop ``serve``) load, as opposed to the shell exports ``os.getenv`` reflects here.
 
-    ``hermes debug share`` runs in a terminal, so ``os.getenv`` reflects the shell's environment, which can
+    ``stardust debug share`` runs in a terminal, so ``os.getenv`` reflects the shell's environment, which can
     include exported keys the managed backend never sees. Comparing against this set lets the dump flag that
     mismatch (the exact trap behind #48504-style "no web_search" reports: key exported in the shell, absent
     from .env, invisible to the launchd backend).
@@ -201,13 +201,13 @@ def _api_key_lines(show_keys: bool) -> list[str]:
     for env_var, label in _API_KEYS:
         val = os.getenv(env_var, "")
         display = _redact(val) if show_keys and val else ("set" if val else "not set")
-        # Set in this shell but absent from ~/.hermes/.env: a managed backend loads .env, not the login
+        # Set in this shell but absent from ~/.stardust/.env: a managed backend loads .env, not the login
         # shell, so it likely can't see this key — flag it so support doesn't chase a phantom "configured".
         if val and env_var not in dotenv_keys:
             display += " (shell only — not in .env; managed/desktop backend may not see it)"
-        # `hermes auth add openrouter` credentials live in the pool, not env — don't read "not set".
-        # A credential added via `hermes auth add openrouter` lives in the credential pool, not as an env
-        # var — surface it so the dump doesn't misleadingly read "not set" while `hermes auth list` shows it
+        # `stardust auth add openrouter` credentials live in the pool, not env — don't read "not set".
+        # A credential added via `stardust auth add openrouter` lives in the credential pool, not as an env
+        # var — surface it so the dump doesn't misleadingly read "not set" while `stardust auth list` shows it
         # (#42130).
         if not val and label == "openrouter":
             try:
@@ -247,7 +247,7 @@ def run_dump(args):
     toolsets = config.get("toolsets", ["hermes-cli"])
     platforms = [name for name, env in _PLATFORM_ENV_VARS.items() if os.getenv(env)]
     lines = [
-        "--- hermes dump ---",
+        "--- stardust dump ---",
         f"version:          {_version_line(project_root)}",
         f"os:               {platform.system()} {platform.release()} {platform.machine()}",
         f"python:           {sys.version.split()[0]}",

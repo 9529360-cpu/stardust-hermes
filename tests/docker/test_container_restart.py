@@ -10,7 +10,7 @@ These tests stand up a container with a named volume, create profiles
 inside it in various gateway states, restart the container, and
 assert the reconciler did the right thing.
 
-Every ``docker exec`` here runs as the unprivileged ``hermes`` user
+Every ``docker exec`` here runs as the unprivileged ``stardust`` user
 (via :func:`docker_exec` / :func:`docker_exec_sh` in conftest); see
 the conftest module docstring.
 """

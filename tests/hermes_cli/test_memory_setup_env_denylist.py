@@ -1,7 +1,7 @@
 """Tests for the env-write denylist on the memory-setup ``.env`` writer.
 
 ``hermes_cli.memory_setup._write_env_vars`` persists provider plugin
-credentials to ``~/.hermes/.env``. It previously called ``Path.write_text``
+credentials to ``~/.stardust/.env``. It previously called ``Path.write_text``
 directly, bypassing the ``_ENV_VAR_NAME_DENYLIST`` / ``_ENV_VAR_NAME_RE`` /
 CR-LF-stripping gates that ``save_env_value`` enforces for every other
 ``.env`` writer in the codebase, and left the file at the default umask
@@ -26,7 +26,7 @@ from hermes_cli.memory_setup import _write_env_vars
 
 
 def _env_file_keys() -> set[str]:
-    """Parse ``~/.hermes/.env`` directly and return the set of keys present.
+    """Parse ``~/.stardust/.env`` directly and return the set of keys present.
 
     Used by tests that want to verify a key was NOT written to disk without
     going through ``load_env()`` (whose sanitization/caching could mask the

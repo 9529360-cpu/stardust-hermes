@@ -31,7 +31,7 @@ test.beforeAll(async () => {
     fs.symlinkSync(path.join(sourceVenv, 'lib'), path.join(runtime, 'lib'))
     fs.symlinkSync(python, path.join(runtime, 'bin', 'python'))
     python = path.join(runtime, 'bin', 'python')
-    fs.writeFileSync(path.join(runtime, 'bin', 'hermes'), `#!/bin/sh\ncd ${repo}\nexec ${python} -m hermes_cli.main "$@"\n`, { mode: 0o755 })
+    fs.writeFileSync(path.join(runtime, 'bin', 'stardust'), `#!/bin/sh\ncd ${repo}\nexec ${python} -m hermes_cli.main "$@"\n`, { mode: 0o755 })
   }
   const bin = path.join(sandbox.root, 'bin')
   fs.mkdirSync(bin)

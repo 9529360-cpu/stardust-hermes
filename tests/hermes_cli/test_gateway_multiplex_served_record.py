@@ -1,11 +1,11 @@
 """The live multiplexer's recorded ``served_profiles`` decides "served"; every start verb honours it.
 
 - Probe: ``named_profile_served_by_running_multiplexer`` reads the pid-verified default
-  ``gateway_state.json`` first (env-only opt-in on the default profile is invisible to ``hermes -p X``);
+  ``gateway_state.json`` first (env-only opt-in on the default profile is invisible to ``stardust -p X``);
   config/env derivation is only the fallback when the key is absent.
 - ``gateway start`` / ``install`` / ``restart`` refuse (exit 78) like ``run`` does, so a served profile
   never gets a permanently failing systemd unit or a launchd respawn loop; ``--force`` overrides.
-- ``hermes status`` / ``cron status`` on a satellite say running-via-multiplexer; the default lists served.
+- ``stardust status`` / ``cron status`` on a satellite say running-via-multiplexer; the default lists served.
 """
 
 from __future__ import annotations
@@ -63,7 +63,7 @@ def test_probe_falls_back_to_config_only_without_recorded_key(served_root):
 def test_probe_survives_a_missing_default_pid_file(served_root):
     """A launch-service-managed multiplexer can be live with no ``gateway.pid``: a replace/cleanup path
     unlinks it while the process keeps serving. Keying liveness off that file alone made every surface
-    (``hermes -p X status``, ``cron list``, the dashboard ladder) say "not running" about the gateway
+    (``stardust -p X status``, ``cron list``, the dashboard ladder) say "not running" about the gateway
     that was in fact serving the profile."""
     from hermes_cli.gateway import named_profile_served_by_running_multiplexer
     from hermes_cli.gateway_multiplex_served import live_default_gateway_pid
@@ -75,7 +75,7 @@ def test_probe_survives_a_missing_default_pid_file(served_root):
 def test_recycled_pid_does_not_lend_a_stale_record_its_served_profiles(served_root):
     """A stale default record whose PID now belongs to an unrelated process (start time differs, command
     line is not a gateway's) must not make its ``served_profiles`` authoritative: bare PID existence
-    once did, so `hermes -p coder gateway start` exited 78 for a multiplexer that was long gone."""
+    once did, so `stardust -p coder gateway start` exited 78 for a multiplexer that was long gone."""
     import subprocess
     import gateway.status as status
     from hermes_cli.gateway import named_profile_served_by_running_multiplexer
@@ -142,7 +142,7 @@ def test_status_surfaces_agree_for_a_satellite_profile(served_root, monkeypatch)
 def test_dashboard_liveness_ladder_reports_served_profile_running(served_root):
     """`/api/status?profile=X` and `/api/messaging/platforms?profile=X` share this ladder: a served
     profile has no gateway.pid/gateway_state.json, so without the multiplexer rung the dashboard said
-    "stopped" while `hermes -p X status` said running. Alpha's `<X>:<platform>` entries project as its own."""
+    "stopped" while `stardust -p X status` said running. Alpha's `<X>:<platform>` entries project as its own."""
     from gateway.status import profile_platforms_from_multiplexer, resolve_gateway_liveness
     (served_root / "gateway_state.json").write_text(json.dumps({
         "pid": os.getpid(), "hermes_home": str(served_root), "gateway_state": "running",

@@ -35,7 +35,7 @@ def test_skill_config_helpers_share_raw_config_parse_cache(tmp_path, monkeypatch
     """Repeated skill config helpers should parse config.yaml only once."""
     from agent import skill_utils
 
-    hermes_home = tmp_path / ".hermes"
+    hermes_home = tmp_path / ".stardust"
     hermes_home.mkdir()
     external = tmp_path / "external-skills"
     external.mkdir()
@@ -75,7 +75,7 @@ skills:
 
 
 class TestParseConfigStringList:
-    """#86661: `hermes config set` and JSON-mode editor saves store lists as
+    """#86661: `stardust config set` and JSON-mode editor saves store lists as
     quoted strings (e.g. '["a","b"]'). Treating such a string as a single name
     made curated disabled lists silently filter nothing."""
 
@@ -86,7 +86,7 @@ class TestParseConfigStringList:
         ]
 
     def test_python_literal_array_string_parses(self):
-        # `hermes config set` can persist single-quoted Python-literal forms.
+        # `stardust config set` can persist single-quoted Python-literal forms.
         assert parse_config_string_list("['skill-a']") == ["skill-a"]
 
     def test_scalar_string_means_one_name(self):
@@ -117,7 +117,7 @@ class TestDisabledSkillsJsonArrayString:
     def test_get_disabled_skill_names_parses_json_array_string(
         self, tmp_path, monkeypatch
     ):
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         (hermes_home / "config.yaml").write_text(
             "skills:\n  disabled: '[\"skill-a\",\"skill-b\"]'\n",
@@ -133,7 +133,7 @@ class TestDisabledSkillsJsonArrayString:
     def test_get_disabled_skill_names_scalar_string_still_single_name(
         self, tmp_path, monkeypatch
     ):
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         (hermes_home / "config.yaml").write_text(
             "skills:\n  disabled: 'hidden-skill'\n",

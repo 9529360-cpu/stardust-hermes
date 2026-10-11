@@ -1,4 +1,4 @@
-"""Flat-install runtime state must be gitignored so ``hermes update``'s untracked
+"""Flat-install runtime state must be gitignored so ``stardust update``'s untracked
 autostash cannot sweep the live state.db (#110648).
 
 On a flat install (checkout root == $STARDUST_HOME) the profile's runtime files
@@ -19,7 +19,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # Runtime state that lives at $STARDUST_HOME's root on a flat install, exactly as
-# ``hermes update`` would sweep it: one representative per ignored class. The
+# ``stardust update`` would sweep it: one representative per ignored class. The
 # sidecar names mirror ``_sqlite_files`` in gateway/platforms/base.py; the
 # credential entries mirror ``_ROOT_CREDENTIAL_PATHS`` there.
 FLAT_INSTALL_RUNTIME_STATE = (
@@ -120,7 +120,7 @@ def flat_install_repo(tmp_path: Path) -> Path:
 
 def test_flat_install_runtime_state_is_ignored(flat_install_repo):
     """`git status --porcelain` must stay empty with the full runtime state present,
-    so `hermes update` never enters its stash step for runtime state alone."""
+    so `stardust update` never enters its stash step for runtime state alone."""
     status = _run_git(
         flat_install_repo, "status", "--porcelain", "--untracked-files=all"
     )

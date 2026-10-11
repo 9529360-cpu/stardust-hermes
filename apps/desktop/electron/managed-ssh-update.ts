@@ -5,7 +5,7 @@
  * maps, while this file owns the security-sensitive ordering and the remote
  * wire protocol:
  *
- *   gate dials -> drain every captured scope -> detached `hermes update`
+ *   gate dials -> drain every captured scope -> detached `stardust update`
  *   -> correlated terminal marker + durable receipt -> restore every scope
  *   -> lift the gate
  *

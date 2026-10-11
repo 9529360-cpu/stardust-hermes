@@ -145,7 +145,7 @@ class TestRuntimeFtsRebuild:
                 "ssh",
                 "--cmd=python -m hermes_cli.main gateway",
             ),
-            ("tmux", "new-session", "/opt/hermes-agent/.venv/bin/hermes gateway"),
+            ("tmux", "new-session", "/opt/hermes-agent/.venv/bin/stardust gateway"),
             ("python3", "/opt/hermes-agent/tools/check_state.py"),
             ("hermes-monitor", "gateway"),
             ("hermesctl", "serve"),
@@ -161,7 +161,7 @@ class TestRuntimeFtsRebuild:
     @pytest.mark.parametrize(
         "argv",
         (
-            ("/usr/local/bin/hermes", "gateway"),
+            ("/usr/local/bin/stardust", "gateway"),
             ("/usr/local/bin/hermes-agent", "serve"),
             ("/usr/local/bin/hermes-acp", "--stdio"),
             ("/usr/bin/python3", "-m", "hermes_cli.main", "gateway"),
