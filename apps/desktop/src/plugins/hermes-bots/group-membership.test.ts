@@ -165,6 +165,12 @@ describe('room listing', () => {
     expect(stripPreviewMarkdown('前面\n---\n后面')).toBe('前面 后面')
   })
 
+  it('a real newline between table rows is a row break', () => {
+    const { stripPreviewMarkdown } = modules.labels
+
+    expect(stripPreviewMarkdown('| a | b |\n| --- | --- |\n| c | d |')).toBe('a · b; c · d')
+  })
+
   it('an empty table cell does not start a new row inside a delimited table', () => {
     const { stripPreviewMarkdown } = modules.labels
 
