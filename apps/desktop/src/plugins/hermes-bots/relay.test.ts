@@ -47,7 +47,8 @@ const { clearBotAttentionMock, hostMock, noteBotAttentionMock, UnboundedCache } 
 vi.mock('@stardust/plugin-sdk', () => ({ host: hostMock, LruCache: UnboundedCache }))
 
 vi.mock('./data', () => ({
-  botHandle: (name: string) => (name === 'default' ? 'hermes' : name),
+  // Mirrors data.ts agentTargetHandle(): the backend still resolves the primary by its legacy alias.
+  agentTargetHandle: (name: string) => (name === 'default' ? 'hermes' : name),
   clearBotAttention: clearBotAttentionMock,
   noteBotAttention: noteBotAttentionMock
 }))

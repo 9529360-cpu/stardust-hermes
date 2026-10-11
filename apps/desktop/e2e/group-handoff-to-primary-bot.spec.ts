@@ -9,9 +9,12 @@ import { expect, test } from './test'
 // `@hermes → @code-farmer` already does. The live roster stamps the primary
 // row's handle as the bare profile id ("default"), and the mention parser let
 // that stamped handle shadow the `@hermes` alias — so the room settled with
-// Hermes never driven. The mock inference server scripts each member's line
-// from the user's send (`E2E_SAY(<handle>)[…]`), so the assertion is on the
-// persisted room log: an entry authored by `default` saying "B".
+// the primary never driven. The primary now presents as Stardust (`@stardust`);
+// the legacy `@hermes` alias must keep resolving to it. The mock inference
+// server scripts each member's line from the user's send (`E2E_SAY(<handle>)[…]`)
+// and matches a member by its `You are @<handle>` prompt line, so the primary's
+// script token is `stardust`. The assertion is on the persisted room log: an
+// entry authored by `default` saying "B".
 
 let fixture: MockBackendFixture | null = null
 
@@ -52,7 +55,9 @@ async function roomLog(page: Page, group: string): Promise<RoomLogEntry[]> {
 }
 
 test.beforeAll(async () => {
-  fixture = await setupMockBackend()
+  // The labels this spec clicks and asserts are English. Pin the display language so the run
+  // does not follow the OS language, which would fail on a Chinese-language machine.
+  fixture = await setupMockBackend({ extraDisplayConfig: '  language: en' })
   await waitForAppReady(fixture, 120_000)
 })
 
@@ -64,7 +69,7 @@ test.afterEach(async ({}, info) => {
   }
 
   await info.attach('room-log', {
-    body: JSON.stringify(await roomLog(fixture.page, 'Hermes, Code Farmer'), null, 2),
+    body: JSON.stringify(await roomLog(fixture.page, 'Stardust, Code Farmer'), null, 2),
     contentType: 'application/json'
   })
   await info.attach('native-window', { body: await fixture.page.screenshot(), contentType: 'image/png' })
@@ -95,17 +100,26 @@ test.afterAll(async () => {
 test('a teammate handing off with @hermes drives the primary profile', async () => {
   test.setTimeout(420_000)
   const page = fixture!.page
-  const group = 'Hermes, Code Farmer'
+  const group = 'Stardust, Code Farmer'
 
   await openBots(page)
   await createAgent(page, 'code-farmer', 'Code Farmer')
+
+  // The primary's roster row and its New Group Chat entry, as the PR body cites them.
+  await expect(page.getByRole('button', { name: /^Stardust · @stardust/ }).first()).toBeVisible({
+    timeout: 30_000
+  })
 
   await page.getByRole('button', { name: 'New bot or group chat' }).click()
   await page.getByRole('menuitem', { name: 'New Group Chat' }).click()
 
   const dialog = page.getByRole('dialog', { name: 'New Group Chat' })
 
-  for (const title of ['Hermes', 'Code Farmer']) {
+  await expect(dialog.getByRole('checkbox', { name: 'Stardust @stardust', exact: true })).toBeVisible({
+    timeout: 30_000
+  })
+
+  for (const title of ['Stardust', 'Code Farmer']) {
     await dialog.getByText(title, { exact: true }).locator('xpath=ancestor::label').getByRole('checkbox').click()
   }
 
@@ -116,16 +130,17 @@ test('a teammate handing off with @hermes drives the primary profile', async () 
   await expect(composer).toBeVisible({ timeout: 20_000 })
 
   // Only Code Farmer is addressed by the user. Its scripted reply hands off
-  // to @hermes; Hermes' scripted reply is "B". Neither script token carries
-  // a literal `@`, so the user send itself never mentions Hermes.
+  // to @hermes (the legacy alias); the primary's scripted reply is "B". Neither
+  // script token carries a literal `@`, so the user send itself never mentions
+  // the primary.
   await composer.fill(
     '@code-farmer Please reply with one line only. ' +
-      'E2E_SAY(code-farmer)[{at}hermes Please reply with the letter B.] E2E_SAY(hermes)[B]'
+      'E2E_SAY(code-farmer)[{at}hermes Please reply with the letter B.] E2E_SAY(stardust)[B]'
   )
   await composer.press('Enter')
 
   // Code Farmer's handoff line lands first (the reverse direction is not in
-  // question); then the room must NOT settle without Hermes' turn.
+  // question); then the room must NOT settle without the primary's turn.
   await expect
     .poll(
       async () =>
@@ -141,7 +156,8 @@ test('a teammate handing off with @hermes drives the primary profile', async () 
       async () => (await roomLog(page, group)).some(e => e.from?.name === 'default' && (e.text || '').trim() === 'B'),
       {
         timeout: 180_000,
-        message: 'the primary profile (default / @hermes) never took its turn after being @mentioned by a teammate'
+        message:
+          'the primary profile (default / @stardust, legacy @hermes) never took its turn after being @mentioned by a teammate'
       }
     )
     .toBe(true)
@@ -150,7 +166,7 @@ test('a teammate handing off with @hermes drives the primary profile', async () 
   await expect(page.getByText('B', { exact: true }).filter({ visible: true }).first()).toBeVisible()
 
   await composer.fill(
-    '@hermes Begin the reverse handoff. E2E_SAY(hermes)[{at}code-farmer Reply with D.] E2E_SAY(code-farmer)[D]'
+    '@hermes Begin the reverse handoff. E2E_SAY(stardust)[{at}code-farmer Reply with D.] E2E_SAY(code-farmer)[D]'
   )
   await composer.press('Enter')
   await expect

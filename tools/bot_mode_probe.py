@@ -30,6 +30,12 @@ def strip_legacy_protocol(text: str) -> str:
 # desktop plugin's createCanonicalChat title and the `-c "Bot Chat"` resume target.
 BOT_CHAT_TITLE = "Bot Chat"
 
+# The primary profile ('default' on the backend) presents as Stardust: its handle is
+# PRIMARY_HANDLE. The legacy handle 'hermes' is still typed by old chats and saved group rooms,
+# so every resolver accepts both names (see PRIMARY_HANDLE_ALIASES).
+PRIMARY_HANDLE = "stardust"
+PRIMARY_HANDLE_ALIASES = (PRIMARY_HANDLE, "hermes")
+
 _lock = threading.Lock()
 _cached: dict[str, str] = {}
 
@@ -65,8 +71,8 @@ def _profile_name(home: Path) -> str:
 
 
 def _handle(name: str) -> str:
-    # The mention middleware aliases the default profile as @hermes.
-    return "hermes" if name == "default" else name
+    """The @handle the protocol shows for a profile; the primary profile is PRIMARY_HANDLE."""
+    return PRIMARY_HANDLE if name == "default" else name
 
 
 def _roster(root: Path) -> list[tuple[str, Path]]:

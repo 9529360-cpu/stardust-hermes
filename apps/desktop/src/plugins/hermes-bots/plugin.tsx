@@ -43,12 +43,15 @@ import { bindProfileSync, RoutinesPane } from './cron'
 import {
   $botMeta,
   $lastRoster,
+  agentTargetHandle,
   botHandle,
   botMentionTag,
   botSelectionKey,
   cachedUnionRoster,
+  claimsPrimaryAlias,
   isActiveRosterBot,
   migrateBotMeta,
+  PRIMARY_ALIASES,
   resolveRosterMentions
 } from './data'
 import {
@@ -129,7 +132,7 @@ export default {
     // query cache — useRoster keeps it ≤5s stale and the popover must answer
     // synchronously per keystroke. Multi-source rosters contribute their
     // precomputed @name-device handles via botHandle. The active profile is
-    // excluded (a bot doesn't @ itself); 'default' surfaces as @hermes.
+    // excluded (a bot doesn't @ itself); 'default' surfaces as @stardust.
     ctx.register({
       id: 'mention-completions',
       area: COMPOSER_AREAS.atCompletions,
@@ -162,11 +165,13 @@ export default {
             // renamed slug when one exists, the profile handle otherwise.
             const tag = botMentionTag(profile)
 
+            // The primary also completes on its legacy alias, inserted under its Stardust handle.
             if (
               q &&
               !tag.toLowerCase().startsWith(q) &&
               !handle.toLowerCase().startsWith(q) &&
-              !display.toLowerCase().startsWith(q)
+              !display.toLowerCase().startsWith(q) &&
+              !(claimsPrimaryAlias(profile) && PRIMARY_ALIASES.some(alias => alias.startsWith(q)))
             ) {
               continue
             }
@@ -720,8 +725,10 @@ export default {
             // local path a bare profile name or 'hermes'. botHandle() prefers
             // the row's source-qualified UI alias ('default-vera'), which
             // neither resolver accepts — annotate the canonical form instead.
+            // agentTargetHandle() is that form: the primary is shown as
+            // @stardust, but the backend still resolves it as 'hermes'.
             const target =
-              bot.remoteSource && bot.connectionId ? `${bot.name}@${bot.connectionId}` : botHandle(bot.name)
+              bot.remoteSource && bot.connectionId ? `${bot.name}@${bot.connectionId}` : agentTargetHandle(bot.name)
 
             // Local rows get the same annotation whenever their UI alias
             // ('default-this-device') differs from the resolvable handle —

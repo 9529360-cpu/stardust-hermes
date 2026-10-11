@@ -135,8 +135,9 @@ _DEFAULT_EXPORT_INCLUDE_ROOT = frozenset({
     "plugins", "memories", "knowledge", "preferences",
 })
 
-# Names that cannot be used as profile aliases
-_RESERVED_NAMES = frozenset({"hermes", "default", "test", "tmp", "root", "sudo"})
+# Names that cannot be used as profile aliases. 'stardust' is the primary profile's handle
+# (tools/bot_mode_probe.PRIMARY_HANDLE) and 'hermes' its legacy alias; neither may name a profile.
+_RESERVED_NAMES = frozenset({"hermes", "stardust", "default", "test", "tmp", "root", "sudo"})
 
 # Hermes subcommands that cannot be used as profile names/aliases
 _HERMES_SUBCOMMANDS = frozenset({
@@ -251,8 +252,8 @@ def validate_profile_name(name: str) -> None:
         raise _invalid_profile_name_error(name)
     if name in _RESERVED_NAMES:
         raise ValueError(
-            f"Profile name {name!r} is reserved — it collides with either "
-            f"the Hermes installation itself or a common system binary.  "
+            f"Profile name {name!r} is reserved — it collides with the primary agent, "
+            f"the Hermes installation itself, or a common system binary.  "
             f"Pick a different name."
         )
 

@@ -85,6 +85,18 @@ describe('notifyBotOpenFailure', () => {
     expect(hostMock.navigate).toHaveBeenCalledWith('/settings?tab=gateway')
   })
 
+  it('needs-update without a connection label falls back to the product name, not a stale one', async () => {
+    const { notifyBotOpenFailure } = await load()
+
+    notifyBotOpenFailure(
+      new Error('RPC -32601: method not found: bots.canonical'),
+      { name: 'default' } as RosterRow,
+      'open'
+    )
+
+    expect(lastToast().message).toBe('Update Stardust, then try again.')
+  })
+
   it('unreachable: plain-words title and next step; the connection error is detail only', async () => {
     const { notifyBotOpenFailure } = await load()
     const raw = 'WebSocket connect ECONNREFUSED 10.0.0.7:8642'

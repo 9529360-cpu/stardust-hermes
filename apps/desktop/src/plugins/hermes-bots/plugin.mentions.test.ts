@@ -239,7 +239,7 @@ describe('@-mention completions', () => {
     expect(provide('').map(item => item.insert)).toContain('@default-vera')
   })
 
-  it('surfaces default as @hermes and prefix-filters on the handle', async () => {
+  it('surfaces default as @stardust and prefix-filters on the handle', async () => {
     const { provide } = await contributions({
       focused: 'researcher',
       profiles: [
@@ -249,8 +249,22 @@ describe('@-mention completions', () => {
       ]
     })
 
-    expect(provide('').map(item => item.insert)).toEqual(expect.arrayContaining(['@hermes', '@writer-homelab']))
+    expect(provide('').map(item => item.insert)).toEqual(expect.arrayContaining(['@stardust', '@writer-homelab']))
     expect(provide('wri').map(item => item.insert)).toEqual(['@writer-homelab'])
+    // Typing the legacy name still finds the primary, inserted under its Stardust handle.
+    expect(provide('her').map(item => item.insert)).toEqual(['@stardust'])
+  })
+
+  it('names the primary by its Stardust handle and tells the agent the target it resolves', async () => {
+    const { handler } = await contributions({
+      focused: 'ops',
+      profiles: [{ connectionId: 'local', connectionKind: 'local', name: 'default' }, { name: 'ops' }]
+    })
+
+    const result = await handler({ text: 'ping @stardust' })
+
+    expect(result.text).toMatch(/@stardust = agent profile "default"/)
+    expect(result.text).toMatch(/message_agent target: "hermes"/)
   })
 
   it('filters self by the FOCUSED chat owner, not the gateway socket profile', async () => {

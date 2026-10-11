@@ -116,6 +116,20 @@ describe('routing', () => {
     expect(parsed.mentioned.size).toBe(1)
   })
 
+  it('resolves @stardust to the default member', async () => {
+    const { rounds } = await loadRoom()
+
+    const members: GroupMember[] = [
+      { name: 'default', title: '' },
+      { name: 'builder', title: '' }
+    ]
+
+    const parsed = rounds.parseGroupChatMentions('@stardust take a look', members)
+
+    expect(parsed.mentioned.has('default')).toBe(true)
+    expect(parsed.mentioned.size).toBe(1)
+  })
+
   it('rotates the lead speaker each round', async () => {
     const { rounds } = await loadRoom()
 
@@ -530,7 +544,7 @@ describe('threads', () => {
 })
 
 describe('turn prompt', () => {
-  it('addresses the default profile as @hermes', async () => {
+  it('addresses the default profile as @stardust', async () => {
     const { rounds } = await loadRoom()
     const { buildGroupChatTurnPrompt } = await import('./group-round-prompt')
 
@@ -546,8 +560,9 @@ describe('turn prompt', () => {
       viewer: { name: 'default', title: '' }
     })
 
-    expect(own).toMatch(/You are @hermes,/)
+    expect(own).toMatch(/You are @stardust,/)
     expect(own).not.toMatch(/@default\b/)
+    expect(own).not.toMatch(/@hermes\b/)
 
     const peer = buildGroupChatTurnPrompt({
       deltaLines: [],
@@ -556,7 +571,7 @@ describe('turn prompt', () => {
       viewer: { name: 'builder', title: '' }
     })
 
-    expect(peer).toMatch(/group chat with @hermes/)
+    expect(peer).toMatch(/group chat with @stardust/)
   })
 
   it('asks for full-quality results and short chatter, not short results', async () => {

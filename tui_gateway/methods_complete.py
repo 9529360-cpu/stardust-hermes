@@ -58,10 +58,12 @@ def _(rid, params: dict) -> dict:
 def _profile_mention_items(prefix: str) -> list[dict]:
     """`@<profile>` completions (multi-agent UIs route `@<profile>` text to another
     profile). Bare-word matches only, never `@kind:` directives; the primary profile
-    is also offered as 'hermes' when no real profile claims that name."""
+    is also offered as @stardust when typed by either of its names, unless a real profile
+    claims one of them."""
     out: list[dict] = []
     try:
         from hermes_cli.profiles import list_profiles
+        from tools.bot_mode_probe import PRIMARY_HANDLE, PRIMARY_HANDLE_ALIASES
         seen: set[str] = set()
         for p in list_profiles():
             if not (name := (p.name or "").strip()):
@@ -69,8 +71,9 @@ def _profile_mention_items(prefix: str) -> list[dict]:
             seen.add(name.lower())
             if name.lower().startswith(prefix.lower()):
                 out.append(_item(f"@{name}", (getattr(p, "description", "") or "").strip() or "agent profile"))
-        if "hermes".startswith(prefix.lower()) and "hermes" not in seen:
-            out.append(_item("@hermes", "agent profile (primary)"))
+        primary_claimed = bool(seen.intersection(PRIMARY_HANDLE_ALIASES))
+        if not primary_claimed and any(alias.startswith(prefix.lower()) for alias in PRIMARY_HANDLE_ALIASES):
+            out.append(_item(f"@{PRIMARY_HANDLE}", "agent profile (primary)"))
     except Exception:
         return []
     return out

@@ -173,6 +173,16 @@ def test_cannot_message_self(tmp_path):
     assert "yourself" in result["error"]
 
 
+def test_cannot_message_self_by_the_stardust_handle(tmp_path):
+    home = _managed_home(tmp_path)
+    agent = _FakeAgent(home, title="Bot Chat")  # default profile
+    result = json.loads(
+        bot_mode_dm.message_agent_tool(target="stardust", message="hi", agent=agent)
+    )
+    assert "error" in result
+    assert "yourself" in result["error"]
+
+
 def test_empty_and_oversized_message_rejected(tmp_path):
     home = _managed_home(tmp_path)
     agent = _FakeAgent(home, title="Bot Chat")
@@ -280,11 +290,11 @@ def test_local_delivery_command_and_ack(tmp_path, monkeypatch):
     assert "PAYLOAD_SENTINEL_7A91" not in command
     assert "$(" not in command
     # the sender rides the runner argv as a stable id plus display handle
-    assert _runner_author(command) == {"id": "bot:default", "name": "hermes", "is_bot": True}
+    assert _runner_author(command) == {"id": "bot:default", "name": "stardust", "is_bot": True}
 
     # attribution prefix applied server-side; body verbatim inside the file
     content = Path(dm_file).read_text(encoding="utf-8")
-    assert content.startswith("Message from 🤖 hermes (@hermes): ")
+    assert content.startswith("Message from 🤖 stardust (@stardust): ")
     assert '$(and this is not shell)' in content
 
 
@@ -334,7 +344,8 @@ def test_peer_delivery_command(tmp_path, monkeypatch):
     assert mode == "stdin"
     assert transport_argv == ["hermes", "-p", "default", "peer", "dm", "spark/researcher"]
     # the peer child reads the author from its env and forwards it in the request body
-    assert _runner_author(calls[0]["command"]) == {"id": "bot:eri-mac.local/default", "name": "hermes", "is_bot": True}
+    assert _runner_author(calls[0]["command"]) == {
+        "id": "bot:eri-mac.local/default", "name": "stardust", "is_bot": True}
 
     # bare peer name targets the peer's main agent
     result2 = json.loads(
@@ -396,7 +407,7 @@ def test_peer_delivery_author_carries_the_sender_hostname_and_local_stays_bare(t
 
 
 def test_named_profile_sender_prefix(tmp_path, monkeypatch):
-    """A named-profile bot signs with its own handle, not @hermes."""
+    """A named-profile bot signs with its own handle, not @stardust."""
     calls = _capture_spawn(monkeypatch)
     home = _managed_home(tmp_path, teammates=("researcher", "coder"))
     profile_home = home / "profiles" / "coder"
@@ -471,8 +482,8 @@ def test_live_dm_admitted_before_waiter_failure(tmp_path, monkeypatch):
     record = live.read_delivery_result(target, result["delivery_id"])
     assert record is not None
     assert record["owner"] == owner
-    assert record["message"] == "Message from 🤖 hermes (@hermes): hello"
-    assert record["author"] == {"id": "bot:default", "name": "hermes", "is_bot": True}
+    assert record["message"] == "Message from 🤖 stardust (@stardust): hello"
+    assert record["author"] == {"id": "bot:default", "name": "stardust", "is_bot": True}
     assert "notification_error" in result
 
 

@@ -1222,8 +1222,8 @@ export const GROUP_CHAT_MAX_MEMBERS = 6
  *  renamed bot never shows up as its raw profile id or a stale "Hermes"
  *  (community report, Aug 21 2026: renamed default still read "Hermes is
  *  thinking…" in group rooms). The untitled primary profile is literally
- *  named "default" — render it as Hermes (matching displayName and the
- *  @hermes handle) so the main agent never loses its name in rooms. */
+ *  named "default" — render it as Stardust (matching displayName and the
+ *  @stardust handle) so the main agent never loses its name in rooms. */
 export function groupSpeakerLabel(name?: null | string) {
   const trimmed = (name || '').trim()
 
@@ -1253,7 +1253,7 @@ export function groupSpeakerLabel(name?: null | string) {
     return renamed
   }
 
-  return trimmed.toLowerCase() === 'default' ? 'Hermes' : trimmed
+  return trimmed.toLowerCase() === 'default' ? 'Stardust' : trimmed
 }
 
 /** Trim a room log + its watermarks to the retained window, keeping
