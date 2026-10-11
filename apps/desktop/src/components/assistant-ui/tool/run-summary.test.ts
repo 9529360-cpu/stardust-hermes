@@ -1,6 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 
-import { summarizeToolRun, type ToolCallLike } from './run-summary'
+import { setRuntimeI18nLocale } from '@/i18n'
+
+import { summarizeToolRun, type ToolCallLike, toolPresentVerb } from './run-summary'
 
 function tool(toolName: string, args: Record<string, unknown> = {}, result?: unknown): ToolCallLike {
   return { args, result, toolCallId: `${toolName}-${Math.random()}`, toolName }
@@ -56,5 +58,49 @@ describe('summarizeToolRun', () => {
   // or it narrates work that stopped happening and never offers its toggle.
   it('reads a run the turn left unresolved as finished', () => {
     expect(settled([read('a.ts'), tool('search_files', { query: 'toolRuns' })])).toBe('Explored 2 files')
+  })
+})
+
+describe('summarizeToolRun copy by category', () => {
+  it('keeps the English copy for the categories no other test reads', () => {
+    expect(settled([tool('delegate_task'), tool('delegate_task')])).toBe('Delegated 2 tasks')
+    expect(settled([tool('write_file'), tool('patch')])).toBe('Edited 2 files')
+    expect(settled([tool('todo'), tool('todo')])).toBe('Used 2 tools')
+    expect(running([tool('todo')])).toBe('Using 1 tool')
+  })
+})
+
+// The header also renders on zh screens, so its copy must come from the active
+// locale. Each block sets its language and puts English back afterwards.
+describe('summarizeToolRun in zh', () => {
+  afterEach(() => setRuntimeI18nLocale('en'))
+
+  it('keeps English words out of a zh run summary', () => {
+    setRuntimeI18nLocale('zh')
+
+    const summaries = [
+      settled([read('a.ts'), read('b.ts'), ran('ls'), ran('pwd')]),
+      running([read('a.ts'), read('b.ts'), ran('x'), ran('y')]),
+      settled([tool('delegate_task'), tool('delegate_task')]),
+      settled([tool('write_file'), tool('patch')]),
+      settled([tool('todo'), { ...tool('todo'), isError: true }]),
+      running([tool('todo'), tool('todo')])
+    ]
+
+    for (const summary of summaries) {
+      expect(summary).not.toMatch(/[A-Za-z]/)
+    }
+  })
+
+  it('reads a settled mixed run in zh', () => {
+    setRuntimeI18nLocale('zh')
+
+    expect(settled([read('a.ts'), read('b.ts'), ran('ls'), ran('pwd')])).toBe('已探索 2 个文件，已运行 2 个命令')
+  })
+
+  it('reads the present-tense verb for the status line in zh', () => {
+    setRuntimeI18nLocale('zh')
+
+    expect(toolPresentVerb('read_file')).toBe('正在探索')
   })
 })

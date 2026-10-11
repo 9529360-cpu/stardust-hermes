@@ -3963,6 +3963,34 @@ export const ru = defineLocale({
       copyFile: 'Копировать файл',
       copyPath: 'Копировать путь',
       failedCalls: (count: number) => `Вызовов с ошибкой: ${count}`,
+      runSummary: {
+        delegate: {
+          past: 'Делегировано',
+          present: 'Делегируется',
+          counted: count => `${count} ${RU_PLURAL(count, 'задача', 'задачи', 'задач')}`
+        },
+        edit: {
+          past: 'Отредактировано',
+          present: 'Редактируется',
+          counted: count => `${count} ${RU_PLURAL(count, 'файл', 'файла', 'файлов')}`
+        },
+        explore: {
+          past: 'Изучено',
+          present: 'Изучается',
+          counted: count => `${count} ${RU_PLURAL(count, 'файл', 'файла', 'файлов')}`
+        },
+        other: {
+          past: 'Использовано',
+          present: 'Используется',
+          counted: count => `${count} ${RU_PLURAL(count, 'инструмент', 'инструмента', 'инструментов')}`
+        },
+        run: {
+          past: 'Выполнено',
+          present: 'Выполняется',
+          counted: count => `${count} ${RU_PLURAL(count, 'команда', 'команды', 'команд')}`
+        },
+        separator: ', '
+      },
       skillActivity: {
         loading: 'Загружается скилл',
         loaded: 'Загружен скилл',

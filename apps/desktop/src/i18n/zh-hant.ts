@@ -3990,6 +3990,34 @@ export const zhHant = defineLocale({
       copyFile: '複製檔案',
       copyPath: '複製路徑',
       failedCalls: (count: number) => `${count} 次工具呼叫失敗`,
+      runSummary: {
+        delegate: {
+          past: '已委派',
+          present: '正在委派',
+          counted: count => `${count} 個任務`
+        },
+        edit: {
+          past: '已編輯',
+          present: '正在編輯',
+          counted: count => `${count} 個檔案`
+        },
+        explore: {
+          past: '已探索',
+          present: '正在探索',
+          counted: count => `${count} 個檔案`
+        },
+        other: {
+          past: '已使用',
+          present: '正在使用',
+          counted: count => `${count} 個工具`
+        },
+        run: {
+          past: '已執行',
+          present: '正在執行',
+          counted: count => `${count} 個指令`
+        },
+        separator: '，'
+      },
       skillActivity: {
         loading: '正在載入技能',
         loaded: '已載入技能',

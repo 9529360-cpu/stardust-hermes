@@ -4860,6 +4860,34 @@ export const zh = defineLocale({
       copyFile: '复制文件',
       copyPath: '复制路径',
       failedCalls: (count: number) => `${count} 次工具调用失败`,
+      runSummary: {
+        delegate: {
+          past: '已委派',
+          present: '正在委派',
+          counted: count => `${count} 个任务`
+        },
+        edit: {
+          past: '已编辑',
+          present: '正在编辑',
+          counted: count => `${count} 个文件`
+        },
+        explore: {
+          past: '已探索',
+          present: '正在探索',
+          counted: count => `${count} 个文件`
+        },
+        other: {
+          past: '已使用',
+          present: '正在使用',
+          counted: count => `${count} 个工具`
+        },
+        run: {
+          past: '已运行',
+          present: '正在运行',
+          counted: count => `${count} 个命令`
+        },
+        separator: '，'
+      },
       skillActivity: {
         loading: '正在加载技能',
         loaded: '已加载技能',

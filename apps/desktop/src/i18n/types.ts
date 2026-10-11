@@ -4023,6 +4023,14 @@ export interface Translations {
       copyFile: string
       copyPath: string
       failedCalls: (count: number) => string
+      runSummary: {
+        delegate: { past: string; present: string; counted: (count: number) => string }
+        edit: { past: string; present: string; counted: (count: number) => string }
+        explore: { past: string; present: string; counted: (count: number) => string }
+        other: { past: string; present: string; counted: (count: number) => string }
+        run: { past: string; present: string; counted: (count: number) => string }
+        separator: string
+      }
       skillActivity: {
         loading: string
         loaded: string
