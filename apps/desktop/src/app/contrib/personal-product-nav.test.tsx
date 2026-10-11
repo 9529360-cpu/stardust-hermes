@@ -30,6 +30,20 @@ vi.mock('@/store/projects', async importOriginal => ({
   fetchProjectSessions: vi.fn().mockResolvedValue(null)
 }))
 
+// Radix popovers measure their anchor with ResizeObserver, which jsdom does not provide.
+class NoopResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+vi.stubGlobal('ResizeObserver', NoopResizeObserver)
+
+// The quick personalization panel reads the gateway only through this hook; the nav test does not need a live socket.
+vi.mock('@/app/gateway/hooks/use-gateway-request', () => ({
+  useGatewayRequest: () => ({ requestGateway: vi.fn() })
+}))
+
 // Spy on the real pane reveal so the agent-space row's call can be asserted without changing its behavior.
 vi.mock('@/components/pane-shell/tree/store', async importOriginal => {
   const actual = await importOriginal<Record<string, unknown>>()
@@ -125,11 +139,25 @@ describe('PersonalProductNav', () => {
       '任务',
       '消息平台',
       '工具',
+      '个性化',
       '项目'
     ])
     expect(screen.queryByRole('button', { name: '对话' })).toBeNull()
     expect(screen.queryByRole('button', { name: '知识库' })).toBeNull()
     expect(screen.queryByRole('button', { name: '设置' })).toBeNull()
+  })
+
+  it('opens the personalization panel from the nav and hands the detailed controls to Appearance settings', () => {
+    const onNavigate = renderNav('chat')
+
+    fireEvent.click(screen.getByRole('button', { name: '个性化' }))
+    expect(screen.getByRole('switch', { name: '桌面宠物' })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: '更多外观设置' }))
+
+    expect(onNavigate).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: 'settings', route: '/settings?tab=config:appearance' })
+    )
   })
 
   it('opens the agent space as a page beside the nav, like tools and plugins', () => {
@@ -186,7 +214,7 @@ describe('PersonalProductNav', () => {
     expect(onNavigate).toHaveBeenCalledTimes(1)
   })
 
-  it('offers the project actions on right-click, so a project can be deleted (Home has none)', async () => {
+  it('offers the project actions on right-click, so a project can be deleted', async () => {
     $projectTree.set([
       { id: 'no-project', isNoProject: true, label: 'Home', path: null, repos: [], sessionCount: 3 },
       { id: 'p_example', label: 'Example', path: 'D:/Example', repos: [], sessionCount: 2 }
@@ -194,8 +222,8 @@ describe('PersonalProductNav', () => {
     renderNav('chat')
     fireEvent.click(screen.getByRole('button', { name: '项目' }))
 
-    fireEvent.contextMenu(screen.getByRole('button', { name: 'Home' }))
-    expect(screen.queryByRole('menuitem')).toBeNull()
+    // Home is not listed as a project, so there is no row to act on.
+    expect(screen.queryByRole('button', { name: 'Home' })).toBeNull()
 
     fireEvent.contextMenu(screen.getByRole('button', { name: 'Example' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: '删除…' }))
@@ -252,6 +280,43 @@ describe('PersonalProductNav', () => {
     fireEvent.click(screen.getByRole('button', { name: '项目' }))
 
     expect(screen.getByText('暂无项目')).toBeTruthy()
+  })
+
+  it('lists a plain new chat under 对话 only, never inside a project group', () => {
+    // A chat with no folder is filed in the Home bucket. The bucket is not a
+    // project, so no project row in the nav may show it or its chats.
+    const plainChat = { id: 'plain-1', title: '随便聊聊', preview: null } as SessionInfo
+    $projectsRpcAvailable.set(true)
+    $projectTree.set([
+      {
+        id: 'no-project',
+        isNoProject: true,
+        label: 'Home',
+        path: null,
+        previewSessions: [plainChat],
+        repos: [
+          {
+            id: 'no-project',
+            label: 'Home',
+            path: null,
+            sessionCount: 1,
+            groups: [{ id: 'no-project', label: 'Home', path: null, sessions: [plainChat] }]
+          }
+        ],
+        sessionCount: 1
+      },
+      { id: 'p_example', label: 'Example', path: 'D:/Example', repos: [], sessionCount: 0 }
+    ])
+    const onNavigate = renderNav('chat')
+
+    fireEvent.click(screen.getByRole('button', { name: '新建对话' }))
+    expect(onNavigate).toHaveBeenLastCalledWith(expect.objectContaining({ action: 'new-session' }))
+    expect($projectScope.get()).toBe(ALL_PROJECTS)
+
+    fireEvent.click(screen.getByRole('button', { name: '项目' }))
+    expect(screen.queryByRole('button', { name: 'Home' })).toBeNull()
+    expect(screen.queryByText('随便聊聊')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Example' })).toBeTruthy()
   })
 
   it('hides the empty line as soon as a real project exists', () => {

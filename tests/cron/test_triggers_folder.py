@@ -1,18 +1,28 @@
-"""Folder triggers: the debounce and seen-set rules, the baseline, the queue and the hourly budget.
+"""Folder triggers: the arrival, debounce and seen-set rules, the queue and the hourly budget.
 
 The debounce rules are tested on ``observe_folder`` directly with synthetic entries. The store path
 runs against real files in a temp folder with an injected clock, so no test waits on real time.
+A file arrives at the later of its modified time and its change time. Synthetic entries set the
+change time equal to the modified time unless a test says otherwise.
 """
 
 import os
+import shutil
+import time
 
 import pytest
 
 from cron import triggers as T
 
+# 2020-01-01T00:00:00Z: the modified time a copy keeps from an old source file.
+OLD_MTIME = 1577836800.0
 
-def _entry(name, size, mtime, folder="/watch"):
-    return {"name": name, "size": size, "mtime": mtime, "path": f"{folder}/{name}"}
+
+def _entry(name, size, mtime, folder="/watch", ctime=None):
+    return {
+        "name": name, "size": size, "mtime": mtime,
+        "ctime": mtime if ctime is None else ctime, "path": f"{folder}/{name}",
+    }
 
 
 def _state(floor=0.0):
@@ -91,6 +101,47 @@ class TestObserveFolder:
             T.observe_folder(state, future, now)
         assert state["floor"] <= 320.0
 
+    def test_a_copy_with_an_old_modified_time_arrives_at_its_change_time(self):
+        state = _state(floor=100.0)
+        # A copy keeps the source's Date modified (50), but the copy was made after the floor (150).
+        entries = [_entry("copy.pdf", 10, 50.0, ctime=150.0)]
+        assert T.observe_folder(state, entries, 200.0) == []
+        assert T.observe_folder(state, entries, 260.0) == []
+        ready = T.observe_folder(state, entries, 320.0)
+        assert [item["name"] for item in ready] == ["copy.pdf"]
+
+    def test_a_file_older_than_the_floor_in_both_times_never_triggers(self):
+        state = _state(floor=100.0)
+        old = [_entry("old.pdf", 5, 50.0, ctime=60.0)]
+        for now in (200.0, 260.0, 320.0, 380.0):
+            assert T.observe_folder(state, old, now) == []
+        assert state["pending"] == {}
+
+    def test_an_evicted_file_with_a_later_change_time_cannot_look_new_again(self, monkeypatch):
+        monkeypatch.setattr(T, "SEEN_CAP", 1)
+        state = _state(floor=100.0)
+        # y.pdf keeps an old modified time (50) but arrived at 110, so it is the first one evicted.
+        entries = [_entry("y.pdf", 1, 50.0, ctime=110.0), _entry("x.pdf", 1, 120.0)]
+        for now in (200.0, 260.0):
+            assert T.observe_folder(state, entries, now) == []
+        ready = T.observe_folder(state, entries, 320.0)
+        assert [item["name"] for item in ready] == ["y.pdf", "x.pdf"]
+        assert state["floor"] == 110.0  # the evicted file's arrival, not its older modified time
+        for now in (380.0, 440.0, 500.0, 560.0):
+            assert T.observe_folder(state, entries, now) == []
+
+    def test_a_real_file_older_than_the_floor_in_both_times_never_triggers(self, tmp_path):
+        path = tmp_path / "old.pdf"
+        path.write_bytes(b"x")
+        os.utime(path, (OLD_MTIME, OLD_MTIME))
+        # A test cannot set the change time back on Linux, so the floor is put just above the real
+        # change time. The modified time is old too, so the file is old on both counts.
+        floor = os.stat(path).st_ctime + 10
+        state = _state(floor=floor)
+        for now in (floor + 60, floor + 120, floor + 180, floor + 240):
+            assert T.observe_folder(state, T.list_watch_folder(str(tmp_path), "*.pdf"), now) == []
+        assert state["pending"] == {}
+
 
 # --- store path against real files -------------------------------------------------------------
 
@@ -102,7 +153,11 @@ def store(tmp_path, monkeypatch):
 
     monkeypatch.setattr(jt, "_ticker_started", False)
     monkeypatch.setattr(jt, "_armed_stores", set())
-    clock = {"now": 1_000_000.0}
+    # A file's change time is the real time it was written, so about now. The clock runs an hour
+    # ahead of real time, so that change time is always before the floor and never makes a test file
+    # look new: each test decides its files by the modified time it writes. The arrival regression
+    # test sets its own clock.
+    clock = {"now": time.time() + 3600.0}
     monkeypatch.setattr(T, "now_epoch", lambda: clock["now"])
     return clock
 
@@ -171,6 +226,26 @@ class TestFolderStore:
         _folder_job(inbox)
         for step in range(1, 6):
             assert _collect(base + 60 * step) == []
+
+    def test_a_file_copied_in_with_an_old_modified_time_triggers(self, store, inbox, tmp_path):
+        # Explorer keeps the source's Date modified on a copy. The copy still arrived after the job
+        # was created, and that is what counts. The floor here is real time, so the file's real
+        # change time is compared against a real floor.
+        floor = time.time() - 60  # the job was created a minute before the copy arrives
+        store["now"] = floor
+        job = _folder_job(inbox)
+        source = tmp_path / "downloads" / "statement.pdf"
+        source.parent.mkdir()
+        source.write_bytes(b"%PDF-1.4 statement")
+        os.utime(source, (OLD_MTIME, OLD_MTIME))
+        shutil.copyfile(source, inbox / "statement.pdf")
+        os.utime(inbox / "statement.pdf", (OLD_MTIME, OLD_MTIME))
+        assert _collect(floor + 60) == []  # first sight
+        assert _collect(floor + 120) == []  # unchanged once
+        handed = _collect(floor + 180)  # unchanged twice: settled
+        assert _names(handed) == ["statement.pdf"]
+        _settle(job["id"])
+        assert _collect(floor + 240) == []  # handed out once, never again
 
     def test_a_growing_file_is_picked_up_only_when_it_stops(self, store, inbox):
         base = store["now"]

@@ -756,16 +756,19 @@ function CommandPaletteBody({ onExited }: { onExited: () => void }) {
           label: cc.openFolder,
           run: () => void openFolderAsProject()
         },
-        ...filterVisibleProjects(projectTree, dismissedAutoProjects).map(project => ({
-          comboHint: 'mod+enter',
-          icon: codiconIcon(project.icon || (project.isNoProject ? 'home' : 'folder-library')),
-          id: `project-${project.id}`,
-          keywords: ['project', 'workspace', 'go to', project.label, ...(project.path ? [project.path] : [])],
-          label: project.label,
-          modLabel: cc.newSessionInProject(project.label),
-          runWithEvent: (event?: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean }) =>
-            goToProject(project.id, { newSession: Boolean(event?.metaKey || event?.ctrlKey) })
-        }))
+        // Home holds chats with no folder; they live in 对话, so it is not a project to jump to.
+        ...filterVisibleProjects(projectTree, dismissedAutoProjects)
+          .filter(project => !project.isNoProject)
+          .map(project => ({
+            comboHint: 'mod+enter',
+            icon: codiconIcon(project.icon || 'folder-library'),
+            id: `project-${project.id}`,
+            keywords: ['project', 'workspace', 'go to', project.label, ...(project.path ? [project.path] : [])],
+            label: project.label,
+            modLabel: cc.newSessionInProject(project.label),
+            runWithEvent: (event?: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean }) =>
+              goToProject(project.id, { newSession: Boolean(event?.metaKey || event?.ctrlKey) })
+          }))
       ]
     }
 
