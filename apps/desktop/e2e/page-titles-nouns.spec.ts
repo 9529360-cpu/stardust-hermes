@@ -104,7 +104,10 @@ test('Tools and Plugins share the Tasks title row, and the Projects list names t
   expect(Math.abs(toolsBox!.x - tasksBox!.x)).toBeLessThanOrEqual(2)
   await capture(page, `tools-${WIDE_WIDTH}`)
 
-  await nav.getByRole('button', { name: '插件', exact: true }).click()
+  // Plugins has no nav button of its own; it is the Plugins tab of the Tools page.
+  await page.evaluate(() => {
+    window.location.hash = '#/skills?tab=plugins'
+  })
   await expect(page.getByRole('heading', { name: '插件', exact: true })).toBeVisible({ timeout: 20_000 })
   await capture(page, `plugins-${WIDE_WIDTH}`)
 
@@ -134,12 +137,16 @@ test('at a narrow width the same pages open from the overlay, and the Projects e
 
   // Picking Tools closed the overlay, so one toggle reopens it for the next pick.
   await page.keyboard.press('Control+b')
-  await nav.getByRole('button', { name: '插件', exact: true }).click()
+  await page.evaluate(() => {
+    window.location.hash = '#/skills?tab=plugins'
+  })
   await expect(page.getByRole('heading', { name: '插件', exact: true })).toBeVisible({ timeout: 20_000 })
   await capture(page, `plugins-${NARROW_WIDTH}`)
 
-  // Picking Plugins closed the overlay too; reopen it for the Projects row, which keeps it open.
-  await page.keyboard.press('Control+b')
+  // Plugins is opened by its route, which leaves the overlay as it was. Open the overlay only if it closed.
+  if (!(await nav.isVisible())) {
+    await page.keyboard.press('Control+b')
+  }
   await nav.getByRole('button', { name: '项目', exact: true }).click()
   await expect(nav.getByText('暂无项目', { exact: true })).toBeVisible({ timeout: 20_000 })
   await capture(page, `projects-${NARROW_WIDTH}`)

@@ -32,25 +32,33 @@ import type { SessionInfo } from '@/types/hermes'
 import { ProjectContextMenu } from '../chat/sidebar/projects/project-menu'
 import type { SidebarProjectTree } from '../chat/sidebar/projects/workspace-groups'
 import { WorkspaceAddButton } from '../chat/sidebar/projects/workspace-header'
-import { type AppView, BOTS_ROUTE, CRON_ROUTE, routePathname, SETTINGS_ROUTE, SKILLS_ROUTE } from '../routes'
+import {
+  type AppView,
+  BOTS_ROUTE,
+  CRON_ROUTE,
+  MESSAGING_ROUTE,
+  routePathname,
+  SETTINGS_ROUTE,
+  SKILLS_ROUTE
+} from '../routes'
 import type { SidebarNavItem } from '../types'
 
 import { PersonalizationPanel } from './personalization-panel'
 
+// Tools is the one entry for the skills page. Its Plugins tab is reached from inside Tools, so the
+// nav carries no separate Plugins button. Messaging takes its label from the i18n bundle.
 const PRODUCT_NAV_COPY = {
   ar: {
     agentSpace: 'مساحة الوكلاء',
     newChat: 'محادثة جديدة',
-    plugins: 'الإضافات',
     project: 'المشروع',
     tasks: 'المهام',
     tools: 'الأدوات'
   },
-  en: { agentSpace: 'Agent space', newChat: 'New chat', plugins: 'Plugins', project: 'Project', tasks: 'Tasks', tools: 'Tools' },
+  en: { agentSpace: 'Agent space', newChat: 'New chat', project: 'Project', tasks: 'Tasks', tools: 'Tools' },
   ja: {
     agentSpace: 'エージェント空間',
     newChat: '新しいチャット',
-    plugins: 'プラグイン',
     project: 'プロジェクト',
     tasks: 'タスク',
     tools: 'ツール'
@@ -58,13 +66,12 @@ const PRODUCT_NAV_COPY = {
   ru: {
     agentSpace: 'Пространство агентов',
     newChat: 'Новый чат',
-    plugins: 'Плагины',
     project: 'Проект',
     tasks: 'Задачи',
     tools: 'Инструменты'
   },
-  zh: { agentSpace: '智能体空间', newChat: '新建对话', plugins: '插件', project: '项目', tasks: '任务', tools: '工具' },
-  'zh-hant': { agentSpace: '智能體空間', newChat: '新增對話', plugins: '外掛', project: '專案', tasks: '任務', tools: '工具' }
+  zh: { agentSpace: '智能体空间', newChat: '新建对话', project: '项目', tasks: '任务', tools: '工具' },
+  'zh-hant': { agentSpace: '智能體空間', newChat: '新增對話', project: '專案', tasks: '任務', tools: '工具' }
 } as const
 
 const NULL_ICON: SidebarNavItem['icon'] = () => null
@@ -118,7 +125,7 @@ export function PersonalProductNav({
   onResumeSession
 }: PersonalProductNavProps) {
   const { locale, t } = useI18n()
-  const { pathname, search } = useLocation()
+  const { pathname } = useLocation()
   const copy = PRODUCT_NAV_COPY[locale]
   const [projectsOpen, setProjectsOpen] = useState(false)
   const [expandedProjectId, setExpandedProjectId] = useState<null | string>(null)
@@ -181,9 +188,9 @@ export function PersonalProductNav({
   // workspace keeps that page's route.
   const focusedSessionIsTile = useStore($focusedSessionIsTile)
   const currentView = focusedSessionIsTile ? 'chat' : routeView
-  const skillsTab = new URLSearchParams(search).get('tab')
-  // The agent roster is a page at its own route, like Tools and Plugins.
+  // The agent roster and messaging are pages at their own routes, like Tools.
   const agentSpaceShowing = routePathname(pathname) === BOTS_ROUTE
+  const messagingShowing = routePathname(pathname) === MESSAGING_ROUTE
 
   // Picking a page or a new chat closes the overlay on a narrow window, so the
   // choice shows in the main area instead of under the nav.
@@ -246,12 +253,12 @@ export function PersonalProductNav({
       route: `${SKILLS_ROUTE}?tab=toolsets`
     })
 
-  const openPlugins = () =>
+  const openMessaging = () =>
     pick({
-      id: 'plugins',
-      label: copy.plugins,
+      id: 'messaging',
+      label: t.sidebar.nav.messaging,
       icon: NULL_ICON,
-      route: `${SKILLS_ROUTE}?tab=plugins`
+      route: MESSAGING_ROUTE
     })
 
   const openProject = () => {
@@ -326,17 +333,17 @@ export function PersonalProductNav({
           tour="sidebar-nav-cron"
         />
         <ProductNavButton
-          active={currentView === 'skills' && skillsTab !== 'plugins'}
+          active={messagingShowing}
+          icon="broadcast"
+          label={t.sidebar.nav.messaging}
+          onClick={openMessaging}
+        />
+        <ProductNavButton
+          active={currentView === 'skills'}
           icon="tools"
           label={copy.tools}
           onClick={openTools}
           tour="sidebar-nav-skills"
-        />
-        <ProductNavButton
-          active={currentView === 'skills' && skillsTab === 'plugins'}
-          icon="plug"
-          label={copy.plugins}
-          onClick={openPlugins}
         />
         <Popover onOpenChange={setPersonalizeOpen} open={personalizeOpen}>
           <PopoverTrigger asChild>

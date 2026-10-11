@@ -46,7 +46,7 @@ test('personal assistant workspace keeps conversation primary and navigation unc
   await expect(newChatButton).toBeVisible()
   await expect(productNav.getByRole('button', { name: '任务' })).toBeVisible()
   await expect(productNav.getByRole('button', { name: '工具' })).toBeVisible()
-  await expect(productNav.getByRole('button', { name: '插件' })).toBeVisible()
+  await expect(productNav.getByRole('button', { name: '消息平台' })).toBeVisible()
   await expect(productNav.getByRole('button', { name: '项目' })).toBeVisible()
   await expect(productNav.getByRole('button', { name: '对话' })).toHaveCount(0)
   await expect(productNav.getByRole('button', { name: '知识库' })).toHaveCount(0)
