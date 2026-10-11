@@ -3,6 +3,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { AutomationBlueprint, AutomationBlueprintField } from '@/hermes'
 import type { Translations } from '@/i18n'
 
+import { WatchFolderInput } from './cron-trigger-fields'
+
 // The blueprint catalog is shared with the dashboard, so its deliver slot
 // defaults to "origin" (the chat/home-channel a dashboard or gateway job was
 // created from). Desktop has no origin chat, so seed the deliver slot to the
@@ -125,6 +127,20 @@ export function BlueprintSlotControl({
 
   if (field.type === 'time') {
     return <Input id={id} onChange={event => onChange(event.target.value)} type="time" value={value} />
+  }
+
+  if (field.type === 'folder') {
+    // The backend checks the folder when the job is created; its refusal shows inline in the dialog.
+    return (
+      <WatchFolderInput
+        c={c}
+        id={id}
+        invalid={false}
+        onChange={onChange}
+        placeholder={c.trigger.folderPlaceholder}
+        value={value}
+      />
+    )
   }
 
   return (

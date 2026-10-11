@@ -892,6 +892,28 @@ export interface AnalyticsTotals {
   total_sessions: number
 }
 
+// When a job runs. A clock job ('schedule') runs on its schedule; a 'startup' job runs once each
+// time Stardust starts; a 'folder' job runs when a new file appears in watch_dir.
+export type CronTriggerType = 'folder' | 'schedule' | 'startup'
+
+export interface CronJobTrigger {
+  type: CronTriggerType
+  /** Folder job only: file-name glob such as '*' or '*.pdf'. */
+  pattern?: string
+  poll_seconds?: number
+  /** Folder job only: the absolute folder being watched. */
+  watch_dir?: string
+}
+
+// Runtime summary the backend adds to startup and folder jobs. Absent on clock jobs.
+export interface CronTriggerStatus {
+  last_error?: null | string
+  last_triggered_at?: null | string
+  queued?: number
+  skipped_total?: number
+  type: CronTriggerType
+}
+
 export interface CronJob {
   profile?: string
   deliver?: null | string
@@ -909,6 +931,9 @@ export interface CronJob {
   schedule_display?: null | string
   script?: null | string
   state?: null | string
+  /** Absent on clock jobs written before triggers existed; treat as 'schedule'. */
+  trigger?: CronJobTrigger | null
+  trigger_status?: CronTriggerStatus | null
 }
 
 export interface CronSuggestion {
@@ -931,7 +956,9 @@ export interface CronJobCreatePayload {
   name?: string
   prompt: string
   provider?: string
-  schedule: string
+  /** Clock jobs only. An event job sends `trigger` instead and no schedule. */
+  schedule?: string
+  trigger?: CronJobTrigger
 }
 
 export interface CronJobSchedule {
@@ -948,6 +975,8 @@ export interface CronJobUpdates {
   prompt?: string
   provider?: null | string
   schedule?: string
+  /** Folder jobs only: a new watch folder or pattern. The run type itself cannot change. */
+  trigger?: CronJobTrigger
 }
 
 // A cron delivery target from GET /api/cron/delivery-targets — the single
@@ -969,7 +998,8 @@ export interface CronDeliveryTarget {
 // GET /api/cron/blueprints (blueprint_catalog_entry).
 export interface AutomationBlueprintField {
   name: string
-  type: 'enum' | 'text' | 'time' | 'weekdays'
+  /** 'folder' is a folder path on the backend machine, checked when the job is created. */
+  type: 'enum' | 'folder' | 'text' | 'time' | 'weekdays'
   label: string
   default: null | string
   options: string[]
@@ -988,6 +1018,8 @@ export interface AutomationBlueprint {
   fields: AutomationBlueprintField[]
   command: string
   appUrl: string
+  /** Absent from backends older than event templates; treat as 'schedule'. */
+  trigger_type?: CronTriggerType
 }
 
 export interface ProfileCreatePayload {

@@ -1,4 +1,6 @@
-import type { CronJob, CronJobUpdates } from '@/types/hermes'
+import type { CronJob, CronJobUpdates, CronTriggerType } from '@/types/hermes'
+
+import { cronEditRunUpdates, type CronTriggerFormValues, DEFAULT_CRON_TRIGGER_FORM } from './cron-trigger-model'
 
 const asText = (value: unknown): string => (typeof value === 'string' ? value : '')
 
@@ -13,17 +15,20 @@ export interface CronEditorValidationInput {
   prompt: string
   schedule: string
   scriptOnlyJob: boolean
+  /** A startup or folder job runs on its trigger, so it needs no schedule. Defaults to a clock job. */
+  triggerType?: CronTriggerType
 }
 
 export function validateCronEditor(input: CronEditorValidationInput): CronEditorValidationError | null {
   const trimmedPrompt = input.prompt.trim()
   const trimmedSchedule = input.schedule.trim()
+  const needsSchedule = (input.triggerType ?? 'schedule') === 'schedule'
 
-  if (!trimmedSchedule && !trimmedPrompt && !input.scriptOnlyJob) {
+  if (needsSchedule && !trimmedSchedule && !trimmedPrompt && !input.scriptOnlyJob) {
     return 'prompt_and_schedule'
   }
 
-  if (!trimmedSchedule) {
+  if (needsSchedule && !trimmedSchedule) {
     return 'schedule'
   }
 
@@ -43,6 +48,8 @@ export interface CronEditorSaveValues {
   /** Provider for the model override ('' = none). Always paired with model. */
   provider: string
   schedule: string
+  /** "When to run" and its folder fields. Absent means a clock job. */
+  trigger?: CronTriggerFormValues
 }
 
 export function parseCronDeliveryTargets(value: string): string[] {
@@ -92,12 +99,19 @@ export function lastErrorSummary(lastError: string | null | undefined): string {
   return sentence.length > ERROR_SUMMARY_MAX ? `${sentence.slice(0, ERROR_SUMMARY_MAX - 1).trimEnd()}…` : sentence
 }
 
-/** Build the API update payload, preserving an empty prompt on script-only jobs. */
-export function cronEditorUpdates(values: CronEditorSaveValues, options: { scriptOnlyJob: boolean }): CronJobUpdates {
+/**
+ * Build the API update payload, preserving an empty prompt on script-only jobs. The run fields
+ * follow the job's own trigger type (fixed at creation): a clock job sends `schedule`, a startup
+ * job sends no run field, and a folder job may send its folder and pattern as `trigger`.
+ */
+export function cronEditorUpdates(
+  values: CronEditorSaveValues,
+  options: { scriptOnlyJob: boolean; triggerType?: CronTriggerType }
+): CronJobUpdates {
   const updates: CronJobUpdates = {
     deliver: values.deliver,
     name: values.name,
-    schedule: values.schedule.trim()
+    ...cronEditRunUpdates(options.triggerType ?? 'schedule', values.trigger ?? DEFAULT_CRON_TRIGGER_FORM, values.schedule)
   }
 
   const trimmedPrompt = values.prompt.trim()

@@ -2283,11 +2283,51 @@ export const ja = defineLocale({
     scriptOnlyEditHint: 'スクリプトのみのジョブ（AI プロンプトなし）。ジョブ ID:',
     saveChanges: '変更を保存',
     createAction: 'Cron を作成',
+    trigger: {
+      whenLabel: '実行タイミング',
+      whenSchedule: '定期実行',
+      whenStartup: 'Stardust の起動ごと',
+      whenFolder: 'フォルダーに新しいファイルが現れたとき',
+      whenFixedHint: '実行方法は作成後に変更できません。',
+      waiting: 'トリガー待ち',
+      badgeSchedule: '定期実行',
+      badgeStartup: '起動ごと',
+      badgeFolder: name => `フォルダー: ${name}`,
+      lastTriggeredLabel: '前回のトリガー',
+      neverTriggered: 'なし',
+      startupHint: 'Stardust が起動するたびに 1 回実行します。',
+      folderLabel: 'フォルダー',
+      folderPlaceholder: '例 D:\\Downloads',
+      folderChoose: 'フォルダーを選択…',
+      folderPickerTitle: '監視するフォルダーを選択',
+      folderRequired: '監視するフォルダーを選択してください。',
+      folderNotAbsolute: '完全なパスを入力してください（例 D:\\Downloads）。',
+      folderRestriction: 'システムフォルダー（Windows、Program Files、ProgramData、/usr、/etc）とドライブのルートは監視できません。',
+      folderHint: '新しいファイルの名前と情報だけを読み、ファイルの中身は開きません。',
+      patternLabel: 'ファイル名のパターン',
+      patternPlaceholder: '* または *.pdf',
+      patternHint: '* はすべてのファイル、*.pdf は PDF だけに一致します。',
+      patternInvalid: 'ファイル名のパターンにスラッシュは使えません。',
+      pickFailed: 'フォルダー選択を開けませんでした。'
+    },
     tabs: {
       jobs: 'ジョブ',
       blueprints: 'ブレーンプリント'
     },
     blueprints: {
+      catalog: {
+        'startup-briefing': { title: '起動時のブリーフィング', description: 'Stardust が起動するたびに、今日のタスクと未読メッセージを短くまとめます。' },
+        'new-pdf-summary': {
+          title: '新しい PDF の要約',
+          description: 'フォルダーに新しい PDF が現れたら、ファイル名と情報だけをもとに 1 ページ目の要約を書きます。',
+          fields: { folder: { label: '監視するフォルダー', help: 'このコンピューター上のフォルダーを選びます。新しい PDF が入ると要約が始まります。' } }
+        },
+        'downloads-report': {
+          title: '新しいダウンロードの報告',
+          description: 'ダウンロードフォルダー（または選んだフォルダー）に新しいファイルが現れたら、届いたものを短く報告します。読み取りのみ：移動・名前変更・削除はしません。',
+          fields: { folder: { label: '監視するフォルダー', help: '既定はダウンロードフォルダーです。' } }
+        }
+      },
       tab: 'ブレーンプリント',
       startFrom: '開始点',
       custom: 'カスタム',
