@@ -14,6 +14,8 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Union
 
+from cron import triggers as _triggers  # pure model; no store access
+
 logger = logging.getLogger("cron.jobs")  # log-record parity with the origin module
 
 
@@ -89,6 +91,11 @@ def _record_run_outcome(
 def _advance_after_run(job: Dict[str, Any], now: str) -> None:
     """Bump ``repeat.completed`` and recompute ``next_run_at``; retire the record as a terminal
     completion when the repeat limit is reached or a one-shot has no further run."""
+    if _triggers.is_event_triggered(job):
+        # A startup or folder job has no next occurrence. A finished run only settles the record,
+        # and the job stays scheduled so the next start or new file can trigger it again.
+        job["next_run_at"] = None
+        return
     # If no next run, decide whether this is terminal completion (one-shot) or a transient failure
     # (recurring schedule couldn't compute — e.g. 'croniter' missing from the runtime env). Recurring jobs
     # must NEVER be silently disabled: that turns a missing runtime dep into "job completed" and the user's
@@ -168,6 +175,7 @@ def mark_job_run(
         now = _jobs._hermes_now().isoformat()
         _record_run_outcome(job, success, error, delivery_error, status, now)
         _advance_after_run(job, now)
+        _jobs.record_trigger_outcome(job, success)
         if success and terminal_complete:
             _jobs._complete_job_record(job)
         from cron.unreachable_retry import clear_state, plan_retry

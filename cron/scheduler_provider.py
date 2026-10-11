@@ -418,6 +418,9 @@ class InProcessCronScheduler(CronScheduler):
         from cron.scheduler import tick as cron_tick
         from cron.jobs import clear_ticker_error, record_ticker_error, record_ticker_heartbeat
 
+        # The gateway starts this ticker only after its adapters are up, so startup triggers arm here.
+        from cron.jobs import mark_ticker_started
+        mark_ticker_started()
         logger.info("In-process cron scheduler started (interval=%ds)", interval)
 
         # Multiplex: tick EACH profile's store every cycle, heartbeats/recovery scoped per profile.

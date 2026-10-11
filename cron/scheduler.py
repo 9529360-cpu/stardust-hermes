@@ -181,8 +181,10 @@ class CronPromptInjectionBlocked(Exception):
 
 from cron.jobs import (
     _ensure_cron_dir, advance_next_runs, claim_dispatch, claim_job_for_fire, fire_claim_fence,
-    clear_run_claim, get_due_jobs, heartbeat_fire_claim, heartbeat_run_claim, mark_job_run,
-    save_job_output, self_removal_delivery_allowed, self_removal_delivery_scope, use_cron_store)
+    clear_run_claim, collect_trigger_dispatches, get_due_jobs, heartbeat_fire_claim,
+    heartbeat_run_claim, mark_job_run, return_trigger_dispatch, save_job_output,
+    self_removal_delivery_allowed, self_removal_delivery_scope, use_cron_store)
+from cron.triggers import is_event_triggered
 from cron.executions import (
     _TERMINAL_STATES, HANDOFF_ADOPTION_GRACE_SECONDS, create_execution, finish_execution,
     get_execution, mark_execution_handoff_pending, mark_execution_running,
@@ -1492,7 +1494,8 @@ def register_persisted_job(job: dict) -> dict:
     External providers key registration by the persisted job identity. This is also the
     reconciliation path for a caller recovering from an unknown create outcome.
     """
-    if not job.get("enabled", True):
+    # Startup and folder jobs are armed by the built-in ticker, not by an external provider's clock.
+    if not job.get("enabled", True) or is_event_triggered(job):
         return job
     from cron.scheduler_provider import resolve_cron_scheduler
 
@@ -1713,6 +1716,8 @@ def _process_due_job(job: dict, adapters, loop, verbose: bool) -> bool:
     # Claim only when the worker actually starts, so a queued lease can't expire first.
     claimed = claim_job_for_fire(job["id"], return_job=True)
     if not claimed:
+        if job.get("trigger_event"):
+            return_trigger_dispatch(job["id"], job["trigger_event"])
         finish_execution(
             job["execution_id"], success=False, error="Fire claim lost; execution was not started.")
         return True
@@ -1720,6 +1725,8 @@ def _process_due_job(job: dict, adapters, loop, verbose: bool) -> bool:
     claimed_job = dict(claimed) if isinstance(claimed, dict) else dict(job)
     claimed_job["execution_id"] = job["execution_id"]
     claimed_job["_scheduled_instant"] = job.get("_scheduled_instant")
+    if job.get("trigger_event"):
+        claimed_job["trigger_event"] = job["trigger_event"]
     return run_one_job(claimed_job, adapters=adapters, loop=loop, verbose=verbose)
 
 
@@ -1774,7 +1781,8 @@ def _submit_with_guard(job: dict, pool: concurrent.futures.ThreadPoolExecutor, p
     # Record the attempt before dispatch; recovery marks abandoned rows unknown (no retry).
     try:
         execution = create_execution(
-            job_id, source="builtin", scheduled_instant=job.get("_scheduled_instant"))
+            job_id, source=str(job.get("_execution_source") or "builtin"),
+            scheduled_instant=job.get("_scheduled_instant"))
         dispatched_job = dict(job, execution_id=execution["id"])
         _ctx = contextvars.copy_context()
     except Exception as execution_err:
@@ -1877,6 +1885,8 @@ def tick(
 
         due_jobs = get_due_jobs()
         _sweep_stale_inflight_for_tick(due_jobs)
+        # Startup and folder triggers hand out their queued runs here; they are submitted like due jobs.
+        due_jobs = due_jobs + collect_trigger_dispatches(get_running_job_ids())
 
         if not due_jobs:
             # Idle tick: skip config load + pool setup, but still reap crashed jobs' MCP orphans.
@@ -1916,6 +1926,8 @@ def tick(
         for job in due_jobs:
             fut = _submit_with_guard(job, pool, _process_job)
             if fut is None:
+                if job.get("trigger_event"):
+                    return_trigger_dispatch(job["id"], job["trigger_event"])
                 continue
             _all_futures.append(fut)
             if not sync:
