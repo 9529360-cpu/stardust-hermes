@@ -2,6 +2,7 @@ import { normalizeMathDelimiters } from '@assistant-ui/react-streamdown'
 
 import { isLikelyProseFence, sanitizeLanguageTag } from '@/lib/markdown-code'
 import { clampHtmlNestingDepth } from '@/lib/markdown-html-depth'
+import { linkBareImagePaths } from '@/lib/markdown-image-paths'
 import { mediaKind, mediaMarkdownHref } from '@/lib/media'
 import { previewMarkdownHref } from '@/lib/preview-targets'
 import { stripPreviewTargets } from '@/lib/preview-targets'
@@ -197,7 +198,9 @@ function rewriteProseSegment(segment: string): string {
   return linkifySessionRefs(
     autoLinkRawUrls(
       routeFileLinksToPreview(
-        segment.replace(/`{3,}/g, '').replace(LOCAL_PREVIEW_URL_RE, '$1').replace(CITATION_MARKER_RE, '')
+        linkBareImagePaths(
+          segment.replace(/`{3,}/g, '').replace(LOCAL_PREVIEW_URL_RE, '$1').replace(CITATION_MARKER_RE, '')
+        )
       )
     )
   )
