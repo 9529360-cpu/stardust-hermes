@@ -31,7 +31,7 @@ from contextlib import suppress
 HARD_DISABLED_LANES: dict[str, str] = {}
 
 # #11: desktop-affecting changes need one stable runtime proof, the visual smoke lane. Full
-# Desktop E2E is a required lane too, so its own failure blocks the gate.
+# Desktop E2E is report-only: it is not in all-checks-pass in ci.yaml (owner decision, Oct 2026).
 DESKTOP_RUNTIME_PROOF_LANE = "stardust-visual-smoke"
 DESKTOP_RUNTIME_PROOF_OUTPUTS = ("python_prod", "frontend")
 

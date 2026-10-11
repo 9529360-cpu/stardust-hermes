@@ -134,10 +134,11 @@ jobs:
     # Tests-only PRs (~17% of commits) skip this 5-minute job — the longest
     # single job in the workflow — while still running the full pytest lanes.
     #
-    # Re-enabled (Oct 2026) by owner decision, after the Sep 2026 disable for
-    # flakiness. The lane is required through all-checks-pass, so a failure
-    # here blocks merges: fix the flake rather than disabling the lane again.
-    # Keep the plain `${{ ... }}` form below. The earlier
+    # Report-only (Oct 2026, owner decision B): the lane runs on every desktop
+    # or Python change, but all-checks-pass does not wait for it, so a red run
+    # does not block merges. The suite has known failures: see the PR thread
+    # before re-adding it to all-checks-pass. Keep the plain `${{ ... }}` form
+    # below. The earlier
     # `${{ false && (... || ...) }}` form on this reusable-workflow job made
     # GitHub's workflow parser fail at startup ("An unexpected error has
     # occurred") and dispatched 0 jobs repo-wide from 24f5a60ed1.
@@ -232,6 +233,8 @@ jobs:
   #
   # Branch protection should require ONLY this check.
   #
+  # Desktop E2E is report-only and is deliberately not in the needs list below.
+  #
   # Outputs ``needs-json`` — a compact ``{job_name: result}`` dict — so
   # the live comment poller can list failed jobs in the PR comment.
   # ─────────────────────────────────────────────────────────────────────
@@ -246,7 +249,6 @@ jobs:
       - installer-tests
       - rust-tests
       - stardust-visual-smoke
-      - e2e-desktop
       - docs-site
       - history-check
       - contributor-check
