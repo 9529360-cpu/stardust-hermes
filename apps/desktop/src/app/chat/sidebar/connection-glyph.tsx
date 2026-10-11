@@ -1,5 +1,5 @@
 import type { DesktopRegistryConnection } from '@/global'
-import { Cloud, Monitor, Network, Terminal } from '@/lib/icons'
+import { Monitor, Network, Terminal } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 
 import { SIDEBAR_ROW_LEAD } from './row-geometry'
@@ -16,14 +16,7 @@ export function ConnectionGlyph({
   className?: string
   connection: Pick<DesktopRegistryConnection, 'kind'>
 }) {
-  const Icon =
-    connection.kind === 'local'
-      ? Monitor
-      : connection.kind === 'cloud'
-        ? Cloud
-        : connection.kind === 'ssh'
-          ? Terminal
-          : Network
+  const Icon = connection.kind === 'local' ? Monitor : connection.kind === 'ssh' ? Terminal : Network
 
   return (
     <span

@@ -242,11 +242,6 @@ export interface Translations {
       remoteSignInHint: (signInLabel: string) => string
       signOutAndSignIn: string
       remoteFailureHint: string
-      cloudDownTitle: string
-      cloudDownDescription: string
-      cloudDownHint: string
-      cloudDownCheckPortal: string
-      cloudDownDiscord: string
       hideRecentLogs: string
       showRecentLogs: string
       signedInTitle: string
@@ -1044,14 +1039,11 @@ export interface Translations {
       updateAllRunning: string
       updateAllDone: string
       updateAllFailed: string
-      updateSkippedCloud: string
       kindLocal: string
       kindRemote: string
-      kindCloud: string
       kindSsh: string
       kindLocalDesc: string
       kindRemoteDesc: string
-      kindCloudDesc: string
       kindSshDesc: string
       labelTitle: string
       labelDesc: string
@@ -1069,7 +1061,6 @@ export interface Translations {
       duplicateSsh: (label: string) => string
       sameBackendHint: (label: string) => string
       localAddHint: string
-      cloudAddHint: string
       save: string
       saving: string
       cancel: string
@@ -1107,37 +1098,6 @@ export interface Translations {
       remoteTitle: string
       remoteDesc: string
       remoteAuthHint: string
-      cloudTitle: string
-      cloudDesc: string
-      cloudSignInTitle: string
-      cloudSignIn: string
-      cloudSignedIn: string
-      cloudNeedsSignIn: string
-      cloudSignedInDesc: string
-      cloudAgentsTitle: string
-      cloudOrgPickerTitle: string
-      cloudOrgSelect: string
-      cloudOrgChange: string
-      cloudOrgRole: (role: string) => string
-      cloudLoadingAgents: string
-      cloudNoAgents: { before: string; linkText: string; after: string }
-      cloudRefresh: string
-      cloudConnect: string
-      cloudSavedTitle: string
-      cloudSavedDesc: string
-      cloudUseSaved: string
-      cloudActive: string
-      cloudConnecting: string
-      cloudDiscoverFailed: string
-      cloudConnectFailed: string
-      cloudSignInFailed: string
-      cloudSignedOutTitle: string
-      cloudSignedOutMessage: string
-      cloudConnectedTitle: string
-      cloudConnectedPill: string
-      cloudConnectedTo: (name: string) => string
-      cloudAgentProvisioning: string
-      cloudStatusLabel: (status: string) => string
       remoteUrlTitle: string
       remoteUrlDesc: string
       probing: string
@@ -1777,11 +1737,6 @@ export interface Translations {
       toggleFailed: (name: string) => string
       legacyBackend: string
       portableBadge: string
-      catalogTitle: string
-      catalogBrowse: string
-      catalogHide: string
-      catalogHint: string
-      alreadyInstalled: (name: string) => string
       catalogProvenance: (sha: string) => string
       pinnedProvenance: (sha: string) => string
       pinnedBadge: (sha: string) => string
@@ -1796,20 +1751,12 @@ export interface Translations {
     hub: {
       install: string
       installing: string
-      updateAll: string
-      updating: string
       installStarted: (name: string) => string
-      updateStarted: string
       actionFailed: string
       installBlockedTitle: (name: string) => string
       installBlockedMessage: (findings: number, unverified: boolean) => string
       viewScan: string
       actionLog: string
-      alreadyInstalled: (name: string) => string
-      pickerTitle: string
-      pickerBrowse: string
-      pickerHide: string
-      pickerHint: string
       scanFailed: string
     }
   }
@@ -3473,8 +3420,6 @@ export interface Translations {
       clientLabel: (version: string) => string
       connectionSsh: (host: string) => string
       connectionRemote: (host: string) => string
-      connectionCloud: (host: string) => string
-      connectionCloudTooltip: (host: string) => string
       connectionSshTooltip: (host: string) => string
       connectionRemoteTooltip: (host: string) => string
       backendLabel: (version: string) => string
