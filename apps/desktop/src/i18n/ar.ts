@@ -3204,14 +3204,37 @@ export const ar = defineLocale({
         runningTool: action => `جار تشغيل ${action.toLowerCase()}`
       },
       cron: {
+        actionOnly: action => `${action}: مهمة مجدولة`,
+        actions: {
+          create: 'إنشاء',
+          update: 'تعديل',
+          pause: 'إيقاف مؤقت',
+          resume: 'استئناف',
+          remove: 'حذف',
+          run: 'تشغيل',
+          list: 'عرض القائمة',
+          refresh: 'تحديث',
+          manage: 'إدارة'
+        },
+        delivery: 'التسليم',
+        deliveryAll: 'جميع القنوات المتصلة',
+        deliveryCurrentChat: 'المحادثة الحالية',
+        deliverySaveOnly: 'الحفظ فقط',
+        jobCount: count => `المهام المجدولة: ${count}`,
+        nextRun: 'التشغيل التالي',
+        nextRuns: 'عمليات التشغيل التالية',
+        noJobs: 'لا توجد مهام مجدولة',
+        noJobsScheduled: 'لا توجد مهام مجدولة مضبوطة',
+        notSaved: 'لم يُحفظ',
         preview: 'معاينة مهمة مجدولة',
         previewWithSchedule: schedule => `معاينة مهمة مجدولة · ${schedule}`,
         previousSchedule: 'الجدول السابق',
-        nextRuns: 'عمليات التشغيل التالية',
-        delivery: 'التسليم',
-        deliveryCurrentChat: 'المحادثة الحالية',
-        deliverySaveOnly: 'الحفظ فقط',
-        notSaved: 'لم يُحفظ'
+        repeat: 'التكرار',
+        repeatForever: 'دائم',
+        repeatOnce: 'مرة واحدة',
+        repeatTimes: times => `${times}×`,
+        schedule: 'الجدول',
+        untitledJob: 'مهمة'
       },
       titles: {
         browser_click: {

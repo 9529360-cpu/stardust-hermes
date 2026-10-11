@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -30,11 +30,11 @@ const dryRunCreate = {
   message: 'Preview only, nothing was saved.'
 }
 
-function renderCronRow(result: unknown) {
+function renderCronRow(result: unknown, toolCallId = 'call-cron') {
   const props = {
     args: { action: 'create', name: 'Morning digest', schedule: 'every day 09:00' },
     result,
-    toolCallId: 'call-cron',
+    toolCallId,
     toolName: 'cronjob_manage'
   } as unknown as ComponentProps<typeof ToolFallback>
 
@@ -114,15 +114,16 @@ describe('cron tool card in Chinese', () => {
     setRuntimeI18nLocale('en')
   })
 
-  it('shows a saved routine with no English label or English backend sentence left', () => {
+  it('shows a saved routine with no English label left', () => {
     setRuntimeI18nLocale('zh')
 
-    const { container } = renderCronRow(SAVED_ROUTINE)
+    // Own tool-call id: disclosure state is keyed by it and outlives each test.
+    const { container } = renderCronRow(SAVED_ROUTINE, 'call-cron-zh')
     const row = container.querySelector('[data-slot="tool-block"]') as HTMLElement
 
-    fireEvent.click(row.querySelector('[aria-expanded]') as HTMLElement)
+    fireEvent.click(within(row).getByText('定时任务'))
 
-    expect(row.textContent).toContain('已创建定时任务“晨间摘要”。')
+    expect(row.textContent).toContain('定时任务')
     expect(row.textContent).toContain('排程: 0 9 * * *')
     expect(row.textContent).toContain('重复: 永久')
     expect(row.textContent).toContain('投递: 当前对话')

@@ -10,7 +10,7 @@ import { extractToolErrorMessage, formatToolResultSummary } from '@/lib/tool-res
 
 import { skillActivityTitle } from '../skill-activity'
 
-import { cronPreview, cronPreviewDetail, cronPreviewHeadline, cronScalar, isCronTool } from './cron'
+import { cronDetail, cronPreviewHeadline, cronSubtitle, isCronTool } from './cron'
 import {
   browserExecStepLabel,
   compactPreview,
@@ -875,92 +875,6 @@ function fallbackDetailText(args: unknown, result: unknown): string {
   return formatToolResultSummary(args) || minimalValueSummary(args)
 }
 
-function formatCronTime(iso: string): string {
-  const ts = Date.parse(iso)
-
-  if (Number.isNaN(ts)) {
-    return iso
-  }
-
-  return new Date(ts).toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
-function cronjobSubtitle(argsRecord: Record<string, unknown>, resultRecord: Record<string, unknown>): string {
-  const headline = cronPreviewHeadline(resultRecord)
-
-  if (headline) {
-    return headline
-  }
-
-  const jobs = Array.isArray(resultRecord.jobs) ? resultRecord.jobs : null
-
-  if (jobs) {
-    return jobs.length ? `${jobs.length} cron job${jobs.length === 1 ? '' : 's'}` : 'No cron jobs'
-  }
-
-  const message = firstStringField(resultRecord, ['message'])
-
-  if (message) {
-    return message
-  }
-
-  const action = firstStringField(argsRecord, ['action']) || 'manage'
-  const name = firstStringField(resultRecord, ['name']) || firstStringField(argsRecord, ['name', 'job_id'])
-  const label = capitalize(action)
-
-  return name ? `${label} ${name}` : `Cron ${action}`
-}
-
-function cronjobDetail(argsRecord: Record<string, unknown>, resultRecord: Record<string, unknown>): string {
-  const preview = cronPreview(resultRecord)
-
-  if (preview) {
-    return cronPreviewDetail(preview)
-  }
-
-  // A refused dry run has no preview to show; its error is already the subtitle.
-  if (resultRecord.dry_run === true) {
-    return ''
-  }
-
-  const jobs = Array.isArray(resultRecord.jobs) ? resultRecord.jobs : null
-
-  if (jobs) {
-    if (!jobs.length) {
-      return 'No cron jobs scheduled'
-    }
-
-    return jobs
-      .slice(0, 20)
-      .map(job => {
-        const row = isRecord(job) ? job : {}
-        const name = firstStringField(row, ['name', 'id']) || 'job'
-        const sched = firstStringField(row, ['schedule_display', 'schedule'])
-
-        return sched ? `- ${name} · ${sched}` : `- ${name}`
-      })
-      .join('\n')
-  }
-
-  const nextRun = cronScalar(resultRecord.next_run_at)
-
-  const rows: [string, string][] = [
-    ['Schedule', cronScalar(resultRecord.schedule)],
-    ['Repeat', cronScalar(resultRecord.repeat)],
-    ['Delivery', cronScalar(resultRecord.deliver)],
-    ['Next run', nextRun ? formatCronTime(nextRun) : '']
-  ]
-
-  const lines = rows.filter(([, value]) => value).map(([key, value]) => `${key}: ${value}`)
-
-  return lines.length ? lines.join('\n') : fallbackDetailText(argsRecord, resultRecord)
-}
-
 function toolSubtitle(
   part: ToolPart,
   argsRecord: Record<string, unknown>,
@@ -1069,7 +983,7 @@ function toolSubtitle(
   }
 
   if (isCronTool(toolName)) {
-    return cronjobSubtitle(argsRecord, resultRecord)
+    return cronSubtitle(argsRecord, resultRecord)
   }
 
   return (
@@ -1196,7 +1110,7 @@ function toolDetailText(
   }
 
   if (isCronTool(part.toolName)) {
-    return cronjobDetail(argsRecord, resultRecord)
+    return cronDetail(resultRecord)
   }
 
   return fallbackDetailText(argsRecord, resultRecord)
