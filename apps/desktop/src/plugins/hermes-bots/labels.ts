@@ -71,11 +71,39 @@ export function slugify(value: string) {
     .slice(0, 64)
 }
 
+// A preview is one truncated line, so a GFM table often arrives flattened onto
+// it with its newlines gone. A table is recognised by its separator cell (`---`).
+// Its cells are joined with " · ", and a row boundary (`| |`, or a newline
+// between two rows) becomes "; ".
+const TABLE_SIGNATURE_RE = /\|[ \t]*:?-{3,}:?[ \t]*(?=\|)/
+const TABLE_SEPARATOR_CELL_RE = /^:?-{3,}:?$/
+const TABLE_ROW_BREAK = '\u0001'
+
+function flattenTables(text: string): string {
+  if (!TABLE_SIGNATURE_RE.test(text)) {
+    return text
+  }
+
+  let flat = ''
+  let rowBreak = false
+
+  for (const cell of text.replace(/\|\s*\|/g, `|${TABLE_ROW_BREAK}|`).split('|').map(part => part.trim())) {
+    if (cell === TABLE_ROW_BREAK) {
+      rowBreak = true
+    } else if (cell && !TABLE_SEPARATOR_CELL_RE.test(cell)) {
+      flat = flat ? `${flat}${rowBreak ? '; ' : ' · '}${cell}` : cell
+      rowBreak = false
+    }
+  }
+
+  return flat
+}
+
 /** Flatten markdown syntax out of a one-line roster preview so rows read
- *  like Discord's — no raw **bold**, `code`, > quotes, or [link](url)
- *  characters in the preview line. */
+ *  like Discord's — no raw **bold**, `code`, > quotes, [link](url), table
+ *  pipes, list markers or rules in the preview line. */
 export function stripPreviewMarkdown(text: unknown) {
-  return String(text || '')
+  const plain = String(text || '')
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/`([^`\n]*)`/g, '$1')
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
@@ -85,6 +113,10 @@ export function stripPreviewMarkdown(text: unknown) {
     .replace(/~~(.*?)~~/g, '$1')
     .replace(/^\s{0,3}#{1,6}\s+/gm, '')
     .replace(/^\s{0,3}>\s?/gm, '')
+
+  return flattenTables(plain)
+    .replace(/^\s*([-*_])(?:\s*\1){2,}\s*$/gm, '')
+    .replace(/^\s{0,3}(?:[-*+]|\d{1,3}[.)])\s+(?:\[[ xX]\]\s+)?/gm, '')
     .replace(/\s+/g, ' ')
     .trim()
 }

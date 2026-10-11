@@ -147,6 +147,23 @@ describe('room listing', () => {
     expect(stripPreviewMarkdown('## Heading\nbody')).toBe('Heading body')
     expect(stripPreviewMarkdown('')).toBe('')
   })
+
+  it('stripPreviewMarkdown turns tables, list markers and rules into readable row text', () => {
+    const { stripPreviewMarkdown } = modules.labels
+    const table = '| 任务 | 状态 |\n| --- | :---: |\n| 整理周报 | 已完成 |'
+
+    // The audit found a table reply shown as raw pipes and dashes in the roster.
+    expect(stripPreviewMarkdown(table)).toBe('任务 · 状态; 整理周报 · 已完成')
+    expect(stripPreviewMarkdown(table)).not.toMatch(/[|]|-{3}/)
+    // The backend hands the roster a table already flattened onto one line.
+    expect(stripPreviewMarkdown('| 任务 | 状态 | | --- | --- | | 整理周报 | 已完成 |')).toBe(
+      '任务 · 状态; 整理周报 · 已完成'
+    )
+    expect(stripPreviewMarkdown('- 第一项\n- 第二项')).toBe('第一项 第二项')
+    expect(stripPreviewMarkdown('1. 计划\n2. 发布')).toBe('计划 发布')
+    expect(stripPreviewMarkdown('- [x] 已完成的事')).toBe('已完成的事')
+    expect(stripPreviewMarkdown('前面\n---\n后面')).toBe('前面 后面')
+  })
 })
 
 describe('seating a room', () => {
