@@ -277,12 +277,12 @@ async function probeRemotePlatform(ssh) {
   return { os: osName, arch }
 }
 
-// The STARDUST_HOME the remote dashboard will use (explicit env wins, else
-// ~/.stardust). Recorded in the lockfile so a future reuse can tell it's the same
+// The home the remote dashboard will use (explicit STARDUST_HOME wins, else the legacy
+// HERMES_HOME, else ~/.stardust). Recorded in the lockfile so a future reuse can tell it's the same
 // state store; best-effort.
 async function probeRemoteHermesHome(ssh) {
   try {
-    const out = (await ssh.exec('echo "${STARDUST_HOME:-$HOME/.stardust}"')).trim().split('\n').pop()
+    const out = (await ssh.exec('echo "${STARDUST_HOME:-${HERMES_HOME:-$HOME/.stardust}}"')).trim().split('\n').pop()
 
     return out || '~/.stardust'
   } catch (cause) {
