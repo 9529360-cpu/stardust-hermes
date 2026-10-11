@@ -262,9 +262,7 @@ type BotsMessages = {
   }
   /** Skills hub + MCP setup surfaces embedded in the bot editor. */
   tools: {
-    skillsHub: string
     filterSkills: string
-    searchHub: string
     noMcpServers: string
   }
 
@@ -487,7 +485,8 @@ const en: BotsMessages = {
     heldMembersStatus: members => `Paused: ${members}`,
     holdReleaseHint: 'Mention a paused bot or send @all resume to release them.',
     needsYourInput: 'A bot in this group chat needs your input',
-    noMembersToSend: group => `${group} has no members to send to — add a bot, or reopen the room if members are still loading.`,
+    noMembersToSend: group =>
+      `${group} has no members to send to — add a bot, or reopen the room if members are still loading.`,
     pictureGenerationFailed: 'Group picture generation failed',
     nameTaken: name => `A group named “${name}” already exists.`,
     memberCount: count => `${count} bots`,
@@ -532,9 +531,7 @@ const en: BotsMessages = {
     answerTo: member => `Answer @${member}`
   },
   tools: {
-    skillsHub: 'Hermes Skills Hub',
     filterSkills: 'Filter skills…',
-    searchHub: 'Search the hub (community + well-known sources)…',
     noMcpServers: 'No MCP servers configured or in the catalog.'
   },
   cron: {
@@ -752,7 +749,8 @@ const ja: BotsMessages = {
     heldMembersStatus: members => `一時停止中: ${members}`,
     holdReleaseHint: '一時停止中のボットにメンションするか、@all resume を送信して再開します。',
     needsYourInput: 'このグループチャットのボットが入力を待っています',
-    noMembersToSend: group => `${group} に送信先のメンバーがいません。ボットを追加するか、メンバーの読み込み中であればルームを開き直してください。`,
+    noMembersToSend: group =>
+      `${group} に送信先のメンバーがいません。ボットを追加するか、メンバーの読み込み中であればルームを開き直してください。`,
     pictureGenerationFailed: 'グループ画像の生成に失敗しました',
     nameTaken: name => `「${name}」という名前のグループはすでに存在します。`,
     memberCount: count => `ボット${count}体`,
@@ -797,9 +795,7 @@ const ja: BotsMessages = {
     answerTo: member => `@${member}に回答`
   },
   tools: {
-    skillsHub: 'Hermes スキルハブ',
     filterSkills: 'スキルを絞り込み…',
-    searchHub: 'ハブを検索（コミュニティと既知のソース）…',
     noMcpServers: '設定済みまたはカタログ内の MCP サーバーはありません。'
   },
   cron: {
@@ -1057,9 +1053,7 @@ const zh: BotsMessages = {
     answerTo: member => `回答 @${member}`
   },
   tools: {
-    skillsHub: 'Hermes 技能中心',
     filterSkills: '筛选技能…',
-    searchHub: '搜索技能中心（社区和常见来源）…',
     noMcpServers: '未配置 MCP 服务器，目录中也没有。'
   },
   cron: {
@@ -1317,9 +1311,7 @@ const zhHant: BotsMessages = {
     answerTo: member => `回覆 @${member}`
   },
   tools: {
-    skillsHub: 'Hermes 技能中心',
     filterSkills: '篩選技能…',
-    searchHub: '搜尋技能中心（社群和常見來源）…',
     noMcpServers: '未設定 MCP 伺服器，目錄中也沒有。'
   },
   cron: {

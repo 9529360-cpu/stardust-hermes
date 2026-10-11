@@ -213,9 +213,9 @@ describe('a build whose SkillsView cannot route connections', () => {
       toolsets: [{ enabled: true, name: 'local-tools' }]
     })
 
-    // The staged checklist and the hub search section both survive here.
+    // The staged checklist survives here; the upstream hub section does not.
     expect(screen.getByText('staged-skill')).toBeTruthy()
-    expect(screen.getByText('Skills Hub')).toBeTruthy()
+    expect(screen.queryByText('Skills Hub')).toBeNull()
     expect(sdk.seen.ToolsetConfigPanel[0]).toEqual({
       profile: { connectionId: 'local', profile: 'default' },
       toolset: 'local-tools'

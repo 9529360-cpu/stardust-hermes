@@ -1813,7 +1813,7 @@ export const zhHant = defineLocale({
       desktopHalfPendingTip: '此套件附帶的桌面部分尚未複製到應用。請重新掃描或重新啟動應用。',
       emptyAll: '尚無外掛。',
       empty: '此設定尚未安裝任何智能體外掛。',
-      emptyHint: '在下方目錄中瀏覽，一鍵安裝經過審核的外掛。',
+      emptyHint: '用上方的「從 Git 安裝」新增一個。',
       loadFailed: '無法載入智能體外掛',
       toggleFailed: (name: string) => `無法切換 ${name}`,
       legacyBackend: '此後端版本較舊，不支援依鍵名切換外掛 — 請更新後再於此管理。',

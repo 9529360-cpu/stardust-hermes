@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { $pluginDecisions, $pluginRecords } from '@/contrib/plugins-store'
 import { $agentPlugins, $agentPluginsStatus } from '@/store/agent-plugins'
-import { $paneHeightOverride, setPaneHeightOverride } from '@/store/panes'
 import { $pluginInstallRequest, closePluginInstallRequest } from '@/store/plugin-install-request'
 
 import { PluginsTab } from './plugins-tab'
@@ -21,7 +20,6 @@ describe('PluginsTab', () => {
     $agentPlugins.set([])
     $agentPluginsStatus.set('ready')
     closePluginInstallRequest()
-    setPaneHeightOverride('capabilities-plugin-catalog', undefined)
     requestGateway.mockClear()
   })
 
@@ -165,53 +163,6 @@ describe('PluginsTab', () => {
     )
   })
 
-  it('opens the dual-target install modal from a catalog pick message', async () => {
-    render(<PluginsTab profile="workbot" />)
-    fireEvent.click(screen.getByRole('button', { name: 'Browse' }))
-
-    window.dispatchEvent(
-      new MessageEvent('message', {
-        data: {
-          name: 'weather-plugin',
-          repo: 'https://github.com/example/weather-plugin',
-          sha: 'a'.repeat(40),
-          subdir: '',
-          tier: 'community',
-          type: 'hermes-plugin-pick'
-        },
-        origin: 'https://hermes-agent.nousresearch.com'
-      })
-    )
-
-    await waitFor(() => {
-      const request = $pluginInstallRequest.get()
-
-      expect(request).not.toBeNull()
-      expect(request?.catalogName).toBe('weather-plugin')
-      expect(request?.repo).toBe('https://github.com/example/weather-plugin')
-      expect(request?.profile).toBe('workbot')
-      expect(request?.sha).toBe('a'.repeat(40))
-    })
-  })
-
-  it('ignores pick messages from foreign origins', () => {
-    render(<PluginsTab profile={null} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Browse' }))
-
-    window.dispatchEvent(
-      new MessageEvent('message', {
-        data: {
-          name: 'evil-plugin',
-          repo: 'https://github.com/evil/evil-plugin',
-          type: 'hermes-plugin-pick'
-        },
-        origin: 'https://evil.example.com'
-      })
-    )
-
-    expect($pluginInstallRequest.get()).toBeNull()
-  })
-
   it('toggles by canonical key through plugins.manage', async () => {
     $agentPlugins.set([
       {
@@ -263,63 +214,29 @@ describe('PluginsTab', () => {
 
     expect(requestGateway).not.toHaveBeenCalledWith('plugins.manage', expect.objectContaining({ action: 'toggle' }))
   })
+})
 
-  it('appends the subdir fragment for multi-plugin repos', async () => {
-    render(<PluginsTab profile={null} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Browse' }))
+describe('PluginsTab without an upstream catalog', () => {
+  afterEach(cleanup)
 
-    window.dispatchEvent(
-      new MessageEvent('message', {
-        data: {
-          name: 'nested-plugin',
-          repo: 'https://github.com/example/plugins-monorepo',
-          subdir: 'nested-plugin',
-          type: 'hermes-plugin-pick'
-        },
-        origin: 'https://hermes-agent.nousresearch.com'
-      })
-    )
+  it('offers no upstream plugin catalog browser', () => {
+    const { container } = render(<PluginsTab profile={null} />)
 
-    await waitFor(() => {
-      expect($pluginInstallRequest.get()?.repo).toBe('https://github.com/example/plugins-monorepo#nested-plugin')
-    })
+    expect(screen.queryByRole('button', { name: 'Browse' })).toBeNull()
+    expect(screen.queryByText('Plugin catalog')).toBeNull()
+    expect(container.querySelector('iframe')).toBeNull()
   })
 })
 
-describe('PluginsTab catalog UX', () => {
+describe('PluginsTab installed-plugin updates', () => {
   beforeEach(() => {
     $agentPlugins.set([])
     $agentPluginsStatus.set('ready')
     closePluginInstallRequest()
-    setPaneHeightOverride('capabilities-plugin-catalog', undefined)
     requestGateway.mockClear()
-    setPaneHeightOverride('capabilities-plugin-catalog', undefined)
   })
 
   afterEach(cleanup)
-
-  it('grows the catalog when its top-edge sash is dragged up, and resets on double-click', () => {
-    // jsdom has no layout: give the Capabilities column a real height so the
-    // "never crush the lists above" clamp has something to clamp against.
-    const clientHeight = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(900)
-    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 1000 })
-    render(<PluginsTab profile={null} />)
-    expect(document.querySelector('iframe')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Browse' }))
-    expect(document.querySelector('iframe')).toBeTruthy()
-    const sash = screen.getByTestId('plugin-catalog-sash')
-
-    fireEvent.pointerDown(sash, { button: 0, clientY: 600 })
-    fireEvent.pointerMove(window, { clientY: 400 })
-    fireEvent.pointerUp(window)
-
-    // Default 380px + 200px of upward drag (clamped only by window/column size).
-    expect($paneHeightOverride('capabilities-plugin-catalog').get()).toBe(580)
-
-    fireEvent.doubleClick(sash)
-    expect($paneHeightOverride('capabilities-plugin-catalog').get()).toBe(380)
-    clientHeight.mockRestore()
-  })
 
   it('shows an Update chip when the catalog pin moved past the installed SHA', () => {
     $agentPlugins.set([
@@ -371,71 +288,5 @@ describe('PluginsTab catalog UX', () => {
         expect.objectContaining({ action: 'update', name: 'demo-weather', profile: 'workbot' })
       )
     )
-  })
-
-  it('refuses a catalog pick that is already installed and current', async () => {
-    $agentPlugins.set([
-      {
-        catalog_name: 'demo-weather',
-        description: '',
-        installed_sha: 'a'.repeat(40),
-        key: 'demo-weather',
-        name: 'demo-weather',
-        source: 'git',
-        status: 'enabled',
-        update_available: false,
-        version: '1.0.0'
-      }
-    ])
-
-    render(<PluginsTab profile={null} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Browse' }))
-
-    window.dispatchEvent(
-      new MessageEvent('message', {
-        data: {
-          name: 'demo-weather',
-          repo: 'https://github.com/example/demo-weather',
-          type: 'hermes-plugin-pick'
-        },
-        origin: 'https://hermes-agent.nousresearch.com'
-      })
-    )
-
-    // The modal must NOT open — the pick is refused with a toast.
-    await new Promise(resolve => setTimeout(resolve, 20))
-    expect($pluginInstallRequest.get()).toBeNull()
-  })
-
-  it('still opens the modal for an installed pick when an update is available', async () => {
-    $agentPlugins.set([
-      {
-        catalog_name: 'demo-weather',
-        description: '',
-        installed_sha: 'a'.repeat(40),
-        key: 'demo-weather',
-        name: 'demo-weather',
-        source: 'git',
-        status: 'enabled',
-        update_available: true,
-        version: '1.0.0'
-      }
-    ])
-
-    render(<PluginsTab profile={null} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Browse' }))
-
-    window.dispatchEvent(
-      new MessageEvent('message', {
-        data: {
-          name: 'demo-weather',
-          repo: 'https://github.com/example/demo-weather',
-          type: 'hermes-plugin-pick'
-        },
-        origin: 'https://hermes-agent.nousresearch.com'
-      })
-    )
-
-    await waitFor(() => expect($pluginInstallRequest.get()).not.toBeNull())
   })
 })

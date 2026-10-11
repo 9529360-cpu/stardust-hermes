@@ -1,13 +1,6 @@
 import { atom, map } from 'nanostores'
 
-import {
-  getActionStatus,
-  installSkillFromHub,
-  type ProfileScope,
-  scanSkillHub,
-  uninstallSkillFromHub,
-  updateSkillsFromHub
-} from '@/hermes'
+import { getActionStatus, installSkillFromHub, type ProfileScope, scanSkillHub, uninstallSkillFromHub } from '@/hermes'
 import { translateNow } from '@/i18n'
 import { queryClient } from '@/lib/query-client'
 import { invalidateSlashCompletions } from '@/lib/slash-completion-cache'
@@ -27,10 +20,8 @@ const SKILLS_LIST_KEY = ['skills-list'] as const
 // flips one of them to an installed (toggle) row, so the catalog's
 // installed-flags must refetch alongside the skills list.
 export const OFFICIAL_SKILLS_KEY = ['official-skills'] as const
-// Non-identifier key for the fleet-wide "Update installed" action.
-export const UPDATE_ALL_KEY = '__update_all__'
 
-export type HubActionKind = 'install' | 'uninstall' | 'update'
+export type HubActionKind = 'install' | 'uninstall'
 
 export interface HubAction {
   kind: HubActionKind
@@ -38,8 +29,8 @@ export interface HubAction {
   lines: string[]
 }
 
-// Per-item action status, keyed by skill identifier (or UPDATE_ALL_KEY). Each
-// row drives its own button off ITS entry — one install never touches another.
+// Per-item action status, keyed by skill identifier. Each row drives its own
+// button off ITS entry — one install never touches another.
 export const $hubActions = map<Record<string, HubAction | undefined>>({})
 
 // Optimistic installed overrides so a row flips to its resolved state the instant
@@ -118,7 +109,7 @@ async function runHubAction(
 
     // Only flip the row on a clean exit — a failed install/uninstall must not
     // render as installed/removed.
-    if (key !== UPDATE_ALL_KEY && exitCode === 0) {
+    if (exitCode === 0) {
       $hubInstalledOverride.setKey(key, kind !== 'uninstall')
     }
 
@@ -175,10 +166,6 @@ export function installHubSkill(identifier: string, profile?: ProfileScope): Pro
 
 export function uninstallHubSkill(identifier: string, name: string, profile?: ProfileScope): Promise<void> {
   return runHubAction(identifier, 'uninstall', () => uninstallSkillFromHub(name, profile), profile)
-}
-
-export function updateHubSkills(profile?: ProfileScope): Promise<void> {
-  return runHubAction(UPDATE_ALL_KEY, 'update', () => updateSkillsFromHub(profile), profile)
 }
 
 export function closeHubLog(): void {
@@ -240,7 +227,12 @@ export class HubInstallBlockedError extends Error {
 
 /** Toast for a failed hub action: a blocked install explains the scan gate and
  *  offers "View scan"; anything else keeps the generic summary + raw tail. */
-export function notifyHubActionFailed(err: unknown, fallbackTitle: string, skillName?: string, profile?: ProfileScope): void {
+export function notifyHubActionFailed(
+  err: unknown,
+  fallbackTitle: string,
+  skillName?: string,
+  profile?: ProfileScope
+): void {
   if (!(err instanceof HubInstallBlockedError)) {
     notifyError(err, fallbackTitle)
 

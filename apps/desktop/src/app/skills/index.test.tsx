@@ -9,7 +9,6 @@ import type * as HermesApi from '@/hermes'
 import { I18nProvider } from '@/i18n/context'
 import { queryClient } from '@/lib/query-client'
 import type * as HubActions from '@/store/hub-actions'
-import { setPaneHeightOverride } from '@/store/panes'
 
 const getSkills = vi.fn()
 const getToolsets = vi.fn()
@@ -84,13 +83,13 @@ function toolset(overrides: Record<string, unknown> = {}) {
   }
 }
 
-async function renderSkills() {
+async function renderSkills(path = '/skills?tab=toolsets') {
   let result: ReturnType<typeof render>
   await act(async () => {
     result = render(
       // SkillsView reads skills/toolsets via useQuery, so it needs a provider.
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={['/skills?tab=toolsets']}>
+        <MemoryRouter initialEntries={[path]}>
           <SkillsView />
         </MemoryRouter>
       </QueryClientProvider>
@@ -101,7 +100,6 @@ async function renderSkills() {
 }
 
 beforeEach(() => {
-  setPaneHeightOverride('capabilities-hub', undefined)
   getSkills.mockResolvedValue([])
   getToolsets.mockResolvedValue([toolset()])
   setToolsetEnabled.mockResolvedValue({ ok: true, name: 'web', enabled: false })
@@ -389,69 +387,11 @@ describe('SkillsView toolset management', { timeout: 60_000 }, () => {
     expect(metadata?.textContent).toContain('1.2.0')
   })
 
-  it('hub picker refuses to reinstall an already-installed skill', async () => {
-    const { notify } = await import('@/store/notifications')
-    const { EmbeddedHubPicker } = await import('./embedded-hub-picker')
+  it('offers no upstream skills hub browser on the Skills tab', async () => {
+    const { container } = await renderSkills('/skills?tab=skills')
 
-    render(<EmbeddedHubPicker installedNames={new Set(['web-research'])} profile={null} />)
-
-    // Discovery is opt-in: the native capabilities surface stays primary.
-    expect(document.querySelector('iframe')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Browse the full hub' }))
-    expect(document.querySelector('iframe')).toBeTruthy()
-
-    await act(async () => {
-      window.dispatchEvent(
-        new MessageEvent('message', {
-          data: { type: 'hermes-skill-pick', name: 'web-research', identifier: 'web-research' },
-          origin: 'https://hermes-agent.nousresearch.com'
-        })
-      )
-    })
-
-    // Refused with an informational toast, no install action spawned.
-    await waitFor(() =>
-      expect(vi.mocked(notify)).toHaveBeenCalledWith(
-        expect.objectContaining({ title: '"web-research" is already installed' })
-      )
-    )
-  })
-
-  it('mounts the hub iframe lazily and keeps it (hidden) across tab switches', async () => {
-    // On a non-Skills tab the docs-site iframe must not exist at all — an
-    // eagerly mounted hub is exactly the Capabilities lag bug.
-    await renderSkills() // ?tab=toolsets
-    await screen.findByRole('switch', { name: 'Turn Web Search toolset off' })
-    expect(document.querySelector('iframe')).toBeNull()
-    cleanup()
-
-    // Embedded mode drives tabs through local state (the route hooks are
-    // mocked here), starting on Skills: the picker mounts with the tab.
-    await act(async () => {
-      render(
-        <QueryClientProvider client={queryClient}>
-          <MemoryRouter initialEntries={['/skills']}>
-            <SkillsView embedded />
-          </MemoryRouter>
-        </QueryClientProvider>
-      )
-    })
-
-    expect(document.querySelector('iframe')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Browse the full hub' }))
-    const iframe = document.querySelector('iframe')
-    expect(iframe).toBeTruthy()
-    expect(iframe!.closest('section')!.classList.contains('hidden')).toBe(false)
-
-    // Switch to Tools → the iframe STAYS mounted (no docs-site reload on the
-    // next visit) but its section is fully hidden, so nothing from the hub
-    // can paint over the toolsets UI.
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Tools/ }))
-    })
-    const kept = document.querySelector('iframe')
-    expect(kept).toBeTruthy()
-    expect(kept!.closest('section')!.classList.contains('hidden')).toBe(true)
+    expect(screen.queryByRole('button', { name: 'Browse the full hub' })).toBeNull()
+    expect(container.querySelector('iframe')).toBeNull()
   })
 
   it('shows a vision explainer that deep-links to Settings → Models', async () => {
@@ -632,21 +572,30 @@ describe('SkillsView toolset management', { timeout: 60_000 }, () => {
 
   it('shows Chinese catalog copy and retains the capability overview for an optional skill', async () => {
     getSkills.mockResolvedValue([])
-    getOfficialSkills.mockResolvedValue({ skills: [{
-      name: 'baoyu-article-illustrator',
-      description: 'Article illustrations: type × style × palette consistency.',
-      identifier: 'official/creative/baoyu-article-illustrator',
-      category: 'creative',
-      installed: false,
-      tags: []
-    }] })
-    previewSkillHub.mockResolvedValue({ skill_md: '---\nname: baoyu-article-illustrator\ndescription: Article illustrations\n---\n# Article illustrator\n\nAdapted for an English tool ecosystem.' })
+    getOfficialSkills.mockResolvedValue({
+      skills: [
+        {
+          name: 'baoyu-article-illustrator',
+          description: 'Article illustrations: type × style × palette consistency.',
+          identifier: 'official/creative/baoyu-article-illustrator',
+          category: 'creative',
+          installed: false,
+          tags: []
+        }
+      ]
+    })
+    previewSkillHub.mockResolvedValue({
+      skill_md:
+        '---\nname: baoyu-article-illustrator\ndescription: Article illustrations\n---\n# Article illustrator\n\nAdapted for an English tool ecosystem.'
+    })
 
     await act(async () => {
       render(
         <I18nProvider configClient={null} initialLocale="zh">
           <QueryClientProvider client={queryClient}>
-            <MemoryRouter initialEntries={['/skills?tab=skills']}><SkillsView /></MemoryRouter>
+            <MemoryRouter initialEntries={['/skills?tab=skills']}>
+              <SkillsView />
+            </MemoryRouter>
           </QueryClientProvider>
         </I18nProvider>
       )
