@@ -37,6 +37,7 @@ from agent.gemini_native_adapter import is_native_gemini_base_url
 from agent.model_metadata import is_local_endpoint
 from agent.message_content import flatten_message_text
 from agent.message_metadata import append_message, stamp_message_timestamp
+from agent.reasoning_timing import REASONING_TIMING_KEY, finish_response_timing
 from agent.message_sanitization import (
     _sanitize_surrogates, _repair_tool_call_arguments, normalize_finish_reason as _normalize_finish_reason,
     sanitize_outbound_kwargs,
@@ -1585,6 +1586,10 @@ def build_assistant_message(agent, assistant_message, finish_reason: str) -> dic
 
     if assistant_tool_calls:
         msg["tool_calls"] = [_assistant_tool_call_dict(agent, tc, i) for i, tc in enumerate(assistant_tool_calls)]
+    # Display-only: the streamed reasoning block's span, so a reloaded block keeps its duration.
+    span = finish_response_timing(agent)
+    if span is not None:
+        msg["display_metadata"] = {REASONING_TIMING_KEY: span}
     return msg
 
 
