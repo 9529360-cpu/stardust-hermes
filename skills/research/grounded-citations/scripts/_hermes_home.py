@@ -18,6 +18,6 @@ try:
 except (ModuleNotFoundError, ImportError):
 
     def get_hermes_home() -> Path:
-        """Return the Hermes home directory (default: ``~/.stardust``)."""
-        val = os.environ.get("STARDUST_HOME", "").strip()
+        """Return the Hermes home directory (default: ``~/.stardust``): STARDUST_HOME, else legacy HERMES_HOME."""
+        val = os.environ.get("STARDUST_HOME", "").strip() or os.environ.get("HERMES_HOME", "").strip()
         return Path(val) if val else Path.home() / ".stardust"

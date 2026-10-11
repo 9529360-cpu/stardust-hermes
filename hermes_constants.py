@@ -9,6 +9,7 @@ import re
 import shutil
 import stat
 import sys
+from collections.abc import Mapping
 from contextvars import ContextVar, Token
 from pathlib import Path
 
@@ -49,6 +50,27 @@ def _get_platform_default_hermes_home() -> Path:
         base = Path(local_appdata) if local_appdata else Path.home() / "AppData" / "Local"
         return base / "stardust"
     return Path.home() / ".stardust"
+
+
+# Names that select the Stardust home, most specific first. HERMES_HOME is the pre-rename name: it is read
+# only when STARDUST_HOME is unset or blank, so an install whose environment still carries it (the owner's
+# user environment and desktop launcher) keeps its data home after the runtime rename.
+_HOME_ENV_NAMES: tuple[str, ...] = ("STARDUST_HOME", "HERMES_HOME")
+
+
+def configured_home_text(environ: Mapping[str, str] | None = None) -> str:
+    """Configured Stardust home text: ``STARDUST_HOME``, else the legacy ``HERMES_HOME``, else ``""``.
+
+    *environ* is read exclusively when given (another process's environment, or a child env); ``None``
+    reads this process. Blank or whitespace-only values count as unset. The platform default is the
+    caller's concern.
+    """
+    source: Mapping[str, str] = os.environ if environ is None else environ
+    for name in _HOME_ENV_NAMES:
+        value = str(source.get(name) or "").strip()
+        if value:
+            return value
+    return ""
 
 
 def sudo_invoker_default_home() -> Path | None:
@@ -99,11 +121,11 @@ def _warn_profile_fallback_once() -> None:
 
 
 def get_hermes_home() -> Path:
-    """Hermes home: context-local override → ``STARDUST_HOME`` env var → platform default."""
+    """Hermes home: context-local override → configured home (``STARDUST_HOME``, else legacy ``HERMES_HOME``) → platform default."""
     override = get_hermes_home_override()
     if override:
         return Path(override)
-    if not os.environ.get("STARDUST_HOME", "").strip():
+    if not configured_home_text():
         _warn_profile_fallback_once()
     return get_process_hermes_home()
 
@@ -153,7 +175,7 @@ def get_process_hermes_home() -> Path:
     For process-level assets (theme YAML, dashboard plugin manifests) that must stay visible while a
     request is scoped to another profile (e.g. embedded ``/chat`` under ``--open-profile``).
     """
-    val = os.environ.get("STARDUST_HOME", "").strip()
+    val = configured_home_text()
     return Path(val) if val else _get_platform_default_hermes_home()
 
 
@@ -166,7 +188,7 @@ def get_default_hermes_root() -> Path:
     """Root Hermes dir for profile-level ops: ``<root>`` when ``STARDUST_HOME=<root>/profiles/<name>``."""
     global _default_hermes_root_memo
     native_home = _get_platform_default_hermes_home()
-    env_home = os.environ.get("STARDUST_HOME", "")
+    env_home = configured_home_text()
     memo = _default_hermes_root_memo
     if memo is not None and memo[:2] == (str(native_home), env_home):
         return memo[2]
@@ -833,7 +855,8 @@ def _norm_home_path(path: str | None) -> str:
 
 def _profile_home_path(env: dict[str, str] | None = None) -> str | None:
     """Return ``{STARDUST_HOME}/home`` when the profile-home directory exists."""
-    hermes_home = get_hermes_home_override() or (env or {}).get("STARDUST_HOME") or os.getenv("STARDUST_HOME")
+    overlay = None if env is None else {**os.environ, **env}
+    hermes_home = get_hermes_home_override() or configured_home_text(overlay)
     if not hermes_home:
         return None
     profile_home = os.path.join(hermes_home, "home")

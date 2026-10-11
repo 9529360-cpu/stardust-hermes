@@ -76,7 +76,9 @@ def _default_home() -> str:
 
 
 def _resolved_home() -> str:
-    return os.environ.get("STARDUST_HOME", "").strip() or _default_home()
+    from hermes_constants import configured_home_text
+
+    return configured_home_text() or _default_home()
 
 
 def container_mode_may_be_active() -> bool:
@@ -88,7 +90,9 @@ def container_mode_may_be_active() -> bool:
     """
     if os.environ.get("STARDUST_DEV") == "1" or is_container_startup_environment():
         return False
-    hermes_home = os.environ.get("STARDUST_HOME", "").strip()
+    from hermes_constants import configured_home_text
+
+    hermes_home = configured_home_text()
     if hermes_home:
         if os.path.exists(os.path.join(hermes_home, ".container-mode")):
             return True

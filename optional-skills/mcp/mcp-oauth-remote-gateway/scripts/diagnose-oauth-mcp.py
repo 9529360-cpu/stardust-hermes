@@ -36,7 +36,7 @@ def _hermes_home():
         from hermes_constants import get_hermes_home
         return str(get_hermes_home())
     except Exception:
-        return os.environ.get("STARDUST_HOME") or os.path.expanduser("~/.stardust")
+        return os.environ.get("STARDUST_HOME") or os.environ.get("HERMES_HOME") or os.path.expanduser("~/.stardust")
 
 
 def _tokens_dir():

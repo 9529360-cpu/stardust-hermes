@@ -41,7 +41,7 @@ try:
     from hermes_constants import get_hermes_home
 except ImportError:
     def get_hermes_home() -> Path:  # type: ignore[misc]
-        val = (os.environ.get("STARDUST_HOME") or "").strip()
+        val = (os.environ.get("STARDUST_HOME") or os.environ.get("HERMES_HOME") or "").strip()
         return Path(val) if val else Path.home() / ".stardust"
 
 DEFAULT_TUI_DIR = Path(

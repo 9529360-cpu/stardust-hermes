@@ -82,7 +82,9 @@ def _path_text(raw_path: str | None) -> str:
 
 
 def _default_hermes_root_is_opt_data() -> bool:
-    raw = os.environ.get("STARDUST_HOME", "").strip()
+    from hermes_constants import configured_home_text
+
+    raw = configured_home_text()
     if not raw:
         return False
     try:

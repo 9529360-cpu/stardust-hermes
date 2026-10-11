@@ -99,8 +99,13 @@ _handle: Optional["StartupWatchdogHandle"] = None
 
 
 def _process_hermes_home() -> Path:
-    """STARDUST_HOME for diagnostic files — stdlib-only replica of the hermes_constants default."""
-    val = os.environ.get("STARDUST_HOME", "").strip()
+    """Configured Stardust home for diagnostic files (STARDUST_HOME, else legacy HERMES_HOME).
+
+    The platform default below is a stdlib replica of the hermes_constants default.
+    """
+    from hermes_constants import configured_home_text
+
+    val = configured_home_text()
     if val:
         return Path(val)
     if sys.platform == "win32":

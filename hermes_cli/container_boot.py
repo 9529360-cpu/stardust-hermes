@@ -327,7 +327,9 @@ def main() -> int:
         print("reconcile: skipping (dashboard container — does not need per-profile gateways)")
         return 0
 
-    hermes_home = Path(os.environ.get("STARDUST_HOME", "/opt/data"))
+    from hermes_constants import configured_home_text
+
+    hermes_home = Path(configured_home_text() or "/opt/data")
     scandir = Path(os.environ.get("S6_PROFILE_GATEWAY_SCANDIR", "/run/service"))
     actions = reconcile_profile_gateways(hermes_home=hermes_home, scandir=scandir)
     for a in actions:

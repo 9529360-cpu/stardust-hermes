@@ -50,7 +50,7 @@ def _hermes_home() -> Path:
         from hermes_constants import get_hermes_home
         return get_hermes_home()
     except ImportError:
-        return Path(os.environ.get("STARDUST_HOME", Path.home() / ".stardust"))
+        return Path(os.environ.get("STARDUST_HOME") or os.environ.get("HERMES_HOME") or (Path.home() / ".stardust"))
 
 
 def _get_sessions_dir() -> Path:

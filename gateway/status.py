@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, NamedTuple, Optional
 
-from hermes_constants import _get_platform_default_hermes_home, get_hermes_home
+from hermes_constants import _get_platform_default_hermes_home, configured_home_text, get_hermes_home
 from utils import atomic_json_write
 
 if sys.platform == "win32":
@@ -88,7 +88,7 @@ def _get_process_hermes_home() -> Path:
     """Launch-home STARDUST_HOME for identity files (PID, lock, status, markers):
     ``get_hermes_home()`` honors the per-session ``_HERMES_HOME_OVERRIDE`` and would misroute
     them."""
-    val = os.environ.get("STARDUST_HOME", "").strip()
+    val = configured_home_text()
     return Path(val) if val else _get_platform_default_hermes_home()
 
 

@@ -59,7 +59,8 @@ if str(PROJECT_ROOT) not in sys.path:
 # otherwise the deny-list would point at the throwaway tempdir and the guard
 # would silently stop protecting the operator's actual ~/.stardust (#69385).
 _PRE_SANDBOX_KANBAN_OVERRIDE = os.environ.get("STARDUST_KANBAN_HOME", "").strip()
-_PRE_SANDBOX_HERMES_HOME = os.environ.get("STARDUST_HOME", "")
+# The legacy HERMES_HOME counts too: the runtime reads it whenever STARDUST_HOME is unset or blank.
+_PRE_SANDBOX_HERMES_HOME = os.environ.get("STARDUST_HOME", "") or os.environ.get("HERMES_HOME", "")
 
 
 def _hermes_home_points_at_production(value: str) -> bool:
@@ -493,6 +494,9 @@ def _hermetic_environment(tmp_path, monkeypatch):
     (fake_hermes_home / "cron").mkdir()
     (fake_hermes_home / "memories").mkdir()
     (fake_hermes_home / "skills").mkdir()
+    # The runtime also reads the legacy HERMES_HOME when STARDUST_HOME is unset, so a developer's
+    # HERMES_HOME must not redirect a test (or a child it spawns with STARDUST_HOME stripped).
+    monkeypatch.delenv("HERMES_HOME", raising=False)
     monkeypatch.setenv("STARDUST_HOME", str(fake_hermes_home))
     # Keep the subprocess-surviving isolation marker pointed at THIS test's
     # home (#82770): children spawned by the test inherit it by default, so
