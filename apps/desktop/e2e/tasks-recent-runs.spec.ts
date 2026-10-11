@@ -6,7 +6,11 @@ import { expect, test } from './test'
 
 const DESKTOP_ROOT = path.resolve(import.meta.dirname, '..')
 const REPO_ROOT = path.resolve(DESKTOP_ROOT, '..', '..')
-const PYTHON = path.join(REPO_ROOT, '.venv', 'Scripts', 'python.exe')
+// The repo venv, as the desktop finds it on each platform (see findPythonForRoot in electron/main.ts).
+const PYTHON =
+  process.platform === 'win32'
+    ? path.join(REPO_ROOT, '.venv', 'Scripts', 'python.exe')
+    : path.join(REPO_ROOT, '.venv', 'bin', 'python')
 
 // Two jobs, each with one finished run, written through the backend's own cron API. The desktop then
 // reads exactly what scheduled runs leave behind. A run that is still going needs a live owner process,
