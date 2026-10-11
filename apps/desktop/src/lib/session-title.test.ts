@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
+import { CANONICAL_CHAT_TITLE } from '@/plugins/hermes-bots/canonical-chat'
+
 import {
+  CANONICAL_BOT_CHAT_TITLE,
+  isCanonicalBotChatSession,
   isInternalSessionTitle,
   oneLineExcerpt,
   SESSION_TITLE_EXCERPT_CHARS,
@@ -57,5 +61,32 @@ describe('isInternalSessionTitle', () => {
     expect(isInternalSessionTitle('handoff-20260101')).toBe(true)
     expect(isInternalSessionTitle('Bot Chat notes')).toBe(false)
     expect(isInternalSessionTitle('handoff-notes')).toBe(false)
+  })
+})
+
+describe('isCanonicalBotChatSession', () => {
+  it('is the hidden session holding the registry title, as the backend decides it', () => {
+    expect(isCanonicalBotChatSession({ hidden: 1, title: 'Bot Chat' })).toBe(true)
+    expect(isCanonicalBotChatSession({ hidden: true, title: 'Bot Chat' })).toBe(true)
+  })
+
+  it('is not a visible session that merely has the name, a hidden side-chat, or an untitled hidden row', () => {
+    expect(isCanonicalBotChatSession({ hidden: 0, title: 'Bot Chat' })).toBe(false)
+    expect(isCanonicalBotChatSession({ hidden: 1, title: 'Side question' })).toBe(false)
+    expect(isCanonicalBotChatSession({ hidden: 1, title: null })).toBe(false)
+    expect(isCanonicalBotChatSession({ title: 'Bot Chat' })).toBe(false)
+  })
+
+  it('compares the title exactly, as the backend does, so a padded name is not the registry row', () => {
+    expect(isCanonicalBotChatSession({ hidden: 1, title: ' Bot Chat ' })).toBe(false)
+    expect(isCanonicalBotChatSession({ hidden: 1, title: 'bot chat' })).toBe(false)
+  })
+})
+
+describe('the canonical Bot Chat title', () => {
+  // The core sidebar restates the registry title, because core never imports a
+  // plugin. Both copies name the same chat, so they must stay one literal.
+  it('is one literal in the core sidebar and the bot plugin', () => {
+    expect(CANONICAL_BOT_CHAT_TITLE).toBe(CANONICAL_CHAT_TITLE)
   })
 })

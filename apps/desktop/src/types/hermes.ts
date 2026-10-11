@@ -485,6 +485,9 @@ export interface SessionInfo {
   git_repo_root?: null | string
   ended_at: null | number
   id: string
+  /** Backend visibility (`sessions.hidden`, 0/1). The list endpoints never return a
+   *  hidden row; a by-id lookup does, and a Bot Mode chat is born hidden. */
+  hidden?: boolean | number | null
   /** Original root id of a compression chain, when this entry is a projected
    *  continuation tip. Stable across compressions — used as the durable id for
    *  pins so a pinned conversation survives auto-compression. */
