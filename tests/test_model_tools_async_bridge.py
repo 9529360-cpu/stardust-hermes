@@ -248,9 +248,10 @@ class TestRunAsyncWithRunningLoop:
         async def _never_finishes():
             await asyncio.sleep(999)
 
+        # _run_async builds its worker pool from tools.daemon_pool (daemon
+        # workers that the interpreter-exit join cannot see); observe that class.
         monkeypatch.setattr(
-            concurrent.futures,
-            "ThreadPoolExecutor",
+            "tools.daemon_pool.DaemonThreadPoolExecutor",
             FakeExecutor,
         )
 
