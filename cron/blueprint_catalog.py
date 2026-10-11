@@ -544,6 +544,24 @@ CATALOG: List[AutomationBlueprint] = [
         ],
         tags=("daily", "curiosity"),
     ),
+    AutomationBlueprint(
+        key="global-market-brief",
+        title="全球股市日报",
+        description="每天汇总美国、欧洲、亚洲主要股指、重要异动和宏观要闻，每条数据附来源，"
+        "并生成 PDF 报告。",
+        category="daily",
+        schedule_template="{minute} {hour} * * *",
+        prompt_template=(
+            "Load the market-brief skill and produce today's global market brief: index levels "
+            "for the US, Europe and Asia, notable movers, and macro news, with every figure cited "
+            "to a source from at least three publishers. Save the Markdown brief and the PDF in the "
+            "reports folder as the skill describes. Never invent a number: write 未取到 when a figure "
+            "is missing. Reply with a short summary and the PDF path."
+        ),
+        slots=[_TIME("18:00"), _DELIVER],
+        skills=("market-brief",),
+        tags=("finance", "markets", "daily", "report"),
+    ),
 ]
 
 _CATALOG_BY_KEY = {r.key: r for r in CATALOG}
