@@ -13,7 +13,7 @@ export function isCronTool(name: string): boolean {
   return CRON_TOOL_NAMES.has(name)
 }
 
-export function cronScalar(value: unknown): string {
+function cronScalar(value: unknown): string {
   if (typeof value === 'string') {
     return value.trim()
   }
@@ -28,7 +28,7 @@ export function cronScalar(value: unknown): string {
 // A dry run (`dry_run: true`) previewed a create or update and saved nothing, so
 // its body is a preview, never a saved job. Refused dry runs (`success: false`)
 // are not previews and return null, as does every other result.
-export function cronPreview(resultRecord: Record<string, unknown>): Record<string, unknown> | null {
+function cronPreview(resultRecord: Record<string, unknown>): Record<string, unknown> | null {
   if (resultRecord.dry_run !== true || resultRecord.success !== true) {
     return null
   }
