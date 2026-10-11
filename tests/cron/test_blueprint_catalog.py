@@ -218,3 +218,26 @@ class TestDocsGenerator:
         # Each entry must round-trip through json and carry the surfaces.
         json.dumps(index)
         assert all("command" in e and "appUrl" in e for e in index)
+
+
+class TestGlobalMarketBriefBlueprint:
+    def test_blueprint_is_valid_and_loads_the_market_brief_skill(self):
+        bp = get_blueprint("global-market-brief")
+        assert bp is not None
+        assert bp.title == "全球股市日报"
+        assert bp.skills == ("market-brief",)
+        assert [s.name for s in bp.slots] == ["time", "deliver"]
+        assert bp.slots[0].type == "time"
+        # Every renderer (dashboard, slash command, docs index) must accept the entry.
+        json.dumps(blueprint_catalog_entry(bp), ensure_ascii=False)
+
+    def test_defaults_to_six_pm_and_delivers_to_origin(self):
+        spec = fill_blueprint(get_blueprint("global-market-brief"), {})
+        assert spec["schedule"] == "0 18 * * *"
+        assert spec["deliver"] == "origin"
+        assert spec["skills"] == ["market-brief"]
+        assert spec["name"] == "全球股市日报"
+
+    def test_time_slot_still_sets_the_schedule(self):
+        spec = fill_blueprint(get_blueprint("global-market-brief"), {"time": "07:30"})
+        assert spec["schedule"] == "30 7 * * *"
