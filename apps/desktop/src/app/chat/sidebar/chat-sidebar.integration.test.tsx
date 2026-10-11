@@ -234,6 +234,7 @@ describe('ChatSidebar compact conversation surface', () => {
 
     expect(screen.getByText('Tile one')).toBeTruthy()
     expect(screen.queryByText('Untitled session')).toBeNull()
+    expect(screen.queryByText('Untitled chat')).toBeNull()
     expect(screen.queryByText('Bot Chat')).toBeNull()
   })
 
@@ -248,6 +249,7 @@ describe('ChatSidebar compact conversation surface', () => {
 
     expect(screen.getByText('Tile one')).toBeTruthy()
     expect(screen.queryByText('Untitled session')).toBeNull()
+    expect(screen.queryByText('Untitled chat')).toBeNull()
     expect(screen.queryByText('Bot Chat')).toBeNull()
   })
 
@@ -262,6 +264,7 @@ describe('ChatSidebar compact conversation surface', () => {
 
     expect(screen.queryByText('Pinned chats')).toBeNull()
     expect(screen.queryByText('Untitled session')).toBeNull()
+    expect(screen.queryByText('Untitled chat')).toBeNull()
   })
 
   it('still lists a hidden side-chat that keeps its own name', () => {
