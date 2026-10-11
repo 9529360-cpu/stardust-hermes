@@ -1,15 +1,29 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { $backdrop, $backdropImagePath, setBackdrop, setBackdropImagePath } from './backdrop'
+import {
+  $backdrop,
+  $backdropImagePath,
+  $backdropOpacity,
+  BACKDROP_OPACITY_DEFAULT,
+  BACKDROP_OPACITY_MAX,
+  BACKDROP_OPACITY_MIN,
+  normalizeBackdropOpacity,
+  setBackdrop,
+  setBackdropImagePath,
+  setBackdropOpacity
+} from './backdrop'
 
 const KEY = 'hermes.desktop.backdrop.v1'
 const IMAGE_KEY = 'stardust.desktop.backdrop-image.v1'
+const OPACITY_KEY = 'stardust.desktop.backdrop-opacity.v1'
 
 afterEach(() => {
   setBackdrop(false)
   setBackdropImagePath(null)
+  setBackdropOpacity(BACKDROP_OPACITY_DEFAULT)
   window.localStorage.removeItem(KEY)
   window.localStorage.removeItem(IMAGE_KEY)
+  window.localStorage.removeItem(OPACITY_KEY)
 })
 
 describe('setBackdrop / setBackdropImagePath', () => {
@@ -73,5 +87,34 @@ describe('cross-window sync', () => {
     window.dispatchEvent(new StorageEvent('storage', { key: IMAGE_KEY, newValue: null }))
 
     expect($backdropImagePath.get()).toBeNull()
+  })
+})
+
+describe('backdrop image opacity', () => {
+  it('turns any stored or slider value into a whole percent inside the slider range', () => {
+    expect(normalizeBackdropOpacity(42.4)).toBe(42)
+    expect(normalizeBackdropOpacity('61')).toBe(61)
+    expect(normalizeBackdropOpacity(0)).toBe(BACKDROP_OPACITY_MIN)
+    expect(normalizeBackdropOpacity(250)).toBe(BACKDROP_OPACITY_MAX)
+    expect(normalizeBackdropOpacity('not a number')).toBe(BACKDROP_OPACITY_DEFAULT)
+  })
+
+  it('stores the normalized value, so the window and the slider read the same number', () => {
+    setBackdropOpacity(3)
+    expect($backdropOpacity.get()).toBe(BACKDROP_OPACITY_MIN)
+    expect(window.localStorage.getItem(OPACITY_KEY)).toBe(String(BACKDROP_OPACITY_MIN))
+
+    setBackdropOpacity(61.6)
+    expect($backdropOpacity.get()).toBe(62)
+    expect(window.localStorage.getItem(OPACITY_KEY)).toBe('62')
+  })
+
+  it("adopts a sibling window's opacity change", () => {
+    setBackdropOpacity(80)
+    window.localStorage.setItem(OPACITY_KEY, '35')
+
+    window.dispatchEvent(new StorageEvent('storage', { key: OPACITY_KEY, newValue: '35' }))
+
+    expect($backdropOpacity.get()).toBe(35)
   })
 })

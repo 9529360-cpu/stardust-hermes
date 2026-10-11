@@ -507,6 +507,7 @@ export function MessagingView({ setStatusbarItemGroup: _setStatusbarItemGroup, .
       searchHints={platforms?.slice(0, 5).map(platform => t.common.tryHint(platform.name.toLowerCase()))}
       searchPlaceholder={m.search}
       searchValue={query}
+      title={m.pageTitle}
     >
       {!platforms ? (
         <PageLoader label={m.loading} />

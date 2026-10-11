@@ -1,5 +1,6 @@
 """Tests for tools/file_operations.py — deny list, result dataclasses, helpers."""
 
+import hashlib
 import os
 import pytest
 import subprocess
@@ -648,6 +649,70 @@ class TestPatchReplacePostWriteVerification:
         result = ops.patch_replace("/tmp/test/a.py", "hello", "hi")
         assert result.error is not None
         assert "could not re-read" in result.error.lower()
+
+
+# =========================================================================
+# write_file digest verification: parsing sha256sum output
+# =========================================================================
+
+class TestVerifyWrittenHashDigest:
+    """``_verify_written_hash`` takes the on-disk digest from ``sha256sum`` stdout.
+
+    The local terminal merges stderr into stdout, so shell startup noise (bash's
+    setlocale warning when LC_ALL names a locale that is not generated) can print
+    before the digest line. The digest is the line that starts with 64 hex digits:
+    a warning is never a digest, and no digest line means unverified, not mismatch.
+    """
+
+    PATH = "/tmp/test/written.txt"
+    CONTENT = b"hello\nworld\n"
+    SETLOCALE_WARNING = (
+        "/usr/bin/bash: warning: setlocale: LC_ALL: cannot change locale (zh_CN.UTF-8)\n"
+    )
+    MISMATCH_ERROR = (
+        "Post-write verification failed for /tmp/test/written.txt: on-disk "
+        "content hash differs from the intended write. The write did not "
+        "persist correctly — re-read the file and retry."
+    )
+
+    @staticmethod
+    def _sha(data: bytes) -> str:
+        return hashlib.sha256(data).hexdigest()
+
+    def _verify(self, mock_env, stdout: str, returncode: int = 0):
+        mock_env.execute.return_value = {"output": stdout, "returncode": returncode}
+        return ShellFileOperations(mock_env)._verify_written_hash(self.PATH, self.CONTENT)
+
+    @pytest.mark.parametrize("digest_case", ["lower", "upper"])
+    def test_digest_after_shell_warning_is_verified(self, mock_env, digest_case):
+        """Regression: a shell warning printed before the digest must not be read as
+        the digest. Before the fix the first token ("/usr/bin/bash:") was compared,
+        so a correct write was reported as a hash mismatch."""
+        digest = self._sha(self.CONTENT)
+        if digest_case == "upper":
+            digest = digest.upper()
+        stdout = f"{self.SETLOCALE_WARNING}{digest}  {self.PATH}\n"
+        assert self._verify(mock_env, stdout) == (True, None)
+
+    def test_warning_without_digest_line_is_unverified_not_mismatch(self, mock_env):
+        """Regression: with no digest line the hash could not be taken, so the write
+        is unverified (None), never a mismatch."""
+        assert self._verify(mock_env, self.SETLOCALE_WARNING) == (None, None)
+
+    def test_real_mismatch_behind_shell_warning_is_still_reported(self, mock_env):
+        """Guard: a valid digest of other bytes is a hard mismatch with the same error
+        text, even when shell noise precedes it."""
+        other = self._sha(b"some other bytes\n")
+        stdout = f"{self.SETLOCALE_WARNING}{other}  {self.PATH}\n"
+        verified, error = self._verify(mock_env, stdout)
+        assert verified is False
+        assert error is not None and error.error == self.MISMATCH_ERROR
+
+    def test_failed_sha256sum_is_unverified(self, mock_env):
+        """Guard: a sha256sum that exits non-zero leaves the write unverified, even when
+        its stdout happens to contain a digest line."""
+        stdout = f"{self._sha(self.CONTENT)}  {self.PATH}\n"
+        assert self._verify(mock_env, stdout, returncode=1) == (None, None)
 
 
 # =========================================================================

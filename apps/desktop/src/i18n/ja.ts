@@ -3,6 +3,21 @@ import { defineFieldCopy } from '@/app/settings/field-copy'
 import { defineLocale } from './define-locale'
 
 export const ja = defineLocale({
+  personalization: {
+    navLabel: 'パーソナライズ',
+    title: 'パーソナライズ',
+    subtitle: '外観をすばやく調整できます。詳細は設定の「外観」にあります。',
+    themeTitle: 'テーマ',
+    backgroundTitle: '背景画像',
+    backgroundShow: '背景画像を表示',
+    opacityLabel: '画像の不透明度',
+    noImage: '画像がまだ選択されていません。',
+    chooseImage: '画像を選択…',
+    removeImage: '削除',
+    petTitle: 'デスクトップペット',
+    petDesc: 'デスクトップにペットを表示します。',
+    moreSettings: '外観の詳細設定'
+  },
   sessionImport: {
     title: '別のアプリから続ける',
     subtitle: '会話をStardustに取り込み、続きを始めましょう。',
@@ -610,9 +625,9 @@ export const ja = defineLocale({
       embedsAlways: '常に',
       embedsOff: 'オフ',
       embedsReset: (count: number) => `許可した${count}件のサービスをリセット`,
-      resumeLastSessionTitle: '起動時に前回のチャットを再開',
+      resumeLastSessionTitle: '起動時に前回のページかチャットを再開',
       resumeLastSessionDesc:
-        'オンの場合、コールドスタート時に直近のチャットを再び開きます。オフにすると常に新しいチャットから始まります。',
+        'オンの場合、前回開いていたページまたはチャットを再び開きます。設定などのポップアップは再開されません。オフにすると常に新しいチャットから始まります。',
       product: 'プロダクト',
       productDesc: '読みやすいツール活動と簡潔な要約を表示します。',
       technical: 'テクニカル',
@@ -1833,6 +1848,7 @@ export const ja = defineLocale({
   },
 
   messaging: {
+    pageTitle: 'メッセージング',
     search: 'メッセージングを検索...',
     loading: 'メッセージングプラットフォームを読み込み中...',
     loadFailed: 'メッセージングプラットフォームの読み込みに失敗しました',
@@ -1927,7 +1943,8 @@ export const ja = defineLocale({
       },
       TELEGRAM_ALLOWED_USERS: {
         label: '許可する Telegram ユーザー ID',
-        help: '推奨。@userinfobot の数値 ID をカンマ区切りで。設定しないと誰でもボットに DM できます。'
+        help: '推奨。@userinfobot の数値 ID をカンマ区切りで。設定しないと誰でもボットに DM できます。',
+        placeholder: 'カンマ区切りの数値 ID'
       },
       TELEGRAM_PROXY: { label: 'プロキシ URL', help: 'Telegram がブロックされているネットワークでのみ必要です。' },
       DISCORD_BOT_TOKEN: {

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 
 import { useDebounced } from '@/app/hooks/use-debounced'
+import { BackdropOpacitySlider } from '@/components/backdrop-opacity-slider'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { Button } from '@/components/ui/button'
 import { SegmentedControl } from '@/components/ui/segmented-control'
@@ -15,7 +16,7 @@ import { Check, Download, Loader2, Palette, Trash2 } from '@/lib/icons'
 import { selectableCardClass } from '@/lib/selectable-card'
 import { normalize } from '@/lib/text'
 import { cn } from '@/lib/utils'
-import { $backdrop, $backdropImagePath, setBackdrop, setBackdropImagePath } from '@/store/backdrop'
+import { $backdrop, $backdropImagePath, BACKDROP_IMAGE_EXTENSIONS, setBackdrop, setBackdropImagePath } from '@/store/backdrop'
 import { $composerPopoutGesturesEnabled, setComposerPopoutGesturesEnabled } from '@/store/composer-popout'
 import { $embedAllowed, $embedMode, clearEmbedAllowed, type EmbedMode, setEmbedMode } from '@/store/embed-consent'
 import { $autoShowGeneratedFiles, setAutoShowGeneratedFiles } from '@/store/generated-files-auto-show'
@@ -519,7 +520,7 @@ export function AppearanceSettings() {
       const [path] = await selectDesktopPaths({
         filters: [
           {
-            extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'],
+            extensions: [...BACKDROP_IMAGE_EXTENSIONS],
             name: t.settings.appearance.imageFilterName
           }
         ],
@@ -845,20 +846,23 @@ export function AppearanceSettings() {
               />
             }
             below={
-              <div className="mt-2 flex min-w-0 items-center gap-2">
-                <Button onClick={() => void chooseBackdropImage()} size="sm" variant="secondary">
-                  {t.common.choose}
-                </Button>
-                {backdropImagePath && (
-                  <>
-                    <Button onClick={removeBackdropImage} size="sm" variant="text">
-                      {t.common.remove}
-                    </Button>
-                    <span className="min-w-0 truncate text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">
-                      {backdropImagePath.split(/[\\/]/).pop() || backdropImagePath}
-                    </span>
-                  </>
-                )}
+              <div className="mt-2 flex min-w-0 flex-col gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <Button onClick={() => void chooseBackdropImage()} size="sm" variant="secondary">
+                    {t.common.choose}
+                  </Button>
+                  {backdropImagePath && (
+                    <>
+                      <Button onClick={removeBackdropImage} size="sm" variant="text">
+                        {t.common.remove}
+                      </Button>
+                      <span className="min-w-0 truncate text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">
+                        {backdropImagePath.split(/[\\/]/).pop() || backdropImagePath}
+                      </span>
+                    </>
+                  )}
+                </div>
+                {backdropImagePath && <BackdropOpacitySlider label={t.personalization.opacityLabel} />}
               </div>
             }
             description={a.backdropDesc}

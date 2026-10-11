@@ -3,6 +3,21 @@ import { defineFieldCopy } from '@/app/settings/field-copy'
 import { defineLocale } from './define-locale'
 
 export const zh = defineLocale({
+  personalization: {
+    navLabel: '个性化',
+    title: '个性化',
+    subtitle: '快速调整外观。更多选项在设置的「外观」里。',
+    themeTitle: '主题',
+    backgroundTitle: '背景图片',
+    backgroundShow: '显示背景图片',
+    opacityLabel: '图片不透明度',
+    noImage: '还没有选择图片。',
+    chooseImage: '选择图片…',
+    removeImage: '移除',
+    petTitle: '桌面宠物',
+    petDesc: '在桌面上显示一只宠物陪伴你。',
+    moreSettings: '更多外观设置'
+  },
   connectors: {
     title: '连接你的应用',
     connect: '连接',
@@ -797,8 +812,8 @@ export const zh = defineLocale({
       embedsAlways: '总是',
       embedsOff: '关闭',
       embedsReset: (count: number) => `重置 ${count} 个已允许的服务`,
-      resumeLastSessionTitle: '启动时恢复上次对话',
-      resumeLastSessionDesc: '开启后，应用冷启动时重新打开最近的聊天。关闭则始终从空白新对话开始。',
+      resumeLastSessionTitle: '启动时恢复上次页面或对话',
+      resumeLastSessionDesc: '开启后，应用启动时回到你上次打开的页面或对话。设置等弹出窗口不会被恢复。关闭则始终从空白新对话开始。',
       product: '产品',
       productDesc: '易读的工具活动与简洁摘要。',
       technical: '技术',
@@ -2505,6 +2520,7 @@ export const zh = defineLocale({
   },
 
   messaging: {
+    pageTitle: '消息平台',
     search: '搜索消息平台…',
     loading: '正在加载消息平台…',
     loadFailed: '消息平台加载失败',
@@ -2613,7 +2629,8 @@ export const zh = defineLocale({
       },
       TELEGRAM_ALLOWED_USERS: {
         label: '允许的 Telegram 用户 ID',
-        help: '推荐。来自 @userinfobot 的逗号分隔数字 ID。不设置则任何人都能私信你的机器人。'
+        help: '推荐。来自 @userinfobot 的逗号分隔数字 ID。不设置则任何人都能私信你的机器人。',
+        placeholder: '用逗号分隔的数字 ID'
       },
       TELEGRAM_PROXY: { label: '代理 URL', help: '仅在 Telegram 被屏蔽的网络中需要。' },
       DISCORD_BOT_TOKEN: { label: 'Bot 令牌', help: '在 Discord 开发者门户创建应用，添加机器人，然后粘贴其令牌。' },
