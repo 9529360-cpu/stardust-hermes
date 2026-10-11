@@ -520,7 +520,7 @@ class GatewayConfig:
     # session keys, per-profile adapters/credentials).
     multiplex_profiles: bool = False
     # Public HTTPS endpoint for scoped RoomLink calls (an API key alone must never advertise a
-    # route); HERMES_ROOM_LINK_URL overrides.
+    # route); STARDUST_ROOM_LINK_URL overrides.
     room_link_url: Optional[str] = None
     systemd_watchdog_seconds: int = 0  # opt-in; zero keeps Type=simple and disables sd_notify
     # In-process loop liveness watchdog: after consecutive missed probes it dumps all-thread stacks

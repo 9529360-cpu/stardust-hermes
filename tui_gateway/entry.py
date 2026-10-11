@@ -35,7 +35,7 @@ _mcp_discovery_enabled = False
 
 def _install_sidecar_publisher() -> None:
     """Mirror every dispatcher emit to the dashboard sidebar via WS when set (best-effort)."""
-    url = os.environ.get("HERMES_TUI_SIDECAR_URL")
+    url = os.environ.get("STARDUST_TUI_SIDECAR_URL")
     if not url:
         return
     from tui_gateway.event_publisher import WsPublisherTransport
@@ -43,12 +43,12 @@ def _install_sidecar_publisher() -> None:
 
 
 # Grace for orderly shutdown before ``os._exit(0)`` so a worker wedged mid-flush can't
-# strand the process; ``HERMES_TUI_GATEWAY_SHUTDOWN_GRACE_S`` overrides.
+# strand the process; ``STARDUST_TUI_GATEWAY_SHUTDOWN_GRACE_S`` overrides.
 _DEFAULT_SHUTDOWN_GRACE_S = 1.0
 
 
 def _shutdown_grace_seconds() -> float:
-    value = env_float("HERMES_TUI_GATEWAY_SHUTDOWN_GRACE_S", _DEFAULT_SHUTDOWN_GRACE_S)
+    value = env_float("STARDUST_TUI_GATEWAY_SHUTDOWN_GRACE_S", _DEFAULT_SHUTDOWN_GRACE_S)
     return value if value > 0 else _DEFAULT_SHUTDOWN_GRACE_S
 
 
@@ -158,7 +158,7 @@ def wait_for_mcp_discovery(timeout: "float | None" = None) -> None:
     # if the previous run finished with zero connected servers, start_background_mcp_discovery's
     # retry-after-zero-connected allowance kicks off a fresh discovery run here instead of leaving the
     # process latched MCP-less for the session. In multi-profile processes this retry runs under the
-    # CALLER's profile context (agent build binds the session profile's HERMES_HOME first), so a launch
+    # CALLER's profile context (agent build binds the session profile's STARDUST_HOME first), so a launch
     # profile with no mcp_servers no longer starves selected profiles of discovery (#67605). Gated on
     # _mcp_discovery_enabled so non-MCP sessions never pay the tools.mcp_tool import on the per-agent-build
     # wait path.
@@ -214,10 +214,10 @@ def _has_configured_mcp_servers() -> bool:
 def ensure_mcp_discovery_started() -> None:
     """Start background MCP discovery for the current profile context, once per profile home.
     ``main()`` calls this for stdio; ``server._start_agent_build`` also calls it AFTER binding the
-    session profile's HERMES_HOME.
+    session profile's STARDUST_HOME.
 
     WebSocket/Desktop entrypoints can accept sessions without running ``main()``, so the agent-build path
-    (``server._start_agent_build``) also calls it AFTER binding the session profile's HERMES_HOME override —
+    (``server._start_agent_build``) also calls it AFTER binding the session profile's STARDUST_HOME override —
     the shared owner in ``hermes_cli.mcp_startup`` captures the caller's context-local override and
     propagates it into the discovery thread, so discovery reads the SELECTED profile's ``mcp_servers``, not
     the launch profile's. The discovery slot in ``hermes_cli.mcp_startup`` is keyed by profile home, so

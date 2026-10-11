@@ -44,7 +44,7 @@ def test_process_hermes_home_ignores_task_override(tmp_path, monkeypatch):
     other_home = tmp_path / "tommy"
     launch_home.mkdir()
     other_home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(launch_home))
+    monkeypatch.setenv("STARDUST_HOME", str(launch_home))
 
     token = set_hermes_home_override(str(other_home))
     try:
@@ -74,7 +74,7 @@ def test_secondary_profile_reload_does_not_bridge_into_shared_env(
         "  ssh_user: bergmann\n",
     )
     _write_terminal_config(other_home, "terminal:\n  backend: local\n")
-    monkeypatch.setenv("HERMES_HOME", str(launch_home))
+    monkeypatch.setenv("STARDUST_HOME", str(launch_home))
 
     # Launch profile's backend is what the shared env carries.
     monkeypatch.setenv("TERMINAL_ENV", "ssh")

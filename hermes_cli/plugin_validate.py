@@ -5,7 +5,7 @@ This is the command the plugin-catalog admission CI (and the
 candidate plugin. It performs static manifest checks plus a
 subprocess-isolated capability probe: the plugin is imported and its
 ``register(ctx)`` called against a minimal recording stub context in a
-scratch child process (with a throwaway ``HERMES_HOME``), so a crashing or
+scratch child process (with a throwaway ``STARDUST_HOME``), so a crashing or
 malicious plugin cannot take down the CLI, and the *actually registered*
 tools/hooks/middleware are compared against the manifest's declared
 ``provides_*`` lists.
@@ -29,7 +29,7 @@ _CONFIG_TYPES = {
     "bool", "boolean", "list", "array", "dict", "mapping", "map",
 }
 _PROBE_TIMEOUT = 30
-_PROBE_SENTINEL = "HERMES_VALIDATE_JSON:"
+_PROBE_SENTINEL = "STARDUST_VALIDATE_JSON:"
 
 
 @dataclass
@@ -272,7 +272,7 @@ def _run_capability_probe(plugin_dir: Path) -> Tuple[Optional[dict], str]:
     """
     with tempfile.TemporaryDirectory(prefix="hermes-validate-") as scratch:
         env = dict(os.environ)
-        env["HERMES_HOME"] = scratch
+        env["STARDUST_HOME"] = scratch
         try:
             result = subprocess.run(
                 [

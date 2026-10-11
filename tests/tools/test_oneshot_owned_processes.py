@@ -117,7 +117,7 @@ def test_quiet_one_shot_exit_stops_the_server_it_started(tmp_path):
     tool_results: list = []
     model = _serve_scripted_model(command, tool_results, ready=pid_file)
     url = f"http://127.0.0.1:{model.server_port}/v1"
-    env = {**os.environ, "HERMES_HOME": str(home), "HOME": str(tmp_path), "USERPROFILE": str(tmp_path),
+    env = {**os.environ, "STARDUST_HOME": str(home), "HOME": str(tmp_path), "USERPROFILE": str(tmp_path),
            "TERMINAL_CWD": str(tmp_path), "OPENAI_BASE_URL": url, "OPENAI_API_KEY": "local-test-only",
            "PYTHONPATH": str(REPO_ROOT)}
     server_pid = None
@@ -152,7 +152,7 @@ def test_a_descendant_still_holding_the_pipe_cannot_hang_poll_or_kill(tmp_path, 
     reconcile in poll/wait and from kill) waited for that read — i.e. until the descendant exited.
     Here the shell backgrounds a sleeper that inherits the pipe and exits; no tree kill can reach it.
     """
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "home"))
     from tools.process_registry import ProcessRegistry
 
     pid_file = tmp_path / "escaped.pid"

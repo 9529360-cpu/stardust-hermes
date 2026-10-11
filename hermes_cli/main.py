@@ -227,7 +227,7 @@ def _config_default_interface_early() -> str:
         return _EARLY_INTERFACE_CACHE[0]
     value = "cli"
     try:
-        home = os.environ.get("HERMES_HOME")
+        home = os.environ.get("STARDUST_HOME")
         if home:
             cfg_path = os.path.join(home, "config.yaml")
         else:
@@ -253,7 +253,7 @@ def _config_default_interface_early() -> str:
 def _wants_tui_early(argv: "list[str] | None" = None) -> bool:
     """Earliest TUI decision, usable before argparse/config imports.
 
-    Precedence: ``--cli`` wins, then ``--tui``/``HERMES_TUI=1``, then a
+    Precedence: ``--cli`` wins, then ``--tui``/``STARDUST_TUI=1``, then a
     real-TTY gate, then ``display.interface``. The TTY gate is load-bearing
     for headless spawners (kanban workers, cron, pipes running ``chat -q``):
     a ``display.interface: tui`` default used to boot the TUI here, whose
@@ -264,7 +264,7 @@ def _wants_tui_early(argv: "list[str] | None" = None) -> bool:
         argv = sys.argv[1:]
     if "--cli" in argv:
         return False
-    if os.environ.get("HERMES_TUI") == "1" or "--tui" in argv:
+    if os.environ.get("STARDUST_TUI") == "1" or "--tui" in argv:
         return True
     try:
         if not (sys.stdin.isatty() and sys.stdout.isatty()):
@@ -278,10 +278,10 @@ def _wants_tui_early(argv: "list[str] | None" = None) -> bool:
 # TUI hot path: while the launcher is still importing (~100-300ms, cooked+echo
 # mode, before the Node TUI takes stdin raw) incoming SGR/X10 mouse reports
 # echo into the shell scrollback as ``^[[<…M``. entry.tsx's
-# `resetTerminalModes()` is the later cousin. ``HERMES_TUI_NO_EARLY_DISABLE``
+# `resetTerminalModes()` is the later cousin. ``STARDUST_TUI_NO_EARLY_DISABLE``
 # escapes the behaviour for diagnostics.
 def _suppress_mouse_residue_early() -> None:
-    if os.environ.get("HERMES_TUI_NO_EARLY_DISABLE") == "1":
+    if os.environ.get("STARDUST_TUI_NO_EARLY_DISABLE") == "1":
         return
     if not _wants_tui_early():
         return
@@ -395,8 +395,8 @@ _startup_fast.ensure_project_root_on_path()
 
 
 # Profile override — MUST happen before any hermes module import: many modules
-# cache HERMES_HOME at import time. --profile/-p is pre-parsed from sys.argv,
-# HERMES_HOME set, and the flag stripped so argparse never sees it. Falls back
+# cache STARDUST_HOME at import time. --profile/-p is pre-parsed from sys.argv,
+# STARDUST_HOME set, and the flag stripped so argparse never sees it. Falls back
 # to ~/.hermes/active_profile for the sticky default.
 _PROFILE_NAME_RE = r"^[a-z0-9][a-z0-9_-]{0,63}$"  # mirrors hermes_cli.profiles._PROFILE_ID_RE
 
@@ -504,29 +504,29 @@ def _under_gateway_supervisor(argv: list) -> bool:
     """A supervisor-launched gateway child must NOT follow the sticky active_profile.
 
     Each supervised slot has a fixed profile identity: named slots pass
-    ``-p <name>`` or pin HERMES_HOME to the profile dir; a bare invocation
-    means "the root HERMES_HOME profile". If a supervised default-profile
+    ``-p <name>`` or pin STARDUST_HOME to the profile dir; a bare invocation
+    means "the root STARDUST_HOME profile". If a supervised default-profile
     child read active_profile, switching the active profile (dashboard,
     ``hermes profile use``) would silently redirect the default gateway into
     that profile — adopting its credentials and double-polling a Telegram
     token already owned by that profile's own gateway (#74872).
 
     Markers (see gateway/restart.py ``is_gateway_supervisor_process``):
-    HERMES_SUPERVISED_CHILD (systemd unit / launchd plist / Windows task),
-    HERMES_S6_SUPERVISED_CHILD (legacy s6 container), INVOCATION_ID (systemd
+    STARDUST_SUPERVISED_CHILD (systemd unit / launchd plist / Windows task),
+    STARDUST_S6_SUPERVISED_CHILD (legacy s6 container), INVOCATION_ID (systemd
     service children only — consulted ONLY for gateway commands because it is
     inherited by every descendant of a systemd-launched process, e.g.
-    self-hosted CI runners), HERMES_GATEWAY_EXTERNAL_SUPERVISOR (explicit
+    self-hosted CI runners), STARDUST_GATEWAY_EXTERNAL_SUPERVISOR (explicit
     opt-in). XPC_SERVICE_NAME is deliberately NOT consulted: interactive macOS
     terminals set it too.
     """
-    if os.environ.get("HERMES_SUPERVISED_CHILD") or os.environ.get("HERMES_S6_SUPERVISED_CHILD"):
+    if os.environ.get("STARDUST_SUPERVISED_CHILD") or os.environ.get("STARDUST_S6_SUPERVISED_CHILD"):
         return True
     is_gateway_cmd = next((a for a in argv if not a.startswith("-")), None) == "gateway"
     if is_gateway_cmd and os.environ.get("INVOCATION_ID"):
         return True
     return os.environ.get(
-        "HERMES_GATEWAY_EXTERNAL_SUPERVISOR", ""
+        "STARDUST_GATEWAY_EXTERNAL_SUPERVISOR", ""
     ).strip().lower() in {"1", "true", "yes", "on"}
 
 
@@ -542,16 +542,16 @@ def _desktop_ssh_backend(argv: list) -> bool:
 
 
 def _apply_profile_override() -> None:
-    """Pre-parse --profile/-p and set HERMES_HOME before imports."""
+    """Pre-parse --profile/-p and set STARDUST_HOME before imports."""
     argv = sys.argv[1:]
     profile_name, consume, profile_index = _scan_profile_flag(argv)
 
-    # HERMES_HOME already set with no explicit flag: trust it only when it
+    # STARDUST_HOME already set with no explicit flag: trust it only when it
     # points at a specific profile dir ("profiles" as immediate parent). If it
-    # points at the hermes root (systemd hardcodes HERMES_HOME=/root/.hermes)
+    # points at the hermes root (systemd hardcodes STARDUST_HOME=/root/.hermes)
     # we must still read active_profile — the user may have run
     # `hermes profile use` and the gateway should honour it (#22502).
-    hermes_home_env = os.environ.get("HERMES_HOME", "")
+    hermes_home_env = os.environ.get("STARDUST_HOME", "")
     if profile_name is None and hermes_home_env and Path(hermes_home_env).parent.name == "profiles":
         return
 
@@ -585,7 +585,7 @@ def _apply_profile_override() -> None:
         # A bug in profiles.py must NEVER prevent hermes from starting
         print(f"Warning: profile override failed ({exc}), using default", file=sys.stderr)
         return
-    os.environ["HERMES_HOME"] = hermes_home
+    os.environ["STARDUST_HOME"] = hermes_home
     # Strip the flag from argv so argparse doesn't choke
     if consume > 0 and profile_index is not None:
         start = profile_index + 1  # +1 because argv is sys.argv[1:]
@@ -627,7 +627,7 @@ from hermes_cli.env_loader import load_hermes_dotenv
 # owns that argv check for every dotenv load in the process. See #73381.
 load_hermes_dotenv(project_env=PROJECT_ROOT / ".env")
 
-# Bridge security.redact_secrets → HERMES_REDACT_SECRETS BEFORE hermes_logging
+# Bridge security.redact_secrets → STARDUST_REDACT_SECRETS BEFORE hermes_logging
 # imports agent.redact, which snapshots the flag exactly once at import. A
 # .env value still wins — this is config.yaml fallback only. network.force_ipv4
 # is read from the same parse to avoid a second full load_config() (~17ms).
@@ -641,12 +641,12 @@ try:
     _cfg_path = get_hermes_home() / "config.yaml"
     if _cfg_path.exists():
         _early_cfg_raw = _load_effective_early(_cfg_path)
-        if "HERMES_REDACT_SECRETS" not in os.environ:
+        if "STARDUST_REDACT_SECRETS" not in os.environ:
             _early_sec_cfg = _early_cfg_raw.get("security", {})
             if isinstance(_early_sec_cfg, dict):
                 _early_redact = _early_sec_cfg.get("redact_secrets")
                 if _early_redact is not None:
-                    os.environ["HERMES_REDACT_SECRETS"] = str(_early_redact).lower()
+                    os.environ["STARDUST_REDACT_SECRETS"] = str(_early_redact).lower()
         _early_net_cfg = _early_cfg_raw.get("network", {})
         if isinstance(_early_net_cfg, dict) and _early_net_cfg.get("force_ipv4"):
             _FORCE_IPV4_EARLY = True
@@ -895,7 +895,7 @@ def _termux_bundled_skills_stamp_path() -> Path:
 def _termux_bundled_skills_sync_needed() -> bool:
     if not _is_termux_startup_environment():
         return True
-    if os.environ.get("HERMES_TERMUX_FORCE_SKILLS_SYNC") == "1":
+    if os.environ.get("STARDUST_TERMUX_FORCE_SKILLS_SYNC") == "1":
         return True
     try:
         stamp = _termux_bundled_skills_stamp_path()
@@ -935,7 +935,7 @@ def _sync_bundled_skills_for_startup() -> bool:
 def _termux_should_prefetch_update_check() -> bool:
     if not _is_termux_startup_environment():
         return True
-    return os.environ.get("HERMES_TERMUX_PREFETCH_UPDATES") == "1"
+    return os.environ.get("STARDUST_TERMUX_PREFETCH_UPDATES") == "1"
 
 
 def _dotenv_has_provider_key(env_file: Path, provider_env_vars: set) -> bool:
@@ -1714,7 +1714,7 @@ def cmd_chat(args):
     _apply_user_config_bypass(args)
     _guard_noninteractive_user_config(args)
     from hermes_cli.stream_json import stream_json_requested
-    # Structured stdout is a non-interactive protocol: it overrides HERMES_TUI/display.interface too.
+    # Structured stdout is a non-interactive protocol: it overrides STARDUST_TUI/display.interface too.
     use_tui = False if stream_json_requested(args) else _resolve_use_tui(args)
 
     _resolve_chat_session_args(args, use_tui)
@@ -1734,14 +1734,14 @@ def cmd_chat(args):
     # before tool imports freeze _YOLO_MODE_FROZEN. This is a safety net for
     # callers that invoke cmd_chat directly (e.g. subcommand dispatch).
     if getattr(args, "yolo", False):
-        os.environ["HERMES_YOLO_MODE"] = "1"
+        os.environ["STARDUST_YOLO_MODE"] = "1"
     # --ignore-rules: skip AGENTS.md/SOUL.md/.cursorrules injection, memory
     # entries and preloaded skills (AIAgent(skip_context_files, skip_memory)).
     if getattr(args, "ignore_rules", False):
-        os.environ["HERMES_IGNORE_RULES"] = "1"
+        os.environ["STARDUST_IGNORE_RULES"] = "1"
     # --source: tag session source for filtering (e.g. 'tool' for integrations)
     if getattr(args, "source", None):
-        os.environ["HERMES_SESSION_SOURCE"] = args.source
+        os.environ["STARDUST_SESSION_SOURCE"] = args.source
 
     _confirm_startup_expensive_model_override(args)
 
@@ -2005,7 +2005,7 @@ def select_provider_and_model(args=None):
     # Effective provider the same way the CLI resolves it at startup:
     # config.yaml model.provider > env var > auto-detect
     config_provider = model_cfg.get("provider") if isinstance(model_cfg, dict) else None
-    effective_provider = config_provider or os.getenv("HERMES_INFERENCE_PROVIDER") or "auto"
+    effective_provider = config_provider or os.getenv("STARDUST_INFERENCE_PROVIDER") or "auto"
 
     # User-defined custom providers from config.yaml: key → {name, base_url, api_key}
     _custom_provider_map = _named_custom_provider_map(config)
@@ -2475,21 +2475,21 @@ def _dashboard_validate_serve_args(args, headless_backend, token_file):
 def _dashboard_sanitize_desktop_env(headless_backend) -> None:
     """Strip Desktop-inherited env that hijacks a standalone launch.
 
-    Desktop Electron spawns its backend with HERMES_DESKTOP=1 plus
-    HERMES_WEB_DIST=<packaged app.asar[/unpacked]/dist> (and often
-    HERMES_SERVE_HEADLESS=1). A shell inheriting those then running
+    Desktop Electron spawns its backend with STARDUST_DESKTOP=1 plus
+    STARDUST_WEB_DIST=<packaged app.asar[/unpacked]/dist> (and often
+    STARDUST_SERVE_HEADLESS=1). A shell inheriting those then running
     `hermes dashboard` would serve the desktop renderer ("Desktop IPC bridge
     is unavailable", #52945) or disable the SPA. Only Electron-packaged
     WEB_DIST contamination is stripped — caller-managed overrides (dev /
     custom builds) must still work, and the desktop-spawned backend itself
-    (HERMES_DESKTOP=1) keeps its dist. Headless `serve` re-sets
-    HERMES_SERVE_HEADLESS itself.
+    (STARDUST_DESKTOP=1) keeps its dist. Headless `serve` re-sets
+    STARDUST_SERVE_HEADLESS itself.
     """
-    if os.environ.get("HERMES_DESKTOP") != "1":
-        if _is_electron_packaged_web_dist(os.environ.get("HERMES_WEB_DIST", "")):
-            os.environ.pop("HERMES_WEB_DIST", None)
+    if os.environ.get("STARDUST_DESKTOP") != "1":
+        if _is_electron_packaged_web_dist(os.environ.get("STARDUST_WEB_DIST", "")):
+            os.environ.pop("STARDUST_WEB_DIST", None)
     if not headless_backend:
-        os.environ.pop("HERMES_SERVE_HEADLESS", None)
+        os.environ.pop("STARDUST_SERVE_HEADLESS", None)
 
 
 def _dashboard_prepare_runtime(args, headless_backend) -> bool:
@@ -2558,7 +2558,7 @@ def _dashboard_prepare_runtime(args, headless_backend) -> bool:
     # ~350ms `mcp` SDK import, which holds the GIL against the web_server
     # import and delays the READY sentinel; _make_agent's bounded
     # wait_for_mcp_discovery covers a server still connecting at first turn.
-    mcp_discovery_after_bind = headless_backend and os.environ.get("HERMES_DESKTOP") == "1"
+    mcp_discovery_after_bind = headless_backend and os.environ.get("STARDUST_DESKTOP") == "1"
     if not mcp_discovery_after_bind:
         try:
             from hermes_cli.mcp_startup import start_background_mcp_discovery
@@ -2762,10 +2762,10 @@ _AGENT_SUBCOMMANDS = {
 
 
 def _is_tui_chat_launch(args) -> bool:
-    if getattr(args, "tui", False) or os.environ.get("HERMES_TUI") == "1":
+    if getattr(args, "tui", False) or os.environ.get("STARDUST_TUI") == "1":
         return True
     # The chat path decides TUI-vs-classic via _resolve_use_tui (--cli/--tui
-    # flags, TTY gate, HERMES_TUI env, display.interface config). Bare
+    # flags, TTY gate, STARDUST_TUI env, display.interface config). Bare
     # `hermes`/`hermes chat` with a TUI display config was previously missed
     # here, so the wrapper pre-warmed its own MCP discovery while the TUI
     # gateway (spawned moments later) ran a second one — an idle stdio MCP
@@ -2796,13 +2796,13 @@ def _should_background_mcp_startup(args) -> bool:
 
 def _prepare_agent_startup(args) -> None:
     """Discover plugins/MCP/hooks for commands that can run an agent turn."""
-    # --yolo chokepoint: HERMES_YOLO_MODE must be set before any discovery
+    # --yolo chokepoint: STARDUST_YOLO_MODE must be set before any discovery
     # below imports tools.approval, which freezes _YOLO_MODE_FROZEN at import.
     # main() sets it earlier too, but other launchers (Termux fast-CLI) reach
     # here directly, so the guarantee lives where the import is triggered.
     # See #7994.
     if getattr(args, "yolo", False):
-        os.environ["HERMES_YOLO_MODE"] = "1"
+        os.environ["STARDUST_YOLO_MODE"] = "1"
     _apply_safe_mode(args)
     _apply_user_config_bypass(args)
     _guard_noninteractive_user_config(args)
@@ -2892,15 +2892,15 @@ def _prepare_agent_startup(args) -> None:
 def _apply_safe_mode(args) -> None:
     if not getattr(args, "safe_mode", False):
         return
-    os.environ["HERMES_SAFE_MODE"] = "1"
-    os.environ["HERMES_IGNORE_USER_CONFIG"] = "1"
-    os.environ["HERMES_IGNORE_RULES"] = "1"
+    os.environ["STARDUST_SAFE_MODE"] = "1"
+    os.environ["STARDUST_IGNORE_USER_CONFIG"] = "1"
+    os.environ["STARDUST_IGNORE_RULES"] = "1"
 
 
 def _apply_user_config_bypass(args) -> None:
     """Apply the explicit config bypass before any startup config reads."""
     if getattr(args, "ignore_user_config", False):
-        os.environ["HERMES_IGNORE_USER_CONFIG"] = "1"
+        os.environ["STARDUST_IGNORE_USER_CONFIG"] = "1"
 
 
 def _guard_noninteractive_user_config(args) -> None:
@@ -2994,7 +2994,7 @@ def _try_fast_serve_launch() -> bool:
     thousands of filesystem-backed lookups on Windows. Unknown or global
     arguments fall back to normal parsing so error reporting is unchanged.
     """
-    if os.environ.get("HERMES_DISABLE_FAST_SERVE_LAUNCH") == "1":
+    if os.environ.get("STARDUST_DISABLE_FAST_SERVE_LAUNCH") == "1":
         return False
 
     argv = sys.argv[1:]
@@ -3035,7 +3035,7 @@ def _try_fast_chat_launch() -> bool:
     ``_try_termux_fast_cli_launch`` minus the Termux deferred startup; kept
     separate so phone-tuned behavior doesn't leak to desktops.
     """
-    if os.environ.get("HERMES_DISABLE_FAST_CHAT_LAUNCH") == "1":
+    if os.environ.get("STARDUST_DISABLE_FAST_CHAT_LAUNCH") == "1":
         return False
     argv = sys.argv[1:]
     if "-h" in argv or "--help" in argv:
@@ -3066,7 +3066,7 @@ def _try_fast_chat_launch() -> bool:
         return False
 
     if getattr(args, "yolo", False):
-        os.environ["HERMES_YOLO_MODE"] = "1"
+        os.environ["STARDUST_YOLO_MODE"] = "1"
     _prepare_agent_startup(args)
 
     if getattr(args, "oneshot", None):
@@ -3082,7 +3082,7 @@ def _try_termux_fast_cli_launch() -> bool:
     """Run obvious Termux non-TUI chat/oneshot/version paths on a light parser."""
     if not _is_termux_startup_environment():
         return False
-    if os.environ.get("HERMES_TERMUX_DISABLE_FAST_CLI") == "1":
+    if os.environ.get("STARDUST_TERMUX_DISABLE_FAST_CLI") == "1":
         return False
 
     argv = sys.argv[1:]
@@ -3121,10 +3121,10 @@ def _try_termux_fast_cli_launch() -> bool:
         if interactive_prompt:
             # Reach the prompt first; agent-only discovery on the first turn.
             setattr(args, "compact", True)
-            os.environ["HERMES_DEFER_AGENT_STARTUP"] = "1"
-            os.environ["HERMES_FAST_STARTUP_BANNER"] = "1"
+            os.environ["STARDUST_DEFER_AGENT_STARTUP"] = "1"
+            os.environ["STARDUST_FAST_STARTUP_BANNER"] = "1"
             if getattr(args, "accept_hooks", False):
-                os.environ["HERMES_ACCEPT_HOOKS"] = "1"
+                os.environ["STARDUST_ACCEPT_HOOKS"] = "1"
         else:
             _prepare_agent_startup(args)
         cmd_chat(args)
@@ -3173,7 +3173,7 @@ def _advertise_agent_env() -> None:
 
     ``AI_AGENT`` is the cross-agent standard (huggingface_hub reads it); the
     value must be our id in the public agent-harness registry
-    (``hermes-agent``) — matching is exact. ``HERMES_AGENT`` is the
+    (``hermes-agent``) — matching is exact. ``STARDUST_AGENT`` is the
     Hermes-specific marker. setdefault: never clobber an outer harness.
 
     ``AI_AGENT`` is the emerging cross-agent standard (huggingface_hub's agent detection reads it; pi and
@@ -3181,7 +3181,7 @@ def _advertise_agent_env() -> None:
     harness that spawned them. Hermes running inside another agent's terminal).
     """
     os.environ.setdefault("AI_AGENT", "hermes-agent")
-    os.environ.setdefault("HERMES_AGENT", "true")
+    os.environ.setdefault("STARDUST_AGENT", "true")
 
 
 def _attach_plugin_cli_command(subparsers, cmd_info) -> None:
@@ -3457,7 +3457,7 @@ def main():
     # --yolo must be set *before* plugin discovery: tools.approval freezes
     # _YOLO_MODE_FROZEN at import; set later (inside cmd_chat) it does nothing.
     if getattr(args, "yolo", False):
-        os.environ["HERMES_YOLO_MODE"] = "1"
+        os.environ["STARDUST_YOLO_MODE"] = "1"
 
     # Plugin discovery + shell hooks once, gated so introspection commands
     # (hooks list, cron list, gateway status, ...) pay no discovery cost and

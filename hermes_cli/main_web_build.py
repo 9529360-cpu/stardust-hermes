@@ -24,7 +24,7 @@ from hermes_cli.main_tui_launch import (
 logger = logging.getLogger("hermes_cli.main")
 
 # Checkout fingerprint the bytecode cache was last validated against. Lives next
-# to the checkout (NOT in HERMES_HOME): __pycache__ is per-checkout state shared
+# to the checkout (NOT in STARDUST_HOME): __pycache__ is per-checkout state shared
 # by every profile.
 _BYTECODE_FINGERPRINT_FILE = ".bytecode-fingerprint"
 
@@ -185,7 +185,7 @@ def _compute_web_ui_content_hash(project_root: Path, web_dir: Path) -> str:
 
 
 def _web_ui_stamp_path() -> Path:
-    """Path of the web UI build stamp under $HERMES_HOME."""
+    """Path of the web UI build stamp under $STARDUST_HOME."""
     from hermes_constants import get_hermes_home
     return get_hermes_home() / "web-ui-build-stamp.json"
 

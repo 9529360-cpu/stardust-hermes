@@ -160,12 +160,12 @@ def _cua_permission_mode(session_id: str) -> str:
     return configured
 
 def _new_backend(permission_mode: str) -> ComputerUseBackend:
-    backend_name = os.environ.get("HERMES_COMPUTER_USE_BACKEND", "cua").lower()
+    backend_name = os.environ.get("STARDUST_COMPUTER_USE_BACKEND", "cua").lower()
     if backend_name in {"cua", "cua-driver", ""}:
         from tools.computer_use.cua_backend import CuaDriverBackend
         return CuaDriverBackend(permission_mode=permission_mode)
     if backend_name != "noop":
-        raise RuntimeError(f"Unknown HERMES_COMPUTER_USE_BACKEND={backend_name!r}")
+        raise RuntimeError(f"Unknown STARDUST_COMPUTER_USE_BACKEND={backend_name!r}")
     return _NoopBackend()  # pragma: no cover
 
 def _install_backend(sid: str, backend: ComputerUseBackend, permission_mode: str) -> ComputerUseBackend:
@@ -274,7 +274,7 @@ def _noop_stub(name: str, *params: str, result: Any = None):
     return method
 
 class _NoopBackend(ComputerUseBackend):  # pragma: no cover
-    """Test/CI stub (HERMES_COMPUTER_USE_BACKEND=noop). Records ``(name, kwargs)`` calls; returns trivial results."""
+    """Test/CI stub (STARDUST_COMPUTER_USE_BACKEND=noop). Records ``(name, kwargs)`` calls; returns trivial results."""
 
     def __init__(self) -> None: self.calls: List[Tuple[str, Dict[str, Any]]] = []
     start = stop = lambda self: None
@@ -707,7 +707,7 @@ def _maybe_follow_capture(backend: ComputerUseBackend, res: ActionResult, do_cap
 
 # ── Cache files (screenshots, element spills, vision temps) ─────────────────
 def _cache_file(subdir: str, legacy: str, name: str, pattern: str = "", cap: int = 0):
-    """Path for a new file under ``$HERMES_HOME/<subdir>`` (dir created). With ``pattern``/``cap``, first unlinks the
+    """Path for a new file under ``$STARDUST_HOME/<subdir>`` (dir created). With ``pattern``/``cap``, first unlinks the
     oldest matching files so at most ``cap - 1`` remain (best-effort)."""
     from hermes_constants import get_hermes_dir  # lazy so tests can patch get_hermes_dir
     cache_dir = get_hermes_dir(subdir, legacy)
@@ -807,7 +807,7 @@ _VISION_PROMPT = ("Describe what is visible in this desktop application screensh
 def _route_capture_through_aux_vision(cap: CaptureResult, summary: str, *, visible_elements: Optional[List[UIElement]] = None,
                                       truncated_elements: int = 0, elements_file: Optional[str] = None,
                                       screenshot_path: Optional[str] = None) -> Optional[str]:
-    """Pre-analyse the capture via ``vision_analyze_tool`` (temp file under ``$HERMES_HOME/cache/vision/``) and merge
+    """Pre-analyse the capture via ``vision_analyze_tool`` (temp file under ``$STARDUST_HOME/cache/vision/``) and merge
     the description with the AX/SOM summary into one text payload. JSON, or None on any failure."""
     if not cap.png_b64:
         return None

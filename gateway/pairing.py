@@ -37,7 +37,7 @@ MAX_FAILED_ATTEMPTS = 5             # Failed approvals before lockout
 DECLINE_DEDUPE_SECONDS = 24 * 3600  # One polite decline per (platform, sender) per window (#88028)
 
 # Default pairing directory override. Deliberately ``None``: an eagerly computed
-# path would freeze the HERMES_HOME/profile context at gateway boot, ignoring later
+# path would freeze the STARDUST_HOME/profile context at gateway boot, ignoring later
 # context-local overrides, so the gateway and ``hermes pairing`` CLI wrote different
 # directories. ``_default_pairing_dir()`` resolves fresh per call; tests patch this.
 PAIRING_DIR = None
@@ -45,7 +45,7 @@ PAIRING_DIR = None
 
 # Default (non-profile-scoped) pairing directory. Left unresolved (``None``) here rather than computed
 # eagerly: this module is imported once by the long-lived gateway process at container/process boot, and
-# computing the path eagerly freezes it to whatever HERMES_HOME/profile context existed at that exact import
+# computing the path eagerly freezes it to whatever STARDUST_HOME/profile context existed at that exact import
 # moment for the rest of the process's lifetime -- even if a context-local override (see
 # hermes_constants.set_hermes_home_override) is established afterward. A freshly-started, short-lived
 # process (e.g. the ``hermes pairing`` CLI) re-imports this module later with the final environment already
@@ -320,7 +320,7 @@ class PairingStore:
 
     Files per platform: ``{platform}-pending.json``, ``{platform}-approved.json``, plus
     shared ``_rate_limits.json``. With ``profile="<name>"`` storage resolves from that
-    profile's HERMES_HOME exactly as ``hermes -p <name> pairing ...`` does, so multiplex
+    profile's STARDUST_HOME exactly as ``hermes -p <name> pairing ...`` does, so multiplex
     gateways and profile-scoped CLI approvals share one whitelist.
     """
 

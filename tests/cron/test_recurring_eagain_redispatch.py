@@ -18,7 +18,7 @@ re-dispatched without force-run/resume — is covered by
 behavioral RED (unfixed: no execution) / GREEN (fixed: re-dispatched) for the
 new recovery path.
 
-This file drives the REAL `tick()` end-to-end against a throwaway HERMES_HOME:
+This file drives the REAL `tick()` end-to-end against a throwaway STARDUST_HOME:
   tick 1 -> script EAGAINs (subprocess.run raises OSError 11) -> failed exec row
   tick 2 -> substrate recovered (script runs clean) -> job MUST fire again
 """
@@ -46,10 +46,10 @@ def wedge_env(tmp_path, monkeypatch):
     (hermes_home / "cron").mkdir()
     (hermes_home / "cron" / "output").mkdir()
     (hermes_home / "scripts").mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
     import cron.jobs as jobs_mod
-    monkeypatch.setattr(jobs_mod, "HERMES_DIR", hermes_home)
+    monkeypatch.setattr(jobs_mod, "STARDUST_DIR", hermes_home)
     monkeypatch.setattr(jobs_mod, "CRON_DIR", hermes_home / "cron")
     monkeypatch.setattr(jobs_mod, "JOBS_FILE", hermes_home / "cron" / "jobs.json")
     monkeypatch.setattr(jobs_mod, "OUTPUT_DIR", hermes_home / "cron" / "output")

@@ -95,7 +95,7 @@ def test_abort_recovery_hands_managed_profiles_to_a_fresh_process(monkeypatch):
     assert kwargs["text"] is True
     assert kwargs["capture_output"] is True
     assert kwargs["check"] is False
-    assert kwargs["env"]["HERMES_UPDATE_RESTART_RECOVERY"] == "1"
+    assert kwargs["env"]["STARDUST_UPDATE_RESTART_RECOVERY"] == "1"
 
 
 def test_abort_recovery_does_not_claim_success_when_fresh_process_fails(monkeypatch):
@@ -287,7 +287,7 @@ def test_recovery_child_restarts_each_profile_with_a_fresh_main(monkeypatch):
         assert kwargs["capture_output"] is True
         assert kwargs["text"] is True
         assert kwargs["check"] is False
-        assert kwargs["env"]["HERMES_UPDATE_RESTART_RECOVERY"] == "1"
+        assert kwargs["env"]["STARDUST_UPDATE_RESTART_RECOVERY"] == "1"
         assert "_HERMES_GATEWAY" not in kwargs["env"]
 
 

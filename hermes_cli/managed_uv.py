@@ -41,7 +41,7 @@ _Provisioned = tuple[Path, Path, SQLiteRuntimeInfo]
 
 
 def managed_uv_path() -> Path:
-    """Path of Hermes' own uv binary (``$HERMES_HOME/bin/uv[.exe]``); may not exist yet."""
+    """Path of Hermes' own uv binary (``$STARDUST_HOME/bin/uv[.exe]``); may not exist yet."""
     return get_hermes_home() / "bin" / ("uv.exe" if platform.system() == "Windows" else "uv")
 
 
@@ -981,7 +981,7 @@ def _install_uv(target: Path) -> None:
     """Bootstrap uv into *target* using the official standalone installer.
 
     Sets ``UV_UNMANAGED_INSTALL`` (POSIX) / ``UV_INSTALL_DIR`` (Windows) so the installer writes
-    into ``$HERMES_HOME/bin/`` instead of ``~/.local/bin/``.
+    into ``$STARDUST_HOME/bin/`` instead of ``~/.local/bin/``.
     """
     env = {**os.environ, "UV_UNMANAGED_INSTALL": str(target.parent),
            "UV_INSTALL_DIR": str(target.parent)}

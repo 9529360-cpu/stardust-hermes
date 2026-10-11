@@ -85,7 +85,7 @@ def format_system_prompt_sections(sections: list) -> str:
 
 
 # Reserved event namespace prefix — only core may publish ``hermes:<event>``.
-HERMES_EVENT_NAMESPACE = "hermes"
+STARDUST_EVENT_NAMESPACE = "hermes"
 # Event recursion depth cap (subscribers may emit); over-deep emits are dropped with a warning.
 _EVENT_EMIT_DEPTH_CAP = 8
 # Max queued + running events per manager generation; emit never waits — a full budget drops.

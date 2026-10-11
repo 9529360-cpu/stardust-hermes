@@ -634,12 +634,12 @@ def _build_allowed_mentions(extra: Optional[dict] = None):
 
 def _discord_ready_timeout_seconds() -> float:
     """Return the Discord ready wait timeout during gateway startup."""
-    raw = os.getenv("HERMES_GATEWAY_PLATFORM_CONNECT_TIMEOUT", "").strip()
+    raw = os.getenv("STARDUST_GATEWAY_PLATFORM_CONNECT_TIMEOUT", "").strip()
     if raw:
         try:
             return max(0.0, float(raw))
         except ValueError:
-            logger.warning("Ignoring invalid HERMES_GATEWAY_PLATFORM_CONNECT_TIMEOUT=%r", raw)
+            logger.warning("Ignoring invalid STARDUST_GATEWAY_PLATFORM_CONNECT_TIMEOUT=%r", raw)
     return 30.0
 
 
@@ -1032,8 +1032,8 @@ class DiscordAdapter(DiscordMediaMixin, BasePlatformAdapter):
         self._voice_clients: Dict[int, Any] = {}  # guild_id -> VoiceClient
         self._voice_locks: Dict[int, asyncio.Lock] = {}  # guild_id -> serialize join/leave
         # Text batching: merge rapid successive messages (Telegram-style)
-        self._text_batch_delay_seconds = env_float("HERMES_DISCORD_TEXT_BATCH_DELAY_SECONDS", 0.6)
-        self._text_batch_split_delay_seconds = env_float("HERMES_DISCORD_TEXT_BATCH_SPLIT_DELAY_SECONDS", 2.0)
+        self._text_batch_delay_seconds = env_float("STARDUST_DISCORD_TEXT_BATCH_DELAY_SECONDS", 0.6)
+        self._text_batch_split_delay_seconds = env_float("STARDUST_DISCORD_TEXT_BATCH_SPLIT_DELAY_SECONDS", 2.0)
         self._voice_text_channels: Dict[int, int] = {}  # guild_id -> text_channel_id
         self._voice_sources: Dict[int, Dict[str, Any]] = {}  # guild_id -> linked text channel source metadata
         self._voice_timeout_tasks: Dict[int, asyncio.Task] = {}  # guild_id -> timeout task
@@ -1063,11 +1063,11 @@ class DiscordAdapter(DiscordMediaMixin, BasePlatformAdapter):
         # ready/open/ACK + heartbeat latency; consecutive failures -> retryable-fatal. 0 disables.
         self._liveness_interval_seconds = self._finite_positive_config_float(
             "websocket_liveness_interval_seconds", 15.0,
-            env_key="HERMES_DISCORD_LIVENESS_INTERVAL_SECONDS",
+            env_key="STARDUST_DISCORD_LIVENESS_INTERVAL_SECONDS",
         )
         self._liveness_failure_threshold = self._config_int(
             "websocket_liveness_failure_threshold", 2,
-            env_key="HERMES_DISCORD_LIVENESS_FAILURE_THRESHOLD",
+            env_key="STARDUST_DISCORD_LIVENESS_FAILURE_THRESHOLD",
         )
         self._heartbeat_ack_max_age_seconds = self._finite_positive_config_float(
             "websocket_heartbeat_ack_max_age_seconds", 60.0,
@@ -1843,7 +1843,7 @@ class DiscordAdapter(DiscordMediaMixin, BasePlatformAdapter):
         """Deadline for flushing pending text batches during shutdown: strictly below the gateway's
         per-adapter disconnect budget so its outer ``wait_for`` can't cancel the flush first."""
         budget = 5.0  # mirrors gateway _ADAPTER_DISCONNECT_TIMEOUT_SECS_DEFAULT
-        raw = os.getenv("HERMES_GATEWAY_ADAPTER_DISCONNECT_TIMEOUT", "").strip()
+        raw = os.getenv("STARDUST_GATEWAY_ADAPTER_DISCONNECT_TIMEOUT", "").strip()
         if raw:
             try:
                 parsed = float(raw)
@@ -7000,8 +7000,8 @@ _YAML_BOOL_ENV_KEYS = (
 )
 # (public websocket_* key, legacy liveness_* alias, env bridge var)
 _YAML_WEBSOCKET_LIVENESS_KEYS = (
-    ("websocket_liveness_interval_seconds", "liveness_interval_seconds", "HERMES_DISCORD_LIVENESS_INTERVAL_SECONDS"),
-    ("websocket_liveness_failure_threshold", "liveness_failure_threshold", "HERMES_DISCORD_LIVENESS_FAILURE_THRESHOLD"),
+    ("websocket_liveness_interval_seconds", "liveness_interval_seconds", "STARDUST_DISCORD_LIVENESS_INTERVAL_SECONDS"),
+    ("websocket_liveness_failure_threshold", "liveness_failure_threshold", "STARDUST_DISCORD_LIVENESS_FAILURE_THRESHOLD"),
     ("websocket_heartbeat_ack_max_age_seconds", None, None),
     ("websocket_max_latency_seconds", None, None),
     ("websocket_event_max_silence_seconds", None, None),

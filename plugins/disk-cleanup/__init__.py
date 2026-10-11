@@ -102,7 +102,7 @@ Subcommands:
 
 Categories: temp | test | research | download | chrome-profile | cron-output | other
 
-All operations are scoped to HERMES_HOME and /tmp/hermes-*.
+All operations are scoped to STARDUST_HOME and /tmp/hermes-*.
 Test files are auto-tracked on write_file / terminal and auto-cleaned at session end.
 """
 
@@ -149,7 +149,7 @@ def _cmd_track(argv: List[str]) -> str:
         return f"Unknown category '{category}'. Allowed: {sorted(dg.ALLOWED_CATEGORIES)}"
     if dg.track(path_arg, category, silent=True):
         return f"Tracked {path_arg} as '{category}'."
-    return f"Not tracked (already present, missing, or outside HERMES_HOME): {path_arg}"
+    return f"Not tracked (already present, missing, or outside STARDUST_HOME): {path_arg}"
 
 
 def _cmd_forget(argv: List[str]) -> str:

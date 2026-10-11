@@ -25,7 +25,7 @@ logger = logging.getLogger("hermes_state")
 
 def _search_slow_ms() -> float:
     """``sessions.search_slow_ms`` for the served profile (default 1000; 0 logs every call)."""
-    value = routed_sessions_setting("search_slow_ms", "HERMES_SEARCH_SLOW_MS")
+    value = routed_sessions_setting("search_slow_ms", "STARDUST_SEARCH_SLOW_MS")
     try:
         return 1000.0 if value is None or str(value).strip() == "" else float(value)
     except (TypeError, ValueError):
@@ -1038,7 +1038,7 @@ class SessionSearchMixin:
         after_ts: Optional[int] = None, before_ts: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """:meth:`_search_messages_impl` plus one log line per slow search with the routing
-        path taken. Threshold HERMES_SEARCH_SLOW_MS (default 1000; 0 logs every call)."""
+        path taken. Threshold STARDUST_SEARCH_SLOW_MS (default 1000; 0 logs every call)."""
         started = time.time()
         rows = None
         try:

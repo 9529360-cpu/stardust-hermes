@@ -6,11 +6,11 @@
 # quits; because it lives in the checkout, every update refreshes the code
 # that drives the next one. Replaces the in-app updater
 # (applyUpdatesPosixInApp) -- with the app gone before the update starts,
-# the HERMES_DESKTOP_CHILD_PID reaper-exclusion dance dies with it.
+# the STARDUST_DESKTOP_CHILD_PID reaper-exclusion dance dies with it.
 #
 # CONTRACT (keep in sync with apps/desktop/electron/main.ts):
 #   bash scripts/desktop-update/posix.sh
-#     --install-root <path>    repo checkout (HERMES_HOME/hermes-agent)
+#     --install-root <path>    repo checkout (STARDUST_HOME/hermes-agent)
 #     --branch <ref>           branch to update against
 #     --desktop-pid <pid>      the Electron main process to wait out
 #     [--relaunch-target <p>]  mac: running .app to swap+reopen;
@@ -63,12 +63,12 @@ done
 [ "$SELF_TEST_UI" -eq 1 ] || [ -n "$INSTALL_ROOT" ] || { echo "--install-root is required" >&2; exit 64; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HERMES_HOME="${INSTALL_ROOT:+$(dirname "$INSTALL_ROOT")}"
-HERMES_HOME="${HERMES_HOME:-${TMPDIR:-/tmp}}"
-MARKER="$HERMES_HOME/.hermes-update-in-progress"
-LOG_DIR="$HERMES_HOME/logs"; mkdir -p "$LOG_DIR" 2>/dev/null || true
+STARDUST_HOME="${INSTALL_ROOT:+$(dirname "$INSTALL_ROOT")}"
+STARDUST_HOME="${STARDUST_HOME:-${TMPDIR:-/tmp}}"
+MARKER="$STARDUST_HOME/.hermes-update-in-progress"
+LOG_DIR="$STARDUST_HOME/logs"; mkdir -p "$LOG_DIR" 2>/dev/null || true
 LOG="$LOG_DIR/desktop-update-handoff.log"
-RESULT="$HERMES_HOME/.hermes-update-result.json"
+RESULT="$STARDUST_HOME/.hermes-update-result.json"
 STATUS="${TMPDIR:-/tmp}/hermes-update-status.$$"
 STARTED_AT="$(date +%s)"  # the shim's elapsed clock; see serve-ui.py
 
@@ -286,7 +286,7 @@ stop_ui() { # error/manual outcomes keep the window up briefly so a watching
   # before this, each aborted update left another orphan browser window on
   # screen until the user closed it by hand.
   if [ "${1:-}" = "leave-window" ]; then
-    sleep "${HERMES_UPDATE_SHIM_GRACE_SECONDS:-15}"
+    sleep "${STARDUST_UPDATE_SHIM_GRACE_SECONDS:-15}"
   fi
   if [ -n "$UI_SERVER_PID" ]; then
     # The server ignores TERM/HUP (see start_ui) — KILL is its off switch.
@@ -649,9 +649,9 @@ fi
 if [ "$SELF_TEST_UI" -eq 1 ]; then
   start_ui
   log "SELF-TEST: shim simulation (no update will run)"
-  sleep "${HERMES_SELFTEST_HOLD_SECONDS:-6}"
+  sleep "${STARDUST_SELFTEST_HOLD_SECONDS:-6}"
   RELAUNCH_TARGET=""
-  if [ -n "${HERMES_SELFTEST_FAIL:-}" ]; then FINAL_MSG="self-test error state"
+  if [ -n "${STARDUST_SELFTEST_FAIL:-}" ]; then FINAL_MSG="self-test error state"
   else FINAL_CODE=0 FINAL_MSG="self-test complete"; fi
   exit "$FINAL_CODE"
 fi
@@ -698,7 +698,7 @@ rm -f "$RESULT" 2>/dev/null || true
 # update_lock.py (the `hermes update` child adopts it via process ancestry).
 # The Desktop supplies one acquisition time for the whole ownership chain.
 NOW="$(date +%s)"
-STARTED_AT="${HERMES_UPDATE_STARTED_AT:-$NOW}"
+STARTED_AT="${STARDUST_UPDATE_STARTED_AT:-$NOW}"
 case "$STARTED_AT" in ''|*[!0-9]*) STARTED_AT="$NOW" ;; esac
 MIN_STARTED_AT=$((NOW - 1200))
 # Compare the validated decimal strings before doing arithmetic. Shell integer
@@ -730,8 +730,8 @@ fi
 sleep 1
 start_ui
 
-HERMES_BIN="$INSTALL_ROOT/venv/bin/hermes"
-[ -x "$HERMES_BIN" ] || { FINAL_CODE=3 FINAL_MSG="Update aborted: $HERMES_BIN is missing. The install needs repair (run the Hermes installer or hermes doctor)."; log "$FINAL_MSG"; exit 3; }
+STARDUST_BIN="$INSTALL_ROOT/venv/bin/hermes"
+[ -x "$STARDUST_BIN" ] || { FINAL_CODE=3 FINAL_MSG="Update aborted: $STARDUST_BIN is missing. The install needs repair (run the Hermes installer or hermes doctor)."; log "$FINAL_MSG"; exit 3; }
 
 # Heal a venv the reverted TCC anchor left bricked BEFORE invoking the CLI:
 # venv/bin/hermes execs venv/bin/python3, so a dead alias kills every attempt
@@ -746,7 +746,7 @@ if [ "$(uname)" = "Darwin" ]; then
   fi
 fi
 tcc_pick_update_invoke "$INSTALL_ROOT/venv/bin"
-if [ "${UPDATE_INVOKE[0]}" != "$HERMES_BIN" ]; then
+if [ "${UPDATE_INVOKE[0]}" != "$STARDUST_BIN" ]; then
   log "venv/bin/python3 still unbootable; invoking the update via ${UPDATE_INVOKE[*]}"
 fi
 

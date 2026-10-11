@@ -40,7 +40,7 @@ def _run_prerequisites(tmp_path: Path, *, uv_find_script: str) -> subprocess.Com
     for manager in ("sudo", "apt", "apt-get", "dnf", "pacman", "brew", "pkg"):
         _exe(bin_dir / manager, f"#!/bin/sh\necho \"{manager} $*\" >> '{attempts}'\nexit 1\n")
     env = os.environ.copy()
-    env.update({"HOME": str(home), "HERMES_HOME": str(hermes_home),
+    env.update({"HOME": str(home), "STARDUST_HOME": str(hermes_home),
                 "PATH": f"{bin_dir}{os.pathsep}{env.get('PATH', os.defpath)}"})
     bash = shutil.which("bash") or "/bin/bash"
     result = subprocess.run([bash, str(INSTALL_SH), "--stage", "prerequisites", "--non-interactive"],

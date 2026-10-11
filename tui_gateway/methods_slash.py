@@ -38,7 +38,7 @@ def _format_live_review_output(sid: str, session: Optional[dict], arg: str) -> s
         snapshot = list(session.get("history", []))
     snapshot = snapshot or list(getattr(agent, "_session_messages", None) or [])
     # slash.exec runs on the RPC pool, not inside a turn: bind the same session identity a turn binds
-    # (HERMES_UI_SESSION_ID + steer authority), or delegate_task registers the reviewer with no owner
+    # (STARDUST_UI_SESSION_ID + steer authority), or delegate_task registers the reviewer with no owner
     # and `subagent.list` hides it — the Desktop status stack then shows nothing for /review.
     tokens = _set_session_context(session["session_key"], ui_session_id=sid)
     runtime_token = _current_runtime_session_record.set(session)

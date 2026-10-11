@@ -244,7 +244,7 @@ async def update_hermes():
 
     action_id = secrets.token_hex(16)
     with http_failure("Failed to spawn hermes update", 500, "Failed to start update"):
-        proc = _spawn_hermes_action(["update"], "hermes-update", env_overrides={"HERMES_ACTION_ID": action_id})
+        proc = _spawn_hermes_action(["update"], "hermes-update", env_overrides={"STARDUST_ACTION_ID": action_id})
     return {"ok": True, "pid": proc.pid, "name": "hermes-update", "action_id": action_id}
 
 

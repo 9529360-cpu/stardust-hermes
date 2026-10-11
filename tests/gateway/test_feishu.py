@@ -966,7 +966,7 @@ class TestAdapterBehavior(unittest.TestCase):
     @patch.dict(
         os.environ,
         {
-            "HERMES_FEISHU_TEXT_BATCH_MAX_MESSAGES": "2",
+            "STARDUST_FEISHU_TEXT_BATCH_MAX_MESSAGES": "2",
         },
         clear=True,
     )
@@ -1115,7 +1115,7 @@ class TestAdapterBehavior(unittest.TestCase):
                 return _FakeResponse()
 
         with tempfile.TemporaryDirectory() as tmp:
-            with patch.dict(os.environ, {"HERMES_HOME": tmp}, clear=False):
+            with patch.dict(os.environ, {"STARDUST_HOME": tmp}, clear=False):
                 adapter = FeishuAdapter(PlatformConfig())
 
                 async def _run() -> tuple[str, str]:
@@ -1204,7 +1204,7 @@ class TestAdapterBehavior(unittest.TestCase):
         from plugins.platforms.feishu.adapter import FeishuAdapter
 
         with tempfile.TemporaryDirectory() as temp_home:
-            with patch.dict(os.environ, {"HERMES_HOME": temp_home}, clear=False):
+            with patch.dict(os.environ, {"STARDUST_HOME": temp_home}, clear=False):
                 first = FeishuAdapter(PlatformConfig())
                 self.assertFalse(asyncio.run(first._is_duplicate("om_same")))
                 second = FeishuAdapter(PlatformConfig())
@@ -1656,7 +1656,7 @@ class TestDedupTTL(unittest.TestCase):
         from plugins.platforms.feishu.adapter import FeishuAdapter
 
         with tempfile.TemporaryDirectory() as temp_home:
-            with patch.dict(os.environ, {"HERMES_HOME": temp_home}, clear=True):
+            with patch.dict(os.environ, {"STARDUST_HOME": temp_home}, clear=True):
                 adapter = FeishuAdapter(PlatformConfig())
                 adapter._dedup_state_path.parent.mkdir(parents=True, exist_ok=True)
                 adapter._dedup_state_path.write_text(
@@ -1709,7 +1709,7 @@ class TestDedupTTL(unittest.TestCase):
         from gateway.config import PlatformConfig
         from plugins.platforms.feishu.adapter import FeishuAdapter
 
-        # The class-level env wipe drops the per-test HERMES_HOME, so the adapter resolves
+        # The class-level env wipe drops the per-test STARDUST_HOME, so the adapter resolves
         # its dedup store under the operator's real ~/.hermes and every id a live gateway
         # persisted leaks into writes[-1]. Pin the store to a scratch path instead.
         # Kept open for the whole test: _persist_seen_message_ids mkdirs the store's

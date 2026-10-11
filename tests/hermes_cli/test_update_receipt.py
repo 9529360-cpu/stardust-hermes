@@ -22,7 +22,7 @@ from hermes_cli import update_cmd
 
 @pytest.fixture()
 def receipt_home(tmp_path, monkeypatch):
-    """Isolated HERMES_HOME for receipt writes."""
+    """Isolated STARDUST_HOME for receipt writes."""
     home = tmp_path / ".hermes"
     home.mkdir()
     monkeypatch.setattr(
@@ -304,7 +304,7 @@ class TestFleetClassification:
 
         home = tmp_path / "fleet_home"
         home.mkdir()
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         monkeypatch.setattr(
             "hermes_cli.build_info.get_code_identity",
             lambda refresh=False: {"sha": "a" * 40, "short_sha": "a" * 8,

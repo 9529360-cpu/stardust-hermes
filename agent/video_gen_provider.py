@@ -70,7 +70,7 @@ class VideoGenProvider(CatalogProviderBase):
 
 
 def save_b64_video(b64_data: str,*, prefix: str="video", extension: str="mp4") -> Path:
-    """Decode base64 video data into ``$HERMES_HOME/cache/videos/``; return the path."""
+    """Decode base64 video data into ``$STARDUST_HOME/cache/videos/``; return the path."""
     return provider_media.save_b64("videos", b64_data, prefix=prefix, extension=extension)
 
 
@@ -93,7 +93,7 @@ def save_url_video(
     headers: Optional[Dict[str, str]] = None,
     require_video_content_type: bool = False,
 ) -> Path:
-    """Download an (often ephemeral) video URL into ``$HERMES_HOME/cache/videos/``;
+    """Download an (often ephemeral) video URL into ``$STARDUST_HOME/cache/videos/``;
     raises on network / HTTP / oversize / empty errors so callers can fall back to the URL."""
     return provider_media.save_url(
         "videos", url, prefix=prefix, timeout=timeout, max_bytes=max_bytes,

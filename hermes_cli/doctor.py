@@ -12,7 +12,7 @@ from hermes_cli.env_loader import load_hermes_dotenv
 from hermes_constants import display_hermes_home
 
 PROJECT_ROOT = get_project_root()
-HERMES_HOME = get_hermes_home()
+STARDUST_HOME = get_hermes_home()
 _DHH = display_hermes_home()  # user-facing display path (e.g. ~/.hermes or ~/.hermes/profiles/coder)
 
 # Load environment variables from ~/.hermes/.env so API key checks work
@@ -167,7 +167,7 @@ def run_doctor(args):
     """Run diagnostic checks."""
     should_fix = getattr(args, 'fix', False)
     # Doctor runs from the interactive CLI, so CLI-gated tool checks (e.g. cronjob) see the same context.
-    os.environ.setdefault("HERMES_INTERACTIVE", "1")
+    os.environ.setdefault("STARDUST_INTERACTIVE", "1")
     if getattr(args, 'ack', None):
         return _ack_advisory(args.ack)
     print()

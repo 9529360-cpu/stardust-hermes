@@ -102,7 +102,7 @@ def test_codex_pool_honors_hermes_codex_base_url(monkeypatch):
 
     monkeypatch.setattr(rp, "resolve_provider", lambda *a, **k: "openai-codex")
     monkeypatch.setattr(rp, "load_pool", lambda provider: _Pool())
-    monkeypatch.setenv("HERMES_CODEX_BASE_URL", "http://127.0.0.1:8787/v1")
+    monkeypatch.setenv("STARDUST_CODEX_BASE_URL", "http://127.0.0.1:8787/v1")
 
     resolved = rp.resolve_runtime_provider(requested="openai-codex")
 

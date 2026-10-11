@@ -10,8 +10,8 @@ Contract under test:
 
 * conflict → single stdout sentinel ``BACKEND_PORT_IN_USE port=<port>`` +
   a human hint line + exit code 75 (EX_TEMPFAIL, the repo's existing
-  transient-condition convention) — and NO ``HERMES_BACKEND_READY``.
-* free explicit port → boots and announces ``HERMES_BACKEND_READY`` exactly
+  transient-condition convention) — and NO ``STARDUST_BACKEND_READY``.
+* free explicit port → boots and announces ``STARDUST_BACKEND_READY`` exactly
   as before (contract untouched).
 * ``--port 0`` (ephemeral) → probe skipped, boots, announces the
   OS-assigned port.
@@ -87,7 +87,7 @@ def test_exit_code_is_distinct_tempfail():
 
 
 # ---------------------------------------------------------------------------
-# E2E: real start_server in a subprocess (temp HERMES_HOME)
+# E2E: real start_server in a subprocess (temp STARDUST_HOME)
 # ---------------------------------------------------------------------------
 
 
@@ -96,13 +96,13 @@ def _spawn_serve(port: int, tmp_path: Path, merge_stderr: bool = True) -> subpro
     home.mkdir(exist_ok=True)
     env = dict(os.environ)
     env.update(
-        HERMES_HOME=str(home),
-        HERMES_SERVE_HEADLESS="1",
+        STARDUST_HOME=str(home),
+        STARDUST_SERVE_HEADLESS="1",
         PYTHONUNBUFFERED="1",
     )
     # Ensure a stray desktop-parent env can't arm the watchdog/reaper paths.
-    for k in ("HERMES_DESKTOP", "HERMES_PARENT_PID", "HERMES_PARENT_START_MARKER",
-              "HERMES_PARENT_NONCE"):
+    for k in ("STARDUST_DESKTOP", "STARDUST_PARENT_PID", "STARDUST_PARENT_START_MARKER",
+              "STARDUST_PARENT_NONCE"):
         env.pop(k, None)
     code = (
         "from hermes_cli.web_server import start_server\n"
@@ -163,7 +163,7 @@ def test_conflict_emits_sentinel_and_exit_75(tmp_path):
     assert proc.returncode == 75, f"exit={proc.returncode}\n{out}"
     assert f"BACKEND_PORT_IN_USE port={port}" in out
     assert f"Port {port}" in out  # human hint line
-    assert "HERMES_BACKEND_READY" not in out  # never claimed ready
+    assert "STARDUST_BACKEND_READY" not in out  # never claimed ready
     # exactly one machine sentinel line
     assert out.count("BACKEND_PORT_IN_USE") == 1
 
@@ -176,10 +176,10 @@ def test_free_port_boots_and_announces_ready(tmp_path):
 
     proc = _spawn_serve(port, tmp_path)
     try:
-        ready, lines = _read_until(proc, "HERMES_BACKEND_READY")
+        ready, lines = _read_until(proc, "STARDUST_BACKEND_READY")
         out = "".join(lines)
         assert ready, f"no READY sentinel; output:\n{out}"
-        assert f"HERMES_BACKEND_READY port={port}" in out
+        assert f"STARDUST_BACKEND_READY port={port}" in out
         assert "BACKEND_PORT_IN_USE" not in out
     finally:
         proc.terminate()
@@ -192,11 +192,11 @@ def test_free_port_boots_and_announces_ready(tmp_path):
 def test_ephemeral_port_zero_unaffected(tmp_path):
     proc = _spawn_serve(0, tmp_path)
     try:
-        ready, lines = _read_until(proc, "HERMES_BACKEND_READY")
+        ready, lines = _read_until(proc, "STARDUST_BACKEND_READY")
         out = "".join(lines)
         assert ready, f"no READY sentinel; output:\n{out}"
         # OS-assigned non-zero port announced
-        ready_line = next(l for l in lines if "HERMES_BACKEND_READY" in l)
+        ready_line = next(l for l in lines if "STARDUST_BACKEND_READY" in l)
         announced = int(ready_line.strip().rsplit("port=", 1)[1])
         assert announced > 0
         assert "BACKEND_PORT_IN_USE" not in out
@@ -229,13 +229,13 @@ def test_ready_sentinel_arrives_on_stdout_not_stderr(tmp_path):
     proc = _spawn_serve(port, tmp_path, merge_stderr=False)
     try:
         # stdout only: the sentinel MUST arrive here (desktop watches this pipe)
-        ready, lines = _read_until(proc, "HERMES_BACKEND_READY")
+        ready, lines = _read_until(proc, "STARDUST_BACKEND_READY")
         out = "".join(lines)
         assert ready, (
             f"READY sentinel not on stdout (desktop boot would time out); "
             f"stdout:\n{out}"
         )
-        assert f"HERMES_BACKEND_READY port={port}" in out
+        assert f"STARDUST_BACKEND_READY port={port}" in out
     finally:
         proc.terminate()
         try:

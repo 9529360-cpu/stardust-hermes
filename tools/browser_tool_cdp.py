@@ -74,7 +74,7 @@ def _get_cdp_override() -> str:
 
 
 def _start_closed_loopback_browser(cdp_url: str) -> None:
-    """Start the ``/browser connect`` debug browser (its own profile under HERMES_HOME) when *cdp_url* is a
+    """Start the ``/browser connect`` debug browser (its own profile under STARDUST_HOME) when *cdp_url* is a
     loopback port nothing answers on: a closed browser otherwise turned every browser task into a 30s failure."""
     from urllib.parse import urlparse
 

@@ -3,7 +3,7 @@
 A guest identity carrying inference shows one row, "Nous · free tier", with the single model
 ``nous/welcome``; the same guest with ``nous.guest: false`` shows no Nous row at all. The rule lives
 in one helper (``_free_tier_nous_row``) and this file exercises it through the real row builders
-against a temp ``HERMES_HOME`` with the network catalog fetch stubbed.
+against a temp ``STARDUST_HOME`` with the network catalog fetch stubbed.
 """
 
 from __future__ import annotations
@@ -28,8 +28,8 @@ GUEST_STATE = {
 @pytest.fixture
 def guest_home(monkeypatch, tmp_path):
     """Seed a guest identity as the only Nous state and keep every row builder offline."""
-    monkeypatch.setenv("HERMES_SHARED_AUTH_DIR", str(tmp_path / "shared-store"))
-    monkeypatch.setenv("HERMES_GUEST_ONBOARDING", "1")
+    monkeypatch.setenv("STARDUST_SHARED_AUTH_DIR", str(tmp_path / "shared-store"))
+    monkeypatch.setenv("STARDUST_GUEST_ONBOARDING", "1")
     from hermes_cli.config import load_config, save_config
     cfg = load_config()
     cfg.setdefault("nous", {})["guest"] = True
@@ -47,7 +47,7 @@ def guest_home(monkeypatch, tmp_path):
     monkeypatch.setattr(models_mod, "get_curated_nous_model_ids", lambda *a, **k: ["anthropic/claude-x", "openai/gpt-y"])
     monkeypatch.setattr(models_mod, "fetch_ollama_cloud_models", lambda *a, **k: [])
     monkeypatch.setattr(msp, "_nous_picker_model_ids", lambda *a, **k: pytest.fail("guest must not fetch the Portal catalog"))
-    return Path(os.environ["HERMES_HOME"])
+    return Path(os.environ["STARDUST_HOME"])
 
 
 def _write_config(monkeypatch, home: Path, text: str) -> None:

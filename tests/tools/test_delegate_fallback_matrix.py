@@ -82,7 +82,7 @@ def test_declared_chain_flows_through_real_profile_config_loader(
         set_hermes_home_override,
     )
 
-    monkeypatch.delenv("HERMES_IGNORE_USER_CONFIG", raising=False)
+    monkeypatch.delenv("STARDUST_IGNORE_USER_CONFIG", raising=False)
     token = set_hermes_home_override(tmp_path)
     try:
         (tmp_path / "config.yaml").write_text(
@@ -116,7 +116,7 @@ def test_explicit_empty_chain_survives_real_profile_config_loader(tmp_path, monk
 
     from hermes_constants import reset_hermes_home_override, set_hermes_home_override
 
-    monkeypatch.delenv("HERMES_IGNORE_USER_CONFIG", raising=False)
+    monkeypatch.delenv("STARDUST_IGNORE_USER_CONFIG", raising=False)
     token = set_hermes_home_override(tmp_path)
     try:
         (tmp_path / "config.yaml").write_text(
@@ -148,7 +148,7 @@ def test_pinned_review_does_not_borrow_general_worker_chain(tmp_path, monkeypatc
     from agent.review_engine import start_review
     from hermes_constants import reset_hermes_home_override, set_hermes_home_override
 
-    monkeypatch.delenv("HERMES_IGNORE_USER_CONFIG", raising=False)
+    monkeypatch.delenv("STARDUST_IGNORE_USER_CONFIG", raising=False)
     (tmp_path / "config.yaml").write_text(
         yaml.safe_dump(
             {

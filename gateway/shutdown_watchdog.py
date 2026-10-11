@@ -3,7 +3,7 @@
 A frozen asyncio loop takes every asyncio-based recovery path down with it, and launchd/systemd
 KeepAlive only restarts a *dead* process. Hence: (1) an OS-thread shutdown watchdog that dumps
 stacks and ``os._exit``s past ``restart_drain_timeout + grace``; (2) a heartbeat file at
-``<HERMES_HOME>/state/gateway.heartbeat`` so supervisors can tell "process alive" from "loop
+``<STARDUST_HOME>/state/gateway.heartbeat`` so supervisors can tell "process alive" from "loop
 frozen"; (3) a lifetime thread watchdog that hard-exits when the loop is too frozen to run its
 own callbacks; (4) a self-rescheduling floor timer that keeps the selector timeout finite."""
 
@@ -153,8 +153,8 @@ def _mark_exited_quietly(exit_code: int, reason: str) -> None:
 
 
 def _process_hermes_home() -> Path:
-    """HERMES_HOME for process-level identity files (ignore profile overrides)."""
-    val = os.environ.get("HERMES_HOME", "").strip()
+    """STARDUST_HOME for process-level identity files (ignore profile overrides)."""
+    val = os.environ.get("STARDUST_HOME", "").strip()
     return Path(val) if val else get_hermes_home()
 
 
@@ -167,7 +167,7 @@ def get_loop_heartbeat_path(home: Optional[Path] = None) -> Path:
 
 
 def get_loop_tick_socket_path(home: Optional[Path] = None, pid: Optional[int] = None) -> Path:
-    """``<HERMES_HOME>/state/gateway.loop-tick.<pid>.sock`` — PID-suffixed so a stale node from a
+    """``<STARDUST_HOME>/state/gateway.loop-tick.<pid>.sock`` — PID-suffixed so a stale node from a
     dead process is never mistaken for this gateway's witness. Served by the loop itself
     (``_tick_socket_handler``), so an answer proves the loop dispatches; the heartbeat cannot.
 

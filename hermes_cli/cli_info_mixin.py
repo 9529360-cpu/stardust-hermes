@@ -145,7 +145,7 @@ class CLIInfoMixin:
         # Tool discovery is deferred on the Termux bare prompt path (warnings show once tools
         # init). On the snapshot fast path the check walks every check_fn (~180ms) — run it in
         # the background and let its output land above the prompt (patch_stdout-safe).
-        if os.environ.get("HERMES_DEFER_AGENT_STARTUP") != "1":
+        if os.environ.get("STARDUST_DEFER_AGENT_STARTUP") != "1":
             if getattr(self, "_defer_tool_warnings", False):
                 threading.Thread(
                     target=self._show_tool_availability_warnings,

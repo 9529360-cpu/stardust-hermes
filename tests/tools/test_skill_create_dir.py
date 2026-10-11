@@ -14,10 +14,10 @@ import pytest
 
 @pytest.fixture
 def isolated_home(tmp_path, monkeypatch):
-    """Fresh HERMES_HOME with an empty local skills dir."""
+    """Fresh STARDUST_HOME with an empty local skills dir."""
     home = tmp_path / ".hermes"
     (home / "skills").mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
 
     import hermes_constants
     monkeypatch.setattr(hermes_constants, "_hermes_home_cache", None, raising=False)

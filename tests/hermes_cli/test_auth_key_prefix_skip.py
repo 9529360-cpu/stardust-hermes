@@ -40,7 +40,7 @@ def isolated_hermes_home(tmp_path, monkeypatch):
     home = tmp_path / ".hermes"
     home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     for key in ["OPENROUTER_API_KEY", "DEEPSEEK_API_KEY", "OPENAI_API_KEY"]:
         monkeypatch.delenv(key, raising=False)
     return home

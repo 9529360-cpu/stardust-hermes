@@ -43,7 +43,7 @@ def _to_async_client(sync_client, model: str, is_vision: bool = False):
         if isinstance(sync_client, GeminiNativeClient):
             return AsyncGeminiNativeClient(sync_client), model
     # ACP shims (subprocess, not an HTTP pool) are already async-safe and opt out of the wrapper.
-    if _aux._client_declares(sync_client, "HERMES_SKIP_ASYNC_WRAP"):
+    if _aux._client_declares(sync_client, "STARDUST_SKIP_ASYNC_WRAP"):
         return sync_client, model
     sync_base_url = str(sync_client.base_url)
     async_kwargs = {"api_key": sync_client.api_key, "base_url": sync_base_url}

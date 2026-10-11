@@ -48,7 +48,7 @@ from hermes_cli.config import DEFAULT_CONFIG
 
 
 # ---------------------------------------------------------------------------
-# Shared fixture: redirect Path.home() and HERMES_HOME for profile tests
+# Shared fixture: redirect Path.home() and STARDUST_HOME for profile tests
 # ---------------------------------------------------------------------------
 
 @pytest.fixture()
@@ -56,13 +56,13 @@ def profile_env(tmp_path, monkeypatch):
     """Set up an isolated environment for profile tests.
 
     * Path.home() -> tmp_path  (so _get_profiles_root() = tmp_path/.hermes/profiles)
-    * HERMES_HOME  -> tmp_path/.hermes  (so get_hermes_home() agrees)
+    * STARDUST_HOME  -> tmp_path/.hermes  (so get_hermes_home() agrees)
     * Creates the bare-minimum ~/.hermes directory.
     """
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     default_home = tmp_path / ".hermes"
     default_home.mkdir(exist_ok=True)
-    monkeypatch.setenv("HERMES_HOME", str(default_home))
+    monkeypatch.setenv("STARDUST_HOME", str(default_home))
     return tmp_path
 
 
@@ -623,16 +623,16 @@ class TestGetActiveProfileName:
         tmp_path = profile_env
         create_profile("coder", no_alias=True)
         profile_dir = tmp_path / ".hermes" / "profiles" / "coder"
-        monkeypatch.setenv("HERMES_HOME", str(profile_dir))
+        monkeypatch.setenv("STARDUST_HOME", str(profile_dir))
         assert get_active_profile_name() == "coder"
 
     def test_custom_path_returns_default(self, profile_env, monkeypatch):
-        """A custom HERMES_HOME (Docker, etc.) IS the default root."""
+        """A custom STARDUST_HOME (Docker, etc.) IS the default root."""
         tmp_path = profile_env
         custom = tmp_path / "some" / "other" / "path"
         custom.mkdir(parents=True)
-        monkeypatch.setenv("HERMES_HOME", str(custom))
-        # With Docker-aware roots, a custom HERMES_HOME is the default —
+        monkeypatch.setenv("STARDUST_HOME", str(custom))
+        # With Docker-aware roots, a custom STARDUST_HOME is the default —
         # not "custom".  The user is on the default profile of their
         # custom deployment.
         assert get_active_profile_name() == "default"
@@ -887,7 +887,7 @@ class TestExportImport:
 
     def test_export_default_includes_profile_data(self, profile_env, tmp_path):
         """Profile data files end up in the archive (credentials excluded)."""
-        # Write through HERMES_HOME, not get_profile_dir("default"): the latter resolves to the
+        # Write through STARDUST_HOME, not get_profile_dir("default"): the latter resolves to the
         # OPERATOR's real install whenever basetest sits inside it, so this test used to
         # overwrite the live config.yaml / .env / MEMORY.md with its fixtures.
         default_dir = profile_env / ".hermes"
@@ -984,22 +984,22 @@ class TestInternalHelpers:
 
 
     def test_default_hermes_home_docker(self, tmp_path, monkeypatch):
-        """In Docker, _get_default_hermes_home() returns HERMES_HOME itself."""
+        """In Docker, _get_default_hermes_home() returns STARDUST_HOME itself."""
         docker_home = tmp_path / "opt" / "data"
         docker_home.mkdir(parents=True)
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
-        monkeypatch.setenv("HERMES_HOME", str(docker_home))
+        monkeypatch.setenv("STARDUST_HOME", str(docker_home))
         home = _get_default_hermes_home()
         assert home == docker_home
 
 
 
     def test_create_profile_docker(self, tmp_path, monkeypatch):
-        """Profile created in Docker lands under HERMES_HOME/profiles/."""
+        """Profile created in Docker lands under STARDUST_HOME/profiles/."""
         docker_home = tmp_path / "opt" / "data"
         docker_home.mkdir(parents=True)
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
-        monkeypatch.setenv("HERMES_HOME", str(docker_home))
+        monkeypatch.setenv("STARDUST_HOME", str(docker_home))
         result = create_profile("orchestrator", no_alias=True)
         expected = docker_home / "profiles" / "orchestrator"
         assert result == expected
@@ -1200,10 +1200,10 @@ class TestProfilesToServe:
 
 
     def test_off_returns_only_active_named(self, profile_env, monkeypatch):
-        # A named profile's gateway runs with HERMES_HOME pointing at the
+        # A named profile's gateway runs with STARDUST_HOME pointing at the
         # profile dir; get_active_profile_name() infers the name from there.
         create_profile("coder", no_alias=True)
-        monkeypatch.setenv("HERMES_HOME", str(get_profile_dir("coder")))
+        monkeypatch.setenv("STARDUST_HOME", str(get_profile_dir("coder")))
         serve = profiles_to_serve(multiplex=False)
         assert len(serve) == 1
         assert serve[0][0] == "coder"
@@ -1224,7 +1224,7 @@ class TestProfilesToServe:
 
 
 class TestResolveProfileEnvSpelling:
-    """resolve_profile_env() keeps the configured HERMES_HOME spelling as
+    """resolve_profile_env() keeps the configured STARDUST_HOME spelling as
 
     the launch root (junction installs) while preserving the pre-existing
     profile-path handling and existence/validation semantics.
@@ -1248,18 +1248,18 @@ class TestResolveProfileEnvSpelling:
             (custom, "beta", custom / "profiles" / "beta"),
         ]
         for env_home, profile, expected in cases:
-            monkeypatch.setenv("HERMES_HOME", str(env_home))
+            monkeypatch.setenv("STARDUST_HOME", str(env_home))
             assert Path(resolve_profile_env(profile)) == expected
 
     def test_missing_named_profile_still_raises(self, monkeypatch, tmp_path):
         root = tmp_path / "configured-root"
-        monkeypatch.setenv("HERMES_HOME", str(root))
+        monkeypatch.setenv("STARDUST_HOME", str(root))
         with pytest.raises(FileNotFoundError):
             resolve_profile_env("nope")
 
     def test_unset_env_falls_back_to_default_root(self, monkeypatch):
-        # No HERMES_HOME: the platform default root applies (existing contract).
-        monkeypatch.delenv("HERMES_HOME", raising=False)
+        # No STARDUST_HOME: the platform default root applies (existing contract).
+        monkeypatch.delenv("STARDUST_HOME", raising=False)
         assert Path(resolve_profile_env("default")) == _get_default_hermes_home()
 
 

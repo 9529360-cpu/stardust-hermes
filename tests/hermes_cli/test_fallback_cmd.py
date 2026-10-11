@@ -10,14 +10,14 @@ import yaml
 
 
 # ---------------------------------------------------------------------------
-# Shared fixture — isolate HERMES_HOME so save_config writes to tmp_path
+# Shared fixture — isolate STARDUST_HOME so save_config writes to tmp_path
 # ---------------------------------------------------------------------------
 
 @pytest.fixture()
 def isolated_home(tmp_path, monkeypatch):
     home = tmp_path / ".hermes"
     home.mkdir(exist_ok=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     return tmp_path
 
 

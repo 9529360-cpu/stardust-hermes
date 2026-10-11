@@ -42,7 +42,7 @@ class SessionPersistenceMixin:
 
     def _open_session_db_for_active_scope(self, db_path: Optional[Path] = None):
         """SessionDB for the active profile scope. ``db_path`` pins the store; otherwise
-        ``_default_db_path()`` follows the context-local HERMES_HOME (resolved per call so
+        ``_default_db_path()`` follows the context-local STARDUST_HOME (resolved per call so
         multiplexed profiles reach their own store). Handles are cached per path; failed opens enter
         a bounded backoff during which callers keep using the JSONL fallback.
 
@@ -115,7 +115,7 @@ class SessionPersistenceMixin:
         return None if not profile or profile == "default" else profile
 
     def _profile_home_for_key(self, session_key: Optional[str]) -> Optional[Path]:
-        """HERMES_HOME of the profile owning *session_key*, or None (no named owner or
+        """STARDUST_HOME of the profile owning *session_key*, or None (no named owner or
         unresolvable)."""
         profile = self._named_profile_for_key(session_key)
         if profile is None:
@@ -139,7 +139,7 @@ class SessionPersistenceMixin:
 
     def _db_for_key(self, session_key: Optional[str]):
         """The SessionDB holding *session_key*'s rows, whatever scope is active (the owning profile
-        is encoded in the key). ``_db`` follows the ambient HERMES_HOME that only the inbound message
+        is encoded in the key). ``_db`` follows the ambient STARDUST_HOME that only the inbound message
         path installs; unscoped background work (expiry watcher) would otherwise write profile rows
         into the ROOT store until the stale-route self-heal drops a live conversation.
 

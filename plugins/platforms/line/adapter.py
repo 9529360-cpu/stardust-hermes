@@ -775,12 +775,12 @@ class LineAdapter(BasePlatformAdapter):
 
     async def _handle_media(self, request) -> Any:
         """Serve a registered local file for LINE's media URLs. Defence-in-depth: the resolved
-        path is rechecked against allowed roots (tempdir, ``/tmp``→``/private/tmp`` on macOS, HERMES_HOME).
+        path is rechecked against allowed roots (tempdir, ``/tmp``→``/private/tmp`` on macOS, STARDUST_HOME).
 
         Defence-in-depth: even though ``_register_media`` is only called from trusted internal code, we
         recheck the resolved path against an allowed-roots set before serving. Sources allowed:
         ``tempfile.gettempdir()``, ``/tmp`` (which resolves to ``/private/tmp`` on macOS), and
-        ``HERMES_HOME``. PR #8398.
+        ``STARDUST_HOME``. PR #8398.
         """
         from aiohttp import web
         token = request.match_info["token"]

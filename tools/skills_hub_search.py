@@ -25,11 +25,11 @@ logger = logging.getLogger("tools.skills_hub")
 
 # Compatibility names are retained for callers that import them from tools.skills_hub.
 # The actual product authority is Stardust's verified release asset.
-HERMES_INDEX_URL = (
+STARDUST_INDEX_URL = (
     "https://github.com/9529360-cpu/stardust-hermes"
     "/releases/download/stardust-skills-index/skills-index.json"
 )
-HERMES_INDEX_TTL = 6 * 3600  # 6 hours
+STARDUST_INDEX_TTL = 6 * 3600  # 6 hours
 
 
 def _hermes_index_cache_file() -> Path:
@@ -39,7 +39,7 @@ def _hermes_index_cache_file() -> Path:
 
 def _load_hermes_index() -> Optional[dict]:
     """Fetch Stardust's centralized skills index release asset, cached locally
-    for HERMES_INDEX_TTL; on any failure serve the Stardust-provenance stale cache.
+    for STARDUST_INDEX_TTL; on any failure serve the Stardust-provenance stale cache.
 
     Brotli is deliberately NOT negotiated: the index is tens of MB and httpx's
     streaming Brotli decoder (brotlicffi, pinned for Discord attachments) raises
@@ -49,13 +49,13 @@ def _load_hermes_index() -> Optional[dict]:
     """
     from tools.skills_hub import _read_json_if_fresh
     cache_file = _hermes_index_cache_file()
-    cached = _read_json_if_fresh(cache_file, HERMES_INDEX_TTL)
+    cached = _read_json_if_fresh(cache_file, STARDUST_INDEX_TTL)
     if cached is not None:
         return cached
     data = None
     for accept_encoding in ("gzip, deflate", "identity"):
         try:
-            resp = httpx.get(HERMES_INDEX_URL, timeout=15, follow_redirects=True,
+            resp = httpx.get(STARDUST_INDEX_URL, timeout=15, follow_redirects=True,
                              headers={"Accept-Encoding": accept_encoding})
             if resp.status_code != 200:
                 logger.debug("Stardust index fetch returned %d", resp.status_code)

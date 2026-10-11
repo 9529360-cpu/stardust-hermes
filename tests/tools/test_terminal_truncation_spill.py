@@ -11,7 +11,7 @@ from tools.terminal_tool import terminal_tool
 
 @pytest.fixture
 def small_cap(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
     from hermes_constants import hermes_home_key
     import tools.tool_output_limits as lim
     monkeypatch.setattr(lim, "_cached_limits", {hermes_home_key(): {

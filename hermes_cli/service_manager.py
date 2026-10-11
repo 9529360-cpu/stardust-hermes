@@ -235,12 +235,12 @@ def _profile_dir_for_gateway_service(name: str) -> Path:
     """Resolve ``gateway-<profile>`` to its persistent profile directory.
 
     s6 lifecycle commands may run from any active profile (``gateway stop --all``), so never write
-    the caller's HERMES_HOME blindly: derive the shared profile root and map the suffix to the root
+    the caller's STARDUST_HOME blindly: derive the shared profile root and map the suffix to the root
     default profile or ``<root>/profiles/<profile>``.
     """
     profile = _profile_from_service(name)
     validate_profile_name(profile)
-    hermes_home = Path(os.environ.get("HERMES_HOME", "/opt/data"))
+    hermes_home = Path(os.environ.get("STARDUST_HOME", "/opt/data"))
     root = hermes_home.parent.parent if hermes_home.parent.name == "profiles" else hermes_home
     return root if profile == "default" else root / "profiles" / profile
 
@@ -402,9 +402,9 @@ class S6ServiceManager:
     def _render_run_script(profile: str, extra_env: dict[str, str]) -> str:
         """Run script for a profile-gateway s6 service.
 
-        Sources HERMES_HOME via with-contenv (run time, not baked in), resets ``HOME`` before the
+        Sources STARDUST_HOME via with-contenv (run time, not baked in), resets ``HOME`` before the
         privilege drop so root's HOME does not leak, activates the venv, drops to hermes.
-        ``profile == "default"`` emits NO ``-p`` flag: it is the sentinel for the root HERMES_HOME
+        ``profile == "default"`` emits NO ``-p`` flag: it is the sentinel for the root STARDUST_HOME
         profile and ``-p default`` would look up ``profiles/default/``. Port comes from the
         profile's own env (``API_SERVER_PORT``, default 8642); two profiles that both leave it
         unset collide.
@@ -412,7 +412,7 @@ class S6ServiceManager:
         Port selection: the gateway binds the port resolved by ``gateway/config.py`` from the profile's own
         environment — ``API_SERVER_PORT`` (or ``platforms.api_server.extra.port`` in that profile's
         ``config.yaml``), defaulting to 8642. There is no ``[gateway] port`` key and no Python-side
-        allocator: because each supervised profile gateway loads its own ``HERMES_HOME``, two profiles that
+        allocator: because each supervised profile gateway loads its own ``STARDUST_HOME``, two profiles that
         both leave the port unset will both try to bind 8642 — give each profile a distinct
         ``API_SERVER_PORT`` in its ``.env``. Previously this method took a ``port`` parameter that was
         passed in but never substituted into the rendered script (carried for "API parity" with a
@@ -433,11 +433,11 @@ class S6ServiceManager:
         # Supervised-child sentinel: without it the supervised gateway re-entering
         # `_gateway_command_inner` with subcmd == "run" would dispatch `gateway start` → re-exec
         # `gateway run --replace` → `gateway start` … (see the matching guard there).
-        lines.append("export HERMES_S6_SUPERVISED_CHILD=1")
+        lines.append("export STARDUST_S6_SUPERVISED_CHILD=1")
         # Generalized supervisor marker — same meaning for the profile-redirect guard in
         # hermes_cli.main._apply_profile_override; kept alongside the s6 one for back-compat.
-        lines.append("export HERMES_SUPERVISED_CHILD=1")
-        # ``--replace`` makes the supervised gateway authoritative for its HERMES_HOME. Without it
+        lines.append("export STARDUST_SUPERVISED_CHILD=1")
+        # ``--replace`` makes the supervised gateway authoritative for its STARDUST_HOME. Without it
         # a gateway started OUTSIDE s6 (stray ``hermes gateway run``, an agent action, the Open
         # WebUI helper) grabs the PID lock first; the slot then hits "Another gateway instance is
         # already running", exits non-zero, and s6 restarts it forever — a log-flooding loop that
@@ -492,8 +492,8 @@ class S6ServiceManager:
         return (
             f"#!/command/with-contenv sh\n"
             f"# shellcheck shell=sh\n"
-            f': "${{HERMES_HOME:=/opt/data}}"\n'
-            f'log_dir="$HERMES_HOME/logs/gateways/{prof}"\n'
+            f': "${{STARDUST_HOME:=/opt/data}}"\n'
+            f'log_dir="$STARDUST_HOME/logs/gateways/{prof}"\n'
             # Create the leaf and clear a stale s6-log lock AS HERMES when starting as root. Never
             # chown/unlink hermes-writable volume paths from this restartable root-context script:
             # an unprivileged user can race a pathname op through a symlink swap (CWE-59/CWE-367).

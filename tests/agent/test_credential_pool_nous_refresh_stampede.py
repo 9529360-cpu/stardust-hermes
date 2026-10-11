@@ -40,7 +40,7 @@ def test_forced_refresh_adopts_peer_rotation_instead_of_reposting(tmp_path, monk
         ).isoformat(),
         expires_in=3600,
     )
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
     posts = []
 

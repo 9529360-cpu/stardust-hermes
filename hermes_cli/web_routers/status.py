@@ -183,7 +183,7 @@ def _merge_profile_gateway_platforms(gateway_platforms: dict, profile_platforms:
 # endpoint and /api/messaging/platforms can never disagree about whether the gateway is up (they used to:
 # sidebar "running" while the Channels page rendered "The gateway is not running"). When ?profile=<name> was
 # given, scope PID and state reads to that profile's directory — gateway identity files (PID, lock, runtime
-# status) are written to the per-profile home, not the process-level HERMES_HOME (see issue #69143). Plain
+# status) are written to the per-profile home, not the process-level STARDUST_HOME (see issue #69143). Plain
 # /api/status keeps the exact zero-arg call so its behavior (and cache signature) is unchanged. The
 # module-level probe references are handed to the resolver so the long-standing
 # `monkeypatch.setattr(gateway.status, "get_running_pid_cached", ...)` seam used across the test-suite still

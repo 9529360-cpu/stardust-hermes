@@ -88,7 +88,7 @@ def load_completed_results(prefix: str = "") -> dict:
 
     from gateway.session_context import get_session_env
 
-    owner = get_session_env("HERMES_SESSION_ID", "")
+    owner = get_session_env("STARDUST_SESSION_ID", "")
     if not owner:
         return {}
     results = {}

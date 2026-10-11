@@ -1,6 +1,6 @@
 """display_hermes_home() renders POSIX separators on every platform.
 
-Maintainer catch (#95681 arc): on Windows with a custom HERMES_HOME under
+Maintainer catch (#95681 arc): on Windows with a custom STARDUST_HOME under
 the user profile (e.g. AppData/Local/hermes), ``"~/" +
 str(home.relative_to(Path.home()))`` produced the mixed-separator chimera
 ``~/AppData\\Local\\hermes`` — which then leaked into every consumer that

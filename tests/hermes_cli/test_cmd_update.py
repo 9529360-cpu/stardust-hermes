@@ -154,10 +154,10 @@ class TestCmdUpdateNpmLockfileCache:
             "_npm_lockfile_changed",
             side_effect=lambda root: cache_roots.append(root) or False,
         ):
-            monkeypatch.setenv("HERMES_HOME", str(shared_root))
+            monkeypatch.setenv("STARDUST_HOME", str(shared_root))
             update_cmd._update_node_dependencies()
 
-            monkeypatch.setenv("HERMES_HOME", str(named_profile))
+            monkeypatch.setenv("STARDUST_HOME", str(named_profile))
             update_cmd._update_node_dependencies()
 
         assert cache_roots == [shared_root, shared_root]
@@ -199,7 +199,7 @@ class TestCmdUpdateTermuxUvBootstrap:
 
         pkg_uv = "/data/data/com.termux/files/usr/bin/uv"
         monkeypatch.setattr(hm, "_is_termux_env", lambda env=None: True)
-        # Production resolve_uv only checks $HERMES_HOME/bin/uv; model an empty
+        # Production resolve_uv only checks $STARDUST_HOME/bin/uv; model an empty
         # managed dir so the PATH probe is what surfaces the packaged uv.
         monkeypatch.setattr("hermes_cli.managed_uv.resolve_uv", lambda: None)
         monkeypatch.setattr("shutil.which", lambda name: pkg_uv if name == "uv" else None)
@@ -1611,7 +1611,7 @@ class TestGitTrampolineSelfHeal:
         run.assert_not_called()
 
     def test_portable_git_candidates_check_shared_root_first(self, tmp_path, monkeypatch):
-        # Profile-scoped layout: HERMES_HOME = <root>/profiles/foo, but the
+        # Profile-scoped layout: STARDUST_HOME = <root>/profiles/foo, but the
         # PortableGit tree lives under the SHARED root (monerostar review on
         # #88136). The candidate list must check get_default_hermes_root()
         # before the profile home.

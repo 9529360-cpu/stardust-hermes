@@ -66,7 +66,7 @@ let
   };
 
   # Optional skills are NOT in the wheel (pythonSrc excludes them, see
-  # lib.nix) — the wrapper exposes them via HERMES_OPTIONAL_SKILLS, the
+  # lib.nix) — the wrapper exposes them via STARDUST_OPTIONAL_SKILLS, the
   # same mechanism Homebrew packaging uses.
   bundledOptionalSkills = lib.cleanSourceWith {
     src = ../optional-skills;
@@ -75,20 +75,20 @@ let
 
   # Import bundled plugins (memory, context_engine, platforms/*).  Keeping
   # them out of the Python site-packages keeps import semantics identical
-  # to a dev checkout — the loader reads them from HERMES_BUNDLED_PLUGINS.
+  # to a dev checkout — the loader reads them from STARDUST_BUNDLED_PLUGINS.
   bundledPlugins = lib.cleanSourceWith {
     src = ../plugins;
     filter = path: _type: !(lib.hasInfix "/__pycache__/" path);
   };
 
   # i18n locale catalogs (locales/*.yaml). Shipped into the store and pointed
-  # at by HERMES_BUNDLED_LOCALES so the wrapped binary always resolves human
+  # at by STARDUST_BUNDLED_LOCALES so the wrapped binary always resolves human
   # strings instead of raw i18n keys (#23943 / #27632 / #35374).
   bundledLocales = lib.cleanSource ../locales;
 
   # Shipped MCP catalog (optional-mcps/<name>/manifest.yaml). Same bare-data-dir
   # case as locales: not a Python package, so it's symlinked into the store and
-  # exposed via HERMES_OPTIONAL_MCPS.
+  # exposed via STARDUST_OPTIONAL_MCPS.
   bundledOptionalMcps = lib.cleanSourceWith {
     src = ../optional-mcps;
     filter = path: _type: !(lib.hasInfix "/__pycache__/" path);
@@ -185,22 +185,22 @@ stdenv.mkDerivation (finalAttrs: {
       (name: ''
         makeWrapper ${hermesVenv}/bin/${name} $out/bin/${name} \
           --suffix PATH : "${runtimePath}" \
-          --set HERMES_BUNDLED_SKILLS $out/share/hermes-agent/skills \
-          --set HERMES_OPTIONAL_SKILLS $out/share/hermes-agent/optional-skills \
-          --set HERMES_BUNDLED_PLUGINS $out/share/hermes-agent/plugins \
-          --set HERMES_BUNDLED_LOCALES $out/share/hermes-agent/locales \
-          --set HERMES_OPTIONAL_MCPS $out/share/hermes-agent/optional-mcps \
-          --set HERMES_WEB_DIST $out/share/hermes-agent/web_dist \
-          --set HERMES_TUI_DIR $out/ui-tui \
-          --set-default HERMES_BIN $out/bin/hermes \
-          --set HERMES_PYTHON ${hermesVenv}/bin/python3 \
-          --set HERMES_NODE ${lib.getExe hermesNpmLib.nodejs}${
+          --set STARDUST_BUNDLED_SKILLS $out/share/hermes-agent/skills \
+          --set STARDUST_OPTIONAL_SKILLS $out/share/hermes-agent/optional-skills \
+          --set STARDUST_BUNDLED_PLUGINS $out/share/hermes-agent/plugins \
+          --set STARDUST_BUNDLED_LOCALES $out/share/hermes-agent/locales \
+          --set STARDUST_OPTIONAL_MCPS $out/share/hermes-agent/optional-mcps \
+          --set STARDUST_WEB_DIST $out/share/hermes-agent/web_dist \
+          --set STARDUST_TUI_DIR $out/ui-tui \
+          --set-default STARDUST_BIN $out/bin/hermes \
+          --set STARDUST_PYTHON ${hermesVenv}/bin/python3 \
+          --set STARDUST_NODE ${lib.getExe hermesNpmLib.nodejs}${
             # Fold the line continuation INTO the optionalString: a bare
             # `\` on the line above an empty expansion would dangle onto a
             # blank line, ending the makeWrapper command early and running
             # the next flag as its own shell command (`--suffix: command
             # not found`). Only reproduces when rev == null (dirty trees).
-            lib.optionalString (rev != null) " \\\n          --set HERMES_REVISION ${rev}"
+            lib.optionalString (rev != null) " \\\n          --set STARDUST_REVISION ${rev}"
           }${
             lib.optionalString (
               extraPythonPackages != [ ]
@@ -248,7 +248,7 @@ stdenv.mkDerivation (finalAttrs: {
       };
 
       devShellHook = ''
-        export HERMES_PYTHON=${devPython}/bin/python3
+        export STARDUST_PYTHON=${devPython}/bin/python3
       '';
 
       devDeps =

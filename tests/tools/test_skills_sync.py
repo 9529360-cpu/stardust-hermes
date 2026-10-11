@@ -148,7 +148,7 @@ class TestComputeRelativeDest:
 
 class TestRmtreeWritableScopeGuard:
     """``_rmtree_writable`` must refuse to remove anything outside
-    ``HERMES_HOME/skills/``.
+    ``STARDUST_HOME/skills/``.
 
     The previous implementation called ``shutil.rmtree(path)`` on whatever
     argument the caller passed. If any of the five call sites in
@@ -526,13 +526,13 @@ class TestGetBundledDir:
     def test_env_var_override_with_default_fallback(self, tmp_path, monkeypatch):
         custom_dir = tmp_path / "custom_skills"
         custom_dir.mkdir()
-        monkeypatch.setenv("HERMES_BUNDLED_SKILLS", str(custom_dir))
+        monkeypatch.setenv("STARDUST_BUNDLED_SKILLS", str(custom_dir))
         assert _get_bundled_dir() == custom_dir
 
         # Empty or unset falls back to the relative path from __file__.
-        monkeypatch.setenv("HERMES_BUNDLED_SKILLS", "")
+        monkeypatch.setenv("STARDUST_BUNDLED_SKILLS", "")
         assert _get_bundled_dir().name == "skills"
-        monkeypatch.delenv("HERMES_BUNDLED_SKILLS", raising=False)
+        monkeypatch.delenv("STARDUST_BUNDLED_SKILLS", raising=False)
         assert _get_bundled_dir().name == "skills"
 
 
@@ -732,7 +732,7 @@ class TestNoBundledSkillsOptOut:
             stack.enter_context(patch("tools.skills_sync._get_optional_dir", return_value=bundled.parent / "optional-skills"))
             stack.enter_context(patch("tools.skills_sync.SKILLS_DIR", skills_dir))
             stack.enter_context(patch("tools.skills_sync.MANIFEST_FILE", manifest_file))
-            stack.enter_context(patch("tools.skills_sync.HERMES_HOME", hermes_home))
+            stack.enter_context(patch("tools.skills_sync.STARDUST_HOME", hermes_home))
             return stack
 
         with _patches():
@@ -769,7 +769,7 @@ class TestOptOutToggleAndRemove:
         home = tmp_path / "home"
         home.mkdir()
         marker = home / ".no-bundled-skills"
-        with patch("tools.skills_sync.HERMES_HOME", home):
+        with patch("tools.skills_sync.STARDUST_HOME", home):
             assert not marker.exists()
             r = set_bundled_skills_opt_out(True)
             assert r["ok"] and r["changed"]
@@ -794,7 +794,7 @@ class TestOptOutToggleAndRemove:
              patch("tools.skills_sync._get_optional_dir", return_value=bundled.parent / "optional-skills"), \
              patch("tools.skills_sync.SKILLS_DIR", skills_dir), \
              patch("tools.skills_sync.MANIFEST_FILE", manifest_file), \
-             patch("tools.skills_sync.HERMES_HOME", home):
+             patch("tools.skills_sync.STARDUST_HOME", home):
             sync_skills(quiet=True)
             # User edits 'beta'
             (skills_dir / "beta" / "SKILL.md").write_text("---\nname: beta\n---\nEDITED\n")
@@ -938,7 +938,7 @@ class TestUpdateBackupRecovery:
 
 class TestCallTimeDirResolution:
     """Regression for #65828: skills_sync bound SKILLS_DIR/MANIFEST_FILE/
-    HERMES_HOME at import, so a long-lived dashboard/TUI process serving a
+    STARDUST_HOME at import, so a long-lived dashboard/TUI process serving a
     console skills command for another profile resolved (and for
     reset_bundled_skill DELETED) against whichever home was live at import.
     The accessors must follow set_hermes_home_override() at call time, while

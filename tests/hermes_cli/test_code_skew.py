@@ -84,7 +84,7 @@ class TestDashboardCodeSkewGuard:
     def test_dashboard_guard_message_names_revs_and_restart(self, monkeypatch):
         from hermes_cli import web_server
 
-        monkeypatch.delenv("HERMES_SERVE_HEADLESS", raising=False)
+        monkeypatch.delenv("STARDUST_SERVE_HEADLESS", raising=False)
         monkeypatch.setattr(code_skew, "detect_code_skew", lambda: ("abc1234567", "def4567890"))
         msg = _web_server_config._dashboard_code_skew_guard()
         assert msg is not None
@@ -97,7 +97,7 @@ class TestDashboardCodeSkewGuard:
     def test_serve_guard_message_points_at_desktop_backend(self, monkeypatch):
         from hermes_cli import web_server
 
-        monkeypatch.setenv("HERMES_SERVE_HEADLESS", "1")
+        monkeypatch.setenv("STARDUST_SERVE_HEADLESS", "1")
         monkeypatch.setattr(code_skew, "detect_code_skew", lambda: ("abc1234567", "def4567890"))
         msg = _web_server_config._dashboard_code_skew_guard()
         assert msg is not None

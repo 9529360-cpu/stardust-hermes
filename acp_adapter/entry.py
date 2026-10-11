@@ -72,7 +72,7 @@ def _setup_logging() -> None:
 
 
 def _load_env() -> None:
-    """Load .env from HERMES_HOME (default ``~/.hermes``)."""
+    """Load .env from STARDUST_HOME (default ``~/.hermes``)."""
     from hermes_cli.env_loader import load_hermes_dotenv
 
     hermes_home = get_hermes_home()
@@ -188,7 +188,7 @@ def main(argv: list[str] | None = None) -> None:
     # Previously this blocked asyncio.run() for 2-5 s. (ACP also registers per-session MCP servers
     # dynamically via asyncio.to_thread inside the event loop; that path is unaffected.)  Moved from
     # model_tools.py module scope to avoid freezing the gateway's loop on lazy import (#16856).
-    if os.environ.get("HERMES_ACP_SKIP_CONFIGURED_MCP", "").strip() != "1":
+    if os.environ.get("STARDUST_ACP_SKIP_CONFIGURED_MCP", "").strip() != "1":
         try:
             from hermes_cli.mcp_startup import start_background_mcp_discovery
 

@@ -4,11 +4,11 @@ will NOT equal call N's messages (prefix divergence) even though the conversatio
 Also reports cache hit per call. Cost: a handful of calls."""
 import os, sys, re, time, json, copy, subprocess
 # LIVE: makes ~6 real calls to the configured provider (a few cents). Usage:
-#   python cache_prefix_wire.py <repo_root> <A|B> [--hermes-home DIR]   (default HERMES_HOME: the real one, for credentials)
+#   python cache_prefix_wire.py <repo_root> <A|B> [--hermes-home DIR]   (default STARDUST_HOME: the real one, for credentials)
 sys.path.insert(0, sys.argv[1])
-os.environ.setdefault("HERMES_HOME", os.path.expanduser("~/.hermes"))
+os.environ.setdefault("STARDUST_HOME", os.path.expanduser("~/.hermes"))
 if "--hermes-home" in sys.argv:
-    os.environ["HERMES_HOME"] = sys.argv[sys.argv.index("--hermes-home") + 1]
+    os.environ["STARDUST_HOME"] = sys.argv[sys.argv.index("--hermes-home") + 1]
 arm = sys.argv[2] if len(sys.argv) > 2 else "A"
 import agent.anthropic_message_convert as amc
 if arm == "B":

@@ -424,7 +424,7 @@ class InProcessCronScheduler(CronScheduler):
         # ── Multiplex profiles ──────────────────────────────────────────── When profile_homes is set
         # (multiplex_profiles on), tick EACH profile's cron store on every tick cycle so secondary-profile
         # jobs actually fire instead of languishing in a store no ticker owns (#69377). Without this, only
-        # the process-global HERMES_HOME (the default profile) is ticked. Heartbeats and recovery are also
+        # the process-global STARDUST_HOME (the default profile) is ticked. Heartbeats and recovery are also
         # scoped per profile so `hermes cron status` reflects liveness for every profile independently.
         if profile_homes is not None and (callable(profile_homes) or profile_homes):
             self._start_multiplex(

@@ -23,7 +23,7 @@ def launch_db_env(monkeypatch, tmp_path):
     launch_home.mkdir()
     foreign_home.mkdir()
 
-    monkeypatch.setenv("HERMES_HOME", str(launch_home))
+    monkeypatch.setenv("STARDUST_HOME", str(launch_home))
     monkeypatch.setattr(server, "_hermes_home", str(launch_home))
     monkeypatch.setattr(server, "_db", None)
     monkeypatch.setattr(server, "_db_error", None)

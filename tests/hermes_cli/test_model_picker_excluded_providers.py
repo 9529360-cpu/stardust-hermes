@@ -15,17 +15,17 @@ import pytest
 
 @pytest.fixture
 def config_home(tmp_path, monkeypatch):
-    """Isolated HERMES_HOME with a minimal config."""
+    """Isolated STARDUST_HOME with a minimal config."""
     home = tmp_path / "hermes"
     home.mkdir()
     config_yaml = home / "config.yaml"
     config_yaml.write_text("model: old-model\ncustom_providers: []\n")
     env_file = home / ".env"
     env_file.write_text("")
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.delenv("HERMES_MODEL", raising=False)
+    monkeypatch.setenv("STARDUST_HOME", str(home))
+    monkeypatch.delenv("STARDUST_MODEL", raising=False)
     monkeypatch.delenv("LLM_MODEL", raising=False)
-    monkeypatch.delenv("HERMES_INFERENCE_PROVIDER", raising=False)
+    monkeypatch.delenv("STARDUST_INFERENCE_PROVIDER", raising=False)
     monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     return home

@@ -82,7 +82,7 @@ def get_hosted_room_service():
 
 
 def _profile_name() -> str:
-    return (os.getenv("HERMES_PROFILE") or "default").strip() or "default"
+    return (os.getenv("STARDUST_PROFILE") or "default").strip() or "default"
 
 
 def _current_profile() -> str:

@@ -270,7 +270,7 @@ class TestWsAuthOkGated:
 
     def test_rejection_audit_logs(self, gated_app, tmp_path, monkeypatch):
         # Point the audit log at a tmp dir so we can read what got written.
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         from hermes_cli.dashboard_auth import audit as audit_mod
 
         # The log path is resolved lazily on the first audit_log() call;

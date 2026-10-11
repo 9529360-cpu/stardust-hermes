@@ -180,8 +180,8 @@ docs/superpowers/*
 # treat it as a local edit and autostash it on every run (#38529).
 .hermes-bootstrap-complete
 
-# Flat-install runtime state (checkout root == $HERMES_HOME, e.g. installs made
-# with HERMES_INSTALL_DIR=$HERMES_HOME or by older installers): every root-level
+# Flat-install runtime state (checkout root == $STARDUST_HOME, e.g. installs made
+# with STARDUST_INSTALL_DIR=$STARDUST_HOME or by older installers): every root-level
 # SQLite store (state.db, kanban.db, response_store.db, ...) with its
 # WAL/SHM/journal sidecars and retired-WAL capture dirs, the legacy transcripts,
 # the cron job store (jobs.json), its lock/heartbeat/output files and all three
@@ -193,7 +193,7 @@ docs/superpowers/*
 # runtime state, never code changes. (`*-snapshots/` above already covers state-snapshots/.)
 # Ignore them so `hermes update`'s `git stash push --include-untracked` cannot
 # sweep the live state.db/-wal into the stash and unlink it under the running
-# gateway (#110648). Nested installs keep all of this under $HERMES_HOME outside
+# gateway (#110648). Nested installs keep all of this under $STARDUST_HOME outside
 # the checkout, where the `.hermes/` rule above already applies.
 /*.db
 /*.db-wal

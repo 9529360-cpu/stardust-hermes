@@ -127,7 +127,7 @@ class TestTelegramYamlConfigLoading:
         hermes_home = self._write_config(
             tmp_path, "telegram:\n  extra:\n    reply_to_mode: \"off\"\n"
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         monkeypatch.delenv("TELEGRAM_REPLY_TO_MODE", raising=False)
 
         load_gateway_config()
@@ -141,7 +141,7 @@ class TestTelegramYamlConfigLoading:
             tmp_path,
             "telegram:\n  reply_to_mode: all\n  extra:\n    reply_to_mode: \"off\"\n",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         monkeypatch.delenv("TELEGRAM_REPLY_TO_MODE", raising=False)
 
         load_gateway_config()

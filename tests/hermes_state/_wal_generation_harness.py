@@ -119,7 +119,7 @@ _GATEWAY_CHILD = textwrap.dedent(
     from pathlib import Path
     repo, hermes_home, db_path = sys.argv[1], sys.argv[2], sys.argv[3]
     sys.path.insert(0, repo)
-    os.environ["HERMES_HOME"] = hermes_home
+    os.environ["STARDUST_HOME"] = hermes_home
     import hermes_state_wal
     if hermes_state_wal.is_sqlite_wal_reset_vulnerable():
         hermes_state_wal.is_sqlite_wal_reset_vulnerable = lambda version_info=None: False
@@ -238,7 +238,7 @@ def gateway_writer(tmp_path: Path):
             [sys.executable, "-c", _GATEWAY_CHILD, repo_root, str(hermes_home), str(path)],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=stderr,
             text=True, encoding="utf-8", bufsize=1,
-            env={**os.environ, "HERMES_STATE_DB_GUARD_BYPASS": "1"},
+            env={**os.environ, "STARDUST_STATE_DB_GUARD_BYPASS": "1"},
         )
         gw = GatewayWriter(proc, path, stderr_path)
         try:

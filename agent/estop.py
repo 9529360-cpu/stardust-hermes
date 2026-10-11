@@ -1,6 +1,6 @@
 """Global emergency stop (ESTOP) — a resumable pause for NEW work only.
 
-``hermes pause`` writes a sentinel at ``$HERMES_HOME/ESTOP``; ``hermes resume``
+``hermes pause`` writes a sentinel at ``$STARDUST_HOME/ESTOP``; ``hermes resume``
 removes it. While it exists the cron scheduler, kanban dispatcher and new gateway
 turns skip work; in-flight work is never killed. The check is one or two uncached
 ``os.stat`` calls (process home + fleet root when they differ). The body is optional
@@ -35,7 +35,7 @@ def sentinel_path() -> Path:
 
 def _candidate_sentinel_paths() -> list:
     """Profile home first, then the fleet root if it is a different directory: a profile
-    gateway (HERMES_HOME=~/.hermes/profiles/<n>) must still honor an operator's ~/.hermes/ESTOP."""
+    gateway (STARDUST_HOME=~/.hermes/profiles/<n>) must still honor an operator's ~/.hermes/ESTOP."""
     primary = sentinel_path()
     try:
         root = _canonical_root() / SENTINEL_NAME

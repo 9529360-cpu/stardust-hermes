@@ -181,7 +181,7 @@ def _patch_aborted_startup(monkeypatch, runner_cls):
 
 @pytest.mark.asyncio
 async def test_start_gateway_does_not_start_cron_after_aborted_startup(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     cron_started = False
     export_shutdown_calls = 0
 
@@ -228,7 +228,7 @@ async def test_start_gateway_preserves_service_restart_fallback_after_aborted_st
     tmp_path, monkeypatch
 ):
     """A legacy service restart without an explicit exit code still exits with EX_TEMPFAIL."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     cron_started = False
 
     class AbortedStartupRunner:
@@ -276,7 +276,7 @@ async def test_start_gateway_classifies_startup_signal_exit(
     tmp_path, monkeypatch, unexpected_signal, expected_success
 ):
     """A startup SIGTERM is restartable unless a planned-stop marker classified it as intentional."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     signal_state = None
     cron_started = False
 

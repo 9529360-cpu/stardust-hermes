@@ -33,7 +33,7 @@ def test_launch_profile_webhooks_register_signed_under_multiplex(tmp_path, monke
     launch_home = tmp_path / ".hermes"
     launch_home.mkdir()
     (launch_home / ".env").write_text("MY_HOOK_SECRET=s3cret-of-launch\n")
-    monkeypatch.setenv("HERMES_HOME", str(launch_home))
+    monkeypatch.setenv("STARDUST_HOME", str(launch_home))
     monkeypatch.delenv("MY_HOOK_SECRET", raising=False)
     cfg = {"hooks": {"outbound": [
         {"url": "https://hooks.example/signed", "events": ["on_session_end"], "secret_env": "MY_HOOK_SECRET"},

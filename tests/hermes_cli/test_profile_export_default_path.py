@@ -57,7 +57,7 @@ def test_custom_hermes_home_inside_a_checkout_uses_a_sibling_store(
 
 
 def test_checkout_detection_does_not_depend_on_cwd(tmp_path, monkeypatch, profiles):
-    """HERMES_HOME inside a checkout must be detected even when cwd is elsewhere.
+    """STARDUST_HOME inside a checkout must be detected even when cwd is elsewhere.
 
     Regression for the cwd-anchored bypass: cron/service-manager invocations
     run from outside the checkout, and the original heuristic walked
@@ -179,7 +179,7 @@ def test_cwd_in_unrelated_checkout_does_not_prove_safety(
     tmp_path, monkeypatch, profiles
 ):
     """cwd inside unrelated checkout A must not stand in for the safety proof
-    of a HERMES_HOME inside checkout B."""
+    of a STARDUST_HOME inside checkout B."""
     checkout_b = tmp_path / "checkout-b"
     checkout_b.mkdir()
     (checkout_b / ".git").mkdir()

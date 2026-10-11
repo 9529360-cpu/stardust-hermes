@@ -61,7 +61,7 @@ def _resolve_requests_verify(base_url: str = "") -> bool | str:
                 return ca
         except Exception:
             pass  # fall through to env vars — never break a probe on config lookup
-    for env_var in ("HERMES_CA_BUNDLE", "REQUESTS_CA_BUNDLE", "SSL_CERT_FILE"):
+    for env_var in ("STARDUST_CA_BUNDLE", "REQUESTS_CA_BUNDLE", "SSL_CERT_FILE"):
         val = os.getenv(env_var)
         if val and os.path.isfile(val):
             return val

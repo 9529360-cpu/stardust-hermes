@@ -106,7 +106,7 @@ def harden_import_path(src_root: str | None = None) -> None:
     absent. ``src_root`` defaults to this module's directory (the repo root for every
     shipped entry point), so no spawner env var is required.
     """
-    root = src_root or os.environ.get("HERMES_PYTHON_SRC_ROOT") or os.path.dirname(
+    root = src_root or os.environ.get("STARDUST_PYTHON_SRC_ROOT") or os.path.dirname(
         os.path.abspath(__file__)
     )
 
@@ -118,14 +118,14 @@ def harden_import_path(src_root: str | None = None) -> None:
 
 
 def activate_durable_lazy_target() -> None:
-    """Put the durable lazy-install dir (``HERMES_LAZY_INSTALL_TARGET``) on ``sys.path``.
+    """Put the durable lazy-install dir (``STARDUST_LAZY_INSTALL_TARGET``) on ``sys.path``.
 
     Immutable Docker images seal the venv and redirect lazy installs to the data volume;
     packages installed there on a previous run must be importable before any backend
     imports its SDK. Appends to the END of ``sys.path`` so the core venv always wins name
     collisions (see ``tools.lazy_deps``). Never raises; unset target is a no-op.
     """
-    if not os.environ.get("HERMES_LAZY_INSTALL_TARGET", "").strip():
+    if not os.environ.get("STARDUST_LAZY_INSTALL_TARGET", "").strip():
         return
     try:
         from tools import lazy_deps

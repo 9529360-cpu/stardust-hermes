@@ -25,7 +25,7 @@ from tools import bot_relay
 def home(tmp_path, monkeypatch):
     h = tmp_path / ".hermes"
     (h / "profiles" / "ops").mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(h))
+    monkeypatch.setenv("STARDUST_HOME", str(h))
     return h
 
 
@@ -256,13 +256,13 @@ def fake_runs(monkeypatch):
     ({}, None),
 ], ids=["sender fields", "sender on another connection", "no sender fields"])
 def test_deliver_child_env_carries_the_envelope_sender_on_every_attempt(home, monkeypatch, fake_runs, sender, expected):
-    """HERMES_TURN_AUTHOR on the child comes from the envelope's sender fields alone: the retry gets the same
+    """STARDUST_TURN_AUTHOR on the child comes from the envelope's sender fields alone: the retry gets the same
     author, and without sender fields a stale author on the gateway's own environment never reaches the child."""
     from agent.turn_author import TURN_AUTHOR_ENV
 
     calls, outcomes = fake_runs
     outcomes.extend([(1, "HTTP 429 rate limit"), (0, "")])
-    monkeypatch.setenv("HERMES_RELAY_TEST_MARKER", "kept")
+    monkeypatch.setenv("STARDUST_RELAY_TEST_MARKER", "kept")
     monkeypatch.setenv(TURN_AUTHOR_ENV, json.dumps({"id": "bot:stale", "name": "stale", "is_bot": True}))
 
     _result(srv._methods["bot_relay.deliver"](1, {"profile": "ops", "message": "ping", **sender}))
@@ -270,7 +270,7 @@ def test_deliver_child_env_carries_the_envelope_sender_on_every_attempt(home, mo
     envs = [c["env"] for c in calls]
     assert len(envs) == 2
     assert [json.loads(e[TURN_AUTHOR_ENV]) if TURN_AUTHOR_ENV in e else None for e in envs] == [expected, expected]
-    assert all(e["HERMES_RELAY_TEST_MARKER"] == "kept" for e in envs)
+    assert all(e["STARDUST_RELAY_TEST_MARKER"] == "kept" for e in envs)
 
 
 class _Client:
@@ -334,7 +334,7 @@ def test_deliver_refuses_a_sender_from_a_logged_in_client(home, fake_runs, bound
 
 @pytest.mark.parametrize("subdir", ["profiles/ops", "dev"])
 def test_gateway_drains_the_mailbox_the_tools_write_to(tmp_path, monkeypatch, subdir):
-    """Both ends of the relay mailbox derive the install root from HERMES_HOME with ONE formula.
+    """Both ends of the relay mailbox derive the install root from STARDUST_HOME with ONE formula.
     The writer side (``message_agent``'s ``_hermes_root``) and the drain side
     (``methods_bot_relay._relay_root``) must agree for a ``profiles/<name>`` home AND for an
     arbitrary subdir of the native ``~/.hermes`` — a split here is silent non-delivery."""
@@ -344,7 +344,7 @@ def test_gateway_drains_the_mailbox_the_tools_write_to(tmp_path, monkeypatch, su
     monkeypatch.setenv("HOME", str(tmp_path))
     home = tmp_path / ".hermes" / subdir
     home.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
 
     writer_root = _hermes_root(Path(_default_home()))
     target = {"profile": "scout", "handle": "scout", "connection_id": "cloud-1",

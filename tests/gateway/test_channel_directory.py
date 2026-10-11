@@ -214,7 +214,7 @@ class TestBuildFromSessions:
             },
         })
 
-        with patch.dict(os.environ, {"HERMES_HOME": str(tmp_path)}):
+        with patch.dict(os.environ, {"STARDUST_HOME": str(tmp_path)}):
             entries = _build_from_sessions("telegram")
 
         assert len(entries) == 2
@@ -295,7 +295,7 @@ class TestBuildSlack:
             "s1": {"origin": {"platform": "slack", "chat_id": "D123", "chat_name": "Alice"}},
         }))
 
-        with patch.dict(os.environ, {"HERMES_HOME": str(tmp_path)}):
+        with patch.dict(os.environ, {"STARDUST_HOME": str(tmp_path)}):
             entries = asyncio.run(_build_slack(_make_slack_adapter({})))
 
         assert len(entries) == 1
@@ -312,7 +312,7 @@ class TestBuildSlack:
                 "response_metadata": {},
             },
         ])
-        with patch.dict(os.environ, {"HERMES_HOME": str(tmp_path)}):
+        with patch.dict(os.environ, {"STARDUST_HOME": str(tmp_path)}):
             entries = asyncio.run(_build_slack(_make_slack_adapter({"T1": client})))
 
         ids = {e["id"] for e in entries}
@@ -335,7 +335,7 @@ class TestBuildSlack:
                 "response_metadata": {"next_cursor": ""},
             },
         ])
-        with patch.dict(os.environ, {"HERMES_HOME": str(tmp_path)}):
+        with patch.dict(os.environ, {"STARDUST_HOME": str(tmp_path)}):
             entries = asyncio.run(_build_slack(_make_slack_adapter({"T1": client})))
 
         assert {e["id"] for e in entries} == {"C001", "C002"}
@@ -356,7 +356,7 @@ class TestBuildSlack:
             ],
         )
 
-        with patch.dict(os.environ, {"HERMES_HOME": str(tmp_path)}):
+        with patch.dict(os.environ, {"STARDUST_HOME": str(tmp_path)}):
             entries = asyncio.run(_build_slack(_make_slack_adapter({"T1": client})))
 
         assert {entry["name"] for entry in entries} == {"engineering", "support"}

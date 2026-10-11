@@ -33,7 +33,7 @@ logger = logging.getLogger("tools.transcription_tools")
 # Mirrors the TTS command-provider registry (same placeholder grammar, quote-aware
 # rendering, process-tree termination on timeout). Resolution order: built-in name
 # (always wins) > stt.providers.<name> command > plugin TranscriptionProvider >
-# "No STT provider available". The single-env-var HERMES_LOCAL_STT_COMMAND escape
+# "No STT provider available". The single-env-var STARDUST_LOCAL_STT_COMMAND escape
 # hatch stays untouched via the built-in ``local_command`` path.
 # Lets any whisper CLI / ASR CLI / curl pipeline become an STT backend with zero Python. 1. Built-in
 # (``local``, ``local_command``, ``groq``, ``openai``, ``mistral``, ``xai``)              → native handler.

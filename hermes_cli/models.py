@@ -1502,7 +1502,7 @@ def provider_model_ids(provider: Optional[str], *, force_refresh: bool = False) 
 
 # ---------------------------------------------------------------------------
 # Disk cache for provider_model_ids() — keeps /model picker fast (otherwise every open re-fetches
-# every authed provider's /v1/models). One JSON file at $HERMES_HOME/provider_models_cache.json;
+# every authed provider's /v1/models). One JSON file at $STARDUST_HOME/provider_models_cache.json;
 # entries keyed by credential fingerprint (rotate OPENAI_API_KEY → entry invalidates); 1h TTL;
 # only NON-EMPTY results are cached so a transient failure is never pinned; any read/write error
 # degrades silently to a live fetch.

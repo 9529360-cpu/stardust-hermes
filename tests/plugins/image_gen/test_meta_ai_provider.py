@@ -36,7 +36,7 @@ def _fake_response(*, b64=None, url=None, revised_prompt=None):
 
 @pytest.fixture(autouse=True)
 def _tmp_hermes_home(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     # Clear every auth + override env var so tests start from a clean slate.
     for env in (
         "MODEL_API_KEY",

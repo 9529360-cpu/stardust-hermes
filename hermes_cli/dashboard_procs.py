@@ -74,13 +74,13 @@ def _scan_dashboard_processes(*, exclude_pids: set[int] | None = None) -> list[t
     """``(pid, cmdline)`` of running ``dashboard``/``serve`` processes; empty on any scan error.
 
     A forgotten dashboard keeps the old Python backend against the new JS bundle after
-    ``hermes update`` (every API call 401s). *exclude_pids* (Desktop's HERMES_DESKTOP_CHILD_PID
+    ``hermes update`` (every API call 401s). *exclude_pids* (Desktop's STARDUST_DESKTOP_CHILD_PID
     backends) are never returned.
 
     *exclude_pids* is an optional set of PIDs that must never be returned. This is used by the Hermes
     Desktop Electron app to protect its own backend child process: when the desktop spawns ``hermes serve``
     as a backend and triggers an auto-update, the update must not kill the backend that the desktop itself
-    manages. The desktop sets the environment variable ``HERMES_DESKTOP_CHILD_PID`` on the spawned backend
+    manages. The desktop sets the environment variable ``STARDUST_DESKTOP_CHILD_PID`` on the spawned backend
     process; ``_kill_stale_dashboard_processes`` reads it and passes it here. (#37532)
     """
     skip = {os.getpid(), *(exclude_pids or ())}
@@ -107,17 +107,17 @@ def _scan_dashboard_processes(*, exclude_pids: set[int] | None = None) -> list[t
 
 
 def _hermes_home_for_pid(pid: int) -> str | None:
-    """Best-effort ``HERMES_HOME`` from *pid*'s environment (psutil, then /proc)."""
+    """Best-effort ``STARDUST_HOME`` from *pid*'s environment (psutil, then /proc)."""
     with contextlib.suppress(Exception):
         import psutil
-        if home := psutil.Process(pid).environ().get("HERMES_HOME"):
+        if home := psutil.Process(pid).environ().get("STARDUST_HOME"):
             return home
     try:
         raw = Path(f"/proc/{pid}/environ").read_bytes()
     except OSError:
         return None
     for part in raw.split(b"\x00"):
-        if part.startswith(b"HERMES_HOME="):
+        if part.startswith(b"STARDUST_HOME="):
             return part.split(b"=", 1)[1].decode("utf-8", errors="replace") or None
     return None
 
@@ -184,7 +184,7 @@ def _normalized_home_for_compare(home: str) -> str:
 
 
 def _profile_key_for_respawn(argv: list[str], hermes_home: str | None = None) -> str:
-    """Stable owner key: ``HERMES_HOME`` when known, else ``--profile`` / ``-p``.
+    """Stable owner key: ``STARDUST_HOME`` when known, else ``--profile`` / ``-p``.
 
     A home ending in ``profiles/<name>`` → ``profile:<name>`` (shares a cap with an explicit
     ``--profile``); other homes keep a ``home:`` key so unrelated installs never collapse.
@@ -205,13 +205,13 @@ def _filter_dashboard_respawn_candidates(
     """Select which killed manual backends ``(pid, argv, hermes_home)`` to respawn after update.
 
     Rules: never resurrect Desktop ``--port 0`` backends; never replay a backend from a
-    **foreign** ``HERMES_HOME`` (the argv-only respawn would come back on this install's home
+    **foreign** ``STARDUST_HOME`` (the argv-only respawn would come back on this install's home
     and steal the foreign install's fixed port → EADDRINUSE crash-loop; unreadable ``None``
     stays eligible); dedupe by normalized cmdline; one backend per profile / home. PPID-1 is
     NOT skipped: a prior respawn detaches, so fixed-port manual backends sit under init.
 
     1. Never resurrect Desktop ephemeral ``serve|dashboard --port 0`` backends — Desktop
-    (``HERMES_DESKTOP_CHILD_PID``) owns their lifecycle. These are also the PPID-1 orphans that previously
+    (``STARDUST_DESKTOP_CHILD_PID``) owns their lifecycle. These are also the PPID-1 orphans that previously
     multiplied across updates because ``--port 0`` always binds a fresh free port. 2. A foreign install's
     backend is owned by that install's supervisor/user. 3. 4. See #78821, #94030.
     Intentionally does **not** blanket-skip every PPID-1 process: a prior ``hermes update`` respawn detaches
@@ -244,9 +244,9 @@ def _filter_dashboard_respawn_candidates(
 
 
 def _exclude_pids_from_env() -> set[int]:
-    """PIDs Desktop marks as live backends (``HERMES_DESKTOP_CHILD_PID``, comma-separated)."""
+    """PIDs Desktop marks as live backends (``STARDUST_DESKTOP_CHILD_PID``, comma-separated)."""
     out: set[int] = set()
-    for part in os.environ.get("HERMES_DESKTOP_CHILD_PID", "").split(","):
+    for part in os.environ.get("STARDUST_DESKTOP_CHILD_PID", "").split(","):
         with contextlib.suppress(ValueError):
             out.add(int(part))
     return out
@@ -352,9 +352,9 @@ def _kill_stale_dashboard_processes(
             pid_cgroup[pid] = _dash._get_pid_cgroup_path(pid)
             pid_service[pid] = _dash._get_systemd_service_for_pid(pid)
             if not pid_service[pid] and (cmdline := _dash._dashboard_cmdline_for_pid(pid)):
-                # Manual process: exact argv + HERMES_HOME for the respawn and its profile cap.
+                # Manual process: exact argv + STARDUST_HOME for the respawn and its profile cap.
                 # Manually-started process: preserve its exact argv so we can respawn it after the update
-                # (#40449, #68934). Snapshot HERMES_HOME before the kill so per-profile caps still work
+                # (#40449, #68934). Snapshot STARDUST_HOME before the kill so per-profile caps still work
                 # after the process is gone (#78821).
                 pid_cmdline[pid] = cmdline
                 pid_home[pid] = _hermes_home_for_pid(pid)
@@ -564,7 +564,7 @@ def _valid_lockfile_payload(parsed: object, ownership_id: str) -> bool:
     if any(not isinstance(parsed.get(f), str) or len(parsed[f]) > 1024
            for f in ("profile", "hermesPath", "hermesHome", "logPath", "startedAt")):
         return False
-    # Suffix-only check of logPath so a relocated HERMES_HOME can't reject a legitimate backend.
+    # Suffix-only check of logPath so a relocated STARDUST_HOME can't reject a legitimate backend.
     return parsed["logPath"].endswith(f"/{ownership_id}/{parsed['spawnNonce']}.log")
 
 
@@ -615,10 +615,10 @@ def _reap_orphaned_desktop_local_serves(
     When Electron dies uncleanly its ``serve --host 127.0.0.1 --port 0`` children are
     reparented to pid 1 with their MCP trees alive; each Desktop boot then stacks a fresh
     backend on the corpses until EMFILE. Reaped only if ALL hold: Desktop-local shape; ppid
-    0/1; not self / parent / HERMES_DESKTOP_CHILD_PID; not claimed by a valid
+    0/1; not self / parent / STARDUST_DESKTOP_CHILD_PID; not claimed by a valid
     ``backend.lock.json`` (SSH backends other clients started legitimately sit at ppid 1);
     older than ``_REAP_MIN_AGE_SECONDS`` with a determinable age (Desktop writes the lock only
-    after HERMES_BACKEND_READY, so a live sibling mid-startup is briefly unowned).
+    after STARDUST_BACKEND_READY, so a live sibling mid-startup is briefly unowned).
     """
     import signal as _signal
     import time as _time

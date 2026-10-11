@@ -368,7 +368,7 @@ class GatewayTopicThreadsMixin:
         if not callable(wait_fn) or not source.chat_id:
             return None
         # 0 means the operator disabled the turn limit; the backstop still needs one.
-        timeout = _float_env("HERMES_AGENT_TIMEOUT", 1800) or 1800
+        timeout = _float_env("STARDUST_AGENT_TIMEOUT", 1800) or 1800
         with suppress(Exception):
             return _as_thread_info(await wait_fn(str(source.chat_id), timeout))
         return None

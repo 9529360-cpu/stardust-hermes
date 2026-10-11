@@ -74,7 +74,7 @@ def _codex_curated_models() -> list[str]:
 
 
 # Static xAI fallback when the models.dev disk cache is empty (fresh install, offline first run).
-# Mirrors the xAI-direct IDs from $HERMES_HOME/models_dev_cache.json; the cache overrides it on the
+# Mirrors the xAI-direct IDs from $STARDUST_HOME/models_dev_cache.json; the cache overrides it on the
 # next refresh. Models xAI retired on 2026-05-15 (grok-4*, grok-4-fast*, grok-4-1-fast*,
 # grok-code-fast-1) are excluded — see docs.x.ai/developers/migration/may-15-retirement.
 _XAI_STATIC_FALLBACK: list[str] = [
@@ -110,7 +110,7 @@ def _xai_finalize_catalog(ids: list[str]) -> list[str]:
 
 
 def _xai_curated_models() -> list[str]:
-    """Offline curated floor for xAI / xAI OAuth pickers: $HERMES_HOME/models_dev_cache.json
+    """Offline curated floor for xAI / xAI OAuth pickers: $STARDUST_HOME/models_dev_cache.json
     (no network), else ``_XAI_STATIC_FALLBACK``. Any failure falls through to the static list."""
     try:
         from agent.models_dev import _load_disk_cache

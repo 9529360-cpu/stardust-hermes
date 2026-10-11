@@ -330,7 +330,7 @@ def test_hermes_pkce_refresh_writes_back_to_singleton(tmp_path, monkeypatch):
     """
     hermes_home = tmp_path / "hermes"
     hermes_home.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     monkeypatch.setattr("hermes_cli.auth.is_provider_explicitly_configured", lambda pid: True)
 
     oauth_file = hermes_home / ".anthropic_oauth.json"
@@ -388,7 +388,7 @@ def test_manual_hermes_pkce_refresh_does_not_create_duplicate_singleton(
     """A pool-owned manual:hermes_pkce entry must not create a second source."""
     hermes_home = tmp_path / "hermes"
     hermes_home.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     monkeypatch.setattr("hermes_cli.auth.is_provider_explicitly_configured", lambda pid: True)
     monkeypatch.setattr("agent.anthropic_credentials.read_claude_code_credentials", lambda: None)
     monkeypatch.setattr(

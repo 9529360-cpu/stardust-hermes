@@ -45,7 +45,7 @@ _OP_ENV_ALLOWLIST = (
     "OP_LOAD_DESKTOP_APP_SETTINGS",
 )
 
-# L1 key folds in str(home_path) so a HERMES_HOME switch inside one long-lived
+# L1 key folds in str(home_path) so a STARDUST_HOME switch inside one long-lived
 # process (the gateway) can't return another profile's secrets. The disk key
 # omits home because the file already lives under <home>/cache/.
 _CacheKey = Tuple[str, str, str, str]  # (auth_fp, account, home, refs_fp)

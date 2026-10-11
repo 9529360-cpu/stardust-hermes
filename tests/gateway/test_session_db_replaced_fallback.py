@@ -32,7 +32,7 @@ def test_replaced_state_db_diverts_pending_without_fts_rebuild(tmp_path, monkeyp
 
     live = tmp_path / "state.db"
     other = tmp_path / "other.db"
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     monkeypatch.setattr(hermes_state, "DEFAULT_DB_PATH", live)
 
     store = SessionStore(sessions_dir=tmp_path, config=GatewayConfig())
@@ -71,7 +71,7 @@ def test_copyfile_replaced_state_db_diverts_pending_without_fts_rebuild(
 
     live = tmp_path / "state.db"
     other = tmp_path / "other.db"
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     monkeypatch.setattr(hermes_state, "DEFAULT_DB_PATH", live)
 
     store = SessionStore(sessions_dir=tmp_path, config=GatewayConfig())

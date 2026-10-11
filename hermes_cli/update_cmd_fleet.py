@@ -20,7 +20,7 @@ from hermes_cli.update_inventory import _gateway_service_matches_profile
 # Log-record parity with the origin module.
 logger = logging.getLogger("hermes_cli.update_cmd")
 
-# Under HERMES_HOME (not next to the venv): records the fleet-restart obligation
+# Under STARDUST_HOME (not next to the venv): records the fleet-restart obligation
 # after a pull advanced HEAD; cleared only when the restart completes or nothing ran.
 # The existing ``.update-incomplete`` / ``.lazy-refresh-incomplete`` markers gate dependency/venv repair;
 # this one is the fleet-restart obligation after a git pull that advanced HEAD (#95294).
@@ -40,7 +40,7 @@ def _write_gateway_update_exit_code(ok: bool) -> None:
 
 
 def _fleet_restart_pending_marker_path() -> Path:
-    """HERMES_HOME breadcrumb for a pull that has not yet restarted the fleet."""
+    """STARDUST_HOME breadcrumb for a pull that has not yet restarted the fleet."""
     from hermes_cli.update_cmd import get_hermes_home
     return get_hermes_home() / _FLEET_RESTART_PENDING_NAME
 
@@ -734,8 +734,8 @@ _DESKTOP_SERVE_SKIP_REASON = (
     "desktop app owns and respawns this serve backend;"
     " the recovery pass must not restart it out from under its supervisor"
 )
-# NOT a claim that no supervisor exists: a systemd-launched serve sets neither HERMES_SPAWN
-# nor HERMES_PARENT_PID ("manual-serve"). Unit-backed serves are recovered by the fresh
+# NOT a claim that no supervisor exists: a systemd-launched serve sets neither STARDUST_SPAWN
+# nor STARDUST_PARENT_PID ("manual-serve"). Unit-backed serves are recovered by the fresh
 # child's systemd pass; survivors reported by _surviving_pre_update_serve_runtimes.
 _SERVE_SKIP_REASON = (
     "no per-profile relaunch command reaches a serve/dashboard runtime; recovered by the fresh"
@@ -842,7 +842,7 @@ def _drain_or_signal_gateway_for_update(pid: int, drain_budget: float, label: st
 
 
 def _gateway_home_for_pid(pid: int):
-    """HERMES_HOME of the gateway ``pid`` per the fleet inventory, else None (own profile's file)."""
+    """STARDUST_HOME of the gateway ``pid`` per the fleet inventory, else None (own profile's file)."""
     with suppress(Exception):
         from hermes_cli.update_receipt import _profile_homes
         from gateway.status import read_runtime_status

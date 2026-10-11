@@ -279,7 +279,7 @@ class TestLoadGatewayConfig:
             encoding="utf-8",
         )
 
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         monkeypatch.delenv("SLACK_IGNORED_CHANNELS", raising=False)
 
         load_gateway_config()
@@ -299,7 +299,7 @@ class TestLoadGatewayConfig:
             '    typing_status_text: "chasing yarn…"\n',
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
         config = load_gateway_config()
 
@@ -327,7 +327,7 @@ class TestLoadGatewayConfig:
             encoding="utf-8",
         )
 
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
         config = load_gateway_config()
 
@@ -345,7 +345,7 @@ class TestLoadGatewayConfig:
             "    - worker\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
         config = load_gateway_config()
 
@@ -364,10 +364,10 @@ class TestLoadGatewayConfig:
             "  websocket_event_max_silence_seconds: 7200\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         for key in (
-            "HERMES_DISCORD_LIVENESS_INTERVAL_SECONDS",
-            "HERMES_DISCORD_LIVENESS_FAILURE_THRESHOLD",
+            "STARDUST_DISCORD_LIVENESS_INTERVAL_SECONDS",
+            "STARDUST_DISCORD_LIVENESS_FAILURE_THRESHOLD",
         ):
             monkeypatch.delenv(key, raising=False)
 
@@ -389,7 +389,7 @@ class TestLoadGatewayConfig:
             "gateway:\n  quick_commands:\n    limits:\n      type: exec\n      command: echo ok\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
         config = load_gateway_config()
 
@@ -406,7 +406,7 @@ class TestLoadGatewayConfig:
             "gateway:\n  stt:\n    enabled: false\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
         config = load_gateway_config()
 
@@ -442,7 +442,7 @@ class TestLoadGatewayConfig:
             "gateway:\n  api_server:\n    enabled: true\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
         config = load_gateway_config()
 
@@ -467,7 +467,7 @@ class TestLoadGatewayConfig:
             "    model_name: my-hermes\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
         config = load_gateway_config()
 
@@ -486,7 +486,7 @@ class TestLoadGatewayConfig:
             "  room_link_url: https://peer.example.test/hermes\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
         config = load_gateway_config()
 
@@ -512,7 +512,7 @@ class TestLoadGatewayConfig:
             "    enabled: true\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
         config = load_gateway_config()
 
@@ -531,7 +531,7 @@ class TestLoadGatewayConfig:
             "gateway:\n  group_sessions_per_user: false\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
         config = load_gateway_config()
 
@@ -546,7 +546,7 @@ class TestLoadGatewayConfig:
             "gateway:\n  reset_triggers:\n    - /new\n    - /clear\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
         config = load_gateway_config()
 
@@ -560,7 +560,7 @@ class TestLoadGatewayConfig:
             "gateway:\n  always_log_local: false\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
         config = load_gateway_config()
 
@@ -575,7 +575,7 @@ class TestLoadGatewayConfig:
             "gateway:\n  unauthorized_dm_behavior: ignore\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
         config = load_gateway_config()
 
@@ -590,7 +590,7 @@ class TestLoadGatewayConfig:
         'relay registered but no inbound' bug)."""
         hermes_home = tmp_path / ".hermes"
         hermes_home.mkdir()
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         monkeypatch.setenv("GATEWAY_RELAY_URL", "https://connector.example/relay/")
 
         config = load_gateway_config()
@@ -621,7 +621,7 @@ class TestLoadGatewayConfig:
             "      enabled: true\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         monkeypatch.setenv("GATEWAY_RELAY_URL", "https://connector.example/relay")
         # Credential-based auto-enable path must be suppressed too.
         monkeypatch.setenv("DISCORD_BOT_TOKEN", "fake-token-for-test")
@@ -654,7 +654,7 @@ class TestLoadGatewayConfig:
             "      bot_token: '123:abc'\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         monkeypatch.delenv("GATEWAY_RELAY_URL", raising=False)
 
         config = load_gateway_config()
@@ -678,7 +678,7 @@ class TestLoadGatewayConfig:
             "      bot_token: '123:abc'\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         monkeypatch.setenv("GATEWAY_RELAY_URL", "https://connector.example/relay")
         monkeypatch.setenv("GATEWAY_RELAY_ALLOW_DIRECT_PLATFORMS", "true")
 
@@ -711,7 +711,7 @@ class TestLoadGatewayConfig:
             "      bot_token: '123:abc'\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         # Managed-deploy stamp in the process env; the profile .env has none.
         monkeypatch.setenv("GATEWAY_RELAY_URL", "https://deploy.example/relay")
 
@@ -768,7 +768,7 @@ class TestLoadGatewayConfig:
             "      bot_token: '123:abc'\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         monkeypatch.setenv("GATEWAY_RELAY_URL", "https://connector.example/relay")
         monkeypatch.setenv("DISCORD_BOT_TOKEN", "fake-token-for-test")
 
@@ -802,7 +802,7 @@ class TestLoadGatewayConfig:
             encoding="utf-8",
         )
 
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         monkeypatch.setenv("DISCORD_THREAD_REQUIRE_MENTION", "true")  # user override
 
         load_gateway_config()
@@ -833,7 +833,7 @@ class TestLoadGatewayConfig:
             encoding="utf-8",
         )
 
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         monkeypatch.delenv("DINGTALK_ALLOWED_USERS", raising=False)
 
         config = load_gateway_config()
@@ -854,7 +854,7 @@ class TestLoadGatewayConfig:
         hermes_home = tmp_path / ".hermes"
         hermes_home.mkdir()
         (hermes_home / "config.yaml").write_text(yaml_text, encoding="utf-8")
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         monkeypatch.delenv("GATEWAY_ALLOW_ALL_USERS", raising=False)
 
         runner = object.__new__(GatewayAuthorizationMixin)
@@ -875,7 +875,7 @@ class TestLoadGatewayConfig:
         hermes_home = tmp_path / ".hermes"
         hermes_home.mkdir()
         (hermes_home / "config.yaml").write_text(yaml_text, encoding="utf-8")
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         if env is None:
             monkeypatch.delenv("GATEWAY_ALLOW_ALL_USERS", raising=False)
         else:
@@ -898,7 +898,7 @@ class TestLoadGatewayConfig:
         hermes_home = tmp_path / ".hermes"
         hermes_home.mkdir()
         (hermes_home / "config.yaml").write_text("gateway:\n  allow_all_users: true\n", encoding="utf-8")
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         monkeypatch.delenv("GATEWAY_ALLOW_ALL_USERS", raising=False)
         load_gateway_config()
         assert os.environ.get("GATEWAY_ALLOW_ALL_USERS") == "true"
@@ -922,7 +922,7 @@ class TestLoadGatewayConfig:
         secondary.mkdir(parents=True)
         (hermes_home / "config.yaml").write_text(
             "gateway:\n  allow_all_users: true\n  multiplex_profiles: true\n", encoding="utf-8")
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         monkeypatch.delenv("GATEWAY_ALLOW_ALL_USERS", raising=False)
         runner = object.__new__(GatewayAuthorizationMixin)
         runner.config = load_gateway_config()
@@ -958,7 +958,7 @@ class TestLoadGatewayConfig:
             encoding="utf-8",
         )
 
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
         config = load_gateway_config()
 
@@ -990,7 +990,7 @@ class TestLoadGatewayConfig:
             encoding="utf-8",
         )
 
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
         config = load_gateway_config()
 
@@ -1016,7 +1016,7 @@ class TestLoadGatewayConfig:
             encoding="utf-8",
         )
 
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
         config = load_gateway_config()
 
@@ -1037,7 +1037,7 @@ class TestLoadGatewayConfig:
             encoding="utf-8",
         )
 
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
         config = load_gateway_config()
 
@@ -1054,7 +1054,7 @@ class TestLoadGatewayConfig:
             encoding="utf-8",
         )
 
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         monkeypatch.setenv("TELEGRAM_PROXY", "socks5://from-env:1080")
 
         load_gateway_config()
@@ -1083,7 +1083,7 @@ class TestLoadGatewayConfig:
             encoding="utf-8",
         )
 
-        monkeypatch.setenv("HERMES_HOME", str(default_home))
+        monkeypatch.setenv("STARDUST_HOME", str(default_home))
         monkeypatch.setenv("API_SERVER_ENABLED", "true")
         monkeypatch.setenv("DISCORD_BOT_TOKEN", "default-token")
 
@@ -1136,7 +1136,7 @@ class TestWebhookPortBridging:
             "    port: 8649\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         monkeypatch.delenv("WEBHOOK_ENABLED", raising=False)
         monkeypatch.delenv("WEBHOOK_PORT", raising=False)
 
@@ -1159,7 +1159,7 @@ class TestWebhookPortBridging:
             "  extra:\n    port: 9999\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         monkeypatch.delenv("WEBHOOK_PORT", raising=False)
         wh = load_gateway_config().platforms[Platform.WEBHOOK]
         assert (wh.extra.get("port"), wh.extra.get("host"), wh.extra.get("secret")) == (9999, "127.0.0.2", "fixture")
@@ -1182,7 +1182,7 @@ class TestWebhookPortBridging:
             "      secret: extra-secret\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         monkeypatch.delenv("MSGRAPH_WEBHOOK_ENABLED", raising=False)
         monkeypatch.delenv("MSGRAPH_WEBHOOK_PORT", raising=False)
         monkeypatch.delenv("MSGRAPH_WEBHOOK_CLIENT_STATE", raising=False)
@@ -1294,7 +1294,7 @@ class TestMultiplexProfilesEnvOverride:
         hermes_home.mkdir(exist_ok=True)
         if config_text is not None:
             (hermes_home / "config.yaml").write_text(config_text, encoding="utf-8")
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         return load_gateway_config()
 
     # ── Tier 1: env wins ──────────────────────────────────────────────────
@@ -1348,7 +1348,7 @@ class TestMultiplexProfilesConfig:
             "gateway:\n  multiplex_profiles: true\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
         config = load_gateway_config()
 
@@ -1373,7 +1373,7 @@ class TestMultiplexProfilesConfig:
             "gateway:\n  multiplex_profiles: true\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
         config = load_gateway_config()
 

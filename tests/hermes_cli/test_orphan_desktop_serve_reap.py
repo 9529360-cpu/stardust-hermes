@@ -80,7 +80,7 @@ def test_reap_only_kills_ppid1_local_serves():
         patch("os.kill", side_effect=fake_kill),
         patch("sys.platform", "darwin"),
     ):
-        os.environ.pop("HERMES_DESKTOP_CHILD_PID", None)
+        os.environ.pop("STARDUST_DESKTOP_CHILD_PID", None)
         result = _reap_orphaned_desktop_local_serves(
             sleep_fn=lambda _s: None,
             signal_term=15,
@@ -102,7 +102,7 @@ def test_reap_passes_child_pid_exclude_to_scan():
             return_value=[],
         ) as scan,
         patch("sys.platform", "darwin"),
-        patch.dict(os.environ, {"HERMES_DESKTOP_CHILD_PID": "999,111"}, clear=False),
+        patch.dict(os.environ, {"STARDUST_DESKTOP_CHILD_PID": "999,111"}, clear=False),
     ):
         result = _reap_orphaned_desktop_local_serves(sleep_fn=lambda _s: None)
 
@@ -230,7 +230,7 @@ def test_reap_spare_lock_owned_ssh_remote_backend_of_foreign_client():
         patch("os.kill", side_effect=fake_kill),
         patch("sys.platform", "darwin"),
     ):
-        os.environ.pop("HERMES_DESKTOP_CHILD_PID", None)
+        os.environ.pop("STARDUST_DESKTOP_CHILD_PID", None)
         result = _reap_orphaned_desktop_local_serves(
             sleep_fn=lambda _s: None,
             signal_term=15,
@@ -349,7 +349,7 @@ def test_reap_age_boundary_makes_180_second_orphan_eligible():
 
 def test_reap_spare_lock_owned_backend_even_without_exclude_match(tmp_path):
     """End-to-end through the real lock scanner: a backend.lock.json on disk
-    spares a matching orphaned serve even when HERMES_DESKTOP_CHILD_PID is
+    spares a matching orphaned serve even when STARDUST_DESKTOP_CHILD_PID is
     unset (foreign-client backend, not ours by env either)."""
     oid = "a" * 32
     nonce = "b" * 16
@@ -379,7 +379,7 @@ def test_reap_spare_lock_owned_backend_even_without_exclude_match(tmp_path):
         patch("os.kill", side_effect=fake_kill),
         patch("sys.platform", "darwin"),
     ):
-        os.environ.pop("HERMES_DESKTOP_CHILD_PID", None)
+        os.environ.pop("STARDUST_DESKTOP_CHILD_PID", None)
         result = _reap_orphaned_desktop_local_serves(
             sleep_fn=lambda _s: None,
             signal_term=15,

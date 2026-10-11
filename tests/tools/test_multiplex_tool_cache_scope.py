@@ -40,7 +40,7 @@ class _scoped:
 def two_homes(tmp_path, monkeypatch):
     a = _make_home(tmp_path / "A", {}, "CAMOFOX_URL=http://camofox-a:9377\n")
     b = _make_home(tmp_path / "A" / "profiles" / "B", {}, "CAMOFOX_URL=http://camofox-b:9377\n")
-    monkeypatch.setenv("HERMES_HOME", str(a))
+    monkeypatch.setenv("STARDUST_HOME", str(a))
     monkeypatch.delenv("CAMOFOX_URL", raising=False)
     return a, b
 
@@ -84,7 +84,7 @@ def test_home_keyed_caches_serve_each_profile_its_own_config(tmp_path, monkeypat
     b = _make_home(tmp_path / "A" / "profiles" / "B", {**main, "security": {"tirith_path": str(bin_b)},
                                                        "auxiliary": {"vision": {"provider": "openai", "model": "gpt-4o-mini"},
                                                                      "summary": {"max_concurrency": 7}}})
-    monkeypatch.setenv("HERMES_HOME", str(a))
+    monkeypatch.setenv("STARDUST_HOME", str(a))
     (a / "cache" / "image_token_costs.json").write_text(json.dumps({"m@gw.example": 1000}), encoding="utf-8")
     (b / "cache" / "image_token_costs.json").write_text(json.dumps({"m@gw.example": 3000}), encoding="utf-8")
 

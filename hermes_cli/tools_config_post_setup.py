@@ -33,7 +33,7 @@ def _ensure_browser_use_cli(*, verbose_hints: bool = False) -> None:
     """Install the Browser Use CLI if it isn't already runnable.
     Primary driver engine for EVERY browser backend except Camofox (Firefox-based, no CDP surface).
     MANAGED-FIRST: a browser-use on the user's PATH does NOT satisfy this check — only the
-    Hermes-managed ``$HERMES_HOME/bin`` copy does."""
+    Hermes-managed ``$STARDUST_HOME/bin`` copy does."""
     _print_info("    Ensuring browser-use CLI (managed install)...")
     try:
         from tools.browser_use_cli import install_cli

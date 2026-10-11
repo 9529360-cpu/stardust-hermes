@@ -173,13 +173,13 @@ _READ_ONLY_IOERR_RETRY_ATTEMPTS, _READ_ONLY_IOERR_RETRY_BACKOFF_S = 3, 0.05
 
 def _default_db_path() -> Path:
     """Default state DB path at CALL time: a re-pointed ``DEFAULT_DB_PATH`` wins, else
-    ``get_hermes_home()`` is resolved fresh (a runtime HERMES_HOME redirect works regardless of import)."""
+    ``get_hermes_home()`` is resolved fresh (a runtime STARDUST_HOME redirect works regardless of import)."""
     return DEFAULT_DB_PATH if DEFAULT_DB_PATH != _IMPORT_DEFAULT_DB_PATH else get_hermes_home() / "state.db"
 
 
 # Live-DB guard knobs live HERE (not in hermes_state_guard): the hermetic conftest monkeypatches
 # ``hermes_state._STATE_DB_GUARD_BYPASS`` (``@pytest.mark.live_system_guard_bypass`` escape hatch)
-# and ``_EXTRA_DENY_ROOTS`` (the pre-sandbox root, so custom-HERMES_HOME deployments are covered).
+# and ``_EXTRA_DENY_ROOTS`` (the pre-sandbox root, so custom-STARDUST_HOME deployments are covered).
 _STATE_DB_GUARD_BYPASS = False
 _STATE_DB_GUARD_EXTRA_DENY_ROOTS: Tuple[Path, ...] = ()
 
@@ -189,7 +189,7 @@ def _ensure_test_isolation(db_path: Path) -> None:
     (env OR ancestry) resolves a production DB.
 
     Env alone is not enough: a child spawned with a rebuilt environment loses ``PYTEST_*`` and
-    ``HERMES_HOME`` together, which is precisely the state in which it writes to production (#82770).
+    ``STARDUST_HOME`` together, which is precisely the state in which it writes to production (#82770).
     """
     if _STATE_DB_GUARD_BYPASS or os.environ.get(_STATE_DB_GUARD_BYPASS_ENV) or not _in_test_context():
         return
@@ -208,9 +208,9 @@ def _ensure_test_isolation(db_path: Path) -> None:
             raise RuntimeError(
                 "live-system guard: test attempted to open production "
                 f"state.db at {resolved} (under real Hermes root {root}). "
-                "Tests must run against a temporary HERMES_HOME — pass an "
+                "Tests must run against a temporary STARDUST_HOME — pass an "
                 "explicit tmp db_path or let the hermetic conftest redirect "
-                "HERMES_HOME. If this test genuinely needs the live database, mark it with "
+                "STARDUST_HOME. If this test genuinely needs the live database, mark it with "
                 "@pytest.mark.live_system_guard_bypass — or, for a spawned "
                 f"child process, export {_STATE_DB_GUARD_BYPASS_ENV}=1 in "
                 "its environment."
@@ -399,7 +399,7 @@ def _close_time_checkpoint_configurable() -> bool:
 
 
 def divert_session_transcript_jsonl(session_id: str, messages) -> "Optional[Path]":
-    """Append pending messages to HERMES_HOME/sessions/<id>.jsonl (state.db was replaced under a
+    """Append pending messages to STARDUST_HOME/sessions/<id>.jsonl (state.db was replaced under a
     live process). Returns the path, or None if nothing to write."""
     sid = str(session_id or "").strip()
     if not sid or not messages:

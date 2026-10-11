@@ -11,7 +11,7 @@ def test_project_facts_prompt_uses_project_authority_and_filters_unsafe_context(
     home = tmp_path / "home"
     cwd = tmp_path / "repo"
     cwd.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     monkeypatch.setattr(system_prompt, "resolve_context_cwd", lambda: cwd)
 
     with pdb.connect_closing() as conn:
@@ -55,7 +55,7 @@ def test_verified_inference_can_enter_project_context(tmp_path, monkeypatch):
     home = tmp_path / "home"
     cwd = tmp_path / "repo"
     cwd.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     monkeypatch.setattr(system_prompt, "resolve_context_cwd", lambda: cwd)
 
     with pdb.connect_closing() as conn:
@@ -91,7 +91,7 @@ def test_project_fact_prompt_is_frozen_for_the_session(tmp_path, monkeypatch):
     home = tmp_path / "home"
     cwd = tmp_path / "repo"
     cwd.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     monkeypatch.setattr(system_prompt, "resolve_context_cwd", lambda: cwd)
 
     with pdb.connect_closing() as conn:
@@ -120,7 +120,7 @@ def test_explicit_session_project_beats_cwd_project(tmp_path, monkeypatch):
     cwd_b = tmp_path / "repo-b"
     cwd_a.mkdir()
     cwd_b.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     monkeypatch.setattr(system_prompt, "resolve_context_cwd", lambda: cwd_a)
 
     with pdb.connect_closing(home / "projects.db") as conn:
@@ -157,7 +157,7 @@ def test_missing_explicit_session_project_does_not_fall_back_to_cwd(tmp_path, mo
     home = tmp_path / "home"
     cwd = tmp_path / "repo"
     cwd.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     monkeypatch.setattr(system_prompt, "resolve_context_cwd", lambda: cwd)
 
     with pdb.connect_closing(home / "projects.db") as conn:
@@ -188,7 +188,7 @@ def test_archived_explicit_project_does_not_fall_back_to_cwd(tmp_path, monkeypat
     home = tmp_path / "home"
     cwd = tmp_path / "repo"
     cwd.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     monkeypatch.setattr(system_prompt, "resolve_context_cwd", lambda: cwd)
 
     with pdb.connect_closing(home / "projects.db") as conn:
@@ -217,7 +217,7 @@ def test_archived_explicit_project_does_not_fall_back_to_cwd(tmp_path, monkeypat
 
 def test_explicit_project_facts_load_even_from_launch_artifact_cwd(tmp_path, monkeypatch):
     home = tmp_path / "home"
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     monkeypatch.setattr(
         system_prompt,
         "resolve_context_cwd",
@@ -253,7 +253,7 @@ def test_explicit_project_facts_load_even_from_launch_artifact_cwd(tmp_path, mon
 def test_project_fact_prompt_never_queries_session_db_for_routing(tmp_path, monkeypatch):
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     session_db = SimpleNamespace(
         db_path=home / "state.db",
         get_session=lambda *_: (_ for _ in ()).throw(AssertionError("prompt must not query state.db")),
@@ -272,7 +272,7 @@ def test_project_fact_prompt_read_does_not_create_projects_db(tmp_path, monkeypa
     home.mkdir()
     cwd = tmp_path / "repo"
     cwd.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     monkeypatch.setattr(system_prompt, "resolve_context_cwd", lambda: cwd)
 
     agent = SimpleNamespace(_context_cwd_is_launch_artifact=False)

@@ -802,7 +802,7 @@ class SessionStore(
         self._db_pinned = _DB_UNPINNED
         self._db_handles: Dict[Path, Any] = {}
         self._db_handles_lock = threading.Lock()
-        self._profile_home_cache: Dict[str, Optional[Path]] = {}  # profile -> HERMES_HOME (hits)
+        self._profile_home_cache: Dict[str, Optional[Path]] = {}  # profile -> STARDUST_HOME (hits)
         # session_id -> owning key for ids proven but not yet published in ``_entries`` (a
         # compression child row is written before its reroute is published).
         self._session_owner_hints: Dict[str, str] = {}

@@ -215,8 +215,8 @@ _NOUS = {"requires_nous_auth": True}
 _OPENAI_VOICE_KEY = _key("VOICE_TOOLS_OPENAI_KEY", "OpenAI API key", "https://platform.openai.com/api-keys")
 _ELEVENLABS_KEY = _key("ELEVENLABS_API_KEY", "ElevenLabs API key", "https://elevenlabs.io/app/settings/api-keys")
 _DEEPINFRA_KEY = _key("DEEPINFRA_API_KEY", "DeepInfra API key", "https://deepinfra.com/dash/api_keys")
-_LANGFUSE_PUBLIC = ("HERMES_LANGFUSE_PUBLIC_KEY", "Langfuse public key (pk-lf-...)")
-_LANGFUSE_SECRET = ("HERMES_LANGFUSE_SECRET_KEY", "Langfuse secret key (sk-lf-...)")
+_LANGFUSE_PUBLIC = ("STARDUST_LANGFUSE_PUBLIC_KEY", "Langfuse public key (pk-lf-...)")
+_LANGFUSE_SECRET = ("STARDUST_LANGFUSE_SECRET_KEY", "Langfuse secret key (sk-lf-...)")
 
 TOOL_CATEGORIES = {
     "tts": {
@@ -352,7 +352,7 @@ TOOL_CATEGORIES = {
         "name": "Computer Use (macOS/Windows/Linux)", "icon": "🖱️",
         # Runtime backends ship for macOS, Windows, Linux (X11; Wayland via XWayland). Gaps surface via `computer-use doctor`.
         "platform_gate": ["darwin", "win32", "linux"],
-        # cua-driver reads HOME/TMPDIR from the process env; HERMES_CUA_DRIVER_CMD selects a specific
+        # cua-driver reads HOME/TMPDIR from the process env; STARDUST_CUA_DRIVER_CMD selects a specific
         # binary (e.g. a local build). There is no version-pin env var.
         "providers": [
             _row("cua-driver (background)", "★ recommended · free · local",
@@ -367,7 +367,7 @@ TOOL_CATEGORIES = {
                  env_vars=[_key(*_LANGFUSE_PUBLIC, "https://cloud.langfuse.com"), _key(*_LANGFUSE_SECRET, "https://cloud.langfuse.com")]),
             _row("Langfuse Self-Hosted", tag="Self-hosted Langfuse instance", post_setup="langfuse",
                  env_vars=[_key(*_LANGFUSE_PUBLIC), _key(*_LANGFUSE_SECRET),
-                           _key("HERMES_LANGFUSE_BASE_URL", "Langfuse server URL (e.g. http://localhost:3000)", default="http://localhost:3000")]),
+                           _key("STARDUST_LANGFUSE_BASE_URL", "Langfuse server URL (e.g. http://localhost:3000)", default="http://localhost:3000")]),
         ],
     },
 }

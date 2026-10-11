@@ -1317,12 +1317,12 @@ class FeishuAdapter(BasePlatformAdapter):
             bot_open_id=_secret("FEISHU_BOT_OPEN_ID"),
             bot_user_id=_secret("FEISHU_BOT_USER_ID"),
             bot_name=_secret("FEISHU_BOT_NAME"),
-            dedup_cache_size=max(32, env_int("HERMES_FEISHU_DEDUP_CACHE_SIZE", _DEFAULT_DEDUP_CACHE_SIZE)),
-            text_batch_delay_seconds=env_float("HERMES_FEISHU_TEXT_BATCH_DELAY_SECONDS", _DEFAULT_TEXT_BATCH_DELAY_SECONDS),
-            text_batch_split_delay_seconds=env_float("HERMES_FEISHU_TEXT_BATCH_SPLIT_DELAY_SECONDS", 2.0),
-            text_batch_max_messages=max(1, env_int("HERMES_FEISHU_TEXT_BATCH_MAX_MESSAGES", _DEFAULT_TEXT_BATCH_MAX_MESSAGES)),
-            text_batch_max_chars=max(1, env_int("HERMES_FEISHU_TEXT_BATCH_MAX_CHARS", _DEFAULT_TEXT_BATCH_MAX_CHARS)),
-            media_batch_delay_seconds=env_float("HERMES_FEISHU_MEDIA_BATCH_DELAY_SECONDS", _DEFAULT_MEDIA_BATCH_DELAY_SECONDS),
+            dedup_cache_size=max(32, env_int("STARDUST_FEISHU_DEDUP_CACHE_SIZE", _DEFAULT_DEDUP_CACHE_SIZE)),
+            text_batch_delay_seconds=env_float("STARDUST_FEISHU_TEXT_BATCH_DELAY_SECONDS", _DEFAULT_TEXT_BATCH_DELAY_SECONDS),
+            text_batch_split_delay_seconds=env_float("STARDUST_FEISHU_TEXT_BATCH_SPLIT_DELAY_SECONDS", 2.0),
+            text_batch_max_messages=max(1, env_int("STARDUST_FEISHU_TEXT_BATCH_MAX_MESSAGES", _DEFAULT_TEXT_BATCH_MAX_MESSAGES)),
+            text_batch_max_chars=max(1, env_int("STARDUST_FEISHU_TEXT_BATCH_MAX_CHARS", _DEFAULT_TEXT_BATCH_MAX_CHARS)),
+            media_batch_delay_seconds=env_float("STARDUST_FEISHU_MEDIA_BATCH_DELAY_SECONDS", _DEFAULT_MEDIA_BATCH_DELAY_SECONDS),
             webhook_host=_extra_or_env("webhook_host", "FEISHU_WEBHOOK_HOST", _DEFAULT_WEBHOOK_HOST),
             webhook_port=int(extra.get("webhook_port") or _get_scoped_secret("FEISHU_WEBHOOK_PORT", str(_DEFAULT_WEBHOOK_PORT))),
             webhook_path=_extra_or_env("webhook_path", "FEISHU_WEBHOOK_PATH", _DEFAULT_WEBHOOK_PATH) or _DEFAULT_WEBHOOK_PATH,
@@ -1386,7 +1386,7 @@ class FeishuAdapter(BasePlatformAdapter):
         """Run a blocking Feishu SDK call on the adapter-owned thread pool.
 
         ``copy_context().run`` mirrors ``asyncio.to_thread``: the worker sees the caller's
-        profile HERMES_HOME override / secret scope (multiplexed dedup flush, thread lookup).
+        profile STARDUST_HOME override / secret scope (multiplexed dedup flush, thread lookup).
         """
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(

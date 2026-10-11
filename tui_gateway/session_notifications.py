@@ -549,7 +549,7 @@ _desktop_ui_wired = False
 def _wire_desktop_sinks() -> None:
     """Idempotently wire process-registry and desktop-tool sinks to renderer events: `agent.terminal.output` and
     `terminal.close` (drops a tab without killing the process) route to the window owning the process; desktop-only
-    tools pass the turn's ``HERMES_UI_SESSION_ID`` as ``sid``. `_emit` is thread-safe."""
+    tools pass the turn's ``STARDUST_UI_SESSION_ID`` as ``sid``. `_emit` is thread-safe."""
     global _desktop_ui_wired
     from tools.process_registry import process_registry
 

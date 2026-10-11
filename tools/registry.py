@@ -229,9 +229,9 @@ _check_fn_cache_lock = threading.Lock()
 CHECK_FN_CACHE_BYPASS = ""
 _NO_CACHE_CHECK_FNS: Set[Callable] = set()
 _BROWSER_IDENTITY_KEYS = (
-    "HERMES_SESSION_ID",
-    "HERMES_BROWSER_CONTROL_PRINCIPAL",
-    "HERMES_BROWSER_CONTROL_TRANSPORT_FAMILY")
+    "STARDUST_SESSION_ID",
+    "STARDUST_BROWSER_CONTROL_PRINCIPAL",
+    "STARDUST_BROWSER_CONTROL_TRANSPORT_FAMILY")
 
 
 def no_cache_check_fn(fn: Callable) -> Callable:
@@ -391,7 +391,7 @@ class ToolRegistry:
 
     def __init__(self):
         self._tools: Dict[str, ToolEntry] = {}  # built-in / process-global registrations
-        # Plugin overlays keyed by resolved HERMES_HOME; a profile sees its overlay first.
+        # Plugin overlays keyed by resolved STARDUST_HOME; a profile sees its overlay first.
         self._scoped_tools: Dict[str, Dict[str, ToolEntry]] = {}
         # Plugin namespace -> operator opt-in for built-in override (lifecycle-managed);
         # scope attribution stays durable after policy removal so delayed callbacks

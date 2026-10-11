@@ -84,12 +84,12 @@ def test_rotation_is_atomic_under_sigkill(tmp_path, requested_mode):
 
     child_env = {}
     if requested_mode is not None:
-        # Steer the CHILD's own resolver via an isolated HERMES_HOME config:
+        # Steer the CHILD's own resolver via an isolated STARDUST_HOME config:
         # pre-seeding the file alone is not enough — SessionDB.__init__ runs
         # apply_wal_with_fallback(), which upgrades a non-WAL file to WAL
         # whenever the configured mode says so (the resolver's downgrade
         # gates may still refuse; effective_mode_or_skip audits post-run).
-        child_env["HERMES_HOME"] = str(
+        child_env["STARDUST_HOME"] = str(
             make_hermes_home(tmp_path, requested_mode.lower())
         )
 

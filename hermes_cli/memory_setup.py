@@ -127,7 +127,7 @@ def _install_dependencies(provider_name: str, *, force: bool = False) -> None:
 
     print(f"\n  Installing dependencies: {', '.join(missing)}")
 
-    # install_specs routes to the durable target on sealed hosted images (HERMES_LAZY_INSTALL_TARGET)
+    # install_specs routes to the durable target on sealed hosted images (STARDUST_LAZY_INSTALL_TARGET)
     # and is venv-scoped on normal installs.
     from tools.lazy_deps import install_specs
 
@@ -354,7 +354,7 @@ def _write_env_vars(
     env_writes: dict, hermes_home: str | os.PathLike[str] | None = None) -> None:
     """Persist memory-provider env vars through the canonical ``.env`` writer.
 
-    ``save_env_value`` applies the shared gate (name regex, ``LD_PRELOAD``/``PYTHONPATH``/``HERMES_HOME``
+    ``save_env_value`` applies the shared gate (name regex, ``LD_PRELOAD``/``PYTHONPATH``/``STARDUST_HOME``
     denylist, CR/LF stripping, atomic 0o600 writes). ``ValueError`` is reported and skipped so one
     bad key doesn't sink the batch; filesystem errors propagate. ``hermes_home`` is applied via the
     context-local override, not ``os.environ``.

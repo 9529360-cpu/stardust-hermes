@@ -126,7 +126,7 @@ def integrity_ok(db_path: Path) -> bool:
 
 
 def make_hermes_home(base: Path, journal_mode: str) -> Path:
-    """Create an isolated HERMES_HOME whose config pins ``database.journal_mode``.
+    """Create an isolated STARDUST_HOME whose config pins ``database.journal_mode``.
 
     The journal-mode matrix legs must steer the CHILD's own resolver:
     pre-seeding the DB file alone is not enough, because ``SessionDB.__init__``

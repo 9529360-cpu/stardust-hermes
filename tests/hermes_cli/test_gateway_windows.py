@@ -93,7 +93,7 @@ def test_spawn_detached_marks_primary_breakaway_success(monkeypatch, tmp_path, c
     monkeypatch.setattr(
         gateway_windows,
         "_build_gateway_argv",
-        lambda home=None: (argv, cwd, {"HERMES_GATEWAY_DETACHED": "1"}),
+        lambda home=None: (argv, cwd, {"STARDUST_GATEWAY_DETACHED": "1"}),
     )
     monkeypatch.setattr("hermes_cli.config.get_hermes_home", lambda: tmp_path)
     monkeypatch.setattr(gateway_windows.subprocess, "Popen", fake_popen)
@@ -134,7 +134,7 @@ def test_spawn_detached_warns_and_marks_no_breakaway_fallback(
         lambda home=None: (
             argv,
             cwd,
-            {"HERMES_GATEWAY_DETACHED": "1", "SECRET_SENTINEL": "do-not-log"},
+            {"STARDUST_GATEWAY_DETACHED": "1", "SECRET_SENTINEL": "do-not-log"},
         ),
     )
     monkeypatch.setattr("hermes_cli.config.get_hermes_home", lambda: tmp_path)
@@ -334,7 +334,7 @@ def test_gateway_vbs_script_is_console_less(monkeypatch):
     assert "hermes_cli.main" in content
     assert "gateway run" in content
     assert ", 0, False" in content  # hidden window, detached/async
-    for var in ("HERMES_HOME", "PYTHONIOENCODING", "HERMES_GATEWAY_DETACHED", "VIRTUAL_ENV", "PYTHONPATH"):
+    for var in ("STARDUST_HOME", "PYTHONIOENCODING", "STARDUST_GATEWAY_DETACHED", "VIRTUAL_ENV", "PYTHONPATH"):
         assert var in content
     assert "--profile" in content and "work" in content
     assert content.endswith("\r\n")

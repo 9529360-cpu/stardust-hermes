@@ -358,7 +358,7 @@ class GatewayGoalsMixin:
         if state is None or not state.awaiting_response:
             return
         # The --until judge is a sync aux-LLM call — keep it off the event loop, but carry the
-        # contextvars: a bare executor hop drops the profile HERMES_HOME override and secret scope,
+        # contextvars: a bare executor hop drops the profile STARDUST_HOME override and secret scope,
         # so a served secondary's tick would be written into the DEFAULT profile's state.db.
         decision = await self._run_in_executor_with_context(mgr.complete_tick, final_response or "")
         msg = decision.get("message") or ""
@@ -416,7 +416,7 @@ class GatewayGoalsMixin:
             return
         # fire_tick()/complete_tick() are writes (BEGIN IMMEDIATE) taking the SessionDB writer lock; a slow
         # writer elsewhere holding it while the loop thread blocked froze the gateway until the watchdog
-        # fired. The context-preserving executor keeps the profile HERMES_HOME override under multiplex.
+        # fired. The context-preserving executor keeps the profile STARDUST_HOME override under multiplex.
         wakeup = await self._run_in_executor_with_context(mgr.fire_tick)
         if not wakeup:
             return

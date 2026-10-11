@@ -83,7 +83,7 @@ class _Profile:
 class TestLaunchdGatewayLabelsForInstall:
     def test_labels_derive_from_this_installs_profiles(self, monkeypatch):
         """The fleet is THIS install's profiles, root first — never a glob of
-        the shared per-user LaunchAgents dir. A sandboxed HERMES_HOME (tests,
+        the shared per-user LaunchAgents dir. A sandboxed STARDUST_HOME (tests,
         side-by-side installs) must not enumerate — and restart — another
         install's services, and the hermetic test suite must not see the dev
         machine's real fleet."""

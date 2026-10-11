@@ -28,7 +28,7 @@ def test_mcp_config_reconciler_runs_only_when_config_changes(monkeypatch, tmp_pa
     from tools import mcp_tool_discovery as _mcp_discovery
     from tools.mcp_oauth import _is_interactive
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     cfg = tmp_path / "config.yaml"
     cfg.write_text("mcp_servers:\n  linear:\n    url: https://x/mcp\n")
     calls: list = []

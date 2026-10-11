@@ -676,7 +676,7 @@ def _configure_journal_mode(monkeypatch, tmp_path, mode) -> None:
 
     home = tmp_path / "hermes-home"
     home.mkdir(exist_ok=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     (home / "config.yaml").write_text(
         yaml.safe_dump({"database": {"journal_mode": mode}}), encoding="utf-8",
     )

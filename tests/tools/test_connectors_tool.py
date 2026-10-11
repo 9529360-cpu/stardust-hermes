@@ -203,7 +203,7 @@ def test_tui_and_desktop_sessions_get_the_tool(monkeypatch):
     """The path the TUI/desktop gateway takes to build its selection."""
     from tui_gateway.server import _load_enabled_toolsets
 
-    monkeypatch.delenv("HERMES_TUI_TOOLSETS", raising=False)
+    monkeypatch.delenv("STARDUST_TUI_TOOLSETS", raising=False)
     for platform in ("tui", "desktop"):
         selection = _load_enabled_toolsets(platform)
         names = _session_tool_names(selection, connectors=True)
@@ -235,7 +235,7 @@ def test_session_the_portal_has_not_enabled_never_receives_the_tool(tmp_path, mo
     from tui_gateway.server import _load_enabled_toolsets
 
     monkeypatch.chdir(tmp_path)
-    monkeypatch.delenv("HERMES_TUI_TOOLSETS", raising=False)
+    monkeypatch.delenv("STARDUST_TUI_TOOLSETS", raising=False)
     selections = [
         sorted(_get_platform_tools({}, "cli", include_default_mcp_servers=True)),
         _load_enabled_toolsets("tui"),

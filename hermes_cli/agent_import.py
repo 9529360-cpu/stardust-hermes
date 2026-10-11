@@ -488,7 +488,7 @@ class AgentImporter:
             dump_yaml_file(destination, config)
 
     def import_skills(self, source_root: Path) -> None:
-        """skills/<name>/SKILL.md dirs → HERMES_HOME/skills/<category>/<name>."""
+        """skills/<name>/SKILL.md dirs → STARDUST_HOME/skills/<category>/<name>."""
         destination_root = self.target_root / "skills" / _SKILL_CATEGORY[self.agent]
         if not source_root.is_dir():
             self.record("skills", None, destination_root, "skipped", "No skills directory found")

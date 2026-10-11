@@ -17,8 +17,8 @@ from hermes_cli import config as config_mod
 def hermes_home(tmp_path, monkeypatch):
     home = tmp_path / ".hermes"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.delenv("HERMES_MANAGED", raising=False)
+    monkeypatch.setenv("STARDUST_HOME", str(home))
+    monkeypatch.delenv("STARDUST_MANAGED", raising=False)
     return home
 
 
@@ -41,9 +41,9 @@ def hermes_home(tmp_path, monkeypatch):
 )
 def test_env_var_names_the_managing_system(hermes_home, monkeypatch, env_value, expected):
     if env_value is None:
-        monkeypatch.delenv("HERMES_MANAGED", raising=False)
+        monkeypatch.delenv("STARDUST_MANAGED", raising=False)
     else:
-        monkeypatch.setenv("HERMES_MANAGED", env_value)
+        monkeypatch.setenv("STARDUST_MANAGED", env_value)
 
     assert config_mod.get_managed_system() == expected
     assert config_mod.is_managed() is (expected is not None)
@@ -62,9 +62,9 @@ def test_env_var_names_the_managing_system(hermes_home, monkeypatch, env_value, 
 def test_marker_file_names_the_managing_system(
     hermes_home, monkeypatch, marker_text, expected
 ):
-    """An interactive shell reads .managed, not the HERMES_MANAGED of the service."""
+    """An interactive shell reads .managed, not the STARDUST_MANAGED of the service."""
     (hermes_home / ".managed").write_text(marker_text, encoding="utf-8")
-    monkeypatch.delenv("HERMES_MANAGED", raising=False)
+    monkeypatch.delenv("STARDUST_MANAGED", raising=False)
 
     assert config_mod.get_managed_system() == expected
     assert config_mod.is_managed() is True
@@ -72,7 +72,7 @@ def test_marker_file_names_the_managing_system(
 
 def test_env_var_wins_over_the_marker(hermes_home, monkeypatch):
     (hermes_home / ".managed").write_text("nixos", encoding="utf-8")
-    monkeypatch.setenv("HERMES_MANAGED", "home-manager")
+    monkeypatch.setenv("STARDUST_MANAGED", "home-manager")
 
     assert config_mod.get_managed_system() == "home-manager"
 
@@ -82,7 +82,7 @@ def test_managed_install_names_its_system_and_offers_an_update(
     hermes_home, monkeypatch, tmp_path, managed_value
 ):
     """The message names the system, so the user knows what owns the install."""
-    monkeypatch.setenv("HERMES_MANAGED", managed_value)
+    monkeypatch.setenv("STARDUST_MANAGED", managed_value)
 
     # This test uses an install tree of its own. The real checkout can carry
     # a stamp from the install shape of the contributor. A stamp answers
@@ -109,7 +109,7 @@ def test_a_stamp_can_name_every_managed_system(
     absent from that allowlist gives "unknown". The update guidance then
     names a command that the managed guard refuses.
     """
-    monkeypatch.delenv("HERMES_MANAGED", raising=False)
+    monkeypatch.delenv("STARDUST_MANAGED", raising=False)
     install_tree = tmp_path / "install"
     install_tree.mkdir()
 
@@ -119,7 +119,7 @@ def test_a_stamp_can_name_every_managed_system(
 
 
 def test_unmanaged_install_offers_no_update_command(hermes_home, monkeypatch):
-    monkeypatch.delenv("HERMES_MANAGED", raising=False)
+    monkeypatch.delenv("STARDUST_MANAGED", raising=False)
     assert config_mod.get_managed_update_command() is None
 
 
@@ -128,7 +128,7 @@ def test_unreadable_marker_still_reports_managed(hermes_home, monkeypatch):
     marker = hermes_home / ".managed"
     marker.write_text("home-manager", encoding="utf-8")
     marker.chmod(0o000)
-    monkeypatch.delenv("HERMES_MANAGED", raising=False)
+    monkeypatch.delenv("STARDUST_MANAGED", raising=False)
     try:
         if os.access(marker, os.R_OK):
             pytest.skip("running as a user that ignores file modes (for example root)")

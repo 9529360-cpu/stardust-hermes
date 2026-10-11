@@ -56,7 +56,7 @@ def _available(name: str):
 def resolve_provider(*, require_references: bool = True, prefer: str | None = None) -> SpriteProvider:
     """Pick the image provider for sprite work.
 
-    Preference: ``HERMES_PET_IMAGE_PROVIDER`` (QA override, unknown values ignored),
+    Preference: ``STARDUST_PET_IMAGE_PROVIDER`` (QA override, unknown values ignored),
     then *prefer* (desktop picker), then the active provider, then the first available
     — each only if ref-capable and configured. With *require_references* off, any
     available active provider is accepted (prompt-only base drafts).
@@ -64,7 +64,7 @@ def resolve_provider(*, require_references: bool = True, prefer: str | None = No
     _discover()
     from agent.image_gen_registry import get_active_provider
 
-    forced = os.environ.get("HERMES_PET_IMAGE_PROVIDER", "").strip().lower()
+    forced = os.environ.get("STARDUST_PET_IMAGE_PROVIDER", "").strip().lower()
     for name in (forced, prefer):
         if name in _REF_CAPABLE and (chosen := _available(name)) is not None:
             return SpriteProvider(name=name, provider=chosen, supports_references=True)

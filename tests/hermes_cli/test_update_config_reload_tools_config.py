@@ -52,7 +52,7 @@ def test_update_migration_survives_stale_module_missing_call_time_symbol(tmp_pat
     home.mkdir()
     (home / "config.yaml").write_text(
         "_config_version: 44\nplatform_toolsets:\n  telegram:\n    - web\n    - file\n", encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     from hermes_constants import set_hermes_home_override
     token = set_hermes_home_override(home)
     try:
@@ -77,7 +77,7 @@ def test_update_migration_import_failure_after_purge_prints_fallback(tmp_path, m
     home = tmp_path / "flat-home"
     home.mkdir()
     (home / "config.yaml").write_text("_config_version: 44\n", encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     import hermes_cli.config  # noqa: F401  (pre-pull world has config cached)
     import hermes_constants
     # A pre-pull root module lacking a symbol the post-pull hermes_cli/config.py imports at module level.

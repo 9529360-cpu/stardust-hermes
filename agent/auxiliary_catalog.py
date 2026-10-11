@@ -345,8 +345,8 @@ def _apply_user_default_headers(headers: dict | None) -> dict | None:
 def build_or_headers(or_config: dict | None = None) -> dict:
     """OpenRouter headers, plus response-cache headers when enabled.
 
-    Precedence env > config > default: ``HERMES_OPENROUTER_CACHE`` overrides
-    ``openrouter.response_cache``; ``HERMES_OPENROUTER_CACHE_TTL`` (1-86400 s) overrides
+    Precedence env > config > default: ``STARDUST_OPENROUTER_CACHE`` overrides
+    ``openrouter.response_cache``; ``STARDUST_OPENROUTER_CACHE_TTL`` (1-86400 s) overrides
     ``openrouter.response_cache_ttl``. ``or_config=None`` reads from disk.
     """
     headers = dict(_OR_HEADERS_BASE)
@@ -356,11 +356,11 @@ def build_or_headers(or_config: dict | None = None) -> dict:
             or_config = load_config_readonly().get("openrouter", {})
         except Exception:
             or_config = {}
-    env_cache = os.environ.get("HERMES_OPENROUTER_CACHE", "").strip().lower()
+    env_cache = os.environ.get("STARDUST_OPENROUTER_CACHE", "").strip().lower()
     if not (env_cache in {"1", "true", "yes", "on"} if env_cache else or_config.get("response_cache", False)):
         return headers
     headers["X-OpenRouter-Cache"] = "true"
-    env_ttl = os.environ.get("HERMES_OPENROUTER_CACHE_TTL", "").strip()
+    env_ttl = os.environ.get("STARDUST_OPENROUTER_CACHE_TTL", "").strip()
     if env_ttl:
         if env_ttl.isdigit() and 1 <= int(env_ttl) <= 86400:
             headers["X-OpenRouter-Cache-TTL"] = str(int(env_ttl))

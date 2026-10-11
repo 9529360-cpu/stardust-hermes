@@ -2,7 +2,7 @@
 
 Runs commands in Vercel cloud sandboxes through the shared ``BaseEnvironment``
 shell contract. With persistence enabled, task-scoped snapshot ids are stored
-under ``HERMES_HOME`` and new sandboxes are restored from them on task reuse.
+under ``STARDUST_HOME`` and new sandboxes are restored from them on task reuse.
 """
 
 from __future__ import annotations

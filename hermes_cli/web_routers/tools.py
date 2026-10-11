@@ -576,7 +576,7 @@ async def run_toolset_post_setup(
     name: str, body: ToolsetPostSetup, profile: Optional[str] = None):
     """Spawn ``hermes tools post-setup <key>`` (long-running installs) as a
     background action tailed via ``GET /api/actions/tools-post-setup/status``;
-    ``profile`` is threaded so hooks see the drawer's HERMES_HOME."""
+    ``profile`` is threaded so hooks see the drawer's STARDUST_HOME."""
     from hermes_cli.tools_config import valid_post_setup_keys
 
     _require_known_toolset(name)

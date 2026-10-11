@@ -26,7 +26,7 @@ import tui_gateway.server as srv
 def home(tmp_path, monkeypatch):
     h = tmp_path / ".hermes"
     h.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(h))
+    monkeypatch.setenv("STARDUST_HOME", str(h))
     return h
 
 

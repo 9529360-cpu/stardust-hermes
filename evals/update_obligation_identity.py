@@ -11,7 +11,7 @@ repo = pathlib.Path(sys.argv[1])
 sys.path.insert(0, str(repo))
 root = pathlib.Path(tempfile.mkdtemp(prefix="obligations-live-"))
 os.environ["HOME"] = str(root)
-os.environ["HERMES_HOME"] = str(root / ".hermes")
+os.environ["STARDUST_HOME"] = str(root / ".hermes")
 from hermes_cli import update_cmd_fleet as fleet, update_receipt as receipts
 
 print("MODULE", fleet.__file__)
@@ -26,7 +26,7 @@ try:
         p = subprocess.Popen(
             [sys.executable, "-c", code, str(repo)],
             cwd=repo,
-            env={**os.environ, "HERMES_HOME": str(home)},
+            env={**os.environ, "STARDUST_HOME": str(home)},
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

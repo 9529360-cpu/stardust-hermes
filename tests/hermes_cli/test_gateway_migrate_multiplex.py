@@ -29,7 +29,7 @@ def fleet(tmp_path, monkeypatch):
     (root / ".env").write_text("TELEGRAM_BOT_TOKEN=111111:default-token\n", encoding="utf-8")
     (root / "profiles/coder/.env").write_text("TELEGRAM_BOT_TOKEN=222222:coder-token\n", encoding="utf-8")
     (root / "profiles/ops/.env").write_text("DISCORD_BOT_TOKEN=ops-discord-333333\n", encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(root))
+    monkeypatch.setenv("STARDUST_HOME", str(root))
     monkeypatch.delenv("GATEWAY_MULTIPLEX_PROFILES", raising=False)
     for name in ("TELEGRAM_BOT_TOKEN", "DISCORD_BOT_TOKEN", "API_SERVER_KEY", "WEBHOOK_ENABLED"):
         monkeypatch.delenv(name, raising=False)
@@ -335,7 +335,7 @@ def test_update_hook_refuses_to_cross_service_user_or_home_boundary(
     fleet, capsys, monkeypatch, secondary_service, secondary_uid, secondary_home, expected,
 ):
     """#109954: the unattended hook must not fold a secondary that sits behind a kernel-enforced
-    boundary (other service domain, other UNIX user, HERMES_HOME outside profiles/). It prints the
+    boundary (other service domain, other UNIX user, STARDUST_HOME outside profiles/). It prints the
     boundary + the explicit command and touches nothing; the dry-run plan shows the same finding as a
     notice and the explicit command stays available."""
     fleet.services["default"] = ("systemd", False)
@@ -557,7 +557,7 @@ def test_opt_out_reads_effective_config_managed_false_wins_and_string_false_is_f
     assert auto_migration_opted_out(fleet.root) is False
     managed = tmp_path / "managed"; managed.mkdir()
     (managed / "config.yaml").write_text("gateway:\n  auto_multiplex_migration: false\n", encoding="utf-8")
-    monkeypatch.setenv("HERMES_MANAGED_DIR", str(managed))
+    monkeypatch.setenv("STARDUST_MANAGED_DIR", str(managed))
     managed_scope.invalidate_managed_cache()
     with gm._home_env(fleet.root):
         assert cfg.load_config()["gateway"]["auto_multiplex_migration"] is False

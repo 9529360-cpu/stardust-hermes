@@ -45,9 +45,9 @@ def test_discovery_uses_exact_profile_and_owner_handshake(tmp_path):
         assert discover_attach_url("same-id", registry_home=home) == reply["websocket_url"]
         assert len(requests) == 1
         from hermes_cli.shared_session_attach import configure_tui_attachment
-        env = {"HERMES_TUI_GATEWAY_URL": "   "}
+        env = {"STARDUST_TUI_GATEWAY_URL": "   "}
         configure_tui_attachment(env, "same-id", registry_home=home)
-        assert env["HERMES_TUI_GATEWAY_URL"] == reply["websocket_url"]
+        assert env["STARDUST_TUI_GATEWAY_URL"] == reply["websocket_url"]
         reply["profile_home"] = str(other.resolve())
         with pytest.raises(ValueError, match="identity"):
             discover_attach_url("same-id", registry_home=home)

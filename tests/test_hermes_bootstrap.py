@@ -277,21 +277,21 @@ class TestHardenImportPath:
 
     def _run(self, hb, path_seed, env=None):
         original = sys.path[:]
-        original_env = os.environ.get("HERMES_PYTHON_SRC_ROOT")
+        original_env = os.environ.get("STARDUST_PYTHON_SRC_ROOT")
         try:
             sys.path[:] = path_seed
             if env is not None:
-                os.environ["HERMES_PYTHON_SRC_ROOT"] = env
-            elif "HERMES_PYTHON_SRC_ROOT" in os.environ:
-                del os.environ["HERMES_PYTHON_SRC_ROOT"]
+                os.environ["STARDUST_PYTHON_SRC_ROOT"] = env
+            elif "STARDUST_PYTHON_SRC_ROOT" in os.environ:
+                del os.environ["STARDUST_PYTHON_SRC_ROOT"]
             hb.harden_import_path(src_root="/opt/hermes")
             return sys.path[:]
         finally:
             sys.path[:] = original
             if original_env is None:
-                os.environ.pop("HERMES_PYTHON_SRC_ROOT", None)
+                os.environ.pop("STARDUST_PYTHON_SRC_ROOT", None)
             else:
-                os.environ["HERMES_PYTHON_SRC_ROOT"] = original_env
+                os.environ["STARDUST_PYTHON_SRC_ROOT"] = original_env
 
     def test_relative_cwd_forms_removed(self):
         hb = _fresh_import()
@@ -319,18 +319,18 @@ class TestHardenImportPath:
     def test_env_var_used_when_no_arg(self):
         hb = _fresh_import()
         original = sys.path[:]
-        original_env = os.environ.get("HERMES_PYTHON_SRC_ROOT")
+        original_env = os.environ.get("STARDUST_PYTHON_SRC_ROOT")
         try:
             sys.path[:] = ["", "/cwd/proj", "/usr/lib"]
-            os.environ["HERMES_PYTHON_SRC_ROOT"] = "/env/hermes"
+            os.environ["STARDUST_PYTHON_SRC_ROOT"] = "/env/hermes"
             hb.harden_import_path()
             assert sys.path[0] == "/env/hermes"
         finally:
             sys.path[:] = original
             if original_env is None:
-                os.environ.pop("HERMES_PYTHON_SRC_ROOT", None)
+                os.environ.pop("STARDUST_PYTHON_SRC_ROOT", None)
             else:
-                os.environ["HERMES_PYTHON_SRC_ROOT"] = original_env
+                os.environ["STARDUST_PYTHON_SRC_ROOT"] = original_env
 
 
 

@@ -31,7 +31,7 @@ class TestUnifiedDashboardRouting:
 
 
     def test_profile_launch_reexecs_machine_dashboard(self, main_mod, monkeypatch):
-        monkeypatch.delenv("HERMES_HOME", raising=False)
+        monkeypatch.delenv("STARDUST_HOME", raising=False)
         monkeypatch.setattr(
             "hermes_cli.profiles.get_active_profile_name", lambda: "worker_x"
         )
@@ -55,19 +55,19 @@ class TestUnifiedDashboardRouting:
         assert "--open-profile" in argv
         assert argv[argv.index("--open-profile") + 1] == "worker_x"
         # The child is pinned to the machine ROOT, not the launching profile's
-        # HERMES_HOME.  For a standard install (HERMES_HOME unset) that root is
+        # STARDUST_HOME.  For a standard install (STARDUST_HOME unset) that root is
         # the platform-native default (~/.hermes), NOT dropped — see the Docker
         # test below for why we resolve explicitly instead of popping.
         from hermes_constants import get_default_hermes_root
-        assert env.get("HERMES_HOME") == str(get_default_hermes_root())
+        assert env.get("STARDUST_HOME") == str(get_default_hermes_root())
 
 
     def test_desktop_profile_backend_skips_machine_dashboard_reroute(self, main_mod, monkeypatch):
-        """A desktop-spawned named-profile backend (HERMES_DESKTOP=1) must NOT
+        """A desktop-spawned named-profile backend (STARDUST_DESKTOP=1) must NOT
         reroute into the machine dashboard. The reroute re-execs as the default
         profile and exits, so the desktop never sees a ready backend → boot
         loop. The guard keeps desktop pool backends per-profile."""
-        monkeypatch.setenv("HERMES_DESKTOP", "1")
+        monkeypatch.setenv("STARDUST_DESKTOP", "1")
         monkeypatch.setattr(
             "hermes_cli.profiles.get_active_profile_name", lambda: "worker_x"
         )
@@ -94,7 +94,7 @@ class TestInteractiveDashboardAuthSetup:
         from hermes_cli.dashboard_auth import clear_providers
 
         monkeypatch.setenv(
-            "HERMES_DASHBOARD_PUBLIC_URL",
+            "STARDUST_DASHBOARD_PUBLIC_URL",
             "https://dashboard.example.test:9443",
         )
         clear_providers()
@@ -126,8 +126,8 @@ class TestInteractiveDashboardAuthSetup:
         assert exc.value.code == 0
         output = capsys.readouterr().out
         assert "Self-hosted OIDC" in output
-        assert "HERMES_DASHBOARD_OIDC_ISSUER" in output
-        assert "HERMES_DASHBOARD_OIDC_CLIENT_ID" in output
+        assert "STARDUST_DASHBOARD_OIDC_ISSUER" in output
+        assert "STARDUST_DASHBOARD_OIDC_CLIENT_ID" in output
         assert "Nous Portal" not in output
         assert "dashboard register" not in output
 
@@ -136,8 +136,8 @@ class TestInteractiveDashboardAuthSetup:
 
         message = _no_auth_provider_message("0.0.0.0")
 
-        assert "HERMES_DASHBOARD_OIDC_ISSUER" in message
-        assert "HERMES_DASHBOARD_OIDC_CLIENT_ID" in message
+        assert "STARDUST_DASHBOARD_OIDC_ISSUER" in message
+        assert "STARDUST_DASHBOARD_OIDC_CLIENT_ID" in message
         assert "Nous Portal" not in message
         assert "dashboard register" not in message
 

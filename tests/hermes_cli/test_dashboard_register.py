@@ -264,14 +264,14 @@ class TestCustomPortalPersistence:
 
 
 class TestPublicUrlPersistence:
-    """`--redirect-uri` derives & persists HERMES_DASHBOARD_PUBLIC_URL in .env.
+    """`--redirect-uri` derives & persists STARDUST_DASHBOARD_PUBLIC_URL in .env.
 
     --redirect-uri is the full public callback (e.g.
     https://hermes.example.com/auth/callback). At serve time the dashboard auth
     layer reconstructs that callback by appending "/auth/callback" to
-    HERMES_DASHBOARD_PUBLIC_URL, so the value that's actually consumed is the
+    STARDUST_DASHBOARD_PUBLIC_URL, so the value that's actually consumed is the
     ORIGIN (scheme://host). We derive the origin from the supplied redirect URI
-    and persist THAT as HERMES_DASHBOARD_PUBLIC_URL — the var the runtime reads
+    and persist THAT as STARDUST_DASHBOARD_PUBLIC_URL — the var the runtime reads
     — so the public-URL override is genuinely wired, not just stored.
 
     An explicitly supplied value is always written (updating an existing entry
@@ -283,7 +283,7 @@ class TestPublicUrlPersistence:
         """Drive cmd_dashboard_register, capturing save_env_value calls.
 
         `existing_public` is what get_env_value returns for
-        HERMES_DASHBOARD_PUBLIC_URL (None = not present in .env).
+        STARDUST_DASHBOARD_PUBLIC_URL (None = not present in .env).
         """
         response = {
             "client_id": "agent:selfhost-1",
@@ -300,7 +300,7 @@ class TestPublicUrlPersistence:
             saved[key] = value
 
         def fake_get_env_value(key, *a, **kw):
-            if key == "HERMES_DASHBOARD_PUBLIC_URL":
+            if key == "STARDUST_DASHBOARD_PUBLIC_URL":
                 return existing_public
             return None
 
@@ -329,7 +329,7 @@ class TestPublicUrlPersistence:
             args=_ns(),
             existing_public="https://already-set.example.com",
         )
-        assert "HERMES_DASHBOARD_PUBLIC_URL" not in saved
+        assert "STARDUST_DASHBOARD_PUBLIC_URL" not in saved
 
     def test_non_http_redirect_not_persisted(self, capsys):
         # A malformed / non-http(s) redirect yields no derivable origin → skip.
@@ -337,7 +337,7 @@ class TestPublicUrlPersistence:
             args=_ns(redirect_uri="not-a-url"),
             existing_public=None,
         )
-        assert "HERMES_DASHBOARD_PUBLIC_URL" not in saved
+        assert "STARDUST_DASHBOARD_PUBLIC_URL" not in saved
 
     def test_public_url_persisted_alongside_portal_url(self, capsys):
         # Both --portal-url and --redirect-uri supplied → portal_url AND the
@@ -377,7 +377,7 @@ class TestPublicUrlPersistence:
                 )
             )
         assert saved["HERMES_DASHBOARD_PORTAL_URL"] == "https://preview.example.com"
-        assert saved["HERMES_DASHBOARD_PUBLIC_URL"] == "https://hermes.example.com"
+        assert saved["STARDUST_DASHBOARD_PUBLIC_URL"] == "https://hermes.example.com"
 
 
 class TestPortalResolution:

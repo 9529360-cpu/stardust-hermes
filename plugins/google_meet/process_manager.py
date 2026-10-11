@@ -1,6 +1,6 @@
 """Subprocess lifecycle manager for the google_meet bot.
 
-One active meeting at a time, recorded in ``$HERMES_HOME/workspace/meetings/.active.json``
+One active meeting at a time, recorded in ``$STARDUST_HOME/workspace/meetings/.active.json``
 (``pid, meeting_id, out_dir, url, started_at, session_id, log_path, mode``) so tool calls
 across turns can find the bot. The bot is a detached subprocess reached via files only
 (``<meeting-id>/status.json``, ``<meeting-id>/transcript.txt``), so the agent loop can't block.
@@ -69,25 +69,25 @@ def start(url: str, *, out_dir: Optional[Path] = None, headed: bool = False,
     for name in ("transcript.txt", "status.json"):
         with contextlib.suppress(OSError):
             (out / name).unlink()
-    env = {**os.environ, "HERMES_MEET_URL": url, "HERMES_MEET_OUT_DIR": str(out),
-           "HERMES_MEET_GUEST_NAME": guest_name}
+    env = {**os.environ, "STARDUST_MEET_URL": url, "STARDUST_MEET_OUT_DIR": str(out),
+           "STARDUST_MEET_GUEST_NAME": guest_name}
     for value, var in (
-        (headed and "1", "HERMES_MEET_HEADED"),
-        (auth_state, "HERMES_MEET_AUTH_STATE"),
-        (duration, "HERMES_MEET_DURATION"),
-        (mode, "HERMES_MEET_MODE"),  # bot defaults to transcribe when unset (v1 behavior)
-        (realtime_model, "HERMES_MEET_REALTIME_MODEL"),
-        (realtime_voice, "HERMES_MEET_REALTIME_VOICE"),
-        (realtime_instructions, "HERMES_MEET_REALTIME_INSTRUCTIONS")):
+        (headed and "1", "STARDUST_MEET_HEADED"),
+        (auth_state, "STARDUST_MEET_AUTH_STATE"),
+        (duration, "STARDUST_MEET_DURATION"),
+        (mode, "STARDUST_MEET_MODE"),  # bot defaults to transcribe when unset (v1 behavior)
+        (realtime_model, "STARDUST_MEET_REALTIME_MODEL"),
+        (realtime_voice, "STARDUST_MEET_REALTIME_VOICE"),
+        (realtime_instructions, "STARDUST_MEET_REALTIME_INSTRUCTIONS")):
         if value:
             env[var] = value
     # Resolve the realtime key at SPAWN time in the parent, where the profile secret scope
     # (a contextvar) is installed; the detached child inherits env, not scope.
     if not realtime_api_key:
         from agent.secret_scope import get_secret
-        realtime_api_key = get_secret("HERMES_MEET_REALTIME_KEY") or get_secret("OPENAI_API_KEY")
+        realtime_api_key = get_secret("STARDUST_MEET_REALTIME_KEY") or get_secret("OPENAI_API_KEY")
     if realtime_api_key:
-        env["HERMES_MEET_REALTIME_KEY"] = realtime_api_key
+        env["STARDUST_MEET_REALTIME_KEY"] = realtime_api_key
     log_path = out / "bot.log"
     # Detach: stdout/stderr → log file, new session so parent signals don't propagate.
     with open(log_path, "ab", buffering=0) as log_fh:

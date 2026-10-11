@@ -368,10 +368,10 @@ def _last_used_profile(src: str) -> str:
 def _secure_snapshot(path: str, *, contents: bool = False) -> None:
     """Lock down a snapshot dir (or, with ``contents``, everything INSIDE it) as a secret store.
     It holds the user's Cookies / Login Data, so it gets the same owner-only perms (managed-mode /
-    NixOS group-share carve-out, HERMES_UID/GID) as every Hermes secret dir — via ``_secure_dir``/
+    NixOS group-share carve-out, STARDUST_UID/GID) as every Hermes secret dir — via ``_secure_dir``/
     ``_secure_file``, not a bespoke chmod. Contents matter too (#96729): ``copy2`` keeps Chrome's
     0644 and sqlite backups land umask-wide, so cookies were world-readable under the
-    ``HERMES_HOME_MODE`` hatch. Best-effort; never blocks a launch."""
+    ``STARDUST_HOME_MODE`` hatch. Best-effort; never blocks a launch."""
     try:
         from hermes_cli.config import _secure_dir, _secure_file
         if not contents:

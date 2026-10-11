@@ -4,7 +4,7 @@
 multi-profile runtimes (dashboard console, TUI/Desktop backend, cron, kanban
 workers) kept writing synthesized audio into the launch profile's
 ``cache/audio`` even while the request was scoped to a different profile via
-``HERMES_HOME`` or ``set_hermes_home_override()``. The call-time accessor
+``STARDUST_HOME`` or ``set_hermes_home_override()``. The call-time accessor
 ``_default_output_dir()`` re-resolves from the live profile-scoped home;
 these pins keep the synthesis paths from re-freezing the launch profile.
 """
@@ -14,7 +14,7 @@ from pathlib import Path
 
 
 def _reload_tts_tool(import_home: Path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(import_home))
+    monkeypatch.setenv("STARDUST_HOME", str(import_home))
     import tools.tts_tool as tts_tool
 
     return importlib.reload(tts_tool)

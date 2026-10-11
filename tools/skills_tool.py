@@ -57,14 +57,14 @@ def _skills_scan_signature(dirs_to_scan, disabled) -> tuple:
     return (tuple(sig), frozenset(disabled), platform)
 
 
-HERMES_HOME = get_hermes_home()  # all skills live in ~/.hermes/skills/ (seeded from bundled)
-SKILLS_DIR = HERMES_HOME / "skills"
+STARDUST_HOME = get_hermes_home()  # all skills live in ~/.hermes/skills/ (seeded from bundled)
+SKILLS_DIR = STARDUST_HOME / "skills"
 _SKILLS_DIR_AT_IMPORT = SKILLS_DIR
 
 
 def _skills_dir() -> Path:
     """Active profile's skills dir at call time: the patched ``SKILLS_DIR`` when a patcher changed
-    it, else live profile-scoped HERMES_HOME (long-lived runtimes may import before profile set)."""
+    it, else live profile-scoped STARDUST_HOME (long-lived runtimes may import before profile set)."""
     configured = Path(SKILLS_DIR)
     return configured if configured != _SKILLS_DIR_AT_IMPORT else get_hermes_home() / "skills"
 
@@ -88,7 +88,7 @@ def _skill_lookup_path_error(name: str) -> Optional[str]:
 
 
 def load_env() -> Dict[str, str]:
-    """Snapshot of HERMES_HOME/.env for the post-skill secret-capture diff (same tokenizer that
+    """Snapshot of STARDUST_HOME/.env for the post-skill secret-capture diff (same tokenizer that
     installs the profile scope, so a captured value never differs from the served one)."""
     from agent.secret_scope import load_env_file
 
@@ -147,17 +147,17 @@ def _parse_tags(tags_value) -> List[str]:
 
 
 def _is_skill_disabled(name: str, platform: str = None) -> bool:
-    """Disabled in config? Platform precedence: explicit arg, ``HERMES_PLATFORM``, session
-    ``HERMES_SESSION_PLATFORM``. A globally-disabled skill stays disabled on every platform
+    """Disabled in config? Platform precedence: explicit arg, ``STARDUST_PLATFORM``, session
+    ``STARDUST_SESSION_PLATFORM``. A globally-disabled skill stays disabled on every platform
     (keep in sync with agent.skill_utils.get_disabled_skill_names)."""
     try:
         from hermes_cli.config import load_config
         skills_cfg = load_config().get("skills", {})
-        resolved_platform = platform or os.getenv("HERMES_PLATFORM")
+        resolved_platform = platform or os.getenv("STARDUST_PLATFORM")
         if not resolved_platform:
             with suppress(Exception):
                 from gateway.session_context import get_session_env
-                resolved_platform = get_session_env("HERMES_SESSION_PLATFORM") or ""
+                resolved_platform = get_session_env("STARDUST_SESSION_PLATFORM") or ""
         platform_disabled = None
         if resolved_platform:
             platform_disabled = cfg_get(skills_cfg, "platform_disabled", resolved_platform)

@@ -277,7 +277,7 @@ def canonical_custom_identity(*, base_url: Optional[str] = None, config_provider
         except Exception:
             candidate = ""
     if not candidate:
-        candidate = os.environ.get("HERMES_INFERENCE_PROVIDER", "").strip()
+        candidate = os.environ.get("STARDUST_INFERENCE_PROVIDER", "").strip()
     candidate_norm = _normalize_custom_provider_name(candidate)
     # A bare/non-routable candidate cannot heal a bare custom override.
     if not candidate_norm or candidate_norm in {"custom", "auto", "openrouter"}:

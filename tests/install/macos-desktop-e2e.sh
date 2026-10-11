@@ -73,8 +73,8 @@ REPO_URL_SSH="git@github.com:NousResearch/hermes-agent.git"
 REPO_URL_HTTPS="https://github.com/NousResearch/hermes-agent.git"
 ASSETS="$REPO_ROOT/tests/install/e2e-assets"
 
-WORK_ROOT="${HERMES_E2E_WORKROOT:-${RUNNER_TEMP:-${TMPDIR:-/tmp}}/hermes-macos-desktop-e2e}"
-LOG_DIR="${HERMES_E2E_LOG_DIR:-$WORK_ROOT/logs}"
+WORK_ROOT="${STARDUST_E2E_WORKROOT:-${RUNNER_TEMP:-${TMPDIR:-/tmp}}/hermes-macos-desktop-e2e}"
+LOG_DIR="${STARDUST_E2E_LOG_DIR:-$WORK_ROOT/logs}"
 SERVE_REPO="$WORK_ROOT/serve.git"
 STATE="$WORK_ROOT/shas.env"
 export HOME_SANDBOX="$WORK_ROOT/home"
@@ -156,8 +156,8 @@ EOF
   # -------
   export HOME="$HOME_SANDBOX"
   export PATH="$HOME/.local/bin:$PATH"
-  export HERMES_HOME="$HOME/.hermes"
-  export INSTALL_DIR="$HERMES_HOME/hermes-agent"
+  export STARDUST_HOME="$HOME/.hermes"
+  export INSTALL_DIR="$STARDUST_HOME/hermes-agent"
 }
 
 phase_stage() {
@@ -184,8 +184,8 @@ phase_stage() {
   git -C "$SERVE_REPO" config uploadpack.allowAnySHA1InWant true
 
   arm_redirect
-  mkdir -p "$HERMES_HOME"
-  touch "$HERMES_HOME/.skip_upstream_prompt"
+  mkdir -p "$STARDUST_HOME"
+  touch "$STARDUST_HOME/.skip_upstream_prompt"
 
   printf 'OLD_SHA=%s\nOLD_REF=%s\nHEAD_SHA=%s\n' "$old_sha" "$old_ref" "$head_sha" > "$STATE"
   ok "serve.git main = $old_sha ($old_ref), update target $head_sha"
@@ -310,7 +310,7 @@ run_playwright_update() {
   local rc=0
   (cd "$pw_dir" && node launch-from-spec.mjs \
     --spec "$spec" \
-    --result "$HERMES_HOME/.hermes-update-result.json" \
+    --result "$STARDUST_HOME/.hermes-update-result.json" \
     --expect-sha "$HEAD_SHA" \
     --repo-dir "$INSTALL_DIR" 2>&1 \
     | ts_prefix > "$LOG_DIR/app-update.log") || rc=$?
@@ -391,7 +391,7 @@ PYEOF
       local rc=0
       (cd "$INSTALL_DIR" && \
         PYTHONPATH="$ASSETS/launch-capture${PYTHONPATH:+:$PYTHONPATH}" \
-        HERMES_E2E_CAPTURE_LAUNCH="$spec" \
+        STARDUST_E2E_CAPTURE_LAUNCH="$spec" \
         "$hermes" desktop < /dev/null 2>&1 | ts_prefix > "$LOG_DIR/desktop-launch-capture.log") || rc=$?
       log_group "hermes desktop (launch capture) transcript" "$LOG_DIR/desktop-launch-capture.log"
       [ "$rc" -eq 0 ] || fail "hermes desktop exited $rc during launch capture"
@@ -417,8 +417,8 @@ PYEOF
   cp -R "$HOME_SANDBOX/.hermes/logs" "$ildest/hermes-logs" 2>/dev/null || true
   local ud="$HOME_SANDBOX/Library/Application Support/Hermes"
   [ -d "$ud" ] && cp -R "$ud" "$ildest/desktop-userdata" 2>/dev/null || true
-  cp "$HERMES_HOME/.hermes-update-result.json" "$ildest" 2>/dev/null || true
-  ls -la "$HERMES_HOME" > "$ildest/hermes-home-ls.txt" 2>/dev/null || true
+  cp "$STARDUST_HOME/.hermes-update-result.json" "$ildest" 2>/dev/null || true
+  ls -la "$STARDUST_HOME" > "$ildest/hermes-home-ls.txt" 2>/dev/null || true
   ls -la "$INSTALL_DIR/venv/bin" > "$ildest/venv-bin-ls.txt" 2>/dev/null || true
   ls -la "$INSTALL_DIR/venv" > "$ildest/venv-ls.txt" 2>/dev/null || true
   ok "collected install-side logs to $ildest"

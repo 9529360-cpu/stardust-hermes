@@ -142,7 +142,7 @@ def test_delivery_lock_recognizes_resolved_cli_paths(tmp_path, monkeypatch):
             return False
 
     monkeypatch.setattr(bot_relay, "acquire_turn_lock", lambda root, profile: _Ctx())
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
 
     with bot_mode_dm._delivery_lock(
         [str(tmp_path / "venv" / "bin" / "hermes"), "-p", "ops", "chat"],

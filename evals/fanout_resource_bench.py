@@ -139,7 +139,7 @@ def main() -> None:
 
     _REPLY_KB[0] = a.reply_kb
     home = tempfile.mkdtemp(prefix="hermes_bench_home_")
-    os.environ["HERMES_HOME"] = home
+    os.environ["STARDUST_HOME"] = home
     os.environ["TERMINAL_ENV"] = "local"
     os.environ.pop("OPENROUTER_API_KEY", None)
     sys.path.insert(0, a.repo)

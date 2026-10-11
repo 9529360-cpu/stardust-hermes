@@ -83,7 +83,7 @@ def _termux_env(tmp_path: Path, bin_dir: Path) -> dict[str, str]:
     env.update({
         "ANDROID_API_LEVEL": "35",
         "HOME": str(tmp_path / "home"),
-        "HERMES_HOME": str(tmp_path / "home" / ".hermes"),
+        "STARDUST_HOME": str(tmp_path / "home" / ".hermes"),
         "PATH": f"{bin_dir}{os.pathsep}{env.get('PATH', os.defpath)}",
         "PREFIX": str(prefix),
         "TERMUX_VERSION": "0.118.0",

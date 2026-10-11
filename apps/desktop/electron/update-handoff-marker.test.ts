@@ -28,9 +28,9 @@ function runPosix(installRoot: string, startedAt?: string) {
   const env = { ...process.env }
 
   if (startedAt === undefined) {
-    delete env.HERMES_UPDATE_STARTED_AT
+    delete env.STARDUST_UPDATE_STARTED_AT
   } else {
-    env.HERMES_UPDATE_STARTED_AT = startedAt
+    env.STARDUST_UPDATE_STARTED_AT = startedAt
   }
 
   return spawnSync('/bin/bash', [POSIX_SCRIPT, '--daemonized', '--install-root', installRoot, '--self-test-marker'], {
@@ -43,9 +43,9 @@ function runWindows(installRoot: string, startedAt?: string) {
   const env = { ...process.env }
 
   if (startedAt === undefined) {
-    delete env.HERMES_UPDATE_STARTED_AT
+    delete env.STARDUST_UPDATE_STARTED_AT
   } else {
-    env.HERMES_UPDATE_STARTED_AT = startedAt
+    env.STARDUST_UPDATE_STARTED_AT = startedAt
   }
 
   return spawnSync(

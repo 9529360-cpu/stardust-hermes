@@ -183,7 +183,7 @@ class TestDoctorEnvFileEncoding:
             encoding="utf-8",
         )
 
-        monkeypatch.setattr(doctor_mod, "HERMES_HOME", hermes_home)
+        monkeypatch.setattr(doctor_mod, "STARDUST_HOME", hermes_home)
 
         orig_read_text = pathlib.Path.read_text
 
@@ -223,7 +223,7 @@ class TestDoctorEnvFileEncoding:
         # so the scan still reports a configured endpoint/key.
         env_path.write_bytes(b"OPENAI_API_KEY=sk-test\xff\n")
 
-        monkeypatch.setattr(doctor_mod, "HERMES_HOME", hermes_home)
+        monkeypatch.setattr(doctor_mod, "STARDUST_HOME", hermes_home)
 
         fake_model_tools = types.SimpleNamespace(
             check_tool_availability=lambda *a, **kw: (_ for _ in ()).throw(SystemExit(0)),
@@ -286,7 +286,7 @@ class TestDoctorMemoryProviderSection:
     """The ◆ Memory Provider section should respect memory.provider config."""
 
     def _make_hermes_home(self, tmp_path, provider="", memory_config=None):
-        """Create a minimal HERMES_HOME with config.yaml."""
+        """Create a minimal STARDUST_HOME with config.yaml."""
         home = tmp_path / ".hermes"
         home.mkdir(parents=True, exist_ok=True)
         import yaml
@@ -313,7 +313,7 @@ class TestDoctorMemoryProviderSection:
             memories.mkdir()
             (memories / "MEMORY.md").write_text("stale memory", encoding="utf-8")
             (memories / "USER.md").write_text("stale user", encoding="utf-8")
-        monkeypatch.setattr(doctor_mod, "HERMES_HOME", home)
+        monkeypatch.setattr(doctor_mod, "STARDUST_HOME", home)
         monkeypatch.setattr(doctor_mod, "PROJECT_ROOT", tmp_path / "project")
         monkeypatch.setattr(doctor_mod, "_DHH", str(home))
         (tmp_path / "project").mkdir(exist_ok=True)
@@ -433,7 +433,7 @@ def test_run_doctor_accepts_named_provider_from_providers_section(monkeypatch, t
         )
     , encoding="utf-8")
 
-    monkeypatch.setattr(doctor_mod, "HERMES_HOME", home)
+    monkeypatch.setattr(doctor_mod, "STARDUST_HOME", home)
     monkeypatch.setattr(doctor_mod, "PROJECT_ROOT", tmp_path / "project")
     monkeypatch.setattr(doctor_mod, "_DHH", str(home))
     (tmp_path / "project").mkdir(exist_ok=True)
@@ -477,7 +477,7 @@ def test_run_doctor_accepts_stable_key_when_provider_name_differs(
         encoding="utf-8",
     )
 
-    monkeypatch.setattr(doctor_mod, "HERMES_HOME", home)
+    monkeypatch.setattr(doctor_mod, "STARDUST_HOME", home)
     monkeypatch.setattr(doctor_mod, "PROJECT_ROOT", tmp_path / "project")
     monkeypatch.setattr(doctor_mod, "_DHH", str(home))
     (tmp_path / "project").mkdir(exist_ok=True)
@@ -519,7 +519,7 @@ def test_run_doctor_accepts_bare_custom_provider(monkeypatch, tmp_path):
         encoding="utf-8",
     )
 
-    monkeypatch.setattr(doctor_mod, "HERMES_HOME", home)
+    monkeypatch.setattr(doctor_mod, "STARDUST_HOME", home)
     monkeypatch.setattr(doctor_mod, "PROJECT_ROOT", tmp_path / "project")
     monkeypatch.setattr(doctor_mod, "_DHH", str(home))
     (tmp_path / "project").mkdir(exist_ok=True)
@@ -556,7 +556,7 @@ def test_run_doctor_flags_missing_credentials_for_active_openrouter_provider(mon
         encoding="utf-8",
     )
 
-    monkeypatch.setattr(doctor_mod, "HERMES_HOME", home)
+    monkeypatch.setattr(doctor_mod, "STARDUST_HOME", home)
     monkeypatch.setattr(doctor_mod, "PROJECT_ROOT", tmp_path / "project")
     monkeypatch.setattr(doctor_mod, "_DHH", str(home))
     (tmp_path / "project").mkdir(exist_ok=True)
@@ -611,7 +611,7 @@ def test_run_doctor_accepts_hermes_provider_ids_that_catalog_aliases(
         encoding="utf-8",
     )
 
-    monkeypatch.setattr(doctor_mod, "HERMES_HOME", home)
+    monkeypatch.setattr(doctor_mod, "STARDUST_HOME", home)
     monkeypatch.setattr(doctor_mod, "PROJECT_ROOT", tmp_path / "project")
     monkeypatch.setattr(doctor_mod, "_DHH", str(home))
     (tmp_path / "project").mkdir(exist_ok=True)
@@ -658,7 +658,7 @@ def test_run_doctor_accepts_vendor_slugs_for_named_custom_provider(monkeypatch, 
         encoding="utf-8",
     )
 
-    monkeypatch.setattr(doctor_mod, "HERMES_HOME", home)
+    monkeypatch.setattr(doctor_mod, "STARDUST_HOME", home)
     monkeypatch.setattr(doctor_mod, "PROJECT_ROOT", tmp_path / "project")
     monkeypatch.setattr(doctor_mod, "_DHH", str(home))
     (tmp_path / "project").mkdir(exist_ok=True)
@@ -703,7 +703,7 @@ def test_run_doctor_accepts_kimi_coding_cn_provider(monkeypatch, tmp_path):
         encoding="utf-8",
     )
 
-    monkeypatch.setattr(doctor_mod, "HERMES_HOME", home)
+    monkeypatch.setattr(doctor_mod, "STARDUST_HOME", home)
     monkeypatch.setattr(doctor_mod, "PROJECT_ROOT", tmp_path / "project")
     monkeypatch.setattr(doctor_mod, "_DHH", str(home))
     (tmp_path / "project").mkdir(exist_ok=True)
@@ -740,7 +740,7 @@ def test_run_doctor_termux_does_not_mark_browser_available_without_agent_browser
 
     monkeypatch.setenv("TERMUX_VERSION", "0.118.3")
     monkeypatch.setenv("PREFIX", "/data/data/com.termux/files/usr")
-    monkeypatch.setattr(doctor_mod, "HERMES_HOME", home)
+    monkeypatch.setattr(doctor_mod, "STARDUST_HOME", home)
     monkeypatch.setattr(doctor_mod, "PROJECT_ROOT", project)
     monkeypatch.setattr(doctor_mod, "_DHH", str(home))
     monkeypatch.setattr(shutil, "which", lambda cmd: "/data/data/com.termux/files/usr/bin/node" if cmd in {"node", "npm"} else None)
@@ -786,7 +786,7 @@ def _doctor_env_for_agent_browser(monkeypatch, tmp_path):
 
     monkeypatch.delenv("TERMUX_VERSION", raising=False)
     monkeypatch.setenv("PREFIX", "/usr")
-    monkeypatch.setattr(doctor_mod, "HERMES_HOME", home)
+    monkeypatch.setattr(doctor_mod, "STARDUST_HOME", home)
     monkeypatch.setattr(doctor_mod, "PROJECT_ROOT", project)
     monkeypatch.setattr(doctor_mod, "_DHH", str(home))
     monkeypatch.setattr(
@@ -884,7 +884,7 @@ def test_run_doctor_kimi_cn_env_is_detected_and_probe_is_null_safe(monkeypatch, 
     project = tmp_path / "project"
     project.mkdir(exist_ok=True)
 
-    monkeypatch.setattr(doctor_mod, "HERMES_HOME", home)
+    monkeypatch.setattr(doctor_mod, "STARDUST_HOME", home)
     monkeypatch.setattr(doctor_mod, "PROJECT_ROOT", project)
     monkeypatch.setattr(doctor_mod, "_DHH", str(home))
     monkeypatch.setenv("KIMI_CN_API_KEY", "sk-test")
@@ -932,7 +932,7 @@ def test_run_doctor_dashscope_retries_china_endpoint_after_intl_unauthorized(mon
     project = tmp_path / "project"
     project.mkdir(exist_ok=True)
 
-    monkeypatch.setattr(doctor_mod, "HERMES_HOME", home)
+    monkeypatch.setattr(doctor_mod, "STARDUST_HOME", home)
     monkeypatch.setattr(doctor_mod, "PROJECT_ROOT", project)
     monkeypatch.setattr(doctor_mod, "_DHH", str(home))
     monkeypatch.setenv("DASHSCOPE_API_KEY", "sk-test")
@@ -988,7 +988,7 @@ def test_run_doctor_opencode_go_skips_invalid_models_probe(monkeypatch, tmp_path
     project = tmp_path / "project"
     project.mkdir(exist_ok=True)
 
-    monkeypatch.setattr(doctor_mod, "HERMES_HOME", home)
+    monkeypatch.setattr(doctor_mod, "STARDUST_HOME", home)
     monkeypatch.setattr(doctor_mod, "PROJECT_ROOT", project)
     monkeypatch.setattr(doctor_mod, "_DHH", str(home))
     monkeypatch.setenv("OPENCODE_GO_API_KEY", "sk-test")
@@ -1039,17 +1039,17 @@ class TestGitHubTokenCheck:
 
     @staticmethod
     def _isolate_home(monkeypatch, home):
-        """Point doctor at the temp HERMES_HOME.
+        """Point doctor at the temp STARDUST_HOME.
 
-        ``run_doctor`` reads the module-level ``HERMES_HOME`` constant (cached
-        at import time), NOT the env var — so ``setenv("HERMES_HOME")`` alone
+        ``run_doctor`` reads the module-level ``STARDUST_HOME`` constant (cached
+        at import time), NOT the env var — so ``setenv("STARDUST_HOME")`` alone
         leaves doctor probing the REAL ~/.hermes. On a dev machine with a
         large state.db that meant a multi-minute ``PRAGMA integrity_check``
         that blew the 300s per-file budget and killed the whole file.
         """
-        monkeypatch.setattr(doctor_mod, "HERMES_HOME", home)
+        monkeypatch.setattr(doctor_mod, "STARDUST_HOME", home)
         monkeypatch.setattr(doctor_mod, "_DHH", str(home))
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
 
     def test_no_token_and_not_gh_authenticated_shows_warn(self, monkeypatch, tmp_path):
         home = tmp_path / ".hermes"
@@ -1146,7 +1146,7 @@ def _run_doctor_with_healthy_oauth_fallback(
     project = tmp_path / "project"
     project.mkdir(exist_ok=True)
 
-    monkeypatch.setattr(doctor_mod, "HERMES_HOME", home)
+    monkeypatch.setattr(doctor_mod, "STARDUST_HOME", home)
     monkeypatch.setattr(doctor_mod, "PROJECT_ROOT", project)
     monkeypatch.setattr(doctor_mod, "_DHH", str(home))
     monkeypatch.setenv(env_key, bad_key)
@@ -1270,7 +1270,7 @@ class TestDoctorXaiOAuthStatus:
         project = tmp_path / "project"
         project.mkdir(exist_ok=True)
 
-        monkeypatch.setattr(doctor_mod, "HERMES_HOME", home)
+        monkeypatch.setattr(doctor_mod, "STARDUST_HOME", home)
         monkeypatch.setattr(doctor_mod, "PROJECT_ROOT", project)
         monkeypatch.setattr(doctor_mod, "_DHH", str(home))
 
@@ -1312,7 +1312,7 @@ class TestDoctorXaiOAuthStatus:
         project = tmp_path / "project"
         project.mkdir(exist_ok=True)
 
-        monkeypatch.setattr(doctor_mod, "HERMES_HOME", home)
+        monkeypatch.setattr(doctor_mod, "STARDUST_HOME", home)
         monkeypatch.setattr(doctor_mod, "PROJECT_ROOT", project)
         monkeypatch.setattr(doctor_mod, "_DHH", str(home))
 
@@ -1365,7 +1365,7 @@ class TestDoctorCodexCliHintPlacement:
         project = tmp_path / "project"
         project.mkdir(exist_ok=True)
 
-        monkeypatch.setattr(doctor_mod, "HERMES_HOME", home)
+        monkeypatch.setattr(doctor_mod, "STARDUST_HOME", home)
         monkeypatch.setattr(doctor_mod, "PROJECT_ROOT", project)
         monkeypatch.setattr(doctor_mod, "_DHH", str(home))
 
@@ -1413,7 +1413,7 @@ class TestDoctorCodexCliHintPlacement:
 
 
 class TestDoctorStaleMaxIterationsDrift:
-    """Regression for #17534: a stale HERMES_MAX_ITERATIONS in .env shadows
+    """Regression for #17534: a stale STARDUST_MAX_ITERATIONS in .env shadows
     agent.max_turns in config.yaml. The repro symptom is config.yaml saying
     400 while the gateway activity line reads N/90. Doctor must detect the
     drift, and `--fix` must remove the .env ghost (config.yaml wins).
@@ -1437,18 +1437,18 @@ class TestDoctorStaleMaxIterationsDrift:
         )
         env_lines = ["OPENAI_API_KEY=sk-test\n"]
         if ghost is not None:
-            env_lines.append(f"HERMES_MAX_ITERATIONS={ghost}\n")
+            env_lines.append(f"STARDUST_MAX_ITERATIONS={ghost}\n")
         (hermes_home / ".env").write_text("".join(env_lines), encoding="utf-8")
 
-        monkeypatch.setattr(doctor_mod, "HERMES_HOME", hermes_home)
+        monkeypatch.setattr(doctor_mod, "STARDUST_HOME", hermes_home)
         monkeypatch.setattr(doctor_mod, "get_hermes_home", lambda: hermes_home)
         # Point the config helpers at the temp home.
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         if os_environ_value is not None:
             # Simulate the gateway bridge having already overridden os.environ.
-            monkeypatch.setenv("HERMES_MAX_ITERATIONS", str(os_environ_value))
+            monkeypatch.setenv("STARDUST_MAX_ITERATIONS", str(os_environ_value))
         else:
-            monkeypatch.delenv("HERMES_MAX_ITERATIONS", raising=False)
+            monkeypatch.delenv("STARDUST_MAX_ITERATIONS", raising=False)
 
         # Short-circuit at the Tool Availability stage — the drift check runs
         # well before it in the Configuration Files section.
@@ -1468,19 +1468,19 @@ class TestDoctorStaleMaxIterationsDrift:
             monkeypatch, tmp_path, fix=False, ghost=90, cfg_turns=400,
             os_environ_value=400,  # bridge contaminated os.environ
         )
-        assert "HERMES_MAX_ITERATIONS=90" in out
+        assert "STARDUST_MAX_ITERATIONS=90" in out
         assert "shadows" in out
         # Warn-only must NOT mutate .env.
-        assert "HERMES_MAX_ITERATIONS=90" in (hermes_home / ".env").read_text(encoding="utf-8")
+        assert "STARDUST_MAX_ITERATIONS=90" in (hermes_home / ".env").read_text(encoding="utf-8")
 
     def test_fix_removes_ghost(self, monkeypatch, tmp_path):
         out, hermes_home = self._run_config_section(
             monkeypatch, tmp_path, fix=True, ghost=90, cfg_turns=400,
             os_environ_value=400,
         )
-        assert "Removed stale HERMES_MAX_ITERATIONS" in out
+        assert "Removed stale STARDUST_MAX_ITERATIONS" in out
         env_after = (hermes_home / ".env").read_text(encoding="utf-8")
-        assert "HERMES_MAX_ITERATIONS" not in env_after
+        assert "STARDUST_MAX_ITERATIONS" not in env_after
         assert "OPENAI_API_KEY=sk-test" in env_after  # other keys preserved
 
 
@@ -1503,19 +1503,19 @@ class TestDoctorDeprecatedConfigAndEnv:
         assert doctor_config.collect_deprecated_env_vars(None) == []
 
     def test_hermes_tool_progress_warning_says_unsupported_since_floor(self):
-        """HERMES_TOOL_PROGRESS lost its last consumer (the retired v3→4
+        """STARDUST_TOOL_PROGRESS lost its last consumer (the retired v3→4
         migration) when the v12 support floor landed — doctor must say the
         variable is ignored rather than merely 'deprecated but read'."""
         findings = dict(
-            doctor_config.collect_deprecated_env_vars({"HERMES_TOOL_PROGRESS": "true"})
+            doctor_config.collect_deprecated_env_vars({"STARDUST_TOOL_PROGRESS": "true"})
         )
-        assert "ignored/unsupported since config floor v12" in findings["HERMES_TOOL_PROGRESS"]
+        assert "ignored/unsupported since config floor v12" in findings["STARDUST_TOOL_PROGRESS"]
         # The MODE variant is still read by the gateway fallback → keeps the
         # plain deprecation wording.
         mode = dict(
-            doctor_config.collect_deprecated_env_vars({"HERMES_TOOL_PROGRESS_MODE": "all"})
+            doctor_config.collect_deprecated_env_vars({"STARDUST_TOOL_PROGRESS_MODE": "all"})
         )
-        assert mode["HERMES_TOOL_PROGRESS_MODE"] == "display.tool_progress in config.yaml"
+        assert mode["STARDUST_TOOL_PROGRESS_MODE"] == "display.tool_progress in config.yaml"
 
     def _run_doctor_with_config(self, monkeypatch, tmp_path, *, config_yaml: str, env_text: str = ""):
         hermes_home = tmp_path / ".hermes"
@@ -1524,13 +1524,13 @@ class TestDoctorDeprecatedConfigAndEnv:
         env_body = env_text if env_text else "OPENAI_API_KEY=sk-test\n"
         (hermes_home / ".env").write_text(env_body, encoding="utf-8")
 
-        monkeypatch.setattr(doctor_mod, "HERMES_HOME", hermes_home)
+        monkeypatch.setattr(doctor_mod, "STARDUST_HOME", hermes_home)
         monkeypatch.setattr(doctor_mod, "get_hermes_home", lambda: hermes_home)
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         # Clear process-level legacy env so tests only see the on-disk .env.
         for k in (
-            "HERMES_TOOL_PROGRESS",
-            "HERMES_TOOL_PROGRESS_MODE",
+            "STARDUST_TOOL_PROGRESS",
+            "STARDUST_TOOL_PROGRESS_MODE",
             "TERMINAL_CWD",
             "MESSAGING_CWD",
             "QQ_HOME_CHANNEL",
@@ -1554,12 +1554,12 @@ class TestDoctorDeprecatedConfigAndEnv:
         """report_deprecated_config_and_env is warn-only — no issues list mutation."""
         findings = doctor_config.report_deprecated_config_and_env(
             {"delegation": {"max_async_children": 2}},
-            {"HERMES_TOOL_PROGRESS_MODE": "verbose"},
+            {"STARDUST_TOOL_PROGRESS_MODE": "verbose"},
         )
         out = capsys.readouterr().out
         assert len(findings) == 2
         assert "Deprecated: delegation.max_async_children" in out
-        assert "Deprecated: HERMES_TOOL_PROGRESS_MODE" in out
+        assert "Deprecated: STARDUST_TOOL_PROGRESS_MODE" in out
         assert "⚠" in out or "Deprecated" in out
 
 

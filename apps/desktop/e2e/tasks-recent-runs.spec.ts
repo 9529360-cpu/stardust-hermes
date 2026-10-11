@@ -26,7 +26,7 @@ executions.finish_execution(broken['id'], success=False, error='provider unavail
 function seedRuns(sandbox: Sandbox): void {
   execFileSync(PYTHON, ['-c', SEED], {
     cwd: REPO_ROOT,
-    env: { ...process.env, HERMES_HOME: sandbox.hermesHome, PYTHONIOENCODING: 'utf-8' },
+    env: { ...process.env, STARDUST_HOME: sandbox.hermesHome, PYTHONIOENCODING: 'utf-8' },
     stdio: 'pipe',
   })
 }

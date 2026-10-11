@@ -159,12 +159,12 @@ def test_explanation_persistence_corrupt_backups_dir_follows_hermes_home(monkeyp
     """Step 3 must name the backups dir under the ACTIVE home, not ~/.hermes (#104250).
 
     Pre-update backups live at ``<hermes_root>/backups`` (``hermes_cli/backup.py``), so a
-    custom-HERMES_HOME deployment told to restore from ``~/.hermes/backups/`` is misdirected
+    custom-STARDUST_HOME deployment told to restore from ``~/.hermes/backups/`` is misdirected
     mid data-loss incident: that directory may not exist at all, or may hold an unrelated
     install's backups.
     """
     custom_home = tmp_path / "custom-hermes-home"
-    monkeypatch.setenv("HERMES_HOME", str(custom_home / "profiles" / "research"))
+    monkeypatch.setenv("STARDUST_HOME", str(custom_home / "profiles" / "research"))
     out = AIAgent._format_turn_completion_explanation(
         "session_persistence_failed", "corrupt"
     )
@@ -445,7 +445,7 @@ def test_classify_persistence_error_fts_provenance_order():
 def test_explainer_enabled_by_default():
     agent = _make_agent()
     with patch.dict(os.environ, {}, clear=False):
-        os.environ.pop("HERMES_TURN_COMPLETION_EXPLAINER", None)
+        os.environ.pop("STARDUST_TURN_COMPLETION_EXPLAINER", None)
         with patch("hermes_cli.config.load_config", return_value={}):
             assert agent._turn_completion_explainer_enabled() is True
 
@@ -453,7 +453,7 @@ def test_explainer_enabled_by_default():
 def test_explainer_disabled_via_env():
     agent = _make_agent()
     with patch.dict(
-        os.environ, {"HERMES_TURN_COMPLETION_EXPLAINER": "0"}, clear=False
+        os.environ, {"STARDUST_TURN_COMPLETION_EXPLAINER": "0"}, clear=False
     ):
         assert agent._turn_completion_explainer_enabled() is False
 
@@ -476,7 +476,7 @@ def test_explainer_config_read_once_then_cached():
         return {"display": {"turn_completion_explainer": True}}
 
     with patch.dict(os.environ, {}, clear=False):
-        os.environ.pop("HERMES_TURN_COMPLETION_EXPLAINER", None)
+        os.environ.pop("STARDUST_TURN_COMPLETION_EXPLAINER", None)
         with patch("hermes_cli.config.load_config", counting_load):
             # First call reads config and caches the result.
             assert agent._turn_completion_explainer_enabled() is True
@@ -487,7 +487,7 @@ def test_explainer_config_read_once_then_cached():
             assert calls["n"] == 1
             # Env override stays authoritative even after the cache is warm.
             with patch.dict(
-                os.environ, {"HERMES_TURN_COMPLETION_EXPLAINER": "0"}, clear=False
+                os.environ, {"STARDUST_TURN_COMPLETION_EXPLAINER": "0"}, clear=False
             ):
                 assert agent._turn_completion_explainer_enabled() is False
             assert calls["n"] == 1  # env path never touches config

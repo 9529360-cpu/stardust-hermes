@@ -1,4 +1,4 @@
-"""Gateway runtime status helpers: PID/lock/marker files under ``{HERMES_HOME}`` (one set per
+"""Gateway runtime status helpers: PID/lock/marker files under ``{STARDUST_HOME}`` (one set per
 home/profile) that tell whether the gateway daemon is running."""
 
 import contextlib
@@ -85,20 +85,20 @@ def record_start_and_check_storm(
 
 
 def _get_process_hermes_home() -> Path:
-    """Launch-home HERMES_HOME for identity files (PID, lock, status, markers):
+    """Launch-home STARDUST_HOME for identity files (PID, lock, status, markers):
     ``get_hermes_home()`` honors the per-session ``_HERMES_HOME_OVERRIDE`` and would misroute
     them."""
-    val = os.environ.get("HERMES_HOME", "").strip()
+    val = os.environ.get("STARDUST_HOME", "").strip()
     return Path(val) if val else _get_platform_default_hermes_home()
 
 
 def _canonical_hermes_home(path: Path | str) -> Path:
-    """Stable absolute HERMES_HOME path for persisted identity data."""
+    """Stable absolute STARDUST_HOME path for persisted identity data."""
     return Path(path).expanduser().resolve(strict=False)
 
 
 def _same_hermes_home(left: Path | str, right: Path | str) -> bool:
-    """Compare HERMES_HOME paths with the host platform's case semantics."""
+    """Compare STARDUST_HOME paths with the host platform's case semantics."""
     left_c = os.path.normcase(str(_canonical_hermes_home(left)))
     return left_c == os.path.normcase(str(_canonical_hermes_home(right)))
 
@@ -106,7 +106,7 @@ def _same_hermes_home(left: Path | str, right: Path | str) -> bool:
 def recorded_gateway_home_conflicts(
     record: Optional[dict[str, Any]], *, expected_home: Optional[Path | str] = None
 ) -> bool:
-    """True when a persisted gateway record names a DIFFERENT HERMES_HOME (cross-profile kill guard:
+    """True when a persisted gateway record names a DIFFERENT STARDUST_HOME (cross-profile kill guard:
     profile B's stop must never SIGTERM profile A). ``expected_home`` overrides the comparison base.
     Legacy records without ``hermes_home`` prove nothing -> False; a comparison failure fails
     closed -> True."""
@@ -167,8 +167,8 @@ def _get_runtime_status_path() -> Path:
 
 
 def _get_lock_dir() -> Path:
-    """Machine-local dir for token-scoped gateway locks; ``HERMES_GATEWAY_LOCK_DIR`` overrides."""
-    override = os.getenv("HERMES_GATEWAY_LOCK_DIR")
+    """Machine-local dir for token-scoped gateway locks; ``STARDUST_GATEWAY_LOCK_DIR`` overrides."""
+    override = os.getenv("STARDUST_GATEWAY_LOCK_DIR")
     if override:
         return Path(override)
     state_home = Path(os.getenv("XDG_STATE_HOME", Path.home() / ".local" / "state"))
@@ -396,7 +396,7 @@ def _command_line_belongs_to_profile(command: str, profile_home: Path) -> bool:
     """True when a gateway command line belongs to ``profile_home`` (mirrors
     ``hermes_cli.gateway._matches_current_profile``): a stale state file can record a PID recycled
     onto ANOTHER profile's live gateway. Named profiles carry ``-p``/``--profile <name>`` or
-    ``HERMES_HOME=`` on argv; the default gateway runs bare. Separators normalized."""
+    ``STARDUST_HOME=`` on argv; the default gateway runs bare. Separators normalized."""
     command_lc = command.lower().replace("\\", "/")
     profile_name = _profile_name_for_home(profile_home)
     home_lc = str(profile_home).lower().replace("\\", "/")
@@ -404,7 +404,7 @@ def _command_line_belongs_to_profile(command: str, profile_home: Path) -> bool:
         return profile_flag_value(command_lc) == profile_name.lower() or f"hermes_home={home_lc}" in command_lc
     # Default profile: accept unless argv names another profile (any spelling the CLI pre-parser
     # accepts, ``--profile=ops`` included -- a substring test let that gateway pass as the default's)
-    # or a conflicting explicit HERMES_HOME= (its absence is not disqualifying -- HERMES_HOME usually
+    # or a conflicting explicit STARDUST_HOME= (its absence is not disqualifying -- STARDUST_HOME usually
     # arrives via the env).
     if profile_flag_value(command_lc) is not None:
         return False
@@ -454,7 +454,7 @@ def _get_code_identity_fields() -> dict[str, Any]:
 
 def _pid_record_belongs_to_current_profile(record: Optional[dict[str, Any]]) -> bool:
     """True when the record's ``hermes_home`` matches the current process (legacy records: True);
-    another HERMES_HOME's record must be ignored or the default gateway assumes its identity."""
+    another STARDUST_HOME's record must be ignored or the default gateway assumes its identity."""
     if not isinstance(record, dict):
         return False
     record_home = record.get("hermes_home")
@@ -1301,7 +1301,7 @@ def _consume_pid_marker_for_self(path: Path, *, ttl_s: int) -> bool:
         return False
     record, target_pid, target_start_time = parsed
     # Cross-profile guard: new markers name the verified TARGET home, which permits a deliberate
-    # cross-HERMES_HOME --replace while ignoring a marker accidentally written into another
+    # cross-STARDUST_HOME --replace while ignoring a marker accidentally written into another
     # profile's directory. Legacy markers have no target field: keep the same-replacer-home rule.
     # See #29092.
     our_home = _get_process_hermes_home()

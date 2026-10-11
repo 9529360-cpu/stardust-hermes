@@ -239,16 +239,16 @@ class TurnExplainersMixin:
                 state.pop(path, None)
 
     def _file_mutation_verifier_enabled(self) -> bool:
-        """``display.file_mutation_verifier`` / ``HERMES_FILE_MUTATION_VERIFIER`` (a patchable seam)."""
+        """``display.file_mutation_verifier`` / ``STARDUST_FILE_MUTATION_VERIFIER`` (a patchable seam)."""
         return _display_flag_enabled(
-            self, env_var="HERMES_FILE_MUTATION_VERIFIER", config_key="file_mutation_verifier",
+            self, env_var="STARDUST_FILE_MUTATION_VERIFIER", config_key="file_mutation_verifier",
             cache_attr="_file_mutation_verifier_enabled_cache",
         )
 
     def _turn_completion_explainer_enabled(self) -> bool:
-        """``display.turn_completion_explainer`` / ``HERMES_TURN_COMPLETION_EXPLAINER``."""
+        """``display.turn_completion_explainer`` / ``STARDUST_TURN_COMPLETION_EXPLAINER``."""
         return _display_flag_enabled(
-            self, env_var="HERMES_TURN_COMPLETION_EXPLAINER", config_key="turn_completion_explainer",
+            self, env_var="STARDUST_TURN_COMPLETION_EXPLAINER", config_key="turn_completion_explainer",
             cache_attr="_turn_completion_explainer_enabled_cache",
         )
 

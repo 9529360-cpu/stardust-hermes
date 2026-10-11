@@ -42,10 +42,10 @@ def test_fast_serve_launch_dispatches_only_unambiguous_serve(monkeypatch) -> Non
     for argv in (["serve", "--future-flag"], ["serve", "--help"], ["chat"]):
         monkeypatch.setattr(sys, "argv", ["hermes", *argv])
         assert main_mod._try_fast_serve_launch() is False
-    monkeypatch.setenv("HERMES_DISABLE_FAST_SERVE_LAUNCH", "1")
+    monkeypatch.setenv("STARDUST_DISABLE_FAST_SERVE_LAUNCH", "1")
     monkeypatch.setattr(sys, "argv", ["hermes", "serve"])
     assert main_mod._try_fast_serve_launch() is False
-    monkeypatch.delenv("HERMES_DISABLE_FAST_SERVE_LAUNCH")
+    monkeypatch.delenv("STARDUST_DISABLE_FAST_SERVE_LAUNCH")
     monkeypatch.setattr(config_mod, "get_container_exec_info", lambda: {"name": "managed"})
     assert main_mod._try_fast_serve_launch() is False
     assert len(captured) == 1

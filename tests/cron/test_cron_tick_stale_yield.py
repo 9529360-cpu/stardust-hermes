@@ -282,7 +282,7 @@ class TestGatewayLockOwnershipProbe:
     def test_ownership_follows_acquire_and_release(self, tmp_path, monkeypatch):
         from gateway import status as gateway_status
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         assert gateway_status.owns_gateway_runtime_lock() is False
         assert gateway_status.acquire_gateway_runtime_lock() is True
         try:
@@ -306,7 +306,7 @@ class TestGatewayLockOwnershipProbe:
             set_hermes_home_override,
         )
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         other_profile = tmp_path / "profiles" / "other"
         other_profile.mkdir(parents=True)
         token = set_hermes_home_override(str(other_profile))

@@ -2,7 +2,7 @@
 session can't call (Blank Slate audit, Aug 2026).
 
 Covers:
-  * HERMES_AGENT_HELP_GUIDANCE degrades to the docs-only variant when the
+  * STARDUST_AGENT_HELP_GUIDANCE degrades to the docs-only variant when the
     skill tools aren't loaded.
   * execution_guidance_text() never names a web tool (guidance is toolset-neutral).
   * The coding operating brief drops the `todo` sentence when the todo tool
@@ -16,15 +16,15 @@ from pathlib import Path
 
 class TestHermesAgentHelpGuidance:
     def test_skill_variant_used_when_skill_view_present(self):
-        from agent.prompt_builder import HERMES_AGENT_HELP_GUIDANCE
-        assert "skill_view(name='hermes-agent')" in HERMES_AGENT_HELP_GUIDANCE
+        from agent.prompt_builder import STARDUST_AGENT_HELP_GUIDANCE
+        assert "skill_view(name='hermes-agent')" in STARDUST_AGENT_HELP_GUIDANCE
 
     def test_no_skills_variant_uses_stardust_authoritative_docs(self):
-        from agent.prompt_builder import HERMES_AGENT_HELP_GUIDANCE_NO_SKILLS
+        from agent.prompt_builder import STARDUST_AGENT_HELP_GUIDANCE_NO_SKILLS
 
-        assert "skill_view" not in HERMES_AGENT_HELP_GUIDANCE_NO_SKILLS
-        assert "github.com/9529360-cpu/stardust-hermes" in HERMES_AGENT_HELP_GUIDANCE_NO_SKILLS
-        assert "hermes-agent.nousresearch.com/docs" not in HERMES_AGENT_HELP_GUIDANCE_NO_SKILLS
+        assert "skill_view" not in STARDUST_AGENT_HELP_GUIDANCE_NO_SKILLS
+        assert "github.com/9529360-cpu/stardust-hermes" in STARDUST_AGENT_HELP_GUIDANCE_NO_SKILLS
+        assert "hermes-agent.nousresearch.com/docs" not in STARDUST_AGENT_HELP_GUIDANCE_NO_SKILLS
 
 
 class TestExecutionGuidanceText:

@@ -61,11 +61,11 @@ class TestProductionPathRefused:
     def test_default_resolution_to_production_raises(self, monkeypatch):
         """The argless-construction path is guarded, not just explicit paths.
 
-        Simulates the escape vector: HERMES_HOME leaked/reset to the real
+        Simulates the escape vector: STARDUST_HOME leaked/reset to the real
         home (subprocess child, stale worktree, gateway-launched shell) so
         ``_default_db_path()`` resolves the production DB.
         """
-        monkeypatch.setenv("HERMES_HOME", str(REAL_ROOT))
+        monkeypatch.setenv("STARDUST_HOME", str(REAL_ROOT))
         # Neutralize the conftest's DEFAULT_DB_PATH re-pin so the default
         # resolver follows the (production-pointing) env, as it would in a
         # process that never imported the hermetic conftest.
@@ -86,8 +86,8 @@ class TestHermeticPathsAllowed:
             db.close()
 
     def test_tmp_hermes_home_default_resolution_works(self, tmp_path, monkeypatch):
-        """Argless SessionDB() under a hermetic HERMES_HOME must succeed."""
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermetic-home"))
+        """Argless SessionDB() under a hermetic STARDUST_HOME must succeed."""
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "hermetic-home"))
         monkeypatch.setattr(
             hermes_state, "DEFAULT_DB_PATH", hermes_state._IMPORT_DEFAULT_DB_PATH
         )
@@ -145,7 +145,7 @@ class TestSessionStoreLoudFailure:
 
 class TestSubprocessChildCovered:
     def test_child_without_hermes_home_is_refused(self, tmp_path):
-        """A subprocess child of a test (no HERMES_HOME) must be blocked.
+        """A subprocess child of a test (no STARDUST_HOME) must be blocked.
 
         This is the real leak vector: tests spawning ``python -m ...``
         children that never import the hermetic conftest. The guard is
@@ -156,7 +156,7 @@ class TestSubprocessChildCovered:
         env = {
             k: v
             for k, v in os.environ.items()
-            if k not in ("HERMES_HOME", "PYTEST_PLUGINS", "PYTHONPATH")
+            if k not in ("STARDUST_HOME", "PYTEST_PLUGINS", "PYTHONPATH")
         }
         env["PYTEST_CURRENT_TEST"] = "tests/fake.py::test_child (call)"
         env["PYTHONPATH"] = str(Path(__file__).resolve().parents[2])
@@ -175,14 +175,14 @@ class TestSubprocessChildCovered:
         assert "live-system guard" in proc.stderr
 
     def test_child_with_tmp_hermes_home_succeeds(self, tmp_path):
-        """Same child, hermetic HERMES_HOME: must work — no false positive."""
+        """Same child, hermetic STARDUST_HOME: must work — no false positive."""
         env = {
             k: v
             for k, v in os.environ.items()
             if k not in ("PYTEST_PLUGINS", "PYTHONPATH")
         }
         env["PYTEST_CURRENT_TEST"] = "tests/fake.py::test_child (call)"
-        env["HERMES_HOME"] = str(tmp_path / "child-home")
+        env["STARDUST_HOME"] = str(tmp_path / "child-home")
         env["PYTHONPATH"] = str(Path(__file__).resolve().parents[2])
         code = (
             "from hermes_state import SessionDB\n"

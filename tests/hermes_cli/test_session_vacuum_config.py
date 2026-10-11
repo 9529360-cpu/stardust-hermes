@@ -80,8 +80,8 @@ def test_shipped_template_does_not_pin_sessions_keys():
 
 
 def test_loader_yields_new_defaults_for_fresh_home(monkeypatch, tmp_path: Path):
-    """Real load_config() against an empty HERMES_HOME → auto_prune on, 90 days."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    """Real load_config() against an empty STARDUST_HOME → auto_prune on, 90 days."""
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     from hermes_cli.config import load_config
 
     sessions = load_config().get("sessions") or {}

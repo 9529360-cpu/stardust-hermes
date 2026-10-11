@@ -8,7 +8,7 @@ and autostart resumed the box. The dashboard runs in a separate process on
 hosted instances, so the signal crosses over as a marker-file mtime.
 
 These tests exercise the REAL seams — the pure helpers with a real temp
-HERMES_HOME, GatewayRunner._scale_to_zero_is_idle's composition, and
+STARDUST_HOME, GatewayRunner._scale_to_zero_is_idle's composition, and
 tui_gateway.ws.handle_ws — rather than stubbing the collection under test
 (the F25 / #84327 lesson: bugs live at the call site, not in the pure predicate).
 """
@@ -26,7 +26,7 @@ from gateway.run import GatewayRunner
 
 @pytest.fixture
 def hermes_home(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     return tmp_path
 
 

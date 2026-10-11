@@ -2,7 +2,7 @@
 
 Cross-session user modeling with dialectic Q&A, semantic search, peer cards and
 persistent conclusions; five tools (profile, search, reasoning, context, conclude).
-Config chain: $HERMES_HOME/honcho.json -> ~/.honcho/config.json -> env vars.
+Config chain: $STARDUST_HOME/honcho.json -> ~/.honcho/config.json -> env vars.
 """
 
 from __future__ import annotations
@@ -193,7 +193,7 @@ class HonchoMemoryProvider(DialecticMixin, MemoryProvider):
             return False
 
     def save_config(self, values, hermes_home):
-        """Merge ``values`` into $HERMES_HOME/honcho.json (Honcho SDK native format); a file that does not parse raises.
+        """Merge ``values`` into $STARDUST_HOME/honcho.json (Honcho SDK native format); a file that does not parse raises.
         Holds the token refresh locks so a rotation cannot land between the read and the write."""
         from pathlib import Path
         from utils import atomic_json_write

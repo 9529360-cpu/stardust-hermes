@@ -3,7 +3,7 @@
 Bug class ("update reports success while reality disagrees" — #88654,
 #88848, #91378, #91439, #91962, #92780, #92902): the updater's word must be
 backed by evidence. This suite pins the honesty contract of the receipt
-subsystem with REAL module functions against a temp HERMES_HOME — it is not
+subsystem with REAL module functions against a temp STARDUST_HOME — it is not
 a fleet E2E (that lives in the CI install/update harness).
 
 Invariants pinned, and WHERE each is enforced:
@@ -54,7 +54,7 @@ from hermes_cli.update_inventory import (
 
 @pytest.fixture()
 def receipt_home(tmp_path, monkeypatch):
-    """Hermetic HERMES_HOME so receipts never touch the real profile."""
+    """Hermetic STARDUST_HOME so receipts never touch the real profile."""
     home = tmp_path / ".hermes"
     home.mkdir()
     monkeypatch.setattr(

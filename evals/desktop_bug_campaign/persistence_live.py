@@ -66,8 +66,8 @@ def main():
         (p / 'SOUL.md').write_text('You are a deterministic test assistant.\n')
         (p / '.no-bundled-skills').touch()
     (profile / 'profile.yaml').write_text('name: worker\nui_meta:\n  hermes-bots:\n    title: Worker\n')
-    env = {k: v for k, v in os.environ.items() if not (k.startswith('HERMES_') or 'API_KEY' in k or 'TOKEN' in k or k in ('PYTHONPATH', 'PYTEST_PLUGINS'))}
-    env.update(HERMES_HOME=str(home), HOME=str(home / 'os-home'), HERMES_DASHBOARD_SESSION_TOKEN='persistence-fixture-token', HERMES_IGNORE_RULES='1', PYTHONPATH=str(args.repo), OPENAI_API_KEY='local-fixture')
+    env = {k: v for k, v in os.environ.items() if not (k.startswith('STARDUST_') or 'API_KEY' in k or 'TOKEN' in k or k in ('PYTHONPATH', 'PYTEST_PLUGINS'))}
+    env.update(STARDUST_HOME=str(home), HOME=str(home / 'os-home'), STARDUST_DASHBOARD_SESSION_TOKEN='persistence-fixture-token', STARDUST_IGNORE_RULES='1', PYTHONPATH=str(args.repo), OPENAI_API_KEY='local-fixture')
     log = (args.out / 'serve.log').open('w')
     cmd = [sys.executable, '-m', 'hermes_cli.main', 'serve', '--isolated', '--port', str(args.port)]
     if observe:

@@ -96,8 +96,8 @@ def main():
                 store = home / "auth.json"
                 store.write_text(json.dumps({"version": 1, "providers": providers, "active_provider": provider, "credential_pool": {provider: rows}}), encoding="utf-8")
                 env = {k: v for k, v in os.environ.items() if not any(t in k for t in
-                       ("TOKEN", "API_KEY", "SECRET", "PASSWORD", "HERMES", "PYTEST"))}
-                env.update(HOME=temp, HERMES_HOME=temp, HERMES_SHARED_AUTH_DIR=str(home / "shared"), PYTHONPATH=str(Path(args.repo).absolute()), TERM="xterm")
+                       ("TOKEN", "API_KEY", "SECRET", "PASSWORD", "STARDUST", "PYTEST"))}
+                env.update(HOME=temp, STARDUST_HOME=temp, STARDUST_SHARED_AUTH_DIR=str(home / "shared"), PYTHONPATH=str(Path(args.repo).absolute()), TERM="xterm")
                 bootstrap = ("import sys, httpx; original_send=httpx.Client.send; "
                              "httpx.Client.send=lambda self, request, **kw: original_send(self, request, **kw) "
                              "if request.url.host == '127.0.0.1' else (_ for _ in ()).throw(AssertionError('NONLOCAL_NETWORK')); "

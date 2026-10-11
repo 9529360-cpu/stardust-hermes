@@ -388,7 +388,7 @@ class TestDockerHostBindApproval:
         """Isolated Docker still bypasses dangerous-command approval."""
         import tools.approval as A
         self._isolate_approval_state(monkeypatch)
-        monkeypatch.setenv("HERMES_EXEC_ASK", "1")
+        monkeypatch.setenv("STARDUST_EXEC_ASK", "1")
         monkeypatch.setattr(
             "tools.tirith_security.check_command_security",
             lambda _c: {"action": "allow", "findings": [], "summary": ""})
@@ -403,16 +403,16 @@ class TestDockerHostBindApproval:
         ``tools.approval`` loads ``command_allowlist`` into module-level
         ``_permanent_approved`` at import time. This file imports
         ``tools.terminal_tool`` at module level (collection time — BEFORE the
-        hermetic HERMES_HOME fixture runs), so on a dev machine whose real
+        hermetic STARDUST_HOME fixture runs), so on a dev machine whose real
         config permanently allowlists e.g. "delete in root path" the guard
         under test silently approves and the assertions flip. CI never has
         such an allowlist, making this a local-only flake.
 
         Same import-time freeze applies to ``_YOLO_MODE_FROZEN``: it reads
-        HERMES_YOLO_MODE off the environment when the module is imported at
+        STARDUST_YOLO_MODE off the environment when the module is imported at
         collection time, before conftest's per-test env blanking runs. A test
         run launched from a --yolo Hermes session (or any shell exporting
-        HERMES_YOLO_MODE=1) freezes True and every guard auto-approves.
+        STARDUST_YOLO_MODE=1) freezes True and every guard auto-approves.
         Reset it explicitly so the tests exercise the guard, not the bypass.
         """
         import tools.approval as A
@@ -425,7 +425,7 @@ class TestDockerHostBindApproval:
         """Host-bound Docker dangerous command escalates instead of bypassing."""
         import tools.approval as A
         self._isolate_approval_state(monkeypatch)
-        monkeypatch.setenv("HERMES_EXEC_ASK", "1")
+        monkeypatch.setenv("STARDUST_EXEC_ASK", "1")
         monkeypatch.setattr(
             "tools.tirith_security.check_command_security",
             lambda _c: {"action": "allow", "findings": [], "summary": ""})
@@ -439,7 +439,7 @@ class TestDockerHostBindApproval:
         """Isolated Docker execute_code still bypasses the guard."""
         import tools.approval as A
         self._isolate_approval_state(monkeypatch)
-        monkeypatch.setenv("HERMES_EXEC_ASK", "1")
+        monkeypatch.setenv("STARDUST_EXEC_ASK", "1")
         res = A.check_execute_code_guard("import os", "docker",
                                          has_host_access=False)
         assert res["approved"] is True
@@ -448,7 +448,7 @@ class TestDockerHostBindApproval:
         """Host-bound Docker execute_code does not get the container fast-path."""
         import tools.approval as A
         self._isolate_approval_state(monkeypatch)
-        monkeypatch.setenv("HERMES_EXEC_ASK", "1")
+        monkeypatch.setenv("STARDUST_EXEC_ASK", "1")
         res = A.check_execute_code_guard(
             "import os; os.system('rm -rf /workspace')", "docker",
             has_host_access=True)
@@ -458,7 +458,7 @@ class TestDockerHostBindApproval:
     def test_execute_code_vercel_sandbox_always_skips(self, monkeypatch):
         """vercel_sandbox has no host-bind concept and stays always-skipped."""
         import tools.approval as A
-        monkeypatch.setenv("HERMES_EXEC_ASK", "1")
+        monkeypatch.setenv("STARDUST_EXEC_ASK", "1")
         res = A.check_execute_code_guard("import os", "vercel_sandbox",
                                          has_host_access=True)
         assert res["approved"] is True

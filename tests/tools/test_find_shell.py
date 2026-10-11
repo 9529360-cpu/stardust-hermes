@@ -103,11 +103,11 @@ class TestFindBashUnchanged:
 
 
 class TestFindBashSkipsBrokenCustomPath:
-    """Stale HERMES_GIT_BASH_PATH must not brick Windows terminal startup."""
+    """Stale STARDUST_GIT_BASH_PATH must not brick Windows terminal startup."""
 
     @pytest.mark.windows_only
     def test_falls_through_to_portable_when_custom_fails_probe(self, tmp_path, monkeypatch):
-        """Windows-only: the candidate ladder (HERMES_GIT_BASH_PATH →
+        """Windows-only: the candidate ladder (STARDUST_GIT_BASH_PATH →
         %LOCALAPPDATA%\\hermes\\git → Program Files) only exists in
         ``_find_bash``'s Windows branch."""
         import tools.environments.local as local_mod
@@ -122,7 +122,7 @@ class TestFindBashSkipsBrokenCustomPath:
         portable.parent.mkdir(parents=True)
         portable.write_text("", encoding="utf-8")
 
-        monkeypatch.setenv("HERMES_GIT_BASH_PATH", str(broken))
+        monkeypatch.setenv("STARDUST_GIT_BASH_PATH", str(broken))
         monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
 
         def fake_starts(path: str) -> bool:
@@ -174,7 +174,7 @@ class TestGitBashExternalProgramProbe:
         portable.parent.mkdir(parents=True)
         portable.write_text("", encoding="utf-8")
 
-        monkeypatch.setenv("HERMES_GIT_BASH_PATH", "")
+        monkeypatch.setenv("STARDUST_GIT_BASH_PATH", "")
         monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
         monkeypatch.setenv("ProgramFiles", str(tmp_path / "empty-program-files"))
         monkeypatch.delenv("ProgramFiles(x86)", raising=False)

@@ -417,7 +417,7 @@ async def test_estop_refuses_fire_before_admission_and_lifts_on_resume(adapter, 
     claimed job that the retry and the misfire backstop both race for."""
     from agent import estop
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     estop._logged_components.clear()
     provider = _SpyProvider()
     monkeypatch.setattr("cron.scheduler_provider.resolve_cron_scheduler", lambda: provider)

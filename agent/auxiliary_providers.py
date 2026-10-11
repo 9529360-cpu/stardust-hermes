@@ -151,7 +151,7 @@ def _resolve_xai_oauth_for_aux() -> Optional[Tuple[str, str]]:
                 ).strip()
                 _url = lambda v: str(v or "").strip().rstrip("/")  # noqa: E731
                 base_url = _xai_validate_inference_base_url(
-                    _url(_aux._scoped_key_env("HERMES_XAI_BASE_URL"))
+                    _url(_aux._scoped_key_env("STARDUST_XAI_BASE_URL"))
                     or _url(_aux._scoped_key_env("XAI_BASE_URL"))
                     or _url(getattr(entry, "runtime_base_url", None))
                     or _url(getattr(entry, "base_url", None)),
@@ -617,9 +617,9 @@ def _build_xai_oauth_aux_client(model: str) -> Tuple[Optional[Any], Optional[str
 
 
 def _codex_base_url_override() -> str:
-    """Profile-scoped ``HERMES_CODEX_BASE_URL`` (same read as the API-key env vars: under a
+    """Profile-scoped ``STARDUST_CODEX_BASE_URL`` (same read as the API-key env vars: under a
     multiplexer the routed profile's .env decides the endpoint, never a sibling's process env)."""
-    return _aux._scoped_key_env("HERMES_CODEX_BASE_URL").rstrip("/")
+    return _aux._scoped_key_env("STARDUST_CODEX_BASE_URL").rstrip("/")
 
 
 def _build_codex_client(model: str) -> Tuple[Optional[Any], Optional[str]]:

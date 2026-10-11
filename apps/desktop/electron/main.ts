@@ -506,7 +506,7 @@ const PRELOAD_PATH = path.join(APP_ROOT, 'dist', 'electron-preload.js')
 // GPU and never see it. Fall back to software rendering when a remote display
 // is detected; it's rock-steady over the wire and the CPU cost is negligible
 // next to the connection's latency. Must run before app `ready` — these
-// switches only apply pre-launch. Override with HERMES_DESKTOP_DISABLE_GPU
+// switches only apply pre-launch. Override with STARDUST_DESKTOP_DISABLE_GPU
 // (1/true → always disable, 0/false → keep GPU on).
 const REMOTE_DISPLAY_REASON = detectRemoteDisplay()
 
@@ -555,7 +555,7 @@ if (IS_WSL && !REMOTE_DISPLAY_REASON && fs.existsSync('/dev/dxg')) {
 
 // Linux: point Chromium at the session's keychain backend so safeStorage can
 // encrypt remote gateway tokens (hardening.ts refuses to persist them without
-// it). The value arrives via HERMES_DESKTOP_PASSWORD_STORE, bridged by the
+// it). The value arrives via STARDUST_DESKTOP_PASSWORD_STORE, bridged by the
 // `hermes desktop` launcher from detection or `desktop.password_store` in
 // config.yaml. Must run before app `ready` — the switch only applies pre-launch.
 const PASSWORD_STORE = resolveLinuxPasswordStore()
@@ -769,8 +769,8 @@ if (INSTALL_STAMP) {
   )
 }
 
-// HERMES_HOME — the user-facing root for everything Hermes-related. Mirrors
-// scripts/install.ps1's $HermesHome and scripts/install.sh's $HERMES_HOME.
+// STARDUST_HOME — the user-facing root for everything Hermes-related. Mirrors
+// scripts/install.ps1's $HermesHome and scripts/install.sh's $STARDUST_HOME.
 //
 // Defaults:
 //   Windows: %LOCALAPPDATA%\hermes (matches install.ps1)
@@ -782,11 +782,11 @@ if (INSTALL_STAMP) {
 // existing config / sessions / .env. New installs go to %LOCALAPPDATA%.
 //
 // STARDUST_DESKTOP_USER_DATA_DIR (used by test:desktop:fresh) puts the sandbox
-// HERMES_HOME beneath the throwaway userData dir so a fresh-install run never
+// STARDUST_HOME beneath the throwaway userData dir so a fresh-install run never
 // touches the user's real ~/.hermes / %LOCALAPPDATA%\hermes.
 function resolveHermesHome() {
-  if (process.env.HERMES_HOME) {
-    return normalizeHermesHomeRoot(process.env.HERMES_HOME)
+  if (process.env.STARDUST_HOME) {
+    return normalizeHermesHomeRoot(process.env.STARDUST_HOME)
   }
 
   if (USER_DATA_OVERRIDE) {
@@ -795,12 +795,12 @@ function resolveHermesHome() {
 
   if (IS_WINDOWS) {
     // A GUI app launched from Explorer inherits the environment block captured
-    // at login, so a HERMES_HOME set via `setx` AFTER login is invisible in
+    // at login, so a STARDUST_HOME set via `setx` AFTER login is invisible in
     // process.env even though the CLI (a fresh shell) sees it. Without this the
     // backend silently falls back to %LOCALAPPDATA%\hermes and reports "No
     // inference provider configured" despite a valid configured home (#45471).
     // Consult the live User-scoped registry value before the default below.
-    const fromRegistry = readWindowsUserEnvVar('HERMES_HOME')
+    const fromRegistry = readWindowsUserEnvVar('STARDUST_HOME')
 
     if (fromRegistry) {
       return normalizeHermesHomeRoot(fromRegistry)
@@ -823,10 +823,10 @@ function resolveHermesHome() {
   return path.join(app.getPath('home'), '.hermes')
 }
 
-const HERMES_HOME = resolveHermesHome()
+const STARDUST_HOME = resolveHermesHome()
 
 function pathWithHermesManagedNode(...entries) {
-  const managed = hermesManagedNodePathEntries(HERMES_HOME).filter(directoryExists)
+  const managed = hermesManagedNodePathEntries(STARDUST_HOME).filter(directoryExists)
 
   return [...managed, ...entries, process.env.PATH].filter(Boolean).join(path.delimiter)
 }
@@ -834,7 +834,7 @@ function pathWithHermesManagedNode(...entries) {
 // ACTIVE_HERMES_ROOT — the canonical mutable Hermes install. Same path
 // install.ps1 / install.sh use, so a desktop-only user and a CLI-only user end
 // up with identical layouts and can share one install.
-const ACTIVE_HERMES_ROOT = path.join(HERMES_HOME, 'hermes-agent')
+const ACTIVE_HERMES_ROOT = path.join(STARDUST_HOME, 'hermes-agent')
 // VENV_ROOT — venv lives inside the repo, exactly like install.ps1 does it.
 const VENV_ROOT = path.join(ACTIVE_HERMES_ROOT, 'venv')
 // BOOTSTRAP_COMPLETE_MARKER — written by the first-launch bootstrap runner
@@ -865,7 +865,7 @@ const DESKTOP_BACKEND_OWNERSHIP_PATH = path.join(app.getPath('userData'), 'backe
 const DESKTOP_MANAGED_SSH_RECOVERY_PATH = path.join(app.getPath('userData'), 'managed-ssh-update-recovery.json')
 // active-profile.json records which Hermes profile the desktop launches its
 // local backend as. When set, startHermes() passes `hermes --profile <name>
-// dashboard …`, which deterministically pins HERMES_HOME (see
+// dashboard …`, which deterministically pins STARDUST_HOME (see
 // _apply_profile_override in hermes_cli/main.py) and bypasses the sticky
 // ~/.hermes/active_profile file. Unset (null) preserves the legacy behavior:
 // no --profile flag, so the backend honors active_profile / default.
@@ -877,10 +877,10 @@ const PROFILE_NAME_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/
 // tracks main. User can also override at runtime via
 // stardustDesktop.updates.setBranch().
 const DEFAULT_UPDATE_BRANCH = 'main'
-// desktop.log lives under HERMES_HOME/logs/ so it sits next to agent.log,
+// desktop.log lives under STARDUST_HOME/logs/ so it sits next to agent.log,
 // errors.log, gateway.log produced by hermes_logging.setup_logging — one log
 // directory per user, regardless of which UI surface produced the line.
-const DESKTOP_LOG_PATH = path.join(HERMES_HOME, 'logs', 'desktop.log')
+const DESKTOP_LOG_PATH = path.join(STARDUST_HOME, 'logs', 'desktop.log')
 const DESKTOP_LOG_FLUSH_MS = 120
 const DESKTOP_LOG_BUFFER_MAX_CHARS = 64 * 1024
 // Bound desktop.log on disk. It is an append-only forensic log, so a boot loop
@@ -902,7 +902,7 @@ const DESKTOP_LOG_MAX_BYTES = 10 * 1024 * 1024
 const DESKTOP_LOG_BACKUP_COUNT = 3
 const DESKTOP_LOG_DISCARD_BYTES = DESKTOP_LOG_MAX_BYTES * 4
 const desktopLogBackupPath = n => `${DESKTOP_LOG_PATH}.${n}`
-const BOOT_FAKE_MODE = process.env.HERMES_DESKTOP_BOOT_FAKE === '1'
+const BOOT_FAKE_MODE = process.env.STARDUST_DESKTOP_BOOT_FAKE === '1'
 const BOOT_FAKE_ERROR = process.env.STARDUST_DESKTOP_BOOT_FAKE_ERROR || ''
 // Automated teardown (Playwright's app.close(), harness scripts) quits with
 // nobody to answer a modal, so the active-work confirmation would hang the
@@ -2336,7 +2336,7 @@ function directoryExists(filePath) {
 }
 
 // --- in-app update mutual exclusion (#50238) -------------------------------
-// The Tauri updater writes HERMES_HOME/.hermes-update-in-progress for the whole
+// The Tauri updater writes STARDUST_HOME/.hermes-update-in-progress for the whole
 // duration of an `--update` run (see update.rs UpdateMarkerGuard). If the user
 // relaunches the desktop mid-update — because the window vanished with no
 // progress and looks crashed — a fresh instance must NOT spawn its own local
@@ -2371,7 +2371,7 @@ const UPDATE_HANDOFF_DWELL_MS = 2500
 // reports as a blocker, aborting every update attempt.
 function updateGateDeps() {
   return {
-    hasLiveMarker: () => Boolean(readLiveUpdateMarker(HERMES_HOME)),
+    hasLiveMarker: () => Boolean(readLiveUpdateMarker(STARDUST_HOME)),
     isUpdateInFlight: () => updateInFlight
   }
 }
@@ -2460,7 +2460,7 @@ async function waitForUpdateToFinish() {
   // (previously a failed detached update was indistinguishable from
   // "nothing happened").
   try {
-    const result = readAndConsumeHandoffResult(HERMES_HOME)
+    const result = readAndConsumeHandoffResult(STARDUST_HOME)
 
     if (result && result.ok && result.manual) {
       // Update landed but the user must act (reopen/reinstall/sandbox). On
@@ -2477,7 +2477,7 @@ async function waitForUpdateToFinish() {
       rememberLog(`[updates] detached update finished OK (branch ${result.branch})`)
     } else if (result) {
       rememberLog(`[updates] detached update FAILED (exit ${result.exitCode}): ${result.message}`)
-      const handoffLogPath = path.join(HERMES_HOME, 'logs', 'desktop-update-handoff.log')
+      const handoffLogPath = path.join(STARDUST_HOME, 'logs', 'desktop-update-handoff.log')
 
       // Async so boot is not blocked behind the dialog; the response handlers
       // reuse the menu's open-updates path (queued until the renderer is ready)
@@ -2592,7 +2592,7 @@ async function unwrapWindowsVenvHermesCommand(command, backendArgs) {
     getVenvPython,
     getVenvSitePackagesEntries,
     buildDesktopBackendEnv,
-    hermesHome: HERMES_HOME,
+    hermesHome: STARDUST_HOME,
     resolvePath: (...segments) => path.resolve(...segments),
     dirname: p => path.dirname(p),
     basename: p => path.basename(p),
@@ -2606,7 +2606,7 @@ async function unwrapWindowsVenvHermesCommand(command, backendArgs) {
 // the legacy `dashboard --no-open` form instead of crashing on an unknown
 // subcommand (would brick every user mid-upgrade — #54568 follow-up).
 // Fast-path / probe / cache strategy: see backend-serve-support.ts header.
-const backendSupportsServe = createBackendServeSupportResolver(HERMES_HOME, rememberLog)
+const backendSupportsServe = createBackendServeSupportResolver(STARDUST_HOME, rememberLog)
 
 // Given a resolved backend whose args target `serve`, return the args the
 // runtime actually understands: unchanged when `serve` is supported, or
@@ -2822,7 +2822,7 @@ async function findSystemPython() {
   return null
 }
 
-// findGitBash — locate bash.exe on Windows. Resolves HERMES_GIT_BASH_PATH
+// findGitBash — locate bash.exe on Windows. Resolves STARDUST_GIT_BASH_PATH
 // first (mirrors tools/environments/local.py:_find_bash), then PortableGit,
 // standard install locations, and finally PATH.
 function findGitBash() {
@@ -2885,7 +2885,7 @@ function venvRootForPython(python: string, root: string) {
 // This makes "no flashing windows" a property of the one backend launch rather
 // than a flag that has to be remembered at every descendant spawn site. Restoring
 // console python also restores stdout, so the backend announces its port on the
-// normal HERMES_DASHBOARD_READY stdout line and no ready-file side channel is
+// normal STARDUST_DASHBOARD_READY stdout line and no ready-file side channel is
 // needed.
 
 function makeDashboardReadyFile() {
@@ -3054,10 +3054,10 @@ function writeZoomState(zoomLevel) {
 
 // Match the backend's source resolution but bias toward a real git checkout.
 // Dev → SOURCE_REPO_ROOT. Packaged/CLI install → ACTIVE_HERMES_ROOT.
-// HERMES_DESKTOP_HERMES_ROOT always wins so devs can pin a worktree.
+// STARDUST_DESKTOP_HERMES_ROOT always wins so devs can pin a worktree.
 function resolveUpdateRoot() {
   const candidates = [
-    process.env.HERMES_DESKTOP_HERMES_ROOT && path.resolve(process.env.HERMES_DESKTOP_HERMES_ROOT),
+    process.env.STARDUST_DESKTOP_HERMES_ROOT && path.resolve(process.env.STARDUST_DESKTOP_HERMES_ROOT),
     !IS_PACKAGED && isHermesSourceRoot(SOURCE_REPO_ROOT) ? SOURCE_REPO_ROOT : null,
     isHermesSourceRoot(ACTIVE_HERMES_ROOT) ? ACTIVE_HERMES_ROOT : null
   ].filter(Boolean)
@@ -3403,7 +3403,7 @@ let quitConfirmedWithActiveWork = false
 // see resolveStagedUpdaterBinary for the policy and for #74836. Returns null
 // whenever no hand-off applies; callers degrade gracefully.
 function resolveUpdaterBinary() {
-  return resolveStagedUpdaterBinary(HERMES_HOME, { fileExists, isWindows: IS_WINDOWS })
+  return resolveStagedUpdaterBinary(STARDUST_HOME, { fileExists, isWindows: IS_WINDOWS })
 }
 
 function repairMacUpdaterHelper(updater) {
@@ -3892,7 +3892,7 @@ async function releaseBackendLock(updateRoot, tag) {
   // taskkill /T from the worker never reaches its parent), drains in-flight
   // agents, and force-kills survivors. Best-effort; abort paths restore via
   // startGatewaysAfterUpdateAbort. No-op off Windows.
-  stopGatewayBeforeUpdate(venvHermesShimPath(updateRoot), HERMES_HOME)
+  stopGatewayBeforeUpdate(venvHermesShimPath(updateRoot), STARDUST_HOME)
 
   // Reap Hermes-OWNED venv daemons the tree-kill above cannot reach: the
   // memory plugin's hindsight daemon is spawned DETACHED (it outlives the
@@ -3976,7 +3976,7 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
       // Windows (quit → detached orchestrator → `hermes update` → relaunch),
       // minus the venv-lock gauntlet POSIX doesn't need. The old in-app
       // updater (applyUpdatesPosixInApp) is gone with everything it dragged
-      // in: the HERMES_DESKTOP_CHILD_PID reaper-exclusion dance (#37532),
+      // in: the STARDUST_DESKTOP_CHILD_PID reaper-exclusion dance (#37532),
       // the in-window rebuild retry, and the relaunch-outcome matrix — the
       // script owns swap/relaunch, and the app is DEAD during the update so
       // there is nothing to reap around. Checkouts that predate the script
@@ -3987,7 +3987,7 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
     if (!updater) {
       // No staged updater binary — this is a CLI-installed user (they ran
       // `hermes desktop`, never the Tauri installer that self-copies
-      // hermes-setup.exe into HERMES_HOME). On Windows the repo hand-off
+      // hermes-setup.exe into STARDUST_HOME). On Windows the repo hand-off
       // script serves them just as well as installer users — it only needs
       // PowerShell and the checkout — so fall through to the normal hand-off
       // when the script exists. Only when the checkout predates the script do
@@ -4028,7 +4028,7 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
       rememberLog('[updates] no staged updater; using repo hand-off script for CLI install')
     }
 
-    const handoffConflict = updateHandoffConflict(HERMES_HOME)
+    const handoffConflict = updateHandoffConflict(STARDUST_HOME)
 
     if (handoffConflict) {
       // A different updater already owns the marker — most often a previous
@@ -4064,7 +4064,7 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
     // ── Pre-flight state.db integrity guard (#68474) ─────────────────
     // Emergency backup and header verification before the update touches
     // anything.  Runs while the backend is still alive.
-    preflightStateDb(HERMES_HOME, rememberLog)
+    preflightStateDb(STARDUST_HOME, rememberLog)
 
     if (IS_WINDOWS && resolveUpdateScriptHandoff(updateRoot)) {
       const message = windowsUpdatePrerequisiteError(updateRoot)
@@ -4206,11 +4206,11 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
       ])
 
       child = spawnUpdaterProcess(wrapped.command, wrapped.args, {
-        cwd: HERMES_HOME,
+        cwd: STARDUST_HOME,
         env: {
           ...process.env,
-          HERMES_HOME,
-          HERMES_UPDATE_STARTED_AT: String(updateStartedAt),
+          STARDUST_HOME,
+          STARDUST_UPDATE_STARTED_AT: String(updateStartedAt),
           PATH: pathWithHermesManagedNode(venvBin)
         },
         detached: true,
@@ -4225,7 +4225,7 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
       // The `hermes update` child adopts the SCRIPT's claim via
       // update_lock.py's process-ancestry rule; no mtime heuristics needed.
       if (Number.isInteger(child.pid)) {
-        writeUpdateMarker(HERMES_HOME, child.pid, { startedAt: updateStartedAt })
+        writeUpdateMarker(STARDUST_HOME, child.pid, { startedAt: updateStartedAt })
       }
 
       rememberLog(
@@ -4233,10 +4233,10 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
       )
     } else {
       child = spawnUpdaterProcess(updater, updaterArgs, {
-        cwd: HERMES_HOME,
+        cwd: STARDUST_HOME,
         env: {
           ...process.env,
-          HERMES_HOME,
+          STARDUST_HOME,
           PATH: pathWithHermesManagedNode(venvBin)
         },
         detached: true,
@@ -4259,7 +4259,7 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
       // strictly better than never updating again, and the updater still writes
       // its own marker moments later.
       if (Number.isInteger(child.pid) && stagedUpdaterSupportsPrewrittenMarker(updater)) {
-        writeUpdateMarker(HERMES_HOME, child.pid)
+        writeUpdateMarker(STARDUST_HOME, child.pid)
       } else if (Number.isInteger(child.pid)) {
         rememberLog(
           `[updates] skipping marker pre-write: staged updater predates self-adopt (${updater}); it would refuse its own claim`
@@ -4326,7 +4326,7 @@ async function handOffWindowsBootstrapRecovery(reason) {
     return false
   }
 
-  const handoffConflict = updateHandoffConflict(HERMES_HOME)
+  const handoffConflict = updateHandoffConflict(STARDUST_HOME)
 
   if (handoffConflict) {
     // Same hazard as applyUpdates (#75778): a live foreign updater already
@@ -4376,10 +4376,10 @@ async function handOffWindowsBootstrapRecovery(reason) {
   localBackendLifecycle.assertCanStart()
 
   const child = spawnUpdaterProcess(updater, updaterArgs, {
-    cwd: HERMES_HOME,
+    cwd: STARDUST_HOME,
     env: {
       ...process.env,
-      HERMES_HOME,
+      STARDUST_HOME,
       PATH: pathWithHermesManagedNode(venvBin)
     },
     detached: true,
@@ -4392,7 +4392,7 @@ async function handOffWindowsBootstrapRecovery(reason) {
   // exclusion: a pre-#74782 binary would refuse its own pre-written claim and
   // strand the very recovery meant to heal the install.
   if (Number.isInteger(child.pid) && stagedUpdaterSupportsPrewrittenMarker(updater)) {
-    writeUpdateMarker(HERMES_HOME, child.pid)
+    writeUpdateMarker(STARDUST_HOME, child.pid)
   } else if (Number.isInteger(child.pid)) {
     rememberLog(
       `[bootstrap] skipping marker pre-write: staged updater predates self-adopt (${updater}); it would refuse its own claim`
@@ -4546,7 +4546,7 @@ async function applyUpdatesPosixHandoff(opts: any) {
     return { ok: true, manual: true, command: 'hermes update', hermesRoot: updateRoot }
   }
 
-  const handoffConflict = updateHandoffConflict(HERMES_HOME)
+  const handoffConflict = updateHandoffConflict(STARDUST_HOME)
 
   if (handoffConflict) {
     // Same hazard as the Windows path (#75778): a live foreign updater
@@ -4558,7 +4558,7 @@ async function applyUpdatesPosixHandoff(opts: any) {
   }
 
   // ── Pre-flight state.db integrity guard (#68474) ──
-  preflightStateDb(HERMES_HOME, rememberLog)
+  preflightStateDb(STARDUST_HOME, rememberLog)
 
   // Branch-pin so a non-main checkout doesn't get switched to main (and
   // self-heal to main when the pinned branch no longer exists on origin).
@@ -4605,11 +4605,11 @@ async function applyUpdatesPosixHandoff(opts: any) {
   }
 
   const child = spawnUpdaterProcess(handoff.command, args, {
-    cwd: HERMES_HOME,
+    cwd: STARDUST_HOME,
     env: {
       ...process.env,
-      HERMES_HOME,
-      HERMES_UPDATE_STARTED_AT: String(updateStartedAt),
+      STARDUST_HOME,
+      STARDUST_UPDATE_STARTED_AT: String(updateStartedAt),
       PATH: pathWithHermesManagedNode(path.join(updateRoot, 'venv', 'bin'))
     },
     detached: true,
@@ -4620,7 +4620,7 @@ async function applyUpdatesPosixHandoff(opts: any) {
   // until the script claims the marker with its own pid as step 0. If the
   // script never starts, the dead pid reads as stale and self-deletes.
   if (Number.isInteger(child.pid)) {
-    writeUpdateMarker(HERMES_HOME, child.pid, { startedAt: updateStartedAt })
+    writeUpdateMarker(STARDUST_HOME, child.pid, { startedAt: updateStartedAt })
   }
 
   rememberLog(`[updates] launched posix hand-off: ${handoff.scriptPath} (branch ${branch}); quitting to hand off`)
@@ -4851,7 +4851,7 @@ function resolveHermesCwd() {
   // real directory), then the home dir.
   const candidates = [
     readDefaultProjectDir(),
-    process.env.HERMES_DESKTOP_CWD,
+    process.env.STARDUST_DESKTOP_CWD,
     IS_PACKAGED ? null : process.env.INIT_CWD,
     IS_PACKAGED ? null : process.cwd(),
     !IS_PACKAGED ? SOURCE_REPO_ROOT : null,
@@ -4961,7 +4961,7 @@ async function createPythonBackend(root, label, backendArgs, options: any = {}) 
     command,
     args: ['-m', 'hermes_cli.main', ...backendArgs],
     env: buildDesktopBackendEnv({
-      hermesHome: HERMES_HOME,
+      hermesHome: STARDUST_HOME,
       pythonPathEntries: [root, ...getVenvSitePackagesEntries(venvRoot)],
       venvRoot
     }),
@@ -4985,7 +4985,7 @@ async function createActiveBackend(backendArgs) {
     command,
     args: ['-m', 'hermes_cli.main', ...backendArgs],
     env: buildDesktopBackendEnv({
-      hermesHome: HERMES_HOME,
+      hermesHome: STARDUST_HOME,
       pythonPathEntries: [ACTIVE_HERMES_ROOT, ...getVenvSitePackagesEntries(VENV_ROOT)],
       venvRoot: VENV_ROOT
     }),
@@ -4996,9 +4996,9 @@ async function createActiveBackend(backendArgs) {
 }
 
 async function resolveHermesBackend(backendArgs) {
-  // 1. Explicit override -- HERMES_DESKTOP_HERMES_ROOT points at a developer
+  // 1. Explicit override -- STARDUST_DESKTOP_HERMES_ROOT points at a developer
   //    checkout. Honour it as-is (no bootstrap; the user is driving).
-  const overrideRoot = process.env.HERMES_DESKTOP_HERMES_ROOT && path.resolve(process.env.HERMES_DESKTOP_HERMES_ROOT)
+  const overrideRoot = process.env.STARDUST_DESKTOP_HERMES_ROOT && path.resolve(process.env.STARDUST_DESKTOP_HERMES_ROOT)
 
   if (overrideRoot && isHermesSourceRoot(overrideRoot)) {
     const backend = await createPythonBackend(overrideRoot, `Hermes source at ${overrideRoot}`, backendArgs)
@@ -5048,8 +5048,8 @@ async function resolveHermesBackend(backendArgs) {
   //    a previous tool-only setup, or pip-installed system-wide. Use it but
   //    do NOT write a bootstrap marker; the user did this themselves and we
   //    don't want to take ownership of an install we didn't perform.
-  //    HERMES_DESKTOP_IGNORE_EXISTING=1 forces the bootstrap path for testing.
-  if (process.env.HERMES_DESKTOP_IGNORE_EXISTING !== '1') {
+  //    STARDUST_DESKTOP_IGNORE_EXISTING=1 forces the bootstrap path for testing.
+  if (process.env.STARDUST_DESKTOP_IGNORE_EXISTING !== '1') {
     let hermesCommand = null
     const hermesOverride = process.env.STARDUST_DESKTOP_HERMES
 
@@ -5240,8 +5240,8 @@ async function runEnsureRuntime(backend: any, assertStillOwned: () => void): Pro
       installStamp: backend.installStamp,
       activeRoot: backend.activeRoot,
       sourceRepoRoot: SOURCE_REPO_ROOT,
-      hermesHome: HERMES_HOME,
-      logRoot: path.join(HERMES_HOME, 'logs'),
+      hermesHome: STARDUST_HOME,
+      logRoot: path.join(STARDUST_HOME, 'logs'),
       abortSignal: bootstrapAbortController.signal,
       onEvent: ev => {
         // Tee every bootstrap event to (a) the desktop log for forensics
@@ -9010,7 +9010,7 @@ async function saveRegistryConnection(input: any = {}) {
 }
 
 // Returns the desktop's chosen profile name, or null when unset. "default" is
-// a valid stored value (pins the root HERMES_HOME explicitly); null means "no
+// a valid stored value (pins the root STARDUST_HOME explicitly); null means "no
 // preference" and preserves the legacy launch (no --profile flag).
 function readActiveDesktopProfile() {
   try {
@@ -9083,9 +9083,9 @@ function isHermesProcess(pid) {
 // just wires Electron/Node fs into a MigrationDeps bag and delegates.
 function migrateActiveProfileIfMissing() {
   migrateActiveProfileIfMissingPure(DESKTOP_PROFILE_CONFIG_PATH, {
-    legacyActivePath: path.join(HERMES_HOME, 'active_profile'),
-    hermesHome: HERMES_HOME,
-    profilesRoot: path.join(HERMES_HOME, 'profiles'),
+    legacyActivePath: path.join(STARDUST_HOME, 'active_profile'),
+    hermesHome: STARDUST_HOME,
+    profilesRoot: path.join(STARDUST_HOME, 'profiles'),
     existsSync: p => fs.existsSync(p),
     readFileSync: (p, enc) => fs.readFileSync(p, enc),
     statSync: p => fs.statSync(p),
@@ -10004,7 +10004,7 @@ async function bootstrapSshConnectionInner(profile, sshConfig, reuseToken, sourc
       adoptServedToken: adoptServedDashboardToken,
       rememberLog: sshRememberLog,
       // Same launch-time free-tier decision the local spawns get; the POSIX
-      // spawn command adds HERMES_GUEST_ONBOARDING=1 only when this is on.
+      // spawn command adds STARDUST_GUEST_ONBOARDING=1 only when this is on.
       guestOnboarding: GUEST_ONBOARDING,
       signal: lease.signal
     })
@@ -10744,7 +10744,7 @@ async function ensureBackend(profile, opts: { passive?: boolean; spawnPriority?:
 
   // A backend for this key may still be dying (idle reap, LRU eviction, a
   // just-finished delete). Wait for its bounded exit before reusing or
-  // spawning, so two children never share one profile's HERMES_HOME.
+  // spawning, so two children never share one profile's STARDUST_HOME.
   const stopping = poolStopper.inFlight(key)
 
   if (stopping) {
@@ -11901,7 +11901,7 @@ async function runPoolBackendStart(profile, entry, opts: { forceLocal?: boolean;
   profileDeletionGate.assertCanStart(profile)
   assertPoolEntryStillOwned(poolKey, entry)
 
-  // --profile wins over the inherited HERMES_HOME env (see _apply_profile_override
+  // --profile wins over the inherited STARDUST_HOME env (see _apply_profile_override
   // step 3 in hermes_cli/main.py), so the child re-homes to this profile.
   // --port 0: the OS assigns an ephemeral port; the child announces it on stdout.
   const backendArgs = ['--profile', profile, 'serve', '--host', '127.0.0.1', '--port', '0']
@@ -11923,7 +11923,7 @@ async function runPoolBackendStart(profile, entry, opts: { forceLocal?: boolean;
   // and no exit — the exact undiagnosable burst signature in remote-gateway
   // user bundles (Aug 2026, Dash's report).
   assertLocalProfileCanStart(profile, profileDeletionGate, key =>
-    directoryExists(path.join(HERMES_HOME, 'profiles', key))
+    directoryExists(path.join(STARDUST_HOME, 'profiles', key))
   )
   rememberLog(`Starting Hermes backend for profile "${profile}" via ${backend.label}`)
 
@@ -11940,22 +11940,22 @@ async function runPoolBackendStart(profile, entry, opts: { forceLocal?: boolean;
       env: desktopBackendSpawnEnv(
         {
           ...process.env,
-          HERMES_HOME,
+          STARDUST_HOME,
           ...backend.env,
           // Pin the gateway's tool/terminal cwd to the same directory we chose for
           // the child process. Inherited TERMINAL_CWD (or a stale config bridge)
           // can still point at the install dir even when spawn cwd is home.
           TERMINAL_CWD: hermesCwd,
-          HERMES_DASHBOARD_SESSION_TOKEN: token,
+          STARDUST_DASHBOARD_SESSION_TOKEN: token,
           // Marks this dashboard backend as desktop-spawned so it runs the cron
           // scheduler tick loop (the gateway isn't running under the app).
-          HERMES_DESKTOP: '1',
+          STARDUST_DESKTOP: '1',
           // Exact parent identity lets the backend self-exit after an unclean
           // Desktop death without mistaking a reused PID for its owner. If the
           // optional marker probe fails, retain legacy PID-only tracking.
           ...parentIdentityEnv,
-          HERMES_WEB_DIST: webDist,
-          ...(readyFile ? { HERMES_DESKTOP_READY_FILE: readyFile } : {})
+          STARDUST_WEB_DIST: webDist,
+          ...(readyFile ? { STARDUST_DESKTOP_READY_FILE: readyFile } : {})
         },
         GUEST_ONBOARDING
       ),
@@ -12330,7 +12330,7 @@ async function runHermesStart() {
     const backendArgs = ['serve', '--host', '127.0.0.1', '--port', '0']
     // Pin the desktop's chosen profile via the global --profile flag. This is
     // deterministic (it wins over the sticky ~/.hermes/active_profile file) and
-    // resolves HERMES_HOME the same way `hermes -p <name>` does on the CLI. An
+    // resolves STARDUST_HOME the same way `hermes -p <name>` does on the CLI. An
     // unset preference keeps the legacy launch so existing installs are
     // unaffected.
     const activeProfile = readActiveDesktopProfile()
@@ -12404,27 +12404,27 @@ async function runHermesStart() {
         env: desktopBackendSpawnEnv(
           {
             ...process.env,
-            // Explicitly pin HERMES_HOME for the child so Python's get_hermes_home()
+            // Explicitly pin STARDUST_HOME for the child so Python's get_hermes_home()
             // resolves to the SAME location our resolveHermesHome() picked. Without
             // this pin, Python falls back to ~/.hermes on every platform — fine on
             // mac/linux (where our default matches), but on Windows our default is
             // %LOCALAPPDATA%\hermes, which differs from C:\Users\<u>\.hermes.
             // Mismatch would split config / sessions / .env / logs across two
-            // directories. install.ps1 sets HERMES_HOME via setx; the desktop
+            // directories. install.ps1 sets STARDUST_HOME via setx; the desktop
             // can't reliably do that, so we set it inline for every spawn.
-            HERMES_HOME,
+            STARDUST_HOME,
             ...backend.env,
             TERMINAL_CWD: hermesCwd,
-            HERMES_DASHBOARD_SESSION_TOKEN: token,
+            STARDUST_DASHBOARD_SESSION_TOKEN: token,
             // Marks this dashboard backend as desktop-spawned so it runs the cron
             // scheduler tick loop (the gateway isn't running under the app).
-            HERMES_DESKTOP: '1',
+            STARDUST_DESKTOP: '1',
             // Exact parent identity lets the backend self-exit after an unclean
             // Desktop death without mistaking a reused PID for its owner. If the
             // optional marker probe fails, retain legacy PID-only tracking.
             ...parentIdentityEnv,
-            HERMES_WEB_DIST: webDist,
-            ...(readyFile ? { HERMES_DESKTOP_READY_FILE: readyFile } : {})
+            STARDUST_WEB_DIST: webDist,
+            ...(readyFile ? { STARDUST_DESKTOP_READY_FILE: readyFile } : {})
           },
           GUEST_ONBOARDING
         ),
@@ -14540,7 +14540,7 @@ ipcMain.handle('stardust:window:openInTerminal', async (_event, sessionId, opts)
         args: backend.args,
         command: backend.command,
         cwd,
-        env: terminalScriptEnv(backend.env, HERMES_HOME)
+        env: terminalScriptEnv(backend.env, STARDUST_HOME)
       }),
       { mode: 0o700 }
     )
@@ -15199,7 +15199,7 @@ async function enumerateRegistryAgentSources(registry = readDesktopConnectionsRe
               )
             : undefined
 
-          // The root HERMES_HOME is an agent too; enumerations that omit it
+          // The root STARDUST_HOME is an agent too; enumerations that omit it
           // (older backends list only named profiles) still get a default row.
           if (!profiles.includes('default')) {
             profiles.unshift('default')
@@ -15647,7 +15647,7 @@ ipcMain.handle('stardust:profile:set', async (_event, name) => {
   const next = writeActiveDesktopProfile(name)
 
   // Switching profiles is a backend re-home: relaunch the dashboard under the
-  // new HERMES_HOME. Pool backends keep their own homes, so only the primary
+  // new STARDUST_HOME. Pool backends keep their own homes, so only the primary
   // is torn down.
   await teardownPrimaryBackendAndWait()
   mainWindow?.reload()
@@ -16152,7 +16152,7 @@ async function handleHermesApiRequest(request) {
 ipcMain.handle('stardust:api', async (_event, request) => {
   // Hold the deletion gate for BOTH profile deletes and renames: a concurrent
   // renderer reconnect entering ensureBackend() mid-mutation would otherwise
-  // respawn the old-name backend and recreate its HERMES_HOME (#45474).
+  // respawn the old-name backend and recreate its STARDUST_HOME (#45474).
   const deletingProfile = profileNameFromDeleteRequest(request)
   const mutatingProfile = deletingProfile || profileRenameFromRequest(request)?.oldName || null
   const registryConnectionId = apiRequestRegistryConnectionId(request)
@@ -16910,7 +16910,7 @@ ipcMain.on('stardust:logs:renderer-error', (_event, report) => {
 
 // Local filesystem + plugin-root IPC (readDir/reveal/rename/trash/…) — see fs-ipc.ts.
 registerFsIpc({
-  hermesHome: HERMES_HOME,
+  hermesHome: STARDUST_HOME,
   readActiveDesktopProfile,
   expandUserPath,
   resolveRequestedPathForIpc,
@@ -17151,7 +17151,7 @@ async function getUninstallSummary() {
   // Fast JS-side fallback used when the agent venv is gone (lite client) or the
   // probe fails — the renderer still needs *something* to render options from.
   const fallback = () => ({
-    hermes_home: HERMES_HOME,
+    hermes_home: STARDUST_HOME,
     agent_installed: isHermesSourceRoot(agentRoot) && fileExists(py),
     gui_installed: true,
     source_built_artifacts: [],
@@ -17185,7 +17185,7 @@ async function getUninstallSummary() {
         ['-m', 'hermes_cli.main', 'uninstall', '--gui-summary'],
         hiddenWindowsChildOptions({
           cwd: agentRoot,
-          env: { ...process.env, HERMES_HOME, NO_COLOR: '1' },
+          env: { ...process.env, STARDUST_HOME, NO_COLOR: '1' },
           stdio: ['ignore', 'pipe', 'ignore']
         })
       )
@@ -17285,7 +17285,7 @@ async function runDesktopUninstall(mode) {
     agentRoot: ACTIVE_HERMES_ROOT,
     uninstallArgs,
     appPath: removeBundle,
-    hermesHome: HERMES_HOME
+    hermesHome: STARDUST_HOME
   }
 
   let scriptPath

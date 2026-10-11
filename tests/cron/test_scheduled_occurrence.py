@@ -29,7 +29,7 @@ else:
         if claim is None:
             continue
         mark_execution_handoff_pending(claim['execution_id'])
-        home = Path(os.environ['HERMES_HOME'])
+        home = Path(os.environ['STARDUST_HOME'])
         payload = home / (claim['execution_id'] + '.json')
         ack = home / (claim['execution_id'] + '.ready')
         payload.write_text(json.dumps({'job': claim, 'profile_home': str(home),
@@ -43,9 +43,9 @@ else:
 
 def _fire(home, mode):
     env = {k: v for k, v in os.environ.items()
-           if not k.startswith(('HERMES_', '_HERMES_'))
+           if not k.startswith(('STARDUST_', '_HERMES_'))
            and not k.endswith(('_API_KEY', '_TOKEN'))}
-    env['HERMES_HOME'] = str(home)
+    env['STARDUST_HOME'] = str(home)
     env['PYTHONPATH'] = str(Path(__file__).resolve().parents[2])
     result = subprocess.run([sys.executable, '-c', _FIRE, mode], env=env,
                             stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=90)

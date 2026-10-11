@@ -109,7 +109,7 @@ def test_secondary_wake_posts_only_to_owned_profile_session(tmp_path, monkeypatc
     root = tmp_path / "root"
     secondary = root / "profiles" / "other"
     secondary.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(root))
+    monkeypatch.setenv("STARDUST_HOME", str(root))
     default_db = SessionDB(db_path=root / "state.db")
     other_db = SessionDB(db_path=secondary / "state.db")
     for db in (default_db, other_db):

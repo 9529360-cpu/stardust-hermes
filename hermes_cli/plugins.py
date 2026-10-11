@@ -2,7 +2,7 @@
 
 Sources, later overriding earlier on key collision: bundled ``<repo>/plugins/<name>/`` (``memory/``
 and ``context_engine/`` have their own discovery), user ``~/.hermes/plugins/<name>/``, project
-``./.hermes/plugins/<name>/`` (opt-in via ``HERMES_ENABLE_PROJECT_PLUGINS``), and pip packages in
+``./.hermes/plugins/<name>/`` (opt-in via ``STARDUST_ENABLE_PROJECT_PLUGINS``), and pip packages in
 the ``hermes_agent.plugins`` entry-point group. A directory plugin needs a ``plugin.yaml`` manifest
 and an ``__init__.py`` exposing ``register(ctx)``. Plugins register callbacks for ``VALID_HOOKS``
 (core fires ``invoke_hook(name, **kwargs)``) and tools via ``PluginContext.register_tool()``.
@@ -50,7 +50,7 @@ from hermes_cli.plugins_loader import (
     _plugin_home_scope, _serialized_replacement,
 )
 from hermes_cli.plugins_dispatch import (  # noqa: F401 — re-exported
-    DEFAULT_SYSTEM_PROMPT_SECTION_MAX_CHARS, HERMES_EVENT_NAMESPACE, MAX_SYSTEM_PROMPT_SECTION_CHARS,
+    DEFAULT_SYSTEM_PROMPT_SECTION_MAX_CHARS, STARDUST_EVENT_NAMESPACE, MAX_SYSTEM_PROMPT_SECTION_CHARS,
     MAX_SYSTEM_PROMPT_SECTIONS_TOTAL_CHARS, PLUGIN_SECTIONS_END, PLUGIN_SECTIONS_START,
     SYSTEM_PROMPT_SECTION_POSITIONS, _EVENT_EMIT_DEPTH_CAP, _EVENT_PENDING_CAP,
     _HOOK_CALLBACK_TIMEOUT_SECS, _HOOK_TIMEOUT_SUPPRESSION_SECONDS, _MAX_HOOK_CALLBACK_TIMEOUT_SECS,
@@ -66,9 +66,9 @@ from hermes_cli.plugins_state import (
 
 
 def get_bundled_plugins_dir() -> Path:
-    """Bundled ``plugins/`` dir: ``HERMES_BUNDLED_PLUGINS`` (Nix wrapper / packaged installs, read-only
+    """Bundled ``plugins/`` dir: ``STARDUST_BUNDLED_PLUGINS`` (Nix wrapper / packaged installs, read-only
     store paths) first, else the in-repo path."""
-    env_override = os.getenv("HERMES_BUNDLED_PLUGINS")
+    env_override = os.getenv("STARDUST_BUNDLED_PLUGINS")
     if env_override:
         return Path(env_override)
     return Path(__file__).resolve().parent.parent / "plugins"
@@ -80,17 +80,17 @@ class PluginToolOverrideError(PermissionError):
 
 logger = logging.getLogger(__name__)
 
-# ``HERMES_PLUGINS_DEBUG=1`` tees verbose discovery logs to stderr in addition to agent.log. Read
+# ``STARDUST_PLUGINS_DEBUG=1`` tees verbose discovery logs to stderr in addition to agent.log. Read
 # once at import; tests flip it mid-process via ``_install_plugin_debug_handler(force=True)``.
-_PLUGINS_DEBUG = env_var_enabled("HERMES_PLUGINS_DEBUG")
+_PLUGINS_DEBUG = env_var_enabled("STARDUST_PLUGINS_DEBUG")
 _DEBUG_HANDLER_INSTALLED = False
 
 
 def _install_plugin_debug_handler(force: bool = False) -> None:
-    """When HERMES_PLUGINS_DEBUG is on, tee plugin logs to stderr at DEBUG (once per process)."""
+    """When STARDUST_PLUGINS_DEBUG is on, tee plugin logs to stderr at DEBUG (once per process)."""
     global _DEBUG_HANDLER_INSTALLED, _PLUGINS_DEBUG
     if force:
-        _PLUGINS_DEBUG = env_var_enabled("HERMES_PLUGINS_DEBUG")
+        _PLUGINS_DEBUG = env_var_enabled("STARDUST_PLUGINS_DEBUG")
     if not _PLUGINS_DEBUG or _DEBUG_HANDLER_INSTALLED:
         return
     handler = logging.StreamHandler(sys.stderr)
@@ -100,7 +100,7 @@ def _install_plugin_debug_handler(force: bool = False) -> None:
     logger.setLevel(logging.DEBUG)
     logger.propagate = True
     _DEBUG_HANDLER_INSTALLED = True
-    logger.debug("HERMES_PLUGINS_DEBUG=1 — verbose plugin discovery logging enabled")
+    logger.debug("STARDUST_PLUGINS_DEBUG=1 — verbose plugin discovery logging enabled")
 
 
 _install_plugin_debug_handler()
@@ -374,7 +374,7 @@ class PluginContext:
     @property
     def profile_name(self) -> str:
         """Active profile name (``"default"``, the ``~/.hermes/profiles/<name>`` id, or ``"custom"``),
-        derived from ``HERMES_HOME`` — not ``_cli_ref``, which is None outside the interactive CLI —
+        derived from ``STARDUST_HOME`` — not ``_cli_ref``, which is None outside the interactive CLI —
         so gateway sessions get it too."""
         try:
             from hermes_cli.profiles import get_active_profile_name
@@ -937,9 +937,9 @@ class PluginContext:
             logger.warning("Plugin '%s' tried to emit namespaced/reserved event '%s' — a plugin may only emit "
                            "bare event names under its own '%s:' namespace (the '%s:' prefix is reserved "
                            "for core, and foreign namespaces are forbidden)",
-                           plugin_key, event, plugin_key, HERMES_EVENT_NAMESPACE)
+                           plugin_key, event, plugin_key, STARDUST_EVENT_NAMESPACE)
             raise ValueError(f"Plugin '{plugin_key}' may not emit '{event}': emit only the bare event name; "
-                             f"the namespace is forced to '{plugin_key}:' and the '{HERMES_EVENT_NAMESPACE}:' "
+                             f"the namespace is forced to '{plugin_key}:' and the '{STARDUST_EVENT_NAMESPACE}:' "
                              f"prefix is reserved for core")
         if payload is not None and not isinstance(payload, dict):
             raise TypeError(f"Plugin '{plugin_key}' emit() payload must be a dict or None")
@@ -1191,8 +1191,8 @@ class PluginManager(PluginLoaderMixin, PluginDispatchMixin, PluginLedgerMixin):
                 return
             if force:
                 self.unload()  # the ledger owns teardown of process-global registries
-            if env_var_enabled("HERMES_SAFE_MODE"):
-                logger.info("HERMES_SAFE_MODE=1 — plugin discovery skipped")
+            if env_var_enabled("STARDUST_SAFE_MODE"):
+                logger.info("STARDUST_SAFE_MODE=1 — plugin discovery skipped")
                 self._discovered = True
                 return
             # Flag set up front as a re-entrancy guard (register() can trigger discovery again) but
@@ -1352,7 +1352,7 @@ class PluginManager(PluginLoaderMixin, PluginDispatchMixin, PluginLedgerMixin):
     def has_enabled_portable_mcp(self, raw_config: Mapping[str, Any]) -> bool:
         """Probe enabled portable MCP packages without loading plugins (shares the full-discovery
         manifest collection so precedence/gating cannot diverge)."""
-        if _env_enabled("HERMES_SAFE_MODE"):
+        if _env_enabled("STARDUST_SAFE_MODE"):
             return False
         plugins_config = raw_config.get("plugins")
         if not isinstance(plugins_config, dict):
@@ -1973,7 +1973,7 @@ def resolve_plugin_command_result(result: Any) -> Any:
             done.set()
 
     # copy_context: the helper thread must see the caller's profile/secret scope, else an
-    # async hook under a running loop reads the default HERMES_HOME and get_secret raises.
+    # async hook under a running loop reads the default STARDUST_HOME and get_secret raises.
     threading.Thread(target=contextvars.copy_context().run, args=(_runner,),
                      name="hermes-plugin-command-await", daemon=True).start()
     if not done.wait(timeout=_PLUGIN_COMMAND_AWAIT_TIMEOUT_SECS):

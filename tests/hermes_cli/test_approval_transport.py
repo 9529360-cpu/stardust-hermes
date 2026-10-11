@@ -80,12 +80,12 @@ def test_force_reload_clears_transport_registry(monkeypatch):
 def test_transport_registry_is_manager_and_profile_isolated(monkeypatch, tmp_path):
     first = PluginManager()
     second = PluginManager()
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "profiles" / "work"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "profiles" / "work"))
     _context(first).register_approval_transport("phone", lambda request: None)
 
     assert first.get_approval_transport("phone") is not None
     assert second.get_approval_transport("phone") is None
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "profiles" / "personal"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "profiles" / "personal"))
     assert first.get_approval_transport("phone") is None
 
 
@@ -444,7 +444,7 @@ def test_explicit_builtin_fallback_uses_existing_surface(monkeypatch):
 def test_live_temp_home_fixture_plugin_routes_and_hardline_stays_core_owned(
     tmp_path, monkeypatch
 ):
-    """Real discovery + config + guard path under an isolated HERMES_HOME."""
+    """Real discovery + config + guard path under an isolated STARDUST_HOME."""
     import hermes_cli.plugins as plugins_module
     from tools import approval
 
@@ -469,7 +469,7 @@ from pathlib import Path
 
 
 def present(request):
-    output = Path(os.environ["HERMES_HOME"]) / "transport-invocations.jsonl"
+    output = Path(os.environ["STARDUST_HOME"]) / "transport-invocations.jsonl"
     with output.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps({
             "request_id": request.request_id,
@@ -498,9 +498,9 @@ def register(ctx):
             }
         )
     )
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.setenv("HERMES_BUNDLED_PLUGINS", str(bundled))
-    monkeypatch.delenv("HERMES_GATEWAY_SESSION", raising=False)
+    monkeypatch.setenv("STARDUST_HOME", str(home))
+    monkeypatch.setenv("STARDUST_BUNDLED_PLUGINS", str(bundled))
+    monkeypatch.delenv("STARDUST_GATEWAY_SESSION", raising=False)
     monkeypatch.setattr(approval, "_YOLO_MODE_FROZEN", False)
     manager = PluginManager()
     monkeypatch.setattr(plugins_module, "_plugin_manager", manager)
@@ -516,7 +516,7 @@ def register(ctx):
             "rm -rf /tmp/hermes-approval-transport-fixture-reloaded", "local"
         )
         gateway_token = approval_context.set_hermes_interactive_context(False)
-        monkeypatch.setenv("HERMES_GATEWAY_SESSION", "1")
+        monkeypatch.setenv("STARDUST_GATEWAY_SESSION", "1")
         try:
             gateway_routed = approval.check_all_command_guards(
                 "rm -rf /tmp/hermes-approval-transport-fixture-gateway", "local"

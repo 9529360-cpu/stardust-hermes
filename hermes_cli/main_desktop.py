@@ -40,7 +40,7 @@ def _compute_desktop_content_hash(project_root: Path) -> str:
 
 
 def _desktop_stamp_path() -> Path:
-    """Path of the desktop build stamp under $HERMES_HOME."""
+    """Path of the desktop build stamp under $STARDUST_HOME."""
     from hermes_constants import get_hermes_home
     return get_hermes_home() / "desktop-build-stamp.json"
 
@@ -1433,29 +1433,29 @@ def _desktop_launch_env(args: argparse.Namespace) -> tuple[dict, list[str]]:
     env = with_hermes_node_path()
     _prefer_wsl_d3d12(env)
     for attr, key in (
-        ("fake_boot", "HERMES_DESKTOP_BOOT_FAKE"), ("ignore_existing", "HERMES_DESKTOP_IGNORE_EXISTING")):
+        ("fake_boot", "STARDUST_DESKTOP_BOOT_FAKE"), ("ignore_existing", "STARDUST_DESKTOP_IGNORE_EXISTING")):
         if getattr(args, attr, False):
             env[key] = "1"
     if getattr(args, "hermes_root", None):
-        env["HERMES_DESKTOP_HERMES_ROOT"] = str(Path(args.hermes_root).expanduser().resolve())
+        env["STARDUST_DESKTOP_HERMES_ROOT"] = str(Path(args.hermes_root).expanduser().resolve())
     cwd = getattr(args, "cwd", None)
-    env["HERMES_DESKTOP_CWD"] = str(Path(cwd).expanduser().resolve()) if cwd else os.getcwd()
+    env["STARDUST_DESKTOP_CWD"] = str(Path(cwd).expanduser().resolve()) if cwd else os.getcwd()
 
     config_electron_flags, config_disable_gpu, config_password_store, config_ozone_hint = (
         _desktop_launch_options())
-    if config_disable_gpu != "auto" and "HERMES_DESKTOP_DISABLE_GPU" not in os.environ:
-        env["HERMES_DESKTOP_DISABLE_GPU"] = config_disable_gpu
+    if config_disable_gpu != "auto" and "STARDUST_DESKTOP_DISABLE_GPU" not in os.environ:
+        env["STARDUST_DESKTOP_DISABLE_GPU"] = config_disable_gpu
     if config_ozone_hint != "auto" and "ELECTRON_OZONE_PLATFORM_HINT" not in os.environ:
         env["ELECTRON_OZONE_PLATFORM_HINT"] = config_ozone_hint
 
     # Without --password-store safeStorage.isEncryptionAvailable() is often
     # false and the desktop app refuses to persist remote gateway tokens.
-    if sys.platform == "linux" and "HERMES_DESKTOP_PASSWORD_STORE" not in os.environ:
+    if sys.platform == "linux" and "STARDUST_DESKTOP_PASSWORD_STORE" not in os.environ:
         password_store = (
             config_password_store if config_password_store != "auto" else _detect_linux_password_store()
         )
         if password_store:
-            env["HERMES_DESKTOP_PASSWORD_STORE"] = password_store
+            env["STARDUST_DESKTOP_PASSWORD_STORE"] = password_store
     return env, config_electron_flags
 
 

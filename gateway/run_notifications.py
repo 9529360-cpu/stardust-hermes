@@ -74,7 +74,7 @@ class GatewayNotificationsMixin:
 
     @dataclasses.dataclass
     class _UpdatePaths:
-        """Marker files ``hermes update --gateway`` and its watcher exchange under HERMES_HOME."""
+        """Marker files ``hermes update --gateway`` and its watcher exchange under STARDUST_HOME."""
 
         pending: Path
         claimed: Path

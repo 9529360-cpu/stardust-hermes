@@ -31,8 +31,8 @@ from tui_gateway._stdin_recovery import handle_spurious_eof
 from rich.console import Console
 
 # Env-overridable so the integration test can drive sub-second timing.
-_WATCHDOG_POLL_S = max(0.05, env_float("HERMES_SLASH_WATCHDOG_POLL_S", 2.0))
-_ORPHAN_GRACE_S = max(0.0, env_float("HERMES_SLASH_WATCHDOG_GRACE_S", 5.0))
+_WATCHDOG_POLL_S = max(0.05, env_float("STARDUST_SLASH_WATCHDOG_POLL_S", 2.0))
+_ORPHAN_GRACE_S = max(0.0, env_float("STARDUST_SLASH_WATCHDOG_GRACE_S", 5.0))
 _in_flight = threading.Event()  # set while a command is executing
 logger = logging.getLogger(__name__)
 
@@ -101,8 +101,8 @@ def main():
     p.add_argument("--session-key", required=True)
     p.add_argument("--model", default="")
     args = p.parse_args()
-    os.environ["HERMES_SESSION_KEY"] = args.session_key
-    os.environ["HERMES_INTERACTIVE"] = "1"
+    os.environ["STARDUST_SESSION_KEY"] = args.session_key
+    os.environ["STARDUST_INTERACTIVE"] = "1"
     # Start before the (hundreds-of-ms) HermesCLI build — that window is itself an orphan risk if the
     # gateway dies mid-spawn.
     _start_parent_death_watchdog(os.getppid())

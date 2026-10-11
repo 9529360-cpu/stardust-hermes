@@ -90,7 +90,7 @@ def test_invalid_profile_name_explains_rule_in_words_with_example():
 
 
 def test_existing_profile_error_offers_use_and_list(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     profiles.create_profile("work", no_alias=True, no_skills=True)
     with pytest.raises(FileExistsError) as info:
         profiles.create_profile("work", no_alias=True, no_skills=True)
@@ -101,7 +101,7 @@ def test_existing_profile_error_offers_use_and_list(tmp_path, monkeypatch):
 
 
 def test_missing_profile_error_points_at_list(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     with pytest.raises(FileNotFoundError) as info:
         profiles.delete_profile("wrk")
     msg = str(info.value)

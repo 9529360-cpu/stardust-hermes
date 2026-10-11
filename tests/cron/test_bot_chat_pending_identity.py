@@ -19,7 +19,7 @@ def test_deferred_destination_does_not_follow_root_changes(tmp_path, monkeypatch
     other = tmp_path / "other" / "profiles" / "beta"
     home.mkdir(parents=True)
     other.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(source))
+    monkeypatch.setenv("STARDUST_HOME", str(source))
     monkeypatch.setattr("hermes_cli.profiles.get_profile_dir", lambda _: home)
     db = SessionDB(db_path=home / "state.db")
     db.create_session(session_id="chat", source="cli")
@@ -47,14 +47,14 @@ def test_deferred_destination_does_not_follow_root_changes(tmp_path, monkeypatch
         home.rename(home.with_name("renamed"))
     try:
         with monkeypatch.context() as changed:
-            changed.setenv("HERMES_HOME", str(tmp_path / "new-source"))
+            changed.setenv("STARDUST_HOME", str(tmp_path / "new-source"))
             queue.drain(source / "cron" / "bot_chat_pending")
             queue.drain(source / "cron" / "bot_chat_pending")
         if recipient == "cli":
             assert run.call_count == 1
             argv = run.call_args.args[0]
             assert "-p" not in argv
-            assert Path(run.call_args.kwargs["env"]["HERMES_HOME"]) == home
+            assert Path(run.call_args.kwargs["env"]["STARDUST_HOME"]) == home
         elif recipient == "desktop":
             run.assert_not_called()
             receipt = read_delivery_result(home, key)
@@ -70,7 +70,7 @@ def test_deferred_destination_does_not_follow_root_changes(tmp_path, monkeypatch
 
 
 def test_corrupt_record_is_retained_without_blocking_other_admissions(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     queue.defer("a" * 64, {"id": "job"}, "first", "", tmp_path)
     broken = tmp_path / "cron" / "bot_chat_pending" / "broken.json"
     broken.write_text("{", encoding="utf-8")

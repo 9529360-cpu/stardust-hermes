@@ -7,7 +7,7 @@ A direct ``jobs.json`` edit that changes ``schedule.expr`` leaves the stored
 the job fired on the day the new expression excludes. The guard re-anchors
 ``next_run_at`` from the current expression and skips the fire.
 
-These exercise the real store against a temp ``HERMES_HOME`` (no mocks) per
+These exercise the real store against a temp ``STARDUST_HOME`` (no mocks) per
 the E2EE-over-mocks discipline for file-touching code.
 """
 
@@ -20,8 +20,8 @@ import pytest
 
 @pytest.fixture
 def temp_home(tmp_path, monkeypatch):
-    """Isolated HERMES_HOME so jobs.json doesn't touch the real store."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    """Isolated STARDUST_HOME so jobs.json doesn't touch the real store."""
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     yield tmp_path
 
 

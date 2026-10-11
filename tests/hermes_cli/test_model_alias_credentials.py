@@ -501,7 +501,7 @@ class TestAliasCacheIsProfileScoped:
         return home
 
     def _load(self, monkeypatch, home):
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         import hermes_cli.model_switch as ms
 
         ms._ensure_direct_aliases()

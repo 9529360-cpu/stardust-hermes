@@ -14,7 +14,7 @@ from tools.environments.file_sync import FileSyncManager
 def test_host_save_during_upload_survives_unchanged_remote(
     tmp_path, monkeypatch, bulk, edit_before_read,
 ):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "home"))
     host = tmp_path / "home" / "skills" / "example" / "SKILL.md"
     host.parent.mkdir(parents=True)
     host.write_bytes(b"original skill")

@@ -26,7 +26,7 @@ from hermes_cli.verify_cmd import run_verify_command
 @pytest.fixture(autouse=True)
 def _ledger_on(monkeypatch):
     """The ledger is inert unless verify-on-stop is enabled; these tests exercise the ledger."""
-    monkeypatch.setenv("HERMES_VERIFY_ON_STOP", "1")
+    monkeypatch.setenv("STARDUST_VERIFY_ON_STOP", "1")
 
 
 
@@ -48,8 +48,8 @@ def make_args(path, **overrides):
 
 @pytest.fixture
 def hermes_home(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes-home"))
-    monkeypatch.delenv("HERMES_SESSION_ID", raising=False)
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes-home"))
+    monkeypatch.delenv("STARDUST_SESSION_ID", raising=False)
     return tmp_path
 
 
@@ -120,7 +120,7 @@ def test_cli_partial_run_records_targeted_scope(hermes_home, capsys):
 
 
 def test_cli_run_uses_hermes_session_id_env(hermes_home, capsys, monkeypatch):
-    monkeypatch.setenv("HERMES_SESSION_ID", "sess-42")
+    monkeypatch.setenv("STARDUST_SESSION_ID", "sess-42")
     project = _workspace(hermes_home, manifest_recipe={"name": "Fake", "test": ["echo ok"]})
     run_verify_command(make_args(project))
     assert verification_status(session_id="sess-42", cwd=project)["status"] == "passed"

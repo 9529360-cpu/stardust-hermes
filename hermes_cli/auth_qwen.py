@@ -128,7 +128,7 @@ def resolve_qwen_runtime_credentials(
 
     return {
         "provider": "qwen-oauth",
-        "base_url": os.getenv("HERMES_QWEN_BASE_URL", "").strip().rstrip("/") or DEFAULT_QWEN_BASE_URL,
+        "base_url": os.getenv("STARDUST_QWEN_BASE_URL", "").strip().rstrip("/") or DEFAULT_QWEN_BASE_URL,
         "api_key": access_token, "source": "qwen-cli", "expires_at_ms": tokens.get("expiry_date"),
         "auth_file": str(_qwen_cli_auth_path()),
     }

@@ -1,4 +1,4 @@
-"""config.yaml backups: one dir, deduped, bounded — never a pile of siblings in HERMES_HOME."""
+"""config.yaml backups: one dir, deduped, bounded — never a pile of siblings in STARDUST_HOME."""
 from pathlib import Path
 
 from hermes_cli.config_backups import backup_config, list_config_backups

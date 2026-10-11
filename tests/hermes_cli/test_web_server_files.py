@@ -42,7 +42,7 @@ def _close_client(client):
 @pytest.fixture
 def forced_files_client(monkeypatch, tmp_path):
     root = tmp_path / "data"
-    monkeypatch.setenv("HERMES_DASHBOARD_FILES_ROOT", str(root))
+    monkeypatch.setenv("STARDUST_DASHBOARD_FILES_ROOT", str(root))
 
     client, prev_auth_required, prev_bound_host = _client_with_app_state()
     try:
@@ -56,8 +56,8 @@ def forced_files_client(monkeypatch, tmp_path):
 def local_files_client(monkeypatch, tmp_path):
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.delenv("HERMES_DASHBOARD_FILES_ROOT", raising=False)
-    monkeypatch.delenv("HERMES_HOME", raising=False)
+    monkeypatch.delenv("STARDUST_DASHBOARD_FILES_ROOT", raising=False)
+    monkeypatch.delenv("STARDUST_HOME", raising=False)
     monkeypatch.setenv("HOME", str(home))
 
     client, prev_auth_required, prev_bound_host = _client_with_app_state()
@@ -141,7 +141,7 @@ def test_download_resolves_paths_in_the_originating_profile_session(local_files_
     client, home = local_files_client
     monkeypatch.setattr(Path, "home", lambda: home)
     hermes_home = home / "isolated-hermes"
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     session_cwd = home / "project"
     session_cwd.mkdir()
     gateway_cwd = home / "gateway"
@@ -347,7 +347,7 @@ def test_other_credential_store_basenames_blocked(forced_files_client):
     """Regression: the managed-files guard must cover the same credential
     basenames as gateway.platforms.base._ROOT_CREDENTIAL_FILES and
     agent.file_safety.get_read_block_error, not just .env — an operator can
-    point the managed root at HERMES_HOME itself (#57505), which contains
+    point the managed root at STARDUST_HOME itself (#57505), which contains
     all of these live secret stores."""
     client, root = forced_files_client
     root.mkdir(parents=True, exist_ok=True)

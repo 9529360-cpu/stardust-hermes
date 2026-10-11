@@ -91,7 +91,7 @@ def _make_cli(env_overrides=None, config_overrides=None, **kwargs):
     }
     if config_overrides:
         _clean_config.update(config_overrides)
-    clean_env = {"LLM_MODEL": "", "HERMES_MAX_ITERATIONS": ""}
+    clean_env = {"LLM_MODEL": "", "STARDUST_MAX_ITERATIONS": ""}
     if env_overrides:
         clean_env.update(env_overrides)
     prompt_toolkit_stubs = {
@@ -147,8 +147,8 @@ def _reset_session_id_context():
     from gateway.session_context import _UNSET, _VAR_MAP
 
     yield
-    os.environ.pop("HERMES_SESSION_ID", None)
-    _VAR_MAP["HERMES_SESSION_ID"].set(_UNSET)
+    os.environ.pop("STARDUST_SESSION_ID", None)
+    _VAR_MAP["STARDUST_SESSION_ID"].set(_UNSET)
 
 
 def test_new_command_creates_real_fresh_session_and_resets_agent_state(tmp_path):

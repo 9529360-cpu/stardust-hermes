@@ -1,4 +1,4 @@
-"""Secret stores under HERMES_HOME are write-denied; control files stay writable (#110464).
+"""Secret stores under STARDUST_HOME are write-denied; control files stay writable (#110464).
 
 ``get_read_block_error`` refuses every credential store. The write side is deliberately
 narrower — #45947 freed ``auth.json`` / ``config.yaml`` / ``webhook_subscriptions.json`` so
@@ -23,7 +23,7 @@ WRITABLE_CONTROL_FILES = ("auth.json", "config.yaml", "webhook_subscriptions.jso
 
 @pytest.fixture()
 def hermes_layout(tmp_path, monkeypatch):
-    """Profile HERMES_HOME plus a distinct global root, both patched."""
+    """Profile STARDUST_HOME plus a distinct global root, both patched."""
     root = tmp_path / "hermes_root"
     profile = root / "profiles" / "coder"
     profile.mkdir(parents=True)

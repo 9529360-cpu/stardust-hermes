@@ -806,7 +806,7 @@ class TestRuntimeModelConfigDropsStaleKeys:
     def test_real_db_persist_heals_desynced_row(self, tmp_path, monkeypatch):
         """A row already desynced (fresh model column + stale model_config
         provider) self-heals on the next live metadata persist."""
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
         db = SessionDB(db_path=tmp_path / "state.db")
         db.create_session(session_id="desync1", source="desktop", model="old-model")
         db.update_session_meta(

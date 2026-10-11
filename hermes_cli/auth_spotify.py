@@ -54,32 +54,32 @@ def _spotify_setting(
 
 def _spotify_client_id(explicit: Optional[str] = None, state: Optional[Dict[str, Any]] = None) -> str:
     client_id = _spotify_setting(
-        state, "client_id", ("HERMES_SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_ID"), "", explicit=explicit,
+        state, "client_id", ("STARDUST_SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_ID"), "", explicit=explicit,
     )
     if client_id:
         return client_id
     raise _spotify_err(
-        "Spotify client_id is required. Set HERMES_SPOTIFY_CLIENT_ID or pass --client-id.",
+        "Spotify client_id is required. Set STARDUST_SPOTIFY_CLIENT_ID or pass --client-id.",
         "spotify_client_id_missing",
     )
 
 
 def _spotify_redirect_uri(explicit: Optional[str] = None, state: Optional[Dict[str, Any]] = None) -> str:
     return _spotify_setting(
-        state, "redirect_uri", ("HERMES_SPOTIFY_REDIRECT_URI", "SPOTIFY_REDIRECT_URI"),
+        state, "redirect_uri", ("STARDUST_SPOTIFY_REDIRECT_URI", "SPOTIFY_REDIRECT_URI"),
         DEFAULT_SPOTIFY_REDIRECT_URI, explicit=explicit,
     )
 
 
 def _spotify_api_base_url(state: Optional[Dict[str, Any]] = None) -> str:
     return _spotify_setting(
-        state, "api_base_url", ("HERMES_SPOTIFY_API_BASE_URL",), DEFAULT_SPOTIFY_API_BASE_URL, strip_slash=True,
+        state, "api_base_url", ("STARDUST_SPOTIFY_API_BASE_URL",), DEFAULT_SPOTIFY_API_BASE_URL, strip_slash=True,
     )
 
 
 def _spotify_accounts_base_url(state: Optional[Dict[str, Any]] = None) -> str:
     return _spotify_setting(
-        state, "accounts_base_url", ("HERMES_SPOTIFY_ACCOUNTS_BASE_URL",), DEFAULT_SPOTIFY_ACCOUNTS_BASE_URL,
+        state, "accounts_base_url", ("STARDUST_SPOTIFY_ACCOUNTS_BASE_URL",), DEFAULT_SPOTIFY_ACCOUNTS_BASE_URL,
         strip_slash=True,
     )
 
@@ -303,11 +303,11 @@ def _spotify_interactive_setup(redirect_uri_hint: str) -> str:
         raise SystemExit("Spotify setup cancelled: empty Client ID.")
 
     # Persist so later runs skip the wizard; only pin a NON-default redirect URI.
-    save_env_value("HERMES_SPOTIFY_CLIENT_ID", raw)
+    save_env_value("STARDUST_SPOTIFY_CLIENT_ID", raw)
     if redirect_uri_hint and redirect_uri_hint != DEFAULT_SPOTIFY_REDIRECT_URI:
-        save_env_value("HERMES_SPOTIFY_REDIRECT_URI", redirect_uri_hint)
+        save_env_value("STARDUST_SPOTIFY_REDIRECT_URI", redirect_uri_hint)
 
-    print("\nSaved HERMES_SPOTIFY_CLIENT_ID to ~/.hermes/.env\n")
+    print("\nSaved STARDUST_SPOTIFY_CLIENT_ID to ~/.hermes/.env\n")
     return raw
 
 
@@ -315,7 +315,7 @@ def login_spotify_command(args) -> None:
     from hermes_cli.auth import _auth_store_lock, _can_open_graphical_browser, _is_remote_session, _load_auth_store, _print_loopback_ssh_hint, _save_auth_store, _store_provider_state, get_provider_auth_state
     existing_state = get_provider_auth_state("spotify") or {}
 
-    # No client_id anywhere -> wizard instead of "HERMES_SPOTIFY_CLIENT_ID is required".
+    # No client_id anywhere -> wizard instead of "STARDUST_SPOTIFY_CLIENT_ID is required".
     try:
         client_id = _spotify_client_id(getattr(args, "client_id", None), existing_state)
     except AuthError as exc:

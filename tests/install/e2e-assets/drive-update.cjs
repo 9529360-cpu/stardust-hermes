@@ -88,7 +88,7 @@ async function main() {
   const app = await _electron.launch({
     executablePath: exePath,
     args: ['--disable-gpu', '--no-sandbox'],
-    // Inherit the driver's env: HERMES_HOME (isolated install) and
+    // Inherit the driver's env: STARDUST_HOME (isolated install) and
     // GIT_CONFIG_GLOBAL (URL redirect to the staged serve repo) MUST reach
     // the main process so its update check fetches from the staged repo.
     env: { ...process.env },
@@ -267,7 +267,7 @@ async function main() {
 
   // ── Wait for the hand-off to take over ────────────────────────────────
   // Clicking Update now spawns the detached updater (desktop-update.ps1 or
-  // the staged binary), which claims HERMES_HOME/.hermes-update-in-progress
+  // the staged binary), which claims STARDUST_HOME/.hermes-update-in-progress
   // and then the desktop quits. We do NOT rely on Playwright's app 'close'
   // event: when the app self-quits for the hand-off that event is
   // unreliable (attempt 8 timed out on it even though the hand-off log
@@ -278,7 +278,7 @@ async function main() {
   // also accept a genuine app close. Any one is success — the PowerShell
   // driver owns asserting the update's OUTCOME (sha, marker cleanup,
   // relaunch) after we return.
-  const hermesHome = process.env.HERMES_HOME
+  const hermesHome = process.env.STARDUST_HOME
   const markerPath = hermesHome ? path.join(hermesHome, '.hermes-update-in-progress') : null
   const resultPath = hermesHome ? path.join(hermesHome, '.hermes-update-result.json') : null
 

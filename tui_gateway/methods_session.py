@@ -68,7 +68,7 @@ def _new_runtime_ids(params: dict) -> tuple[str, str]:
 
 
 def _profile_build_scope(profile_home):
-    """Bind HERMES_HOME + secret + terminal scope for an agent build: the same composition a turn
+    """Bind STARDUST_HOME + secret + terminal scope for an agent build: the same composition a turn
     binds (``_session_profile_runtime_scope``). Home alone leaves ``get_secret()`` on the LAUNCH
     ``.env``; home + secrets alone leaves ``_make_agent``'s terminal probing on the launch process's
     ambient ``TERMINAL_*`` (a ``terminal.backend: docker`` secondary built a ``local`` agent)."""
@@ -343,7 +343,7 @@ def _(rid, params: dict) -> dict:
     with contextlib.suppress(Exception):
         explicit_cwd = bool(raw_cwd) and os.path.isdir(os.path.abspath(os.path.expanduser(raw_cwd)))
     _enable_gateway_prompts()
-    # ``profile`` (app-global remote mode): stored so the build and every turn re-bind HERMES_HOME.
+    # ``profile`` (app-global remote mode): stored so the build and every turn re-bind STARDUST_HOME.
     profile_home = _profile_home(profile := (params.get("profile") or "").strip() or None)
     session_model_override, create_reasoning_override, create_service_tier_override = _create_overrides(params)
     now = time.time()
@@ -841,7 +841,7 @@ def _resume_eager(ctx: _Resume) -> dict:
             if (session := _sessions.get(sid)) is not None:
                 if stored_runtime_overrides.get("model_override") is not None:
                     session["model_override"] = stored_runtime_overrides["model_override"]
-                # Each turn re-binds HERMES_HOME (mid-turn memory/skills reads); lease claimed lazily on turn 1.
+                # Each turn re-binds STARDUST_HOME (mid-turn memory/skills reads); lease claimed lazily on turn 1.
                 if ctx.profile_home is not None:
                     session["profile_home"] = str(ctx.profile_home)
                 session.update(display_history_prefix=display_history_prefix, active_session_lease=None)

@@ -39,7 +39,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # ── Locate python ───────────────────────────────────────────────────────────
 # Probe local venvs first; fall back to the Nix devShell's editable venv
-# (HERMES_PYTHON is exported by the devShell hook and ships [dev] extras:
+# (STARDUST_PYTHON is exported by the devShell hook and ships [dev] extras:
 # pytest, pytest-asyncio, pytest-timeout, ruff, ty).
 #
 # A candidate must have pytest INSTALLED, not merely exist. The release venv
@@ -82,16 +82,16 @@ fi
 
 if [ -n "$VENV" ]; then
   PYTHON="$VENV_PYTHON"
-elif [ -n "${HERMES_PYTHON:-}" ] && [ -x "$HERMES_PYTHON" ] \
-    && "$HERMES_PYTHON" -c 'import pytest' 2>/dev/null; then
-  # Guard with an import check: HERMES_PYTHON may point at the RELEASE
+elif [ -n "${STARDUST_PYTHON:-}" ] && [ -x "$STARDUST_PYTHON" ] \
+    && "$STARDUST_PYTHON" -c 'import pytest' 2>/dev/null; then
+  # Guard with an import check: STARDUST_PYTHON may point at the RELEASE
   # venv (no pytest) when inherited from a wrapped `hermes` binary rather
   # than the devShell hook.
-  PYTHON="$HERMES_PYTHON"
-  echo "▶ no local venv — using Nix dev venv via HERMES_PYTHON: $PYTHON"
+  PYTHON="$STARDUST_PYTHON"
+  echo "▶ no local venv — using Nix dev venv via STARDUST_PYTHON: $PYTHON"
 else
   echo "error: no virtualenv with pytest found in $REPO_ROOT/.venv or $REPO_ROOT/venv," >&2
-  echo "       and HERMES_PYTHON is not a python with pytest (enter the Nix devShell or create a venv)" >&2
+  echo "       and STARDUST_PYTHON is not a python with pytest (enter the Nix devShell or create a venv)" >&2
   if [ -n "$SKIPPED_VENVS" ]; then
     echo "       (skipped for missing pytest:$SKIPPED_VENVS — install dev extras there, or create $REPO_ROOT/.venv)" >&2
   fi
@@ -127,23 +127,23 @@ done
 # The runner's own documented environment knobs must survive the hermetic
 # `env -i` below, or they are silent no-ops for anyone invoking this script:
 #
-#   * HERMES_TEST_WORKERS / PATHS / FILE_TIMEOUT / FILE_RETRIES / SLICE are
+#   * STARDUST_TEST_WORKERS / PATHS / FILE_TIMEOUT / FILE_RETRIES / SLICE are
 #     read by run_tests_parallel.py at argparse-default time — inside the
 #     stripped environment.
-#   * HERMES_TEST_IMAGE is read by tests/docker/conftest.py to skip its
+#   * STARDUST_TEST_IMAGE is read by tests/docker/conftest.py to skip its
 #     session-scoped `docker build`. CI's docker.yml sets it to the image
 #     the build step just loaded; stripping it made every per-file pytest
 #     subprocess rebuild the 5GB image from a cold builder cache instead
 #     (~4 min per worker per run, and the rebuilt image lacked the
-#     HERMES_GIT_SHA build-arg the workflow bakes in).
+#     STARDUST_GIT_SHA build-arg the workflow bakes in).
 #
 # These are test-infrastructure knobs, not credentials — same class as the
-# HERMES_RUN_SLOW_PET_TESTS / HERMES_E2E_BROWSER opt-ins already forwarded.
-# Keep this an explicit allowlist (no HERMES_TEST_* glob) so the "no
+# STARDUST_RUN_SLOW_PET_TESTS / STARDUST_E2E_BROWSER opt-ins already forwarded.
+# Keep this an explicit allowlist (no STARDUST_TEST_* glob) so the "no
 # credential can leak" property stays auditable at a glance.
 TEST_ENV=()
-for _test_var in HERMES_TEST_IMAGE HERMES_TEST_WORKERS HERMES_TEST_PATHS \
-  HERMES_TEST_FILE_TIMEOUT HERMES_TEST_FILE_RETRIES HERMES_TEST_SLICE; do
+for _test_var in STARDUST_TEST_IMAGE STARDUST_TEST_WORKERS STARDUST_TEST_PATHS \
+  STARDUST_TEST_FILE_TIMEOUT STARDUST_TEST_FILE_RETRIES STARDUST_TEST_SLICE; do
   if [ -n "${!_test_var:-}" ]; then
     TEST_ENV+=("$_test_var=${!_test_var}")
   fi
@@ -176,8 +176,8 @@ exec env -i \
   LC_ALL=C.UTF-8 \
   PYTHONHASHSEED=0 \
   PYTHONUTF8=1 \
-  ${HERMES_RUN_SLOW_PET_TESTS:+HERMES_RUN_SLOW_PET_TESTS="$HERMES_RUN_SLOW_PET_TESTS"} \
-  ${HERMES_E2E_BROWSER:+HERMES_E2E_BROWSER="$HERMES_E2E_BROWSER"} \
+  ${STARDUST_RUN_SLOW_PET_TESTS:+STARDUST_RUN_SLOW_PET_TESTS="$STARDUST_RUN_SLOW_PET_TESTS"} \
+  ${STARDUST_E2E_BROWSER:+STARDUST_E2E_BROWSER="$STARDUST_E2E_BROWSER"} \
   ${EXTRA_PYTHONPATH:+PYTHONPATH="$EXTRA_PYTHONPATH"} \
   ${EXTRA_PYTEST_PLUGINS:+PYTEST_PLUGINS="$EXTRA_PYTEST_PLUGINS"} \
   "$PYTHON" "$SCRIPT_DIR/run_tests_parallel.py" "$@"

@@ -1,5 +1,5 @@
 """Multiplexed-gateway invariants: per-turn config, credentials and hooks follow the ROUTED profile
-(HERMES_HOME override), not the launch home the module constants were frozen from."""
+(STARDUST_HOME override), not the launch home the module constants were frozen from."""
 
 from __future__ import annotations
 
@@ -15,12 +15,12 @@ from hermes_constants import reset_hermes_home_override, set_hermes_home_overrid
 
 @pytest.fixture
 def two_homes(tmp_path, monkeypatch):
-    """Launch home A (HERMES_HOME) and a routed profile B with different config everywhere."""
+    """Launch home A (STARDUST_HOME) and a routed profile B with different config everywhere."""
     a = tmp_path / ".hermes"
     b = a / "profiles" / "b"
     b.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(a))
-    monkeypatch.delenv("HERMES_MAX_ITERATIONS", raising=False)
+    monkeypatch.setenv("STARDUST_HOME", str(a))
+    monkeypatch.delenv("STARDUST_MAX_ITERATIONS", raising=False)
     for home, turns, model in ((a, 7, "A/fallback"), (b, 99, "B/fallback")):
         (home / "config.yaml").write_text(yaml.safe_dump({
             "agent": {"max_turns": turns},
@@ -112,7 +112,7 @@ def test_media_policy_reads_routed_profile_config_not_env(two_homes, monkeypatch
     (b / "config.yaml").write_text(yaml.safe_dump(
         {"gateway": {"strict": False, "media_delivery_allow_dirs": ["/srv/b"]}}), encoding="utf-8")
     # Gateway startup bridges the LAUNCH profile's policy into the process env.
-    for var in ("HERMES_MEDIA_DELIVERY_STRICT", "HERMES_MEDIA_ALLOW_DIRS"):
+    for var in ("STARDUST_MEDIA_DELIVERY_STRICT", "STARDUST_MEDIA_ALLOW_DIRS"):
         monkeypatch.delenv(var, raising=False)
     from hermes_cli.config import load_config
     media_policy.apply_media_policy_env(load_config())

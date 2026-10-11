@@ -1,7 +1,7 @@
 """Hindsight memory plugin — MemoryProvider with knowledge graph, entity resolution
 and multi-strategy retrieval; cloud (API key), local_external, or local_embedded.
 
-Config: $HERMES_HOME/hindsight/config.json (profile-scoped), else ~/.hindsight/
+Config: $STARDUST_HOME/hindsight/config.json (profile-scoped), else ~/.hindsight/
 config.json (legacy, shared), else env: HINDSIGHT_API_KEY / BANK_ID / BUDGET /
 API_URL / MODE / TIMEOUT / IDLE_TIMEOUT / RETAIN_TAGS / RETAIN_OBSERVATION_SCOPES /
 RETAIN_SOURCE / RETAIN_USER_PREFIX / RETAIN_ASSISTANT_PREFIX, and
@@ -256,7 +256,7 @@ REFLECT_SCHEMA = {
 
 
 def _load_config() -> dict:
-    """$HERMES_HOME/hindsight/config.json (profile-scoped), else ~/.hindsight/config.json
+    """$STARDUST_HOME/hindsight/config.json (profile-scoped), else ~/.hindsight/config.json
     (legacy, shared), else environment variables."""
     for path in (get_hermes_home() / "hindsight" / "config.json", Path.home() / ".hindsight" / "config.json"):
         # A corrupt (or empty) file falls through to the next source, as before the dedup.
@@ -402,7 +402,7 @@ class HindsightMemoryProvider(MemoryProvider):
         return "" if available else _local_runtime_hint(reason).strip()
 
     def save_config(self, values, hermes_home):
-        """Merge *values* into $HERMES_HOME/hindsight/config.json."""
+        """Merge *values* into $STARDUST_HOME/hindsight/config.json."""
         from utils import atomic_json_write
         config_path = Path(hermes_home) / "hindsight" / "config.json"
         atomic_json_write(config_path, {**read_json_or_empty(config_path), **values}, mode=0o600)

@@ -228,7 +228,7 @@ export function listProfileDirs(deps: MigrationDeps): string[] {
     .map(e => e.name)
 }
 
-/** Default is always a candidate; it is `$HERMES_HOME`, not `$HERMES_HOME/profiles/default`. */
+/** Default is always a candidate; it is `$STARDUST_HOME`, not `$STARDUST_HOME/profiles/default`. */
 export function withDefaultCandidate(named: string[]): string[] {
   return ['default', ...named.filter(name => name !== 'default')]
 }

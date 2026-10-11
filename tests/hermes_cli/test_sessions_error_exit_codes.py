@@ -26,7 +26,7 @@ def _args(action, **kw):
 
 
 def test_delete_missing_returns_1(tmp_path, monkeypatch, capsys):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     from hermes_state import SessionDB
     SessionDB(tmp_path / "state.db")  # initialize an empty store
     rc = sc.cmd_sessions(_args("delete", session_id="nope_xyz"))
@@ -36,7 +36,7 @@ def test_delete_missing_returns_1(tmp_path, monkeypatch, capsys):
 
 
 def test_rename_missing_returns_1(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     from hermes_state import SessionDB
     SessionDB(tmp_path / "state.db")
     rc = sc.cmd_sessions(_args("rename", session_id="nope_xyz", title=["New"]))
@@ -44,7 +44,7 @@ def test_rename_missing_returns_1(tmp_path, monkeypatch):
 
 
 def test_import_missing_file_returns_1(tmp_path, monkeypatch, capsys):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     rc = sc.cmd_sessions(_args("import", path=str(tmp_path / "nope.jsonl")))
     assert rc == 1
     assert "file not found" in capsys.readouterr().out.lower()

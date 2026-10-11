@@ -20,8 +20,8 @@ function readBasePath(): string {
   return withLead.replace(/\/+$/, "");
 }
 
-export const HERMES_BASE_PATH = readBasePath();
-const BASE = HERMES_BASE_PATH;
+export const STARDUST_BASE_PATH = readBasePath();
+const BASE = STARDUST_BASE_PATH;
 
 import type { DashboardTheme } from "@/themes/types";
 import {
@@ -1941,7 +1941,7 @@ export interface StatusResponse {
   /** NS-656: memory-pressure rollup from the gateway heartbeat +
    * lifecycle ledger. Absent on older gateways. */
   memory?: MemoryPressureStatus;
-  /** NS-656: disk-usage rollup for the HERMES_HOME volume. Absent on
+  /** NS-656: disk-usage rollup for the STARDUST_HOME volume. Absent on
    * older gateways. */
   disk?: DiskPressureStatus;
   release_date: string;
@@ -1967,7 +1967,7 @@ export interface MemoryPressureStatus {
 }
 
 /** NS-656: coarse disk telemetry served by /api/status. Live statvfs
- * sample of the HERMES_HOME volume — no staleness dimension, so no
+ * sample of the STARDUST_HOME volume — no staleness dimension, so no
  * sampled_at. */
 export interface DiskPressureStatus {
   pressure: "ok" | "elevated" | "critical" | "unknown";

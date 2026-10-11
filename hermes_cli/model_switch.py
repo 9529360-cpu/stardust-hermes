@@ -1598,7 +1598,7 @@ def apply_model_selection(model_cfg: Any, result: ModelSwitchResult) -> dict:
 
 def persist_model_selection(result: ModelSwitchResult, config_path: Any = None) -> None:
     """Write a successful :func:`switch_model` result to ``config_path`` (default:
-    ``HERMES_HOME/config.yaml`` — the context override or ``HERMES_HOME`` at call time).
+    ``STARDUST_HOME/config.yaml`` — the context override or ``STARDUST_HOME`` at call time).
 
     Targeted key writes, not a whole-``model:`` rewrite: a block rewrite destroys sibling keys the
     user set there (``model_slots``, ``model_fallback``, ...). ``should_clear_context_pin`` can do
@@ -1632,7 +1632,7 @@ def _scoped_key_env(name: str) -> str:
     value from the process env or the default ``.env``. Multiplexing on with no scope fails closed
     (``UnscopedSecretError`` -> ""). Otherwise resolve through ``get_env_prefer_dotenv`` — the
     chain ``client_lifecycle`` uses for the actual request — so a ``key_env`` that lives only in
-    ``$HERMES_HOME/.env`` authenticates the ``/model`` verification probe (#109315) and a rotated
+    ``$STARDUST_HOME/.env`` authenticates the ``/model`` verification probe (#109315) and a rotated
     ``.env`` beats a stale value inherited from the parent shell."""
     if not name:
         return ""

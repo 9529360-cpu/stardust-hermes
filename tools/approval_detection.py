@@ -14,9 +14,9 @@ import unicodedata
 
 logger = logging.getLogger("tools.approval")
 
-# Sensitive write targets, matched via ~ / $HOME / $HERMES_HOME spellings. The resolved absolute
+# Sensitive write targets, matched via ~ / $HOME / $STARDUST_HOME spellings. The resolved absolute
 # home is folded into these forms at detection time by _normalize_command_for_detection(), so no
-# import-time path snapshot (stale once HERMES_HOME is set after import) lives in the patterns.
+# import-time path snapshot (stale once STARDUST_HOME is set after import) lives in the patterns.
 _SSH_SENSITIVE_PATH = r'(?:~|\$home|\$\{home\})/\.ssh(?:/|$)'
 _HERMES_ENV_PATH = (
     r'(?:~\/\.hermes/|(?:\$home|\$\{home\})/\.hermes/|(?:\$hermes_home|\$\{hermes_home\})/)' r'\.env\b'
@@ -479,7 +479,7 @@ def _normalize_command_for_detection(command: str) -> str:
     # backslash wedged between tokens, defeating the structured rm/mkfs/dd patterns incl. the HARDLINE floor.
     command = re.sub(r'\\\r?\n', '', command)
     # Fold absolute user/Hermes home prefixes to ~/ and ~/.hermes/ so the static patterns catch /home/alice/.bashrc
-    # and C:\Users\alice\.bashrc. Resolved at detection time (not import time) so it tracks HOME/HERMES_HOME set
+    # and C:\Users\alice\.bashrc. Resolved at detection time (not import time) so it tracks HOME/STARDUST_HOME set
     # later. MUST run before the backslash strip (which would dissolve C:\Users\alice to C:Usersalice). Hermes home
     # first: on Windows it nests under the user home, and folding the user home first would eat the prefix it needs.
     command = _rewrite_resolved_hermes_home(command)
@@ -533,7 +533,7 @@ def _rewrite_resolved_user_home(command: str) -> str:
 
 
 def _rewrite_resolved_hermes_home(command: str) -> str:
-    """Resolved HERMES_HOME (and its realpath) -> ``~/.hermes/`` so the _HERMES_CONFIG_PATH /
+    """Resolved STARDUST_HOME (and its realpath) -> ``~/.hermes/`` so the _HERMES_CONFIG_PATH /
     _HERMES_ENV_PATH rules match Docker/gateway deployments that spell the absolute path."""
     try:
         from hermes_constants import get_hermes_home

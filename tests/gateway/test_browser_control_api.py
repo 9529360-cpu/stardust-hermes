@@ -226,11 +226,11 @@ def test_api_agent_context_binds_server_principal_and_transport_family():
     )
     try:
         assert (
-            get_session_env("HERMES_BROWSER_CONTROL_PRINCIPAL")
+            get_session_env("STARDUST_BROWSER_CONTROL_PRINCIPAL")
             == "principal-fixture"
         )
         assert (
-            get_session_env("HERMES_BROWSER_CONTROL_TRANSPORT_FAMILY")
+            get_session_env("STARDUST_BROWSER_CONTROL_TRANSPORT_FAMILY")
             == "local-api"
         )
     finally:

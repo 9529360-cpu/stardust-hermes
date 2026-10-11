@@ -114,7 +114,7 @@ jobs:
         env:
           # Outside the workspace on purpose: logs written into the repo
           # would trip the driver's own dirty-tree guard.
-          HERMES_E2E_LOG_DIR: ${{ runner.temp }}/e2e-logs
+          STARDUST_E2E_LOG_DIR: ${{ runner.temp }}/e2e-logs
 
       - name: Stop screen recording
         if: always()

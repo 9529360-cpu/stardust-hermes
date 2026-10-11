@@ -109,7 +109,7 @@ class TestApprovalsSaveBroadcast:
         )
         assert resp.status_code == 200
         assert broadcast_calls, (
-            "?profile=default is this process's own HERMES_HOME; skipping "
+            "?profile=default is this process's own STARDUST_HOME; skipping "
             "the broadcast leaves live sessions painting stale YOLO state"
         )
 
@@ -126,7 +126,7 @@ class TestApprovalsSaveBroadcast:
         )
         assert resp.status_code == 200
         assert not broadcast_calls, (
-            "a profile-scoped save targets a different HERMES_HOME than this "
+            "a profile-scoped save targets a different STARDUST_HOME than this "
             "process's gateway sessions; broadcasting our own sessions' "
             "unchanged state is wrong"
         )

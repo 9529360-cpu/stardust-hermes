@@ -139,7 +139,7 @@ def _run_ddgs_search_bounded(query: str, safe_limit: int) -> list[dict[str, Any]
     env = _sanitize_subprocess_env(dict(os.environ))
     if _test_hook:
         request["test_hook"] = _test_hook
-        env["HERMES_DDGS_ALLOW_TEST_HOOKS"] = "1"
+        env["STARDUST_DDGS_ALLOW_TEST_HOOKS"] = "1"
     proc = _last_worker_proc = _spawn_worker(env)
     # ``communicate`` runs in a side thread so the parent can poll interrupt /
     # deadline without blocking; killing the child unblocks it.

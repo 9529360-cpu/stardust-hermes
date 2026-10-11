@@ -100,7 +100,7 @@ def _existing_secret_keeps(env_var: str, label: str, question: str) -> bool:
 
 
 def _pip_install_vercel(package):
-    """uv when Hermes has one ($HERMES_HOME/bin is never on PATH, so which() misses it and
+    """uv when Hermes has one ($STARDUST_HOME/bin is never on PATH, so which() misses it and
     bootstrapping mid-wizard is fine), else pip — a `uv venv` venv may not even have pip."""
     import subprocess
     from hermes_cli.managed_uv import ensure_uv

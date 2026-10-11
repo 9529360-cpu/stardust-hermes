@@ -11,7 +11,7 @@ import re
 from functools import lru_cache
 
 # `--profile` / `-p` is consumed by ``main._apply_profile_override`` before argparse runs
-# (it sets ``HERMES_HOME`` and strips itself from ``sys.argv``), so it isn't on the parser.
+# (it sets ``STARDUST_HOME`` and strips itself from ``sys.argv``), so it isn't on the parser.
 # Listed here so all "carry over on relaunch" metadata lives in one file.
 PRE_ARGPARSE_INHERITED_FLAGS: list[tuple[str, bool]] = [("--profile", True), ("-p", True)]
 
@@ -134,7 +134,7 @@ def _add_top_level_flags(parser: argparse.ArgumentParser) -> None:
     # `chat` subcommand; if neither -z nor a subcommand consumes them, they fall through as None.
     inherited(parser, "-m", "--model", default=None, help=(
         "Model override for this invocation (e.g. anthropic/claude-sonnet-4.6). "
-        "Applies to -z/--oneshot and --tui. Also settable via HERMES_INFERENCE_MODEL env var."))
+        "Applies to -z/--oneshot and --tui. Also settable via STARDUST_INFERENCE_MODEL env var."))
     inherited(parser, "--provider", default=None, help=(
         "Provider override for this invocation (e.g. openrouter, anthropic). "
         "Applies to -z/--oneshot and --tui. The persistent provider lives in config.yaml "
@@ -162,7 +162,7 @@ def _add_top_level_flags(parser: argparse.ArgumentParser) -> None:
         help="Run in an isolated git worktree (for parallel agents)")
     inherited(parser, "--accept-hooks", action="store_true", default=False, help=(
         "Auto-approve any unseen shell hooks declared in config.yaml "
-        "without a TTY prompt.  Equivalent to HERMES_ACCEPT_HOOKS=1 or "
+        "without a TTY prompt.  Equivalent to STARDUST_ACCEPT_HOOKS=1 or "
         "hooks_auto_accept: true in config.yaml.  Use on CI / headless "
         "runs that can't prompt."))
     inherited(parser, "--skills", "-s", action="append", default=None,
@@ -255,7 +255,7 @@ def _build_chat_parser(subparsers) -> argparse.ArgumentParser:
         help="Run in an isolated git worktree (for parallel agents on the same repo)")
     inherited(chat_parser, "--accept-hooks", action="store_true", default=SUPPRESS, help=(
         "Auto-approve any unseen shell hooks declared in config.yaml "
-        "without a TTY prompt (see also HERMES_ACCEPT_HOOKS env var and "
+        "without a TTY prompt (see also STARDUST_ACCEPT_HOOKS env var and "
         "hooks_auto_accept: in config.yaml)."))
     add("--checkpoints", action="store_true", default=False,
         help="Enable filesystem checkpoints before destructive file operations (use /rollback to restore)")

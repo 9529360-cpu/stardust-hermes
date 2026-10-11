@@ -7,7 +7,7 @@ import pytest
 
 @pytest.fixture
 def rpc(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     stdout = sys.stdout
     from tui_gateway import server
 
@@ -128,10 +128,10 @@ def test_duplicate_entries_fail_without_deduplicating(rpc, tmp_path):
 
 def test_profile_home_resolved_per_call(rpc, tmp_path, monkeypatch):
     assert "result" in rpc("memory.remember", target="memory", content="Profile one note")
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "second"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "second"))
     assert rpc("memory.list")["result"]["entries"] == []
     assert "result" in rpc("memory.remember", target="user", content="Profile two note")
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     assert rpc("memory.list")["result"]["entries"] == [
         {"target": "memory", "index": 0, "text": "Profile one note"}]
 

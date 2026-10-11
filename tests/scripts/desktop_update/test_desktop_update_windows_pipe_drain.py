@@ -73,7 +73,7 @@ class TestIdleWatchdogCountsUpdateLogGrowth:
     drain loop consults update-log growth before terminating the tree.
     Sabotage-proof: removing the ``Get-StepProgressLogStamp`` consult from
     the stall branch, dropping the ``logstall`` self-test arm, or dropping
-    the ``HERMES_UPDATE_STEP_IDLE_SECONDS`` override each fails a test here.
+    the ``STARDUST_UPDATE_STEP_IDLE_SECONDS`` override each fails a test here.
     """
 
     def _src(self) -> str:
@@ -84,11 +84,11 @@ class TestIdleWatchdogCountsUpdateLogGrowth:
         assert '$script:StepProgressLogPath = Join-Path $LogDir "update.log"' in src
 
     def test_progress_log_overridable_for_self_test(self):
-        assert "HERMES_UPDATE_PROGRESS_LOG" in self._src()
+        assert "STARDUST_UPDATE_PROGRESS_LOG" in self._src()
 
     def test_idle_override_env_retained(self):
         # The user/test-facing idle override must survive the amendment.
-        assert "HERMES_UPDATE_STEP_IDLE_SECONDS" in self._src()
+        assert "STARDUST_UPDATE_STEP_IDLE_SECONDS" in self._src()
 
     def test_stall_branch_consults_log_growth_before_terminating(self):
         src = self._src()
@@ -177,9 +177,9 @@ def test_update_step_survives_pipe_leak_flood_and_live_child_stall(
         # Keep the test quick. The grace is what the fix bounds; the hold is
         # how long the leaking grandchild lives. hold >> grace is what makes a
         # regression measurable rather than lucky.
-        "HERMES_UPDATE_PIPE_DRAIN_SECONDS": "3",
-        "HERMES_UPDATE_STEP_IDLE_SECONDS": "3",
-        "HERMES_SELFTEST_HOLD_SECONDS": "45",
+        "STARDUST_UPDATE_PIPE_DRAIN_SECONDS": "3",
+        "STARDUST_UPDATE_STEP_IDLE_SECONDS": "3",
+        "STARDUST_SELFTEST_HOLD_SECONDS": "45",
     }
 
     result = subprocess.run(

@@ -577,7 +577,7 @@ def _scan_gateway_pids(
         looks_like_gateway_command_line, looks_like_gateway_runtime_command_line, profile_flag_value,
     )
     current_home = str(get_hermes_home().resolve())
-    # Forward slashes on both sides of the HERMES_HOME= match (mirrors gateway.status).
+    # Forward slashes on both sides of the STARDUST_HOME= match (mirrors gateway.status).
     current_home_lc = current_home.lower().replace("\\", "/")
     current_profile_arg = _profile_arg(current_home)
     current_profile_name = current_profile_arg.split()[-1] if current_profile_arg else ""
@@ -594,8 +594,8 @@ def _scan_gateway_pids(
 
         # Default profile: accept unless argv advertises another profile in any spelling the CLI
         # pre-parser accepts (``--profile=ops`` slipped past a substring test, so a default-profile
-        # fallback stop could SIGTERM the named gateway). HERMES_HOME may come via env (invisible to
-        # wmic/CIM), so only a non-matching explicit HERMES_HOME= disqualifies.
+        # fallback stop could SIGTERM the named gateway). STARDUST_HOME may come via env (invisible to
+        # wmic/CIM), so only a non-matching explicit STARDUST_HOME= disqualifies.
         if profile_flag_value(command_lc) is not None:
             return False
         return not ("hermes_home=" in command_lc and f"hermes_home={current_home_lc}" not in command_lc)
@@ -959,7 +959,7 @@ def _spawn_gateway_restart_watcher(old_pid: int, run_argv: list[str]) -> bool:
     # Windows: ``run_argv`` leads with the venv's console ``python.exe`` — the interpreter we want:
     # the watcher respawns it under CREATE_NO_WINDOW detach flags so the gateway owns one hidden
     # console all descendants inherit and nothing flashes (#54220/#56747). The spec helper
-    # normalizes the interpreter and captures a stable cwd + env overlay (HERMES_HOME,
+    # normalizes the interpreter and captures a stable cwd + env overlay (STARDUST_HOME,
     # VIRTUAL_ENV, PYTHONPATH) so the respawn doesn't depend on the watcher's cwd. No-op on POSIX.
     respawn_cwd = ""
     # See gateway_windows.windowless_gateway_restart_spec. See #54220, #56747.
@@ -1017,7 +1017,7 @@ def _spawn_gateway_restart_watcher(old_pid: int, run_argv: list[str]) -> bool:
         # gateway dies when that job tears down. See _subprocess_compat.windows_detach_flags().
         _popen_kwargs = {{"stdout": _stdio_target, "stderr": _stdio_target}}
         # Anchor at the stable working dir and overlay the env (VIRTUAL_ENV / PYTHONPATH /
-        # HERMES_HOME) the windowless base interpreter needs to import hermes_cli. Empty on POSIX.
+        # STARDUST_HOME) the windowless base interpreter needs to import hermes_cli. Empty on POSIX.
         if _respawn_cwd:
             _popen_kwargs["cwd"] = _respawn_cwd
         _base_env = {{**os.environ, **_respawn_env_overlay}}
@@ -1103,7 +1103,7 @@ def _systemctl_show(properties: tuple[str, ...], *, system: bool) -> dict[str, s
 
 
 def _hermes_home_pinned_by_unit(unit_path: Path) -> str | None:
-    """``HERMES_HOME`` pinned by the unit file at *unit_path*, or None when absent/unreadable."""
+    """``STARDUST_HOME`` pinned by the unit file at *unit_path*, or None when absent/unreadable."""
     try:
         text = unit_path.read_text(encoding="utf-8")
     except OSError:
@@ -1112,18 +1112,18 @@ def _hermes_home_pinned_by_unit(unit_path: Path) -> str | None:
         body = line.strip()
         if body.startswith("Environment="):
             body = body[len("Environment=") :].strip().strip('"')
-            if body.startswith("HERMES_HOME="):
+            if body.startswith("STARDUST_HOME="):
                 return body.split("=", 1)[1].strip().strip('"') or None
     return None
 
 
 def _hermes_home_from_systemd_unit_file(system: bool = False) -> str | None:
-    """``HERMES_HOME`` from the on-disk unit file - what refresh/compare already read, and reliable under ``sudo``."""
+    """``STARDUST_HOME`` from the on-disk unit file - what refresh/compare already read, and reliable under ``sudo``."""
     return _hermes_home_pinned_by_unit(get_systemd_unit_path(system=system))
 
 
 def _sync_hermes_home_from_systemd_unit(system: bool) -> None:
-    """Adopt a system-scope unit's ``HERMES_HOME``: under ``sudo`` it is stripped and HOME=/root, so
+    """Adopt a system-scope unit's ``STARDUST_HOME``: under ``sudo`` it is stripped and HOME=/root, so
     get_hermes_home() would pick the wrong profile for runtime-status/PID reads."""
     if not system:
         return
@@ -1131,9 +1131,9 @@ def _sync_hermes_home_from_systemd_unit(system: bool) -> None:
     unit_home = (_hermes_home_from_systemd_unit_file(system=True) or "").strip()
     if not unit_home:
         env_line = _systemctl_show(("Environment",), system=True).get("Environment", "")
-        unit_home = _parse_kv_pairs(env_line.split()).get("HERMES_HOME", "").strip()
-    if unit_home and os.environ.get("HERMES_HOME", "").strip() != unit_home:
-        os.environ["HERMES_HOME"] = unit_home
+        unit_home = _parse_kv_pairs(env_line.split()).get("STARDUST_HOME", "").strip()
+    if unit_home and os.environ.get("STARDUST_HOME", "").strip() != unit_home:
+        os.environ["STARDUST_HOME"] = unit_home
 
 
 def _read_systemd_unit_properties(
@@ -1930,7 +1930,7 @@ def _windows_scheduled_task_supervises(task_name: str) -> bool:
 
 
 def _gateway_detached_env() -> bool:
-    return _truthy_env(os.getenv("HERMES_GATEWAY_DETACHED"))
+    return _truthy_env(os.getenv("STARDUST_GATEWAY_DETACHED"))
 
 
 def _stdin_is_tty() -> bool | None:
@@ -1942,7 +1942,7 @@ def _stdin_is_tty() -> bool | None:
 
 
 def _windows_gateway_should_absorb_console_controls() -> bool:
-    """True for detached Windows gateway runs that should ignore Ctrl+C (``HERMES_GATEWAY_DETACHED=1``
+    """True for detached Windows gateway runs that should ignore Ctrl+C (``STARDUST_GATEWAY_DETACHED=1``
     or no interactive stdin); foreground runs stay interruptible."""
     if not is_windows():
         return False
@@ -2005,7 +2005,7 @@ def _native_service_homes() -> set[Path]:
 
 
 def _bare_unit_pinned_home() -> Path | None:
-    """Resolved ``HERMES_HOME`` pinned by an installed ``hermes-gateway.service``, or None. The unit is the
+    """Resolved ``STARDUST_HOME`` pinned by an installed ``hermes-gateway.service``, or None. The unit is the
     one naming basis that holds still across the sudo mid-command switch (see ``_profile_suffix``) and it
     covers every elevated identity — ``sudo -i`` and cron included, where SUDO_USER is absent.
 
@@ -2029,20 +2029,20 @@ def _bare_unit_pinned_home() -> Path | None:
 
 
 def _profile_suffix() -> str:
-    """Service-name suffix for HERMES_HOME: "" for a home that owns the bare name, the profile name for
+    """Service-name suffix for STARDUST_HOME: "" for a home that owns the bare name, the profile name for
     ``<root>/profiles/<name>``, else a short hash of the path.
 
     Bare-name owners: this process's platform-native default (``~/.hermes``), under sudo the invoking
     user's native default, and the home pinned by an installed ``hermes-gateway.service``. Under sudo the
-    naming basis moves MID-COMMAND — sudo strips HERMES_HOME and sets HOME=/root, then
-    ``_sync_hermes_home_from_systemd_unit()`` adopts the unit's own HERMES_HOME into ``os.environ`` — so a
+    naming basis moves MID-COMMAND — sudo strips STARDUST_HOME and sets HOME=/root, then
+    ``_sync_hermes_home_from_systemd_unit()`` adopts the unit's own STARDUST_HOME into ``os.environ`` — so a
     basis derived from the process alone names one unit before the adoption and another after it. The
     unit-pinned check must precede the profile branch: ``sudo hermes gateway install --system`` resolves
     the BARE name from root's default, then pins the invoking user's remapped home, so the bare unit
     legitimately carries a ``<root>/profiles/<name>`` home.
 
     The bare name is deliberately NOT tied to ``get_default_hermes_root()``: that helper treats any
-    HERMES_HOME outside ``~/.hermes`` (Docker ``/opt/data``, a temp dir) as "the root itself", which let a
+    STARDUST_HOME outside ``~/.hermes`` (Docker ``/opt/data``, a temp dir) as "the root itself", which let a
     temp-home harness resolve to the default profile's ``hermes-gateway`` unit and uninstall the
     production gateway. Service names are host-wide identities; a home with no installed bare unit and
     no native default keeps its own suffix.
@@ -2077,7 +2077,7 @@ def _profile_arg(hermes_home: str | None = None, default_root: str | Path | None
 
 
 def get_service_name() -> str:
-    """Systemd service name: ``hermes-gateway`` for default HERMES_HOME, ``hermes-gateway-<profile>``
+    """Systemd service name: ``hermes-gateway`` for default STARDUST_HOME, ``hermes-gateway-<profile>``
     or ``-<hash>`` otherwise."""
     suffix = _profile_suffix()
     return f"{_SERVICE_BASE}-{suffix}" if suffix else _SERVICE_BASE
@@ -2654,7 +2654,7 @@ def get_launchd_plist_path() -> Path:
 
 def launchd_gateway_labels_for_install() -> list[str]:
     """Launchd labels for every profile of THIS install (root first, then profiles by name). Derived from
-    the profile layout, NOT by globbing ``~/Library/LaunchAgents``, so a sandboxed HERMES_HOME never
+    the profile layout, NOT by globbing ``~/Library/LaunchAgents``, so a sandboxed STARDUST_HOME never
     restarts another install's fleet. Names that can't map to a suffix are skipped."""
     import re as _re
     from hermes_cli.profiles import list_profiles
@@ -2758,11 +2758,11 @@ def _remap_path_for_user(path: str, target_home_dir: str) -> str:
 
 
 def _hermes_home_for_target_user(target_home_dir: str) -> str:
-    """Remap the current HERMES_HOME (root's, under sudo) to the target user's equivalent:
+    """Remap the current STARDUST_HOME (root's, under sudo) to the target user's equivalent:
     ``/root/.hermes[/profiles/x]`` → ``/home/alice/.hermes[/profiles/x]``; custom paths kept as-is."""
-    current_hermes_raw = os.environ.get("HERMES_HOME", "").strip()
+    current_hermes_raw = os.environ.get("STARDUST_HOME", "").strip()
     current_hermes = Path(current_hermes_raw).expanduser() if current_hermes_raw else get_hermes_home()
-    # Keep paths lexical: resolving a non-existent path can bake a different HERMES_HOME into the unit.
+    # Keep paths lexical: resolving a non-existent path can bake a different STARDUST_HOME into the unit.
     current_default = Path.home() / ".hermes"
     target_default = Path(target_home_dir) / ".hermes"
     try:
@@ -2799,7 +2799,7 @@ def _build_service_path_dirs(project_root: Path | None = None) -> list[str]:
 
 
 def _stable_service_working_dir() -> str:
-    """WorkingDirectory that won't disappear under systemd (HERMES_HOME, else PROJECT_ROOT). cwd is
+    """WorkingDirectory that won't disappear under systemd (STARDUST_HOME, else PROJECT_ROOT). cwd is
     irrelevant to ``-m`` resolution, and a pinned transient checkout rots: systemd fails at CHDIR
     (status=200) before Python loads, so the unit self-heal never runs and Restart=always crash-loops."""
     try:
@@ -2934,8 +2934,8 @@ Type={systemd_type}
 WorkingDirectory={working_dir}
 {env_lines}Environment="PATH={sane_path}"
 Environment="VIRTUAL_ENV={venv_dir}"
-Environment="HERMES_HOME={hermes_home}"
-Environment="HERMES_SUPERVISED_CHILD=1"
+Environment="STARDUST_HOME={hermes_home}"
+Environment="STARDUST_SUPERVISED_CHILD=1"
 Restart=always
 RestartSec=5
 RestartForceExitStatus={GATEWAY_SERVICE_RESTART_EXIT_CODE}
@@ -2984,7 +2984,7 @@ def _normalize_launchd_plist_for_comparison(text: str) -> str:
 
 
 def systemd_unit_is_current(system: bool = False) -> bool:
-    # HERMES_HOME sync chokepoint for every compare/regenerate path: under `sudo … --system` it is often
+    # STARDUST_HOME sync chokepoint for every compare/regenerate path: under `sudo … --system` it is often
     # stripped to /root/.hermes, so refresh would rewrite a correct unit and status warn forever.
     # Idempotent; the os.environ mutation persists for later runtime reads (restart's PID/drain).
     _sync_hermes_home_from_systemd_unit(system=system)
@@ -3002,12 +3002,12 @@ def systemd_unit_is_current(system: bool = False) -> bool:
 
 
 def _temp_home_in_service_definition(definition: str) -> str | None:
-    """Temp-dir HERMES_HOME baked into a systemd unit / launchd plist, or None. A temp home means a
+    """Temp-dir STARDUST_HOME baked into a systemd unit / launchd plist, or None. A temp home means a
     test/E2E harness generated it; installing it leaves the gateway "running" but deaf to every platform."""
     import re
     import tempfile
-    candidates = re.findall(r'HERMES_HOME=([^"\n]+)', definition)
-    candidates += re.findall(r"<key>HERMES_HOME</key>\s*<string>(.*?)</string>", definition, flags=re.S)
+    candidates = re.findall(r'STARDUST_HOME=([^"\n]+)', definition)
+    candidates += re.findall(r"<key>STARDUST_HOME</key>\s*<string>(.*?)</string>", definition, flags=re.S)
     temp_roots = {
         Path(tempfile.gettempdir()).resolve(),
         Path("/tmp"), Path("/var/tmp"), Path("/private/tmp"), Path("/private/var/tmp"),
@@ -3023,13 +3023,13 @@ def _temp_home_in_service_definition(definition: str) -> str | None:
 
 
 def _refuse_temp_home_service_write(definition: str, kind: str) -> bool:
-    """Refuse (with guidance) when a service definition carries a temp HERMES_HOME."""
+    """Refuse (with guidance) when a service definition carries a temp STARDUST_HOME."""
     temp_home = _temp_home_in_service_definition(definition)
     if temp_home is None:
         return False
-    print(f"✗ Refusing to write the gateway {kind}: HERMES_HOME resolves to a temporary directory ({temp_home}).")
+    print(f"✗ Refusing to write the gateway {kind}: STARDUST_HOME resolves to a temporary directory ({temp_home}).")
     print(
-        "  This usually means a test/E2E environment exported HERMES_HOME. "
+        "  This usually means a test/E2E environment exported STARDUST_HOME. "
         "Unset it (or run from a clean shell) and retry."
     )
     return True
@@ -3041,7 +3041,7 @@ def refresh_systemd_unit_if_needed(system: bool = False) -> bool:
     if not unit_path.exists():
         return False
 
-    # systemd_unit_is_current is the HERMES_HOME-sync chokepoint; its env mutation persists for the regenerate below.
+    # systemd_unit_is_current is the STARDUST_HOME-sync chokepoint; its env mutation persists for the regenerate below.
     if systemd_unit_is_current(system=system):
         return False
 
@@ -3049,11 +3049,11 @@ def refresh_systemd_unit_if_needed(system: bool = False) -> bool:
     new_unit = generate_systemd_unit(system=system, run_as_user=expected_user)
 
     # Test safety belt: the user unit path is under Path.home(), which conftest does NOT sandbox, and a
-    # pytest-tmp HERMES_HOME baked into the developer's real unit breaks their gateway on next reboot.
+    # pytest-tmp STARDUST_HOME baked into the developer's real unit breaks their gateway on next reboot.
     if not system and any(m in new_unit for m in ("/pytest-of-", '/hermes_test"', "/hermes_test/")):
         return False
 
-    # Structural variant: refuse ANY temp-dir HERMES_HOME (manual E2E homes lack the pytest markers).
+    # Structural variant: refuse ANY temp-dir STARDUST_HOME (manual E2E homes lack the pytest markers).
     if _refuse_temp_home_service_write(new_unit, "systemd unit"):
         return False
 
@@ -3177,7 +3177,7 @@ def _print_system_scope_remediation(action: str) -> None:
 
 def _get_restart_drain_timeout() -> float:
     """Return the configured gateway restart drain timeout in seconds."""
-    raw = os.getenv("HERMES_RESTART_DRAIN_TIMEOUT", "").strip()
+    raw = os.getenv("STARDUST_RESTART_DRAIN_TIMEOUT", "").strip()
     if not raw:
         cfg = read_raw_config()
         agent_cfg = cfg.get("agent", {}) if isinstance(cfg, dict) else {}
@@ -3202,7 +3202,7 @@ def _get_cron_drain_timeout() -> float:
 
     See #82161.
     """
-    return _agent_timeout_setting("HERMES_CRON_DRAIN_TIMEOUT", "cron_drain_timeout", parse_cron_drain_timeout)
+    return _agent_timeout_setting("STARDUST_CRON_DRAIN_TIMEOUT", "cron_drain_timeout", parse_cron_drain_timeout)
 
 
 def _get_restart_exit_wait_budget() -> float:
@@ -3214,7 +3214,7 @@ def _get_restart_exit_wait_budget() -> float:
         # top, with a 60s floor.
         _get_restart_drain_timeout(),
         _agent_timeout_setting(
-            "HERMES_RESTART_AFTER_TURN_TIMEOUT", "restart_after_turn_timeout", parse_restart_after_turn_timeout
+            "STARDUST_RESTART_AFTER_TURN_TIMEOUT", "restart_after_turn_timeout", parse_restart_after_turn_timeout
         ),
     )
 
@@ -3242,7 +3242,7 @@ def systemd_install(
     scope_label = _service_scope_label(system)
     sudo, scope_flag, user_flag = _systemd_cli_bits(system)
 
-    # Existing system units already pin HERMES_HOME; adopt it before any regenerate.
+    # Existing system units already pin STARDUST_HOME; adopt it before any regenerate.
     if unit_path.exists():
         _sync_hermes_home_from_systemd_unit(system=system)
 
@@ -3313,15 +3313,15 @@ def _systemd_scope_preamble(
 
 
 def _systemd_unit_belongs_to_current_home(system: bool = False) -> bool:
-    """False (with a warning) when the installed unit pins a HERMES_HOME other than this process's: the
+    """False (with a warning) when the installed unit pins a STARDUST_HOME other than this process's: the
     service name then resolved to ANOTHER install's gateway, and stop/disable/unlink would take it down."""
-    _sync_hermes_home_from_systemd_unit(system=system)  # sudo strips HERMES_HOME; adopt the unit's first
+    _sync_hermes_home_from_systemd_unit(system=system)  # sudo strips STARDUST_HOME; adopt the unit's first
     unit_home = _hermes_home_from_systemd_unit_file(system=system)
     if unit_home is None or Path(unit_home).expanduser().resolve() == get_hermes_home().resolve():
         return True
     print_warning(
-        f"Refusing to remove {get_systemd_unit_path(system=system)}: it runs HERMES_HOME={unit_home}, "
-        f"but this process has HERMES_HOME={get_hermes_home()}"
+        f"Refusing to remove {get_systemd_unit_path(system=system)}: it runs STARDUST_HOME={unit_home}, "
+        f"but this process has STARDUST_HOME={get_hermes_home()}"
     )
     return False
 
@@ -3356,7 +3356,7 @@ def _require_service_installed(action: str, system: bool = False) -> None:
 
 def systemd_start(system: bool = False):
     system = _systemd_scope_preamble("start", system, preflight_user=True)
-    # HERMES_HOME sync happens in refresh's systemd_unit_is_current gate; the unit is guaranteed to exist here.
+    # STARDUST_HOME sync happens in refresh's systemd_unit_is_current gate; the unit is guaranteed to exist here.
     refresh_systemd_unit_if_needed(system=system)
     _run_systemctl(["start", get_service_name()], system=system, check=True, timeout=30)
     print(f"✓ {_service_scope_label(system).capitalize()} service started")
@@ -3379,7 +3379,7 @@ def systemd_stop(system: bool = False):
 
 def systemd_restart(system: bool = False):
     system = _systemd_scope_preamble("restart", system, preflight_user=True)
-    # HERMES_HOME sync happens in refresh's systemd_unit_is_current gate; its os.environ mutation
+    # STARDUST_HOME sync happens in refresh's systemd_unit_is_current gate; its os.environ mutation
     # persists for the get_running_pid / drain-timeout reads below.
     refresh_systemd_unit_if_needed(system=system)
     from gateway.status import get_running_pid
@@ -3884,9 +3884,9 @@ def generate_launchd_plist() -> str:
         <string>{sane_path}</string>
         <key>VIRTUAL_ENV</key>
         <string>{venv_dir}</string>
-        <key>HERMES_HOME</key>
+        <key>STARDUST_HOME</key>
         <string>{hermes_home}</string>
-        <key>HERMES_SUPERVISED_CHILD</key>
+        <key>STARDUST_SUPERVISED_CHILD</key>
         <string>1</string>
     </dict>
 
@@ -4191,7 +4191,7 @@ def launchd_stop():
 
 def _wait_for_gateway_exit(timeout: float = 10.0, force_after: float | None = 5.0) -> bool:
     """Wait up to ``timeout`` s for the gateway (by gateway.pid, not launchd labels, so multiple
-    HERMES_HOMEs work) to exit; SIGKILL it after ``force_after`` s of graceful waiting."""
+    STARDUST_HOMEs work) to exit; SIGKILL it after ``force_after`` s of graceful waiting."""
     from gateway.status import get_process_start_time, get_running_pid
     deadline = time.monotonic() + timeout
     force_deadline = (time.monotonic() + force_after) if force_after is not None else None
@@ -4414,7 +4414,7 @@ def _is_official_docker_checkout() -> bool:
 def _running_under_gateway_supervisor() -> bool:
     """True when this process IS the supervisor-launched gateway, so the conflict guard never wedges
     the service into a respawn/refuse loop. Markers: systemd INVOCATION_ID, launchd XPC_SERVICE_NAME
-    (shells inherit "0"), s6 HERMES_S6_SUPERVISED_CHILD, or ``--external-supervisor``."""
+    (shells inherit "0"), s6 STARDUST_S6_SUPERVISED_CHILD, or ``--external-supervisor``."""
     return is_gateway_supervisor_process()
 
 
@@ -4562,7 +4562,7 @@ def _guard_supervised_gateway_conflict(force: bool = False) -> None:
 def _guard_existing_gateway_process_conflict(replace: bool = False) -> None:
     """Cheap PID-file preflight before the expensive ``gateway.run`` import (the authoritative lock check):
     supervisor loops re-running bare ``gateway run`` burned memory on plugin discovery just to fail
-    "already running". Same user-facing contract; never scans other HERMES_HOME roots."""
+    "already running". Same user-facing contract; never scans other STARDUST_HOME roots."""
     if replace or _running_under_gateway_supervisor():
         return
     try:
@@ -4572,7 +4572,7 @@ def _guard_existing_gateway_process_conflict(replace: bool = False) -> None:
         logger.debug("Existing-gateway process probe failed", exc_info=True)
         return
     if pid is None:
-        # get_running_pid() filters by the current profile's HERMES_HOME; warn if the PID file
+        # get_running_pid() filters by the current profile's STARDUST_HOME; warn if the PID file
         # belongs to another profile (user switched profiles while the old gateway still runs).
         try:
             from gateway.status import _read_pid_record, _pid_record_belongs_to_current_profile
@@ -4596,7 +4596,7 @@ def _guard_existing_gateway_process_conflict(replace: bool = False) -> None:
 
 def _guard_official_docker_root_gateway() -> None:
     """Refuse gateway startup when the official Docker privilege drop was bypassed."""
-    if not hasattr(os, "geteuid") or os.geteuid() != 0 or _truthy_env(os.getenv("HERMES_ALLOW_ROOT_GATEWAY")):
+    if not hasattr(os, "geteuid") or os.geteuid() != 0 or _truthy_env(os.getenv("STARDUST_ALLOW_ROOT_GATEWAY")):
         return
     if not _is_official_docker_checkout():
         return
@@ -4609,9 +4609,9 @@ def _guard_official_docker_root_gateway() -> None:
     )
     print(
         "  Running the gateway as root can leave root-owned files in "
-        "$HERMES_HOME and break later non-root dashboard/gateway runs."
+        "$STARDUST_HOME and break later non-root dashboard/gateway runs."
     )
-    print("  Set HERMES_ALLOW_ROOT_GATEWAY=1 only if you intentionally accept this risk.")
+    print("  Set STARDUST_ALLOW_ROOT_GATEWAY=1 only if you intentionally accept this risk.")
     sys.exit(1)
 
 
@@ -4666,11 +4666,11 @@ def _absorb_windows_console_controls() -> None:
 
 def _make_exit_diag():
     """``_exit_diag(tag, **extra)`` recorder writing ``logs/gateway-exit-diag.log`` — captures every way
-    ``asyncio.run()`` can return, for chasing silent Windows gateway deaths. HERMES_GATEWAY_EXIT_DIAG=0 opts out."""
+    ``asyncio.run()`` can return, for chasing silent Windows gateway deaths. STARDUST_GATEWAY_EXIT_DIAG=0 opts out."""
     from datetime import datetime as _dt, timezone as _tz
 
     def _exit_diag(tag: str, **extra: object) -> None:
-        if os.environ.get("HERMES_GATEWAY_EXIT_DIAG", "1") != "1":
+        if os.environ.get("STARDUST_GATEWAY_EXIT_DIAG", "1") != "1":
             return
         try:
             from hermes_constants import get_hermes_home as _ghh
@@ -4690,7 +4690,7 @@ def _make_exit_diag():
 
 def _respawn_storm_backoff() -> None:
     """Portable app-level respawn-storm breaker (for supervisors without a floor). Defaults mirror
-    DEFAULT_CONFIG ``gateway.respawn_storm``; HERMES_GATEWAY_MAX_STARTS / HERMES_GATEWAY_START_WINDOW_S
+    DEFAULT_CONFIG ``gateway.respawn_storm``; STARDUST_GATEWAY_MAX_STARTS / STARDUST_GATEWAY_START_WINDOW_S
     override; max_starts <= 0 disables. Never blocks startup."""
     try:
         from gateway.status import record_start_and_check_storm
@@ -4709,11 +4709,11 @@ def _respawn_storm_backoff() -> None:
         except Exception:
             pass
         try:
-            _max_starts = int(os.environ["HERMES_GATEWAY_MAX_STARTS"])
+            _max_starts = int(os.environ["STARDUST_GATEWAY_MAX_STARTS"])
         except (KeyError, ValueError):
             pass
         try:
-            _win = float(os.environ["HERMES_GATEWAY_START_WINDOW_S"])
+            _win = float(os.environ["STARDUST_GATEWAY_START_WINDOW_S"])
         except (KeyError, ValueError):
             pass
         _storm = record_start_and_check_storm(max_starts=_max_starts, window_s=_win) if _max_starts > 0 else None
@@ -4743,7 +4743,7 @@ def run_gateway(verbose: int = 0, quiet: bool = False, replace: bool = False, fo
     sys.path.insert(0, str(PROJECT_ROOT))
     _apply_startup_watchdog_config()
 
-    # Detached Windows runs (HERMES_GATEWAY_DETACHED=1, or non-TTY for older wrappers) ignore
+    # Detached Windows runs (STARDUST_GATEWAY_DETACHED=1, or non-TTY for older wrappers) ignore
     # console-control broadcasts from sibling CLIs; foreground runs keep Ctrl+C-to-stop.
     stdin_is_tty = bool(_stdin_is_tty())
     _console_window_attached = _windows_console_window_attached()
@@ -5913,23 +5913,23 @@ def gateway_command(args):
 
 def _maybe_redirect_run_to_s6_supervision(args) -> bool:
     """Inside an s6 container, upgrade bare ``gateway run`` to the supervised s6 longrun; True iff dispatched.
-    ``HERMES_S6_SUPERVISED_CHILD`` (set by ``S6ServiceManager._render_run_script``) marks the supervised
+    ``STARDUST_S6_SUPERVISED_CHILD`` (set by ``S6ServiceManager._render_run_script``) marks the supervised
     child, which must run in foreground or we'd recurse run → start → run; ``--no-supervise`` /
-    HERMES_GATEWAY_NO_SUPERVISE=1 opts out (CI smoke, debugging)."""
+    STARDUST_GATEWAY_NO_SUPERVISE=1 opts out (CI smoke, debugging)."""
     no_supervise = getattr(args, "no_supervise", False) or \
-        os.environ.get("HERMES_GATEWAY_NO_SUPERVISE", "").lower() in ("1", "true", "yes")
-    # HERMES_S6_SUPERVISED_CHILD: we ARE the supervised child; fall through so the gateway starts.
-    if no_supervise or os.environ.get("HERMES_S6_SUPERVISED_CHILD"):
+        os.environ.get("STARDUST_GATEWAY_NO_SUPERVISE", "").lower() in ("1", "true", "yes")
+    # STARDUST_S6_SUPERVISED_CHILD: we ARE the supervised child; fall through so the gateway starts.
+    if no_supervise or os.environ.get("STARDUST_S6_SUPERVISED_CHILD"):
         return False
     if not _dispatch_via_service_manager_if_s6("start"):
         return False
     # Breadcrumb on stderr (keep stdout clean for scripts); gateway logs follow via s6-log.
     print(
         "→ gateway is now running under s6 supervision (auto-restart on crash,\n"
-        "  dashboard supervised alongside if HERMES_DASHBOARD is set).\n"
+        "  dashboard supervised alongside if STARDUST_DASHBOARD is set).\n"
         "  This is the recommended setup for the s6 container image — the\n"
         "  gateway will keep running even if it crashes.\n"
-        "  Use `--no-supervise` (or HERMES_GATEWAY_NO_SUPERVISE=1) to opt out\n"
+        "  Use `--no-supervise` (or STARDUST_GATEWAY_NO_SUPERVISE=1) to opt out\n"
         "  and get the pre-s6 foreground behavior instead.",
         file=sys.stderr,
         flush=True,

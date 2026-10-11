@@ -11,7 +11,7 @@ def test_process_rpc_profile_scope_and_session_owner(tmp_path, monkeypatch):
     root = tmp_path / "home"
     other = root / "profiles" / "other"
     other.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(root))
+    monkeypatch.setenv("STARDUST_HOME", str(root))
     registry = ProcessRegistry()
     monkeypatch.setattr(process_module, "process_registry", registry)
     sessions = {}

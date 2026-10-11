@@ -71,7 +71,7 @@ def test_session_info_recovers_identity_from_the_owning_profile(tmp_path, monkey
         config = {"model": {"provider": "anthropic", "default": "claude-test"},
                   "providers": {name: {"api": url, "models": ["same-model"]}}}
         (home / "config.yaml").write_text(json.dumps(config), encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(launch))
+    monkeypatch.setenv("STARDUST_HOME", str(launch))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     monkeypatch.setattr(server, "_hermes_home", launch)
     monkeypatch.setattr(server, "_probe_credentials", lambda agent: None)

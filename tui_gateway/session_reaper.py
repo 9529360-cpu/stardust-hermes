@@ -65,7 +65,7 @@ def _flush_dirty_sessions(now: float | None = None) -> int:
 
 def _flush_sessions_before_exit(budget_s: float | None = None) -> int:
     """Bounded flush of ALL in-memory sessions on the way out, on a daemon worker joined with the budget so a
-    hung SQLite write can't block exit past ``HERMES_TUI_EXIT_FLUSH_BUDGET_S`` (default 5s). Running sessions
+    hung SQLite write can't block exit past ``STARDUST_TUI_EXIT_FLUSH_BUDGET_S`` (default 5s). Running sessions
     are included — the process is dying, a partial transcript beats loss."""
     budget = _EXIT_FLUSH_BUDGET_S if budget_s is None else max(0.0, budget_s)
     if budget <= 0:
@@ -343,7 +343,7 @@ def _sweep_orphaned_session_rows() -> list[str]:
 # "owned by a live but idle backend" from "truly orphaned" (else the first process to restart reaped every
 # inactive row of the other N−1). Refresh 60s default — far shorter than the 6h TTL so a refresh always lands
 # inside the staleness window. Removed at exit; a crashed row ages out.
-_HEARTBEAT_REFRESH_S = max(0.0, env_float("HERMES_GATEWAY_HEARTBEAT_REFRESH_S", 60.0))
+_HEARTBEAT_REFRESH_S = max(0.0, env_float("STARDUST_GATEWAY_HEARTBEAT_REFRESH_S", 60.0))
 _heartbeat_refresher_started = False
 _heartbeat_refresher_lock = threading.Lock()
 _BACKEND_NONCE = secrets.token_hex(4)

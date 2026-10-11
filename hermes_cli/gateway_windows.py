@@ -52,7 +52,7 @@ _TASK_LOGON_DELAY = "PT30S"
 _TASK_RESTART_INTERVAL = "PT1M"
 _TASK_RESTART_COUNT = 999
 
-_GATEWAY_ENV = (("PYTHONIOENCODING", "utf-8"), ("HERMES_GATEWAY_DETACHED", "1"), ("HERMES_SUPERVISED_CHILD", "1"))
+_GATEWAY_ENV = (("PYTHONIOENCODING", "utf-8"), ("STARDUST_GATEWAY_DETACHED", "1"), ("STARDUST_SUPERVISED_CHILD", "1"))
 
 
 def _schtasks_encoding() -> str:
@@ -77,10 +77,10 @@ def _hermes_home() -> Path:
 
 
 def _preserve_hermes_home_path(path: str | Path) -> str:
-    r"""Render Hermes-owned paths under the configured HERMES_HOME spelling.
+    r"""Render Hermes-owned paths under the configured STARDUST_HOME spelling.
 
     ``%LOCALAPPDATA%\hermes`` may be a symlink/junction to another drive; launcher files must not
-    bake in the resolved target for paths under HERMES_HOME.
+    bake in the resolved target for paths under STARDUST_HOME.
     """
     candidate = Path(path)
     try:
@@ -191,13 +191,13 @@ def _launch_elevated_gateway_command(command: str, extra_args: list[str] | None 
 
 def _launch_elevated_install(force: bool = False, *, start_now: bool | None = None, start_on_login: bool | None = None) -> bool:
     """Launch an elevated gateway install via UAC and return True on handoff."""
-    overrides = {"HERMES_GATEWAY_ELEVATED_HANDOFF": "1"}
+    overrides = {"STARDUST_GATEWAY_ELEVATED_HANDOFF": "1"}
     extra_args = ["--elevated-handoff"]
     if force:
         extra_args.append("--force")
     for choice, env_key, flag in (
-        (start_now, "HERMES_GATEWAY_INSTALL_START_NOW", "start-now"),
-        (start_on_login, "HERMES_GATEWAY_INSTALL_START_ON_LOGIN", "start-on-login"),
+        (start_now, "STARDUST_GATEWAY_INSTALL_START_NOW", "start-now"),
+        (start_on_login, "STARDUST_GATEWAY_INSTALL_START_ON_LOGIN", "start-on-login"),
     ):
         if choice is not None:
             overrides[env_key] = "1" if choice else "0"
@@ -231,7 +231,7 @@ def _sanitize_filename(value: str) -> str:
 
 
 def get_task_script_path() -> Path:
-    """The generated ``gateway.cmd`` wrapper under ``<HERMES_HOME>/gateway-service/`` (per-profile
+    """The generated ``gateway.cmd`` wrapper under ``<STARDUST_HOME>/gateway-service/`` (per-profile
     installs stay self-contained); the VBS launcher lives beside it."""
     _assert_windows()
     script_dir = _hermes_home() / "gateway-service"
@@ -260,7 +260,7 @@ def _legacy_startup_entry_path() -> Path:
 
 
 def _stable_gateway_working_dir(project_root: Path) -> str:
-    """Stable cwd for detached/startup runs: anchor at HERMES_HOME when it exists (mirrors the POSIX
+    """Stable cwd for detached/startup runs: anchor at STARDUST_HOME when it exists (mirrors the POSIX
     service invariant) so a moved checkout/worktree can't fail the ``cd`` step; else the checkout."""
     from hermes_cli.config import get_hermes_home
 
@@ -286,7 +286,7 @@ def _gateway_run_argv(python_exe: str, profile_arg: str) -> list[str]:
 
 def _launcher_settings(home: Path | None = None) -> tuple[str, str, str, str]:
     """Return (python_path, working_dir, hermes_home, profile_arg) for generated launchers.
-    ``home`` targets another profile's HERMES_HOME (per-profile cold-start, #110959)."""
+    ``home`` targets another profile's STARDUST_HOME (per-profile cold-start, #110959)."""
     from hermes_cli.gateway import PROJECT_ROOT, _profile_arg, get_python_path  # avoid circular init
 
     hermes_home = str(home if home is not None else _hermes_home())
@@ -315,7 +315,7 @@ def _build_gateway_cmd_script(python_path: str, working_dir: str, hermes_home: s
         "@echo off",
         f"rem {_TASK_DESCRIPTION}",
         f"cd /d {_quote_cmd_script_arg(working_dir)}",
-        f'set "HERMES_HOME={hermes_home}"',
+        f'set "STARDUST_HOME={hermes_home}"',
         *[f'set "{k}={v}"' for k, v in _GATEWAY_ENV],
         # VIRTUAL_ENV lets the gateway's own python detection find the venv.
         f'set "VIRTUAL_ENV={_preserve_hermes_home_path(venv_dir)}"',
@@ -354,7 +354,7 @@ def _build_gateway_vbs_script(python_path: str, working_dir: str, hermes_home: s
         "Dim sh, env, existing_pp",
         'Set sh = CreateObject("WScript.Shell")',
         'Set env = sh.Environment("PROCESS")',
-        f"env.Item({q('HERMES_HOME')}) = {q(hermes_home)}",
+        f"env.Item({q('STARDUST_HOME')}) = {q(hermes_home)}",
         *[f"env.Item({q(k)}) = {q(v)}" for k, v in _GATEWAY_ENV],
         f"env.Item({q('VIRTUAL_ENV')}) = {q(_preserve_hermes_home_path(venv_dir))}",
         # Mirror the cmd wrapper's ``PYTHONPATH=<static>;%PYTHONPATH%`` at runtime.
@@ -582,7 +582,7 @@ def _build_gateway_argv(home: Path | None = None) -> tuple[list[str], str, dict[
 
     python_path, working_dir, hermes_home, profile_arg = _launcher_settings(home)
     python_exe, venv_dir, extra_pythonpath = _resolve_detached_python(python_path)
-    env_overlay = {"HERMES_HOME": hermes_home, **dict(_GATEWAY_ENV), "VIRTUAL_ENV": _preserve_hermes_home_path(venv_dir)}
+    env_overlay = {"STARDUST_HOME": hermes_home, **dict(_GATEWAY_ENV), "VIRTUAL_ENV": _preserve_hermes_home_path(venv_dir)}
     _prepend_pythonpath(env_overlay, [_preserve_hermes_home_path(p) for p in (PROJECT_ROOT, *extra_pythonpath)])
     return _gateway_run_argv(python_exe, profile_arg), working_dir, env_overlay
 
@@ -596,7 +596,7 @@ def windowless_gateway_restart_spec(run_argv: list[str]) -> tuple[list[str], str
     flags, so the respawned gateway owns a single hidden console that all of its descendants inherit —
     nothing flashes (#54220/#56747; the old pythonw.exe rewrite here produced a console-less gateway whose
     every console-subsystem child allocated a visible conhost). This helper now only normalizes the
-    interpreter via ``_resolve_detached_python`` and supplies the stable cwd + env overlay (HERMES_HOME,
+    interpreter via ``_resolve_detached_python`` and supplies the stable cwd + env overlay (STARDUST_HOME,
     VIRTUAL_ENV, PYTHONPATH) so the respawn doesn't depend on the watcher's transient working directory.
     """
     if not run_argv or sys.platform != "win32":
@@ -612,9 +612,9 @@ def windowless_gateway_restart_spec(run_argv: list[str]) -> tuple[list[str], str
         hermes_home = str(_hermes_home().resolve())
     except Exception:
         hermes_home = ""
-    env_overlay: dict[str, str] = {"PYTHONIOENCODING": "utf-8", "HERMES_GATEWAY_DETACHED": "1", "VIRTUAL_ENV": str(venv_dir)}
+    env_overlay: dict[str, str] = {"PYTHONIOENCODING": "utf-8", "STARDUST_GATEWAY_DETACHED": "1", "VIRTUAL_ENV": str(venv_dir)}
     if hermes_home:
-        env_overlay["HERMES_HOME"] = hermes_home
+        env_overlay["STARDUST_HOME"] = hermes_home
     _prepend_pythonpath(env_overlay, [str(PROJECT_ROOT), *extra_pythonpath])
     return [hidden_console_python, *run_argv[1:]], _stable_gateway_working_dir(PROJECT_ROOT), env_overlay
 
@@ -681,9 +681,9 @@ def _install_choice_from_env(name: str) -> bool | None:
 def _prompt_install_choices(start_now: bool | None = None, start_on_login: bool | None = None) -> tuple[bool, bool]:
     """Return (start_now, start_on_login), asking before any UAC escalation."""
     if start_now is None:
-        start_now = _install_choice_from_env("HERMES_GATEWAY_INSTALL_START_NOW")
+        start_now = _install_choice_from_env("STARDUST_GATEWAY_INSTALL_START_NOW")
     if start_on_login is None:
-        start_on_login = _install_choice_from_env("HERMES_GATEWAY_INSTALL_START_ON_LOGIN")
+        start_on_login = _install_choice_from_env("STARDUST_GATEWAY_INSTALL_START_ON_LOGIN")
     if start_now is not None and start_on_login is not None:
         return start_now, start_on_login
 

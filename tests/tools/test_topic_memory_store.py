@@ -18,7 +18,7 @@ from tools.topic_memory_store import (
 @pytest.fixture
 def topic_home(tmp_path, monkeypatch):
     home = tmp_path / "hermes"
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     return home
 
 

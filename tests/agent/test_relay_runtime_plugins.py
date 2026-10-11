@@ -296,8 +296,8 @@ def test_legacy_exporter_env_without_plugins_toml_warns_and_stays_disabled(
     caplog,
 ):
     monkeypatch.delenv(relay_runtime.RELAY_PLUGINS_CONFIG_ENV, raising=False)
-    monkeypatch.setenv("HERMES_NEMO_RELAY_ATOF_ENABLED", "1")
-    monkeypatch.setenv("HERMES_NEMO_RELAY_ATIF_EXPORT_TIMEOUT_S", "30")
+    monkeypatch.setenv("STARDUST_NEMO_RELAY_ATOF_ENABLED", "1")
+    monkeypatch.setenv("STARDUST_NEMO_RELAY_ATIF_EXPORT_TIMEOUT_S", "30")
     relay = _FakeRelay()
 
     with caplog.at_level("WARNING"):
@@ -310,9 +310,9 @@ def test_legacy_exporter_env_without_plugins_toml_warns_and_stays_disabled(
             is relay_runtime._RelayPluginConfigurationState.DISABLED
         )
         assert relay.events == []
-        assert "no HERMES_NEMO_RELAY_PLUGINS_TOML was provided" in caplog.text
-        assert "HERMES_NEMO_RELAY_ATOF_ENABLED" in caplog.text
-        assert "HERMES_NEMO_RELAY_ATIF_EXPORT_TIMEOUT_S" in caplog.text
+        assert "no STARDUST_NEMO_RELAY_PLUGINS_TOML was provided" in caplog.text
+        assert "STARDUST_NEMO_RELAY_ATOF_ENABLED" in caplog.text
+        assert "STARDUST_NEMO_RELAY_ATIF_EXPORT_TIMEOUT_S" in caplog.text
     finally:
         host.shutdown()
 
@@ -1190,7 +1190,7 @@ agent_version = "test"
     try:
         for profile in ("profile-a", "profile-b"):
             session_id = f"native-export-{profile}"
-            monkeypatch.setenv("HERMES_HOME", str(tmp_path / profile))
+            monkeypatch.setenv("STARDUST_HOME", str(tmp_path / profile))
             profile_key = relay_runtime.current_profile_key()
             lease = relay_runtime.SESSION_COORDINATOR.acquire_conversation(
                 profile_key=profile_key,

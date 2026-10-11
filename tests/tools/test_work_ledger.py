@@ -11,7 +11,7 @@ from hermes_constants import hermes_home_key
 
 @pytest.fixture(autouse=True)
 def isolated(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     async_work._reset_for_tests()
     monkeypatch.setattr(ledger, "process_registry", SimpleNamespace(list_sessions=lambda **kw: []))
     monkeypatch.setattr(ledger, "list_active_subagents", lambda: [])

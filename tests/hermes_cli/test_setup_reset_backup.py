@@ -62,7 +62,7 @@ class TestResetBackupOrdering:
         """
         from hermes_cli.setup import run_setup_wizard
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         config_path = _write_user_config(tmp_path)
 
         run_setup_wizard(_make_setup_args(non_interactive=True, reset=True))
@@ -85,7 +85,7 @@ class TestResetBackupOrdering:
         """--reset can exit early, so it must surface the backup path itself."""
         from hermes_cli.setup import run_setup_wizard
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         _write_user_config(tmp_path)
 
         run_setup_wizard(_make_setup_args(non_interactive=True, reset=True))

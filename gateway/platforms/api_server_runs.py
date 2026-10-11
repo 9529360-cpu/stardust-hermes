@@ -530,7 +530,7 @@ def _run_agent_sync(self, run: _RunLaunch, agent, approval_notify, *, _api_serve
             # Contextvars, not process env: concurrent runs must not share identity.
             resets.append((set_current_session_key(run.approval_session_key), reset_current_session_key))
             # chat_id carries the raw session id like _run_agent() does; without it
-            # tools.async_delegation sees no HERMES_SESSION_CHAT_ID and forces delegations sync.
+            # tools.async_delegation sees no STARDUST_SESSION_CHAT_ID and forces delegations sync.
             session_tokens = self._bind_api_server_session(
                 chat_id=session_id or "", session_key=run.approval_session_key, session_id=session_id or "",
                 profile=run.request_profile or "",

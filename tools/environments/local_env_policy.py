@@ -32,7 +32,7 @@ _STATIC_PROVIDER_ENV_BLOCKLIST = frozenset({
     "SIGNAL_ALLOWED_USERS", "SIGNAL_GROUP_ALLOWED_USERS", "SIGNAL_HOME_CHANNEL",
     "SIGNAL_HOME_CHANNEL_NAME", "SIGNAL_IGNORE_STORIES", "HASS_TOKEN", "HASS_URL",
     "EMAIL_ADDRESS", "EMAIL_PASSWORD", "EMAIL_IMAP_HOST", "EMAIL_SMTP_HOST",
-    "EMAIL_HOME_ADDRESS", "EMAIL_HOME_ADDRESS_NAME", "HERMES_DASHBOARD_SESSION_TOKEN",
+    "EMAIL_HOME_ADDRESS", "EMAIL_HOME_ADDRESS_NAME", "STARDUST_DASHBOARD_SESSION_TOKEN",
     "GATEWAY_ALLOWED_USERS", "GH_TOKEN", "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY_PATH",
     "GITHUB_APP_INSTALLATION_ID", "MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET",
     "DAYTONA_API_KEY", "GATEWAY_RELAY_ID", "GATEWAY_RELAY_SECRET",
@@ -96,7 +96,7 @@ _HERMES_PROVIDER_ENV_BLOCKLIST = _build_provider_env_blocklist()
 # the terminal scrub. CONTEXT-GATED: the carve-out applies ONLY when this process/session is actually
 # operating as a Buzz agent — either the process is a Buzz-ACP managed agent (``BUZZ_MANAGED_AGENT`` is set,
 # only by Buzz Desktop's buzz-acp harness; see #76243 / #78511) or the current session's platform is
-# ``buzz`` (the gateway's ``HERMES_SESSION_PLATFORM`` ContextVar; concurrency safe under a multi-session
+# ``buzz`` (the gateway's ``STARDUST_SESSION_PLATFORM`` ContextVar; concurrency safe under a multi-session
 # host). A Telegram/CLI/cron session on a host that also runs a Buzz gateway does NOT get BUZZ_PRIVATE_KEY
 # in its terminal children — blanket passthrough of a signing key to every terminal child on the host would
 # be wrong (maintainer triage note on #76243: don't expose the key to unrelated shell commands).
@@ -139,7 +139,7 @@ def _buzz_terminal_context_active() -> bool:
     try:
         from gateway.session_context import get_session_env
 
-        return get_session_env("HERMES_SESSION_PLATFORM", "").strip().lower() == "buzz"
+        return get_session_env("STARDUST_SESSION_PLATFORM", "").strip().lower() == "buzz"
     except Exception:
         return False
 
@@ -207,7 +207,7 @@ _ALWAYS_STRIP_KEYS: frozenset[str] = frozenset({
     # _is_hermes_internal_secret, but _ID has no secret suffix, so it must be
     # enumerated here to stay stripped on the inherit_credentials=True path.
     "GATEWAY_RELAY_ID", "GATEWAY_RELAY_SECRET", "GATEWAY_RELAY_DELIVERY_KEY",
-    "HASS_TOKEN", "EMAIL_PASSWORD", "HERMES_DASHBOARD_SESSION_TOKEN",
+    "HASS_TOKEN", "EMAIL_PASSWORD", "STARDUST_DASHBOARD_SESSION_TOKEN",
     # Remote-compute / infrastructure secrets
     "MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET", "DAYTONA_API_KEY",
 })

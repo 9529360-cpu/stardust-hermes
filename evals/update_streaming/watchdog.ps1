@@ -5,7 +5,7 @@ $temp = Join-Path ([IO.Path]::GetTempPath()) ('update-watchdog-' + [guid]::NewGu
 New-Item -ItemType Directory $temp | Out-Null
 $env:HOME = $temp
 $env:USERPROFILE = $temp
-$env:HERMES_HOME = $temp
+$env:STARDUST_HOME = $temp
 $LogDir = Join-Path $temp 'logs'
 New-Item -ItemType Directory $LogDir | Out-Null
 $script:Ui = $null

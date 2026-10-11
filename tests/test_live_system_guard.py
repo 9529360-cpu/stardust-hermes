@@ -46,7 +46,7 @@ def test_gateway_start_inside_a_container_exec_is_not_blocked():
     import os
     import stat
 
-    stub_dir = os.path.join(os.environ["HERMES_HOME"], "stub-bin")
+    stub_dir = os.path.join(os.environ["STARDUST_HOME"], "stub-bin")
     os.makedirs(stub_dir, exist_ok=True)
     stub = os.path.join(stub_dir, "docker")
     with open(stub, "w") as fh:

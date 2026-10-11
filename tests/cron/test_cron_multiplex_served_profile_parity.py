@@ -23,14 +23,14 @@ def two_homes(tmp_path, monkeypatch):
     for home in (root, alpha):
         (home / "cron").mkdir(parents=True)
     (root / ".env").write_text(
-        "HERMES_CRON_TIMEOUT=111\nHERMES_MODEL=default-model\nTERMINAL_ENV=docker\n"
+        "STARDUST_CRON_TIMEOUT=111\nHERMES_MODEL=default-model\nTERMINAL_ENV=docker\n"
         "TERMINAL_DOCKER_IMAGE=default-only-image\nHERMES_LANGUAGE=en\n")
-    (alpha / ".env").write_text("HERMES_CRON_TIMEOUT=222\nHERMES_LANGUAGE=zh\n")
+    (alpha / ".env").write_text("STARDUST_CRON_TIMEOUT=222\nHERMES_LANGUAGE=zh\n")
     # The launch (default) profile's .env is what the multiplexer process loaded into os.environ.
-    monkeypatch.setenv("HERMES_HOME", str(root))
-    for key, val in (("HERMES_CRON_TIMEOUT", "111"), ("HERMES_MODEL", "default-model"),
+    monkeypatch.setenv("STARDUST_HOME", str(root))
+    for key, val in (("STARDUST_CRON_TIMEOUT", "111"), ("STARDUST_MODEL", "default-model"),
                      ("TERMINAL_ENV", "docker"), ("TERMINAL_DOCKER_IMAGE", "default-only-image"),
-                     ("HERMES_LANGUAGE", "en")):
+                     ("STARDUST_LANGUAGE", "en")):
         monkeypatch.setenv(key, val)
     set_multiplex_active(True)
     home_token = set_hermes_home_override(str(alpha))
@@ -42,7 +42,7 @@ def two_homes(tmp_path, monkeypatch):
 
 
 def test_cron_env_settings_resolve_from_the_served_profile(two_homes):
-    """``HERMES_CRON_TIMEOUT`` / ``HERMES_MODEL`` are alpha's (or absent) both with the fire-time
+    """``STARDUST_CRON_TIMEOUT`` / ``STARDUST_MODEL`` are alpha's (or absent) both with the fire-time
     secret scope installed and on the bare tick thread — never the default profile's environ."""
     import cron.scheduler as sched
     from cron.jobs import _oneshot_run_claim_ttl_seconds
@@ -67,7 +67,7 @@ def test_cron_env_settings_resolve_from_the_served_profile(two_homes):
         try:
             assert sched._cron_inactivity_seconds() == 222.0
             _preflight_check_provider_key({"id": "j"}, {"cron": {}})
-            assert captured["target_model"] == ""  # alpha has no HERMES_MODEL; default's must not leak
+            assert captured["target_model"] == ""  # alpha has no STARDUST_MODEL; default's must not leak
             with pytest.raises(RuntimeError, match="no model configured"):
                 sched._load_cron_job_config({"id": "j", "name": "j", "prompt": "x"}, "j", "j")
         finally:
@@ -88,9 +88,9 @@ def test_child_env_for_served_profile_drops_launch_profile_settings(two_homes):
         env = strip_launch_profile_env(build_subprocess_env(scrub_secrets=True, inherit_profile_home=True))
     finally:
         reset_secret_scope(token)
-    for key in ("HERMES_MODEL", "TERMINAL_ENV", "TERMINAL_DOCKER_IMAGE", "HERMES_LANGUAGE", "HERMES_CRON_TIMEOUT"):
+    for key in ("STARDUST_MODEL", "TERMINAL_ENV", "TERMINAL_DOCKER_IMAGE", "STARDUST_LANGUAGE", "STARDUST_CRON_TIMEOUT"):
         assert key not in env, key
-    assert env["HERMES_HOME"] == str(alpha)
+    assert env["STARDUST_HOME"] == str(alpha)
     assert "PATH" in env
 
     # No-op when the scope IS the launch profile (standalone / default profile's own children).
@@ -101,4 +101,4 @@ def test_child_env_for_served_profile_drops_launch_profile_settings(two_homes):
     finally:
         reset_hermes_home_override(home_token)
     assert env["TERMINAL_ENV"] == "docker"
-    assert env["HERMES_MODEL"] == "default-model"
+    assert env["STARDUST_MODEL"] == "default-model"

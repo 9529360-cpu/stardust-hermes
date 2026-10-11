@@ -58,7 +58,7 @@ def resolve_identity() -> Dict[str, Any]:
 
 
 # Configuration -- env-first so Hermes Cloud can enable sync via environment alone. Every knob:
-# HERMES_SYNC_<KEY> env -> config.yaml ``sync.<key>`` -> default (base_url = the sync plane, NOT
+# STARDUST_SYNC_<KEY> env -> config.yaml ``sync.<key>`` -> default (base_url = the sync plane, NOT
 # the inference URL; enabled; default_opt_in; org_auto_propose).
 DEFAULT_SYNC_BASE_URL = "https://gateway-gateway.nousresearch.com"
 
@@ -76,9 +76,9 @@ def _sync_config(key: str) -> Any:
 
 
 def resolve_sync_base_url() -> Optional[str]:
-    """HERMES_SYNC_BASE_URL -> ``sync.base_url`` -> production plane, without trailing slash
+    """STARDUST_SYNC_BASE_URL -> ``sync.base_url`` -> production plane, without trailing slash
     (``/v1/sync/`` is appended by the client). None only if the default is blanked out."""
-    env = os.getenv("HERMES_SYNC_BASE_URL")
+    env = os.getenv("STARDUST_SYNC_BASE_URL")
     if env and env.strip():
         return env.strip().rstrip("/")
     base = _sync_config("base_url")
@@ -104,19 +104,19 @@ def _sync_config_bool(env_var: str, config_key: str, *, default: bool) -> bool:
 
 def sync_feature_enabled() -> bool:
     """Master switch; the gate-and-swallow entrypoints ALSO require the Nous-admin gate and a base URL."""
-    return _sync_config_bool("HERMES_SYNC_ENABLED", "enabled", default=False)
+    return _sync_config_bool("STARDUST_SYNC_ENABLED", "enabled", default=False)
 
 
 def sync_org_auto_propose() -> bool:
     """False (default): edits to an org skill stay LOCAL until ``hermes sync propose``. True: every
     edit is proposed right away (an admin still approves unless the editor is one)."""
-    return _sync_config_bool("HERMES_SYNC_ORG_AUTO_PROPOSE", "org_auto_propose", default=False)
+    return _sync_config_bool("STARDUST_SYNC_ORG_AUTO_PROPOSE", "org_auto_propose", default=False)
 
 
 def sync_default_opt_in() -> bool:
     """False (default): opt-IN -- a skill syncs only after ``hermes sync enable`` or a plane manifest
     opting it in. True: opt-OUT -- every eligible skill syncs unless disabled (Hermes Cloud default)."""
-    return _sync_config_bool("HERMES_SYNC_DEFAULT_OPT_IN", "default_opt_in", default=False)
+    return _sync_config_bool("STARDUST_SYNC_DEFAULT_OPT_IN", "default_opt_in", default=False)
 
 
 # Local skill eligibility + the personal opt-in flag
@@ -221,12 +221,12 @@ def _default_device_label() -> str:
 
 def stable_device_id() -> str:
     """Per-device label at ~/.hermes/skills/.sync_device_id. An existing file always wins; else seeded
-    from HERMES_SYNC_DEVICE_NAME (first use only, for Hermes Cloud) or a friendly default, then persisted."""
+    from STARDUST_SYNC_DEVICE_NAME (first use only, for Hermes Cloud) or a friendly default, then persisted."""
     with suppress(OSError):
         val = _device_id_path().read_text(encoding="utf-8").strip()
         if val:
             return val
-    val = (os.environ.get("HERMES_SYNC_DEVICE_NAME") or "").strip() or _default_device_label()
+    val = (os.environ.get("STARDUST_SYNC_DEVICE_NAME") or "").strip() or _default_device_label()
     try:
         _write_device_id(val)
     except OSError as e:

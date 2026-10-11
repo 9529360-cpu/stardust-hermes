@@ -2,7 +2,7 @@
 
 Under ``gateway.multiplex_profiles`` ``os.environ`` is the DEFAULT profile's ``.env``. When a secondary
 profile's scope does not define MEM0_USER_ID / SUPERMEMORY_CONTAINER_TAG / RETAINDB_PROJECT /
-OPENVIKING_* / HINDSIGHT_BANK_ID / HERMES_HONCHO_HOST, the provider must fall back to its own default
+OPENVIKING_* / HINDSIGHT_BANK_ID / STARDUST_HONCHO_HOST, the provider must fall back to its own default
 (per-profile partition), NOT write the secondary's memories into the default profile's account.
 """
 from __future__ import annotations
@@ -22,7 +22,7 @@ _DEFAULT_ENV = {
     "HINDSIGHT_RETAIN_TAGS": "tag-default", "HINDSIGHT_RETAIN_OBSERVATION_SCOPES": "per_tag",
     "HINDSIGHT_RETAIN_SOURCE": "source-default", "HINDSIGHT_RETAIN_USER_PREFIX": "UserDefault",
     "HINDSIGHT_RETAIN_ASSISTANT_PREFIX": "AssistantDefault",
-    "HERMES_HONCHO_HOST": "host-default", "HONCHO_BASE_URL": "https://honcho.default",
+    "STARDUST_HONCHO_HOST": "host-default", "HONCHO_BASE_URL": "https://honcho.default",
     "OPENAI_API_KEY": "sk-default", "OPENAI_BASE_URL": "https://openai.default/v1",
 }
 
@@ -37,7 +37,7 @@ def secondary_profile(monkeypatch, tmp_path):
     prof_b = home / "profiles" / "b"
     prof_b.mkdir(parents=True)
     (prof_b / "config.yaml").write_text("{}\n")
-    monkeypatch.setenv("HERMES_HOME", str(prof_b))
+    monkeypatch.setenv("STARDUST_HOME", str(prof_b))
     secret_scope.set_multiplex_active(True)
     token = secret_scope.set_secret_scope({"RETAINDB_API_KEY": "rdb-b", "SUPERMEMORY_API_KEY": "sm-b",
                                            "HONCHO_API_KEY": "honcho-b", "MEM0_API_KEY": "mem0-b"})
@@ -142,7 +142,7 @@ def test_hindsight_retain_shaping_still_reads_the_process_env_for_a_single_profi
     """No multiplexing: the process env IS this profile's own .env, so it must keep being read."""
     import plugins.memory.hindsight as hindsight
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     monkeypatch.setenv("HINDSIGHT_RETAIN_TAGS", "solo-tag")
     monkeypatch.setenv("HINDSIGHT_RETAIN_SOURCE", "solo-source")
     monkeypatch.setenv("HINDSIGHT_RETAIN_USER_PREFIX", "Operator")

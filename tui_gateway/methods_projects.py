@@ -139,7 +139,7 @@ def _non_workspace_dirs() -> set[str]:
 
 def _is_repo_junk(root: str) -> bool:
     """A git root never auto-surfaced as a project: a non-workspace dir or anything under
-    HERMES_HOME. User-created projects pointing there are still honored."""
+    STARDUST_HOME. User-created projects pointing there are still honored."""
     if not root:
         return True
     from hermes_constants import get_hermes_home
@@ -152,8 +152,8 @@ def _is_repo_junk(root: str) -> bool:
 
 
 def _is_session_cwd_junk(cwd: str) -> bool:
-    """A non-git cwd that stays in flat Recents. A DESCENDANT of HERMES_HOME may be an
-    intentional prose/data workspace, so only HERMES_HOME itself is excluded here."""
+    """A non-git cwd that stays in flat Recents. A DESCENDANT of STARDUST_HOME may be an
+    intentional prose/data workspace, so only STARDUST_HOME itself is excluded here."""
     if not cwd:
         return True
     from hermes_constants import get_hermes_home

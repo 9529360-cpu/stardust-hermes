@@ -500,7 +500,7 @@ class GatewayTurnMixin:
         try:
             _lease_token = await _lease_registry.acquire(
                 session_entry.session_id, owner_key=_quick_key, generation=run_generation,
-                timeout=_float_env("HERMES_TURN_LEASE_TIMEOUT", DEFAULT_LEASE_WAIT),
+                timeout=_float_env("STARDUST_TURN_LEASE_TIMEOUT", DEFAULT_LEASE_WAIT),
             )
         except TurnLeaseTimeoutError:
             # The cleanup finally starts later; restore the tokens here or this exit leaks identity.
@@ -1195,7 +1195,7 @@ class GatewayTurnMixin:
             attempt.future = loop.run_in_executor(
                 None,
                 # But it MUST run inside the caller's contextvars: under multiplex_profiles the profile
-                # secret scope / HERMES_HOME override live in ContextVars, and a bare run_in_executor worker
+                # secret scope / STARDUST_HOME override live in ContextVars, and a bare run_in_executor worker
                 # starts with an empty Context — the summary model's get_secret(<PROVIDER>_API_KEY) then
                 # fails closed (UnscopedSecretError) and every hygiene compaction silently degrades to a
                 # lossy truncation (#100849 bundle).
@@ -2754,7 +2754,7 @@ class GatewayTurnMixin:
 
         # Resolve the mode and its provenance together: null inherits, tier off is not intent.
         progress_mode, _tool_progress_explicit = resolve_tool_progress(
-            user_config, platform_key, os.getenv("HERMES_TOOL_PROGRESS_MODE"),
+            user_config, platform_key, os.getenv("STARDUST_TOOL_PROGRESS_MODE"),
         )
         # "accumulate" (edit one bubble) or "separate" (one msg per tool)
         progress_grouping = resolve_display_setting(user_config, platform_key, "tool_progress_grouping") or "accumulate"
@@ -3212,7 +3212,7 @@ class GatewayTurnMixin:
     def _run_agent_start_turn_worker(self, turn_ctx: TurnContext, run_sync: Callable[[], Any]) -> "GatewayRunner._RunAgentWorker":
         """Schedule ``run_sync`` on the executor plus the inactivity watchdog thread.
 
-        *Inactivity* timeout (agent.gateway_timeout / HERMES_AGENT_TIMEOUT, env wins; 0 = unlimited),
+        *Inactivity* timeout (agent.gateway_timeout / STARDUST_AGENT_TIMEOUT, env wins; 0 = unlimited),
         not wall-clock. The daemon watchdog is independent of asyncio: cgroup memory reclaim can
         starve the loop that runs the normal timeout poll."""
         from gateway.run import _float_env, _watch_gateway_turn_inactivity
@@ -3220,7 +3220,7 @@ class GatewayTurnMixin:
         agent_holder, session_key, run_generation = turn_ctx.agent_holder, turn_ctx.session_key, turn_ctx.run_generation
         _agent_timeout, _agent_warning = (
             v if v > 0 else None
-            for v in (_float_env("HERMES_AGENT_TIMEOUT", 1800), _float_env("HERMES_AGENT_TIMEOUT_WARNING", 900))
+            for v in (_float_env("STARDUST_AGENT_TIMEOUT", 1800), _float_env("STARDUST_AGENT_TIMEOUT_WARNING", 900))
         )
 
         # background=true processes survive a turn: reap only children created by THIS turn on timeout.
@@ -3921,11 +3921,11 @@ class GatewayTurnMixin:
         no longer owns the session slot or the executor finished. ``_executor_task_holder[0]`` is
         bound just after this task is scheduled (reads as None until then).
 
-        Interval: agent.gateway_notify_interval / HERMES_AGENT_NOTIFY_INTERVAL (default 180s; 0 or
+        Interval: agent.gateway_notify_interval / STARDUST_AGENT_NOTIFY_INTERVAL (default 180s; 0 or
         long_running_notifications=off disables)."""
         from gateway.run import _float_env, _interim_metadata, _non_conversational_metadata
         _notify_start = time.time()
-        _NOTIFY_INTERVAL = _float_env("HERMES_AGENT_NOTIFY_INTERVAL", 180)
+        _NOTIFY_INTERVAL = _float_env("STARDUST_AGENT_NOTIFY_INTERVAL", 180)
         _long_running_mode = disp._display_surface_mode("long_running_notifications", default=True, allow_generic=True)
         if _NOTIFY_INTERVAL <= 0 or _long_running_mode == "off":
             return

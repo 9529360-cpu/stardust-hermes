@@ -25,7 +25,7 @@ hermes-agent/
 └── website/              # Docusaurus docs site
 ```
 
-Config: `~/.hermes/config.yaml` (settings), `~/.hermes/.env` (API keys) — both under `$HERMES_HOME` when it is set.
+Config: `~/.hermes/config.yaml` (settings), `~/.hermes/.env` (API keys) — both under `$STARDUST_HOME` when it is set.
 
 ### Adding a Tool
 
@@ -95,7 +95,7 @@ scripts/run_tests.sh tests/tools/test_x.py    # one file
 scripts/run_tests.sh -v --tb=long             # pass-through pytest flags
 ```
 
-- Tests auto-redirect `HERMES_HOME` to temp dirs — never touch real `~/.hermes/`.
+- Tests auto-redirect `STARDUST_HOME` to temp dirs — never touch real `~/.hermes/`.
 - The script probes `.venv`, then `venv`, then the shared worktree venv.
 - **Windows:** the wrapper is POSIX-only; see `references/windows-quirks.md`
   for the direct-pytest workaround.

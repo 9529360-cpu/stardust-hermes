@@ -14,7 +14,7 @@ function compilerPreset() {
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
-const BACKEND = process.env.HERMES_DASHBOARD_URL ?? "http://127.0.0.1:9119";
+const BACKEND = process.env.STARDUST_DASHBOARD_URL ?? "http://127.0.0.1:9119";
 
 /**
  * In production the Python `hermes dashboard` server injects a one-shot
@@ -60,7 +60,7 @@ function hermesDevToken(): Plugin {
       } catch (err) {
         console.warn(
           `[hermes] Dashboard at ${BACKEND} unreachable — ` +
-            `start it with \`hermes dashboard\` or set HERMES_DASHBOARD_URL. ` +
+            `start it with \`hermes dashboard\` or set STARDUST_DASHBOARD_URL. ` +
             `(${(err as Error).message})`,
         );
       }

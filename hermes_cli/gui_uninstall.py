@@ -69,7 +69,7 @@ def packaged_gui_app_paths() -> "list[Path]":
 
 
 def agent_is_installed(hermes_home: Path) -> bool:
-    """True when a usable Python agent install exists under HERMES_HOME (gates the desktop UI's options).
+    """True when a usable Python agent install exists under STARDUST_HOME (gates the desktop UI's options).
     Package source or a venv alone is enough — a source checkout without a venv is still "the agent is here"."""
     return any((hermes_home / "hermes-agent" / sub).is_dir() for sub in ("hermes_cli", "venv", ".venv"))
 

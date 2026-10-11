@@ -382,7 +382,7 @@ test('decideMigration returns null when no candidate scores and legacy is invali
 test('decideMigration suppresses write when best is default (single-profile fallback)', () => {
   // The whole point of the migration is to migrate AWAY from default when a
   // better candidate exists. If 'default' wins the score, the install is
-  // default-primary and we leave it alone. Default's DB is $HERMES_HOME/state.db,
+  // default-primary and we leave it alone. Default's DB is $STARDUST_HOME/state.db,
   // not profiles/default/state.db.
   const deps = baseDeps()
 

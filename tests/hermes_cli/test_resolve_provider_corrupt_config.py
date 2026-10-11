@@ -29,7 +29,7 @@ def _clean_inference_env(monkeypatch):
         "ANTHROPIC_TOKEN",
         "CLAUDE_CODE_OAUTH_TOKEN",
         "NOUS_API_KEY",
-        "HERMES_INFERENCE_PROVIDER",
+        "STARDUST_INFERENCE_PROVIDER",
     ):
         monkeypatch.delenv(key, raising=False)
 
@@ -41,7 +41,7 @@ VALID_YAML = "gateway:\n  enabled: false\n"
 def _setup_home(tmp_path, monkeypatch, config_text):
     home = tmp_path / "hermes"
     home.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     cfg = home / "config.yaml"
     cfg.write_text(config_text)
     return home, cfg

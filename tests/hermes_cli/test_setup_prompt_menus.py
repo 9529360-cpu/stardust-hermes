@@ -176,7 +176,7 @@ def test_section_specific_model_setup_can_go_back_from_model_to_provider(
                 setup_mod.MenuNavigationEvent.RESOLVE, label
             )
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     monkeypatch.setattr(setup_mod, "is_interactive_stdin", lambda: True)
     monkeypatch.setattr(
         setup_mod,

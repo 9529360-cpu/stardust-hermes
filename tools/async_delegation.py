@@ -128,7 +128,7 @@ def _capture_routing_origin() -> Dict[str, Any]:
     Best-effort: empty values are omitted."""
     try:
         from gateway.session_context import get_session_env
-        return {k: v for k in _ROUTING_KEYS if (v := get_session_env(f"HERMES_SESSION_{k.upper()}", ""))}
+        return {k: v for k in _ROUTING_KEYS if (v := get_session_env(f"STARDUST_SESSION_{k.upper()}", ""))}
     except Exception:  # noqa: BLE001 - routing origin is additive, never fatal
         return {}
 
@@ -615,15 +615,15 @@ def _prune_completed_locked() -> None:
 
 
 def _current_origin_session_id() -> str:
-    """Raw session id of the ORIGINATING api_server request, or ``""``. ``HERMES_SESSION_ID``
+    """Raw session id of the ORIGINATING api_server request, or ``""``. ``STARDUST_SESSION_ID``
     is unsafe here: building the child agent calls ``set_current_session_id(child.session_id)``
     just before dispatch, so the wake would self-post into the subagent's own session. The
-    request-scoped ``HERMES_SESSION_CHAT_ID`` (raw X-Hermes-Session-Id on api_server) survives
+    request-scoped ``STARDUST_SESSION_CHAT_ID`` (raw X-Hermes-Session-Id on api_server) survives
     child construction; on push platforms chat_id is a chat, not a session => ``""``."""
     try:
         from gateway.session_context import get_session_env
-        is_api = get_session_env("HERMES_SESSION_PLATFORM", "") == "api_server"
-        return (get_session_env("HERMES_SESSION_CHAT_ID", "") or "") if is_api else ""
+        is_api = get_session_env("STARDUST_SESSION_PLATFORM", "") == "api_server"
+        return (get_session_env("STARDUST_SESSION_CHAT_ID", "") or "") if is_api else ""
     except Exception:
         return ""
 

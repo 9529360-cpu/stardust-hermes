@@ -264,7 +264,7 @@ def _migrate_to_17(results: Dict[str, Any], quiet: bool) -> None:
 
 
 def _installed_user_plugins(disabled: set) -> List[str]:
-    """Names of plugins under ``$HERMES_HOME/plugins/`` with a manifest, minus *disabled*."""
+    """Names of plugins under ``$STARDUST_HOME/plugins/`` with a manifest, minus *disabled*."""
     _c = _cfg()
     found: List[str] = []
     try:
@@ -489,7 +489,7 @@ def _migrate_to_38(results: Dict[str, Any], quiet: bool) -> None:
     message = (
         "Removed legacy Relay plugin from plugins.enabled: "
         f"{', '.join(removed)}. Configure native Relay plugins with "
-        "HERMES_NEMO_RELAY_PLUGINS_TOML.")
+        "STARDUST_NEMO_RELAY_PLUGINS_TOML.")
     results["warnings"].append(message)
     if not quiet:
         print(f"  ⚠ {message}")

@@ -154,7 +154,7 @@ class TestCronJobTrigger:
         default home (and route-level skills stay out of the per-run context — the job's own apply)."""
         home = tmp_path / ".hermes"
         (home / "profiles" / "sec").mkdir(parents=True)
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         monkeypatch.setattr("hermes_cli.profiles._get_default_hermes_home", lambda: home)
         monkeypatch.setattr("hermes_cli.profiles._get_profiles_root", lambda: home / "profiles")
         adapter = _make_adapter({"ev": {"secret": _INSECURE_NO_AUTH, "cron_job": "sweeper", "profile": "sec",

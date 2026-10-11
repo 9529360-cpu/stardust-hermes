@@ -128,9 +128,9 @@ class TestSmartApproval:
         dangerous, pattern_key, _ = detect_dangerous_command(command)
         assert dangerous is True
 
-        monkeypatch.setenv("HERMES_SESSION_KEY", session_key)
-        monkeypatch.setenv("HERMES_EXEC_ASK", "1")
-        monkeypatch.delenv("HERMES_CRON_SESSION", raising=False)
+        monkeypatch.setenv("STARDUST_SESSION_KEY", session_key)
+        monkeypatch.setenv("STARDUST_EXEC_ASK", "1")
+        monkeypatch.delenv("STARDUST_CRON_SESSION", raising=False)
         monkeypatch.setattr(
             approval_context, "_get_approval_config",
             lambda: {"mode": "smart"},
@@ -378,7 +378,7 @@ class TestSessionKeyContext:
     def test_context_session_key_overrides_process_env(self):
         token = approval_context.set_current_session_key("alice")
         try:
-            with mock_patch.dict("os.environ", {"HERMES_SESSION_KEY": "bob"}, clear=False):
+            with mock_patch.dict("os.environ", {"STARDUST_SESSION_KEY": "bob"}, clear=False):
                 assert approval_module.get_current_session_key() == "alice"
         finally:
             approval_context.reset_current_session_key(token)
@@ -447,8 +447,8 @@ class TestTeePattern:
             "cat file | tee ~/.ssh/authorized_keys",
             "echo x | tee /dev/sda",
             "echo x | tee ~/.hermes/.env",
-            "echo x | tee $HERMES_HOME/.env",
-            'echo x | tee "$HERMES_HOME/.env"',
+            "echo x | tee $STARDUST_HOME/.env",
+            'echo x | tee "$STARDUST_HOME/.env"',
         ):
             dangerous, key, desc = detect_dangerous_command(command)
             assert dangerous is True, command
@@ -474,7 +474,7 @@ class TestHermesConfigWriteProtection:
             "echo 'approvals:' > ~/.hermes/config.yaml",
             "echo '  mode: off' >> ~/.hermes/config.yaml",
             "echo x | tee ~/.hermes/config.yaml",
-            "echo x | tee $HERMES_HOME/config.yaml",
+            "echo x | tee $STARDUST_HOME/config.yaml",
             "cp /tmp/evil.yaml ~/.hermes/config.yaml",
         ):
             dangerous, key, desc = detect_dangerous_command(command)
@@ -515,7 +515,7 @@ class TestSensitiveRedirectPattern:
     def test_redirect_to_sensitive_target(self):
         authorized_keys = Path.home() / ".ssh" / "authorized_keys"
         for command in (
-            "echo x > $HERMES_HOME/.env",
+            "echo x > $STARDUST_HOME/.env",
             "cat key >> $HOME/.ssh/authorized_keys",
             "cat key >> ~/.ssh/authorized_keys",
             f"cat key >> {authorized_keys}",
@@ -641,7 +641,7 @@ class TestWindowsAbsolutePathFolding:
     SSH, and Hermes config/env files returned "safe" without an approval prompt.
     The OS-specific ``Path.home()`` / ``get_hermes_home()`` tests above only
     exercise this branch on a Windows host; these monkeypatch a Windows-style
-    HOME/HERMES_HOME so the fold is verified on the POSIX CI runner too."""
+    HOME/STARDUST_HOME so the fold is verified on the POSIX CI runner too."""
 
     def test_windows_home_multiseg_and_forward_slash_fold(self, monkeypatch):
         # The multi-segment suffix (\.ssh\authorized_keys) must also have its
@@ -791,7 +791,7 @@ class TestSmartDeniedPrompt:
         assert "[s]ession" not in rendered and "[a]lways" not in rendered
 
     def test_smart_deny_uses_locale_specific_once_deny_choices(self, monkeypatch, capsys):
-        monkeypatch.setenv("HERMES_LANGUAGE", "tr")
+        monkeypatch.setenv("STARDUST_LANGUAGE", "tr")
         from agent import i18n
         i18n.reset_language_cache()
         prompts = []
@@ -881,9 +881,9 @@ class TestWebhookApprovalExclusion:
         """Webhook sessions are not gateway approval contexts."""
         from tools.approval import _is_gateway_approval_context
 
-        monkeypatch.delenv("HERMES_CRON_SESSION", raising=False)
-        monkeypatch.delenv("HERMES_GATEWAY_SESSION", raising=False)
-        monkeypatch.setenv("HERMES_SESSION_PLATFORM", "webhook")
+        monkeypatch.delenv("STARDUST_CRON_SESSION", raising=False)
+        monkeypatch.delenv("STARDUST_GATEWAY_SESSION", raising=False)
+        monkeypatch.setenv("STARDUST_SESSION_PLATFORM", "webhook")
 
         assert _is_gateway_approval_context() is False
 
@@ -892,19 +892,19 @@ class TestWebhookApprovalExclusion:
         from tools.approval import _is_gateway_approval_context
         from tools.approval_context import _UNATTENDED_APPROVAL_PLATFORMS
 
-        monkeypatch.delenv("HERMES_CRON_SESSION", raising=False)
-        monkeypatch.delenv("HERMES_GATEWAY_SESSION", raising=False)
+        monkeypatch.delenv("STARDUST_CRON_SESSION", raising=False)
+        monkeypatch.delenv("STARDUST_GATEWAY_SESSION", raising=False)
         for platform in _UNATTENDED_APPROVAL_PLATFORMS:
-            monkeypatch.setenv("HERMES_SESSION_PLATFORM", platform)
+            monkeypatch.setenv("STARDUST_SESSION_PLATFORM", platform)
             assert _is_gateway_approval_context() is False, platform
 
     def test_non_webhook_gateway_session_returns_true(self, monkeypatch):
         """Non-webhook gateway sessions (e.g. Telegram) are still gateway contexts."""
         from tools.approval import _is_gateway_approval_context
 
-        monkeypatch.delenv("HERMES_CRON_SESSION", raising=False)
-        monkeypatch.setenv("HERMES_GATEWAY_SESSION", "1")
-        monkeypatch.setenv("HERMES_SESSION_PLATFORM", "telegram")
+        monkeypatch.delenv("STARDUST_CRON_SESSION", raising=False)
+        monkeypatch.setenv("STARDUST_GATEWAY_SESSION", "1")
+        monkeypatch.setenv("STARDUST_SESSION_PLATFORM", "telegram")
 
         assert _is_gateway_approval_context() is True
 
@@ -912,8 +912,8 @@ class TestWebhookApprovalExclusion:
         """Cron sessions are never gateway approval contexts."""
         from tools.approval import _is_gateway_approval_context
 
-        monkeypatch.setenv("HERMES_CRON_SESSION", "1")
-        monkeypatch.setenv("HERMES_SESSION_PLATFORM", "telegram")
+        monkeypatch.setenv("STARDUST_CRON_SESSION", "1")
+        monkeypatch.setenv("STARDUST_SESSION_PLATFORM", "telegram")
 
         assert _is_gateway_approval_context() is False
 
@@ -921,9 +921,9 @@ class TestWebhookApprovalExclusion:
         """No session platform means not a gateway context."""
         from tools.approval import _is_gateway_approval_context
 
-        monkeypatch.delenv("HERMES_CRON_SESSION", raising=False)
-        monkeypatch.delenv("HERMES_GATEWAY_SESSION", raising=False)
-        monkeypatch.delenv("HERMES_SESSION_PLATFORM", raising=False)
+        monkeypatch.delenv("STARDUST_CRON_SESSION", raising=False)
+        monkeypatch.delenv("STARDUST_GATEWAY_SESSION", raising=False)
+        monkeypatch.delenv("STARDUST_SESSION_PLATFORM", raising=False)
 
         assert _is_gateway_approval_context() is False
 
@@ -947,11 +947,11 @@ class TestWebhookApprovalExclusion:
         from tools.approval import check_all_command_guards
 
         self._isolate(monkeypatch)
-        monkeypatch.delenv("HERMES_CRON_SESSION", raising=False)
-        monkeypatch.delenv("HERMES_GATEWAY_SESSION", raising=False)
-        monkeypatch.delenv("HERMES_INTERACTIVE", raising=False)
-        monkeypatch.setenv("HERMES_SESSION_PLATFORM", "webhook")
-        monkeypatch.setenv("HERMES_SESSION_KEY", "test-webhook-session")
+        monkeypatch.delenv("STARDUST_CRON_SESSION", raising=False)
+        monkeypatch.delenv("STARDUST_GATEWAY_SESSION", raising=False)
+        monkeypatch.delenv("STARDUST_INTERACTIVE", raising=False)
+        monkeypatch.setenv("STARDUST_SESSION_PLATFORM", "webhook")
+        monkeypatch.setenv("STARDUST_SESSION_KEY", "test-webhook-session")
 
         result = check_all_command_guards("sudo systemctl restart nginx", "local")
         assert result["approved"] is False
@@ -964,11 +964,11 @@ class TestWebhookApprovalExclusion:
         from tools.approval import check_all_command_guards
 
         self._isolate(monkeypatch)
-        monkeypatch.delenv("HERMES_CRON_SESSION", raising=False)
-        monkeypatch.delenv("HERMES_GATEWAY_SESSION", raising=False)
-        monkeypatch.delenv("HERMES_INTERACTIVE", raising=False)
-        monkeypatch.setenv("HERMES_SESSION_PLATFORM", "webhook")
-        monkeypatch.setenv("HERMES_SESSION_KEY", "test-webhook-session")
+        monkeypatch.delenv("STARDUST_CRON_SESSION", raising=False)
+        monkeypatch.delenv("STARDUST_GATEWAY_SESSION", raising=False)
+        monkeypatch.delenv("STARDUST_INTERACTIVE", raising=False)
+        monkeypatch.setenv("STARDUST_SESSION_PLATFORM", "webhook")
+        monkeypatch.setenv("STARDUST_SESSION_KEY", "test-webhook-session")
         monkeypatch.setattr(
             approval_context, "_get_unattended_approval_mode", lambda: "approve"
         )
@@ -980,11 +980,11 @@ class TestWebhookApprovalExclusion:
         """Non-dangerous commands on unattended platforms are unaffected."""
         from tools.approval import check_all_command_guards
 
-        monkeypatch.delenv("HERMES_CRON_SESSION", raising=False)
-        monkeypatch.delenv("HERMES_GATEWAY_SESSION", raising=False)
-        monkeypatch.delenv("HERMES_INTERACTIVE", raising=False)
-        monkeypatch.setenv("HERMES_SESSION_PLATFORM", "webhook")
-        monkeypatch.setenv("HERMES_SESSION_KEY", "test-webhook-session")
+        monkeypatch.delenv("STARDUST_CRON_SESSION", raising=False)
+        monkeypatch.delenv("STARDUST_GATEWAY_SESSION", raising=False)
+        monkeypatch.delenv("STARDUST_INTERACTIVE", raising=False)
+        monkeypatch.setenv("STARDUST_SESSION_PLATFORM", "webhook")
+        monkeypatch.setenv("STARDUST_SESSION_KEY", "test-webhook-session")
 
         result = check_all_command_guards("ls -la /tmp", "local")
         assert result["approved"] is True
@@ -994,11 +994,11 @@ class TestWebhookApprovalExclusion:
         from tools.approval import check_all_command_guards
 
         self._isolate(monkeypatch)
-        monkeypatch.delenv("HERMES_CRON_SESSION", raising=False)
-        monkeypatch.delenv("HERMES_GATEWAY_SESSION", raising=False)
-        monkeypatch.delenv("HERMES_INTERACTIVE", raising=False)
-        monkeypatch.setenv("HERMES_SESSION_PLATFORM", "api_server")
-        monkeypatch.setenv("HERMES_SESSION_KEY", "test-api-session")
+        monkeypatch.delenv("STARDUST_CRON_SESSION", raising=False)
+        monkeypatch.delenv("STARDUST_GATEWAY_SESSION", raising=False)
+        monkeypatch.delenv("STARDUST_INTERACTIVE", raising=False)
+        monkeypatch.setenv("STARDUST_SESSION_PLATFORM", "api_server")
+        monkeypatch.setenv("STARDUST_SESSION_KEY", "test-api-session")
 
         result = check_all_command_guards("sudo systemctl restart nginx", "local")
         assert result["approved"] is False
@@ -1009,12 +1009,12 @@ class TestWebhookApprovalExclusion:
         from tools.approval import check_execute_code_guard
 
         self._isolate(monkeypatch)
-        monkeypatch.delenv("HERMES_CRON_SESSION", raising=False)
-        monkeypatch.delenv("HERMES_GATEWAY_SESSION", raising=False)
-        monkeypatch.delenv("HERMES_INTERACTIVE", raising=False)
-        monkeypatch.delenv("HERMES_EXEC_ASK", raising=False)
-        monkeypatch.setenv("HERMES_SESSION_PLATFORM", "webhook")
-        monkeypatch.setenv("HERMES_SESSION_KEY", "test-webhook-session")
+        monkeypatch.delenv("STARDUST_CRON_SESSION", raising=False)
+        monkeypatch.delenv("STARDUST_GATEWAY_SESSION", raising=False)
+        monkeypatch.delenv("STARDUST_INTERACTIVE", raising=False)
+        monkeypatch.delenv("STARDUST_EXEC_ASK", raising=False)
+        monkeypatch.setenv("STARDUST_SESSION_PLATFORM", "webhook")
+        monkeypatch.setenv("STARDUST_SESSION_KEY", "test-webhook-session")
 
         result = check_execute_code_guard("import os", "local")
         assert result["approved"] is False
@@ -1502,18 +1502,18 @@ class TestApprovalTimeoutIsNotConsent:
 
         self._saved_env = {
             k: os.environ.get(k)
-            for k in ("HERMES_GATEWAY_SESSION", "HERMES_CRON_SESSION",
-                      "HERMES_YOLO_MODE",
-                      "HERMES_SESSION_KEY", "HERMES_INTERACTIVE")
+            for k in ("STARDUST_GATEWAY_SESSION", "STARDUST_CRON_SESSION",
+                      "STARDUST_YOLO_MODE",
+                      "STARDUST_SESSION_KEY", "STARDUST_INTERACTIVE")
         }
-        os.environ.pop("HERMES_YOLO_MODE", None)
-        os.environ.pop("HERMES_INTERACTIVE", None)
-        # HERMES_CRON_SESSION takes priority over HERMES_GATEWAY_SESSION in
+        os.environ.pop("STARDUST_YOLO_MODE", None)
+        os.environ.pop("STARDUST_INTERACTIVE", None)
+        # STARDUST_CRON_SESSION takes priority over STARDUST_GATEWAY_SESSION in
         # _is_gateway_approval_context(); a leaked value from a parent cron
         # process would force the cron path and break these gateway tests.
-        os.environ.pop("HERMES_CRON_SESSION", None)
-        os.environ["HERMES_GATEWAY_SESSION"] = "1"
-        os.environ["HERMES_SESSION_KEY"] = self.SESSION_KEY
+        os.environ.pop("STARDUST_CRON_SESSION", None)
+        os.environ["STARDUST_GATEWAY_SESSION"] = "1"
+        os.environ["STARDUST_SESSION_KEY"] = self.SESSION_KEY
 
     def teardown_method(self):
         from tools import approval as mod
@@ -2060,7 +2060,7 @@ class TestTirithImportErrorFailOpenPolicy:
         with _patch("builtins.__import__", side_effect=self._make_failing_import(real_import)):
             with _patch("hermes_cli.config.load_config_readonly", return_value=cfg):
                 with _patch("tools.approval.detect_dangerous_command", return_value=(False, None, None)):
-                    with mock_patch.dict("os.environ", {"HERMES_INTERACTIVE": "1"}, clear=False):
+                    with mock_patch.dict("os.environ", {"STARDUST_INTERACTIVE": "1"}, clear=False):
                         result = check_all_command_guards("echo hello", "local")
 
         assert result.get("approved") is True
@@ -2085,7 +2085,7 @@ class TestTirithImportErrorFailOpenPolicy:
         with _patch("builtins.__import__", side_effect=self._make_failing_import(real_import)):
             with _patch("hermes_cli.config.load_config_readonly", return_value=cfg):
                 with _patch("tools.approval.detect_dangerous_command", return_value=(False, None, None)):
-                    with mock_patch.dict("os.environ", {"HERMES_INTERACTIVE": "1"}, clear=False):
+                    with mock_patch.dict("os.environ", {"STARDUST_INTERACTIVE": "1"}, clear=False):
                         result = check_all_command_guards(
                             "echo hello",
                             "local",
@@ -2190,7 +2190,7 @@ class TestCliApprovalTimeoutClassifiedSeparately:
     def _interactive_env(self):
         return mock_patch.dict(
             "os.environ",
-            {"HERMES_INTERACTIVE": "1"},
+            {"STARDUST_INTERACTIVE": "1"},
             clear=False,
         )
 

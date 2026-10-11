@@ -26,7 +26,7 @@ class HermesOverlay:
     keyless: bool = False                 # served anonymously — no credential exists to configure
 
 
-HERMES_OVERLAYS: Dict[str, HermesOverlay] = {
+STARDUST_OVERLAYS: Dict[str, HermesOverlay] = {
     "moa": HermesOverlay(auth_type="virtual", base_url_override="moa://local"),
     "openrouter": HermesOverlay(is_aggregator=True, base_url_env_var="OPENROUTER_BASE_URL"),
     "nous": HermesOverlay(auth_type="oauth_device_code", base_url_override="https://inference-api.nousresearch.com/v1"),
@@ -37,7 +37,7 @@ HERMES_OVERLAYS: Dict[str, HermesOverlay] = {
     "xai-oauth": HermesOverlay(transport="codex_responses", auth_type="oauth_external",
                                base_url_override="https://api.x.ai/v1", base_url_env_var="XAI_BASE_URL"),
     "qwen-oauth": HermesOverlay(auth_type="oauth_external", base_url_override="https://portal.qwen.ai/v1",
-                                base_url_env_var="HERMES_QWEN_BASE_URL"),
+                                base_url_env_var="STARDUST_QWEN_BASE_URL"),
     "lmstudio": HermesOverlay(extra_env_vars=("LM_API_KEY",), base_url_override="http://127.0.0.1:1234/v1",
                               base_url_env_var="LM_BASE_URL"),
     "copilot-acp": HermesOverlay(transport="codex_responses", auth_type="external_process",
@@ -196,7 +196,7 @@ def get_provider(name: str, *, allow_network: bool = True) -> Optional[ProviderD
     Hermes-only overlay (nous, openai-codex, …); plugin provider profiles with a concrete endpoint."""
     canonical = normalize_provider(name)
     mdev_info = _models_dev_info(canonical, allow_network)
-    overlay = HERMES_OVERLAYS.get(canonical)
+    overlay = STARDUST_OVERLAYS.get(canonical)
     if mdev_info is not None:
         ov = overlay or HermesOverlay()
         env_vars = list(mdev_info.env)
@@ -209,7 +209,7 @@ def get_provider(name: str, *, allow_network: bool = True) -> Optional[ProviderD
         return _overlay_pdef(canonical, overlay, _LABEL_OVERRIDES.get(canonical, canonical), overlay.extra_env_vars,
                              overlay.base_url_override, "", "hermes")
     # Plugin-registered profiles (plugins/model-providers/<name>/) absent from models.dev and
-    # HERMES_OVERLAYS would otherwise be "Unknown provider" in /model, --provider and model-switch
+    # STARDUST_OVERLAYS would otherwise be "Unknown provider" in /model, --provider and model-switch
     # even though the picker lists them. Only profiles with a concrete endpoint resolve here:
     # placeholder profiles like ``custom`` (aliases ollama/local/vllm) ship an empty base_url and
     # are completed by config.yaml custom_providers — resolving them would preempt

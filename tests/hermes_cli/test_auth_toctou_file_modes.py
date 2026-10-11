@@ -38,7 +38,7 @@ pytestmark = pytest.mark.skipif(
 
 def test_save_auth_store_writes_0o600_with_0o700_parent(tmp_path, monkeypatch):
     """``_save_auth_store`` must land ``auth.json`` at 0o600 and parent at 0o700."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     old_umask = os.umask(0o022)  # make the race observable if it regresses
     try:
         from hermes_cli import auth as auth_mod
@@ -74,7 +74,7 @@ def test_save_auth_store_writes_0o600_with_0o700_parent(tmp_path, monkeypatch):
 
 def test_save_qwen_cli_tokens_writes_0o600_with_0o700_parent(tmp_path, monkeypatch):
     """``_save_qwen_cli_tokens`` must land the token file at 0o600 and parent at 0o700."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     # The Qwen CLI auth path lives under $HOME/.qwen by default — isolate it.
     monkeypatch.setenv("HOME", str(tmp_path))
     old_umask = os.umask(0o022)
@@ -112,14 +112,14 @@ def test_save_qwen_cli_tokens_writes_0o600_with_0o700_parent(tmp_path, monkeypat
 
 def test_shared_nous_store_writes_0o600_with_0o700_parent(tmp_path, monkeypatch):
     """The Nous shared-credential store must land at 0o600 / parent 0o700."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     # _nous_shared_store_path() refuses to touch the real shared store during
     # pytest runs; redirect it into tmp_path explicitly. Use a distinct
     # subdirectory name (``shared_override``) so the guard's "real user
-    # home" reference — which currently tracks HERMES_HOME via
+    # home" reference — which currently tracks STARDUST_HOME via
     # get_default_hermes_root() — can't collide with our override and
     # falsely claim we're writing to the real user's shared store.
-    monkeypatch.setenv("HERMES_SHARED_AUTH_DIR", str(tmp_path / "shared_override"))
+    monkeypatch.setenv("STARDUST_SHARED_AUTH_DIR", str(tmp_path / "shared_override"))
     old_umask = os.umask(0o022)
     try:
         from hermes_cli import auth as auth_mod

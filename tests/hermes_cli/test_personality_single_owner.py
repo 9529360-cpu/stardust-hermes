@@ -133,7 +133,7 @@ def test_describe_personality_truncates_and_flattens():
 def test_persist_personality_roundtrip(tmp_path):
     home = tmp_path / ".hermes"
     home.mkdir()
-    with patch.dict(os.environ, {"HERMES_HOME": str(home)}):
+    with patch.dict(os.environ, {"STARDUST_HOME": str(home)}):
         assert persist_personality("KAWAII ") is True
         raw = yaml.safe_load((home / "config.yaml").read_text(encoding="utf-8"))
         assert raw["display"]["personality"] == "kawaii"
@@ -149,7 +149,7 @@ def test_persist_personality_never_touches_system_prompt(tmp_path):
     (home / "config.yaml").write_text(
         yaml.safe_dump({"agent": {"system_prompt": "manual forever"}})
     , encoding="utf-8")
-    with patch.dict(os.environ, {"HERMES_HOME": str(home)}):
+    with patch.dict(os.environ, {"STARDUST_HOME": str(home)}):
         assert persist_personality("kawaii") is True
         raw = yaml.safe_load((home / "config.yaml").read_text(encoding="utf-8"))
         assert raw["agent"]["system_prompt"] == "manual forever"
@@ -161,7 +161,7 @@ def test_persist_personality_never_touches_system_prompt(tmp_path):
 
 def _run_migration(home, cfg):
     (home / "config.yaml").write_text(yaml.safe_dump(cfg, allow_unicode=True), encoding="utf-8")
-    with patch.dict(os.environ, {"HERMES_HOME": str(home)}):
+    with patch.dict(os.environ, {"STARDUST_HOME": str(home)}):
         from hermes_cli.config import migrate_config, read_raw_config
 
         results = migrate_config(interactive=False, quiet=True)

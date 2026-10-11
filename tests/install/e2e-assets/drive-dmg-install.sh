@@ -92,7 +92,7 @@ click_install() {
   echo "clicked ${cx},${cy} (window ${x},${y} ${wd}x${ht})"
 }
 
-HERMES_BIN="$INSTALL_DIR/venv/bin/hermes"
+STARDUST_BIN="$INSTALL_DIR/venv/bin/hermes"
 # The bootstrap runs 11 stages; checkout + venv land in the first few and
 # the desktop app build is near the end, so success requires all three or
 # the EXIT trap kills the installer mid-build.
@@ -107,7 +107,7 @@ installed_app() {
   return 1
 }
 install_complete() {
-  [ -d "$INSTALL_DIR/.git" ] && [ -x "$HERMES_BIN" ] && installed_app
+  [ -d "$INSTALL_DIR/.git" ] && [ -x "$STARDUST_BIN" ] && installed_app
 }
 # The bootstrap parks on an error screen instead of exiting when a stage
 # fails (e.g. a transient 429 downloading install.sh), with a Retry button

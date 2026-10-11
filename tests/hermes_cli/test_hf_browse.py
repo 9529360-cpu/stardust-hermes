@@ -23,7 +23,7 @@ GIB = 1 << 30
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
     (tmp_path / ".hermes").mkdir()
     from hermes_cli import web_server
 

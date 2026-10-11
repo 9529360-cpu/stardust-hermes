@@ -100,7 +100,7 @@ def _profile_setup_command(name: str) -> str:
 
 
 def _write_profile_model(profile_dir: Path, provider: str, model: str, validate_in: Optional[Path] = None) -> None:
-    """Write the main model assignment into ``profile_dir``'s config.yaml (HERMES_HOME-scoped)
+    """Write the main model assignment into ``profile_dir``'s config.yaml (STARDUST_HOME-scoped)
     through the same validated /model shape as ``POST /api/model/set``.
 
     ``validate_in`` is the home whose ``providers:``/``.env``/catalog vouch for the pick (default:
@@ -897,7 +897,7 @@ async def update_profile_description_endpoint(name: str, body: ProfileDescriptio
 @router.put("/api/profiles/{name}/model")
 async def update_profile_model_endpoint(name: str, body: ProfileModelUpdate):
     """Set the main model for a specific profile's config.yaml without touching the dashboard's
-    own profile — ``POST /api/model/set`` (main scope) via the HERMES_HOME override."""
+    own profile — ``POST /api/model/set`` (main scope) via the STARDUST_HOME override."""
     profile_dir = _resolve_profile_dir(name)
     provider = (body.provider or "").strip()
     model = (body.model or "").strip()

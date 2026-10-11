@@ -91,11 +91,11 @@ def _format_db_size(db_path: Path) -> str:
 
 def _report_database_journal_modes(hermes_home: Path | None = None, version_info: tuple[int, ...] | None = None) -> None:
     """List each database's journal mode; warn on WAL under a vulnerable SQLite."""
-    from hermes_cli.doctor import HERMES_HOME
+    from hermes_cli.doctor import STARDUST_HOME
     from hermes_state_wal import _path_on_cross_vm_fs, _wal_reset_repair_hint, is_sqlite_wal_reset_vulnerable
     vulnerable = is_sqlite_wal_reset_vulnerable(version_info)
     try:
-        databases = _hermes_database_paths(hermes_home if hermes_home is not None else HERMES_HOME)
+        databases = _hermes_database_paths(hermes_home if hermes_home is not None else STARDUST_HOME)
     except Exception as exc:
         check_warn(f"Could not list Hermes databases: {exc}")
         return

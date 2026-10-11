@@ -81,12 +81,12 @@ import sys
 import threading
 import traceback
 
-_SENTINEL = os.environ["HERMES_KERNEL_SENTINEL"]
+_SENTINEL = os.environ["STARDUST_KERNEL_SENTINEL"]
 _CAPTURE_LIMIT = {capture_limit}
-_SPILL_DIR = os.environ.get("HERMES_KERNEL_SPILL_DIR", "")
+_SPILL_DIR = os.environ.get("STARDUST_KERNEL_SPILL_DIR", "")
 _SPILL_CAP = {spill_cap}
-_PARENT_PROCESS_HANDLE = os.environ.pop("HERMES_KERNEL_PARENT_PROCESS_HANDLE", "")
-_PARENT_DEATH_FD = os.environ.pop("HERMES_KERNEL_PARENT_DEATH_FD", "")
+_PARENT_PROCESS_HANDLE = os.environ.pop("STARDUST_KERNEL_PARENT_PROCESS_HANDLE", "")
+_PARENT_DEATH_FD = os.environ.pop("STARDUST_KERNEL_PARENT_DEATH_FD", "")
 
 
 def _start_parent_death_pipe_watchdog():
@@ -452,7 +452,7 @@ def _resolve_owner(task_id: str) -> str | tuple[str, str]:
         from agent.delegation_context import is_delegated_child_context
         if is_delegated_child_context():
             from gateway.session_context import get_session_env
-            child_id = get_session_env("HERMES_SESSION_ID", "") or (task_id or "")
+            child_id = get_session_env("STARDUST_SESSION_ID", "") or (task_id or "")
             owner = f"{owner}{_CHILD_OWNER_QUALIFIER}{child_id}"
     except Exception:
         pass
@@ -505,7 +505,7 @@ def _rpc_forever(kernel: SessionKernel, max_tool_calls: int,
                  sandbox_tools: frozenset) -> None:
     """Serve tool RPC for the kernel's whole life: ``_rpc_server_loop`` returns on disconnect or
     its 300s idle timeout, and a kernel idles longer between cells, so re-accept until teardown
-    (the client stub reconnects: HERMES_RPC_PERSISTENT). The serving thread carries NO frozen
+    (the client stub reconnects: STARDUST_RPC_PERSISTENT). The serving thread carries NO frozen
     authority — every dispatch routes through the CURRENT cell's ``CellAuthority``."""
     from tools.code_execution_rpc import _rpc_server_loop
     from tools.registry import tool_error
@@ -621,13 +621,13 @@ def _parent_process_handle(child_env: Dict[str, str]):
         # SYNCHRONIZE; inherited only by the explicitly allow-listed child.
         handle = kernel32.OpenProcess(0x00100000, True, kernel32.GetCurrentProcessId())
         if handle:
-            child_env["HERMES_KERNEL_PARENT_PROCESS_HANDLE"] = str(int(handle))
+            child_env["STARDUST_KERNEL_PARENT_PROCESS_HANDLE"] = str(int(handle))
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.lpAttributeList = {"handle_list": [int(handle)]}
     except (AttributeError, ImportError, OSError, TypeError, ValueError):
         if handle and close is not None:
             close(handle)
-        child_env.pop("HERMES_KERNEL_PARENT_PROCESS_HANDLE", None)
+        child_env.pop("STARDUST_KERNEL_PARENT_PROCESS_HANDLE", None)
         handle = close = startupinfo = None
     return handle, close, startupinfo
 
@@ -645,11 +645,11 @@ def _spawn(kernel: SessionKernel, *, child_python: str, child_cwd: str,
         Path(kernel.tmpdir, name).write_text(src, encoding="utf-8")
     child_env = _build_child_env(rpc_endpoint=rpc_endpoint, rpc_token=kernel.rpc_token,
                                  tmpdir=kernel.tmpdir, child_python=child_python)
-    child_env["HERMES_KERNEL_SENTINEL"] = kernel.sentinel
+    child_env["STARDUST_KERNEL_SENTINEL"] = kernel.sentinel
     # Full clipped stdout spills to the kernel's tmpdir so the agent can read_file the middle.
-    child_env["HERMES_KERNEL_SPILL_DIR"] = kernel.tmpdir
+    child_env["STARDUST_KERNEL_SPILL_DIR"] = kernel.tmpdir
     # Generated client reconnects after the RPC server's 300s idle timeout between cells.
-    child_env["HERMES_RPC_PERSISTENT"] = "1"
+    child_env["STARDUST_RPC_PERSISTENT"] = "1"
     # Parent-death watchdog plumbing: Windows inherits a SYNCHRONIZE handle to this process; POSIX
     # inherits the read end of a pipe whose only write end we hold (EOF == host gone, any cause).
     parent_handle, close_handle, startupinfo = _parent_process_handle(child_env) if _IS_WINDOWS else (None, None, None)
@@ -657,7 +657,7 @@ def _spawn(kernel: SessionKernel, *, child_python: str, child_cwd: str,
     pass_fds: Tuple[int, ...] = ()
     if not _IS_WINDOWS:
         death_r, kernel.death_pipe_w = os.pipe()
-        child_env["HERMES_KERNEL_PARENT_DEATH_FD"] = str(death_r)
+        child_env["STARDUST_KERNEL_PARENT_DEATH_FD"] = str(death_r)
         pass_fds = (death_r,)
     try:
         kernel.proc = subprocess.Popen(

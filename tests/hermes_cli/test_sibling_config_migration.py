@@ -4,7 +4,7 @@
 profiles silently drifted config versions until their gateway hit a config
 the new code couldn't read. `_migrate_sibling_profile_configs()` runs the
 same non-interactive safe migration for every sibling home, scoped via the
-context-local HERMES_HOME override.
+context-local STARDUST_HOME override.
 
 These tests use REAL config files on disk and the REAL migration pipeline —
 only the profile-root location is pointed at tmp_path.

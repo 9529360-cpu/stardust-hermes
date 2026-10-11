@@ -179,7 +179,7 @@ def test_secondary_home_override_does_not_latch_ambient_env(tmp_path, monkeypatc
         '    - /bee/vol:/data\n',
         encoding="utf-8",
     )
-    monkeypatch.setenv("HERMES_HOME", str(launch_home))
+    monkeypatch.setenv("STARDUST_HOME", str(launch_home))
     # Clean ambient — the dashboard process starts without TERMINAL_ENV.
     for name in (
         "TERMINAL_ENV",

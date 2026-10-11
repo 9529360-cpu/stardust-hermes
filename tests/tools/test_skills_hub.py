@@ -16,7 +16,7 @@ from tools.skills_hub_install import (
 from tools.skills_hub_models import SkillBundle, SkillMeta, SkillSource, _referenced_support_paths
 from tools.skills_hub_official import OptionalSkillSource
 from tools.skills_hub_search import (
-    HERMES_INDEX_TTL, _load_hermes_index, create_source_router, parallel_search_sources, unified_search,
+    STARDUST_INDEX_TTL, _load_hermes_index, create_source_router, parallel_search_sources, unified_search,
 )
 from tools.skills_hub_skillssh import SkillsShSource
 from tools.skills_hub_sources import LobeHubSource, UrlSource, WellKnownSkillSource
@@ -1911,7 +1911,7 @@ class TestLoadHermesIndex:
         cache_file = self._isolate_cache(monkeypatch, tmp_path)
         cache_file.write_text(json.dumps({"skills": [{"name": "stale"}]}))
         # Force the cache to look expired so the network path runs.
-        old = time.time() - (HERMES_INDEX_TTL + 100)
+        old = time.time() - (STARDUST_INDEX_TTL + 100)
         import os
 
         os.utime(cache_file, (old, old))

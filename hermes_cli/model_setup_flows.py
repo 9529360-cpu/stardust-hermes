@@ -596,7 +596,7 @@ def _model_flow_copilot_acp(config, current_model=""):
     try:
         creds = resolve_external_process_provider_credentials(provider_id)
     except Exception as exc:
-        _say(f"  ⚠ {exc}", "  Set HERMES_COPILOT_ACP_COMMAND or COPILOT_CLI_PATH if Copilot CLI is installed elsewhere.")
+        _say(f"  ⚠ {exc}", "  Set STARDUST_COPILOT_ACP_COMMAND or COPILOT_CLI_PATH if Copilot CLI is installed elsewhere.")
         return
     effective_base = creds.get("base_url") or effective_base
 

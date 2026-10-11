@@ -6,7 +6,7 @@ first profile's workspace_id and bearer into one shared client, so every
 later profile's memory landed in the first profile's workspace.
 
 The tests drive the REAL resolution chain — HonchoClientConfig.from_global_config
-against real honcho.json files under temp HERMES_HOMEs, with the same
+against real honcho.json files under temp STARDUST_HOMEs, with the same
 ContextVar override the gateway multiplexer / dashboard use — and assert
 client identity, not internals.
 
@@ -153,7 +153,7 @@ class TestBackgroundThreadIsolation:
         assert box["client"].kwargs["api_key"] == "key-b"
 
     def test_spawn_context_thread_sees_profile_override(self, tmp_path):
-        """spawn_context_thread must carry the caller's HERMES_HOME override."""
+        """spawn_context_thread must carry the caller's STARDUST_HOME override."""
         from hermes_constants import get_hermes_home
         from agent.memory_provider import spawn_context_thread
 

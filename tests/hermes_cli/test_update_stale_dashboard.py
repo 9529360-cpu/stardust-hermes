@@ -97,8 +97,8 @@ def _write_valid_ssh_backend_lock(tmp_path, monkeypatch) -> int:
         "logPath": f"{tmp_path}/desktop-ssh/{ownership_id}/{spawn_nonce}.log",
         "startedAt": "2026-08-21T15:27:39Z",
     }))
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    monkeypatch.delenv("HERMES_DESKTOP_CHILD_PID", raising=False)
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
+    monkeypatch.delenv("STARDUST_DESKTOP_CHILD_PID", raising=False)
     return pid
 
 
@@ -546,7 +546,7 @@ class TestManualBackendRespawn:
     def test_respawn_adds_no_open_to_dashboard_commands(self, tmp_path, monkeypatch):
         """Respawned `dashboard` argv gains --no-open; `serve` argv untouched."""
         live = self._live()
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
         spawned: list[list[str]] = []
 
         class _FakePopen:
@@ -565,7 +565,7 @@ class TestManualBackendRespawn:
 
     def test_respawn_failure_returned(self, tmp_path, monkeypatch, capsys):
         live = self._live()
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
 
         with patch.object(live.subprocess, "Popen", side_effect=OSError("no such file")):
             failed = live._respawn_dashboard_processes([["hermes", "serve"]])
@@ -678,7 +678,7 @@ class TestFilterDashboardRespawnCandidates:
         assert out == [a]
 
     def test_foreign_home_backend_is_not_replayed(self):
-        """A backend from another HERMES_HOME is never respawned (#94030).
+        """A backend from another STARDUST_HOME is never respawned (#94030).
 
         Its supervisor/user owns its lifecycle; an argv-only replay would
         run on the updating install's home and steal the foreign install's
@@ -742,7 +742,7 @@ class TestFilterDashboardRespawnCandidates:
         assert out == [argv]
 
     def test_unknown_home_stays_eligible(self):
-        """Unreadable HERMES_HOME (env probe failed) keeps pre-#94030 behaviour."""
+        """Unreadable STARDUST_HOME (env probe failed) keeps pre-#94030 behaviour."""
         from hermes_cli.dashboard_procs import _filter_dashboard_respawn_candidates
 
         argv = ["hermes", "dashboard", "--port", "8300"]

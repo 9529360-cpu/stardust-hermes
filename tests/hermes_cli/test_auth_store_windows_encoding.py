@@ -29,12 +29,12 @@ import hermes_cli.auth_codex as auth_codex
 
 @pytest.fixture
 def hermes_home(tmp_path, monkeypatch):
-    """Point HERMES_HOME at a tmp dir so we never touch the real auth store.
+    """Point STARDUST_HOME at a tmp dir so we never touch the real auth store.
 
     Required because ``_auth_file_path()`` has a seat belt that refuses to
     resolve to the real user's ~/.hermes/auth.json under pytest.
     """
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     return tmp_path
 
 
@@ -235,7 +235,7 @@ class TestAuthJsonSiblingReaders:
         import agent.auxiliary_client as aux
 
         # _AUTH_JSON_PATH is resolved at module import time, so the
-        # HERMES_HOME env from the fixture doesn't reach it — point it at
+        # STARDUST_HOME env from the fixture doesn't reach it — point it at
         # the tmp store explicitly.
         monkeypatch.setattr(aux, "_AUTH_JSON_PATH", hermes_home / "auth.json")
 
@@ -262,7 +262,7 @@ class TestAuthJsonSiblingReaders:
         # The shared-store path has a seat belt that refuses to resolve to the
         # real user's store under pytest; pin it to a tmp dir explicitly.
         shared_dir = tmp_path / "shared"
-        monkeypatch.setenv("HERMES_SHARED_AUTH_DIR", str(shared_dir))
+        monkeypatch.setenv("STARDUST_SHARED_AUTH_DIR", str(shared_dir))
 
         payload = {
             "refresh_token": "rt",

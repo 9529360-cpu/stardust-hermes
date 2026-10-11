@@ -1129,7 +1129,7 @@ class TestBackgroundReviewDeleteGate:
     summary is never published back."""
 
     def test_remove_staged_not_applied(self, store, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         store.add("memory", "never create records without permission")
         token = set_current_write_origin("background_review")
         try:
@@ -1150,7 +1150,7 @@ class TestBackgroundReviewDeleteGate:
         assert record["origin"] == "background_review"
 
     def test_replace_staged_in_background_review(self, store, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         store.add("memory", "entry the fork must not rewrite")
         token = set_current_write_origin("background_review")
         try:
@@ -1164,7 +1164,7 @@ class TestBackgroundReviewDeleteGate:
         assert "entry the fork must not rewrite" in store._entries_for("memory")
 
     def test_batch_containing_remove_staged_whole_batch(self, store, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         store.add("memory", "rule one")
         token = set_current_write_origin("background_review")
         try:

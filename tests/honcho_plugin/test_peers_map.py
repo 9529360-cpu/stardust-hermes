@@ -148,7 +148,7 @@ class TestCmdPeersMap:
         """A host block without the key inherits root, so clearing must leave an empty map behind."""
         from plugins.memory.honcho.client import HonchoClientConfig
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         cfg = _cfg(root={"userPeerAliases": {"111": "root-person"}}, userPeerAliases={"111": "host-person"})
         written = _run_map(monkeypatch, tmp_path, answers=["111", "-", ""], cfg=cfg)
         assert written["cfg"]["hosts"]["hermes"]["userPeerAliases"] == {}

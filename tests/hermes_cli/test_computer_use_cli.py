@@ -57,7 +57,7 @@ def test_computer_use_status_returns_zero_for_compatible_driver(
     import hermes_cli.tools_config_cua as tools_config_cua
 
     driver = r"C:\Users\tester\.local\bin\cua-driver.exe"
-    monkeypatch.delenv("HERMES_CUA_DRIVER_CMD", raising=False)
+    monkeypatch.delenv("STARDUST_CUA_DRIVER_CMD", raising=False)
     monkeypatch.setattr(cua_backend_driver, "resolve_cua_driver_cmd", lambda: driver)
     monkeypatch.setattr(
         tools_config,
@@ -97,7 +97,7 @@ def test_computer_use_status_returns_nonzero_for_incompatible_standard_driver(
     import hermes_cli.tools_config_cua as tools_config_cua
 
     driver = r"C:\Users\tester\.local\bin\cua-driver.exe"
-    monkeypatch.delenv("HERMES_CUA_DRIVER_CMD", raising=False)
+    monkeypatch.delenv("STARDUST_CUA_DRIVER_CMD", raising=False)
     monkeypatch.setattr(cua_backend_driver, "resolve_cua_driver_cmd", lambda: driver)
     monkeypatch.setattr(
         tools_config,
@@ -130,7 +130,7 @@ def test_computer_use_status_returns_nonzero_for_incompatible_custom_driver(
     import hermes_cli.tools_config_cua as tools_config_cua
 
     driver = r"C:\custom\cmd.exe"
-    monkeypatch.setenv("HERMES_CUA_DRIVER_CMD", driver)
+    monkeypatch.setenv("STARDUST_CUA_DRIVER_CMD", driver)
     monkeypatch.setattr(cua_backend_driver, "resolve_cua_driver_cmd", lambda: driver)
     monkeypatch.setattr(
         tools_config,
@@ -145,7 +145,7 @@ def test_computer_use_status_returns_nonzero_for_incompatible_custom_driver(
 
     assert _invoke(monkeypatch, "status") == 1
     output = capsys.readouterr().out
-    assert "custom binary from HERMES_CUA_DRIVER_CMD" in output
+    assert "custom binary from STARDUST_CUA_DRIVER_CMD" in output
     assert "unset the override" in output
 
 
@@ -182,7 +182,7 @@ def test_computer_use_install_returns_nonzero_for_unrepairable_custom_override(
     import hermes_cli.tools_config_cua as tools_config_cua
 
     driver = r"C:\custom\cmd.exe"
-    monkeypatch.setenv("HERMES_CUA_DRIVER_CMD", driver)
+    monkeypatch.setenv("STARDUST_CUA_DRIVER_CMD", driver)
     install = Mock(return_value=False)
     contract = Mock(side_effect=AssertionError("failed install must short-circuit"))
     monkeypatch.setattr(tools_config, "install_cua_driver", install)

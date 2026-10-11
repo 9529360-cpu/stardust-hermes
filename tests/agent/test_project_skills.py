@@ -10,7 +10,7 @@ import agent.skill_utils as su
 
 @pytest.fixture
 def project_env(tmp_path, monkeypatch):
-    """A temp HERMES_HOME + a git-marked project with skills in both subdirs."""
+    """A temp STARDUST_HOME + a git-marked project with skills in both subdirs."""
     home = tmp_path / ".hermes"
     (home / "skills").mkdir(parents=True)
     config = home / "config.yaml"
@@ -29,7 +29,7 @@ def project_env(tmp_path, monkeypatch):
         "---\nname: conv-skill\ndescription: convention\n---\nbody\n"
     )
 
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     monkeypatch.chdir(repo)
     su._external_dirs_cache_clear()
     yield {"home": home, "repo": repo, "config": config}
@@ -104,7 +104,7 @@ class TestTrustGate:
         (home / "config.yaml").write_text("skills: {}\n")
         repo = tmp_path / "empty-proj"
         (repo / ".git").mkdir(parents=True)
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         monkeypatch.chdir(repo)
         su._external_dirs_cache_clear()
         assert su.get_untrusted_project_skills_root() is None

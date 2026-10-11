@@ -30,7 +30,7 @@ class _TestableEnv(BaseEnvironment):
 
 def test_prepare_command_uses_selected_environment_for_nopasswd(monkeypatch):
     monkeypatch.delenv("SUDO_PASSWORD", raising=False)
-    monkeypatch.setenv("HERMES_INTERACTIVE", "1")
+    monkeypatch.setenv("STARDUST_INTERACTIVE", "1")
     env = _TestableEnv()
     monkeypatch.setattr(env, "_sudo_nopasswd_works", lambda: True)
 
@@ -374,7 +374,7 @@ class TestEmbedStdinHeredoc:
 
         assert result.startswith("cat << '")
         assert "hello world" in result
-        assert "HERMES_STDIN_" in result
+        assert "STARDUST_STDIN_" in result
 
     def test_unique_delimiter_each_call(self):
         r1 = BaseEnvironment._embed_stdin_heredoc("cat", "data")

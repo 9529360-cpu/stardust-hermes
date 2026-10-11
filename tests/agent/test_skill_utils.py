@@ -61,7 +61,7 @@ skills:
         parse_count += 1
         return real_yaml_load(text)
 
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     skill_utils._external_dirs_cache_clear()
     getattr(skill_utils, "_raw_config_cache_clear", lambda: None)()
     monkeypatch.setattr(skill_utils, "yaml_load", counting_yaml_load)
@@ -123,7 +123,7 @@ class TestDisabledSkillsJsonArrayString:
             "skills:\n  disabled: '[\"skill-a\",\"skill-b\"]'\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         from agent import skill_utils
 
         getattr(skill_utils, "_raw_config_cache_clear", lambda: None)()
@@ -139,7 +139,7 @@ class TestDisabledSkillsJsonArrayString:
             "skills:\n  disabled: 'hidden-skill'\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         from agent import skill_utils
 
         getattr(skill_utils, "_raw_config_cache_clear", lambda: None)()
@@ -157,7 +157,7 @@ def test_skill_config_home_vars_use_subprocess_home(tmp_path, monkeypatch):
     subprocess_home = hermes_home / "home"
     subprocess_home.mkdir(parents=True)
     (hermes_home / "config.yaml").write_text("", encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     monkeypatch.setenv("HOME", str(hermes_home))
     monkeypatch.setenv("TERMINAL_HOME_MODE", "profile")
     monkeypatch.setenv("PROJECT_ROOT", "/proj")

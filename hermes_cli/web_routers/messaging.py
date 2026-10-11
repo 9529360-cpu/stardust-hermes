@@ -208,7 +208,7 @@ def _messaging_platform_payload(
     # Same shared liveness ladder /api/status uses, so the sidebar strip and the
     # Channels page can never disagree on one page load. profile_home is passed when
     # scoped to a named profile: gateway/status readers resolve process-level paths
-    # and do NOT follow the HERMES_HOME contextvar override, so without it messaging
+    # and do NOT follow the STARDUST_HOME contextvar override, so without it messaging
     # silently reports another profile's gateway.
     gateway_running = resolve_gateway_liveness(
         profile_dir=profile_home, runtime=runtime,
@@ -275,7 +275,7 @@ def _messaging_platform_payload(
 
 def _platform_payloads(scoped_dir: Optional[Path], entries) -> list[dict[str, Any]]:
     """Payloads for ``entries``; call inside ``_profile_scope`` (load_env honors the
-    HERMES_HOME contextvar; the gateway status readers do not, hence the explicit path)."""
+    STARDUST_HOME contextvar; the gateway status readers do not, hence the explicit path)."""
     env_on_disk = load_env()
     runtime = read_runtime_status(path=scoped_dir / "gateway_state.json") if scoped_dir is not None else read_runtime_status()
     if runtime is None:
@@ -785,7 +785,7 @@ async def get_messaging_platforms(profile: Optional[str] = None):
     # Profile-scoped so the global profile switcher shows the TARGET profile's channel state.
     def _run():
         # Profile-scoped so the dashboard's global profile switcher shows the TARGET profile's channel
-        # credentials/state, not the root install's. load_env() honors the HERMES_HOME contextvar override;
+        # credentials/state, not the root install's. load_env() honors the STARDUST_HOME contextvar override;
         # the gateway status readers do NOT (they resolve process-level paths), so the profile directory is
         # passed explicitly for those (#71211).
         with _profile_scope(profile) as scoped_dir:
@@ -816,7 +816,7 @@ def _multiplex_port_binding_conflict(platform_id: str, requested_profile: Option
     if not requested or requested.lower() == "current":
         from hermes_cli.profiles import get_active_profile_name
 
-        # The dashboard's own profile. "custom" (unrecognized HERMES_HOME) is outside
+        # The dashboard's own profile. "custom" (unrecognized STARDUST_HOME) is outside
         # the profiles tree, so a multiplexed gateway never serves it.
         target = get_active_profile_name()
     else:

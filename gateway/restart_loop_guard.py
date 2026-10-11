@@ -4,7 +4,7 @@ Defenses 1-2 (``_HERMES_GATEWAY`` guard on ``hermes gateway stop|restart`` /
 ``terminal_tool``, cron lifecycle filter) stop the agent scheduling its own restart
 but not every SIGTERM source: the supervisor respawns, the gateway auto-resumes the
 restart-interrupted session, whose next turn re-runs the offending logic.  Boots are
-persisted to ``<HERMES_HOME>/gateway/restart_loop.json`` and CHAIN while gaps stay
+persisted to ``<STARDUST_HOME>/gateway/restart_loop.json`` and CHAIN while gaps stay
 within ``max_gap_seconds`` (a ~150s watchdog-kill cycle trips like a ~10s loop).
 Tripped → caller SKIPS auto-resume.  Any I/O failure fails OPEN, never wedging.
 """

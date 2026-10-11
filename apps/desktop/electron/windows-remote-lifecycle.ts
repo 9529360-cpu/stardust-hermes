@@ -4,7 +4,7 @@ import { assertBootstrapNotSuperseded, redactSecrets, SSH_ERROR } from './ssh-co
 
 const LOCKFILE_SCHEMA_VERSION = 2
 const PROTOCOL_VERSION = 1
-const READY_RE = /^HERMES_(?:BACKEND|DASHBOARD)_READY port=(\d+)/gm
+const READY_RE = /^STARDUST_(?:BACKEND|DASHBOARD)_READY port=(\d+)/gm
 const READY_POLL_INTERVAL_MS = 750
 
 function psLiteral(value) {
@@ -36,7 +36,7 @@ async function probeWindowsRemote(ssh, explicitHermesPath = '') {
     '}',
     `$explicit=${explicit}`,
     'if($explicit){Assert-NoReparse $explicit $false;$explicitPython=[IO.Path]::Combine([IO.Path]::GetDirectoryName($explicit), "python.exe");Assert-NoReparse $explicitPython $false}',
-    '$hermesHome=$env:HERMES_HOME',
+    '$hermesHome=$env:STARDUST_HOME',
     'if(-not $hermesHome){$hermesHome=Join-Path $env:LOCALAPPDATA "hermes"}',
     'Assert-NoReparse $hermesHome $true',
     '$candidate=[IO.Path]::Combine($hermesHome, "hermes-agent\\venv\\Scripts\\hermes.exe")',

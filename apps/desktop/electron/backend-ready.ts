@@ -1,15 +1,15 @@
 import fs from 'node:fs'
 
-// `hermes serve` announces HERMES_BACKEND_READY; the legacy `hermes dashboard`
-// backend announces HERMES_DASHBOARD_READY. Accept either so the desktop spawn
+// `hermes serve` announces STARDUST_BACKEND_READY; the legacy `hermes dashboard`
+// backend announces STARDUST_DASHBOARD_READY. Accept either so the desktop spawn
 // works against both the headless backend and old/dashboard runtimes.
-const _READY_RE = /^HERMES_(?:BACKEND|DASHBOARD)_READY port=(\d+)/m
+const _READY_RE = /^STARDUST_(?:BACKEND|DASHBOARD)_READY port=(\d+)/m
 
 // Same sentinel inside a MERGED stdout+stderr buffer (the spawn-time output tail, a remote
 // `>> log 2>&1` file): uvicorn's stderr chunks end without a newline, so the sentinel can be
-// spliced onto them (`...process [4711]HERMES_BACKEND_READY port=65238`) and `^` never lines up
+// spliced onto them (`...process [4711]STARDUST_BACKEND_READY port=65238`) and `^` never lines up
 // (#103792). Match on a token boundary instead; `port=<digits>` keeps prose mentions out.
-export const READY_IN_MERGED_OUTPUT_RE = /(?<!\w)HERMES_(?:BACKEND|DASHBOARD)_READY port=(\d+)/
+export const READY_IN_MERGED_OUTPUT_RE = /(?<!\w)STARDUST_(?:BACKEND|DASHBOARD)_READY port=(\d+)/
 
 // The announcement clock starts the instant the backend process is spawned —
 // before uvicorn binds its socket. On a cold install the child must first
@@ -41,7 +41,7 @@ function resolvePortAnnounceTimeoutMs(env = process.env) {
 }
 
 /**
- * Watch a child process's stdout for the `HERMES_(BACKEND|DASHBOARD)_READY
+ * Watch a child process's stdout for the `STARDUST_(BACKEND|DASHBOARD)_READY
  * port=<N>` line that web_server.py prints after uvicorn binds its socket.
  *
  * Returns the parsed port. Rejects if:

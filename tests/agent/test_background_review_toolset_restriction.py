@@ -221,7 +221,7 @@ def test_background_review_whitelist_includes_configured_extra_tools(
         "      - propose_shared_memory\n",
         encoding="utf-8",
     )
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
     import run_agent
     from hermes_cli import config as config_module

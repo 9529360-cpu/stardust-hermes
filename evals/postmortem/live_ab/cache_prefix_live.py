@@ -1,10 +1,10 @@
 """Live A/B for the thinking-strip cache miss (F0). Runs a short real tool loop through AIAgent on
 Fable 5.1 via Nous and prints per-call cache hit ratios from agent.log. ~10 calls, well under $1.
-Arm A = current code. Arm B = HERMES_KEEP_ALL_THINKING=1 monkeypatch of _manage_thinking_signatures
+Arm A = current code. Arm B = STARDUST_KEEP_ALL_THINKING=1 monkeypatch of _manage_thinking_signatures
 that passes thinking blocks back unchanged for the Nous/Anthropic route."""
 import os, sys, re, time, subprocess, json
 # LIVE: real provider calls (cents). Usage: python cache_prefix_live.py <repo_root> <A|B>
-os.environ.setdefault("HERMES_HOME", os.path.expanduser("~/.hermes"))
+os.environ.setdefault("STARDUST_HOME", os.path.expanduser("~/.hermes"))
 sys.path.insert(0, sys.argv[1])
 arm = sys.argv[2] if len(sys.argv) > 2 else "A"
 import agent.anthropic_message_convert as amc

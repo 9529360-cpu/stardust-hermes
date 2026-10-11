@@ -58,7 +58,7 @@ def test_real_child_detached_turn_activity(tmp_path, monkeypatch, mode):
             mode, str(tmp_path),
         ],
         registry_path=tmp_path / "host.json", env={
-            "HERMES_HOME": str(home),
+            "STARDUST_HOME": str(home),
             "PYTHONPATH": os.pathsep.join(site.getsitepackages()),
         },
         expected_hermes_home=str(home), rpc_sink=server._relay_compute_host_rpc,

@@ -29,7 +29,7 @@ def child(out: Path) -> None:
 
     runner = GatewayRunner.__new__(GatewayRunner)
     runner.config = GatewayConfig()
-    runner.session_store = SessionStore(Path(os.environ["HERMES_HOME"]) / "sessions", runner.config)
+    runner.session_store = SessionStore(Path(os.environ["STARDUST_HOME"]) / "sessions", runner.config)
     runner._session_db = None
     runner.adapters = {}
     source = SessionSource(platform=Platform.TELEGRAM, user_id="fixture", chat_id="fixture", chat_type="dm")
@@ -119,7 +119,7 @@ def main() -> None:
         pid, fd = pty.fork()
         if pid == 0:
             os.environ.clear()
-            os.environ.update(HOME=home, HERMES_HOME=home + "/.hermes", PATH="/usr/bin:/bin", TERM="dumb", NO_COLOR="1")
+            os.environ.update(HOME=home, STARDUST_HOME=home + "/.hermes", PATH="/usr/bin:/bin", TERM="dumb", NO_COLOR="1")
             try:
                 child(out)
             finally:

@@ -230,7 +230,7 @@ def _live_cache_path() -> Path:
 
 def fetch_live_catalog(*, force: bool = False) -> Optional[Dict[str, Any]]:
     """The published ``plugin-catalog.json`` (``{"entries": [...], "removed": [...]}``), cached under
-    ``HERMES_HOME/cache`` for :data:`LIVE_CATALOG_TTL_SECONDS`. ``None`` on ANY failure — callers fall
+    ``STARDUST_HOME/cache`` for :data:`LIVE_CATALOG_TTL_SECONDS`. ``None`` on ANY failure — callers fall
     back to the in-tree catalog."""
     cache = _live_cache_path()
     try:

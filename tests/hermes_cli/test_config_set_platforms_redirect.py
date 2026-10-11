@@ -21,8 +21,8 @@ def _write_config(hermes_home: Path, data: dict) -> Path:
 
 
 def _set(monkeypatch, hermes_home, key, value, force=False):
-    """Isolated call to set_config_value against a temp HERMES_HOME."""
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    """Isolated call to set_config_value against a temp STARDUST_HOME."""
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     # set_config_value resolves the home live via get_config_path()/get_hermes_home()
     from hermes_cli.config import set_config_value
     set_config_value(key, value, force=force)
@@ -127,7 +127,7 @@ class TestRedirectSiblingSurfaces:
     def test_unset_missing_redirected_leaf_exits_nonzero(self, hermes_home, monkeypatch):
         from hermes_cli.config import unset_config_value
 
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         with pytest.raises(SystemExit) as exc:
             unset_config_value("platforms.telegram.streaming")
         assert exc.value.code == 1

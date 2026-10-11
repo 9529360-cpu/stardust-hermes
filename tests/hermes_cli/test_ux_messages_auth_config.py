@@ -30,7 +30,7 @@ class TestConfigParseWarning:
     def test_warning_names_repair_commands_and_line(self, tmp_path, monkeypatch, capsys, fallback):
         from hermes_cli import config as config_mod
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         config_mod._CONFIG_PARSE_WARNED.clear()
         config_path = tmp_path / "config.yaml"
         config_path.write_text("model:\n  default: x\n bad: [unterminated\n", encoding="utf-8")
@@ -54,7 +54,7 @@ class TestConfigGuardCopy:
     def test_require_parseable_user_config_says_what_happened_and_how_to_fix(self, tmp_path, monkeypatch):
         from hermes_cli import config as config_mod
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         (tmp_path / "config.yaml").write_text("model: [unterminated\n", encoding="utf-8")
 
         with pytest.raises(config_mod.InvalidUserConfigError) as excinfo:
@@ -70,7 +70,7 @@ class TestConfigGuardCopy:
         from hermes_cli import config as config_mod
         from hermes_constants import display_hermes_home
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         config_mod._CONFIG_PARSE_WARNED.clear()
         (tmp_path / "config.yaml").write_text("model: [unterminated\n", encoding="utf-8")
 
@@ -91,7 +91,7 @@ def test_no_provider_configured_points_at_model_and_auth_add(monkeypatch, tmp_pa
     from hermes_cli.auth import AuthError, resolve_provider
     from hermes_constants import display_hermes_home
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     monkeypatch.setattr("agent.bedrock_adapter.has_aws_credentials", lambda env=None: False)
 
     with pytest.raises(AuthError) as excinfo:
@@ -249,7 +249,7 @@ class TestProviderSetupFailureCopy:
     def test_setup_provider_step_reports_reason_and_that_nothing_changed(self, monkeypatch, capsys, tmp_path):
         from hermes_cli import setup as setup_mod
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
 
         def _boom(*_a, **_k):
             raise httpx.ConnectError("[Errno -2] Name or service not known")

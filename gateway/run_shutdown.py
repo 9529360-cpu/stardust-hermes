@@ -1363,7 +1363,7 @@ class GatewayShutdownMixin:
         an unreadable activity summary means "not wedged".
         """
         from gateway.run import _AGENT_PENDING_SENTINEL, _float_env
-        timeout = _float_env("HERMES_AGENT_TIMEOUT", 1800)
+        timeout = _float_env("STARDUST_AGENT_TIMEOUT", 1800)
         if timeout <= 0:
             return 0
 

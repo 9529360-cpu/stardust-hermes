@@ -9,9 +9,9 @@ system (`~/.hermes/plugins/`) is otherwise documented separately.
 
 There are TWO on-disk doors, same contract and hot reload:
 
-- `$HERMES_HOME/desktop-plugins/<id>/plugin.js` — standalone desktop plugin.
+- `$STARDUST_HOME/desktop-plugins/<id>/plugin.js` — standalone desktop plugin.
   Loads enabled by default.
-- `$HERMES_HOME/plugins/<id>/desktop/plugin.js` — the desktop HALF of a
+- `$STARDUST_HOME/plugins/<id>/desktop/plugin.js` — the desktop HALF of a
   unified agent-plugin package: the same folder that carries the Python
   plugin (`plugin.yaml`) and its `dashboard/plugin_api.py` backend ships its
   desktop UI beside them, so one feature installs/uninstalls as one folder.
@@ -35,12 +35,12 @@ Full human reference (every export, area payloads, backend, security):
 ## Prerequisites
 
 - The Hermes desktop app (it loads plugins; the CLI/gateway alone does not).
-- Write access to `$HERMES_HOME/desktop-plugins/` (usually
+- Write access to `$STARDUST_HOME/desktop-plugins/` (usually
   `~/.hermes/desktop-plugins/`).
 
 ## How to Run
 
-1. Create `$HERMES_HOME/desktop-plugins/<name>/plugin.js` from
+1. Create `$STARDUST_HOME/desktop-plugins/<name>/plugin.js` from
    `templates/plugin.js` (in this skill directory) — that's
    `~/.hermes/...` by default, or `~/.hermes/profiles/<profile>/...` under a
    named profile. Keep `<name>` equal to the plugin `id`.

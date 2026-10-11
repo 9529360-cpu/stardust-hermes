@@ -460,7 +460,7 @@ def _evaluate_due_job(job: Dict[str, Any], scan: _DueScan, run_claim_ttl: float)
         if _retire_expired_oneshot(d) or _oneshot_dispatch_limit_reached(job, scan):
             return False
         # Durably claim the one-shot for the DURATION of its run: a second scheduler process on the
-        # same HERMES_HOME must not re-dispatch it while in flight, and advancing next_run_at by a
+        # same STARDUST_HOME must not re-dispatch it while in flight, and advancing next_run_at by a
         # fixed window is not enough for a run that outlives a tick. The other process sees the
         # fresh claim and skips; mark_job_run() clears it. The TTL only covers a tick that DIES.
         claim = {"at": now.isoformat(), "by": _jobs._machine_id()}

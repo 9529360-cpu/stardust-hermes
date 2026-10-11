@@ -43,16 +43,16 @@ def _clean(value: Any) -> str:
 def _is_desktop_session() -> bool:
     """Execution-time surface authority; toolset selection alone is not a security boundary.
 
-    Gateway messaging binds HERMES_SESSION_PLATFORM, while TUI/Desktop sessions bind their
-    client identity primarily as HERMES_SESSION_SOURCE. Accept Desktop only through either
-    task-local ContextVar channel; never infer it from process-global HERMES_DESKTOP.
+    Gateway messaging binds STARDUST_SESSION_PLATFORM, while TUI/Desktop sessions bind their
+    client identity primarily as STARDUST_SESSION_SOURCE. Accept Desktop only through either
+    task-local ContextVar channel; never infer it from process-global STARDUST_DESKTOP.
     """
     try:
         from gateway.session_context import get_session_env
 
         identities = (
-            get_session_env("HERMES_SESSION_PLATFORM", ""),
-            get_session_env("HERMES_SESSION_SOURCE", ""),
+            get_session_env("STARDUST_SESSION_PLATFORM", ""),
+            get_session_env("STARDUST_SESSION_SOURCE", ""),
         )
         return any(str(value or "").strip().lower() == "desktop" for value in identities)
     except Exception:

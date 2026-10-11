@@ -522,7 +522,7 @@ def _bootstrap_session_db(home: str, done: threading.Event) -> None:
 
 
 def _get_session_db() -> Optional[Any]:
-    """Cached SessionDB per HERMES_HOME (profile switches pick the right DB); None on any failure.
+    """Cached SessionDB per STARDUST_HOME (profile switches pick the right DB); None on any failure.
 
     Never constructs SessionDB on an event-loop thread: a cache miss there kicks a one-shot background
     bootstrap and waits a bounded grace window (the kick call waits ``_DB_BOOTSTRAP_INIT_WAIT_S`` so a

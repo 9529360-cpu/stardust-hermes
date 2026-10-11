@@ -69,7 +69,7 @@ class TestConfigRegistrationAgreementUnderMultiplexScope:
             "      bot_token: '123:abc'\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         monkeypatch.setenv("GATEWAY_RELAY_URL", "wss://deploy.example/relay")
 
         profile_dir = tmp_path / "profile-a"
@@ -116,7 +116,7 @@ class TestConfigRegistrationAgreementUnderMultiplexScope:
             "      bot_token: '123:abc'\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
         profile_dir = tmp_path / "profile-a"
         profile_dir.mkdir()

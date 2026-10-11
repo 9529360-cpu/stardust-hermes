@@ -512,8 +512,8 @@ def _external_process_signed_in(slug: str) -> bool:
 def _provider_is_keyless(slug: str) -> bool:
     """True when the provider's Hermes overlay declares it keyless."""
     try:
-        from hermes_cli.providers import HERMES_OVERLAYS
-        overlay = HERMES_OVERLAYS.get(slug)
+        from hermes_cli.providers import STARDUST_OVERLAYS
+        overlay = STARDUST_OVERLAYS.get(slug)
         return bool(overlay is not None and getattr(overlay, "keyless", False))
     except Exception:
         return False

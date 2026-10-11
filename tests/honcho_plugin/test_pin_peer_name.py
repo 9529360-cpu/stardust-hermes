@@ -43,7 +43,7 @@ class TestPinPeerNameConfigParsing:
             "peerName": "Igor",
             "pinPeerName": True,
         }))
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "isolated"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "isolated"))
 
         config = HonchoClientConfig.from_global_config(config_path=config_file)
         assert config.pin_peer_name is True
@@ -59,7 +59,7 @@ class TestPinPeerNameConfigParsing:
                 "hermes": {"pinPeerName": True},
             },
         }))
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "isolated"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "isolated"))
 
         config = HonchoClientConfig.from_global_config(config_path=config_file)
         assert config.pin_peer_name is True
@@ -72,7 +72,7 @@ class TestPinPeerNameConfigParsing:
             "peerName": "Igor",
             "pinPeerName": False,
         }))
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "isolated"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "isolated"))
 
         config = HonchoClientConfig.from_global_config(config_path=config_file)
         assert config.pin_peer_name is False
@@ -538,7 +538,7 @@ class TestPinTransition:
         from gateway.run_agent_cache import GatewayAgentCacheMixin
 
         cfg_path = tmp_path / "honcho.json"
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         monkeypatch.setattr(GatewayAgentCacheMixin, "_MEMORY_IDENTITY_PROVIDER_MEMO", {})
 
         cfg_path.write_text(json.dumps({"apiKey": "k", "peerName": "Igor", "pinPeerName": True}))
@@ -557,7 +557,7 @@ class TestPinTransition:
         from plugins.memory.honcho import HonchoMemoryProvider
 
         cfg_path = tmp_path / "honcho.json"
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         base = {"apiKey": "k", "peerName": "Igor", "aiPeer": "hermes"}
         provider = HonchoMemoryProvider()
 
@@ -574,7 +574,7 @@ class TestPinTransition:
         from plugins.memory.honcho import HonchoMemoryProvider
 
         cfg_path = tmp_path / "honcho.json"
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         base = {"apiKey": "k", "peerName": "Igor", "aiPeer": "hermes"}
         provider = HonchoMemoryProvider()
 

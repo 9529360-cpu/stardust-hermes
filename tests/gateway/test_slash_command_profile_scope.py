@@ -1,7 +1,7 @@
 """Gateway slash commands must do their blocking work inside the routed profile.
 
 The multiplexed inbound handler wraps the whole message in
-``_profile_runtime_scope``, which installs the routed profile's ``HERMES_HOME``
+``_profile_runtime_scope``, which installs the routed profile's ``STARDUST_HOME``
 override and its secret scope as **contextvars**. A bare
 ``loop.run_in_executor(None, ...)`` starts the worker with an EMPTY context, so
 ``SessionDB()`` / ``get_hermes_home()`` inside the worker resolve the LAUNCH
@@ -27,7 +27,7 @@ def profile_home(tmp_path, monkeypatch):
     home = root / "profiles" / "coder"
     home.mkdir(parents=True)
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(root))
+    monkeypatch.setenv("STARDUST_HOME", str(root))
     return home
 
 

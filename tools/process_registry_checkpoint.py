@@ -65,7 +65,7 @@ class ProcessCheckpointMixin:
         owner_home = hermes_home_key()
         current_profile = profile_name_for_home(get_hermes_home())
         if current_profile is None:
-            # Custom single-profile HERMES_HOME roots do not follow the standard
+            # Custom single-profile STARDUST_HOME roots do not follow the standard
             # profiles/<name> layout; their legacy namespace is still agent:main.
             current_profile = "default"
         if not checkpoint_path.exists():

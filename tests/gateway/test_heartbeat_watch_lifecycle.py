@@ -14,7 +14,7 @@ from hermes_constants import get_hermes_home
 @pytest.mark.asyncio
 async def test_watches_read_and_admit_in_each_owner_profile(tmp_path, monkeypatch):
     monkeypatch.setattr('pathlib.Path.home', lambda: tmp_path)
-    monkeypatch.setenv('HERMES_HOME', str(tmp_path / '.hermes'))
+    monkeypatch.setenv('STARDUST_HOME', str(tmp_path / '.hermes'))
     runner = object.__new__(GatewayRunner)
     runner.config = SimpleNamespace(multiplex_profiles=True)
     runner._run_in_executor_with_context = asyncio.to_thread

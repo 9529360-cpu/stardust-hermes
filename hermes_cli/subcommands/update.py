@@ -29,7 +29,7 @@ def build_update_parser(subparsers, *, cmd_update: Callable) -> None:
     )
     update_parser.add_argument(
         "--backup", action="store_true", default=False,
-        help="Force a FULL pre-update backup (quick state snapshot + HERMES_HOME zip) for this run, regardless of updates.pre_update_backup",
+        help="Force a FULL pre-update backup (quick state snapshot + STARDUST_HOME zip) for this run, regardless of updates.pre_update_backup",
     )
     update_parser.add_argument(
         "--yes", "-y", action="store_true", default=False,

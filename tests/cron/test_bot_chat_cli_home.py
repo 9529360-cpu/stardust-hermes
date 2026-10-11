@@ -19,7 +19,7 @@ def test_cli_keeps_discovered_home_when_launch_selection_changes(tmp_path, monke
     other = root / "profiles" / "other"
     other.mkdir(parents=True)
     monkeypatch.setenv("HOME", str(tmp_path))
-    monkeypatch.setenv("HERMES_HOME", str(root))
+    monkeypatch.setenv("STARDUST_HOME", str(root))
     token = set_hermes_home_override(str(root))
     real_run = subprocess.run
     seen = []
@@ -58,7 +58,7 @@ def test_missing_destination_never_launches_or_recreates(tmp_path, monkeypatch, 
     home = root / "profiles" / "beta"
     if removed_during_discovery:
         home.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(root))
+    monkeypatch.setenv("STARDUST_HOME", str(root))
     token = set_hermes_home_override(str(root))
     run = Mock(return_value=subprocess.CompletedProcess([], 0, "", ""))
 

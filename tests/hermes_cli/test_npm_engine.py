@@ -99,7 +99,7 @@ class TestManagedDetection:
         cli = node / "lib" / "node_modules" / "npm" / "bin" / "npm-cli.js"
         cli.write_text("#!/usr/bin/env node\n", encoding="utf-8")
         (node / "bin" / "npm").symlink_to(cli)
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         return home
 
     def test_direct_managed_bin_is_managed(self, managed_tree):
@@ -138,7 +138,7 @@ class TestInUseDeferral:
         npm = bin_dir / "npm"
         npm.write_text("#!/bin/sh\n", encoding="utf-8")
         npm.chmod(0o755)
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         return npm
 
     def test_in_use_managed_tree_defers_upgrade_without_running_npm(
@@ -189,7 +189,7 @@ class TestRepairDecision:
         npm = bin_dir / "npm"
         npm.write_text("#!/bin/sh\n", encoding="utf-8")
         npm.chmod(0o755)
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         return npm
 
     def test_upgrades_managed_npm_with_the_range_npm_asked_for(
@@ -247,7 +247,7 @@ class TestRepairDecision:
         """A system/nvm/brew/Nix npm is never modified — Hermes provisions its
         own managed tree, upgrades THAT npm into range, and returns it."""
         home = tmp_path / ".hermes"
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         system_npm = tmp_path / "usr-bin-npm"
         system_npm.write_text("#!/bin/sh\n", encoding="utf-8")
 
@@ -284,7 +284,7 @@ class TestRepairDecision:
         self, tmp_path, monkeypatch, capsys
     ):
         home = tmp_path / ".hermes"
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         system_npm = tmp_path / "usr-bin-npm"
         system_npm.write_text("#!/bin/sh\n", encoding="utf-8")
 
@@ -313,7 +313,7 @@ class TestRepairDecision:
         managed tree ships a supported Node — provisioning covers it. The
         managed npm is still upgraded to the repo's own engines.npm range."""
         home = tmp_path / ".hermes"
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         system_npm = tmp_path / "usr-bin-npm"
         system_npm.write_text("#!/bin/sh\n", encoding="utf-8")
 

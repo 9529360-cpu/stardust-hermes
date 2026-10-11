@@ -33,7 +33,7 @@ from hermes_constants import OPENROUTER_BASE_URL, get_hermes_home
 from agent.retry_utils import jittered_backoff
 from hermes_cli.env_loader import load_hermes_dotenv
 
-# Load .env from HERMES_HOME first, then project root as a dev fallback.
+# Load .env from STARDUST_HOME first, then project root as a dev fallback.
 load_hermes_dotenv(hermes_home=get_hermes_home(), project_env=Path(__file__).parent / ".env")
 
 

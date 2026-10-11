@@ -2,7 +2,7 @@
 
 Each of these toggles decides whether a tool is in the model's schema at all,
 so the contract under test is end to end: a real ``config.yaml`` in a temp
-``HERMES_HOME``, read through the real config loader, answering a real
+``STARDUST_HOME``, read through the real config loader, answering a real
 ``check_fn``. Mocking the loader here would test nothing that matters — the
 whole failure this guards against was a value that never reached the config.
 """
@@ -20,7 +20,7 @@ from tools.tour_tool import check_tours_enabled
 
 @pytest.fixture
 def display_config():
-    """Write a ``display:`` section into this test's HERMES_HOME."""
+    """Write a ``display:`` section into this test's STARDUST_HOME."""
 
     def _write(**flags: bool) -> None:
         home = get_hermes_home()

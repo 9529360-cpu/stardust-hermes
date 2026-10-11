@@ -59,7 +59,7 @@ async def test_shutdown_teardown_commits_memory_under_the_owning_profile(tmp_pat
     prof_b = default_home / "profiles" / "b"
     prof_b.mkdir(parents=True)
     (prof_b / ".env").write_text("OPENVIKING_API_KEY=key-of-b\n")
-    monkeypatch.setenv("HERMES_HOME", str(default_home))
+    monkeypatch.setenv("STARDUST_HOME", str(default_home))
     seen: dict = {}
     secret_scope.set_multiplex_active(True)
     try:
@@ -76,7 +76,7 @@ async def test_shutdown_teardown_commits_memory_under_the_owning_profile(tmp_pat
 
 @pytest.mark.asyncio
 async def test_in_turn_teardown_keeps_the_callers_scope(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     seen: dict = {}
     secret_scope.set_multiplex_active(True)
     token = secret_scope.set_secret_scope({"MARKER": "turn-scope"})

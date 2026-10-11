@@ -12,14 +12,14 @@
  *
  * Usage (from the scratch dir where the driver installed @playwright/test):
  *   node launch-from-spec.mjs --spec /path/launch-spec.json \
- *     [--result $HERMES_HOME/.hermes-update-result.json] \
+ *     [--result $STARDUST_HOME/.hermes-update-result.json] \
  *     [--expect-sha <sha> --repo-dir <install dir>] [--no-update]
  *
  * --no-update: launch + wait for the window + close. The smoke arm.
  * Otherwise: click Update now, then poll for completion. Two signals,
  * either satisfies (poll whichever are given, first hit wins):
  *   --result      the windows hand-off's result file
- *                 (HERMES_HOME/.hermes-update-result.json)
+ *                 (STARDUST_HOME/.hermes-update-result.json)
  *   --expect-sha  the installed checkout reaching the expected commit -
  *                 the source-install signal, where the About pane's update
  *                 runs `hermes update` and no result file exists.

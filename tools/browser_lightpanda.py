@@ -61,7 +61,7 @@ def _home_candidates() -> list:
 
 def find_lightpanda_binary() -> Optional[str]:
     """Return the lightpanda executable, or None. Order: PATH (with agent-browser's Homebrew/managed-node
-    fallbacks), then installer/agent-browser locations, then ``$HERMES_HOME/bin``. No Windows build."""
+    fallbacks), then installer/agent-browser locations, then ``$STARDUST_HOME/bin``. No Windows build."""
     if os.name == "nt":
         logger.debug("Lightpanda has no Windows build")
         return None

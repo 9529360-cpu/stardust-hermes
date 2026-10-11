@@ -37,7 +37,7 @@ def test_owner_hint_names_sender_allowlist_and_pairing_switch():
 
 @pytest.mark.asyncio
 async def test_ignored_dm_sends_nothing_to_stranger_and_notifies_owner_once(tmp_path, monkeypatch, caplog):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     runner, adapter = make_restart_runner()
     runner.pairing_store = PairingStore()
     runner.pairing_stores = {}

@@ -47,7 +47,7 @@ def _line_adapter(secret: str, profile: str):
 
 async def _publish_line(adapter, runner) -> list[tuple[str, Path]]:
     """Wire the LINE webhook app the way ``connect()`` does, without the LINE API or a bind, and
-    record the HERMES_HOME the handler ran under."""
+    record the STARDUST_HOME the handler ran under."""
     from gateway.platforms.shared_ingress import bind_listener
     from hermes_constants import get_hermes_home
     seen: list[tuple[str, Path]] = []
@@ -70,7 +70,7 @@ def mux_home(tmp_path, monkeypatch):
     for name in ("coder", "ops"):
         (root / "profiles" / name).mkdir(parents=True)
         (root / "profiles" / name / ".env").write_text(f"LINE_CHANNEL_SECRET=secret-{name}\n")
-    monkeypatch.setenv("HERMES_HOME", str(root))
+    monkeypatch.setenv("STARDUST_HOME", str(root))
     import hermes_constants
     monkeypatch.setattr(hermes_constants, "_default_hermes_root_memo", None)
     monkeypatch.setattr(Path, "home", lambda: tmp_path)

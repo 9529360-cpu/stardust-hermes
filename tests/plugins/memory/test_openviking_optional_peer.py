@@ -15,7 +15,7 @@ import plugins.memory.openviking as ov
 @pytest.fixture(autouse=True)
 def isolated_config(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "hermes"))
     for key in (*ov._OPENVIKING_ENV_KEYS, "OPENVIKING_CLI_CONFIG_FILE"):
         # Track absent keys too, so setup's direct environment writes are undone.
         monkeypatch.setenv(key, "")

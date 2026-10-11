@@ -1,7 +1,7 @@
 """pytest's basetemp must never sit inside the operator's platform-native Hermes home.
 
 Every per-test sandbox is ``<basetemp>/.../hermes_test`` and ``get_default_hermes_root()``
-prefers the platform-native home whenever ``HERMES_HOME`` sits *under* it — so a basetemp
+prefers the platform-native home whenever ``STARDUST_HOME`` sits *under* it — so a basetemp
 inside the home silently turns the sandbox back into the live install (#111101).
 """
 from __future__ import annotations
@@ -34,7 +34,7 @@ def test_basetemp_inside_the_native_home_is_relocated_outside_it(tmp_path, monke
     assert relocated is not None and not relocated.resolve().is_relative_to(native.resolve())
     assert config.option.basetemp == str(relocated)
     # The sandbox derived from it no longer resolves to the native root.
-    monkeypatch.setenv("HERMES_HOME", str(relocated / "t0" / "hermes_test"))
+    monkeypatch.setenv("STARDUST_HOME", str(relocated / "t0" / "hermes_test"))
     assert hermes_constants.get_default_hermes_root() == relocated / "t0" / "hermes_test"
 
 

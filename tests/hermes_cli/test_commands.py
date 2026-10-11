@@ -328,7 +328,7 @@ class TestGatewayConfigGate:
         # Write a config with the gate off (default)
         config_file = tmp_path / "config.yaml"
         config_file.write_text("display:\n  tool_progress_command: false\n", encoding="utf-8")
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
 
         lines = gateway_help_lines()
         joined = "\n".join(lines)
@@ -338,7 +338,7 @@ class TestGatewayConfigGate:
     def test_config_gate_included_in_slack_when_on(self, tmp_path, monkeypatch):
         config_file = tmp_path / "config.yaml"
         config_file.write_text("display:\n  tool_progress_command: true\n", encoding="utf-8")
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
 
         mapping = slack_subcommand_map()
         assert "verbose" in mapping
@@ -694,7 +694,7 @@ class TestTelegramMenuCommands:
         lookalike_dir = tmp_path / "my-skills-extra"
         lookalike_dir.mkdir()
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         (tmp_path / "config.yaml").write_text(
             f"skills:\n  external_dirs:\n    - {external_dir}\n"
         )
@@ -744,7 +744,7 @@ class TestTelegramMenuCommands:
         from unittest.mock import patch
         import re
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
 
         fake_skills_dir = str(tmp_path / "skills")
         fake_cmds = {
@@ -777,7 +777,7 @@ class TestTelegramMenuCommands:
         """Skills whose names sanitize to empty string are silently dropped."""
         from unittest.mock import patch
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
 
         fake_skills_dir = str(tmp_path / "skills")
         fake_cmds = {
@@ -813,7 +813,7 @@ class TestTelegramMenuCommands:
         """A prioritized dynamic skill must not be trimmed behind alphabetical peers."""
         from unittest.mock import patch
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         local_dir = tmp_path / "skills"
         local_dir.mkdir()
         fake_cmds = {
@@ -861,7 +861,7 @@ class TestTelegramMenuCommands:
         """Built-in defaults must not elevate a dynamic command across tiers."""
         from unittest.mock import patch
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         local_dir = tmp_path / "skills"
         local_dir.mkdir()
         fake_cmds = {
@@ -898,7 +898,7 @@ class TestTelegramMenuCommands:
         """Priority matches the original skill key after its menu name is clamped."""
         from unittest.mock import patch
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         local_dir = tmp_path / "skills"
         local_dir.mkdir()
         long_name = "x" * 40
@@ -934,7 +934,7 @@ class TestTelegramMenuCommands:
         """Plugin priority also matches the original name after clamping."""
         from unittest.mock import patch
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         local_dir = tmp_path / "skills"
         local_dir.mkdir()
         long_name = "p" * 40
@@ -962,7 +962,7 @@ class TestTelegramMenuCommands:
         """Telegram omits plugins that cannot be invoked without a payload."""
         from unittest.mock import patch
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         local_dir = tmp_path / "skills"
         local_dir.mkdir()
         fake_plugins = {
@@ -1045,7 +1045,7 @@ class TestDiscordSkillCommandsByCategory:
                     "skill_md_path": f"{fake_skills_dir}/{cat}/{name}/SKILL.md",
                 }
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         with (
             patch("agent.skill_commands.get_skill_commands", return_value=fake_cmds),
             patch("tools.skills_tool.SKILLS_DIR", tmp_path / "skills"),
@@ -1102,7 +1102,7 @@ class TestDiscordSkillCommandsByCategory:
                 "skill_md_path": str(external_dir / "mlops" / "external-skill" / "SKILL.md"),
             },
         }
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         with (
             patch("agent.skill_commands.get_skill_commands", return_value=fake_cmds),
             patch("tools.skills_tool.SKILLS_DIR", local_skills_dir),

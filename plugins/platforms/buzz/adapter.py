@@ -96,7 +96,7 @@ def _escape_unresolved_presentation_mention(content: str, error: str) -> Optiona
 
 _FETCH_LIMIT = 50  # events per poll / seed call
 _SEEN_CAP = 500  # per-channel de-dupe set bound (events)
-_CURSOR_STATE_SUBDIR = "buzz"  # per-channel cursors survive a restart under HERMES_HOME
+_CURSOR_STATE_SUBDIR = "buzz"  # per-channel cursors survive a restart under STARDUST_HOME
 _CURSOR_STATE_FILENAME = "channel-cursors.json"
 _DM_DISCOVERY_EVERY = 5  # re-run DM discovery every N poll sweeps
 _DEFAULT_POLL_INTERVAL = 4.0

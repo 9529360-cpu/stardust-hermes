@@ -183,7 +183,7 @@ _contract_repair_attempted = False
 
 def _maybe_repair_runtime_contract(contract: Dict[str, Any]) -> Dict[str, Any]:
     """Try one automatic driver repair; return the post-repair contract (or the original when no repair was
-    attempted / it failed). Never raises. An explicit ``HERMES_CUA_DRIVER_CMD`` override is authoritative even
+    attempted / it failed). Never raises. An explicit ``STARDUST_CUA_DRIVER_CMD`` override is authoritative even
     when broken, and a missing binary means installation was never requested."""
     global _contract_repair_attempted
     if contract.get("ready") or _contract_repair_attempted or os.environ.get(_CUA_DRIVER_CMD_ENV, "").strip() or not contract.get("binary"):
@@ -254,7 +254,7 @@ class CuaDriverBackend(_CaptureMixin, _InputMixin, ComputerUseBackend):
             contract = _maybe_repair_runtime_contract(contract)
         if not contract.get("ready"):
             raise RuntimeError(f"cua-driver is not ready: {contract.get('reason') or 'runtime contract is incomplete'}. "
-                               + ("Update the binary selected by HERMES_CUA_DRIVER_CMD or remove that override."
+                               + ("Update the binary selected by STARDUST_CUA_DRIVER_CMD or remove that override."
                                   if os.environ.get(_CUA_DRIVER_CMD_ENV, "").strip() else "Run `hermes computer-use install` to repair it."))
         _maybe_nudge_update()
         # `mcp` is an optional extra: lazy-install on first use (gated by `security.allow_lazy_installs`); failure

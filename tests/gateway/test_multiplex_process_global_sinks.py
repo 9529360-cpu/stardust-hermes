@@ -50,7 +50,7 @@ def test_env_passthrough_allowlist_follows_the_active_profile(tmp_path, monkeypa
     secondary.mkdir(parents=True)
     (default_home / "config.yaml").write_text("terminal:\n  env_passthrough: [FOO_DEFAULT]\n")
     (secondary / "config.yaml").write_text("terminal:\n  env_passthrough: [FOO_B2]\n")
-    monkeypatch.setenv("HERMES_HOME", str(default_home))
+    monkeypatch.setenv("STARDUST_HOME", str(default_home))
     ep._config_passthrough.clear()
 
     assert ep._load_config_passthrough() == {"FOO_DEFAULT"}

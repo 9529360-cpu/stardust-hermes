@@ -19,7 +19,7 @@ def test_session_search_honours_requested_profile_db(tmp_path, monkeypatch):
     profile_home = hermes_home / "profiles" / "llm-wiki"
     profile_home.mkdir(parents=True)
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
     current_db = SessionDB(hermes_home / "state.db")
     current_db.create_session("default-session", source="gateway")

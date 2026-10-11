@@ -144,8 +144,8 @@ def register_from_config(cfg: Optional[Dict[str, Any]], *, accept_hooks: bool = 
     if not isinstance(cfg, dict):
         return []
     from utils import env_var_enabled
-    if env_var_enabled("HERMES_SAFE_MODE"):  # hooks are user customizations too — fire zero user-configured code
-        logger.info("HERMES_SAFE_MODE=1 — shell-hook registration skipped")
+    if env_var_enabled("STARDUST_SAFE_MODE"):  # hooks are user customizations too — fire zero user-configured code
+        logger.info("STARDUST_SAFE_MODE=1 — shell-hook registration skipped")
         return []
     effective_accept = _resolve_effective_accept(cfg, accept_hooks)
     specs = _parse_hooks_block(cfg.get("hooks"))
@@ -162,7 +162,7 @@ def register_from_config(cfg: Optional[Dict[str, Any]], *, accept_hooks: bool = 
             already_allowlisted = _is_allowlisted(spec.event, spec.command)
         if not already_allowlisted and not _prompt_and_record(spec.event, spec.command, accept_hooks=effective_accept):
             logger.warning("shell hook for %s (%s) not allowlisted — skipped. Use --accept-hooks / "
-                           "HERMES_ACCEPT_HOOKS=1 / hooks_auto_accept: true, or approve at the TTY prompt next run.",
+                           "STARDUST_ACCEPT_HOOKS=1 / hooks_auto_accept: true, or approve at the TTY prompt next run.",
                            spec.event, spec.command)
             continue
         with _registered_lock:
@@ -303,7 +303,7 @@ def _spawn(spec: ShellHookSpec, stdin_json: str) -> Dict[str, Any]:
     # Own process group on POSIX so a timed-out hook's descendants are reaped with it (Windows: kill_process_tree
     # / taskkill /T). Hooks that finish in time keep detached helpers alive.
     popen_kwargs: Dict[str, Any] = {"creationflags": windows_hide_flags()} if IS_WINDOWS else {"process_group": 0}
-    # HERMES_HOME follows the routed profile (the import-time environ holds the launch profile's), and
+    # STARDUST_HOME follows the routed profile (the import-time environ holds the launch profile's), and
     # under multiplexing os.environ carries the DEFAULT profile's secrets, which a secondary's hook
     # script must not inherit; single-profile runs keep the process env byte-for-byte as before.
     from agent.secret_scope import is_multiplex_active
@@ -472,7 +472,7 @@ def save_allowlist(data: Dict[str, Any]) -> None:
     except OSError as exc:
         logger.warning("Failed to persist shell hook allowlist to %s: %s. The approval is in-memory for this run, "
                        "but the next startup will re-prompt (or skip registration on non-TTY runs without "
-                       "--accept-hooks / HERMES_ACCEPT_HOOKS).", p, exc)
+                       "--accept-hooks / STARDUST_ACCEPT_HOOKS).", p, exc)
 
 
 def _is_allowlisted(event: str, command: str) -> bool:
@@ -552,8 +552,8 @@ def _command_script_path(command: str) -> str:
 
 
 def _resolve_effective_accept(cfg: Dict[str, Any], accept_hooks_arg: bool) -> bool:
-    """Any truthy opt-in channel wins: explicit arg, HERMES_ACCEPT_HOOKS, hooks_auto_accept."""
-    if accept_hooks_arg or os.environ.get("HERMES_ACCEPT_HOOKS", "").strip().lower() in _TRUTHY:
+    """Any truthy opt-in channel wins: explicit arg, STARDUST_ACCEPT_HOOKS, hooks_auto_accept."""
+    if accept_hooks_arg or os.environ.get("STARDUST_ACCEPT_HOOKS", "").strip().lower() in _TRUTHY:
         return True
     cfg_val = cfg.get("hooks_auto_accept", False)
     return cfg_val if isinstance(cfg_val, bool) else isinstance(cfg_val, str) and cfg_val.strip().lower() in _TRUTHY

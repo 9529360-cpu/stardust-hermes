@@ -2,8 +2,8 @@
 
 Field-verified 2026-09-07 on a production host running TWO independent
 Hermes instances: a main gateway (user ``ubuntu``,
-HERMES_HOME=/home/ubuntu/.hermes) and a demo gateway (user ``demo``,
-HERMES_HOME=/home/demo/.hermes).  The demo gateway runs as another user, so
+STARDUST_HOME=/home/ubuntu/.hermes) and a demo gateway (user ``demo``,
+STARDUST_HOME=/home/demo/.hermes).  The demo gateway runs as another user, so
 its ``/proc/<pid>/fd`` table is unreadable from the main instance and the
 holder scan falls back to ``/proc/<pid>/cmdline`` + ``_looks_like_hermes``.
 The demo process's argv matches the Hermes patterns exactly, so the fallback
@@ -14,7 +14,7 @@ across 6 gateway restarts, the ``fts_stale`` breadcrumb never cleared, and
 FTS self-repair stayed permanently disabled.
 
 PR #92419 fixed substring false positives (journalctl/grep mentioning
-hermes); a genuine second instance with a DIFFERENT HERMES_HOME is still
+hermes); a genuine second instance with a DIFFERENT STARDUST_HOME is still
 misjudged on current main (issue #92401).
 
 Behavior contract: an uninspectable holder identified only by argv must be

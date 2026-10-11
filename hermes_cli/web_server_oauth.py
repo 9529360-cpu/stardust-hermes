@@ -111,7 +111,7 @@ def _copilot_acp_status() -> Dict[str, Any]:
 
 def _external_process_cli_command(provider_id: str, default: str) -> str:
     """Render an external-process provider's sign-in command with the CLI actually configured
-    (``HERMES_COPILOT_ACP_COMMAND`` / ``COPILOT_CLI_PATH``); others get ``default`` untouched."""
+    (``STARDUST_COPILOT_ACP_COMMAND`` / ``COPILOT_CLI_PATH``); others get ``default`` untouched."""
     try:
         from hermes_cli.auth import PROVIDER_REGISTRY, get_external_process_provider_status
         pconfig = PROVIDER_REGISTRY.get(provider_id)

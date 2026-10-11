@@ -35,7 +35,7 @@ logger = logging.getLogger("hermes_state")
 _FTS_HOLDER_ESCALATE_ATTEMPTS = 3
 _FTS_HOLDER_ESCALATE_SECONDS = 60.0
 # The same holder PID set blocking this many deferrals over this long is a structurally resident
-# peer (a supervised service on the same HERMES_HOME), not a transient one worth waiting out (#106393).
+# peer (a supervised service on the same STARDUST_HOME), not a transient one worth waiting out (#106393).
 _FTS_HOLDER_FUTILE_ATTEMPTS = 10
 _FTS_HOLDER_FUTILE_SECONDS = 1800.0
 # retry_deferred_fts_recovery cadence: startup paid the full admission wait once; later

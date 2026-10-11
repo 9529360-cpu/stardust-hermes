@@ -49,10 +49,10 @@ const APP = (() => {
   }
 })()
 
-// Default HERMES_HOME for non-sandboxed runs -- matches main.ts's
+// Default STARDUST_HOME for non-sandboxed runs -- matches main.ts's
 // resolveHermesHome(). On Windows it's %LOCALAPPDATA%\hermes; elsewhere
 // it's ~/.hermes. The fresh-install sandbox launchFresh() sets its own
-// HERMES_HOME and never touches this.
+// STARDUST_HOME and never touches this.
 const DEFAULT_HERMES_HOME = (() => {
   if (PLATFORM === 'win32' && process.env.LOCALAPPDATA) {
     return path.join(process.env.LOCALAPPDATA, 'hermes')
@@ -256,13 +256,13 @@ function launchFresh() {
     env[key] = value
   }
 
-  env.HERMES_DESKTOP_CWD = cwd
-  env.HERMES_DESKTOP_IGNORE_EXISTING = '1'
+  env.STARDUST_DESKTOP_CWD = cwd
+  env.STARDUST_DESKTOP_IGNORE_EXISTING = '1'
   env.STARDUST_DESKTOP_TEST_MODE = 'fresh-install'
   env.STARDUST_DESKTOP_USER_DATA_DIR = userDataDir
-  env.HERMES_HOME = hermesHome
+  env.STARDUST_HOME = hermesHome
   delete env.STARDUST_DESKTOP_HERMES
-  delete env.HERMES_DESKTOP_HERMES_ROOT
+  delete env.STARDUST_DESKTOP_HERMES_ROOT
 
   const child = spawn(APP.binary, [], {
     cwd: os.homedir(),
@@ -275,7 +275,7 @@ function launchFresh() {
   console.log('\nFresh install sandbox:')
   console.log(`  root: ${sandbox}`)
   console.log(`  electron userData: ${userDataDir}`)
-  console.log(`  HERMES_HOME: ${hermesHome}`)
+  console.log(`  STARDUST_HOME: ${hermesHome}`)
   console.log(`  cwd: ${cwd}`)
 
   return { runtimeRoot: path.join(hermesHome, 'hermes-agent', 'venv') }
@@ -400,7 +400,7 @@ function printArtifacts(options = {}) {
 function help() {
   console.log(`Usage:
   npm run test:desktop:existing  # build packaged app, launch with normal PATH/existing Hermes
-  npm run test:desktop:fresh     # build packaged app, launch with temp userData + HERMES_HOME
+  npm run test:desktop:fresh     # build packaged app, launch with temp userData + STARDUST_HOME
   npm run test:desktop:dmg       # (macOS only) build DMG and open it
   npm run test:desktop:nsis      # (win32 only) build NSIS installer
   npm run test:desktop:all       # build installer, validate app payload, print paths

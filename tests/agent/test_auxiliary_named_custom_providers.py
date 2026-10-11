@@ -8,16 +8,16 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def _isolate(tmp_path, monkeypatch):
-    """Redirect HERMES_HOME and clear module caches."""
+    """Redirect STARDUST_HOME and clear module caches."""
     hermes_home = tmp_path / ".hermes"
     hermes_home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     # Write a minimal config so load_config doesn't fail
     (hermes_home / "config.yaml").write_text("model:\n  default: test-model\n")
 
 
 def _write_config(tmp_path, config_dict):
-    """Write a config.yaml to the test HERMES_HOME."""
+    """Write a config.yaml to the test STARDUST_HOME."""
     import yaml
     config_path = tmp_path / ".hermes" / "config.yaml"
     config_path.write_text(yaml.dump(config_dict))

@@ -176,7 +176,7 @@ def test_copyfile_same_inode_fails_loudly_without_fts_repair(tmp_path):
 
 
 def test_divert_session_transcript_jsonl_appends(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     path = divert_session_transcript_jsonl(
         "sess-jsonl",
         [{"role": "user", "content": "hello-jsonl"}],

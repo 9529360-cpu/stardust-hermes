@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 _UNSET: Any = object()
 
-_SESSION_CWD: ContextVar = ContextVar("HERMES_SESSION_CWD", default=_UNSET)
+_SESSION_CWD: ContextVar = ContextVar("STARDUST_SESSION_CWD", default=_UNSET)
 
 # The package/source root (<root>/agent/runtime_cwd.py). A backend launched from or
 # self-spawned into this tree (desktop default) must never let an os.getcwd() fallback

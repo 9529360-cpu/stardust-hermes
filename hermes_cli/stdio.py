@@ -48,14 +48,14 @@ def configure_windows_stdio() -> bool:
     """Force UTF-8 stdio on Windows. No-op elsewhere.
 
     Idempotent; returns ``True`` only when something actually changed. Set
-    ``HERMES_DISABLE_WINDOWS_UTF8=1`` to opt out (forces the old cp1252 path for diagnosing
+    ``STARDUST_DISABLE_WINDOWS_UTF8=1`` to opt out (forces the old cp1252 path for diagnosing
     encoding bugs). Also sets a default ``EDITOR`` on Windows if none is set.
     """
     global _CONFIGURED
 
     if _CONFIGURED:
         return False
-    if not is_windows() or os.environ.get("HERMES_DISABLE_WINDOWS_UTF8") in {"1", "true", "True", "yes"}:
+    if not is_windows() or os.environ.get("STARDUST_DISABLE_WINDOWS_UTF8") in {"1", "true", "True", "yes"}:
         _CONFIGURED = True  # repeated calls on POSIX / opted-out are true no-ops
         return False
 

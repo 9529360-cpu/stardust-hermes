@@ -116,7 +116,7 @@ let
           # must remain blocked.
           (final: prev: {
             hermes-agent = prev.hermes-agent.overrideAttrs (_old: {
-              HERMES_NIX_BUILD = "1";
+              STARDUST_NIX_BUILD = "1";
             });
           })
         ]
@@ -127,11 +127,11 @@ let
   # computes relative paths via lib.path.splitRoot, which rejects the
   # filtered pythonSrc (a cleanSourceWith set, not a path).  Filtering
   # buys nothing here anyway: the editable install reads from
-  # $HERMES_PYTHON_SRC_ROOT at runtime.
+  # $STARDUST_PYTHON_SRC_ROOT at runtime.
   workspaceRoot = ./..;
   editableWorkspace = uv2nix.lib.workspace.loadWorkspace { inherit workspaceRoot; };
   editableOverlay = editableWorkspace.mkEditablePyprojectOverlay {
-    root = "$HERMES_PYTHON_SRC_ROOT"; # resolved at shellHook time
+    root = "$STARDUST_PYTHON_SRC_ROOT"; # resolved at shellHook time
   };
 
   editableSet = pythonSet.overrideScope (

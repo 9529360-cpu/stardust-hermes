@@ -151,12 +151,12 @@ def collect_directory_manifests() -> List[PluginManifest]:
     user_dir = get_hermes_home() / "plugins"
     logger.debug("Scanning user plugins: %s", user_dir)
     _scan("user", user_dir, "user")
-    if _origin._env_enabled("HERMES_ENABLE_PROJECT_PLUGINS"):
+    if _origin._env_enabled("STARDUST_ENABLE_PROJECT_PLUGINS"):
         project_dir = Path.cwd() / ".hermes" / "plugins"
         logger.debug("Scanning project plugins: %s", project_dir)
         _scan("project", project_dir, "project")
     else:
-        logger.debug("Project plugins disabled (set HERMES_ENABLE_PROJECT_PLUGINS=1 to enable)")
+        logger.debug("Project plugins disabled (set STARDUST_ENABLE_PROJECT_PLUGINS=1 to enable)")
     return manifests
 
 

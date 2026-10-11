@@ -761,7 +761,7 @@ def _deliver_to_bot_chat(job: dict, content: str, profile: str, *, deferred: Opt
         return _fail(f"bot-chat delivery target no longer exists: {home}; do not resend")
     # Discovery (or deferred admission) owns the destination, not HOME or a
     # subsequently changed active_profile. Do not resolve the name a second time.
-    env["HERMES_HOME"] = str(home)
+    env["STARDUST_HOME"] = str(home)
     if home.parent.name != "profiles":
         argv += ["-p", "default"]
 

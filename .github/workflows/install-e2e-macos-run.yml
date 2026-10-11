@@ -107,7 +107,7 @@ jobs:
             --install-ref '${{ inputs.install-ref }}' \
             --dmg-url '${{ inputs.dmg-url }}'
         env:
-          HERMES_E2E_LOG_DIR: ${{ runner.temp }}/e2e-logs
+          STARDUST_E2E_LOG_DIR: ${{ runner.temp }}/e2e-logs
 
       - name: Install ${{ inputs.install-ref }} via Hermes-Setup.dmg
         run: |
@@ -117,7 +117,7 @@ jobs:
             --install-ref '${{ inputs.install-ref }}' \
             --dmg-url '${{ inputs.dmg-url }}'
         env:
-          HERMES_E2E_LOG_DIR: ${{ runner.temp }}/e2e-logs
+          STARDUST_E2E_LOG_DIR: ${{ runner.temp }}/e2e-logs
 
       - name: Update ${{ inputs.install-ref }} -> HEAD (${{ inputs.update-method }})
         run: |
@@ -127,7 +127,7 @@ jobs:
             --install-ref '${{ inputs.install-ref }}' \
             --dmg-url '${{ inputs.dmg-url }}'
         env:
-          HERMES_E2E_LOG_DIR: ${{ runner.temp }}/e2e-logs
+          STARDUST_E2E_LOG_DIR: ${{ runner.temp }}/e2e-logs
 
       - name: Stop screen recording
         if: always()

@@ -16,7 +16,7 @@ def _provider():
 
 
 def test_save_config_merges_into_existing_yaml(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     (tmp_path / "config.yaml").write_text("model:\n  default: keep-me\nmemory:\n  provider: holographic\n")
 
     _provider().save_config({"db_path": "custom.db", "hrr_dim": "512"}, str(tmp_path))
@@ -28,7 +28,7 @@ def test_save_config_merges_into_existing_yaml(tmp_path, monkeypatch):
 
 
 def test_save_config_respects_managed_mode(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     before = "model:\n  default: managed\n"
     (tmp_path / "config.yaml").write_text(before)
     monkeypatch.setattr("hermes_cli.config.is_managed", lambda: True)

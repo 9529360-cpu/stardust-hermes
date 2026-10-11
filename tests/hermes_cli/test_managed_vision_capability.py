@@ -15,7 +15,7 @@ import pytest
 def hermes_home(tmp_path, monkeypatch):
     home = tmp_path / ".hermes"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     import importlib
 
     import hermes_constants
@@ -26,7 +26,7 @@ def hermes_home(tmp_path, monkeypatch):
 
 
 def _stage(home_root, name):
-    # Machine-scoped models dir (the shared root — tmp HERMES_HOME IS the root here).
+    # Machine-scoped models dir (the shared root — tmp STARDUST_HOME IS the root here).
     from hermes_cli.local_runtime.bootstrap import models_dir
 
     mdir = models_dir()

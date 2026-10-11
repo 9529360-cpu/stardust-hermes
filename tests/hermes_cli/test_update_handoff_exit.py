@@ -1,7 +1,7 @@
 """Windows hand-off child must hard-exit once the update is durably done (#93581).
 
 The re-exec'd venv child (spawned by
-``_reexec_dependency_sync_off_windows_shim`` with ``HERMES_UPDATE_REEXEC=1``)
+``_reexec_dependency_sync_off_windows_shim`` with ``STARDUST_UPDATE_REEXEC=1``)
 completes all update work — the receipt records ``success`` / ``completed at
 command boundary`` — but then hangs in interpreter shutdown on a leftover
 non-daemon thread, freezing the PowerShell window for minutes. The fix: on
@@ -70,9 +70,9 @@ def _run_cmd_update(monkeypatch, impl, *, reexec: bool):
     monkeypatch.setattr("hermes_cli.update_receipt.finalize_pending_update_receipt", fake_receipt)
     monkeypatch.setattr("os._exit", fake_exit)
     if reexec:
-        monkeypatch.setenv("HERMES_UPDATE_REEXEC", "1")
+        monkeypatch.setenv("STARDUST_UPDATE_REEXEC", "1")
     else:
-        monkeypatch.delenv("HERMES_UPDATE_REEXEC", raising=False)
+        monkeypatch.delenv("STARDUST_UPDATE_REEXEC", raising=False)
 
     args = SimpleNamespace(plan=False, check=False, gateway=False, branch=None)
     try:

@@ -1,4 +1,4 @@
-"""HERMES_HOME state checks for hermes doctor: directories, memory files, state.db health, skills hub, memory provider, profiles.
+"""STARDUST_HOME state checks for hermes doctor: directories, memory files, state.db health, skills hub, memory provider, profiles.
 Split out of ``hermes_cli/doctor.py``, which re-exports every name so ``hermes_cli.doctor.<name>`` keeps resolving (and monkeypatching)."""
 
 from __future__ import annotations
@@ -26,10 +26,10 @@ def _honcho_is_configured_for_doctor() -> bool:
 
 def _doctor_memory_config(hermes_home: Path | None = None) -> dict:
     """Return the effective memory section used by doctor diagnostics."""
-    from hermes_cli.doctor import HERMES_HOME
+    from hermes_cli.doctor import STARDUST_HOME
     try:
         from hermes_cli.config_effective import load_user_config_effective
-        config_path = (hermes_home if hermes_home is not None else HERMES_HOME) / "config.yaml"
+        config_path = (hermes_home if hermes_home is not None else STARDUST_HOME) / "config.yaml"
         if not config_path.exists():
             return {}
         section = load_user_config_effective(config_path).get("memory")
@@ -108,9 +108,9 @@ def _memory_store_flags(hermes_home: Path) -> tuple:
 
 @doctor_check()
 def _check_directory_structure(should_fix: bool, f: Finding) -> None:
-    """HERMES_HOME, expected subdirs, SOUL.md, and the enabled built-in memory files."""
-    from hermes_cli.doctor import HERMES_HOME, _DHH
-    hermes_home = HERMES_HOME
+    """STARDUST_HOME, expected subdirs, SOUL.md, and the enabled built-in memory files."""
+    from hermes_cli.doctor import STARDUST_HOME, _DHH
+    hermes_home = STARDUST_HOME
     ensure_dir(f, should_fix, hermes_home, f"{_DHH} directory exists", f"Created {_DHH} directory", f"{_DHH} not found")
     _memory_enabled, _user_profile_enabled = _memory_store_flags(hermes_home)
     memory_on = bool(_memory_enabled or _user_profile_enabled)
@@ -368,8 +368,8 @@ def _state_db_wal(f: Finding, should_fix: bool, state_db_path: Path) -> None:
 @doctor_check()
 def _check_state_db(should_fix: bool, f: Finding) -> None:
     """state.db session count, FTS write health, schema repair, stats snapshot, WAL size."""
-    from hermes_cli.doctor import HERMES_HOME, _DHH
-    state_db_path = HERMES_HOME / "state.db"
+    from hermes_cli.doctor import STARDUST_HOME, _DHH
+    state_db_path = STARDUST_HOME / "state.db"
     if state_db_path.exists():
         _state_db_health(f, should_fix, state_db_path, _DHH)
         _state_db_stats(f.issues, state_db_path)
@@ -394,8 +394,8 @@ def _gh_authenticated() -> bool:
 
 @doctor_check()
 def _check_skills_hub(should_fix: bool, f: Finding) -> None:
-    from hermes_cli.doctor import HERMES_HOME, _DHH
-    hub_dir = HERMES_HOME / "skills" / ".hub"
+    from hermes_cli.doctor import STARDUST_HOME, _DHH
+    hub_dir = STARDUST_HOME / "skills" / ".hub"
     if check_bool(hub_dir.exists(), "Skills Hub directory exists", ("Skills Hub directory not initialized", "(run: hermes skills list)")):
         lock_file = hub_dir / "lock.json"
         if lock_file.exists():
@@ -473,8 +473,8 @@ def _memory_provider_generic(name: str) -> None:
 
 @doctor_check()
 def _check_memory_provider(should_fix: bool, f: Finding) -> None:
-    from hermes_cli.doctor import HERMES_HOME
-    name = _doctor_memory_config(HERMES_HOME).get("provider", "")
+    from hermes_cli.doctor import STARDUST_HOME
+    name = _doctor_memory_config(STARDUST_HOME).get("provider", "")
     if not name:
         check_ok("Built-in memory active", "(no external provider configured — this is fine)")
         return

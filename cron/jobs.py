@@ -66,16 +66,16 @@ def _ensure_croniter() -> bool:
 
 # Cron is per-profile by design: anchor at get_hermes_home() (active profile home), NOT
 # get_default_hermes_root() — the shared root would funnel every profile's jobs into one jobs.json
-# and run them under the ticker's HERMES_HOME, leaking config/credentials/skills across profiles.
-# Each profile owns its own cron store under its own HERMES_HOME, and a profile-scoped gateway runs that
-# profile's jobs under that same HERMES_HOME — so a job authored in profile `coder` lives in
+# and run them under the ticker's STARDUST_HOME, leaking config/credentials/skills across profiles.
+# Each profile owns its own cron store under its own STARDUST_HOME, and a profile-scoped gateway runs that
+# profile's jobs under that same STARDUST_HOME — so a job authored in profile `coder` lives in
 # `~/.hermes/profiles/coder/cron/jobs.json` and executes with `coder`'s `.env`, `config.yaml`, and skills.
 # Do NOT change this to the default root: that re-breaks per-profile isolation. See also the dynamic
 # `_get_hermes_home()` / `_get_lock_paths()` resolution in cron/scheduler.py. See #4707.
-HERMES_DIR = get_hermes_home().resolve()
+STARDUST_DIR = get_hermes_home().resolve()
 # Default-profile fallback and compatibility surface for callers/tests. Cross-profile callers must
 # scope paths with use_cron_store() instead of mutating these process-wide.
-CRON_DIR = HERMES_DIR / "cron"
+CRON_DIR = STARDUST_DIR / "cron"
 JOBS_FILE = CRON_DIR / "jobs.json"
 # Heartbeat: touched every ticker loop so `hermes cron status` can tell the ticker THREAD is alive,
 # not just the gateway PROCESS; success = last tick that completed WITHOUT raising.
@@ -158,7 +158,7 @@ _IMPORT_STORE = _CronStorePaths(CRON_DIR, JOBS_FILE, OUTPUT_DIR)
 def _current_cron_store() -> _CronStorePaths:
     """Paths pinned to this execution context's profile. Precedence: (1) active use_cron_store()
     override; (2) deliberately re-pointed module constants; (3) the ACTIVE profile home via
-    get_hermes_home(), so re-pointing HERMES_HOME after import uses ITS OWN store rather than the
+    get_hermes_home(), so re-pointing STARDUST_HOME after import uses ITS OWN store rather than the
     user's real jobs.json frozen at import; (4) import-time constants."""
     override = _cron_store_override.get()
     if override is not None:
@@ -167,7 +167,7 @@ def _current_cron_store() -> _CronStorePaths:
     if live_constants != _IMPORT_STORE:
         return live_constants
     home = get_hermes_home().resolve()
-    if home == HERMES_DIR:
+    if home == STARDUST_DIR:
         return live_constants
     return _CronStorePaths.for_dir(home / "cron")
 
@@ -188,7 +188,7 @@ def get_cron_output_dir() -> Path:
     return _current_cron_store().output_dir
 
 
-# Fallback stale-recovery window for a one-shot's running-claim when HERMES_CRON_TIMEOUT=0
+# Fallback stale-recovery window for a one-shot's running-claim when STARDUST_CRON_TIMEOUT=0
 # (unlimited, no bound to derive from); also the floor so a tiny timeout can't expire a claim
 # mid-run.
 ONESHOT_RUN_CLAIM_TTL_SECONDS = 1800
@@ -202,9 +202,9 @@ _DEFAULT_CRON_INACTIVITY_TIMEOUT = 600.0
 
 
 def _oneshot_run_claim_ttl_seconds() -> float:
-    """One-shot running-claim TTL from ``HERMES_CRON_TIMEOUT``: unset/invalid → 600s → 1800s;
+    """One-shot running-claim TTL from ``STARDUST_CRON_TIMEOUT``: unset/invalid → 600s → 1800s;
     ``0`` (unlimited) → the fixed floor; positive N → ``max(N * headroom, floor)``."""
-    raw = cron_env_setting("HERMES_CRON_TIMEOUT").strip()
+    raw = cron_env_setting("STARDUST_CRON_TIMEOUT").strip()
     try:
         timeout = float(raw) if raw else _DEFAULT_CRON_INACTIVITY_TIMEOUT
     except (ValueError, TypeError):
@@ -585,7 +585,7 @@ def _is_recoverable_error_job(job: Dict[str, Any]) -> bool:
 
 def _secure_dir(path: Path):
     """Owner-only (0700) via the shared helper, so cron/ and cron/output honor the same managed/
-    container/HERMES_HOME_MODE rules as the rest of HERMES_HOME (#10757)."""
+    container/STARDUST_HOME_MODE rules as the rest of STARDUST_HOME (#10757)."""
     from hermes_cli.config import _secure_dir as _shared_secure_dir
     _shared_secure_dir(path)
 

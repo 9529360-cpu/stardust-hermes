@@ -243,7 +243,7 @@ def _legacy_posix_scrubber(source_env, is_passthrough):
     _scrub_child_env's POSIX behavior, used to prove the production helper does
     what we think it does.
 
-    Deliberately updated for #27303 (the broad ``HERMES_`` prefix was dropped
+    Deliberately updated for #27303 (the broad ``STARDUST_`` prefix was dropped
     in favor of an explicit operational allowlist, and DSN/WEBHOOK were added
     to the secret substrings).  The original docstring said: if POSIX behavior
     legitimately needs to evolve, adjust this oracle on purpose so the churn is
@@ -255,7 +255,7 @@ def _legacy_posix_scrubber(source_env, is_passthrough):
     _SECRET_SUBSTRINGS = ("KEY", "TOKEN", "SECRET", "PASSWORD", "CREDENTIAL",
                           "PASSWD", "AUTH", "DSN", "WEBHOOK")
     _HERMES_CHILD_ALLOWED = frozenset({
-        "HERMES_HOME", "HERMES_PROFILE", "HERMES_CONFIG", "HERMES_ENV",
+        "STARDUST_HOME", "STARDUST_PROFILE", "STARDUST_CONFIG", "STARDUST_ENV",
     })
     out = {}
     for k, v in source_env.items():
@@ -301,13 +301,13 @@ class TestPosixEquivalence:
         "PYTHONPATH": "/opt/lib",
         "VIRTUAL_ENV": "/home/alice/.venv",
         "CONDA_PREFIX": "/opt/conda",
-        # HERMES_* handling (#27303): only the operational allowlist passes;
-        # every other HERMES_* is dropped (the broad prefix was removed).
-        "HERMES_HOME": "/home/alice/.hermes",        # allowlisted → kept
-        "HERMES_PROFILE": "default",                 # allowlisted → kept
-        "HERMES_INTERACTIVE": "1",                   # not allowlisted → dropped
-        "HERMES_BASE_URL": "https://api.internal",   # not allowlisted → dropped
-        "HERMES_KANBAN_DB": "postgres://u:p@h/db",   # not allowlisted → dropped
+        # STARDUST_* handling (#27303): only the operational allowlist passes;
+        # every other STARDUST_* is dropped (the broad prefix was removed).
+        "STARDUST_HOME": "/home/alice/.hermes",        # allowlisted → kept
+        "STARDUST_PROFILE": "default",                 # allowlisted → kept
+        "STARDUST_INTERACTIVE": "1",                   # not allowlisted → dropped
+        "STARDUST_BASE_URL": "https://api.internal",   # not allowlisted → dropped
+        "STARDUST_KANBAN_DB": "postgres://u:p@h/db",   # not allowlisted → dropped
         # Secret-substring blocks
         "OPENAI_API_KEY": "sk-xxx",
         "GITHUB_TOKEN": "ghp_xxx",

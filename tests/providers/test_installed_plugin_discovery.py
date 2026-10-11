@@ -1,6 +1,6 @@
 """A provider installed by ``hermes plugins install`` must actually be found.
 
-The installer clones into ``$HERMES_HOME/plugins/<name>/`` (flat), provider
+The installer clones into ``$STARDUST_HOME/plugins/<name>/`` (flat), provider
 discovery only scanned ``plugins/model-providers/<name>/``, and PluginManager
 skips ``kind: model-provider`` on purpose — so the documented install path
 reported success and registered nothing. These tests pin the join, and that
@@ -48,7 +48,7 @@ def _write_plugin(directory: Path, *, name: str, manifest: str | None):
 
 @pytest.fixture
 def hermes_home(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     _clear_provider_caches()
     yield tmp_path
     _clear_provider_caches()

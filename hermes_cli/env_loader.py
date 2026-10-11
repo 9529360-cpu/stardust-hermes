@@ -30,7 +30,7 @@ _SCOPED_SKIP_LOGGED: set[str] = set()   # routed profile homes whose multiplex d
 _SECRET_SOURCES: dict[str, str] = {}
 # Immutable per-home snapshots: os.environ is shared across profiles and a later home's apply may overwrite it.
 _SECRET_SOURCE_VALUES_BY_HOME: dict[str, dict[str, str]] = {}
-# HERMES_HOME paths already pulled external secrets for: load_hermes_dotenv() runs at import time from
+# STARDUST_HOME paths already pulled external secrets for: load_hermes_dotenv() runs at import time from
 # several hot modules, so without this the Bitwarden status line prints 3-5x per startup and the config
 # re-parse + ASCII sweep re-run each time (Bitwarden's own cache only saves the network call).
 _APPLIED_HOMES: set[str] = set()
@@ -41,8 +41,8 @@ _SECRET_SOURCE_CACHE_LOCK = threading.RLock()
 # profile's .env. Credentials are excluded: shell exports are a documented way to supply them, and
 # read-time secret-scope checks (agent/secret_scope.py) own cross-profile credential isolation.
 _PROFILE_MANAGED_ENV_KEYS: frozenset[str] = frozenset({
-    "HERMES_ACP_AUTH_METHOD", "HERMES_ACP_AUTO_APPROVE", "HERMES_COPILOT_ACP_COMMAND",
-    "HERMES_COPILOT_ACP_ARGS", "COPILOT_CLI_PATH", "COPILOT_ACP_BASE_URL",
+    "STARDUST_ACP_AUTH_METHOD", "STARDUST_ACP_AUTO_APPROVE", "STARDUST_COPILOT_ACP_COMMAND",
+    "STARDUST_COPILOT_ACP_ARGS", "COPILOT_CLI_PATH", "COPILOT_ACP_BASE_URL",
 })
 
 
@@ -126,7 +126,7 @@ def _hydrate_profile_secret_sources(home: Path) -> dict[str, str]:
         if op_env.exists():
             for _name, _value in load_env_file(op_env).items():
                 local_env.setdefault(_name, _value)
-        local_env["HERMES_HOME"] = str(home)
+        local_env["STARDUST_HOME"] = str(home)
         report = apply_all(cfg, home, environ=local_env)
     except Exception:  # noqa: BLE001 — preserve fail-open startup behavior
         return {}
@@ -559,7 +559,7 @@ def _load_secrets_config(home_path: Path) -> dict:
 
 
 def _process_hermes_home() -> Path:
-    """The HERMES_HOME the running process was launched under.
+    """The STARDUST_HOME the running process was launched under.
 
     Must be the *true* process home, ignoring any context-local
     ``set_hermes_home_override`` a per-request task has installed. Both

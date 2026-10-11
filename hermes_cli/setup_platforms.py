@@ -18,7 +18,7 @@ def _is_valid_telegram_bot_token(token: str) -> bool:
 
 
 def _profile_name_from_hermes_home(hermes_home) -> str | None:
-    """Return the active profile name when HERMES_HOME is a profile dir."""
+    """Return the active profile name when STARDUST_HOME is a profile dir."""
     return hermes_home.name if hermes_home.parent.name == "profiles" else None
 
 

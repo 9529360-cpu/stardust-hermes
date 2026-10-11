@@ -17,7 +17,7 @@ Environment:
     BENCH_CDP_URL      CDP endpoint both arms drive (default http://127.0.0.1:9333)
     OPENROUTER_API_KEY provider credential for the runs
 
-The run gets a throwaway HERMES_HOME so no local config leaks in, and the
+The run gets a throwaway STARDUST_HOME so no local config leaks in, and the
 web-fetch credential env vars are stripped so every arm must actually drive
 the browser (no web_extract shortcuts).
 
@@ -60,7 +60,7 @@ import yaml
 
 with open(os.path.join(hh, "config.yaml"), "w", encoding="utf-8") as f:
     yaml.safe_dump(cfg, f)
-os.environ["HERMES_HOME"] = hh
+os.environ["STARDUST_HOME"] = hh
 # Strip web-fetch shortcuts: every arm must drive the browser.
 os.environ.pop("BROWSER_USE_API_KEY", None)
 for k in ("FIRECRAWL_API_KEY", "NOUS_API_KEY", "TAVILY_API_KEY", "SERPER_API_KEY"):
@@ -102,7 +102,7 @@ if _or_key:
         provider="openrouter",
     )
 else:
-    # Resolved by the orchestrator BEFORE HERMES_HOME is redirected to the
+    # Resolved by the orchestrator BEFORE STARDUST_HOME is redirected to the
     # throwaway home (auth state lives in the real profile). Never printed.
     _tok = os.environ.get("BUBENCH_NOUS_TOKEN", "").strip()
     if not _tok:

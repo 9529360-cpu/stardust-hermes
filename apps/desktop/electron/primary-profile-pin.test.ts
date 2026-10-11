@@ -20,7 +20,7 @@ test('a live primary keeps answering for its booted profile after the preference
 
   // Routing must still see the running primary as "default": otherwise a
   // request for "default" falls through to the pool and a second backend is
-  // spawned for the same HERMES_HOME.
+  // spawned for the same STARDUST_HOME.
   assert.equal(
     pin.resolve(() => preference),
     'default'

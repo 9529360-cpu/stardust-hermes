@@ -40,7 +40,7 @@ class TestLoadGatewayConfigForRunner:
         home.mkdir()
         (home / ".env").write_text("TELEGRAM_BOT_TOKEN=from-default-env\n", encoding="utf-8")
         (home / "config.yaml").write_text("gateway:\n  multiplex_profiles: false\n", encoding="utf-8")
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
 
         # Without multiplex, dotenv is still loaded into os.environ by the
@@ -74,7 +74,7 @@ class TestLoadGatewayConfigForRunner:
         (home / "config.yaml").write_text(
             "gateway:\n  multiplex_profiles: true\n", encoding="utf-8"
         )
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         # Listener settings live ONLY in os.environ — the Docker compose case.
         monkeypatch.setenv("API_SERVER_ENABLED", "true")
         monkeypatch.setenv("API_SERVER_HOST", "0.0.0.0")
@@ -159,7 +159,7 @@ class TestPlatformHasBotCredential:
         implementation that falls back to os.getenv would report every Matrix
         config as credentialed and never evict anything.
 
-        conftest sandboxes HERMES_HOME and scrubs MATRIX_* from the
+        conftest sandboxes STARDUST_HOME and scrubs MATRIX_* from the
         environment, so without these explicit setenv calls this test would
         pass against an env-reading implementation and guard nothing.
         """

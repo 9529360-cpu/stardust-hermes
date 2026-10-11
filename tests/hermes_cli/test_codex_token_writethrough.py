@@ -37,7 +37,7 @@ def profile_env(tmp_path, monkeypatch):
     root = tmp_path / ".hermes"
     profile = root / "profiles" / "work"
     profile.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(profile))
+    monkeypatch.setenv("STARDUST_HOME", str(profile))
     return profile / "auth.json", root / "auth.json"
 
 

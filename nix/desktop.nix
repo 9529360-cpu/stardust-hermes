@@ -18,7 +18,7 @@
   # Environment to bake into the launcher. A GUI launcher reads none of the
   # shell profile, so a variable that an interactive shell exports does not
   # reach an app that the desktop menu starts. The Home Manager module passes
-  # HERMES_HOME and HERMES_MANAGED here, which gives the app the same state
+  # STARDUST_HOME and STARDUST_MANAGED here, which gives the app the same state
   # directory as the services.
   extraEnv ? { },
   # Shell lines to run before the app starts. A secret belongs here and never

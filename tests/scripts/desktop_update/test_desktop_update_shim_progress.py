@@ -120,13 +120,13 @@ FAKE_HERMES = """#!/bin/bash
 # real update call; answer it without consuming a counted call so the
 # exits.N mapping below still refers to actual update attempts.
 case "$*" in *--help*) echo "--keep-stash"; exit 0 ;; esac
-n="$(cat "$HERMES_TEST_CALLS" 2>/dev/null || echo 0)"; n=$((n + 1))
-printf '%s' "$n" > "$HERMES_TEST_CALLS"
+n="$(cat "$STARDUST_TEST_CALLS" 2>/dev/null || echo 0)"; n=$((n + 1))
+printf '%s' "$n" > "$STARDUST_TEST_CALLS"
 for f in "$TMPDIR"/hermes-update-status.[0-9]*; do
   case "$f" in *.tmp) continue ;; esac
-  cp "$f" "$HERMES_TEST_CAPTURE.$n" 2>/dev/null
+  cp "$f" "$STARDUST_TEST_CAPTURE.$n" 2>/dev/null
 done
-exit "$(cat "$HERMES_TEST_EXITS.$n" 2>/dev/null || echo 0)"
+exit "$(cat "$STARDUST_TEST_EXITS.$n" 2>/dev/null || echo 0)"
 """
 
 
@@ -146,9 +146,9 @@ def _run_handoff(tmp_path, exits: dict[int, int]) -> list[dict]:
     env = {
         **os.environ,
         "TMPDIR": str(tmp_path),
-        "HERMES_TEST_CAPTURE": str(capture),
-        "HERMES_TEST_CALLS": str(calls),
-        "HERMES_TEST_EXITS": str(tmp_path / "exits"),
+        "STARDUST_TEST_CAPTURE": str(capture),
+        "STARDUST_TEST_CALLS": str(calls),
+        "STARDUST_TEST_EXITS": str(tmp_path / "exits"),
     }
     # The hand-off daemonizes and the launcher exits immediately; the result
     # file is the orchestrator's own completion signal.

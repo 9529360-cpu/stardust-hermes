@@ -235,11 +235,11 @@ function writeEmptyConfig(hermesHome: string): void {
  * Build the environment for the Electron app process.
  *
  * Key env vars:
- *  - HERMES_HOME → sandbox hermes-home (isolated config/sessions)
+ *  - STARDUST_HOME → sandbox hermes-home (isolated config/sessions)
  *  - STARDUST_DESKTOP_USER_DATA_DIR → sandbox electron-user-data
- *  - HERMES_DESKTOP_IGNORE_EXISTING=1 → don't pick up `hermes` from PATH
+ *  - STARDUST_DESKTOP_IGNORE_EXISTING=1 → don't pick up `hermes` from PATH
  *    (we want the dev checkout at REPO_ROOT)
- *  - HERMES_DESKTOP_HERMES_ROOT → REPO_ROOT (dev checkout resolution)
+ *  - STARDUST_DESKTOP_HERMES_ROOT → REPO_ROOT (dev checkout resolution)
  *  - STARDUST_DESKTOP_APP_NAME → unique-ish per test (avoids single-instance lock)
  *  - XDG_RUNTIME_DIR → ensure Electron has a writable runtime dir on Linux
  */
@@ -259,10 +259,10 @@ export function buildAppEnv(sandbox: Sandbox, extra: Record<string, string> = {}
 
   return {
     ...clean,
-    HERMES_HOME: sandbox.hermesHome,
+    STARDUST_HOME: sandbox.hermesHome,
     STARDUST_DESKTOP_USER_DATA_DIR: sandbox.userDataDir,
-    HERMES_DESKTOP_IGNORE_EXISTING: '1',
-    HERMES_DESKTOP_HERMES_ROOT: REPO_ROOT,
+    STARDUST_DESKTOP_IGNORE_EXISTING: '1',
+    STARDUST_DESKTOP_HERMES_ROOT: REPO_ROOT,
     STARDUST_DESKTOP_APP_NAME: `HermesE2E-${Date.now()}`,
     // `app.close()` in teardown must exit even when a spec leaves a turn
     // mid-flight — otherwise the quit confirmation waits on a click that no
@@ -321,8 +321,8 @@ export function findElectron(): string {
 /**
  * Launch the desktop app in dev mode.
  *
- * @param sandbox  - isolated HERMES_HOME + userData
- * @param env      - the process environment (already has HERMES_HOME etc.)
+ * @param sandbox  - isolated STARDUST_HOME + userData
+ * @param env      - the process environment (already has STARDUST_HOME etc.)
  * @returns the ElectronApplication + first Page
  */
 export async function launchDesktop(
@@ -554,7 +554,7 @@ export interface PackagedAppFixture {
  * progress without spawning a real Hermes backend.
  *
  * Uses the same sandbox isolation (credential stripping, isolated
- * HERMES_HOME + userData, unique app name) as the dev-mode fixtures.
+ * STARDUST_HOME + userData, unique app name) as the dev-mode fixtures.
  *
  * Skips if the packaged binary doesn't exist — run `npm run pack` first.
  */
@@ -571,7 +571,7 @@ export async function setupPackagedApp(): Promise<PackagedAppFixture> {
   // packaged-binary-specific overrides.
   const env = buildAppEnv(sandbox, {
     // Fake boot: simulates progress steps without spawning the real backend.
-    HERMES_DESKTOP_BOOT_FAKE: '1',
+    STARDUST_DESKTOP_BOOT_FAKE: '1',
     STARDUST_DESKTOP_BOOT_FAKE_STEP_MS: '120',
   })
 
@@ -579,7 +579,7 @@ export async function setupPackagedApp(): Promise<PackagedAppFixture> {
   // should use its own bundled renderer, not the dev checkout.
   delete (env as Record<string, string | undefined>).STARDUST_DESKTOP_DEV_SERVER
   delete (env as Record<string, string | undefined>).STARDUST_DESKTOP_HERMES
-  delete (env as Record<string, string | undefined>).HERMES_DESKTOP_HERMES_ROOT
+  delete (env as Record<string, string | undefined>).STARDUST_DESKTOP_HERMES_ROOT
 
   const app = await _electron.launch({
     executablePath: PACKAGED_BINARY_PATH,

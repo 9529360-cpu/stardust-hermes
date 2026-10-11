@@ -64,7 +64,7 @@ class TestIsWriteDenied:
         root = tmp_path / "hermes"
         profile = root / "profiles" / "coder"
         profile.mkdir(parents=True)
-        monkeypatch.setenv("HERMES_HOME", str(profile))
+        monkeypatch.setenv("STARDUST_HOME", str(profile))
 
         assert _is_write_denied(str(profile / "mcp-tokens" / "tok.json")) is True
         assert _is_write_denied(str(root / "mcp-tokens" / "tok.json")) is True
@@ -83,7 +83,7 @@ class TestIsWriteDenied:
         root = tmp_path / "hermes"
         profile = root / "profiles" / "coder"
         profile.mkdir(parents=True)
-        monkeypatch.setenv("HERMES_HOME", str(profile))
+        monkeypatch.setenv("STARDUST_HOME", str(profile))
 
         # Active profile pairing entries
         assert _is_write_denied(str(profile / "pairing" / "telegram-approved.json")) is True
@@ -425,7 +425,7 @@ class TestShellFileOpsHelpers:
         result = ops.read_file("/tmp/test/a.py")
 
         assert result.error is None
-        assert "HERMES_FENCE" not in result.content
+        assert "STARDUST_FENCE" not in result.content
         assert "\x1b]" not in result.content
         assert "\x07" not in result.content
         assert "1|print('ok')" in result.content

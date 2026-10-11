@@ -107,7 +107,7 @@ def _active_profile_name() -> str:
         from hermes_cli.profiles import get_active_profile_name
         return get_active_profile_name() or "default"
     except Exception:
-        return os.getenv("HERMES_PROFILE", "default") or "default"
+        return os.getenv("STARDUST_PROFILE", "default") or "default"
 
 
 def _profile_home(profile: str) -> Optional[str]:
@@ -607,7 +607,7 @@ class A2AAdapter(BasePlatformAdapter):
             # TERMINAL_* residue dropped, the target's own secrets overlaid), not the gateway's raw environ.
             from tools.environments.local import served_profile_child_env
             env = served_profile_child_env(target_home=_profile_home(profile), inherit_credentials=True)
-            env["HERMES_A2A_PEER"] = peer
+            env["STARDUST_A2A_PEER"] = peer
             start = time.time()
             try:
                 proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace",

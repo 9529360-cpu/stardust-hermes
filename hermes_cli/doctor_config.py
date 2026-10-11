@@ -28,11 +28,11 @@ _DEPRECATED_CONFIG_KEYS: tuple[tuple[str, str, str], ...] = (
 
 
 # Deprecated env vars (checked in the .env FILE, not process env, so config→env bridges like terminal.cwd →
-# TERMINAL_CWD do not false-positive). HERMES_TOOL_PROGRESS is silently ignored since the v12 config floor
-# removed its only consumer; HERMES_TOOL_PROGRESS_MODE is still read by the gateway as a back-compat fallback.
+# TERMINAL_CWD do not false-positive). STARDUST_TOOL_PROGRESS is silently ignored since the v12 config floor
+# removed its only consumer; STARDUST_TOOL_PROGRESS_MODE is still read by the gateway as a back-compat fallback.
 _DEPRECATED_ENV_VARS: tuple[tuple[str, str], ...] = (
-    ("HERMES_TOOL_PROGRESS", "display.tool_progress in config.yaml — ignored/unsupported since config floor v12"),
-    ("HERMES_TOOL_PROGRESS_MODE", "display.tool_progress in config.yaml"),
+    ("STARDUST_TOOL_PROGRESS", "display.tool_progress in config.yaml — ignored/unsupported since config floor v12"),
+    ("STARDUST_TOOL_PROGRESS_MODE", "display.tool_progress in config.yaml"),
     ("TERMINAL_CWD", "terminal.cwd in config.yaml"), ("MESSAGING_CWD", "terminal.cwd in config.yaml"),
     ("QQ_HOME_CHANNEL", "QQBOT_HOME_CHANNEL"), ("QQ_HOME_CHANNEL_NAME", "QQBOT_HOME_CHANNEL_NAME"),
 )
@@ -97,7 +97,7 @@ def report_deprecated_config_and_env(raw_config: dict | None = None, env_map: di
 
 
 def managed_scope_check() -> None:
-    """Report the active managed scope (resolved dir + pinned key counts); silent when none. A HERMES_MANAGED_DIR
+    """Report the active managed scope (resolved dir + pinned key counts); silent when none. A STARDUST_MANAGED_DIR
     override is surfaced too — a redirected scope is the documented foot-gun (docs/design/managed-scope.md §7)."""
     managed_dir = None
     with warn_on_error(""):  # diagnostics must never crash
@@ -107,8 +107,8 @@ def managed_scope_check() -> None:
         return
     n_cfg, n_env = len(managed_scope.managed_config_keys()), len(managed_scope.load_managed_env())
     check_ok(f"Managed scope active: {n_cfg} config key(s), {n_env} env key(s) pinned by {managed_dir}")
-    if os.environ.get("HERMES_MANAGED_DIR", "").strip():
-        check_info(f"managed dir set via HERMES_MANAGED_DIR={managed_dir}")
+    if os.environ.get("STARDUST_MANAGED_DIR", "").strip():
+        check_info(f"managed dir set via STARDUST_MANAGED_DIR={managed_dir}")
 
 
 @doctor_check("MCP security check failed: {e}")
@@ -132,9 +132,9 @@ def _check_mcp_security(should_fix: bool, f: Finding) -> None:
 @doctor_check()
 def _check_env_file(should_fix: bool, f: Finding) -> None:
     """Managed scope plus ~/.hermes/.env presence and provider credentials."""
-    from hermes_cli.doctor import HERMES_HOME, PROJECT_ROOT, _DHH
+    from hermes_cli.doctor import STARDUST_HOME, PROJECT_ROOT, _DHH
     managed_scope_check()
-    env_path = HERMES_HOME / '.env'
+    env_path = STARDUST_HOME / '.env'
     if env_path.exists():
         check_ok(f"{_DHH}/.env file exists")
         # UTF-8 first; latin-1 fallback for Windows Notepad/cp1252 files (matches env_loader._load_dotenv_with_fallback).
@@ -264,8 +264,8 @@ def _validate_model_config(config_path, issues: list) -> None:
 @doctor_check()
 def _check_config_file(should_fix: bool, f: Finding) -> None:
     """config.yaml presence (project cli-config.yaml as fallback); model/provider validation."""
-    from hermes_cli.doctor import HERMES_HOME, PROJECT_ROOT, _DHH
-    config_path = HERMES_HOME / 'config.yaml'
+    from hermes_cli.doctor import STARDUST_HOME, PROJECT_ROOT, _DHH
+    config_path = STARDUST_HOME / 'config.yaml'
     if config_path.exists():
         check_ok(f"{_DHH}/config.yaml exists")
         with warn_on_error("Could not validate model/provider config"):
@@ -329,16 +329,16 @@ def _drift_stale_root_keys(f: Finding, should_fix: bool, config_path) -> None:
 
 
 def _drift_max_iterations_ghost(f: Finding, should_fix: bool, config_path) -> None:
-    """A stale HERMES_MAX_ITERATIONS in .env shadows agent.max_turns in config.yaml.
+    """A stale STARDUST_MAX_ITERATIONS in .env shadows agent.max_turns in config.yaml.
 
-    The setup wizard used to dual-write the budget. The gateway bridge derives HERMES_MAX_ITERATIONS from
+    The setup wizard used to dual-write the budget. The gateway bridge derives STARDUST_MAX_ITERATIONS from
     agent.max_turns, but if it bails on an earlier config-parse error the .env value silently wins. Read the
     .env FILE (load_env), not get_env_value/os.environ, which the bridge may have overridden already.
     """
     from hermes_cli.doctor import _DHH
-    # Detect stale HERMES_MAX_ITERATIONS ghost in .env shadowing agent.max_turns in config.yaml (issue
+    # Detect stale STARDUST_MAX_ITERATIONS ghost in .env shadowing agent.max_turns in config.yaml (issue
     # #17534). The setup wizard used to dual-write the iteration budget to both stores; users who later edit
-    # only config.yaml are left with a .env ghost. The gateway bridge normally derives HERMES_MAX_ITERATIONS
+    # only config.yaml are left with a .env ghost. The gateway bridge normally derives STARDUST_MAX_ITERATIONS
     # from agent.max_turns at startup, but if that bridge bails (any earlier config-parse error), the stale
     # .env value silently wins and the agent runs at the wrong budget — e.g. config says 400 but the
     # activity line reads N/90.
@@ -348,19 +348,19 @@ def _drift_max_iterations_ghost(f: Finding, should_fix: bool, config_path) -> No
     cfg_max_turns = agent_cfg.get("max_turns") if isinstance(agent_cfg, dict) else None
     if cfg_max_turns is None:
         cfg_max_turns = raw_config.get("max_turns")  # legacy root-level key counts too
-    env_ghost = load_env().get("HERMES_MAX_ITERATIONS")
+    env_ghost = load_env().get("STARDUST_MAX_ITERATIONS")
     if cfg_max_turns is None or env_ghost is None or str(cfg_max_turns).strip() == str(env_ghost).strip():
         return
-    check_warn(f"HERMES_MAX_ITERATIONS={env_ghost} in .env shadows agent.max_turns={cfg_max_turns} in config.yaml",
+    check_warn(f"STARDUST_MAX_ITERATIONS={env_ghost} in .env shadows agent.max_turns={cfg_max_turns} in config.yaml",
                "(stale ghost from an earlier `hermes setup` run)")
     if not should_fix:
-        f.issues.append("Stale HERMES_MAX_ITERATIONS in .env shadows config.yaml — run 'hermes doctor --fix'")
-    elif remove_env_value("HERMES_MAX_ITERATIONS"):
-        check_ok(f"Removed stale HERMES_MAX_ITERATIONS from .env (config.yaml agent.max_turns={cfg_max_turns} is now authoritative)")
+        f.issues.append("Stale STARDUST_MAX_ITERATIONS in .env shadows config.yaml — run 'hermes doctor --fix'")
+    elif remove_env_value("STARDUST_MAX_ITERATIONS"):
+        check_ok(f"Removed stale STARDUST_MAX_ITERATIONS from .env (config.yaml agent.max_turns={cfg_max_turns} is now authoritative)")
         f.fixed += 1
     else:
-        check_warn("Could not remove HERMES_MAX_ITERATIONS from .env")
-        f.manual_issues.append(f"Manually delete the HERMES_MAX_ITERATIONS line from {_DHH}/.env — config.yaml agent.max_turns is authoritative.")
+        check_warn("Could not remove STARDUST_MAX_ITERATIONS from .env")
+        f.manual_issues.append(f"Manually delete the STARDUST_MAX_ITERATIONS line from {_DHH}/.env — config.yaml agent.max_turns is authoritative.")
 
 
 def _drift_deprecations(f: Finding, should_fix: bool, config_path) -> None:
@@ -394,12 +394,12 @@ _CONFIG_DRIFT_STEPS = (
 
 @doctor_check()
 def _check_config_drift(should_fix: bool, f: Finding) -> None:
-    """Config version, stale root keys, HERMES_MAX_ITERATIONS ghost, deprecations, structure.
+    """Config version, stale root keys, STARDUST_MAX_ITERATIONS ghost, deprecations, structure.
 
     Each step is independent and best-effort: a failure in one never hides the next.
     """
-    from hermes_cli.doctor import HERMES_HOME
-    config_path = HERMES_HOME / 'config.yaml'
+    from hermes_cli.doctor import STARDUST_HOME
+    config_path = STARDUST_HOME / 'config.yaml'
     if not config_path.exists():
         config_path = None
     for step in _CONFIG_DRIFT_STEPS if config_path else (_drift_deprecations,):

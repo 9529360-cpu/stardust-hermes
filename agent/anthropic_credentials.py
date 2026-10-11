@@ -307,7 +307,7 @@ def _refresh_oauth_token(creds: Dict[str, Any]) -> Optional[str]:
     path-keyed cross-process lock (else two profiles can spend one refresh token)."""
     try:
         from hermes_cli.auth import AUTH_LOCK_TIMEOUT_SECONDS, _auth_store_lock, env_float
-        refresh_timeout_seconds = env_float("HERMES_ANTHROPIC_REFRESH_TIMEOUT_SECONDS", 20)
+        refresh_timeout_seconds = env_float("STARDUST_ANTHROPIC_REFRESH_TIMEOUT_SECONDS", 20)
         lock_timeout_seconds = max(float(AUTH_LOCK_TIMEOUT_SECONDS), float(refresh_timeout_seconds) + 5.0)
         cred_path = claude_code_credentials_path()
         with _auth_store_lock(timeout_seconds=lock_timeout_seconds, target_path=cred_path):
@@ -563,7 +563,7 @@ def _write_hermes_oauth_credentials(
 ) -> None:
     """Commit refreshed hermes_pkce tokens to ~/.hermes/.anthropic_oauth.json (``CredentialPersistError`` on failure).
     ``target`` lets a named profile commit a grant it BORROWED from the global root back to the ROOT singleton
-    instead of forking a copy under its own HERMES_HOME; without this write-through the next ``load_pool()``
+    instead of forking a copy under its own STARDUST_HOME; without this write-through the next ``load_pool()``
     re-seeds the stale (consumed) pair from the file over the rotated pool entry."""
     _commit_private_json(
         target if target is not None else _get_hermes_oauth_file(),

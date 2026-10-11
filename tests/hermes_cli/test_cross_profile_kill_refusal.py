@@ -1,6 +1,6 @@
 """Cross-profile kill refusal regression tests (#89315).
 
-A poisoned/contaminated ``gateway.pid`` inside one profile's HERMES_HOME can
+A poisoned/contaminated ``gateway.pid`` inside one profile's STARDUST_HOME can
 truthfully name ANOTHER profile's live gateway (its ``hermes_home`` stamp
 records the real owner).  ``gateway stop`` / the restart force-kill escalation
 / ``profile delete`` must refuse to signal such a PID instead of starting the
@@ -68,18 +68,18 @@ def _pid_record(proc: subprocess.Popen, script: Path, owner_home: Path) -> dict:
 
 class TestRecordedGatewayHomeConflicts:
     def test_conflicting_home_detected(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "profiles" / "tim"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "profiles" / "tim"))
         record = {"pid": 1, "hermes_home": str(tmp_path)}
         assert recorded_gateway_home_conflicts(record) is True
 
     def test_same_home_accepted(self, tmp_path, monkeypatch):
         home = tmp_path / "profiles" / "tim"
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         record = {"pid": 1, "hermes_home": str(home)}
         assert recorded_gateway_home_conflicts(record) is False
 
     def test_legacy_record_without_home_proves_nothing(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         assert recorded_gateway_home_conflicts({"pid": 1}) is False
         assert recorded_gateway_home_conflicts(None) is False
         assert recorded_gateway_home_conflicts({"pid": 1, "hermes_home": "  "}) is False
@@ -115,7 +115,7 @@ class TestCrossProfileStopRefusal:
         root_home = tmp_path / "root-home"
         tim_home = tmp_path / "root-home" / "profiles" / "tim"
         tim_home.mkdir(parents=True)
-        monkeypatch.setenv("HERMES_HOME", str(tim_home))
+        monkeypatch.setenv("STARDUST_HOME", str(tim_home))
 
         proc = _spawn_gateway_lookalike(
             tmp_path / "bin", tim_home / "gateway.lock"
@@ -144,7 +144,7 @@ class TestCrossProfileStopRefusal:
         """Same-home records keep stopping normally (no false refusal)."""
         tim_home = tmp_path / "profiles" / "tim"
         tim_home.mkdir(parents=True)
-        monkeypatch.setenv("HERMES_HOME", str(tim_home))
+        monkeypatch.setenv("STARDUST_HOME", str(tim_home))
 
         proc = _spawn_gateway_lookalike(
             tmp_path / "bin", tim_home / "gateway.lock"

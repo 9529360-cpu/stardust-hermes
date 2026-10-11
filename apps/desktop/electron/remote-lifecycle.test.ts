@@ -144,7 +144,7 @@ test('POSIX relaunch gate refuses live and uncertain install markers without exe
           return 'Linux\nx86_64\n'
         }
 
-        if (command.includes('HERMES_HOME')) {
+        if (command.includes('STARDUST_HOME')) {
           return '/home/alice/.hermes\n'
         }
 
@@ -196,7 +196,7 @@ test('POSIX relaunch gate rechecks after token upload immediately before process
         return 'Linux\nx86_64\n'
       }
 
-      if (command.includes('HERMES_HOME')) {
+      if (command.includes('STARDUST_HOME')) {
         return '/home/alice/.hermes\n'
       }
 
@@ -239,7 +239,7 @@ test('POSIX relaunch gate rechecks after token upload immediately before process
 
 test('listRemoteHermesProfiles inventories Mini-style profile dirs without spawning a dashboard', async () => {
   const ssh = fakeSsh([
-    [/HERMES_HOME/, '/Users/zillajr/.hermes\n'],
+    [/STARDUST_HOME/, '/Users/zillajr/.hermes\n'],
     [/ls -1/, 'bob\ndixie\ngoose\nrambo\nbob.rollback-old\n']
   ])
 
@@ -250,8 +250,8 @@ test('listRemoteHermesProfiles inventories Mini-style profile dirs without spawn
   )
 })
 
-test('listRemoteHermesProfiles rejects a hostile HERMES_HOME', async () => {
-  const ssh = fakeSsh([[/HERMES_HOME/, '/tmp/x; echo pwned\n']])
+test('listRemoteHermesProfiles rejects a hostile STARDUST_HOME', async () => {
+  const ssh = fakeSsh([[/STARDUST_HOME/, '/tmp/x; echo pwned\n']])
 
   await assert.rejects(
     () => listRemoteHermesProfiles(ssh),
@@ -301,8 +301,8 @@ test('locateHermes falls back to the login-shell command -v probe', async () => 
 })
 
 test('locateHermes preserves an installer wrapper instead of resolving its interpreter', async () => {
-  // install.sh venv mode writes: exec "$HERMES_BIN" "$HERMES_ENTRYPOINT" "$@",
-  // where $HERMES_BIN is the venv python. The old canonicalization returned
+  // install.sh venv mode writes: exec "$STARDUST_BIN" "$STARDUST_ENTRYPOINT" "$@",
+  // where $STARDUST_BIN is the venv python. The old canonicalization returned
   // that interpreter, so `<python> --version` printed "Python x.y.z" and
   // `<python> serve --help` failed outright (#74411). The wrapper itself is
   // executable and forwards args correctly — return it untouched.
@@ -779,7 +779,7 @@ test('buildSpawnCommand is headless serve, detached, token not in argv', () => {
   assert.match(cmd, /<\/dev\/null/)
   assert.match(cmd, /echo \$!/)
   assert.ok(!cmd.includes('tok_secret_value'), 'token must not appear in spawn command')
-  assert.ok(!cmd.includes('HERMES_DASHBOARD_SESSION_TOKEN'), 'token env var must not appear')
+  assert.ok(!cmd.includes('STARDUST_DASHBOARD_SESSION_TOKEN'), 'token env var must not appear')
 })
 
 test('buildSpawnCommand always uses serve (legacy dashboard path removed)', () => {
@@ -914,10 +914,10 @@ test('spawnRemoteDashboard always spawns serve (legacy dashboard path removed)',
 })
 
 test('READY_RE accepts both serve and dashboard sentinels', () => {
-  assert.equal(READY_RE.exec('HERMES_BACKEND_READY port=4321')?.[1], '4321')
-  assert.equal(READY_RE.exec('HERMES_DASHBOARD_READY port=8765')?.[1], '8765')
+  assert.equal(READY_RE.exec('STARDUST_BACKEND_READY port=4321')?.[1], '4321')
+  assert.equal(READY_RE.exec('STARDUST_DASHBOARD_READY port=8765')?.[1], '8765')
   // The remote log is `>> log 2>&1`, so a stderr chunk without a newline can be spliced onto the sentinel.
-  assert.equal(READY_RE.exec('INFO  Started server process [4711]HERMES_BACKEND_READY port=65238')?.[1], '65238')
+  assert.equal(READY_RE.exec('INFO  Started server process [4711]STARDUST_BACKEND_READY port=65238')?.[1], '65238')
 })
 
 test('spawnRemoteDashboard rejects when no pid is returned', async () => {
@@ -999,7 +999,7 @@ test('connect() spawns fresh when there is no lockfile, adopts the served token'
     [/printf '%s\\n'/, ''],
     [/setsid/, '777\n'],
     [/kill -0 777/, 'ALIVE'],
-    [/cat .*\.log/, 'HERMES_DASHBOARD_READY port=51999\n']
+    [/cat .*\.log/, 'STARDUST_DASHBOARD_READY port=51999\n']
   ])
 
   const result = await connect(
@@ -1046,7 +1046,7 @@ test('managed SSH maps a local scope to a different non-default remote profile',
     [/printf '%s\\n'/, ''],
     [/setsid/, '778\n'],
     [/kill -0 778/, 'ALIVE'],
-    [/cat .*\.log/, 'HERMES_BACKEND_READY port=52000\n']
+    [/cat .*\.log/, 'STARDUST_BACKEND_READY port=52000\n']
   ])
 
   await connect(
@@ -1101,7 +1101,7 @@ test('connect() respawns when the requested remote profile differs from the lock
     [/python3 -c/, ''],
     [/setsid/, '890\n'],
     [/kill -0 890/, 'ALIVE'],
-    [/cat .*\.log/, 'HERMES_DASHBOARD_READY port=52050\n']
+    [/cat .*\.log/, 'STARDUST_DASHBOARD_READY port=52050\n']
   ])
 
   const result = await connect(
@@ -1129,7 +1129,7 @@ test('connect() respawns when the lockfile hermesPath differs from the resolved 
     [/grep -q ssh-session-token-file/, 'YES\n'],
     [/python3 -c/, ''],
     [/setsid/, '890\n'],
-    [/cat .*\.log/, 'HERMES_DASHBOARD_READY port=52050\n']
+    [/cat .*\.log/, 'STARDUST_DASHBOARD_READY port=52050\n']
   ])
 
   const result = await connect(
@@ -1161,7 +1161,7 @@ test('connect() respawns when the lockfile protocolVersion is incompatible', asy
     [/python3 -c/, ''],
     [/setsid/, '901\n'],
     [/kill -0 901/, 'ALIVE'],
-    [/cat .*\.log/, 'HERMES_DASHBOARD_READY port=44100\n']
+    [/cat .*\.log/, 'STARDUST_DASHBOARD_READY port=44100\n']
   ])
 
   const result = await connect(connectDeps(ssh, { reuseToken, adoptServedToken: async () => 'fresh' }))
@@ -1176,13 +1176,13 @@ test('connect() fresh spawn writes hermesHome + protocolVersion into the lockfil
     [/uname/, 'Linux\nx86_64'],
     [/\[ -x/, 'OK'],
     [/cat .*lock\.json/, ''], // no lockfile
-    [/HERMES_HOME/, '/home/alice/.hermes\n'],
+    [/STARDUST_HOME/, '/home/alice/.hermes\n'],
     [/grep -q ssh-session-token-file/, 'YES\n'],
     [/python3 -c/, ''],
     [/printf '%s\\n'/, ''],
     [/setsid/, '700\n'],
     [/kill -0 700/, 'ALIVE'],
-    [/cat .*\.log/, 'HERMES_DASHBOARD_READY port=45500\n'],
+    [/cat .*\.log/, 'STARDUST_DASHBOARD_READY port=45500\n'],
     [
       /printf '%s' '/,
       c => {
@@ -1212,7 +1212,7 @@ test('connect() respawns when the lockfile pid is dead (killed dashboard)', asyn
     [/python3 -c/, ''],
     [/setsid/, '888\n'],
     [/kill -0 888/, 'ALIVE'],
-    [/cat .*\.log/, 'HERMES_DASHBOARD_READY port=42000\n']
+    [/cat .*\.log/, 'STARDUST_DASHBOARD_READY port=42000\n']
   ])
 
   const result = await connect(connectDeps(ssh, { reuseToken: 't', adoptServedToken: async () => 'fresh' }))
@@ -1315,7 +1315,7 @@ test('connect() respawns when the dashboard is wedged (alive pid, probe fails)',
     [/python3 -c/, ''],
     [/setsid/, '999\n'],
     [/kill -0 999/, 'ALIVE'],
-    [/cat .*\.log/, 'HERMES_DASHBOARD_READY port=43000\n']
+    [/cat .*\.log/, 'STARDUST_DASHBOARD_READY port=43000\n']
   ])
 
   const result = await connect(
@@ -1451,7 +1451,7 @@ test('expandRemotePath preserves spaces as data', () => {
 test('buildSpawnCommand does not embed the token in the command string', () => {
   const cmd = buildSpawnCommand('/x/hermes', 'work', { logPath: spawnLogPath(OWNERSHIP_ID, SPAWN_NONCE) })
   assert.ok(!cmd.includes('super_secret_token_value'), 'token must not appear in the spawn command')
-  assert.ok(!cmd.includes('HERMES_DASHBOARD_SESSION_TOKEN'), 'env var name must not appear')
+  assert.ok(!cmd.includes('STARDUST_DASHBOARD_SESSION_TOKEN'), 'env var name must not appear')
 })
 
 test('buildSpawnCommand includes --ssh-session-token-file when tokenFilePath is provided', () => {
@@ -1475,7 +1475,7 @@ test('buildSpawnCommand always uses serve, never dashboard', () => {
 
 test('buildSpawnCommand raises the SSH child file limit before execing Hermes', () => {
   const cmd = buildSpawnCommand('/x/hermes', '', { logPath: spawnLogPath(OWNERSHIP_ID, SPAWN_NONCE) })
-  assert.match(cmd, /ulimit -n 65536 2>\/dev\/null \|\| true; exec env HERMES_DESKTOP=1/)
+  assert.match(cmd, /ulimit -n 65536 2>\/dev\/null \|\| true; exec env STARDUST_DESKTOP=1/)
   assert.ok(cmd.indexOf('ulimit -n 65536') < cmd.indexOf('serve --isolated'))
 })
 
@@ -1765,7 +1765,7 @@ test('connect replaces an exact-owned backend only after authenticated stale pro
     [/python3 -c/, ''],
     [/setsid/, '999\n'],
     [/kill -0 999/, 'ALIVE'],
-    [/cat .*\.log/, 'HERMES_DASHBOARD_READY port=43000\n']
+    [/cat .*\.log/, 'STARDUST_DASHBOARD_READY port=43000\n']
   ])
 
   const result = await connect(

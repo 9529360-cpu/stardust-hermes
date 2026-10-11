@@ -26,7 +26,7 @@ FIRE_CLAIM_TTL_SECONDS = 300
 FIRE_CLAIM_SKEW_SECONDS = 60
 def _claim_owner_is_dead(claim: Dict[str, Any]) -> bool:
     """True when the claim's ``by`` names a process on THIS host that provably no longer exists.
-    ``_machine_id()`` stamps ``host:pid[:token]``; a foreign host, an explicit HERMES_MACHINE_ID,
+    ``_machine_id()`` stamps ``host:pid[:token]``; a foreign host, an explicit STARDUST_MACHINE_ID,
     or any liveness-probe failure returns False (fail safe: only a proven death shortens the TTL)."""
     parts = str(claim.get("by") or "").split(":")
     if len(parts) < 2 or not parts[1].isdigit():
@@ -391,8 +391,8 @@ def advance_next_run(job_id: str) -> bool:
 
 def _machine_id() -> str:
     """Claim attribution/debugging id (NOT correctness — that comes from the file lock and the
-    fresh-claim check): ``HERMES_MACHINE_ID`` if set, else hostname:pid."""
-    explicit = os.getenv("HERMES_MACHINE_ID", "").strip()
+    fresh-claim check): ``STARDUST_MACHINE_ID`` if set, else hostname:pid."""
+    explicit = os.getenv("STARDUST_MACHINE_ID", "").strip()
     if explicit:
         return explicit
     try:

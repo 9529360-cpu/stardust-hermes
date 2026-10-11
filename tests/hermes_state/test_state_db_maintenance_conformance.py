@@ -227,7 +227,7 @@ def test_copy_honesty_truncated_db(tmp_path):
 def test_quick_snapshot_flags_corrupt_state_db(tmp_path):
     """The quick-snapshot path must flag — never silently absorb — a bad DB.
 
-    A fake HERMES_HOME carries a truncated state.db plus a config.yaml. The
+    A fake STARDUST_HOME carries a truncated state.db plus a config.yaml. The
     snapshot must either return None or record state.db in the manifest's
     failed_dbs; a manifest listing state.db as captured is the #90613 class
     surfacing through the snapshot path.

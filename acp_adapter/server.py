@@ -25,7 +25,7 @@ from acp.schema import (
 )
 
 from acp_adapter.auth import TERMINAL_SETUP_AUTH_METHOD_ID, build_auth_methods, detect_provider
-from acp_adapter.commands import HERMES_VERSION, SlashCommandsMixin, _estimate_tokens
+from acp_adapter.commands import STARDUST_VERSION, SlashCommandsMixin, _estimate_tokens
 from acp_adapter.content import PromptBlock, _content_blocks_to_openai_user_content, _extract_text
 from acp_adapter.events import (
     AssistantMessageIdAllocator, _build_plan_update_from_todo_result, make_message_cb, make_step_cb,
@@ -528,7 +528,7 @@ class HermesACPAgent(SlashCommandsMixin, acp.Agent):
 
         return InitializeResponse(
             protocol_version=acp.PROTOCOL_VERSION,
-            agent_info=Implementation(name="hermes-agent", version=HERMES_VERSION),
+            agent_info=Implementation(name="hermes-agent", version=STARDUST_VERSION),
             agent_capabilities=AgentCapabilities(
                 load_session=True,
                 prompt_capabilities=PromptCapabilities(image=True),
@@ -739,16 +739,16 @@ class HermesACPAgent(SlashCommandsMixin, acp.Agent):
         ContextVar writes are isolated from concurrent sessions.
 
         Approval routing is thread-local, so it MUST be bound here, not on the loop thread.
-        Interactive routing is a ``tools.approval`` contextvar, not ``HERMES_INTERACTIVE`` in
+        Interactive routing is a ``tools.approval`` contextvar, not ``STARDUST_INTERACTIVE`` in
         os.environ, so concurrent workers can't race a global flag onto the non-interactive
         auto-approve path (GHSA-96vc-wcxf-jjff)."""
         agent = state.agent
         with contextlib.ExitStack() as stack:
-            # HERMES_SESSION_KEY scopes per-session caches (interactive sudo password) to this
+            # STARDUST_SESSION_KEY scopes per-session caches (interactive sudo password) to this
             # session, not the reused thread. ``cwd`` pins what the system prompt reports as the
             # working directory — otherwise it advertises the Hermes workspace while tools are
             # rooted at the client's project and edits land outside it. ``cron_session=""`` masks
-            # any leaked process-global HERMES_CRON_SESSION.
+            # any leaked process-global STARDUST_CRON_SESSION.
             def _session_context() -> Callable[[], None]:
                 from gateway.session_context import clear_session_vars, set_session_vars
 
@@ -777,8 +777,8 @@ class HermesACPAgent(SlashCommandsMixin, acp.Agent):
                 _bind_guarded(stack, "edit approval requester", _edit_approval)
             stack.callback(reset_hermes_interactive_context, set_hermes_interactive_context(True))
             # Tools tag side-effects with the ACP session (``kanban_create``); save/restore it.
-            stack.callback(_restore_env, "HERMES_SESSION_ID", os.environ.get("HERMES_SESSION_ID"))
-            os.environ["HERMES_SESSION_ID"] = session_id
+            stack.callback(_restore_env, "STARDUST_SESSION_ID", os.environ.get("STARDUST_SESSION_ID"))
+            os.environ["STARDUST_SESSION_ID"] = session_id
 
             # Auto-titling fires in the turn prologue; push the title now as a session-info update.
             def _notify_title_update(_title: str, _source: str) -> None:

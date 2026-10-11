@@ -1,7 +1,7 @@
 """Gateway control socket — the gateway-owned local coordination surface: a local-only socket answering
 versioned JSON verbs (``identify``, ``status``). A connectable socket with a well-formed ``identify``
 answer IS liveness — no PID-reuse heuristics. Never a TCP port: filesystem/pipe ACLs are the auth
-boundary. POSIX: ``$HERMES_HOME/gateway.sock`` (or a temp-dir socket + ``gateway.sock.path`` pointer
+boundary. POSIX: ``$STARDUST_HOME/gateway.sock`` (or a temp-dir socket + ``gateway.sock.path`` pointer
 file when the home path exceeds ``sun_path``); Windows: named pipe ``\\\\.\\pipe\\hermes-gateway-<hash>``.
 Wire contract: ONE request per connection — one JSON line in, one out, then the server closes.
 Consumers PREFER the socket and fall back to the state-file/scan layer when it doesn't answer.
@@ -40,7 +40,7 @@ def _home_hash(home: Path) -> str:
 
 
 def windows_pipe_name(home: Path) -> str:
-    """Per-HERMES_HOME named pipe path (Windows transport)."""
+    """Per-STARDUST_HOME named pipe path (Windows transport)."""
     return rf"\\.\pipe\hermes-gateway-{_home_hash(home)}"
 
 
@@ -89,7 +89,7 @@ def _detect_supervisor() -> str:
     if sys.platform == "darwin" and (env.get("XPC_SERVICE_NAME", "").startswith("ai.hermes")
                                      or env.get("LAUNCHD_SOCKET")):
         return "launchd"
-    if env.get("HERMES_DESKTOP_MANAGED"):
+    if env.get("STARDUST_DESKTOP_MANAGED"):
         return "desktop"
     return "external" if "--external-supervisor" in sys.argv else "manual"
 

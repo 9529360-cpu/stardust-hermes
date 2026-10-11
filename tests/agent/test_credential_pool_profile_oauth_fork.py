@@ -1,7 +1,7 @@
 """Regression tests for #100339: cloned / borrowed single-use Anthropic OAuth
 grants must never fork across profiles.
 
-Real imports, real temp HERMES_HOME root + named profile, real auth.json I/O.
+Real imports, real temp STARDUST_HOME root + named profile, real auth.json I/O.
 The Anthropic token endpoint is replaced at the ``urllib.request.urlopen``
 boundary with genuine single-use semantics (a refresh token redeems once;
 a second POST returns ``invalid_grant``).
@@ -20,7 +20,7 @@ import pytest
 
 @pytest.fixture
 def fleet(tmp_path, monkeypatch):
-    """Root HERMES_HOME with an expired-but-refreshable Anthropic pool row."""
+    """Root STARDUST_HOME with an expired-but-refreshable Anthropic pool row."""
     root = tmp_path / "hermes-root"
     root.mkdir()
     (tmp_path / "fakehome").mkdir()
@@ -29,7 +29,7 @@ def fleet(tmp_path, monkeypatch):
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "fakehome"))
     for var in ("ANTHROPIC_TOKEN", "ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN"):
         monkeypatch.delenv(var, raising=False)
-    monkeypatch.setenv("HERMES_HOME", str(root))
+    monkeypatch.setenv("STARDUST_HOME", str(root))
     # The pytest seat-belt in the root write-through compares the global path
     # against $HOME/.hermes/auth.json; our root is elsewhere, so writes go.
     import hermes_constants
@@ -92,7 +92,7 @@ def fleet(tmp_path, monkeypatch):
 
     def use(home):
         """Switch the process to *home* (root or a profile dir)."""
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         hermes_constants._default_hermes_root_memo = None  # type: ignore[attr-defined]
         import hermes_cli.auth as auth_mod
         auth_mod._global_auth_store_cache = None

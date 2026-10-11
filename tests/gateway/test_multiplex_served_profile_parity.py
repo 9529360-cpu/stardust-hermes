@@ -50,7 +50,7 @@ def served(tmp_path, monkeypatch):
     (alpha / "config.yaml").write_text("display:\n  background_process_notifications: 'off'\n")
     (root / ".env").write_text("")
     (alpha / ".env").write_text("")
-    monkeypatch.setenv("HERMES_HOME", str(root))
+    monkeypatch.setenv("STARDUST_HOME", str(root))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     monkeypatch.setattr("hermes_constants.get_default_hermes_root", lambda: root)
     set_multiplex_active(True)

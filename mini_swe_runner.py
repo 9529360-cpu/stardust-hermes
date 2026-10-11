@@ -78,14 +78,14 @@ When you need to run commands, use the 'terminal' tool with your bash command.
 
 Complete the user's task step by step."""
 
-HERMES_SYSTEM_PREFIX = (
+STARDUST_SYSTEM_PREFIX = (
     "You are a function calling AI model. You are provided with function signatures within <tools> </tools> XML tags. "
     "You may call one or more functions to assist with the user query. If available tools are not relevant in assisting "
     "with user query, just respond in natural conversational language. Don't make assumptions about what values to plug "
     "into functions. After calling & executing the functions, you will be provided with function results within "
     "<tool_response> </tool_response> XML tags. Here are the available tools:\n"
 )
-HERMES_SYSTEM_SUFFIX = (
+STARDUST_SYSTEM_SUFFIX = (
     "For each function call return a JSON object, with the following pydantic model json schema for each:\n"
     "{'title': 'FunctionCall', 'type': 'object', 'properties': {'name': {'title': 'Name', 'type': 'string'}, "
     "'arguments': {'title': 'Arguments', 'type': 'object'}}, 'required': ['name', 'arguments']}\n"
@@ -211,7 +211,7 @@ class MiniSWERunner:
 
     def _convert_to_hermes_format(self, messages: List[Dict[str, Any]], user_query: str) -> List[Dict[str, Any]]:
         """Convert the OpenAI-style message list to the Hermes trajectory format used by batch_runner.py."""
-        system_msg = HERMES_SYSTEM_PREFIX + f"<tools>\n{self._format_tools_for_system_message()}\n</tools>\n" + HERMES_SYSTEM_SUFFIX
+        system_msg = STARDUST_SYSTEM_PREFIX + f"<tools>\n{self._format_tools_for_system_message()}\n</tools>\n" + STARDUST_SYSTEM_SUFFIX
         trajectory = [{"from": "system", "value": system_msg}, {"from": "human", "value": user_query}]
         i = 1  # first user message already added
         while i < len(messages):

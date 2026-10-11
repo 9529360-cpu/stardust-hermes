@@ -90,7 +90,7 @@ class HeartbeatState:
 
 
 def _get_session_db() -> Optional[Any]:
-    """Persistence goes through the goals module's per-HERMES_HOME cached SessionDB (one shared connection)."""
+    """Persistence goes through the goals module's per-STARDUST_HOME cached SessionDB (one shared connection)."""
     try:
         from hermes_cli.goals import _get_session_db as _goals_db
         return _goals_db()

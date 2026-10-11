@@ -472,7 +472,7 @@ class TestAgentInitConfig:
         if threshold_yaml is not None:
             lines.append(f"  codex_responses_compact_threshold: {threshold_yaml}")
         (home / "config.yaml").write_text("\n".join(lines) + "\n", encoding="utf-8")
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
 
         agent = AIAgent(
             api_key="test-key",

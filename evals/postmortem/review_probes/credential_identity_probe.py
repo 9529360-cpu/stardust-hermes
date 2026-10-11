@@ -11,7 +11,7 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 ROOT = Path(sys.argv[1]); MODE = sys.argv[2]
 sys.path.insert(0, str(ROOT))
 home = Path(tempfile.mkdtemp(prefix='pr103526-probe-'))
-os.environ.update(HOME=str(home), HERMES_HOME=str(home/'hermes'), XDG_CONFIG_HOME=str(home/'config'), CODEX_HOME=str(home/'codex'))
+os.environ.update(HOME=str(home), STARDUST_HOME=str(home/'hermes'), XDG_CONFIG_HOME=str(home/'config'), CODEX_HOME=str(home/'codex'))
 for k in list(os.environ):
     if any(x in k for x in ('API_KEY','TOKEN','NOUS_','SECRET')): os.environ.pop(k, None)
 (home/'hermes').mkdir()
@@ -45,7 +45,7 @@ server=ThreadingHTTPServer(('127.0.0.1',0),Handler); threading.Thread(target=ser
 url=f'http://127.0.0.1:{server.server_port}/v1'
 # Runtime override preserves loopback routing, without relaxing URL validation.
 os.environ['NOUS_INFERENCE_BASE_URL']=url
-os.environ['HERMES_SHARED_AUTH_DIR']=str(home/'shared')
+os.environ['STARDUST_SHARED_AUTH_DIR']=str(home/'shared')
 from run_agent import AIAgent
 from agent.turn_iteration_prep import prepare_iteration
 import agent.client_lifecycle as lifecycle

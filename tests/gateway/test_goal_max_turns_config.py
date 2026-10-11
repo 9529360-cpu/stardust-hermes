@@ -57,7 +57,7 @@ async def test_gateway_goal_uses_goals_max_turns_from_full_config(tmp_path, monk
     home = tmp_path / ".hermes"
     home.mkdir()
     (home / "config.yaml").write_text("goals:\n  max_turns: 7\n", encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     goals._DB_CACHE.clear()
     # Pre-warm from sync context: the /goal handler runs on the event loop,
     # where a cold cache only waits the bounded bootstrap window — under CI
@@ -109,7 +109,7 @@ async def test_goal_command_slow_db_init_still_persists(tmp_path, monkeypatch):
     home = tmp_path / ".hermes"
     home.mkdir()
     (home / "config.yaml").write_text("goals:\n  max_turns: 7\n", encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     goals._DB_CACHE.clear()
 
     runner = _make_runner()

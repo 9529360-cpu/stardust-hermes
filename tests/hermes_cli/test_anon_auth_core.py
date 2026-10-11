@@ -69,9 +69,9 @@ class FakePortal:
 def portal(monkeypatch, tmp_path):
     fake = FakePortal()
     monkeypatch.setenv("HERMES_PORTAL_BASE_URL", PORTAL)
-    monkeypatch.setenv("HERMES_ANON_API_SECRET", "test-secret")
-    monkeypatch.setenv("HERMES_SHARED_AUTH_DIR", str(tmp_path / "shared-store"))
-    monkeypatch.setenv("HERMES_GUEST_ONBOARDING", "1")
+    monkeypatch.setenv("STARDUST_ANON_API_SECRET", "test-secret")
+    monkeypatch.setenv("STARDUST_SHARED_AUTH_DIR", str(tmp_path / "shared-store"))
+    monkeypatch.setenv("STARDUST_GUEST_ONBOARDING", "1")
     # This file exercises the inherited compatibility layer intentionally. Stardust ships it off.
     from hermes_cli.config import load_config, save_config
     cfg = load_config()
@@ -104,7 +104,7 @@ def portal(monkeypatch, tmp_path):
 
 
 def _write_config(monkeypatch, **nous):
-    home = Path(os.environ["HERMES_HOME"])
+    home = Path(os.environ["STARDUST_HOME"])
     (home / "config.yaml").write_text("nous:\n" + "".join(f"  {k}: {str(v).lower()}\n" for k, v in nous.items()))
     from hermes_cli import config as cfg_mod
     for attr in ("_config_cache", "_cached_config"):
@@ -139,7 +139,7 @@ class TestIdentityLifecycle:
         first = anon_auth.ensure_portal_identity(explicit=True)
         other_home = tmp_path / "profiles" / "two"
         other_home.mkdir(parents=True)
-        monkeypatch.setenv("HERMES_HOME", str(other_home))
+        monkeypatch.setenv("STARDUST_HOME", str(other_home))
         _write_config(monkeypatch, guest=True)
         before = len(portal.calls)
         second = anon_auth.ensure_portal_identity(explicit=True)
@@ -167,18 +167,18 @@ class TestIdentityLifecycle:
             resolve_provider("auto")
 
     def test_launch_gate_off_means_no_free_tier_at_all(self, portal, monkeypatch):
-        """Without ``HERMES_GUEST_ONBOARDING=1`` the free tier does not exist: no mint, no portal
+        """Without ``STARDUST_GUEST_ONBOARDING=1`` the free tier does not exist: no mint, no portal
         traffic, ``nous.guest``'s default is never consulted, and an identity already on disk is
         not treated as enabled. The env var is the only lever; ``0``/``true``/anything but ``1`` is off."""
         monkeypatch.setattr("agent.bedrock_adapter.has_aws_credentials", lambda: False)
         for raw in ("", "0", "true", "yes", "new"):
-            monkeypatch.setenv("HERMES_GUEST_ONBOARDING", raw)
+            monkeypatch.setenv("STARDUST_GUEST_ONBOARDING", raw)
             assert anon_auth.guest_enabled() is False
             assert anon_auth.ensure_portal_identity(explicit=True) is None
         assert portal.calls == []
         with pytest.raises(anon_auth.AuthError):
             resolve_provider("auto")
-        monkeypatch.setenv("HERMES_GUEST_ONBOARDING", "1")
+        monkeypatch.setenv("STARDUST_GUEST_ONBOARDING", "1")
         assert anon_auth.guest_enabled() is True
 
 
@@ -200,7 +200,7 @@ class TestExplicitProvision:
         # A sibling profile adopts the same identity implicitly; no second create call.
         sibling = tmp_path / "sibling-profile"
         sibling.mkdir()
-        monkeypatch.setenv("HERMES_HOME", str(sibling))
+        monkeypatch.setenv("STARDUST_HOME", str(sibling))
         _write_config(monkeypatch, guest=True)
         adopted = anon_auth.ensure_portal_identity(explicit=True)
         assert adopted and adopted["anon_token"] == token

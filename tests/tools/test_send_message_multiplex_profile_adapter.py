@@ -20,7 +20,7 @@ def mux_runner(tmp_path, monkeypatch):
     (home / "profiles" / "sec").mkdir(parents=True)
     (home / "profiles" / "nobot").mkdir(parents=True)
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     default_slack, sec_slack = object(), object()
     runner = object.__new__(GatewayRunner)
     runner.adapters = {Platform.SLACK: default_slack}

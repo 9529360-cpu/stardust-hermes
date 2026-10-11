@@ -186,7 +186,7 @@ def run_probe(repo, receipt):
     from tui_gateway import mcp_oauth_sessions as sessions
     from tools.mcp_oauth import HermesTokenStorage
 
-    owner = Path(os.environ["HERMES_HOME"])
+    owner = Path(os.environ["STARDUST_HOME"])
     other = owner.parent / "other-profile"
     other.mkdir()
     checks = receipt["checks"]
@@ -316,7 +316,7 @@ def main():
             home = Path(temp)
             (home / ".hermes").mkdir()
             env = {"PATH": os.environ.get("PATH", ""), "HOME": temp,
-                   "HERMES_HOME": str(home / ".hermes"), "LANG": "C.UTF-8", "TZ": "UTC",
+                   "STARDUST_HOME": str(home / ".hermes"), "LANG": "C.UTF-8", "TZ": "UTC",
                    "PYTHONNOUSERSITE": "1"}
             completed = subprocess.run([sys.executable, str(Path(__file__).resolve()),
                 "--repo", str(repo), "--output", str(output), "--isolated-worker"],

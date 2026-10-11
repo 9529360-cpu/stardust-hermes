@@ -76,16 +76,16 @@
       # not reach it, and the application would open ~/.hermes while the
       # services use hermesHome. Thus the launcher carries the value itself.
       #
-      # HERMES_MANAGED rides along only when the services are enabled. That
+      # STARDUST_MANAGED rides along only when the services are enabled. That
       # variable makes the CLI refuse a configuration change and name the
       # rebuild command. A person who enables `programs.` alone has no
       # activation and no managed configuration, so the application must not
       # claim one and refuse an edit that nothing else owns.
       desktopEnvironment = {
-        HERMES_HOME = cfg.hermesHome;
+        STARDUST_HOME = cfg.hermesHome;
       }
       // lib.optionalAttrs cfg.enable {
-        inherit (processEnvironment) HERMES_MANAGED;
+        inherit (processEnvironment) STARDUST_MANAGED;
       }
       // lib.optionalAttrs desktopUsesService {
         STARDUST_DESKTOP_REMOTE_URL = "http://${cfg.backend.host}:${toString cfg.backend.port}";
@@ -191,7 +191,7 @@
         enable = lib.mkEnableOption ''
           the Hermes Agent command line application.
 
-          This adds `hermes` to home.packages, and exports HERMES_HOME with
+          This adds `hermes` to home.packages, and exports STARDUST_HOME with
           home.sessionVariables. An interactive shell then uses the same
           state as `services.hermes-agent`
         '';
@@ -217,7 +217,7 @@
 
             This adds `hermes-desktop` to home.packages, with an XDG
             launcher entry on Linux. The launcher starts the same Hermes
-            runtime that `package` gives, and reads the HERMES_HOME of
+            runtime that `package` gives, and reads the STARDUST_HOME of
             `services.hermes-agent`. Thus the application, the interactive
             shell and the services share one state directory.
 
@@ -258,12 +258,12 @@
             default = "${config.home.homeDirectory}/.hermes";
             defaultText = lib.literalExpression ''"''${config.home.homeDirectory}/.hermes"'';
             description = ''
-              The value of HERMES_HOME. This state directory holds
+              The value of STARDUST_HOME. This state directory holds
               config.yaml, .env, auth.json, the sessions, the skills, the
               memory and the cron jobs.
 
               The NixOS module takes a `stateDir` and adds `/.hermes` to it.
-              This module sets HERMES_HOME directly. Thus an existing
+              This module sets STARDUST_HOME directly. Thus an existing
               ~/.hermes continues to work, and you can give the directory any
               name.
             '';
@@ -297,13 +297,13 @@
         # daemon at all.
         (lib.mkIf cfgPrograms.enable {
           home.packages = [ cfgPrograms.package ];
-          home.sessionVariables.HERMES_HOME = cfg.hermesHome;
+          home.sessionVariables.STARDUST_HOME = cfg.hermesHome;
         })
 
         # A launcher from the desktop menu reads no shell profile, so the
-        # HERMES_HOME that `programs.enable` exports does not reach it. Home
+        # STARDUST_HOME that `programs.enable` exports does not reach it. Home
         # Manager writes only systemd.user.sessionVariables into
-        # environment.d, and this module does not put HERMES_HOME there,
+        # environment.d, and this module does not put STARDUST_HOME there,
         # because that file applies to each user unit. Thus the launcher
         # carries the value itself. See desktopEnvironment above.
         (lib.mkIf cfgPrograms.desktop.enable {

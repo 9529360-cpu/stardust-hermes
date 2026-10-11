@@ -1,6 +1,6 @@
 """``hermes pause`` / ``hermes resume`` — the global emergency stop.
 
-``pause`` writes the ESTOP sentinel at ``$HERMES_HOME/ESTOP``; cron, kanban and new gateway
+``pause`` writes the ESTOP sentinel at ``$STARDUST_HOME/ESTOP``; cron, kanban and new gateway
 turns halt on their next check (in-flight work is never killed). ``resume`` removes it and
 operation resumes on the next tick — no restart. Ported from gastownhall/gastown estop.go (MIT).
 """

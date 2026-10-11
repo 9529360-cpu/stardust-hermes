@@ -11,14 +11,14 @@
  *   - reuse an existing desktop-dedicated dashboard via a lockfile + an
  *     AUTHENTICATED /api/status probe (pid liveness alone is insufficient),
  *   - spawn a fresh detached `--isolated --port 0` dashboard and scrape its
- *     `HERMES_DASHBOARD_READY port=<n>` readiness line,
+ *     `STARDUST_DASHBOARD_READY port=<n>` readiness line,
  *   - adopt the token the dashboard actually serves (served-token adoption),
  *   - clean up a stale dashboard only when it is provably ours.
  *
  * No `import 'electron'` so it's unit-testable with `node --test`. main.ts wires
  * the real SshConnection, fetch, adoptServedDashboardToken, and waitForHermes in.
  *
- * The minted HERMES_DASHBOARD_SESSION_TOKEN is the SPAWN credential. After
+ * The minted STARDUST_DASHBOARD_SESSION_TOKEN is the SPAWN credential. After
  * readiness the caller runs served-token adoption against the tunneled baseUrl
  * and the SERVED token's fingerprint is what lands in the lockfile — so the
  * reuse probe checks the credential that actually authenticates /api/ws, not
@@ -277,12 +277,12 @@ async function probeRemotePlatform(ssh) {
   return { os: osName, arch }
 }
 
-// The HERMES_HOME the remote dashboard will use (explicit env wins, else
+// The STARDUST_HOME the remote dashboard will use (explicit env wins, else
 // ~/.hermes). Recorded in the lockfile so a future reuse can tell it's the same
 // state store; best-effort.
 async function probeRemoteHermesHome(ssh) {
   try {
-    const out = (await ssh.exec('echo "${HERMES_HOME:-$HOME/.hermes}"')).trim().split('\n').pop()
+    const out = (await ssh.exec('echo "${STARDUST_HOME:-$HOME/.hermes}"')).trim().split('\n').pop()
 
     return out || '~/.hermes'
   } catch (cause) {
@@ -594,7 +594,7 @@ async function pidIsOurDashboard(
       `expected=os.path.expanduser(${shq(hermesPath)})\n` +
       // The installer-facing launcher is intentionally preserved for invocation
       // (#74411), but it may `exec python <install-dir>/hermes`, leaving neither
-      // launcher nor HERMES_HOME-derived entrypoint in argv. The ownership-scoped
+      // launcher nor STARDUST_HOME-derived entrypoint in argv. The ownership-scoped
       // token path + random nonce + exact profile below are the alternative proof.
       `hermes_home=os.path.expanduser(${shq(hermesHome)}) if ${shq(hermesHome)} else ""\n` +
       'expected_entries={expected}\n' +
@@ -1067,7 +1067,7 @@ function buildSpawnCommand(hermesPath, profile, opts: any = {}) {
 
   const dashCmd =
     `ulimit -n ${REMOTE_NOFILE_SOFT_LIMIT} 2>/dev/null || true; ` +
-    `exec env HERMES_DESKTOP=1${opts.guestOnboarding === true ? ' HERMES_GUEST_ONBOARDING=1' : ''} ${hermes} ${profileArgs}${subCmd}`
+    `exec env STARDUST_DESKTOP=1${opts.guestOnboarding === true ? ' STARDUST_GUEST_ONBOARDING=1' : ''} ${hermes} ${profileArgs}${subCmd}`
 
   const detachedShell = `eval "exec $1>&-"; ${dashCmd} </dev/null >> ${logPath} 2>&1 & echo $!`
   const detachedSpawn = `child=$("$(command -v setsid || echo nohup)" sh -c ${shq(detachedShell)} hermes-update-child "$1" & echo $!)`

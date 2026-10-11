@@ -679,7 +679,7 @@ def test_managed_gateway_restart_preserves_active_worker_and_single_side_effect(
         "print('completed')\n",
         encoding="utf-8",
     )
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     with use_cron_store(home):
         job = create_job(
             prompt=None,
@@ -725,7 +725,7 @@ def test_managed_gateway_restart_preserves_active_worker_and_single_side_effect(
 
     harness = (
         "import json, os, pathlib, time\n"
-        f"os.environ['HERMES_HOME'] = {str(home)!r}\n"
+        f"os.environ['STARDUST_HOME'] = {str(home)!r}\n"
         "os.environ['INVOCATION_ID'] = 'restart-fixture'\n"
         "from cron import scheduler\n"
         "from tools import process_registry\n"

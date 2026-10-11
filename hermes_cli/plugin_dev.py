@@ -32,7 +32,7 @@ def _doctor_runtime(plugin_path: Path):
     """Load one plugin through the real runtime and restore global state afterwards.
 
     Private Doctor machinery, not a plugin test framework. Registration code runs under a temporary
-    HERMES_HOME with outbound socket connects blocked.
+    STARDUST_HOME with outbound socket connects blocked.
     """
     stack = ExitStack()
     try:
@@ -48,9 +48,9 @@ def _doctor_runtime(plugin_path: Path):
             plugin_path, copied,
             ignore=shutil.ignore_patterns(".git", "__pycache__", ".pytest_cache", "*.pyc"))
         stack.enter_context(patch.dict(os.environ, {
-            "HERMES_HOME": str(home),
-            "HERMES_BUNDLED_PLUGINS": str(bundled),
-            "HERMES_ENABLE_PROJECT_PLUGINS": "0",
+            "STARDUST_HOME": str(home),
+            "STARDUST_BUNDLED_PLUGINS": str(bundled),
+            "STARDUST_ENABLE_PROJECT_PLUGINS": "0",
         }, clear=False))
         stack.enter_context(patch.object(socket, "create_connection", _deny_network))
         stack.enter_context(patch.object(socket.socket, "connect", _deny_network))

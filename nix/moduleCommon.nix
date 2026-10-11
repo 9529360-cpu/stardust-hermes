@@ -73,7 +73,7 @@ let
         default = null;
         description = ''
           Authentication method. Set to "oauth" for OAuth 2.1 PKCE flow
-          (remote MCP servers). Tokens are stored in $HERMES_HOME/mcp-tokens/.
+          (remote MCP servers). Tokens are stored in $STARDUST_HOME/mcp-tokens/.
         '';
       };
 
@@ -299,7 +299,7 @@ let
         description = ''
           The paths to environment files that contain secrets, for example
           API keys and tokens. Activation adds the contents of these files to
-          $HERMES_HOME/.env. Hermes reads that file at each start, with
+          $STARDUST_HOME/.env. Hermes reads that file at each start, with
           load_hermes_dotenv().
 
           Each activation writes .env again from the start. Thus a secret
@@ -313,7 +313,7 @@ let
         default = { };
         description = ''
           Environment variables that are not secret. Activation writes them
-          to $HERMES_HOME/.env.
+          to $STARDUST_HOME/.env.
 
           CAUTION: Do not put secrets in this option. All users can read the
           Nix store. Use environmentFiles for secrets.
@@ -348,7 +348,7 @@ let
 
           Use this option for the project context that the agent reads from
           its working directory, for example AGENTS.md, notes and checklists.
-          Hermes reads SOUL.md and memories/ from HERMES_HOME, so put those
+          Hermes reads SOUL.md and memories/ from STARDUST_HOME, so put those
           files in `hermesHomeFiles`.
 
           If you set this option, you must also set `workingDirectory`. The
@@ -367,11 +367,11 @@ let
         type = documentsType;
         default = { };
         description = ''
-          Files that the module installs into HERMES_HOME. Each key is a path
+          Files that the module installs into STARDUST_HOME. Each key is a path
           relative to that directory, and the module makes the necessary
           subdirectories. Each value is a string or a path.
 
-          Hermes reads SOUL.md and the memory files from HERMES_HOME and not
+          Hermes reads SOUL.md and the memory files from STARDUST_HOME and not
           from the working directory. Declare those files here, or Hermes
           does not load them.
         '';
@@ -632,7 +632,7 @@ let
             on one line.
 
             The backend reads the file at each start and gives the value to
-            HERMES_DASHBOARD_SESSION_TOKEN. That token authorizes the /api
+            STARDUST_DASHBOARD_SESSION_TOKEN. That token authorizes the /api
             routes and the /api/ws socket. Hermes Desktop presents the same
             value, so the application reaches this backend and starts no
             second one.
@@ -665,7 +665,7 @@ let
       separates the installation from the services, which is the
       Home Manager convention:
 
-        programs.hermes-agent.enable = ${lib.boolToString (value != false)};  # the hermes CLI, and HERMES_HOME for your shells
+        programs.hermes-agent.enable = ${lib.boolToString (value != false)};  # the hermes CLI, and STARDUST_HOME for your shells
         programs.hermes-agent.desktop.enable = true;  # the desktop application
 
       `services.hermes-agent` keeps the state, the configuration and
@@ -721,7 +721,7 @@ let
           if builtins.isPath value || lib.isStorePath value then
             "${mkdir}\ncp ${value} $out/${name}"
           else
-            "${mkdir}\ncat > $out/${name} <<'HERMES_DOC_EOF'\n${value}\nHERMES_DOC_EOF"
+            "${mkdir}\ncat > $out/${name} <<'STARDUST_DOC_EOF'\n${value}\nHERMES_DOC_EOF"
         ) documents
       )
     );
@@ -786,7 +786,7 @@ let
       stateDirs ? [ ],
       # The module writes this value into the .managed marker. An
       # interactive shell reads the marker, because it does not see the
-      # HERMES_MANAGED variable of the service. The value tells the shell
+      # STARDUST_MANAGED variable of the service. The value tells the shell
       # which system owns the install and which rebuild command to name.
       managedSystem ? "nixos",
     }:
@@ -948,10 +948,10 @@ let
             exit 1
           fi
 
-          HERMES_DASHBOARD_SESSION_TOKEN="$(${pkgs.coreutils}/bin/tr -d '\r\n' < "$_token_file")"
-          export HERMES_DASHBOARD_SESSION_TOKEN
+          STARDUST_DASHBOARD_SESSION_TOKEN="$(${pkgs.coreutils}/bin/tr -d '\r\n' < "$_token_file")"
+          export STARDUST_DASHBOARD_SESSION_TOKEN
 
-          if [ -z "$HERMES_DASHBOARD_SESSION_TOKEN" ]; then
+          if [ -z "$STARDUST_DASHBOARD_SESSION_TOKEN" ]; then
             echo "hermes-backend: the session token file '$_token_file' is empty. The unit stops." >&2
             exit 1
           fi
@@ -1039,7 +1039,7 @@ let
 
   # The environment that each Hermes process needs, from either module.
   #
-  # managedSystem gives the value of HERMES_MANAGED. The CLI reads that
+  # managedSystem gives the value of STARDUST_MANAGED. The CLI reads that
   # variable to refuse a configuration change that it cannot keep, and to
   # name the correct rebuild command. The answer is different on each module,
   # so each module gives its own value.
@@ -1049,8 +1049,8 @@ let
       managedSystem ? "true",
     }:
     {
-      HERMES_HOME = hermesHome;
-      HERMES_MANAGED = managedSystem;
+      STARDUST_HOME = hermesHome;
+      STARDUST_MANAGED = managedSystem;
     };
 
   processPath =
@@ -1097,7 +1097,7 @@ let
 
           To give Hermes an identity and a memory, use
           ${optionPath}.hermesHomeFiles instead. Those files go to
-          HERMES_HOME. Hermes reads SOUL.md and memories/ only from there.
+          STARDUST_HOME. Hermes reads SOUL.md and memories/ only from there.
         '';
       }
     ];
@@ -1131,7 +1131,7 @@ let
       }
     ];
 
-  # The subdirectories of HERMES_HOME that both modules make.
+  # The subdirectories of STARDUST_HOME that both modules make.
   stateSubdirs = [
     "cron"
     "sessions"

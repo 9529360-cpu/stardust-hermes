@@ -75,7 +75,7 @@ def _get_script_timeout() -> int:
                 "Invalid patched _SCRIPT_TIMEOUT=%r; using env/config/default",
                 _sched._SCRIPT_TIMEOUT)
     resolved = _timeout_from_env_or_config(
-        "HERMES_CRON_SCRIPT_TIMEOUT", "script_timeout_seconds", _positive_int,
+        "STARDUST_CRON_SCRIPT_TIMEOUT", "script_timeout_seconds", _positive_int,
         "cron script timeout",
     )
     return _sched._DEFAULT_SCRIPT_TIMEOUT if resolved is None else resolved
@@ -85,20 +85,20 @@ _DEFAULT_MEDIA_SEND_TIMEOUT = 300
 
 
 def _get_media_send_timeout() -> int:
-    """Per-attachment media-send timeout: HERMES_CRON_MEDIA_SEND_TIMEOUT env, then
+    """Per-attachment media-send timeout: STARDUST_CRON_MEDIA_SEND_TIMEOUT env, then
     ``cron.media_send_timeout_seconds``, then 300s (long TTS audio can exceed a 30s window)."""
     resolved = _timeout_from_env_or_config(
-        "HERMES_CRON_MEDIA_SEND_TIMEOUT", "media_send_timeout_seconds", _positive_int,
+        "STARDUST_CRON_MEDIA_SEND_TIMEOUT", "media_send_timeout_seconds", _positive_int,
         "cron media-send timeout")
     return _DEFAULT_MEDIA_SEND_TIMEOUT if resolved is None else resolved
 
 
 def _get_session_db_timeout() -> float:
-    """Bound on run_job's SessionDB init: HERMES_CRON_SESSION_DB_TIMEOUT env, then
+    """Bound on run_job's SessionDB init: STARDUST_CRON_SESSION_DB_TIMEOUT env, then
     ``cron.session_db_timeout_seconds`` (in DEFAULT_CONFIG), then 10s. Unlike sibling timeouts,
     0 is meaningful (unlimited, debugging opt-in), so values pass through untouched."""
     resolved = _timeout_from_env_or_config(
-        "HERMES_CRON_SESSION_DB_TIMEOUT", "session_db_timeout_seconds", float,
+        "STARDUST_CRON_SESSION_DB_TIMEOUT", "session_db_timeout_seconds", float,
         "cron.session_db_timeout_seconds")
     return 10.0 if resolved is None else resolved
 
@@ -256,7 +256,7 @@ def _windows_cron_bootstrap_argv(
 
 def _resolve_script_path(script_path: str) -> tuple[Optional[Path], Optional[str]]:
     """Validate a job script path; ``(path, None)`` or ``(None, error)``. Scripts MUST resolve
-    inside HERMES_HOME/scripts/ (relative, absolute and ``~`` paths are all validated — path
+    inside STARDUST_HOME/scripts/ (relative, absolute and ``~`` paths are all validated — path
     traversal / absolute-path injection); contract of lifecycle_guard._expand_candidate_path."""
     scripts_dir = _sched._get_hermes_home() / "scripts"
     _ensure_cron_dir(scripts_dir)
@@ -279,7 +279,7 @@ def _resolve_script_path(script_path: str) -> tuple[Optional[Path], Optional[str
         return None, f"Blocked: script path is not a valid filesystem path: {script_path!r}"
     path = raw.resolve() if raw.is_absolute() else (scripts_dir / raw).resolve()
 
-    # Traversal / absolute-path / symlink escape guard — MUST stay inside HERMES_HOME/scripts/.
+    # Traversal / absolute-path / symlink escape guard — MUST stay inside STARDUST_HOME/scripts/.
     try:
         path.relative_to(scripts_dir_resolved)
     except ValueError:
@@ -329,7 +329,7 @@ def _run_job_script(
     §2.3). ``workdir`` sets the subprocess cwd only; the Python process cwd is NEVER mutated (an
     ``os.chdir()`` would leak into concurrent gateway sessions).
 
-    Args: script_path: Path to the script. Relative paths are resolved against HERMES_HOME/scripts/.
+    Args: script_path: Path to the script. Relative paths are resolved against STARDUST_HOME/scripts/.
     Absolute and ~-prefixed paths are also validated to ensure they stay within the scripts dir. workdir:
     Optional absolute path to use as the script's cwd. When set, the subprocess runs in this directory
     instead of the scripts-dir parent. See #69396.

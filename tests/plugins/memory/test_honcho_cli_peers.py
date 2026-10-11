@@ -9,7 +9,7 @@ always missed, so cmd_peers fell back to "(not set)" and leaked the raw
 malformed key into the AI-peer column.
 
 These tests drive the real cmd_peers / _all_profile_host_configs against
-a real honcho.json (temp HERMES_HOME, no network).
+a real honcho.json (temp STARDUST_HOME, no network).
 """
 import io
 import json

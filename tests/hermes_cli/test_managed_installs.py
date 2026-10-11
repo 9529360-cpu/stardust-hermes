@@ -9,10 +9,10 @@ from tools.skills_hub_official import OptionalSkillSource
 
 
 def test_recommended_update_command_defaults_to_hermes_update(monkeypatch):
-    monkeypatch.delenv("HERMES_MANAGED", raising=False)
+    monkeypatch.delenv("STARDUST_MANAGED", raising=False)
 
     # Also short-circuit the .managed marker path — CI runners may have an
-    # ambient ~/.hermes/.managed if a prior test left HERMES_HOME pointing
+    # ambient ~/.hermes/.managed if a prior test left STARDUST_HOME pointing
     # somewhere with that marker, which would make get_managed_update_command()
     # return "Update your Nix flake input ..." instead of falling through to
     # detect_install_method().
@@ -24,7 +24,7 @@ def test_recommended_update_command_defaults_to_hermes_update(monkeypatch):
 @pytest.mark.parametrize("false_value", ["false", "0", "no", "off", "FALSE"])
 def test_get_managed_system_false_values(monkeypatch, false_value):
     """An explicit opt-out is not a package manager named "false" (#12864)."""
-    monkeypatch.setenv("HERMES_MANAGED", false_value)
+    monkeypatch.setenv("STARDUST_MANAGED", false_value)
 
     assert get_managed_system() is None
     assert not is_managed()
@@ -35,7 +35,7 @@ def test_get_managed_system_false_values(monkeypatch, false_value):
 def test_optional_skill_source_honors_env_override(monkeypatch, tmp_path):
     optional_dir = tmp_path / "optional-skills"
     optional_dir.mkdir()
-    monkeypatch.setenv("HERMES_OPTIONAL_SKILLS", str(optional_dir))
+    monkeypatch.setenv("STARDUST_OPTIONAL_SKILLS", str(optional_dir))
 
     source = OptionalSkillSource()
 

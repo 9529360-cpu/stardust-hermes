@@ -34,7 +34,7 @@ from agent.lsp.install import INSTALL_RECIPES
 
 def test_install_npm_works_without_extras(tmp_path, monkeypatch):
     """Backwards compat: pyright-style recipes (no extras) still install."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
 
     captured = {}
 
@@ -70,7 +70,7 @@ def test_install_pip_finds_windows_scripts_launcher(tmp_path, monkeypatch):
     made the test assert against a directory tree the test itself created, on
     a host where pip would never lay it out that way.
     """
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
 
     from agent.lsp import install as install_mod
 
@@ -102,7 +102,7 @@ def test_install_pip_finds_windows_scripts_launcher(tmp_path, monkeypatch):
 
 def test_backend_warnings_fires_when_bash_installed_but_shellcheck_missing(tmp_path, monkeypatch):
     """The exact scenario from the bug report."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     from agent.lsp import cli as lsp_cli
 
     def which(name):
@@ -119,7 +119,7 @@ def test_backend_warnings_fires_when_bash_installed_but_shellcheck_missing(tmp_p
 
 def test_status_output_includes_backend_warnings_section(tmp_path, monkeypatch):
     """End-to-end: status command output includes the warning section."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
 
     # Pretend bash-language-server is installed but shellcheck is missing
     def which(name):

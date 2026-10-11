@@ -132,8 +132,8 @@ _ENV_VAR_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 # implicitly-invoked commands (BROWSER/EDITOR/VISUAL/PAGER = RCE on next $EDITOR), SHELL,
 # and Hermes runtime-location / security-policy flags (config.yaml is the supported surface).
 #
-# ``HERMES_*`` overall is NOT blocked — many integration credentials use that prefix
-# (HERMES_LANGFUSE_PUBLIC_KEY, HERMES_SPOTIFY_CLIENT_ID, ...). The denylist is name-by-name so
+# ``STARDUST_*`` overall is NOT blocked — many integration credentials use that prefix
+# (STARDUST_LANGFUSE_PUBLIC_KEY, STARDUST_SPOTIFY_CLIENT_ID, ...). The denylist is name-by-name so
 # it cannot break provider setup wizards. Enforced on *write* only: pre-existing/out-of-band
 # ``.env`` values keep working; the dashboard's writable surface just cannot escalate.
 _ENV_VAR_NAME_DENYLIST: frozenset[str] = frozenset({
@@ -148,17 +148,17 @@ _ENV_VAR_NAME_DENYLIST: frozenset[str] = frozenset({
     "PATH", "SHELL", "BROWSER", "EDITOR", "VISUAL", "PAGER",
     "GIT_SSH_COMMAND", "GIT_EXEC_PATH", "GIT_SHELL",
     # Hermes runtime location
-    "HERMES_HOME", "HERMES_PROFILE", "HERMES_CONFIG", "HERMES_ENV",
-    "HERMES_CONFIG_PATH", "HERMES_ENV_PATH",
+    "STARDUST_HOME", "STARDUST_PROFILE", "STARDUST_CONFIG", "STARDUST_ENV",
+    "STARDUST_CONFIG_PATH", "STARDUST_ENV_PATH",
     # MCP catalog trust root; package-manager wrappers may still set it in the process env.
-    "HERMES_OPTIONAL_MCPS",
+    "STARDUST_OPTIONAL_MCPS",
     # Local ACP subprocess selection (executable/argv authority).
-    "HERMES_COPILOT_ACP_COMMAND", "HERMES_COPILOT_ACP_ARGS",
+    "STARDUST_COPILOT_ACP_COMMAND", "STARDUST_COPILOT_ACP_ARGS",
     # Security policy / approval-routing context — set via their dedicated controls only.
-    "HERMES_YOLO_MODE", "HERMES_ACCEPT_HOOKS", "HERMES_REDACT_SECRETS",
-    "HERMES_INTERACTIVE", "HERMES_EXEC_ASK", "HERMES_GATEWAY_SESSION",
-    "HERMES_CRON_SESSION", "HERMES_SINGLE_QUERY_SESSION",
-    "HERMES_SESSION_KEY", "HERMES_SESSION_PLATFORM"})
+    "STARDUST_YOLO_MODE", "STARDUST_ACCEPT_HOOKS", "STARDUST_REDACT_SECRETS",
+    "STARDUST_INTERACTIVE", "STARDUST_EXEC_ASK", "STARDUST_GATEWAY_SESSION",
+    "STARDUST_CRON_SESSION", "STARDUST_SINGLE_QUERY_SESSION",
+    "STARDUST_SESSION_KEY", "STARDUST_SESSION_PLATFORM"})
 
 
 def _env_var_policy_name(key: str, *, is_windows: Optional[bool] = None) -> str:
@@ -176,7 +176,7 @@ def validate_env_var_name_for_write(key: str) -> None:
         raise ValueError(
             f"Environment variable {key!r} is on the writer denylist. "
             "Names that influence subprocess execution (LD_PRELOAD, PYTHONPATH, PATH, EDITOR, ...) "
-            "or Hermes runtime location and security policy (HERMES_HOME, HERMES_YOLO_MODE, ...) "
+            "or Hermes runtime location and security policy (STARDUST_HOME, STARDUST_YOLO_MODE, ...) "
             "cannot be persisted via the env writer. If you really need this, edit ~/.hermes/.env "
             "directly.")
 
@@ -230,9 +230,9 @@ _EXTRA_ENV_KEYS = frozenset({
     "IRC_SERVER", "IRC_PORT", "IRC_NICKNAME", "IRC_CHANNEL", "IRC_USE_TLS", "IRC_SERVER_PASSWORD",
     "IRC_NICKSERV_PASSWORD", "TERMINAL_ENV", "TERMINAL_SSH_KEY", "TERMINAL_SSH_PORT",
     # Deprecated (replaced by display.tool_progress) but STILL READ by the gateway as a
-    # back-compat fallback. The boolean HERMES_TOOL_PROGRESS variant is unsupported (its only
+    # back-compat fallback. The boolean STARDUST_TOOL_PROGRESS variant is unsupported (its only
     # consumer, the v3->4 migration, is below the v12 support floor); doctor flags it as ignored.
-    "HERMES_TOOL_PROGRESS_MODE",
+    "STARDUST_TOOL_PROGRESS_MODE",
     "WHATSAPP_MODE", "WHATSAPP_ENABLED",
     "MATTERMOST_HOME_CHANNEL", "MATTERMOST_HOME_CHANNEL_NAME", "MATTERMOST_REPLY_MODE",
     "MATRIX_PASSWORD", "MATRIX_ENCRYPTION", "MATRIX_DEVICE_ID", "MATRIX_HOME_ROOM",
@@ -240,12 +240,12 @@ _EXTRA_ENV_KEYS = frozenset({
     "MATRIX_RECOVERY_KEY",
     # Langfuse observability plugin tuning keys + standard SDK vars (activation is via
     # plugins.enabled; credentials gate the plugin at runtime).
-    "HERMES_LANGFUSE_ENV", "HERMES_LANGFUSE_RELEASE", "HERMES_LANGFUSE_SAMPLE_RATE",
-    "HERMES_LANGFUSE_MAX_CHARS", "HERMES_LANGFUSE_CAPTURE", "HERMES_LANGFUSE_DEBUG",
+    "STARDUST_LANGFUSE_ENV", "STARDUST_LANGFUSE_RELEASE", "STARDUST_LANGFUSE_SAMPLE_RATE",
+    "STARDUST_LANGFUSE_MAX_CHARS", "STARDUST_LANGFUSE_CAPTURE", "STARDUST_LANGFUSE_DEBUG",
     "LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY", "LANGFUSE_BASE_URL",
     # ACP (Agent Client Protocol) keys — profile-isolable so profiles can use different backends.
-    "HERMES_ACP_AUTH_METHOD", "HERMES_ACP_AUTO_APPROVE", "HERMES_COPILOT_ACP_COMMAND",
-    "HERMES_COPILOT_ACP_ARGS", "COPILOT_CLI_PATH", "COPILOT_ACP_BASE_URL"})
+    "STARDUST_ACP_AUTH_METHOD", "STARDUST_ACP_AUTO_APPROVE", "STARDUST_COPILOT_ACP_COMMAND",
+    "STARDUST_COPILOT_ACP_ARGS", "COPILOT_CLI_PATH", "COPILOT_ACP_BASE_URL"})
 
 
 # ---- Managed mode (NixOS declarative config) ----
@@ -255,21 +255,21 @@ _NIX_MANAGED_SYSTEMS = {"nixos", "home-manager"}
 # Only the NixOS module ever wrote a bare "true" or an empty marker.
 _LEGACY_MANAGED_SYSTEM = "nixos"
 # Nix store root; identifies `nix run` / `nix profile install` installs (which don't set
-# HERMES_MANAGED). Module-level so tests can patch it without touching /nix/store.
+# STARDUST_MANAGED). Module-level so tests can patch it without touching /nix/store.
 _NIX_STORE = Path("/nix/store")
 # Homebrew is no longer a supported distribution: these markers fall through to git/unknown
 # detection instead of blocking config writes.
 _IGNORED_MANAGED_VALUES = frozenset({"brew", "homebrew"})
-# Explicit opt-out (``HERMES_MANAGED=false``): without this a bool-shaped value became a package
+# Explicit opt-out (``STARDUST_MANAGED=false``): without this a bool-shaped value became a package
 # manager literally named "false" and is_managed() blocked `hermes update` (#12864).
 _MANAGED_FALSE_VALUES = frozenset({"false", "0", "no", "off"})
 
 
 def get_managed_system() -> Optional[str]:
     """Return the package manager owning this install, if any.
-    Signals: HERMES_MANAGED env var (systemd service) or a ``.managed`` marker file in
-    HERMES_HOME (NixOS activation script — interactive shells don't see the service env)."""
-    marker = os.getenv("HERMES_MANAGED", "").strip().lower() or None
+    Signals: STARDUST_MANAGED env var (systemd service) or a ``.managed`` marker file in
+    STARDUST_HOME (NixOS activation script — interactive shells don't see the service env)."""
+    marker = os.getenv("STARDUST_MANAGED", "").strip().lower() or None
     managed_marker = get_hermes_home() / ".managed"
     if marker is None and managed_marker.exists():
         try:
@@ -318,8 +318,8 @@ def _install_method_stamp(path: Path) -> Optional[str]:
 def detect_install_method(project_root: Optional[Path] = None) -> str:
     """Detect how Hermes was installed: apt/docker/nix/nixos/home-manager/git/unknown.
     Order: code-scoped ``<install tree>/.install_method`` stamp (authoritative) -> legacy
-    ``$HERMES_HOME/.install_method`` -> managed marker -> /nix/store path -> .git dir -> unknown.
-    The stamp lives next to the code because HERMES_HOME is shared data: a container and a host
+    ``$STARDUST_HOME/.install_method`` -> managed marker -> /nix/store path -> .git dir -> unknown.
+    The stamp lives next to the code because STARDUST_HOME is shared data: a container and a host
     install can bind-mount the same home, so a home-scoped ``docker`` stamp would make the host
     ``hermes update`` refuse to run. A legacy ``docker`` value is therefore ignored unless we are
     really inside a container, and being in a container alone never implies 'docker'.
@@ -330,7 +330,7 @@ def detect_install_method(project_root: Optional[Path] = None) -> str:
     ``/opt/hermes`` at build time. An unsupported manual install dropped into a container (no stamp) falls
     through to the ``.git`` checks and behaves like any off-path install. See issue #34397.
     """
-    # The stamp is a property of the running code tree (parent of hermes_cli/), NOT of $HERMES_HOME,
+    # The stamp is a property of the running code tree (parent of hermes_cli/), NOT of $STARDUST_HOME,
     # so it survives two installs sharing a home.
     root = project_root if project_root is not None else get_project_root()
     method = _install_method_stamp(root / ".install_method")
@@ -422,7 +422,7 @@ Notes:
     won't move your container — pull the newer tag you actually want, or
     switch to ``:latest`` / ``:main`` for rolling updates.  See available
     tags at https://hub.docker.com/r/nousresearch/hermes-agent/tags
-  • Your config and session history live under ``$HERMES_HOME`` (``/opt/data``
+  • Your config and session history live under ``$STARDUST_HOME`` (``/opt/data``
     in the container, typically bind-mounted from the host) and persist
     across image upgrades — re-pulling doesn't lose any state.
   • Running a fork?  Build your own image with this repo's ``Dockerfile``
@@ -448,12 +448,12 @@ def managed_error(action: str = "modify configuration"):
 
 
 def get_container_exec_info() -> Optional[dict]:
-    """Read container mode metadata from HERMES_HOME/.container-mode.
+    """Read container mode metadata from STARDUST_HOME/.container-mode.
     Written by the NixOS activation script when container.enable = true; tells the host CLI to
     exec into the container instead of running locally. None when container mode is off, when
-    already inside the container, or when HERMES_DEV=1 is set. Only FileNotFoundError is
+    already inside the container, or when STARDUST_DEV=1 is set. Only FileNotFoundError is
     swallowed; other errors (permissions, malformed data) propagate."""
-    if os.environ.get("HERMES_DEV") == "1":
+    if os.environ.get("STARDUST_DEV") == "1":
         return None
 
     from hermes_constants import is_container
@@ -478,7 +478,7 @@ def get_container_exec_info() -> Optional[dict]:
         "hermes_bin": info.get("hermes_bin", "/data/current-package/bin/hermes")}
 
 
-# ---- Config paths / HERMES_HOME skeleton ----
+# ---- Config paths / STARDUST_HOME skeleton ----
 
 def get_config_path() -> Path:
     """Get the main config file path."""
@@ -490,8 +490,8 @@ def require_parseable_user_config(*, ignore_user_config: bool = False) -> None:
     Interactive surfaces keep ``load_config()``'s recovery behavior so the operator can repair
     the file; a one-shot run has no such chance, and defaults there could silently pick a hosted
     provider and spend against ``.env`` credentials. Missing/empty files stay valid first-run
-    states; ``--ignore-user-config`` / HERMES_IGNORE_USER_CONFIG=1 remain authoritative."""
-    if ignore_user_config or os.environ.get("HERMES_IGNORE_USER_CONFIG") == "1":
+    states; ``--ignore-user-config`` / STARDUST_IGNORE_USER_CONFIG=1 remain authoritative."""
+    if ignore_user_config or os.environ.get("STARDUST_IGNORE_USER_CONFIG") == "1":
         return
 
     config_path = get_config_path()
@@ -532,8 +532,8 @@ def get_project_root() -> Path:
 
 
 def _resolve_hermes_uid_gid() -> tuple[Optional[int], Optional[int]]:
-    """Read HERMES_UID / HERMES_GID (set by Docker deployments); (None, None) if unset/invalid/Windows.
-    The entrypoint chowns HERMES_HOME once, but subdirs created at runtime (``profiles/<name>/``)
+    """Read STARDUST_UID / STARDUST_GID (set by Docker deployments); (None, None) if unset/invalid/Windows.
+    The entrypoint chowns STARDUST_HOME once, but subdirs created at runtime (``profiles/<name>/``)
     need the same chown or they land root:root and block later uid-mapped workers.
 
     Docker containers running Hermes commonly set these to map the in-container user to a host user so
@@ -548,11 +548,11 @@ def _resolve_hermes_uid_gid() -> tuple[Optional[int], Optional[int]]:
         except (TypeError, ValueError):
             return None
 
-    return _env_int("HERMES_UID"), _env_int("HERMES_GID")
+    return _env_int("STARDUST_UID"), _env_int("STARDUST_GID")
 
 
 def _chown_to_hermes_uid(path) -> None:
-    """Chown ``path`` to ``HERMES_UID:HERMES_GID`` when set; EPERM/ENOENT are non-fatal (the
+    """Chown ``path`` to ``STARDUST_UID:STARDUST_GID`` when set; EPERM/ENOENT are non-fatal (the
     entrypoint's startup chown -R fixes ownership on the next restart).
 
     Used by :func:`_secure_dir` to keep ownership consistent across all directories created by
@@ -568,21 +568,21 @@ def _chown_to_hermes_uid(path) -> None:
 
 
 def _secure_dir(path):
-    """chmod a directory owner-only (0700) and apply HERMES_UID/GID ownership. No-op when managed;
-    in a container only an explicit HERMES_HOME_MODE is applied. HERMES_HOME_MODE (e.g. 0701)
-    overrides the mode so a web server can traverse HERMES_HOME to a served subdirectory without
+    """chmod a directory owner-only (0700) and apply STARDUST_UID/GID ownership. No-op when managed;
+    in a container only an explicit STARDUST_HOME_MODE is applied. STARDUST_HOME_MODE (e.g. 0701)
+    overrides the mode so a web server can traverse STARDUST_HOME to a served subdirectory without
     directory listings.
 
-    Also applies ``HERMES_UID``/``HERMES_GID``-based ownership when those env vars are set (#34107 — Docker
+    Also applies ``STARDUST_UID``/``STARDUST_GID``-based ownership when those env vars are set (#34107 — Docker
     deployments need this so profile subdirs created at runtime by kanban workers don't land as root:root
     and block subsequent uid-mapped workers).
     """
     if is_managed():
         return
-    explicit_mode = os.environ.get("HERMES_HOME_MODE", "").strip()
+    explicit_mode = os.environ.get("STARDUST_HOME_MODE", "").strip()
     # Same skip as _secure_file: a bind-mounted data dir is often shared with sibling containers
     # running as other UIDs (web UI, permissions fixers); forcing 0700 on it locks them out on every
-    # start (#10757). An explicit HERMES_HOME_MODE is the operator's choice and is still applied.
+    # start (#10757). An explicit STARDUST_HOME_MODE is the operator's choice and is still applied.
     if _is_container() and not explicit_mode:
         _chown_to_hermes_uid(path)
         return
@@ -598,10 +598,10 @@ def _secure_dir(path):
 
 
 def _is_container() -> bool:
-    """Detect Docker/Podman/LXC (or HERMES_CONTAINER / HERMES_SKIP_CHMOD opt-out).
+    """Detect Docker/Podman/LXC (or STARDUST_CONTAINER / STARDUST_SKIP_CHMOD opt-out).
     Volume-mounted config is not forced to 0o600 in containers: gateway and dashboard may run
     as different UIDs, or the mount itself needs broader permissions."""
-    if (os.environ.get("HERMES_CONTAINER") or os.environ.get("HERMES_SKIP_CHMOD")
+    if (os.environ.get("STARDUST_CONTAINER") or os.environ.get("STARDUST_SKIP_CHMOD")
             or os.path.exists("/.dockerenv")):
         return True
     try:
@@ -1842,7 +1842,7 @@ def _canonicalize_config(config: Dict[str, Any]) -> Dict[str, Any]:
 
 
 # Sentinel for an unlimited turn budget. ``sys.maxsize`` survives the str->int round-trip through
-# the HERMES_MAX_ITERATIONS env bridge, works in every ``<``/``>=``/``max - used`` comparison in
+# the STARDUST_MAX_ITERATIONS env bridge, works in every ``<``/``>=``/``max - used`` comparison in
 # the iteration budget without an "unlimited" special case, and is unreachable in practice.
 TURN_LIMIT_UNLIMITED = sys.maxsize
 
@@ -2622,12 +2622,12 @@ def save_env_value(key: str, value: str):
 def custom_endpoint_key_env(identity: str) -> str:
     """Legacy env slot used by CLI setup and preexisting Desktop endpoints."""
     slug = re.sub(r"[^A-Z0-9]+", "_", str(identity or "").upper()).strip("_")
-    return f"HERMES_CUSTOM_{slug}_API_KEY" if slug else "HERMES_CUSTOM_API_KEY"
+    return f"STARDUST_CUSTOM_{slug}_API_KEY" if slug else "STARDUST_CUSTOM_API_KEY"
 
 
 def custom_endpoint_key_env_v2(identity: str) -> str:
     """Byte-preserving Desktop endpoint slot; callers still check persisted key_env collisions."""
-    return f"HERMES_CUSTOM_V2_{str(identity or '').encode('utf-8').hex().upper()}_API_KEY"
+    return f"STARDUST_CUSTOM_V2_{str(identity or '').encode('utf-8').hex().upper()}_API_KEY"
 
 
 def remove_env_value(key: str) -> bool:
@@ -2831,14 +2831,14 @@ def _show_model_section(config: Dict[str, Any]) -> None:
     print(f"  Model:        {redact_config_value(config.get('model', 'not set'))}")
     cfg_max_turns = config.get('agent', {}).get('max_turns', DEFAULT_CONFIG['agent']['max_turns'])
     print(f"  Max turns:    {cfg_max_turns}")
-    # Read the .env FILE directly so a stale HERMES_MAX_ITERATIONS ghost is caught even when the
+    # Read the .env FILE directly so a stale STARDUST_MAX_ITERATIONS ghost is caught even when the
     # gateway bridge already overrode os.environ.
     try:
-        env_ghost = load_env().get("HERMES_MAX_ITERATIONS")
+        env_ghost = load_env().get("STARDUST_MAX_ITERATIONS")
     except Exception:
         env_ghost = None
     if env_ghost is not None and str(env_ghost).strip() != str(cfg_max_turns).strip():
-        print(color(f"                ⚠ .env has stale HERMES_MAX_ITERATIONS={env_ghost} "
+        print(color(f"                ⚠ .env has stale STARDUST_MAX_ITERATIONS={env_ghost} "
                     f"(run 'hermes doctor --fix' to remove)", Colors.YELLOW))
 
 
@@ -3053,7 +3053,7 @@ def _model_assignment_text(value: Any) -> str:
 def resolve_cron_model_drift_defaults(
     config: Any, *, environ: Optional[Dict[str, str]] = None) -> Tuple[str, str]:
     """Resolve the global ``(provider, model)`` cron compares against snapshots.
-    Mirrors the scheduler's precedence: a truthy configured model wins over ``HERMES_MODEL``; the
+    Mirrors the scheduler's precedence: a truthy configured model wins over ``STARDUST_MODEL``; the
     environment is only a fallback. Per-job and cron fleet defaults are handled by the caller
     because they cover an axis rather than changing the global assignment."""
     env = os.environ if environ is None else environ
@@ -3063,7 +3063,7 @@ def resolve_cron_model_drift_defaults(
         provider = _model_assignment_text(model_config.get("provider"))
         model_config = model_config.get("default") or model_config.get("model") or model_config.get("name")
     configured_model = _model_assignment_text(model_config)
-    return provider, configured_model or _model_assignment_text(env.get("HERMES_MODEL", ""))
+    return provider, configured_model or _model_assignment_text(env.get("STARDUST_MODEL", ""))
 
 
 def cron_model_drift_axes(

@@ -17,7 +17,7 @@
 
 set -eu
 
-HERMES_HOME="${HERMES_HOME:-/opt/data}"
+STARDUST_HOME="${STARDUST_HOME:-/opt/data}"
 INSTALL_DIR="/opt/hermes"
 
 # Drop to hermes via s6-setuidgid, but skip it when already non-root.
@@ -32,12 +32,12 @@ as_hermes() { [ "$(id -u)" = 0 ] || { "$@"; return; }; s6-setuidgid hermes "$@";
 # ownership, config seeding) requires root, and it is skipped when the container
 # starts non-root. The baked install tree under /opt/hermes is intentionally
 # root-owned and non-writable; mutable runtime state must live under
-# $HERMES_HOME. An arbitrary `--user` UID therefore cannot repair or populate
+# $STARDUST_HOME. An arbitrary `--user` UID therefore cannot repair or populate
 # the data volume, and startup fails with EACCES. See #34837 for the
 # supervision-tree side of this.
 #
 # The supported way to match host-side ownership is to start as root (the image
-# default) and pass HERMES_UID/HERMES_GID — or the PUID/PGID aliases — which the
+# default) and pass STARDUST_UID/STARDUST_GID — or the PUID/PGID aliases — which the
 # remap block below consumes via usermod/groupmod + targeted chown. That gives
 # the exact same outcome (files owned by your host UID) without breaking s6.
 #
@@ -60,7 +60,7 @@ will fail.
 To make container-written files match your HOST user, DON'T use --user.
 Start the container as root (the default) and pass your host UID/GID instead:
 
-    docker run -e HERMES_UID=\$(id -u) -e HERMES_GID=\$(id -g) ...
+    docker run -e STARDUST_UID=\$(id -u) -e STARDUST_GID=\$(id -g) ...
 
 NAS users (Synology / unRAID / UGOS) can use the PUID/PGID aliases:
 
@@ -73,17 +73,17 @@ EOF
     exit 1
 fi
 
-# --- Bootstrap HERMES_HOME as root ---
+# --- Bootstrap STARDUST_HOME as root ---
 # Create the directory (and any missing parents) while we still have root
 # privileges so the chown checks below see real metadata and the later
 # `s6-setuidgid hermes mkdir -p` block doesn't EACCES on root-owned
-# ancestors. Without this, custom HERMES_HOME paths whose parents only
-# root can create (e.g. `HERMES_HOME=/home/hermes/.hermes` in a Compose
+# ancestors. Without this, custom STARDUST_HOME paths whose parents only
+# root can create (e.g. `STARDUST_HOME=/home/hermes/.hermes` in a Compose
 # file, or any path under a fresh / not pre-populated by the image)
 # fail on first boot with `mkdir: cannot create directory '/...': Permission
 # denied` and the cont-init hook exits non-zero. Idempotent — `mkdir -p`
 # is a no-op if the dir already exists. (#18482, salvages #18488)
-mkdir -p "$HERMES_HOME"
+mkdir -p "$STARDUST_HOME"
 
 # Numeric UID/GID validation: must be digits only, non-root, 1-65534.
 # NAS hosts such as Unraid commonly use low non-root IDs (99:100).
@@ -95,24 +95,24 @@ validate_uid_gid() {
 }
 
 # --- UID/GID remap ---
-# Accept PUID/PGID as aliases for HERMES_UID/HERMES_GID.  NAS users (UGOS,
+# Accept PUID/PGID as aliases for STARDUST_UID/STARDUST_GID.  NAS users (UGOS,
 # Synology, unRAID) expect the LinuxServer.io PUID/PGID convention and
 # bind-mount /opt/data from a host directory owned by their own UID; without
 # this alias those vars are silently ignored and the s6-setuidgid drop to
-# UID 10000 leaves the runtime unable to read the volume.  HERMES_UID/
-# HERMES_GID still win when both are set.  See #15290, salvages #25872.
-HERMES_UID="${HERMES_UID:-${PUID:-}}"
-HERMES_GID="${HERMES_GID:-${PGID:-}}"
+# UID 10000 leaves the runtime unable to read the volume.  STARDUST_UID/
+# STARDUST_GID still win when both are set.  See #15290, salvages #25872.
+STARDUST_UID="${STARDUST_UID:-${PUID:-}}"
+STARDUST_GID="${STARDUST_GID:-${PGID:-}}"
 
-if [ -n "${HERMES_UID:-}" ] && validate_uid_gid "$HERMES_UID" && [ "$HERMES_UID" != "$(id -u hermes)" ]; then
-    echo "[stage2] Changing hermes UID to $HERMES_UID"
-    usermod -u "$HERMES_UID" hermes
+if [ -n "${STARDUST_UID:-}" ] && validate_uid_gid "$STARDUST_UID" && [ "$STARDUST_UID" != "$(id -u hermes)" ]; then
+    echo "[stage2] Changing hermes UID to $STARDUST_UID"
+    usermod -u "$STARDUST_UID" hermes
 fi
-if [ -n "${HERMES_GID:-}" ] && validate_uid_gid "$HERMES_GID" && [ "$HERMES_GID" != "$(id -g hermes)" ]; then
-    echo "[stage2] Changing hermes GID to $HERMES_GID"
+if [ -n "${STARDUST_GID:-}" ] && validate_uid_gid "$STARDUST_GID" && [ "$STARDUST_GID" != "$(id -g hermes)" ]; then
+    echo "[stage2] Changing hermes GID to $STARDUST_GID"
     # -o allows non-unique GID (e.g. macOS GID 20 "staff" may already
     # exist as "dialout" in the Debian-based container image).
-    groupmod -o -g "$HERMES_GID" hermes 2>/dev/null || true
+    groupmod -o -g "$STARDUST_GID" hermes 2>/dev/null || true
 fi
 
 # --- Docker socket group membership (docker-in-docker / DooD) ---
@@ -172,9 +172,9 @@ for sock in /var/run/docker.sock /run/docker.sock; do
 done
 
 # --- Fix ownership of data volume ---
-# When HERMES_UID is remapped or the top-level $HERMES_HOME isn't owned by
+# When STARDUST_UID is remapped or the top-level $STARDUST_HOME isn't owned by
 # the runtime hermes UID, restore ownership to hermes — but ONLY for the
-# directories hermes actually writes to. The full $HERMES_HOME may be a
+# directories hermes actually writes to. The full $STARDUST_HOME may be a
 # host-mounted bind containing unrelated user files; `chown -R` would
 # silently destroy host ownership of those (see issue #19788).
 #
@@ -184,7 +184,7 @@ actual_hermes_uid=$(id -u hermes)
 
 path_has_symlink_component() {
     path="$1"
-    root="${2:-$HERMES_HOME}"
+    root="${2:-$STARDUST_HOME}"
     while [ -n "$path" ] && [ "$path" != "/" ]; do
         if [ -L "$path" ]; then
             return 0
@@ -226,30 +226,30 @@ tree_has_non_hermes_owner() {
 }
 
 needs_chown=false
-if [ "$(stat -c %u "$HERMES_HOME" 2>/dev/null)" != "$actual_hermes_uid" ]; then
+if [ "$(stat -c %u "$STARDUST_HOME" 2>/dev/null)" != "$actual_hermes_uid" ]; then
     needs_chown=true
 fi
 if [ "$needs_chown" = true ]; then
-    echo "[stage2] Fixing ownership of $HERMES_HOME (targeted) to hermes ($actual_hermes_uid)"
+    echo "[stage2] Fixing ownership of $STARDUST_HOME (targeted) to hermes ($actual_hermes_uid)"
     # In rootless Podman the container's "root" is mapped to an
     # unprivileged host UID — chown will fail. That's fine: the volume
     # is already owned by the mapped user on the host side.
     #
-    # Top-level $HERMES_HOME: chown the directory itself (not its contents)
+    # Top-level $STARDUST_HOME: chown the directory itself (not its contents)
     # so hermes can mkdir new subdirs but bind-mounted host files keep
     # their existing ownership.
-    if refuse_symlinked_path "chown" "$HERMES_HOME"; then
+    if refuse_symlinked_path "chown" "$STARDUST_HOME"; then
         :
     else
-        chown hermes:hermes "$HERMES_HOME" 2>/dev/null || \
-            echo "[stage2] Warning: chown $HERMES_HOME failed (rootless container?) — continuing"
+        chown hermes:hermes "$STARDUST_HOME" 2>/dev/null || \
+            echo "[stage2] Warning: chown $STARDUST_HOME failed (rootless container?) — continuing"
     fi
     # Hermes-owned subdirs: recursive chown is safe here because these are
     # created and managed exclusively by hermes (see the s6-setuidgid mkdir
     # -p block below for the canonical list).
     for sub in cron sessions logs hooks memories skills skins plans workspace home profiles pairing platforms/pairing lazy-packages; do
-        if [ -e "$HERMES_HOME/$sub" ] && tree_has_non_hermes_owner "$HERMES_HOME/$sub"; then
-            chown_hermes_tree "$HERMES_HOME/$sub"
+        if [ -e "$STARDUST_HOME/$sub" ] && tree_has_non_hermes_owner "$STARDUST_HOME/$sub"; then
+            chown_hermes_tree "$STARDUST_HOME/$sub"
         fi
     done
 fi
@@ -257,15 +257,15 @@ fi
 # --- Immutable install tree ---
 # Do not chown runtime code or dependency trees under $INSTALL_DIR back to the
 # hermes user. Hosted/container instances keep mutable state under
-# $HERMES_HOME (/opt/data) and run with PYTHONDONTWRITEBYTECODE plus
-# HERMES_DISABLE_LAZY_INSTALLS=1. Keeping /opt/hermes root-owned and
+# $STARDUST_HOME (/opt/data) and run with PYTHONDONTWRITEBYTECODE plus
+# STARDUST_DISABLE_LAZY_INSTALLS=1. Keeping /opt/hermes root-owned and
 # non-writable prevents an agent session from self-modifying the installed
 # source, venv, TUI bundle, or node_modules and bricking the gateway.
 #
 # Lazy-installable optional backends (Firecrawl, Exa, Feishu, etc.) cannot
 # install into the sealed venv, so they are redirected to the writable
-# $HERMES_HOME/lazy-packages dir on the data volume (Dockerfile sets
-# HERMES_LAZY_INSTALL_TARGET). That dir is appended to the END of sys.path,
+# $STARDUST_HOME/lazy-packages dir on the data volume (Dockerfile sets
+# STARDUST_LAZY_INSTALL_TARGET). That dir is appended to the END of sys.path,
 # so a package installed there can only ADD modules — it can never shadow or
 # break a core module, which is what keeps the sealed-venv guarantee intact
 # even though installs are re-enabled. The dir is seeded + chowned to hermes
@@ -273,7 +273,7 @@ fi
 # unprivileged runtime user, and it persists across container recreates /
 # image updates (an ABI stamp wipes it if a rebuild bumps the interpreter).
 
-# Always reset ownership of $HERMES_HOME/profiles to hermes on every
+# Always reset ownership of $STARDUST_HOME/profiles to hermes on every
 # boot. Profile dirs and files can land owned by root when commands
 # are invoked via `docker exec <container> hermes …` (which defaults
 # to root unless `-u` is passed), and that breaks the cont-init
@@ -281,32 +281,32 @@ fi
 # the profiles dir. Skip the recursive walk when the tree is already
 # owned correctly so warm boots do not rescan huge profile caches.
 # Idempotent; skipped on rootless containers where chown would fail.
-if [ -d "$HERMES_HOME/profiles" ] && tree_has_non_hermes_owner "$HERMES_HOME/profiles"; then
-    chown_hermes_tree "$HERMES_HOME/profiles"
+if [ -d "$STARDUST_HOME/profiles" ] && tree_has_non_hermes_owner "$STARDUST_HOME/profiles"; then
+    chown_hermes_tree "$STARDUST_HOME/profiles"
 fi
 
-# Always reset ownership of $HERMES_HOME/cron on every boot for the same
+# Always reset ownership of $STARDUST_HOME/cron on every boot for the same
 # docker-exec/root-write reason as profiles/. The cron scheduler state
 # (jobs.json) must stay readable by the unprivileged hermes runtime even
 # after root-context maintenance commands or scheduler writes. Skip the
 # recursive walk when the tree is already owned correctly (same warm-boot
 # gate as profiles/).
-if [ -d "$HERMES_HOME/cron" ] && tree_has_non_hermes_owner "$HERMES_HOME/cron"; then
-    chown_hermes_tree "$HERMES_HOME/cron"
+if [ -d "$STARDUST_HOME/cron" ] && tree_has_non_hermes_owner "$STARDUST_HOME/cron"; then
+    chown_hermes_tree "$STARDUST_HOME/cron"
 fi
 
 # Always ensure logs/gateways is hermes-owned (#45258). Formerly healed by
 # restartable gateway log/run chown — removed due to symlink TOCTOU
 # (CWE-59/367). The targeted data-volume chown above only runs when the
-# top-level $HERMES_HOME is mis-owned, so a warm volume with hermes-owned
-# HERMES_HOME but root-owned logs/gateways would otherwise leave
+# top-level $STARDUST_HOME is mis-owned, so a warm volume with hermes-owned
+# STARDUST_HOME but root-owned logs/gateways would otherwise leave
 # s6-setuidgid hermes mkdir failing with Permission denied. Non-recursive:
 # profile leaf dirs are each created/owned by their own log/run as hermes.
-if [ -d "$HERMES_HOME/logs/gateways" ]; then
-    if refuse_symlinked_path "chown" "$HERMES_HOME/logs/gateways"; then
+if [ -d "$STARDUST_HOME/logs/gateways" ]; then
+    if refuse_symlinked_path "chown" "$STARDUST_HOME/logs/gateways"; then
         :
     else
-        chown hermes:hermes "$HERMES_HOME/logs/gateways" 2>/dev/null || true
+        chown hermes:hermes "$STARDUST_HOME/logs/gateways" 2>/dev/null || true
     fi
 fi
 
@@ -315,22 +315,22 @@ fi
 # hermes pairing approve …` defaults to uid=0 and writes 0600 root-owned
 # approval files that the unprivileged hermes gateway cannot read,
 # silently leaving the approved user unauthorized (#10270). The targeted
-# data-volume chown above only runs when the top-level $HERMES_HOME is
+# data-volume chown above only runs when the top-level $STARDUST_HOME is
 # mis-owned, so warm boots skip it — this block makes a container restart
 # self-heal. Tiny directory (a handful of small JSON files), so even the
 # ownership pre-scan is negligible; gated for consistency with profiles/
 # and cron/.
-if [ -d "$HERMES_HOME/platforms/pairing" ] && tree_has_non_hermes_owner "$HERMES_HOME/platforms/pairing"; then
-    chown_hermes_tree "$HERMES_HOME/platforms/pairing"
+if [ -d "$STARDUST_HOME/platforms/pairing" ] && tree_has_non_hermes_owner "$STARDUST_HOME/platforms/pairing"; then
+    chown_hermes_tree "$STARDUST_HOME/platforms/pairing"
 fi
 # Legacy location (pre-consolidated layout).
-if [ -d "$HERMES_HOME/pairing" ] && tree_has_non_hermes_owner "$HERMES_HOME/pairing"; then
-    chown_hermes_tree "$HERMES_HOME/pairing"
+if [ -d "$STARDUST_HOME/pairing" ] && tree_has_non_hermes_owner "$STARDUST_HOME/pairing"; then
+    chown_hermes_tree "$STARDUST_HOME/pairing"
 fi
 
 # Reset ownership of hermes-owned top-level state files on every boot.
 # The targeted data-volume chown above only covers hermes-owned
-# *subdirectories*; loose state files living directly under $HERMES_HOME
+# *subdirectories*; loose state files living directly under $STARDUST_HOME
 # are missed. When those files are created or rewritten by
 # `docker exec <container> hermes …` (root unless `-u` is passed) they
 # land root-owned, and the unprivileged hermes runtime then hits
@@ -338,7 +338,7 @@ fi
 # auth.json), producing a gateway restart loop.
 #
 # We use an explicit allowlist rather than a blanket `find -user root`
-# sweep so host-owned files in a bind-mounted $HERMES_HOME are never
+# sweep so host-owned files in a bind-mounted $STARDUST_HOME are never
 # touched — same targeted-ownership contract as the subdir chown above
 # (issue #19788, PR #19795). The list mirrors the top-level *file*
 # entries of hermes_cli.profile_distribution.USER_OWNED_EXCLUDE plus the
@@ -350,11 +350,11 @@ for f in \
     response_store.db response_store.db-shm response_store.db-wal \
     gateway.pid gateway.lock gateway_state.json processes.json \
     active_profile; do
-    if [ -e "$HERMES_HOME/$f" ]; then
-        if refuse_symlinked_path "chown" "$HERMES_HOME/$f"; then
+    if [ -e "$STARDUST_HOME/$f" ]; then
+        if refuse_symlinked_path "chown" "$STARDUST_HOME/$f"; then
             :
         else
-            chown hermes:hermes "$HERMES_HOME/$f" 2>/dev/null || true
+            chown hermes:hermes "$STARDUST_HOME/$f" 2>/dev/null || true
         fi
     fi
 done
@@ -362,12 +362,12 @@ done
 # --- config.yaml permissions ---
 # Ensure config.yaml is readable by the hermes runtime user even if it
 # was edited on the host after initial ownership setup.
-if [ -f "$HERMES_HOME/config.yaml" ]; then
-    if refuse_symlinked_path "chown/chmod" "$HERMES_HOME/config.yaml"; then
+if [ -f "$STARDUST_HOME/config.yaml" ]; then
+    if refuse_symlinked_path "chown/chmod" "$STARDUST_HOME/config.yaml"; then
         :
     else
-        chown hermes:hermes "$HERMES_HOME/config.yaml" 2>/dev/null || true
-        chmod 640 "$HERMES_HOME/config.yaml" 2>/dev/null || true
+        chown hermes:hermes "$STARDUST_HOME/config.yaml" 2>/dev/null || true
+        chmod 640 "$STARDUST_HOME/config.yaml" 2>/dev/null || true
     fi
 fi
 
@@ -376,42 +376,42 @@ fi
 # under rootless Podman where chown back to root would fail).
 #
 # Use direct `mkdir -p` invocation (no `sh -c "..."` wrapper) so the
-# shell isn't a second interpreter — defends against $HERMES_HOME values
+# shell isn't a second interpreter — defends against $STARDUST_HOME values
 # containing shell metacharacters. PR #30136 review item O2.
 as_hermes mkdir -p \
-    "$HERMES_HOME/backups" \
-    "$HERMES_HOME/cron" \
-    "$HERMES_HOME/sessions" \
-    "$HERMES_HOME/logs" \
-    "$HERMES_HOME/logs/gateways" \
-    "$HERMES_HOME/hooks" \
-    "$HERMES_HOME/memories" \
-    "$HERMES_HOME/skills" \
-    "$HERMES_HOME/skins" \
-    "$HERMES_HOME/plans" \
-    "$HERMES_HOME/workspace" \
-    "$HERMES_HOME/home" \
-    "$HERMES_HOME/pairing" \
-    "$HERMES_HOME/platforms/pairing" \
-    "$HERMES_HOME/lazy-packages"
+    "$STARDUST_HOME/backups" \
+    "$STARDUST_HOME/cron" \
+    "$STARDUST_HOME/sessions" \
+    "$STARDUST_HOME/logs" \
+    "$STARDUST_HOME/logs/gateways" \
+    "$STARDUST_HOME/hooks" \
+    "$STARDUST_HOME/memories" \
+    "$STARDUST_HOME/skills" \
+    "$STARDUST_HOME/skins" \
+    "$STARDUST_HOME/plans" \
+    "$STARDUST_HOME/workspace" \
+    "$STARDUST_HOME/home" \
+    "$STARDUST_HOME/pairing" \
+    "$STARDUST_HOME/platforms/pairing" \
+    "$STARDUST_HOME/lazy-packages"
 
 # --- Install-method stamp ---
 # The 'docker' stamp is baked into the immutable install tree at
 # /opt/hermes/.install_method (see Dockerfile), NOT written here into
-# $HERMES_HOME. detect_install_method() reads the code-scoped stamp first.
+# $STARDUST_HOME. detect_install_method() reads the code-scoped stamp first.
 #
-# Why we no longer stamp $HERMES_HOME: it is a shared DATA volume, commonly
+# Why we no longer stamp $STARDUST_HOME: it is a shared DATA volume, commonly
 # bind-mounted from the host (~/.hermes:/opt/data) and sometimes shared with a
 # host-side Desktop/CLI install. Stamping 'docker' here clobbered that host
 # install's marker, so its in-app updater read 'docker' and refused to run
 # 'hermes update'. To heal homes already poisoned by older images, remove a
-# stale 'docker' stamp from $HERMES_HOME if one is present (the host install's
+# stale 'docker' stamp from $STARDUST_HOME if one is present (the host install's
 # own installer re-creates its code-scoped stamp; a genuine container relies on
 # the baked /opt/hermes stamp, so deleting the data-dir copy is safe).
-if [ -f "$HERMES_HOME/.install_method" ]; then
-    stamped="$(tr -d '[:space:]' < "$HERMES_HOME/.install_method" 2>/dev/null || true)"
+if [ -f "$STARDUST_HOME/.install_method" ]; then
+    stamped="$(tr -d '[:space:]' < "$STARDUST_HOME/.install_method" 2>/dev/null || true)"
     if [ "$stamped" = "docker" ]; then
-        rm -f "$HERMES_HOME/.install_method" 2>/dev/null || true
+        rm -f "$STARDUST_HOME/.install_method" 2>/dev/null || true
     fi
 fi
 
@@ -419,11 +419,11 @@ fi
 seed_one() {
     dest=$1
     src=$2
-    if [ ! -f "$HERMES_HOME/$dest" ] && [ -f "$INSTALL_DIR/$src" ]; then
-        if refuse_symlinked_path "seed" "$HERMES_HOME/$dest"; then
+    if [ ! -f "$STARDUST_HOME/$dest" ] && [ -f "$INSTALL_DIR/$src" ]; then
+        if refuse_symlinked_path "seed" "$STARDUST_HOME/$dest"; then
             :
         else
-            as_hermes cp "$INSTALL_DIR/$src" "$HERMES_HOME/$dest"
+            as_hermes cp "$INSTALL_DIR/$src" "$STARDUST_HOME/$dest"
         fi
     fi
 }
@@ -453,12 +453,12 @@ seed_one "SOUL.md" "docker/SOUL.md"
 #
 # OPERATOR-PROVIDED KEYS WIN: if the container environment already carries
 # API_SERVER_KEY (documented `docker run -e API_SERVER_KEY=...` flow), do
-# not generate one. Hermes loads $HERMES_HOME/.env with override=True, so
+# not generate one. Hermes loads $STARDUST_HOME/.env with override=True, so
 # a generated key written here would silently SHADOW the operator's env
 # key and 401 every client still using the supplied credential.
 if [ -n "${API_SERVER_KEY:-}" ]; then
-    if [ -f "$HERMES_HOME/.env" ] && grep -q '^API_SERVER_KEY=..*' "$HERMES_HOME/.env" 2>/dev/null; then
-        echo "[stage2] Warning: API_SERVER_KEY is set in both the container environment and $HERMES_HOME/.env — the .env value wins at runtime (loaded with override=True)"
+    if [ -f "$STARDUST_HOME/.env" ] && grep -q '^API_SERVER_KEY=..*' "$STARDUST_HOME/.env" 2>/dev/null; then
+        echo "[stage2] Warning: API_SERVER_KEY is set in both the container environment and $STARDUST_HOME/.env — the .env value wins at runtime (loaded with override=True)"
     else
         # The env key is the effective key on this boot (no .env key wins
         # over it). The api_server startup guard refuses keys shorter than
@@ -475,41 +475,41 @@ if [ -n "${API_SERVER_KEY:-}" ]; then
         # override=True and python-dotenv sets the empty string, which fails
         # the api_server's startup guard — the exact silent-cron-loss symptom
         # this hook exists to prevent. Drop it so the operator key wins.
-        if [ -f "$HERMES_HOME/.env" ] && ! refuse_symlinked_path "clean" "$HERMES_HOME/.env"; then
-            sed -i '/^API_SERVER_KEY=$/d' "$HERMES_HOME/.env" 2>/dev/null || true
+        if [ -f "$STARDUST_HOME/.env" ] && ! refuse_symlinked_path "clean" "$STARDUST_HOME/.env"; then
+            sed -i '/^API_SERVER_KEY=$/d' "$STARDUST_HOME/.env" 2>/dev/null || true
         fi
         echo "[stage2] API_SERVER_KEY provided via container environment — skipping generation"
     fi
-elif ! grep -q '^API_SERVER_KEY=..*' "$HERMES_HOME/.env" 2>/dev/null; then
-    if refuse_symlinked_path "append" "$HERMES_HOME/.env"; then
+elif ! grep -q '^API_SERVER_KEY=..*' "$STARDUST_HOME/.env" 2>/dev/null; then
+    if refuse_symlinked_path "append" "$STARDUST_HOME/.env"; then
         :
     else
-        if [ ! -f "$HERMES_HOME/.env" ]; then
+        if [ ! -f "$STARDUST_HOME/.env" ]; then
             # Create an empty, owner-only .env so the append below (and any
             # later runtime save_env_value writes) have a durable target.
             # Created under a restrictive umask so the file is 0600 from the
             # first instant — no touch→chmod window, and no dependence on a
             # silenced chmod succeeding. The chown/chmod block below still
             # re-tightens perms every boot.
-            (umask 077 && as_hermes touch "$HERMES_HOME/.env") 2>/dev/null || true
+            (umask 077 && as_hermes touch "$STARDUST_HOME/.env") 2>/dev/null || true
         fi
-        if [ -f "$HERMES_HOME/.env" ]; then
+        if [ -f "$STARDUST_HOME/.env" ]; then
             _gen_key=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
             if [ -n "$_gen_key" ]; then
                 # Drop an empty assignment line if the seed left one behind,
                 # then append the generated key. The append is guarded: on a
                 # read-only volume / full disk it must degrade to the warning
                 # below, not abort the whole stage2 hook under `set -e`.
-                sed -i '/^API_SERVER_KEY=$/d' "$HERMES_HOME/.env" 2>/dev/null || true
-                if printf 'API_SERVER_KEY=%s\n' "$_gen_key" >> "$HERMES_HOME/.env" 2>/dev/null; then
+                sed -i '/^API_SERVER_KEY=$/d' "$STARDUST_HOME/.env" 2>/dev/null || true
+                if printf 'API_SERVER_KEY=%s\n' "$_gen_key" >> "$STARDUST_HOME/.env" 2>/dev/null; then
                     echo "[stage2] Generated API_SERVER_KEY for the loopback gateway api_server"
                 else
-                    echo "[stage2] Warning: could not write API_SERVER_KEY to $HERMES_HOME/.env (read-only volume?) — gateway api_server (cron fires) will be unavailable"
+                    echo "[stage2] Warning: could not write API_SERVER_KEY to $STARDUST_HOME/.env (read-only volume?) — gateway api_server (cron fires) will be unavailable"
                 fi
             fi
             unset _gen_key
         else
-            echo "[stage2] Warning: could not create $HERMES_HOME/.env — gateway api_server (cron fires) will be unavailable"
+            echo "[stage2] Warning: could not create $STARDUST_HOME/.env — gateway api_server (cron fires) will be unavailable"
         fi
     fi
 fi
@@ -517,12 +517,12 @@ fi
 # .env holds API keys and secrets — restrict to owner-only access. Applied
 # unconditionally (not only on first-seed) so a host-mounted .env that was
 # created with a permissive umask gets tightened on every container start.
-if [ -f "$HERMES_HOME/.env" ]; then
-    if refuse_symlinked_path "chown/chmod" "$HERMES_HOME/.env"; then
+if [ -f "$STARDUST_HOME/.env" ]; then
+    if refuse_symlinked_path "chown/chmod" "$STARDUST_HOME/.env"; then
         :
     else
-        chown hermes:hermes "$HERMES_HOME/.env" 2>/dev/null || true
-        chmod 600 "$HERMES_HOME/.env" 2>/dev/null || true
+        chown hermes:hermes "$STARDUST_HOME/.env" 2>/dev/null || true
+        chmod 600 "$STARDUST_HOME/.env" 2>/dev/null || true
     fi
 fi
 
@@ -551,11 +551,11 @@ fi
 
 # --- Migrate persisted config schema ---
 # Docker image upgrades replace the code under $INSTALL_DIR but preserve
-# $HERMES_HOME on the mounted volume. Run the same safe, non-interactive
+# $STARDUST_HOME on the mounted volume. Run the same safe, non-interactive
 # config-schema migrations that `hermes update` runs for non-Docker installs,
 # after first-boot seeding and before supervised gateway services start.
-# Set HERMES_SKIP_CONFIG_MIGRATION=1 for controlled/manual migrations.
-if [ -f "$HERMES_HOME/config.yaml" ]; then
+# Set STARDUST_SKIP_CONFIG_MIGRATION=1 for controlled/manual migrations.
+if [ -f "$STARDUST_HOME/config.yaml" ]; then
     s6-setuidgid hermes "$INSTALL_DIR/.venv/bin/python" "$INSTALL_DIR/scripts/docker_config_migrate.py" \
         || echo "[stage2] Warning: docker_config_migrate.py failed; continuing"
 fi
@@ -563,13 +563,13 @@ fi
 # auth.json: bootstrap from env on first boot only. Same semantics as the
 # pre-s6 entrypoint — the [ ! -f ] guard is critical to avoid clobbering
 # rotated refresh tokens on container restart.
-if [ ! -f "$HERMES_HOME/auth.json" ] && [ -n "${HERMES_AUTH_JSON_BOOTSTRAP:-}" ]; then
-    if refuse_symlinked_path "seed" "$HERMES_HOME/auth.json"; then
+if [ ! -f "$STARDUST_HOME/auth.json" ] && [ -n "${STARDUST_AUTH_JSON_BOOTSTRAP:-}" ]; then
+    if refuse_symlinked_path "seed" "$STARDUST_HOME/auth.json"; then
         :
     else
-        printf '%s' "$HERMES_AUTH_JSON_BOOTSTRAP" > "$HERMES_HOME/auth.json"
-        chown hermes:hermes "$HERMES_HOME/auth.json" 2>/dev/null || true
-        chmod 600 "$HERMES_HOME/auth.json"
+        printf '%s' "$STARDUST_AUTH_JSON_BOOTSTRAP" > "$STARDUST_HOME/auth.json"
+        chown hermes:hermes "$STARDUST_HOME/auth.json" 2>/dev/null || true
+        chmod 600 "$STARDUST_HOME/auth.json"
     fi
 fi
 
@@ -580,7 +580,7 @@ fi
 # invalid_grant (tokens cleared, providers.nous.last_auth_error.relogin_required
 # stamped) can NOT recover from a plain restart — it stays unauthenticated until
 # the credential is replaced. An orchestrator that manages the container can
-# supply a freshly-issued session via HERMES_AUTH_JSON_REBOOTSTRAP (distinct
+# supply a freshly-issued session via STARDUST_AUTH_JSON_REBOOTSTRAP (distinct
 # from the create-only *_BOOTSTRAP var); this helper swaps ONLY the
 # providers.nous entry when the on-disk entry is provably terminal OR the
 # orchestrator seed has a later obtained_at timestamp. The latter covers the
@@ -588,13 +588,13 @@ fi
 # local session. Older/incomparable seeds remain no-ops, so leaving the env set
 # cannot roll a healthy rotated token backward. Runs as its own stdlib-only
 # subprocess (no app imports) and always exits 0.
-if [ -f "$HERMES_HOME/auth.json" ] && [ -n "${HERMES_AUTH_JSON_REBOOTSTRAP:-}" ]; then
-    if refuse_symlinked_path "reseed" "$HERMES_HOME/auth.json"; then
+if [ -f "$STARDUST_HOME/auth.json" ] && [ -n "${STARDUST_AUTH_JSON_REBOOTSTRAP:-}" ]; then
+    if refuse_symlinked_path "reseed" "$STARDUST_HOME/auth.json"; then
         :
     else
         s6-setuidgid hermes "$INSTALL_DIR/.venv/bin/python" \
             "$INSTALL_DIR/scripts/docker_rebootstrap_nous_session.py" \
-            "$HERMES_HOME/auth.json" \
+            "$STARDUST_HOME/auth.json" \
             || echo "[stage2] Warning: docker_rebootstrap_nous_session.py failed; continuing"
     fi
 fi
@@ -609,14 +609,14 @@ fi
 # freshly-provisioned container comes up with the gateway down until
 # someone starts it (e.g. from the dashboard). An orchestrator that
 # provisions a fresh volume and wants the gateway running from first boot
-# can set HERMES_GATEWAY_BOOTSTRAP_STATE=running; we seed the state file
+# can set STARDUST_GATEWAY_BOOTSTRAP_STATE=running; we seed the state file
 # here, BEFORE 02-reconcile-profiles runs (cont-init.d scripts run in
 # lexicographic order), so the reconciler sees prior_state=running and
 # brings the supervised slot up on the very first boot.
 #
 # This is a generic container contract, not specific to any host: it seeds
 # the SAME gateway_state.json the reconciler already consults, exactly as
-# HERMES_AUTH_JSON_BOOTSTRAP seeds auth.json. The [ ! -f ] guard is the
+# STARDUST_AUTH_JSON_BOOTSTRAP seeds auth.json. The [ ! -f ] guard is the
 # load-bearing part — on every subsequent boot the persisted state wins,
 # so a gateway the operator deliberately stopped stays stopped across
 # restarts and we never clobber real runtime state.
@@ -624,14 +624,14 @@ fi
 # Only a literal "running" is honoured (the sole value in the reconciler's
 # _AUTOSTART_STATES); any other value is ignored so a typo can't write a
 # bogus state the reconciler would treat as "no prior state" anyway.
-if [ ! -f "$HERMES_HOME/gateway_state.json" ] && \
-        [ "${HERMES_GATEWAY_BOOTSTRAP_STATE:-}" = "running" ]; then
-    if refuse_symlinked_path "seed" "$HERMES_HOME/gateway_state.json"; then
+if [ ! -f "$STARDUST_HOME/gateway_state.json" ] && \
+        [ "${STARDUST_GATEWAY_BOOTSTRAP_STATE:-}" = "running" ]; then
+    if refuse_symlinked_path "seed" "$STARDUST_HOME/gateway_state.json"; then
         :
     else
-        printf '{"gateway_state":"running"}\n' > "$HERMES_HOME/gateway_state.json"
-        chown hermes:hermes "$HERMES_HOME/gateway_state.json" 2>/dev/null || true
-        chmod 644 "$HERMES_HOME/gateway_state.json"
+        printf '{"gateway_state":"running"}\n' > "$STARDUST_HOME/gateway_state.json"
+        chown hermes:hermes "$STARDUST_HOME/gateway_state.json" 2>/dev/null || true
+        chmod 644 "$STARDUST_HOME/gateway_state.json"
     fi
 fi
 

@@ -5,7 +5,7 @@ gateways fight over one bot (standalone) or blocks ``hermes gateway migrate --mu
 duplicate-credential finding per platform.
 
 The inventory is OWNERSHIP-based and evaluated in the SOURCE profile's plugin scope: every adapter
-(built-in ``Platform`` member or plugin registered under the source's ``HERMES_HOME``) owns the env
+(built-in ``Platform`` member or plugin registered under the source's ``STARDUST_HOME``) owns the env
 keys it declares outright (``required_env``, allowlist / allow-all / home-channel names, the gateway
 env-override table ``gateway.config_env._ENV_STEPS`` / ``_ENV_ENABLE_CREDENTIALS``) plus every key
 under its canonical ``<PLATFORM>_`` prefix and its historical alias prefixes. Gateway-wide channel

@@ -303,11 +303,11 @@ def _resolve_chat_argv(
     """Resolve the argv + cwd + env for the chat PTY (what ``hermes --tui`` runs).
 
     Tests monkeypatch this with a tiny fake command.  Env contract: resume goes
-    through ``HERMES_TUI_RESUME`` (``ui-tui`` does not parse argv), resolved to
-    the newest descendant; ``HERMES_TUI_GATEWAY_URL`` attaches to this process's
+    through ``STARDUST_TUI_RESUME`` (``ui-tui`` does not parse argv), resolved to
+    the newest descendant; ``STARDUST_TUI_GATEWAY_URL`` attaches to this process's
     in-memory gateway but is SKIPPED for profile-scoped chats (that gateway runs
     under the dashboard's own profile, so a scoped chat spawns its own);
-    ``profile`` scopes the ENTIRE chat by pointing ``HERMES_HOME`` at the profile
+    ``profile`` scopes the ENTIRE chat by pointing ``STARDUST_HOME`` at the profile
     dir, the same propagation ``hermes -p <name>`` performs.
     """
     from hermes_cli.web_server_profiles import _config_profile_scope, _resolve_profile_dir
@@ -322,11 +322,11 @@ def _resolve_chat_argv(
 
     argv, cwd = _make_tui_argv(PROJECT_ROOT / "ui-tui", tui_dev=False)
     # Secrets kept — the spawned agent needs provider creds.  An explicit profile
-    # scope overrides HERMES_HOME before config is bridged into the env.
+    # scope overrides STARDUST_HOME before config is bridged into the env.
     from tools.environments.local import build_subprocess_env
     env = build_subprocess_env(scrub_secrets=False, inherit_profile_home=True)
     if profile_dir is not None:
-        env["HERMES_HOME"] = str(profile_dir)
+        env["STARDUST_HOME"] = str(profile_dir)
     try:
         from hermes_cli.config import (
             apply_terminal_config_to_env, read_raw_config, terminal_config_owned_env_vars)
@@ -347,12 +347,12 @@ def _resolve_chat_argv(
     env.setdefault("NODE_ENV", "production")
     # Mouse tracking would swallow wheel events the browser needs for
     # transcript scrolling; disable it for the dashboard PTY only.
-    env.setdefault("HERMES_TUI_DISABLE_MOUSE", "1")
-    env.setdefault("HERMES_TUI_INLINE", "1")
+    env.setdefault("STARDUST_TUI_DISABLE_MOUSE", "1")
+    env.setdefault("STARDUST_TUI_INLINE", "1")
     # chalk in the child picks its color depth from the SERVER env; hosted
     # deploys have no COLORTERM, so hex colors would snap to the 256 palette.
     env.setdefault("COLORTERM", "truecolor")
-    env["HERMES_TUI_DASHBOARD"] = "1"
+    env["STARDUST_TUI_DASHBOARD"] = "1"
 
     if resume:
         _resume_db = _open_session_db_for_profile(
@@ -363,18 +363,18 @@ def _resolve_chat_argv(
             _resume_db.close()
         if latest_resume:
             resume = latest_resume
-        env["HERMES_TUI_RESUME"] = resume
+        env["STARDUST_TUI_RESUME"] = resume
 
     if sidecar_url:
-        env["HERMES_TUI_SIDECAR_URL"] = sidecar_url
+        env["STARDUST_TUI_SIDECAR_URL"] = sidecar_url
 
     if active_session_file:
-        env["HERMES_TUI_ACTIVE_SESSION_FILE"] = active_session_file
+        env["STARDUST_TUI_ACTIVE_SESSION_FILE"] = active_session_file
 
     # Without the attach URL, gatewayClient spawns its own `tui_gateway.entry`,
-    # which inherits the profile HERMES_HOME set above.
+    # which inherits the profile STARDUST_HOME set above.
     if profile_dir is None and (gateway_ws_url := _build_gateway_ws_url()):
-        env["HERMES_TUI_GATEWAY_URL"] = gateway_ws_url
+        env["STARDUST_TUI_GATEWAY_URL"] = gateway_ws_url
 
     return list(argv), str(cwd) if cwd else None, env
 
@@ -385,10 +385,10 @@ _WILDCARD_HOSTS = frozenset({"0.0.0.0", "::"})
 
 
 def _resolve_client_ws_host() -> Optional[str]:
-    """Host the in-container WS client should dial: ``HERMES_DASHBOARD_WS_HOST``
+    """Host the in-container WS client should dial: ``STARDUST_DASHBOARD_WS_HOST``
     wins always; a wildcard bind becomes ``127.0.0.1``; others verbatim."""
     from hermes_cli.web_server import app
-    explicit = os.environ.get("HERMES_DASHBOARD_WS_HOST", "").strip()
+    explicit = os.environ.get("STARDUST_DASHBOARD_WS_HOST", "").strip()
     if explicit:
         return explicit
     host = getattr(app.state, "bound_host", None)

@@ -14,7 +14,7 @@ def boba_installed(tmp_path, monkeypatch):
 
     home = tmp_path / ".hermes"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
 
     sheet = Image.new("RGBA", (FRAME_W * 8, FRAME_H * 9), (0, 0, 0, 0))
     pet_dir = store.pets_dir() / "boba"
@@ -40,7 +40,7 @@ def test_toggle_pet_display_errors_with_no_installed_pets(tmp_path, monkeypatch)
 
     home = tmp_path / ".hermes"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     _write_config(home, enabled=False, slug="")
 
     enabled, name, err = toggle_pet_display()
@@ -62,7 +62,7 @@ def test_pets_cli_quoted_false_disables_and_toggle_enables(tmp_path, monkeypatch
 
     home = tmp_path / ".hermes"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     (home / "config.yaml").write_text(
         yaml.safe_dump(
             {"display": {"pet": {"enabled": "false", "slug": "", "scale": 0.33}}}
@@ -83,7 +83,7 @@ def test_pets_cli_quoted_false_disables_and_toggle_enables(tmp_path, monkeypatch
 def empty_home(tmp_path, monkeypatch):
     home = tmp_path / ".hermes"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     return home
 
 

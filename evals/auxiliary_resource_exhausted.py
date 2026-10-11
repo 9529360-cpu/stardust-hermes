@@ -58,7 +58,7 @@ def main():
 
     with tempfile.TemporaryDirectory(prefix="aux-resource-") as home:
         os.environ["HOME"] = home
-        os.environ["HERMES_HOME"] = home
+        os.environ["STARDUST_HOME"] = home
         # Two listeners: a payment/quota error is credential-wide, so the fallback must be a
         # different backend identity (distinct base_url) exactly as NIM -> OpenRouter is in the field.
         server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)

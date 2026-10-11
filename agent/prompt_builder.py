@@ -172,7 +172,7 @@ DEFAULT_AGENT_IDENTITY = (
     "claim an action or verification you did not actually complete."
 )
 
-HERMES_AGENT_HELP_GUIDANCE = (
+STARDUST_AGENT_HELP_GUIDANCE = (
     # The symbol/skill name is inherited compatibility; product/source authority is Stardust.
     "You run on Stardust, an independently maintained personal assistant built on the Hermes Agent foundation. "
     "When the user needs help configuring, using, extending, or troubleshooting Stardust — or when you need to "
@@ -183,7 +183,7 @@ HERMES_AGENT_HELP_GUIDANCE = (
 )
 
 # Variant for sessions without the skills toolset (e.g. Blank Slate): naming skill_view() there would dangle.
-HERMES_AGENT_HELP_GUIDANCE_NO_SKILLS = (
+STARDUST_AGENT_HELP_GUIDANCE_NO_SKILLS = (
     "You run on Stardust, an independently maintained personal assistant built on the Hermes Agent foundation. "
     "For Stardust configuration, usage, extension, troubleshooting, and product behavior, treat the repository "
     "and documentation at https://github.com/9529360-cpu/stardust-hermes as authoritative; upstream Hermes "
@@ -993,9 +993,9 @@ def _config_readonly(what: str) -> dict:
 
 
 def _embedder_environment_hint() -> str:
-    """Embedder-supplied environment description: HERMES_ENVIRONMENT_HINT (container ENV)
+    """Embedder-supplied environment description: STARDUST_ENVIRONMENT_HINT (container ENV)
     wins over config.yaml ``agent.environment_hint``. Read once at prompt-build time."""
-    return (os.getenv("HERMES_ENVIRONMENT_HINT") or "").strip() or str(
+    return (os.getenv("STARDUST_ENVIRONMENT_HINT") or "").strip() or str(
         (_config_readonly("agent.environment_hint").get("agent", {}) or {}).get("environment_hint", "")).strip()
 
 
@@ -1185,12 +1185,12 @@ def _skill_should_show(
 
 def _current_session_platform_hint() -> str:
     """Active platform without importing the gateway package on CLI startup."""
-    platform = os.environ.get("HERMES_PLATFORM") or os.environ.get("HERMES_SESSION_PLATFORM")
+    platform = os.environ.get("STARDUST_PLATFORM") or os.environ.get("STARDUST_SESSION_PLATFORM")
     if platform:
         return platform
     get_session_env = getattr(sys.modules.get("gateway.session_context"), "get_session_env", None)
     try:
-        return (get_session_env("HERMES_SESSION_PLATFORM") if get_session_env else "") or ""
+        return (get_session_env("STARDUST_SESSION_PLATFORM") if get_session_env else "") or ""
     except Exception:
         return ""
 
@@ -1203,7 +1203,7 @@ def build_skills_system_prompt(
 
     External dirs (``skills.external_dirs``) are read-only and lose name collisions to local skills.
     ``compact_categories`` (coding posture) demotes categories to a names-only line — nothing is ever hidden.
-    ``skills_dir_override`` makes home resolution EXPLICIT: a build thread that never bound the HERMES_HOME
+    ``skills_dir_override`` makes home resolution EXPLICIT: a build thread that never bound the STARDUST_HOME
     ContextVar would otherwise leak the default profile's skills into a bot's prompt.
     """
     _home_token = None
@@ -1439,13 +1439,13 @@ def _truncate_content(
 
 
 def load_soul_md(context_length: Optional[int] = None, home_override: "Path | None" = None) -> Optional[str]:
-    """SOUL.md from HERMES_HOME (identity slot #1), or None.
+    """SOUL.md from STARDUST_HOME (identity slot #1), or None.
 
     Callers must pass ``skip_soul=True`` to ``build_context_files_prompt`` so it isn't injected twice.
-    ``home_override`` pins the profile home (a thread that lost the HERMES_HOME ContextVar reads the wrong one).
+    ``home_override`` pins the profile home (a thread that lost the STARDUST_HOME ContextVar reads the wrong one).
 
     ``home_override`` scopes the read to an explicit profile home (the agent knows its own home from its
-    session_db path). Without it, resolution is ambient — which on a thread that lost the HERMES_HOME
+    session_db path). Without it, resolution is ambient — which on a thread that lost the STARDUST_HOME
     ContextVar falls back to the launch home and reads the wrong profile's SOUL.md (#50233, same class as
     the skills-index leak fixed in #86313).
     """
@@ -1453,7 +1453,7 @@ def load_soul_md(context_length: Optional[int] = None, home_override: "Path | No
         from hermes_cli.config import ensure_hermes_home
         ensure_hermes_home()
     except Exception as e:
-        logger.debug("Could not ensure HERMES_HOME before loading SOUL.md: %s", e)
+        logger.debug("Could not ensure STARDUST_HOME before loading SOUL.md: %s", e)
     soul_path = (Path(home_override) if home_override is not None else get_hermes_home()) / "SOUL.md"
     if not soul_path.exists():
         return None
@@ -1638,7 +1638,7 @@ def build_context_files_prompt(
 
     Only ONE project context type loads, first found wins: .hermes.md/HERMES.md (walk to git root) →
     AGENTS.md chain (git root → cwd) → CLAUDE.md (cwd) → .cursorrules + .cursor/rules/*.mdc (cwd). SOUL.md
-    from HERMES_HOME is independent and always included unless *skip_soul* (already the identity slot).
+    from STARDUST_HOME is independent and always included unless *skip_soul* (already the identity slot).
     """
     cwd_path = Path(cwd if cwd is not None else os.getcwd()).resolve()
     if _project_context_suppressed(cwd, cwd_path, allow_install_tree_fallback):

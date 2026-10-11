@@ -73,7 +73,7 @@ def _read_vision_setting(env_var: str, key: str, cast, minimum=None):
 
 
 # HTTP download timeout (separate from ``auxiliary.vision.timeout``, which governs the LLM call).
-_VISION_DOWNLOAD_TIMEOUT = _read_vision_setting("HERMES_VISION_DOWNLOAD_TIMEOUT", "download_timeout", float)
+_VISION_DOWNLOAD_TIMEOUT = _read_vision_setting("STARDUST_VISION_DOWNLOAD_TIMEOUT", "download_timeout", float)
 if _VISION_DOWNLOAD_TIMEOUT is None:
     _VISION_DOWNLOAD_TIMEOUT = 30.0
 
@@ -96,8 +96,8 @@ def _detect_host_cpus() -> int:
 
 
 def _resolve_vision_cpu_workers() -> int:
-    """HERMES_VISION_MAX_CONCURRENCY → ``auxiliary.vision.max_concurrency`` → host cores (< 1 ignored)."""
-    val = _read_vision_setting("HERMES_VISION_MAX_CONCURRENCY", "max_concurrency", int, minimum=1)
+    """STARDUST_VISION_MAX_CONCURRENCY → ``auxiliary.vision.max_concurrency`` → host cores (< 1 ignored)."""
+    val = _read_vision_setting("STARDUST_VISION_MAX_CONCURRENCY", "max_concurrency", int, minimum=1)
     return val or _detect_host_cpus()
 
 
@@ -759,7 +759,7 @@ async def vision_analyze_tool(
     image_url: str, user_prompt: str, model: str = None,
     task_id: Optional[str] = None, region: Optional[list] = None) -> str:
     """Describe an image (URL, local path, data: URL) with the auxiliary vision LLM. ``user_prompt``
-    is pre-formatted by the caller. Temp images live under $HERMES_HOME/cache/vision/."""
+    is pre-formatted by the caller. Temp images live under $STARDUST_HOME/cache/vision/."""
     async def stage(prompt: str, debug_call_data: dict, temp_paths: list) -> tuple:
         prepared = await _prepare_image(image_url, task_id, region, validate_decode=False)
         temp_paths.append(prepared.path)

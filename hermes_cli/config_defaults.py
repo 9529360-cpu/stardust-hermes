@@ -68,7 +68,7 @@ DEFAULT_CONFIG = {
     "max_live_sessions": 16,
     "session": {
         # Per-terminal `hermes -c`: each CLI session writes a breadcrumb under
-        # $HERMES_HOME/terminal-sessions/<terminal-id>, so bare -c/--continue resumes THIS
+        # $STARDUST_HOME/terminal-sessions/<terminal-id>, so bare -c/--continue resumes THIS
         # terminal's session (tmux/kitty/wezterm pane, tty). false = resume globally most-recent.
         "terminal_continue": True,
     },
@@ -182,7 +182,7 @@ DEFAULT_CONFIG = {
         "bot_mode_protocol": True,
         # Embedder-supplied text appended to the system prompt's environment-hints block, so a host
         # wrapping Hermes (sandbox runner, managed platform) can describe proxy/credential/ mount
-        # layout without editing SOUL.md. Env HERMES_ENVIRONMENT_HINT overrides it.
+        # layout without editing SOUL.md. Env STARDUST_ENVIRONMENT_HINT overrides it.
         "environment_hint": "",
         # Coding posture: CLI/TUI/ACP may infer a code workspace; Desktop stays neutral under
         # "auto" because a selected project is context, not user intent. Explicit "focus"/"on"
@@ -257,7 +257,7 @@ DEFAULT_CONFIG = {
         # Stale-stream ceiling (seconds) for local providers (Ollama, oMLX, llama-cpp). Applied when
         # the base stale timeout is at its 180s default and a local endpoint is detected, so a
         # wedged local server eventually trips the detector instead of hanging forever. Env
-        # HERMES_LOCAL_STREAM_STALE_TIMEOUT overrides.
+        # STARDUST_LOCAL_STREAM_STALE_TIMEOUT overrides.
         "local_stream_stale_timeout": 900,
         # How user-attached images reach the main model (gateway, TUI, CLI /attach). "auto" = native
         # when the model reports supports_vision=True AND auxiliary.vision.provider is not
@@ -292,7 +292,7 @@ DEFAULT_CONFIG = {
         "degraded_mode": "warn",
         "cwd": ".",  # Use current directory
         # Root for terminal session temp files (background logs/pid/exit files, code-exec
-        # sandboxes). Empty = TMPDIR/TMP/TEMP if set, else HERMES_HOME/cache/terminal (auto-pruned
+        # sandboxes). Empty = TMPDIR/TMP/TEMP if set, else STARDUST_HOME/cache/terminal (auto-pruned
         # after 72h) — NOT tmpfs /tmp, which is RAM-capped and fills under load. Must be an existing
         # absolute POSIX path; user-set paths are never auto-pruned.
         "temp_dir": "",
@@ -316,7 +316,7 @@ DEFAULT_CONFIG = {
         # required_environment_variables pass through automatically).
         "env_passthrough": [],
         # HOME for host tool subprocesses: "auto" = host keeps the real OS-user HOME, containers use
-        # HERMES_HOME/home; "real" = force real HOME; "profile" = force HERMES_HOME/home when it
+        # STARDUST_HOME/home; "real" = force real HOME; "profile" = force STARDUST_HOME/home when it
         # exists (strict per-profile isolation).
         "home_mode": "auto",
         # Extra files sourced in the login shell when building the per-session env snapshot — for
@@ -804,10 +804,10 @@ DEFAULT_CONFIG = {
         # POSIX PTYs whose plain Enter arrives as LF.
         "cli_multiline_shortcuts": True,
         # Interface bare `hermes`/`hermes chat` launches: "cli" (prompt_toolkit REPL) | "tui" (Ink).
-        # Flags win: `--cli` forces the REPL, `--tui` / HERMES_TUI=1 forces the TUI.
+        # Flags win: `--cli` forces the REPL, `--tui` / STARDUST_TUI=1 forces the TUI.
         "interface": "cli",
         # `hermes --tui` auto-resumes the most recent human-facing session (like `hermes -c`).
-        # HERMES_TUI_RESUME=<id> always wins.
+        # STARDUST_TUI_RESUME=<id> always wins.
         "tui_auto_resume_recent": False,
         # Desktop reopens the last chat/page on cold start (also in Settings → Appearance).
         "resume_last_session": True,
@@ -902,7 +902,7 @@ DEFAULT_CONFIG = {
         # display.platforms.<platform>.tool_progress_grouping.
         "tool_progress_grouping": "accumulate",
         # Custom long-running status phrases. Defaults: gateway/assets/status_phrases.yaml.
-        # `path`/`paths` = HERMES_HOME-relative YAML files/dirs (or conventional status_phrases.yaml
+        # `path`/`paths` = STARDUST_HOME-relative YAML files/dirs (or conventional status_phrases.yaml
         # / status_phrases/*.yaml). Keys: status, generic. mode: "append" (default) | "replace".
         # Per-platform: display.platforms.<platform>.status_phrases.
         "status_phrases": {},
@@ -978,7 +978,7 @@ DEFAULT_CONFIG = {
         "ws_ping_interval": 20.0,
         "ws_ping_timeout": 20.0,
         # Grace (seconds) before a WS-orphaned gateway session is interrupted/reaped after its
-        # client disconnects. 0 = park forever. Env: HERMES_TUI_WS_ORPHAN_REAP_GRACE_S.
+        # client disconnects. 0 = park forever. Env: STARDUST_TUI_WS_ORPHAN_REAP_GRACE_S.
         "ws_orphan_reap_grace_s": 20.0,
         # A detached RUNNING turn is only interrupted once its activity clock (API waits, stream
         # tokens, tool heartbeats) has been idle this many seconds; an active turn runs to
@@ -986,7 +986,7 @@ DEFAULT_CONFIG = {
         # See #100325, #98028.
         "ws_orphan_activity_stale_s": 600.0,
         # On gateway boot, close tui/desktop/subagent rows orphaned by a dead gateway (start AND
-        # newest message older than HERMES_TUI_SESSION_TTL_S, default 6h) with
+        # newest message older than STARDUST_TUI_SESSION_TTL_S, default 6h) with
         # end_reason='startup_orphan_reap'; otherwise they stay phantom "active" forever.
         # Messaging-gateway and live sessions are never touched; swept rows stay resumable.
         # The ws-orphan grace timer above is in-process, so a gateway restart (update, crash, systemd)
@@ -1002,7 +1002,7 @@ DEFAULT_CONFIG = {
         },
         # Username/password gate (dashboard_auth/basic plugin, no OAuth IDP). Active when username
         # plus password_hash (preferred) or password (hashed in-memory) are set; empty username =
-        # no-op. Env HERMES_DASHBOARD_BASIC_AUTH_USERNAME / _PASSWORD_HASH / _PASSWORD / _SECRET /
+        # no-op. Env STARDUST_DASHBOARD_BASIC_AUTH_USERNAME / _PASSWORD_HASH / _PASSWORD / _SECRET /
         # _TTL_SECONDS win when non-empty. secret signs session tokens; empty = random per-process
         # key (sessions die on restart, no multi-worker) — set 32+ random bytes. Hash:
         # plugins.dashboard_auth.basic.hash_password('PW').
@@ -1014,10 +1014,10 @@ DEFAULT_CONFIG = {
             "session_ttl_seconds": 0,  # 0 → plugin default (12h)
         },
         # Drain-control token auth (dashboard_auth/drain plugin). The secret is NOT here: env
-        # HERMES_DASHBOARD_DRAIN_SECRET; no-op unless >=256-bit, weak secrets rejected
+        # STARDUST_DASHBOARD_DRAIN_SECRET; no-op unless >=256-bit, weak secrets rejected
         # (fail-closed). scope = capability label; min_secret_chars in url-safe-b64 chars.
         "drain_auth": {"scope": "drain", "min_secret_chars": 43},
-        # Public URL (env HERMES_DASHBOARD_PUBLIC_URL): full authority (scheme + host + optional
+        # Public URL (env STARDUST_DASHBOARD_PUBLIC_URL): full authority (scheme + host + optional
         # prefix, e.g. https://example.com/hermes) for the OAuth redirect_uri; its hostname is
         # trusted by Host/Origin guards and engages the auth gate when non-loopback. For proxies
         # that don't forward X-Forwarded-Host/-Proto/-Prefix; X-Forwarded-Prefix is then IGNORED on
@@ -1381,7 +1381,7 @@ DEFAULT_CONFIG = {
         "external_dirs": [],   # e.g. ["~/.agents/skills", "/shared/team-skills"]
         # Where skill_manage-created skills go (empty = profile-local dir). When set, new skills
         # land here AND agent-facing instructions name this path; expanded (~, ${VAR}), relative to
-        # HERMES_HOME, scanned alongside the local dir.
+        # STARDUST_HOME, scanned alongside the local dir.
         "create_dir": "",
         # In a git checkout, <root>/.hermes/skills/ and <root>/.agents/skills/ load as the
         # highest-precedence tier — ONLY if the root is in trusted_project_dirs. false = no scan, no
@@ -1391,9 +1391,9 @@ DEFAULT_CONFIG = {
         "trusted_project_dirs": [],
         # Skill names pinned as fully loaded in every new session (CLI, TUI, gateway, cron, API).
         # Resolved once when the agent's prompt is first built; missing/disabled names warn and
-        # skip; HERMES_IGNORE_RULES suppresses the list like the other auto-injected context.
+        # skip; STARDUST_IGNORE_RULES suppresses the list like the other auto-injected context.
         "auto_load": [],
-        # Substitute ${HERMES_SKILL_DIR} / ${HERMES_SESSION_ID} in SKILL.md content.
+        # Substitute ${STARDUST_SKILL_DIR} / ${STARDUST_SESSION_ID} in SKILL.md content.
         "template_vars": True,
         # Pre-execute !`cmd` snippets in SKILL.md, inlining stdout (dates, git state...). Off:
         # skill-author content would run on the host unapproved — trusted sources only.
@@ -1579,7 +1579,7 @@ DEFAULT_CONFIG = {
     # Approvals for dangerous commands.
     # mode: manual (always prompt) | smart (aux LLM auto-approves low-risk) | off (= --yolo)
     # cron_mode / single_query_mode / unattended_mode: deny | approve — what to do when a
-    #   cron job, a -q session (HERMES_INTERACTIVE=1 but nobody to answer), or an unattended
+    #   cron job, a -q session (STARDUST_INTERACTIVE=1 but nobody to answer), or an unattended
     #   platform (webhook, msgraph_webhook, api_server; no /approve channel) hits one.
     #   deny blocks instantly so the agent finds another way instead of waiting out the
     #   timeout and failing closed.
@@ -1587,7 +1587,7 @@ DEFAULT_CONFIG = {
     #   proved too tight for Telegram/Discord push notifications, hence 300.
     "approvals": {
         # single_query_mode — what to do when a single-query (-q) session hits a dangerous command. -q runs
-        # export HERMES_INTERACTIVE=1 (for interactive sudo prompts) but have NO user waiting to answer
+        # export STARDUST_INTERACTIVE=1 (for interactive sudo prompts) but have NO user waiting to answer
         # approval prompts — an unanswered prompt just waits the full timeout then fails closed, so the
         # agent is forced to work around the block (often via execute_code). This setting makes that intent
         # explicit: deny    — block the command and let the agent find another way (default, safe; mirrors
@@ -1619,7 +1619,7 @@ DEFAULT_CONFIG = {
         "mcp_reload_confirm": True,
         # /clear, /new, /reset, /undo confirm before discarding state (Approve Once / Always Approve
         # / Cancel via tools.slash_confirm; native buttons on Telegram/ Discord/Slack). "Always
-        # Approve" → false. HERMES_TUI_NO_CONFIRM=1 skips the TUI modal.
+        # Approve" → false. STARDUST_TUI_NO_CONFIRM=1 skips the TUI modal.
         "destructive_slash_confirm": True,
     },
     # Permanently allowed dangerous command patterns (added via "always" approval).
@@ -1644,7 +1644,7 @@ DEFAULT_CONFIG = {
     # website/docs/user-guide/features/hooks.md.
     "hooks": {},
     # Auto-accept shell-hook registrations without a TTY prompt (also --accept-hooks or
-    # HERMES_ACCEPT_HOOKS=1). Gateway/cron/non-interactive runs need one of these to pick up
+    # STARDUST_ACCEPT_HOOKS=1). Gateway/cron/non-interactive runs need one of these to pick up
     # newly-added hooks.
     "hooks_auto_accept": False,
     # Custom personalities: {"name": "system prompt"} or {"name": {"description", "system_prompt",
@@ -1708,7 +1708,7 @@ DEFAULT_CONFIG = {
         # from global config.
         "model_provider": "",
         # Cron SCHEDULER provider (WHEN a due job fires). "" = built-in in-process 60s ticker. Name
-        # an installed provider (plugins/cron_providers/<name>/ or $HERMES_HOME/plugins/ <name>/),
+        # an installed provider (plugins/cron_providers/<name>/ or $STARDUST_HOME/plugins/ <name>/),
         # e.g. "chronos" (NAS-mediated managed cron for scale-to-zero). An unknown or unavailable
         # provider falls back to the built-in so cron never loses its trigger.
         "provider": "",
@@ -1744,20 +1744,20 @@ DEFAULT_CONFIG = {
         # broadcast expansions, which do not gain mirror eligibility.
         "mirror_delivery": False,
         # Max due jobs run in parallel per tick. None/0 = unbounded (thread count only); 1 = serial.
-        # Env override: HERMES_CRON_MAX_PARALLEL.
+        # Env override: STARDUST_CRON_MAX_PARALLEL.
         "max_parallel_jobs": None,
         # save_job_output keeps the N most recent .md files per job; 0 or negative disables pruning
         # (for externally managed cleanup).
         "output_retention": 50,
-        # Timeout (seconds) for a no-agent cron script. Env: HERMES_CRON_SCRIPT_TIMEOUT. Keep in
+        # Timeout (seconds) for a no-agent cron script. Env: STARDUST_CRON_SCRIPT_TIMEOUT. Keep in
         # sync with cron.scheduler._DEFAULT_SCRIPT_TIMEOUT.
         "script_timeout_seconds": 3600,
         # Timeout (seconds) for SessionDB() init inside cron jobs: state.db open/migrate has no
         # timeout of its own against a wedged sqlite3.connect, and an unbounded hang wedges the
-        # job's dispatch guard forever. Env: HERMES_CRON_SESSION_DB_TIMEOUT. 0 = unlimited.
+        # job's dispatch guard forever. Env: STARDUST_CRON_SESSION_DB_TIMEOUT. 0 = unlimited.
         "session_db_timeout_seconds": 10,
         # Timeout (seconds) per media attachment send during gateway delivery; large attachments
-        # (long TTS audio, big exports) need more than 30s. Env: HERMES_CRON_MEDIA_SEND_TIMEOUT.
+        # (long TTS audio, big exports) need more than 30s. Env: STARDUST_CRON_MEDIA_SEND_TIMEOUT.
         # Keep in sync with cron.scheduler._DEFAULT_MEDIA_SEND_TIMEOUT.
         "media_send_timeout_seconds": 300,
         # Managed systemd gateway with no user session (containers, no linger): false runs
@@ -1914,7 +1914,7 @@ DEFAULT_CONFIG = {
         "delivery_ledger": True,
         # Seconds to wait for one platform to connect at startup/reconnect; raise on "discord
         # connect timed out" loops (many slash commands to sync). 0/negative = wait forever. Bridged
-        # to HERMES_GATEWAY_PLATFORM_CONNECT_TIMEOUT, which wins if set explicitly.
+        # to STARDUST_GATEWAY_PLATFORM_CONNECT_TIMEOUT, which wins if set explicitly.
         # Seconds the gateway waits for a single messaging platform to finish connecting during startup (and
         # on reconnect). Discord in particular can blow past the old fixed 30s when an account has many
         # slash commands to sync (#19776: 90-173 skills → ~28-31s sync). Raise this if your gateway hits
@@ -1939,7 +1939,7 @@ DEFAULT_CONFIG = {
         "bot_loop_guard": {"enabled": True, "max_events": 20, "window_seconds": 300, "cooldown_seconds": 600},
         # Startup-liveness watchdog: stdlib-only daemon thread armed at process entry that
         # hard-exits 75 if the loop isn't live within the deadline. Armed before config loads, so
-        # run_gateway() bridges these to HERMES_STARTUP_WATCHDOG / HERMES_STARTUP_WATCHDOG_TIMEOUT_S
+        # run_gateway() bridges these to STARDUST_STARTUP_WATCHDOG / STARDUST_STARTUP_WATCHDOG_TIMEOUT_S
         # and re-arms the live handle; explicit env wins.
         "startup_watchdog": True,
         "startup_watchdog_timeout_seconds": 300,
@@ -1968,7 +1968,7 @@ DEFAULT_CONFIG = {
         # Most-specific match wins; only read by the multiplexing default gateway.
         "profile_routes": [],
         # Scale-to-zero idle TIMEOUT only. When an instance is opted in via the NAS "Labs" toggle
-        # (HERMES_SCALE_TO_ZERO env stamp) AND messaging is relay-only/absent AND a wakeUrl is
+        # (STARDUST_SCALE_TO_ZERO env stamp) AND messaging is relay-only/absent AND a wakeUrl is
         # registered, the relay transport goes dormant so the platform (e.g. Fly autostop) can
         # suspend the machine; it wakes on the wakeUrl poke. Enablement is the Labs toggle, never a
         # config key. 0/negative = default.
@@ -1982,7 +1982,7 @@ DEFAULT_CONFIG = {
         # Respawn-storm circuit breaker (complements restart_loop_guard): counts (re)starts in a
         # sliding window and sleeps an exponential backoff before booting so a crash-looping
         # supervisor can't hammer the process. max_starts <= 0 disables. Env escape hatches:
-        # HERMES_GATEWAY_MAX_STARTS / HERMES_GATEWAY_START_WINDOW_S.
+        # STARDUST_GATEWAY_MAX_STARTS / STARDUST_GATEWAY_START_WINDOW_S.
         "respawn_storm": {"max_starts": 5, "window_seconds": 120},
         # Prefix user messages IN THE MODEL'S CONTEXT with a timestamp (e.g. "[Tue 2026-04-28
         # 13:40:53 CEST]") for temporal awareness. Persisted transcripts stay clean (timestamp is
@@ -2003,20 +2003,20 @@ DEFAULT_CONFIG = {
         # credential/system denylist (/etc, /proc, ~/.ssh, ~/.aws, ~/.hermes/.env, auth.json). True:
         # files must be under the Hermes cache, media_delivery_allow_dirs, or fresher than
         # trust_recent_files_seconds — recommended for public-facing gateways so prompt injection
-        # can't exfiltrate host secrets. Bridged to HERMES_MEDIA_DELIVERY_STRICT.
+        # can't exfiltrate host secrets. Bridged to STARDUST_MEDIA_DELIVERY_STRICT.
         "strict": False,
         # Extra roots (project/scratch dirs, mounted shares) from which bare file paths may be
         # uploaded; the Hermes cache is always trusted. List of absolute paths or one
-        # os.pathsep-separated string; tildes expanded. Bridged to HERMES_MEDIA_ALLOW_DIRS. Honored
+        # os.pathsep-separated string; tildes expanded. Bridged to STARDUST_MEDIA_ALLOW_DIRS. Honored
         # in both modes.
         "media_delivery_allow_dirs": [],
         # Trust files whose mtime is within trust_recent_files_seconds even outside the cache/
         # allowlist (e.g. `pandoc -o /tmp/report.pdf`); system paths stay blocked. False =
-        # pure-allowlist mode. Bridged to HERMES_MEDIA_TRUST_RECENT_FILES. Only consulted when
+        # pure-allowlist mode. Bridged to STARDUST_MEDIA_TRUST_RECENT_FILES. Only consulted when
         # strict is true.
         "trust_recent_files": True,
         # Recency window in seconds; 600 covers a multi-tool turn. Bridged to
-        # HERMES_MEDIA_TRUST_RECENT_SECONDS. Only consulted when strict is true.
+        # STARDUST_MEDIA_TRUST_RECENT_SECONDS. Only consulted when strict is true.
         "trust_recent_files_seconds": 600,
         "api_server": {  # OpenAI-compatible API server platform (gateway/platforms/api_server.py).
             # Max concurrent agent runs. Requests to /v1/chat/completions, /v1/responses, and
@@ -2085,11 +2085,11 @@ DEFAULT_CONFIG = {
         # CJK-bigram search index (messages_fts_cjk). When the extension is built
         # (native/fts5_cjk/build.sh → ~/.hermes/lib/libfts5_cjk.so), 1-2 char CJK terms get exact
         # index matches instead of LIKE scans. True = use when present (inert otherwise); False =
-        # never load/serve it. Bridged to HERMES_CJK_FTS.
+        # never load/serve it. Bridged to STARDUST_CJK_FTS.
         "cjk_fts": True,
         # Slow session-search threshold (ms): searches at/above it log one INFO line with the
         # routing path (fts_cjk / fts5 / trigram / like_scan). 0 logs every search. Bridged to
-        # HERMES_SEARCH_SLOW_MS.
+        # STARDUST_SEARCH_SLOW_MS.
         "search_slow_ms": 1000,
         # Transcript guards (a runaway 100k+ row session can exhaust memory when materialized at
         # once; 0 disables). Max active messages (across the compression lineage) for interactive
@@ -2131,9 +2131,9 @@ DEFAULT_CONFIG = {
         # Passive version/banner checks only; explicit `hermes update --check` remains enabled.
         "check": True,
         # Pre-update backup. quick = snapshot small critical state (pairing JSONs, cron jobs,
-        # config.yaml, .env, auth.json, profile DBs) into <HERMES_HOME>/state-snapshots/, skipping
+        # config.yaml, .env, auth.json, profile DBs) into <STARDUST_HOME>/state-snapshots/, skipping
         # files >1 GiB; restore via ``/snapshot``. full = quick PLUS a ``hermes backup`` zip in
-        # <HERMES_HOME>/backups/ (``hermes import`` restores; slow on large homes; ``--backup``
+        # <STARDUST_HOME>/backups/ (``hermes import`` restores; slow on large homes; ``--backup``
         # forces once). off = none (``--no-backup`` forces once). Legacy booleans: true -> full,
         # false -> off.
         # Pre-update safety backup — ONE consolidated mechanism, three modes: Files over 1 GiB (e.g. a
@@ -2171,7 +2171,7 @@ DEFAULT_CONFIG = {
         # request workspace-wide diagnostics (slower).
         "wait_mode": "document",
         "wait_timeout": 5.0,
-        # Missing server binaries: auto = install via npm/go/pip into <HERMES_HOME>/lsp/bin/ on
+        # Missing server binaries: auto = install via npm/go/pip into <STARDUST_HOME>/lsp/bin/ on
         # first use; manual = only binaries on PATH; off = alias for manual.
         "install_strategy": "auto",
         # Idle seconds before a server is shut down (respawned on demand), so long- running
@@ -2338,14 +2338,14 @@ DEFAULT_CONFIG = {
         # a native Wayland surface.
         # See #84011.
         "ozone_platform_hint": "auto",
-        # Bridged to HERMES_DESKTOP_DISABLE_GPU: auto = disable GPU only on remote displays
+        # Bridged to STARDUST_DESKTOP_DISABLE_GPU: auto = disable GPU only on remote displays
         # (SSH/VNC/RDP); true = always software rendering (no-GPU VMs where the GPU path hangs);
         # false = always keep GPU on.
         "disable_gpu": "auto",
         # Linux keychain for token storage (Chromium --password-store). auto = detect KWallet (KDE
         # env) or any org.freedesktop.secrets provider via D-Bus;
         # gnome-libsecret|kwallet|kwallet5|kwallet6|basic force one (basic = unencrypted). Bridged
-        # to HERMES_DESKTOP_PASSWORD_STORE; ignored off-Linux.
+        # to STARDUST_DESKTOP_PASSWORD_STORE; ignored off-Linux.
         "password_store": "auto",
         # Linux: False preserves an existing custom XDG launcher entry; missing entries
         # are still created. True keeps the generated entry current on each launch.
@@ -2457,7 +2457,7 @@ def _base_url(name, prompt_name=None):
 OPTIONAL_ENV_VARS = {
     # ── Provider (handled in provider selection, not shown in checklists) ──
     "NOUS_BASE_URL": _base_url("Nous Portal"),
-    "HERMES_ANON_API_SECRET": _env(
+    "STARDUST_ANON_API_SECRET": _env(
         "Shared secret for the Nous free-tier sign-up endpoints while they are in their gated "
         "integration phase (not needed once the gate is removed)",
         "Nous free-tier shared secret (leave empty unless given one)", password=True,
@@ -2524,7 +2524,7 @@ OPTIONAL_ENV_VARS = {
     "DASHSCOPE_BASE_URL": _prov(
         "Custom DashScope base URL (default: coding-intl OpenAI-compat endpoint)",
         "DashScope Base URL", "", password=False),
-    "HERMES_QWEN_BASE_URL": _prov(
+    "STARDUST_QWEN_BASE_URL": _prov(
         "Qwen Portal base URL override (default: https://portal.qwen.ai/v1)",
         "Qwen Portal base URL (leave empty for default)", None, password=False),
     "OPENCODE_ZEN_API_KEY": _prov("OpenCode Zen API key (pay-as-you-go access to curated models)",
@@ -2708,11 +2708,11 @@ OPTIONAL_ENV_VARS = {
     "OPENVIKING_ENDPOINT": _tool("OpenViking server URL (default: http://127.0.0.1:1933)",
         "OpenViking endpoint", password=None, advanced=True),
     # ── Langfuse observability ──
-    "HERMES_LANGFUSE_PUBLIC_KEY": _tool("Langfuse project public key (pk-lf-...)",
+    "STARDUST_LANGFUSE_PUBLIC_KEY": _tool("Langfuse project public key (pk-lf-...)",
         "Langfuse public key", "https://cloud.langfuse.com", password=False),
-    "HERMES_LANGFUSE_SECRET_KEY": _tool("Langfuse project secret key (sk-lf-...)",
+    "STARDUST_LANGFUSE_SECRET_KEY": _tool("Langfuse project secret key (sk-lf-...)",
         "Langfuse secret key", "https://cloud.langfuse.com"),
-    "HERMES_LANGFUSE_BASE_URL": _tool("Langfuse server URL (default: https://cloud.langfuse.com)",
+    "STARDUST_LANGFUSE_BASE_URL": _tool("Langfuse server URL (default: https://cloud.langfuse.com)",
         "Langfuse server URL (leave empty for cloud.langfuse.com)", None, password=False,
         advanced=True),
     # ── Messaging platforms ──
@@ -2786,7 +2786,7 @@ OPTIONAL_ENV_VARS = {
     "MATRIX_DM_AUTO_THREAD": _msg("Auto-create threads for DM messages in Matrix (default: false)",
         "Auto-create threads in DMs (true/false)", None, advanced=True),
     "MATRIX_DEVICE_ID": _msg(
-        "Stable Matrix device ID for E2EE persistence across restarts (e.g. HERMES_BOT)",
+        "Stable Matrix device ID for E2EE persistence across restarts (e.g. STARDUST_BOT)",
         "Matrix device ID (stable across restarts)", None, advanced=True),
     "MATRIX_RECOVERY_KEY": _msg(
         "Matrix recovery key for cross-signing verification after device key rotation (from "
@@ -2867,13 +2867,13 @@ OPTIONAL_ENV_VARS = {
     "SUDO_PASSWORD": _setting(
         "Sudo password for terminal commands requiring root access; set to an explicit empty "
         "string to try empty without prompting", "Sudo password", None, password=True),
-    # HERMES_TOOL_PROGRESS_MODE (deprecated; use display.tool_progress) is intentionally NOT listed:
+    # STARDUST_TOOL_PROGRESS_MODE (deprecated; use display.tool_progress) is intentionally NOT listed:
     # this dict feeds user-facing surfaces (dashboard keys page, setup checklists), so deprecated
-    # knobs stay in config._EXTRA_ENV_KEYS only. HERMES_TOOL_PROGRESS is unsupported.
-    "HERMES_PREFILL_MESSAGES_FILE": _setting(
+    # knobs stay in config._EXTRA_ENV_KEYS only. STARDUST_TOOL_PROGRESS is unsupported.
+    "STARDUST_PREFILL_MESSAGES_FILE": _setting(
         "Path to JSON file with ephemeral prefill messages for few-shot priming",
         "Prefill messages file path", None),
-    "HERMES_EPHEMERAL_SYSTEM_PROMPT": _setting(
+    "STARDUST_EPHEMERAL_SYSTEM_PROMPT": _setting(
         "Ephemeral system prompt injected at API-call time (never persisted to sessions)",
         "Ephemeral system prompt", None),
 }

@@ -1,7 +1,7 @@
 """E2E tests for the per-profile MCP lifecycle RPCs (mcp.servers.*).
 
 These drive the real registered gateway handlers against a real temp
-``HERMES_HOME`` with named profile dirs — no mocks of the config/mcp layer — and
+``STARDUST_HOME`` with named profile dirs — no mocks of the config/mcp layer — and
 assert that every write lands in the RIGHT profile's ``config.yaml`` / ``.env``
 and NEVER leaks into the launch (default) profile.
 
@@ -22,16 +22,16 @@ import tui_gateway.server as server
 
 @pytest.fixture
 def hermes_root(tmp_path, monkeypatch):
-    """A temp HERMES_HOME root with two named profiles: 'work' and 'other'.
+    """A temp STARDUST_HOME root with two named profiles: 'work' and 'other'.
 
-    Pointing HERMES_HOME at a dir outside ~/.hermes makes it the profile ROOT
+    Pointing STARDUST_HOME at a dir outside ~/.hermes makes it the profile ROOT
     (get_default_hermes_root's Docker/custom branch), so named profiles live at
     ``<root>/profiles/<name>/`` and the launch/default profile is ``<root>``.
     """
     root = tmp_path / "hermes_home"
     (root / "profiles" / "work").mkdir(parents=True)
     (root / "profiles" / "other").mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(root))
+    monkeypatch.setenv("STARDUST_HOME", str(root))
     # Make sure no stale process-wide home override leaks in from another test.
     from hermes_constants import get_hermes_home_override
 
@@ -353,7 +353,7 @@ def test_default_profile_add_when_profile_omitted(hermes_root):
             {"name": "rootsvc", "config": {"command": "rootsvc-bin"}},
         )
     )
-    # Omitted profile → launch/default profile == HERMES_HOME root config.yaml.
+    # Omitted profile → launch/default profile == STARDUST_HOME root config.yaml.
     default_cfg = _read_yaml(root / "config.yaml")
     assert "rootsvc" in default_cfg.get("mcp_servers", {})
     # ...and NOT in a named profile.

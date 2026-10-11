@@ -140,8 +140,8 @@ _EXTRA_ENV_VARS = (
     # Base URLs / paths that influence detection but aren't api_key_env_vars.
     "LM_BASE_URL", "KIMI_BASE_URL", "STEPFUN_BASE_URL", "KILOCODE_BASE_URL",
     "GMI_BASE_URL", "OPENAI_BASE_URL",
-    "HERMES_COPILOT_ACP_COMMAND", "COPILOT_CLI_PATH",
-    "HERMES_COPILOT_ACP_ARGS", "COPILOT_ACP_BASE_URL",
+    "STARDUST_COPILOT_ACP_COMMAND", "COPILOT_CLI_PATH",
+    "STARDUST_COPILOT_ACP_ARGS", "COPILOT_ACP_BASE_URL",
 )
 
 PROVIDER_ENV_VARS = tuple(
@@ -491,7 +491,7 @@ class TestRuntimeProviderResolution:
 
     def test_runtime_copilot_acp_uses_process_runtime(self, monkeypatch):
         monkeypatch.setattr("hermes_cli.auth.shutil.which", lambda command: f"/usr/local/bin/{command}")
-        monkeypatch.setenv("HERMES_COPILOT_ACP_ARGS", "--acp --stdio --debug")
+        monkeypatch.setenv("STARDUST_COPILOT_ACP_ARGS", "--acp --stdio --debug")
 
         from hermes_cli.runtime_provider import resolve_runtime_provider
 
@@ -557,7 +557,7 @@ class TestHasAnyProviderConfigured:
         }))
         monkeypatch.setattr(config_module, "get_env_path", lambda: hermes_home / ".env")
         monkeypatch.setattr(config_module, "get_hermes_home", lambda: hermes_home)
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         # Clear all provider env vars
         for var in ("OPENROUTER_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY",
                      "ANTHROPIC_TOKEN", "OPENAI_BASE_URL"):
@@ -583,7 +583,7 @@ class TestHasAnyProviderConfigured:
         hermes_home.mkdir()
         monkeypatch.setattr(config_module, "get_env_path", lambda: hermes_home / ".env")
         monkeypatch.setattr(config_module, "get_hermes_home", lambda: hermes_home)
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         self._clear_provider_env(monkeypatch)
         return hermes_home
 

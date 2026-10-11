@@ -34,7 +34,7 @@ def test_cancel_is_scoped_idempotent_and_releases_worker(
 
     monkeypatch.setattr(sessions, "_worker", worker)
     home = str(tmp_path / "origin")
-    monkeypatch.setenv("HERMES_HOME", home)
+    monkeypatch.setenv("STARDUST_HOME", home)
     result = sessions.start_flow(
         home,
         "reports",

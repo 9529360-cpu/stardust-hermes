@@ -197,7 +197,7 @@ def build_auto_tts_output_path(platform) -> str:
     """Unique temp output path for gateway auto-TTS: ``.ogg`` for ``OPUS_VOICE_PLATFORMS``
     (the tool's ``_repair_ogg_container`` then guarantees real Opus bytes), else ``.mp3``.
     Platform-awareness lives HERE because ``_clear_session_env`` wipes the TTS tool's
-    ``HERMES_SESSION_PLATFORM`` contextvar before the post-handler auto-TTS block runs.
+    ``STARDUST_SESSION_PLATFORM`` contextvar before the post-handler auto-TTS block runs.
 
     Platforms whose native voice bubbles require Ogg/Opus (``tools.tts_tool.OPUS_VOICE_PLATFORMS`` — the
     single source of truth) get an explicit ``.ogg`` path; the tool's central container repair
@@ -708,12 +708,12 @@ _CACHE_DIR_IMPORT_DEFAULTS = {
 # enumerated at check time), never for the credential DENY side — see _credential_home_roots.
 _HERMES_HOME = get_hermes_home()
 _HERMES_ROOT = get_default_hermes_root()
-MEDIA_DELIVERY_ALLOW_DIRS_ENV = "HERMES_MEDIA_ALLOW_DIRS"
-MEDIA_DELIVERY_TRUST_RECENT_ENV = "HERMES_MEDIA_TRUST_RECENT_FILES"
-MEDIA_DELIVERY_TRUST_RECENT_SECONDS_ENV = "HERMES_MEDIA_TRUST_RECENT_SECONDS"
+MEDIA_DELIVERY_ALLOW_DIRS_ENV = "STARDUST_MEDIA_ALLOW_DIRS"
+MEDIA_DELIVERY_TRUST_RECENT_ENV = "STARDUST_MEDIA_TRUST_RECENT_FILES"
+MEDIA_DELIVERY_TRUST_RECENT_SECONDS_ENV = "STARDUST_MEDIA_TRUST_RECENT_SECONDS"
 # Strict mode = allowlist+recency validation; off by default (the denylist still blocks
 # credential / system paths). Set true on public-facing gateways.
-MEDIA_DELIVERY_STRICT_ENV = "HERMES_MEDIA_DELIVERY_STRICT"
+MEDIA_DELIVERY_STRICT_ENV = "STARDUST_MEDIA_DELIVERY_STRICT"
 # Canonical cache subdirs of deliverable artifacts; also enumerates per-profile cache roots.
 _MEDIA_DELIVERY_CACHE_SUBDIRS = ("images", "audio", "videos", "documents", "screenshots")
 MEDIA_DELIVERY_SAFE_ROOTS = (
@@ -742,7 +742,7 @@ def _sqlite_files(name: str) -> tuple[str, ...]:
     return (name, f"{name}-wal", f"{name}-shm", f"{name}-journal")
 
 
-# Credential stores at the HERMES_HOME root, denied per-file so skills/, logs/ and agent-written
+# Credential stores at the STARDUST_HOME root, denied per-file so skills/, logs/ and agent-written
 # files stay deliverable (cache subdirs are allowlisted BEFORE this). A superset of the
 # agent/file_safety.py read+write denies so exfil never trails the read guard. google_token.json's mtime bumps every turn (defeats the
 # recency window); pairing/ and mcp-tokens/ (live OAuth tokens) are denied as whole trees.
@@ -759,13 +759,13 @@ _ROOT_CREDENTIAL_PATHS = (
 
 def _profile_cache_roots() -> List[Path]:
     """Per-profile cache roots ``<root>/profiles/<name>/cache/{images,...}`` (the static safe
-    roots cover only the active HERMES_HOME). Enumerated at check time so profiles created after
-    startup count and are allowlisted BEFORE the ``/root`` denylist (HERMES_HOME symlinked).
+    roots cover only the active STARDUST_HOME). Enumerated at check time so profiles created after
+    startup count and are allowlisted BEFORE the ``/root`` denylist (STARDUST_HOME symlinked).
 
-    ``HERMES_HOME=/opt/data``) while the model emits a profile-scoped path silently fails delivery.
+    ``STARDUST_HOME=/opt/data``) while the model emits a profile-scoped path silently fails delivery.
     Enumerated dynamically at check time so profiles created after startup are covered, and so the resolved
     profile path is allowlisted *before* the ``/root`` system denylist is consulted (which otherwise wins
-    when HERMES_HOME is symlinked under a denied prefix and $HOME is not that prefix). See issue #31733.
+    when STARDUST_HOME is symlinked under a denied prefix and $HOME is not that prefix). See issue #31733.
     """
     return [p / "cache" / subdir for p in _profile_dirs() for subdir in _MEDIA_DELIVERY_CACHE_SUBDIRS]
 
@@ -780,7 +780,7 @@ def _profile_dirs() -> List[Path]:
 
 def _credential_home_roots() -> List[Path]:
     """Every Hermes home whose credential stores the denylist must cover: the ACTIVE home
-    (the per-turn HERMES_HOME override under ``gateway.multiplex_profiles``), the shared root
+    (the per-turn STARDUST_HOME override under ``gateway.multiplex_profiles``), the shared root
     and every ``<root>/profiles/*``. Enumerated at check time like ``_profile_cache_roots`` on
     the allow side — a denylist frozen at import covers only the launch profile, so a
     ``MEDIA:<root>/profiles/<other>/.env`` emitted in any profile's turn would upload it."""
@@ -789,7 +789,7 @@ def _credential_home_roots() -> List[Path]:
 
 def _kanban_root() -> Path:
     """Kanban is root-shared across profiles by design (``kanban_db.kanban_home``)."""
-    return Path(os.environ.get("HERMES_KANBAN_HOME", "").strip() or _HERMES_ROOT).expanduser()
+    return Path(os.environ.get("STARDUST_KANBAN_HOME", "").strip() or _HERMES_ROOT).expanduser()
 
 
 def _kanban_board_dirs() -> List[Path]:
@@ -802,7 +802,7 @@ def _kanban_board_dirs() -> List[Path]:
 
 def _kanban_attachment_roots() -> List[Path]:
     """Return durable Kanban attachment roots without importing kanban_db."""
-    override = os.environ.get("HERMES_KANBAN_ATTACHMENTS_ROOT", "").strip()
+    override = os.environ.get("STARDUST_KANBAN_ATTACHMENTS_ROOT", "").strip()
     if override:
         return [Path(override).expanduser()]
     roots = [_kanban_root() / "kanban" / "attachments"]
@@ -1071,8 +1071,8 @@ def _translate_docker_container_media_path(candidate: Path, session_key: str = "
 def validate_media_delivery_path(path: str, session_key: str = "") -> Optional[str]:
     """Safe absolute file path for native media delivery, else None. Default: any existing
     regular file outside the credential / system denylist (symmetric with inbound). Strict
-    (``HERMES_MEDIA_DELIVERY_STRICT=1``, public bots where prompt injection must not exfiltrate
-    host secrets): MUST be under a Hermes cache, an operator root (``HERMES_MEDIA_ALLOW_DIRS``),
+    (``STARDUST_MEDIA_DELIVERY_STRICT=1``, public bots where prompt injection must not exfiltrate
+    host secrets): MUST be under a Hermes cache, an operator root (``STARDUST_MEDIA_ALLOW_DIRS``),
     or freshly produced within the recency window. Symlinks are resolved before any check."""
     candidate = _normalize_media_tag_path(path)
     if not candidate:
@@ -1829,7 +1829,7 @@ class BasePlatformAdapter(ABC):
             store.pop(str(chat_id), None)
 
     # Can wake a fresh turn AFTER a turn ends (detached-subagent completions); False for stateless
-    # adapters (API server). Propagated to ``HERMES_SESSION_ASYNC_DELIVERY`` so tools never promise
+    # adapters (API server). Propagated to ``STARDUST_SESSION_ASYNC_DELIVERY`` so tools never promise
     # a delivery they can't keep.
     supports_async_delivery: bool = True
     # ``send()`` chunks natively via ``truncate_message()`` -> the router skips its truncation.
@@ -1889,9 +1889,9 @@ class BasePlatformAdapter(ABC):
         # Legacy env knob; the runner syncs the busy_input_mode value after construction.
         # Default "interrupt" so a pre-sync read never silently queues.
         self._busy_text_mode: str = (
-            os.environ.get("HERMES_GATEWAY_BUSY_TEXT_MODE", "interrupt").strip().lower() or "interrupt")
-        self._busy_text_debounce_seconds: float = _float_env("HERMES_GATEWAY_BUSY_TEXT_DEBOUNCE_SECONDS", 0.35)
-        self._busy_text_hard_cap_seconds: float = _float_env("HERMES_GATEWAY_BUSY_TEXT_HARD_CAP_SECONDS", 1.0)
+            os.environ.get("STARDUST_GATEWAY_BUSY_TEXT_MODE", "interrupt").strip().lower() or "interrupt")
+        self._busy_text_debounce_seconds: float = _float_env("STARDUST_GATEWAY_BUSY_TEXT_DEBOUNCE_SECONDS", 0.35)
+        self._busy_text_hard_cap_seconds: float = _float_env("STARDUST_GATEWAY_BUSY_TEXT_HARD_CAP_SECONDS", 1.0)
         self._text_debounce: dict[str, TextDebounceState] = {}
         # handle_message() tasks; shutdown cancels them so a replaced gateway stops working.
         self._background_tasks: set[asyncio.Task] = set()
@@ -2140,7 +2140,7 @@ class BasePlatformAdapter(ABC):
                 raise
 
     def _acquire_platform_lock(self, scope: str, identity: str, resource_desc: str) -> bool:
-        """Acquire a scoped lock for this adapter; True on success. A live cross-HERMES_HOME
+        """Acquire a scoped lock for this adapter; True on success. A live cross-STARDUST_HOME
         holder is replaced only when the runner armed this adapter for its initial
         ``--replace`` connect (the status module validates ownership and terminates)."""
         from gateway.status import (
@@ -3803,21 +3803,21 @@ class BasePlatformAdapter(ABC):
 
     @staticmethod
     def _get_human_delay() -> float:
-        """Random human-like pacing delay (s) from HERMES_HUMAN_DELAY_MODE: "off" (default) |
-        "natural" 800-2500ms | "custom" via HERMES_HUMAN_DELAY_MIN_MS /
-        HERMES_HUMAN_DELAY_MAX_MS."""
-        mode = os.getenv("HERMES_HUMAN_DELAY_MODE", "off").lower()
+        """Random human-like pacing delay (s) from STARDUST_HUMAN_DELAY_MODE: "off" (default) |
+        "natural" 800-2500ms | "custom" via STARDUST_HUMAN_DELAY_MIN_MS /
+        STARDUST_HUMAN_DELAY_MAX_MS."""
+        mode = os.getenv("STARDUST_HUMAN_DELAY_MODE", "off").lower()
         if mode == "off":
             return 0.0
         lo, hi = 800, 2500
         if mode != "natural":  # custom mode tolerates malformed env vars
-            lo = _or_default(lambda: int(os.getenv("HERMES_HUMAN_DELAY_MIN_MS", str(lo))), lo)
-            hi = _or_default(lambda: int(os.getenv("HERMES_HUMAN_DELAY_MAX_MS", str(hi))), hi)
+            lo = _or_default(lambda: int(os.getenv("STARDUST_HUMAN_DELAY_MIN_MS", str(lo))), lo)
+            hi = _or_default(lambda: int(os.getenv("STARDUST_HUMAN_DELAY_MAX_MS", str(hi))), hi)
         return random.uniform(lo / 1000.0, hi / 1000.0)
 
     async def _synthesize_auto_tts(self, text_content: str) -> Tuple[List[str], Optional[str]]:
         """Synthesize auto-TTS audio -> ``(existing_paths, requested_path)``; empty/None on failure
-        (logged, never raised). Path built platform-aware HERE: HERMES_SESSION_PLATFORM is cleared
+        (logged, never raised). Path built platform-aware HERE: STARDUST_SESSION_PLATFORM is cleared
         post-handler."""
         paths: List[str] = []
         requested_path = None
@@ -4342,7 +4342,7 @@ class BasePlatformAdapter(ABC):
         role_authorized: bool = False, auto_thread_created: bool = False,
         auto_thread_initial_name: Optional[str] = None) -> SessionSource:
         """Build a SessionSource; with ``gateway.profile_routes`` configured the matching
-        profile is stamped on ``source.profile`` for per-profile HERMES_HOME isolation."""
+        profile is stamped on ``source.profile`` for per-profile STARDUST_HOME isolation."""
         def _opt(value) -> Optional[str]:
             return str(value) if value else None
         fields = dict(

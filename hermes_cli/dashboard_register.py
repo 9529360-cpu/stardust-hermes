@@ -105,7 +105,7 @@ def _print_post_register_hint(
     if wrote_portal_url:
         print("    HERMES_DASHBOARD_PORTAL_URL=" + str(portal_base_url))
     if public_url:
-        print("    HERMES_DASHBOARD_PUBLIC_URL=" + str(public_url))
+        print("    STARDUST_DASHBOARD_PUBLIC_URL=" + str(public_url))
     print(
         "\n  Heads up — Nous login only *engages* on a non-loopback bind. A plain\n"
         "  `hermes dashboard` (localhost) leaves the gate off and serves locally\n"
@@ -150,7 +150,7 @@ def _save_env_quietly(key: str, value: str) -> bool:
 
 def _public_url_from_redirect(redirect_uri: Optional[str]) -> str:
     """Origin (``scheme://host[:port]``) of *redirect_uri*, or ``""`` — the runtime appends
-    ``/auth/callback`` to HERMES_DASHBOARD_PUBLIC_URL, so the raw URI would double the path."""
+    ``/auth/callback`` to STARDUST_DASHBOARD_PUBLIC_URL, so the raw URI would double the path."""
     try:
         parsed = urlparse(redirect_uri or "")
         if parsed.scheme in ("http", "https") and parsed.netloc:
@@ -220,8 +220,8 @@ def cmd_dashboard_register(args) -> None:
     public_url = _public_url_from_redirect(custom_redirect_uri)
     wrote_public_url = bool(
         public_url
-        and _env_value("HERMES_DASHBOARD_PUBLIC_URL") != public_url
-        and _save_env_quietly("HERMES_DASHBOARD_PUBLIC_URL", public_url))
+        and _env_value("STARDUST_DASHBOARD_PUBLIC_URL") != public_url
+        and _save_env_quietly("STARDUST_DASHBOARD_PUBLIC_URL", public_url))
     _print_post_register_hint(
         client_id=client_id, portal_base_url=portal_base_url, custom_redirect_uri=custom_redirect_uri,
         wrote_portal_url=wrote_portal_url, public_url=public_url if wrote_public_url else "")

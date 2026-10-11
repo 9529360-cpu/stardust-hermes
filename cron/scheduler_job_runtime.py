@@ -142,9 +142,9 @@ def _snapshot_pin(job: dict, axis: str, current: str, job_id: str) -> str:
 
 def _load_cron_job_config(job: dict, job_id: str, job_name: str) -> _CronJobConfig:
     """Load config.yaml and resolve the run's model: per-job override > cron.model (fleet default) >
-    creation snapshot > HERMES_MODEL > config ``model:``. Re-read every tick (no cache) so
+    creation snapshot > STARDUST_MODEL > config ``model:``. Re-read every tick (no cache) so
     ``hermes cron edit --model`` applies next tick."""
-    model = job.get("model") or _sched.cron_env_setting("HERMES_MODEL") or ""
+    model = job.get("model") or _sched.cron_env_setting("STARDUST_MODEL") or ""
     _cron_default_provider = ""
     _cfg: dict = {}
     _model_cfg: Any = {}
@@ -165,7 +165,7 @@ def _load_cron_job_config(job: dict, job_id: str, job_name: str) -> _CronJobConf
                     model = _cron_default_model
                 else:
                     _, _global_model = _sched.resolve_cron_model_drift_defaults(
-                        _cfg, environ={"HERMES_MODEL": _sched.cron_env_setting("HERMES_MODEL")})
+                        _cfg, environ={"STARDUST_MODEL": _sched.cron_env_setting("STARDUST_MODEL")})
                     model = _snapshot_pin(job, "model", _global_model, job_id) or _global_model or model
     except Exception as e:
         logger.warning("Job '%s': failed to load config.yaml, using defaults: %s", job_id, e)
@@ -176,7 +176,7 @@ def _load_cron_job_config(job: dict, job_id: str, job_name: str) -> _CronJobConf
         raise RuntimeError(
             f"Cron job '{job_name}' has no model configured "
             f"(job.model={job.get('model')!r}, "
-            f"HERMES_MODEL={_sched.cron_env_setting('HERMES_MODEL')!r}, "
+            f"STARDUST_MODEL={_sched.cron_env_setting('STARDUST_MODEL')!r}, "
             "config.yaml model.default missing or empty). "
             f"Set a per-job model via "
             f"`hermes cron edit {job_id} --model <name>` or set a "
@@ -195,7 +195,7 @@ def _load_prefill_messages(cfg: dict, job_id: str) -> Optional[list]:
     """Prefill messages from env or config.yaml (top-level key canonical; agent.* is legacy)."""
     agent_cfg = cfg.get("agent", {}) if isinstance(cfg.get("agent", {}), dict) else {}
     prefill_file = (
-        _sched.cron_env_setting("HERMES_PREFILL_MESSAGES_FILE")
+        _sched.cron_env_setting("STARDUST_PREFILL_MESSAGES_FILE")
         or cfg.get("prefill_messages_file", "")
         or agent_cfg.get("prefill_messages_file", "")
     )
@@ -291,7 +291,7 @@ def _resolve_job_runtime(job: dict, job_id: str, jc: _CronJobConfig) -> tuple[di
         # config exactly as before.
         requested = _snapshot_pin(job, "provider", global_provider, job_id) or None
     try:
-        # Do NOT pass HERMES_INFERENCE_PROVIDER as `requested`: it would override persisted config
+        # Do NOT pass STARDUST_INFERENCE_PROVIDER as `requested`: it would override persisted config
         # and resurrect stale providers for unpinned jobs.
         runtime_kwargs = {
             "requested": requested,
@@ -376,13 +376,13 @@ def _init_cron_mcp_tools(job_id: str) -> None:
 
 
 def _open_cron_session_db(job: dict):
-    """Open the SQLite session store under its own timeout (HERMES_CRON_TIMEOUT only watches
+    """Open the SQLite session store under its own timeout (STARDUST_CRON_TIMEOUT only watches
     run_conversation). A wedged sqlite3.connect returns None (no session store) instead of
     wedging the worker thread."""
     # Initialize the SQLite session store so cron job messages are persisted and discoverable via
     # session_search (same pattern as gateway/run.py) — only now, after every early-return path (wake-gate,
     # prompt validation, drift skip) has passed, so a gated run never opens state.db just to abandon the
-    # handle (#96290). Bounded with its own timeout (separate from HERMES_CRON_TIMEOUT, which only watches
+    # handle (#96290). Bounded with its own timeout (separate from STARDUST_CRON_TIMEOUT, which only watches
     # the agent's run_conversation below): SessionDB.__init__ opens/migrates state.db synchronously and has
     # no timeout of its own against a wedged sqlite3.connect (e.g. a stale flock left by a crashed sibling
     # process). An unbounded hang here would wedge the job's worker thread, so the init is bounded and a

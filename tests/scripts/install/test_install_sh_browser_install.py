@@ -241,7 +241,7 @@ def test_ensure_browser_no_longer_references_agent_browser_binary_path() -> None
     there by this function."""
     body = _extract_function_body(INSTALL_SH.read_text(), "ensure_browser")
 
-    assert "$HERMES_HOME/node/bin/agent-browser" not in body
+    assert "$STARDUST_HOME/node/bin/agent-browser" not in body
 
 
 

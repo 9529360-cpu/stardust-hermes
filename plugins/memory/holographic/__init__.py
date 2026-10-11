@@ -1,6 +1,6 @@
 """hermes-memory-store — holographic memory plugin (MemoryProvider): structured fact storage with entity
 resolution, trust scoring, and HRR-based compositional retrieval. Original plugin by dusterbloom (PR #2351).
-Config in $HERMES_HOME/config.yaml under plugins.hermes-memory-store: db_path ($HERMES_HOME/memory_store.db),
+Config in $STARDUST_HOME/config.yaml under plugins.hermes-memory-store: db_path ($STARDUST_HOME/memory_store.db),
 auto_extract (false), default_trust (0.5), min_trust_threshold (0.3), temporal_decay_half_life (0),
 hrr_dim (1024), hrr_weight (0.3)."""
 
@@ -131,8 +131,8 @@ class HolographicMemoryProvider(MemoryProvider):
         from hermes_constants import get_hermes_home
         _hermes_home = str(get_hermes_home())
         db_path = self._config.get("db_path", _hermes_home + "/memory_store.db")
-        if isinstance(db_path, str):  # expand $HERMES_HOME so paths resolve to the active profile
-            db_path = db_path.replace("$HERMES_HOME", _hermes_home).replace("${HERMES_HOME}", _hermes_home)
+        if isinstance(db_path, str):  # expand $STARDUST_HOME so paths resolve to the active profile
+            db_path = db_path.replace("$STARDUST_HOME", _hermes_home).replace("${STARDUST_HOME}", _hermes_home)
         hrr_dim = int(self._config.get("hrr_dim", 1024))
         self._store = MemoryStore(db_path=db_path, default_trust=float(self._config.get("default_trust", 0.5)), hrr_dim=hrr_dim)
         self._retriever = FactRetriever(store=self._store, hrr_dim=hrr_dim, hrr_weight=float(self._config.get("hrr_weight", 0.3)),

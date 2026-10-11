@@ -14,7 +14,7 @@ def test_tools_configure_uses_live_session_profile(tmp_path, monkeypatch, explic
     home = tmp_path / ".hermes"
     profile = home / "profiles" / "worker"
     profile.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
     config = {"platform_toolsets": {"cli": ["terminal", "web"]}}
     for path in (home, profile):
@@ -54,7 +54,7 @@ def test_rebuild_preparation_failure_keeps_reachable_owner(tmp_path, monkeypatch
     home = tmp_path / ".hermes"
     profile = home / "profiles" / "worker"
     profile.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
     db = SessionDB(db_path=profile / "state.db")
     old = SimpleNamespace(_session_db=db if has_agent_db else None,

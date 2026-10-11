@@ -6,7 +6,7 @@ A per-subsystem boolean ``write_approval`` gates the agent's cross-session write
 origin (**foreground** turn or **background_review** fork). ``false`` (default)
 writes freely; ``true`` never commits directly: it prompts inline (memory,
 interactive CLI only) or **stages** the write under
-``<HERMES_HOME>/pending/{memory,skills}/<id>.json`` for out-of-band review.
+``<STARDUST_HOME>/pending/{memory,skills}/<id>.json`` for out-of-band review.
 """
 
 from __future__ import annotations

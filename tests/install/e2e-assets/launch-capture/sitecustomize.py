@@ -16,7 +16,7 @@ identically on every sampled OLD ref -- version drift in the launch
 shapes is the matcher's problem, which lives here, next to the driver
 (the same maintenance model as ``installer_supports()``).
 
-Opt-in: ``HERMES_E2E_CAPTURE_LAUNCH=<path>`` -- the spec is written
+Opt-in: ``STARDUST_E2E_CAPTURE_LAUNCH=<path>`` -- the spec is written
 there, and the marker file ``<path>.captured`` distinguishes "hermes
 desktop exited 0 and we captured" from "exited 0 without reaching a
 launch" (a version that errors out earlier must FAIL the leg, loudly).
@@ -36,7 +36,7 @@ token in argv and pass through untouched -- they must run for real.
 
 import os
 
-_SPEC_PATH = os.environ.get("HERMES_E2E_CAPTURE_LAUNCH")
+_SPEC_PATH = os.environ.get("STARDUST_E2E_CAPTURE_LAUNCH")
 
 if _SPEC_PATH:
     import json

@@ -274,13 +274,13 @@ def prompt_choice(question: str, choices: list, default: int = 0, description: s
 
 def is_noninteractive() -> bool:
     """True when no human is available to answer a prompt: the dashboard/desktop spawn CLI actions
-    with ``stdin=DEVNULL`` and ``HERMES_NONINTERACTIVE=1`` (``hermes_cli/web_server.py``), where a
+    with ``stdin=DEVNULL`` and ``STARDUST_NONINTERACTIVE=1`` (``hermes_cli/web_server.py``), where a
     prompt that aborts on EOF would kill the spawned action — callers fall back to their default."""
-    return os.environ.get("HERMES_NONINTERACTIVE", "").strip().lower() in {"1", "true", "yes", "on"}
+    return os.environ.get("STARDUST_NONINTERACTIVE", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def prompt_yes_no(question: str, default: bool = True) -> bool:
-    """Prompt for yes/no. Ctrl+C exits; empty input, ``HERMES_NONINTERACTIVE=1`` or a
+    """Prompt for yes/no. Ctrl+C exits; empty input, ``STARDUST_NONINTERACTIVE=1`` or a
     closed/redirected stdin return ``default`` instead of aborting the whole process."""
     if is_noninteractive():
         return default
@@ -400,9 +400,9 @@ def setup_model_provider(config: dict, *, quick: bool = False):
 def _apply_default_agent_settings(config: dict):
     """Apply recommended defaults for all agent settings without prompting."""
     config.setdefault("agent", {})["max_turns"] = 150
-    # config.yaml is authoritative for max_turns (the gateway bridges it into HERMES_MAX_ITERATIONS);
+    # config.yaml is authoritative for max_turns (the gateway bridges it into STARDUST_MAX_ITERATIONS);
     # a stale .env entry silently shadowing it caused the 60-vs-500 bug, so drop it.
-    remove_env_value("HERMES_MAX_ITERATIONS")
+    remove_env_value("STARDUST_MAX_ITERATIONS")
     config.setdefault("display", {})["tool_progress"] = "all"
     config.setdefault("compression", {})["enabled"] = True
     config["compression"]["threshold"] = 0.50
@@ -451,10 +451,10 @@ def setup_agent_settings(config: dict):
     if max_iter is None:
         print_warning("Invalid number, keeping current value")
     elif max_iter > 0:
-        # config.yaml only; gateway/run.py derives HERMES_MAX_ITERATIONS from agent.max_turns.
+        # config.yaml only; gateway/run.py derives STARDUST_MAX_ITERATIONS from agent.max_turns.
         config.setdefault("agent", {})["max_turns"] = max_iter
         config.pop("max_turns", None)
-        remove_env_value("HERMES_MAX_ITERATIONS")
+        remove_env_value("STARDUST_MAX_ITERATIONS")
         print_success(f"Max iterations set to {max_iter}")
 
     # ── Tool Progress Display ──

@@ -47,7 +47,7 @@ def _mount(host_path: Path | str, container_path: str) -> Dict[str, str]:
 
 
 def _contained_host_path(rel: str, hermes_home: Path, abs_msg: str, traversal_msg: str) -> Optional[Path]:
-    """Resolve *rel* under HERMES_HOME, refusing absolute paths and escapes."""
+    """Resolve *rel* under STARDUST_HOME, refusing absolute paths and escapes."""
     if os.path.isabs(rel):
         logger.warning(abs_msg, rel)
         return None
@@ -61,23 +61,23 @@ def _contained_host_path(rel: str, hermes_home: Path, abs_msg: str, traversal_ms
 
 
 def register_credential_file(relative_path: str, container_base: str = "/root/.hermes") -> bool:
-    """Register a HERMES_HOME-relative credential file for mounting; True if it exists and was registered.
+    """Register a STARDUST_HOME-relative credential file for mounting; True if it exists and was registered.
 
-    Rejects absolute paths and traversal out of HERMES_HOME. Containment alone is not
-    enough: HERMES_HOME holds the MASTER stores (``.env``, ``auth.json``, ``mcp-tokens/``),
+    Rejects absolute paths and traversal out of STARDUST_HOME. Containment alone is not
+    enough: STARDUST_HOME holds the MASTER stores (``.env``, ``auth.json``, ``mcp-tokens/``),
     which are refused via the canonical read deny-list so the mount surface cannot hand a
     skill what the read surface denies. Fails CLOSED (logged) if the guard is unavailable or raises.
     """
     resolved = _contained_host_path(
         relative_path, get_hermes_home(),
-        "credential_files: rejected absolute path %r (must be relative to HERMES_HOME)",
+        "credential_files: rejected absolute path %r (must be relative to STARDUST_HOME)",
         "credential_files: rejected path traversal %r (%s)")
     if resolved is None:
         return False
     if not resolved.is_file():
         logger.debug("credential_files: skipping %s (not found)", resolved)
         return False
-    # Master credential stores are never mountable, even though they sit inside HERMES_HOME and therefore
+    # Master credential stores are never mountable, even though they sit inside STARDUST_HOME and therefore
     # pass the containment check above. Fails CLOSED: if the canonical guard can't be consulted we refuse
     # the mount rather than risk bind-mounting auth.json into a sandbox. The import lives at module top (no
     # circular-import concern — file_safety is stdlib-only); the sentinel + logger.exception keep guard

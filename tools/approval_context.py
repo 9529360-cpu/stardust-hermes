@@ -33,7 +33,7 @@ _cron_approval_mode_override: contextvars.ContextVar[str | None] = _ctx(
 # session whose scope never closes, so close-time exporters never ship them.
 _approval_session_id: contextvars.ContextVar[str] = _ctx("approval_session_id")
 # Interactive-CLI flag. Concurrent ACP sessions share a ThreadPoolExecutor, so mutating
-# os.environ["HERMES_INTERACTIVE"] races: one session's `finally` restore can clobber another's set mid-run, dropping
+# os.environ["STARDUST_INTERACTIVE"] races: one session's `finally` restore can clobber another's set mid-run, dropping
 # it onto the non-interactive auto-approve path so a dangerous command runs without the approval callback firing
 # (GHSA-96vc-wcxf-jjff). None = unset → env fallback.
 _hermes_interactive_ctx: contextvars.ContextVar[str | None] = _ctx("hermes_interactive", None)
@@ -52,7 +52,7 @@ def reset_hermes_interactive_context(token: contextvars.Token) -> None:
 def _is_interactive_cli() -> bool:
     """True for an interactive CLI/ACP session (contextvar first, env fallback)."""
     ctx_val = _hermes_interactive_ctx.get()
-    return is_truthy_value(ctx_val) if ctx_val is not None else env_var_enabled("HERMES_INTERACTIVE")
+    return is_truthy_value(ctx_val) if ctx_val is not None else env_var_enabled("STARDUST_INTERACTIVE")
 
 
 def _fire_approval_hook(hook_name: str, **kwargs) -> None:
@@ -109,7 +109,7 @@ def get_current_session_key(default: str = "default") -> str:
     if session_key := _approval_session_key.get():
         return session_key
     from gateway.session_context import get_session_env
-    return get_session_env("HERMES_SESSION_KEY", default)
+    return get_session_env("STARDUST_SESSION_KEY", default)
 
 
 def _session_env(name: str) -> str:
@@ -125,12 +125,12 @@ def _session_env(name: str) -> str:
 
 def _get_session_platform() -> str:
     """Return the current gateway platform from contextvars/env fallback."""
-    return _session_env("HERMES_SESSION_PLATFORM")
+    return _session_env("STARDUST_SESSION_PLATFORM")
 
 
 def _is_cron_approval_context() -> bool:
     """True when the current approval decision is running inside cron."""
-    return is_truthy_value(_session_env("HERMES_CRON_SESSION"))
+    return is_truthy_value(_session_env("STARDUST_CRON_SESSION"))
 
 
 # Programmatic/unattended platforms: no human can answer a prompt and the adapter has no ``send_exec_approval`` /
@@ -142,7 +142,7 @@ _UNATTENDED_APPROVAL_PLATFORMS = frozenset({"webhook", "msgraph_webhook", "api_s
 def _is_unattended_platform_approval_context() -> bool:
     """True when the session platform is a programmatic/unattended surface.
 
-    Webhook, msgraph_webhook, and api_server sessions bind ``HERMES_SESSION_PLATFORM`` like chat gateways
+    Webhook, msgraph_webhook, and api_server sessions bind ``STARDUST_SESSION_PLATFORM`` like chat gateways
     do, but there is no human who can resolve a pending approval. Treating them as gateway approval contexts
     blocks the session for the full approval timeout (60-300s) and then fails closed anyway — the deadlock
     in #37284/#87509.
@@ -152,18 +152,18 @@ def _is_unattended_platform_approval_context() -> bool:
 
 def _is_single_query_approval_context() -> bool:
     """True for a single-query (-q) session: ``hermes chat -q`` exports
-    ``HERMES_INTERACTIVE=1`` (so sudo password prompts work) but nobody is waiting
+    ``STARDUST_INTERACTIVE=1`` (so sudo password prompts work) but nobody is waiting
     to answer approvals; without this marker the gate would wait the full timeout,
     fail closed and push the agent toward workarounds (e.g. execute_code).
     ``approvals.single_query_mode`` makes the path deterministic."""
-    return is_truthy_value(_session_env("HERMES_SINGLE_QUERY_SESSION"))
+    return is_truthy_value(_session_env("STARDUST_SINGLE_QUERY_SESSION"))
 
 
 def _is_gateway_approval_context() -> bool:
     """True inside a gateway/API session that can answer an approval.
 
-    Legacy integrations set HERMES_GATEWAY_SESSION; concurrent paths bind
-    HERMES_SESSION_PLATFORM via contextvars. Cron is NEVER a gateway approval
+    Legacy integrations set STARDUST_GATEWAY_SESSION; concurrent paths bind
+    STARDUST_SESSION_PLATFORM via contextvars. Cron is NEVER a gateway approval
     context even when it originated from a platform (cron binds the platform for
     delivery routing): falling through would submit a pending approval with no
     listener and block the job indefinitely; unattended platforms likewise.
@@ -176,7 +176,7 @@ def _is_gateway_approval_context() -> bool:
     """
     if _is_cron_approval_context() or _is_unattended_platform_approval_context():
         return False
-    return env_var_enabled("HERMES_GATEWAY_SESSION") or bool(_get_session_platform())
+    return env_var_enabled("STARDUST_GATEWAY_SESSION") or bool(_get_session_platform())
 
 
 def _resolve_cli_approval_callback(approval_callback=None):
@@ -192,7 +192,7 @@ def _resolve_cli_approval_callback(approval_callback=None):
 
 def _should_fall_through_to_cli_approval(*, is_cli: bool, approval_callback, notify_cb) -> bool:
     """Prefer the CLI Dangerous Command panel over a silent pending approval:
-    ``HERMES_EXEC_ASK`` (or a platform marker) can leak into an interactive CLI
+    ``STARDUST_EXEC_ASK`` (or a platform marker) can leak into an interactive CLI
     process (historically via ``import gateway.run``), and without a gateway notify
     listener the ask branch used to return ``pending_approval`` immediately and
     skip the panel the user can actually answer."""

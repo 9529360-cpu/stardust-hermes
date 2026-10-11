@@ -35,8 +35,8 @@ class TestGetDefaultHermesRoot:
 
     @pytest.mark.linux_only
     def test_no_hermes_home_returns_native(self, tmp_path, monkeypatch):
-        """When HERMES_HOME is not set, returns ~/.hermes."""
-        monkeypatch.delenv("HERMES_HOME", raising=False)
+        """When STARDUST_HOME is not set, returns ~/.hermes."""
+        monkeypatch.delenv("STARDUST_HOME", raising=False)
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
 
         assert get_default_hermes_root() == tmp_path / ".hermes"
@@ -46,40 +46,40 @@ class TestGetDefaultHermesRoot:
 
 
     def test_docker_profile_active(self, tmp_path, monkeypatch):
-        """When a Docker profile is active (HERMES_HOME=<root>/profiles/<name>),
+        """When a Docker profile is active (STARDUST_HOME=<root>/profiles/<name>),
         returns the Docker root, not the profile dir."""
         docker_root = tmp_path / "opt" / "data"
         profile = docker_root / "profiles" / "coder"
         profile.mkdir(parents=True)
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
-        monkeypatch.setenv("HERMES_HOME", str(profile))
+        monkeypatch.setenv("STARDUST_HOME", str(profile))
         assert get_default_hermes_root() == docker_root
 
     @pytest.mark.windows_only
     def test_no_hermes_home_returns_localappdata_root_on_windows(self, tmp_path, monkeypatch):
         """Native Windows falls back to %LOCALAPPDATA%\\hermes, not ~/.hermes."""
         local_appdata = tmp_path / "LocalAppData"
-        monkeypatch.delenv("HERMES_HOME", raising=False)
+        monkeypatch.delenv("STARDUST_HOME", raising=False)
         monkeypatch.setenv("LOCALAPPDATA", str(local_appdata))
         monkeypatch.setattr(Path, "home", lambda: tmp_path / "Home")
 
         assert get_default_hermes_root() == local_appdata / "hermes"
 
     def test_result_memoised_until_env_or_home_changes(self, tmp_path, monkeypatch):
-        """Repeated calls reuse the memo; HERMES_HOME / home changes invalidate.
+        """Repeated calls reuse the memo; STARDUST_HOME / home changes invalidate.
 
-        get_default_hermes_root() resolves HERMES_HOME against the native
+        get_default_hermes_root() resolves STARDUST_HOME against the native
         home (~80us of path resolution) and is called at 31+ sites — every
         _load_global_auth_store() (per provider row in the /model picker),
         kanban, backup, gateway, update. The memo is keyed on
-        (native home, HERMES_HOME) compared for free each call.
+        (native home, STARDUST_HOME) compared for free each call.
         """
-        # HERMES_HOME set to a Docker-profile path: every call resolves the
+        # STARDUST_HOME set to a Docker-profile path: every call resolves the
         # env path against the native home (the ~80us work the memo skips).
         docker_root = tmp_path / "opt" / "data"
         profile = docker_root / "profiles" / "coder"
         profile.mkdir(parents=True)
-        monkeypatch.setenv("HERMES_HOME", str(profile))
+        monkeypatch.setenv("STARDUST_HOME", str(profile))
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
 
         # Probe the expensive inner work: the memo check itself calls
@@ -111,14 +111,14 @@ class TestGetDefaultHermesRoot:
         )
         assert first == docker_root
 
-        # HERMES_HOME change invalidates the memo (fresh resolution).
+        # STARDUST_HOME change invalidates the memo (fresh resolution).
         other_profile = docker_root / "profiles" / "writer"
         other_profile.mkdir(parents=True)
-        monkeypatch.setenv("HERMES_HOME", str(other_profile))
+        monkeypatch.setenv("STARDUST_HOME", str(other_profile))
         before = resolve_calls["n"]
         assert get_default_hermes_root() == docker_root
         assert resolve_calls["n"] > before, (
-            "HERMES_HOME change must force a fresh resolution"
+            "STARDUST_HOME change must force a fresh resolution"
         )
 
 
@@ -130,9 +130,9 @@ class TestGetHermesHome:
 
     @pytest.mark.windows_only
     def test_windows_fallback_uses_localappdata(self, tmp_path, monkeypatch):
-        """When HERMES_HOME is unset on Windows, use %LOCALAPPDATA%\\hermes."""
+        """When STARDUST_HOME is unset on Windows, use %LOCALAPPDATA%\\hermes."""
         local_appdata = tmp_path / "LocalAppData"
-        monkeypatch.delenv("HERMES_HOME", raising=False)
+        monkeypatch.delenv("STARDUST_HOME", raising=False)
         monkeypatch.setenv("LOCALAPPDATA", str(local_appdata))
         monkeypatch.setattr(Path, "home", lambda: tmp_path / "Home")
         monkeypatch.setattr(hermes_constants, "_profile_fallback_warned", False)
@@ -150,7 +150,7 @@ class TestGetProcessHermesHome:
 
     def test_env_set_returns_that_path(self, tmp_path, monkeypatch):
         home = tmp_path / "launch-home"
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         assert get_process_hermes_home() == home
 
 
@@ -164,7 +164,7 @@ class TestHermesManagedNode:
         bin_dir = node_dir / "bin"
         node_dir.mkdir(parents=True)
         bin_dir.mkdir()
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
 
         assert iter_hermes_node_dirs() == [node_dir, bin_dir]
 
@@ -175,7 +175,7 @@ class TestHermesManagedNode:
         node_dir.mkdir(parents=True)
         npm_cmd = node_dir / "npm.cmd"
         npm_cmd.write_text("@echo off\n")
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         monkeypatch.setattr(hermes_constants, "node_tool_runnable", lambda path: True)
 
         assert find_hermes_node_executable("npm") == str(npm_cmd)
@@ -192,7 +192,7 @@ class TestHermesManagedNode:
         bin_dir.mkdir()
         path_npm = bin_dir / "npm.cmd"
         path_npm.write_text("@echo off\n")
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         monkeypatch.setenv("PATH", str(bin_dir))
         monkeypatch.setattr(hermes_constants, "_managed_node_heal_attempted", False)
         monkeypatch.setattr(hermes_constants, "heal_hermes_managed_node", lambda: False)
@@ -237,7 +237,7 @@ class TestNodeToolRunnable:
         system_bin.mkdir()
         self._stub(system_bin, "npm", "#!/bin/sh\necho '11.10.0'\nexit 0\n")
 
-        monkeypatch.setenv("HERMES_HOME", str(profile_home))
+        monkeypatch.setenv("STARDUST_HOME", str(profile_home))
         monkeypatch.setenv("PATH", str(system_bin))
         monkeypatch.setattr(hermes_constants, "_managed_node_heal_attempted", False)
 
@@ -265,7 +265,7 @@ class TestNodeToolRunnable:
         system_bin.mkdir()
         self._stub(system_bin, "npm", "#!/bin/sh\necho '11.10.0'\nexit 0\n")
 
-        monkeypatch.setenv("HERMES_HOME", str(profile_home))
+        monkeypatch.setenv("STARDUST_HOME", str(profile_home))
         monkeypatch.setenv("PATH", str(system_bin))
         monkeypatch.setattr(hermes_constants, "_managed_node_heal_attempted", False)
         monkeypatch.setattr(hermes_constants, "heal_hermes_managed_node", lambda: False)
@@ -283,7 +283,7 @@ class TestNodeToolRunnable:
         )
         heal_called = {"value": False}
 
-        monkeypatch.setenv("HERMES_HOME", str(profile_home))
+        monkeypatch.setenv("STARDUST_HOME", str(profile_home))
         monkeypatch.setenv("PATH", "")
         monkeypatch.setattr(hermes_constants, "_managed_node_heal_attempted", False)
 
@@ -309,7 +309,7 @@ class TestNodeToolRunnable:
             managed_bin, "node", f"#!/bin/sh\necho 'v{target - 1}.20.0'\nexit 0\n"
         )
 
-        monkeypatch.setenv("HERMES_HOME", str(profile_home))
+        monkeypatch.setenv("STARDUST_HOME", str(profile_home))
         monkeypatch.setenv("PATH", "")
         monkeypatch.setattr(hermes_constants, "_managed_node_heal_attempted", False)
         monkeypatch.setattr(hermes_constants, "heal_hermes_managed_node", lambda: False)
@@ -326,7 +326,7 @@ class TestNodeToolRunnable:
             managed_bin, "node", f"#!/bin/sh\necho 'v{target}.5.1'\nexit 0\n"
         )
 
-        monkeypatch.setenv("HERMES_HOME", str(profile_home))
+        monkeypatch.setenv("STARDUST_HOME", str(profile_home))
         monkeypatch.setenv("PATH", "")
         monkeypatch.setattr(hermes_constants, "_managed_node_heal_attempted", False)
 
@@ -724,7 +724,7 @@ class TestGetHermesDir:
     """
 
     def _set_home(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
 
     def test_neither_exists_returns_new(self, tmp_path, monkeypatch):
         self._set_home(tmp_path, monkeypatch)
@@ -822,13 +822,13 @@ class TestManagedNodeTreeInUse:
 
     def test_always_false_off_windows(self, tmp_path, monkeypatch):
         monkeypatch.setattr(hermes_constants.sys, "platform", "darwin")
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         assert hermes_constants.managed_node_tree_in_use() is False
 
     def test_exe_under_node_dir_counts(self, tmp_path, monkeypatch):
         home = tmp_path / "hermes"
         (home / "node").mkdir(parents=True)
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         self._install_fake_psutil(
             monkeypatch,
             [{"exe": str(home / "node" / "node.exe"), "cmdline": None}],
@@ -838,7 +838,7 @@ class TestManagedNodeTreeInUse:
     def test_cmdline_arg_under_node_dir_counts(self, tmp_path, monkeypatch):
         home = tmp_path / "hermes"
         (home / "node").mkdir(parents=True)
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         self._install_fake_psutil(
             monkeypatch,
             [
@@ -853,7 +853,7 @@ class TestManagedNodeTreeInUse:
     def test_unrelated_process_does_not_count(self, tmp_path, monkeypatch):
         home = tmp_path / "hermes"
         (home / "node").mkdir(parents=True)
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         self._install_fake_psutil(
             monkeypatch,
             [{"exe": r"C:\Program Files\nodejs\node.exe", "cmdline": None}],
@@ -864,7 +864,7 @@ class TestManagedNodeTreeInUse:
         import sys
 
         monkeypatch.setattr(hermes_constants.sys, "platform", "win32")
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         # None in sys.modules makes `import psutil` raise ImportError.
         monkeypatch.setitem(sys.modules, "psutil", None)
         assert hermes_constants.managed_node_tree_in_use() is False
@@ -909,9 +909,9 @@ class TestWindowsHealStageSwap:
 
         monkeypatch.setattr(hermes_constants.sys, "platform", "win32")
         monkeypatch.setenv("PROCESSOR_ARCHITECTURE", "AMD64")
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         monkeypatch.setenv(
-            "HERMES_NODE_TARGET_MAJOR",
+            "STARDUST_NODE_TARGET_MAJOR",
             str(hermes_constants._HERMES_NODE_TARGET_MAJOR),
         )
         monkeypatch.setattr(hermes_constants, "_managed_node_heal_attempted", False)
@@ -1142,7 +1142,7 @@ class TestHealAttemptFlagSemantics:
         (home / "node").mkdir(parents=True)
         (home / "node" / "node.exe").write_text("x", encoding="utf-8")
         monkeypatch.setattr(hermes_constants.sys, "platform", "win32")
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         monkeypatch.setattr(hermes_constants, "_managed_node_heal_attempted", False)
         calls = {"n": 0}
 
@@ -1163,7 +1163,7 @@ class TestHealAttemptFlagSemantics:
         (home / "node").mkdir(parents=True)
         (home / "node" / "node.exe").write_text("x", encoding="utf-8")
         monkeypatch.setattr(hermes_constants.sys, "platform", "win32")
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         monkeypatch.setattr(hermes_constants, "_managed_node_heal_attempted", False)
         calls = {"n": 0}
 

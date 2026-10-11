@@ -1,6 +1,6 @@
 """``hermes import-agent --sync`` — keep previously imported Claude Code / Codex setups current.
 
-Every successful ``hermes import-agent`` run records its source in ``HERMES_HOME/import-sync.json``
+Every successful ``hermes import-agent`` run records its source in ``STARDUST_HOME/import-sync.json``
 (the sync manifest); ``--sync`` re-imports every registered source whose files changed since the
 last run. Change detection is a content digest over exactly the files the importer reads, so an
 unchanged source is a cheap no-op and credential files (never read by the importer) can never

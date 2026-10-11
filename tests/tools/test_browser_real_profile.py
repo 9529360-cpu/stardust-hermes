@@ -648,7 +648,7 @@ class TestSnapshotIsCredentialStore:
         (home / "browser-profile" / "chrome" / "Default").mkdir(parents=True)
         cookies = home / "browser-profile" / "chrome" / "Default" / "Cookies"
         cookies.write_text("secret-cookie-db")
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         err = fs.get_read_block_error(str(cookies))
         assert err and "snapshot" in err.lower()
 
@@ -656,7 +656,7 @@ class TestSnapshotIsCredentialStore:
         import agent.file_safety as fs
         home = tmp_path / ".hermes"
         home.mkdir(parents=True)
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         normal = tmp_path / "notes.txt"
         normal.write_text("hello")
         assert fs.get_read_block_error(str(normal)) is None

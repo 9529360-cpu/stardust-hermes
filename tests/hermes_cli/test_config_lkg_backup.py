@@ -24,7 +24,7 @@ BROKEN = "approvals:\n  deny: [unclosed\n"
 
 
 def _fresh_load(home: Path) -> tuple[dict, str]:
-    env = {**os.environ, "HERMES_HOME": str(home), "PYTHONPATH": str(REPO), "LKG_TOKEN": "expanded-secret"}
+    env = {**os.environ, "STARDUST_HOME": str(home), "PYTHONPATH": str(REPO), "LKG_TOKEN": "expanded-secret"}
     proc = subprocess.run(
         [sys.executable, "-c", "import json; from hermes_cli.config import load_config; print(json.dumps(load_config()))"],
         cwd=REPO, env=env, text=True, capture_output=True, check=True, stdin=subprocess.DEVNULL,

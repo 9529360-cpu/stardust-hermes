@@ -18,7 +18,7 @@ from cron.jobs import create_job, get_job, mark_job_run
 def tmp_cron_home(tmp_path, monkeypatch):
     home = tmp_path / ".hermes"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     return home
 
 

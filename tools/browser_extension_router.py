@@ -32,12 +32,12 @@ def _bound_identity() -> Tuple[Optional[str], Optional[str], Optional[str]]:
 
     identity = tuple(
         get_session_env(key, "") or None
-        for key in ("HERMES_SESSION_ID", "HERMES_BROWSER_CONTROL_PRINCIPAL",
-                    "HERMES_BROWSER_CONTROL_TRANSPORT_FAMILY")
+        for key in ("STARDUST_SESSION_ID", "STARDUST_BROWSER_CONTROL_PRINCIPAL",
+                    "STARDUST_BROWSER_CONTROL_TRANSPORT_FAMILY")
     )
     session_id, principal_id, family = identity
     if family == "local-api" and (principal_id or "").startswith("principal:desktop:"):
-        session_id = get_session_env("HERMES_UI_SESSION_ID", "") or session_id
+        session_id = get_session_env("STARDUST_UI_SESSION_ID", "") or session_id
     return session_id, principal_id, family
 
 

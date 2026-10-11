@@ -284,7 +284,7 @@ class TestCachedFetchApiModelsDiskRoundTrip:
         for key B must not evict key A's catalog, and a cache-only read for A must still hit."""
         import hermes_cli.models as mod
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         monkeypatch.setattr(mod, "fetch_api_models", lambda key, *a, **k: [f"models-for-{key}"])
 
         url = "https://proxy.example.com/v1"

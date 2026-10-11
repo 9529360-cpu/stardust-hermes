@@ -602,7 +602,7 @@ def _collect_authed_provider_slugs(
     from hermes_cli.model_switch import _scoped_key_env
     from agent.models_dev import PROVIDER_TO_MODELS_DEV
     from hermes_cli.auth import PROVIDER_REGISTRY
-    from hermes_cli.providers import HERMES_OVERLAYS
+    from hermes_cli.providers import STARDUST_OVERLAYS
     from hermes_cli.models import CANONICAL_PROVIDERS
     excluded_set = {str(p).strip().lower() for p in excluded if p}
     slugs: list[str] = []
@@ -617,7 +617,7 @@ def _collect_authed_provider_slugs(
             _emit(hermes_id, hermes_id)
 
     mdev_to_hermes = {v: k for k, v in PROVIDER_TO_MODELS_DEV.items()}
-    for pid, overlay in HERMES_OVERLAYS.items():
+    for pid, overlay in STARDUST_OVERLAYS.items():
         hermes_slug = mdev_to_hermes.get(pid, pid)
         if _skip(seen, excluded_set, pid, hermes_slug) or overlay.auth_type == "aws_sdk":
             continue
@@ -828,12 +828,12 @@ def _overlay_has_creds(b: _PickerBuild, pid: str, hermes_slug: str, overlay) -> 
 def _lap_overlay_rows(b: _PickerBuild, data: dict) -> None:
     """Section 2: Hermes-only providers (nous, openai-codex, copilot, opencode-go, ...)."""
     from agent.models_dev import PROVIDER_TO_MODELS_DEV
-    from hermes_cli.providers import HERMES_OVERLAYS
+    from hermes_cli.providers import STARDUST_OVERLAYS
 
-    # HERMES_OVERLAYS keys may be models.dev IDs ("github-copilot") while config.yaml uses
+    # STARDUST_OVERLAYS keys may be models.dev IDs ("github-copilot") while config.yaml uses
     # Hermes IDs ("copilot").
     mdev_to_hermes = {v: k for k, v in PROVIDER_TO_MODELS_DEV.items()}
-    for pid, overlay in HERMES_OVERLAYS.items():
+    for pid, overlay in STARDUST_OVERLAYS.items():
         hermes_slug = mdev_to_hermes.get(pid, pid)
         if _skip(b.seen_slugs, b.excluded, pid, hermes_slug):
             continue

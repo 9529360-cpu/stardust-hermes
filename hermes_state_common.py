@@ -27,7 +27,7 @@ def routed_sessions_setting(key: str, env_var: str) -> Any:
     """``sessions.<key>`` for the profile whose state.db this process is touching.
 
     ``gateway/run.py`` bridges the LAUNCH profile's ``sessions.*`` into ``env_var`` (the cross-process
-    carrier CLI/cron children read). Under a multiplexer a routed turn runs with a HERMES_HOME override
+    carrier CLI/cron children read). Under a multiplexer a routed turn runs with a STARDUST_HOME override
     and that env slot holds the default profile's value, so a served profile with different
     ``sessions.*`` settings must read its own config.yaml. Unscoped: the env bridge, as before.
     Returns ``None`` when neither source sets the key.

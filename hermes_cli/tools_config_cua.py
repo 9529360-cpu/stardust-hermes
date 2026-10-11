@@ -88,7 +88,7 @@ def _post_setup_no_window_flags(*, streams_to_console: bool = False) -> int:
 
 def _cua_driver_cmd() -> str:
     """Return the configured cua-driver override, or the bare default name."""
-    return os.environ.get("HERMES_CUA_DRIVER_CMD", "").strip() or "cua-driver"
+    return os.environ.get("STARDUST_CUA_DRIVER_CMD", "").strip() or "cua-driver"
 
 
 def _cua_version_summary(raw: str, *, limit: int = 120) -> str:
@@ -149,7 +149,7 @@ def _pip_install(args: List[str], *, timeout: int = 300, capture_output: bool = 
     venv_root = Path(sys.executable).parent.parent
     install_flags = _post_setup_no_window_flags(streams_to_console=not capture_output)
 
-    # Managed uv first: $HERMES_HOME/bin is never on PATH, so a bare which() misses the uv Hermes
+    # Managed uv first: $STARDUST_HOME/bin is never on PATH, so a bare which() misses the uv Hermes
     # installed; ensure_uv() (not a pure lookup) because installing uv is in scope during setup.
     from hermes_cli.managed_uv import ensure_uv
     uv_bin = ensure_uv()
@@ -274,9 +274,9 @@ def install_cua_driver(upgrade: bool = False, require_confirmed_update: bool = F
     driver_cmd, binary = _cua_driver_cmd(), _resolved_cua_driver_cmd()
     # An explicit override is authoritative even when broken: installing the standard driver
     # cannot repair the configured path and would mutate an unrelated installation.
-    override = os.environ.get("HERMES_CUA_DRIVER_CMD", "").strip()
+    override = os.environ.get("STARDUST_CUA_DRIVER_CMD", "").strip()
     if override and not binary:
-        return _fail(f"    HERMES_CUA_DRIVER_CMD does not resolve to an executable: {override}",
+        return _fail(f"    STARDUST_CUA_DRIVER_CMD does not resolve to an executable: {override}",
                      "    Fix or unset the override before running computer-use install.")
 
     # Not installed → fresh install path (only when caller asked for it).
@@ -311,7 +311,7 @@ def install_cua_driver(upgrade: bool = False, require_confirmed_update: bool = F
                        "Hermes cannot use its current runtime contract: "
                        f"{contract.get('reason') or 'required runtime features are missing'}.")
         if override:
-            return _fail("    Update the binary selected by HERMES_CUA_DRIVER_CMD, or unset the "
+            return _fail("    Update the binary selected by STARDUST_CUA_DRIVER_CMD, or unset the "
                          f"override and run: {_UPGRADE_CMD}", warn=False)
         if is_windows and require_confirmed_update:
             return _fail("    Automatic Windows updates cannot safely run cua-driver's interactive "

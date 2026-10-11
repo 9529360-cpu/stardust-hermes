@@ -3,7 +3,7 @@
 A ``/p/<profile>/`` route's reply, deliver_only message, home-channel fallback and
 ``github_comment`` credential all belong to THAT profile; a default-bound route never
 borrows a secondary's adapter. Real ``GatewayAuthorizationMixin`` resolver, real
-``load_gateway_config`` against a temp HERMES_HOME — no patched predicates.
+``load_gateway_config`` against a temp STARDUST_HOME — no patched predicates.
 """
 import os
 from unittest.mock import AsyncMock, MagicMock
@@ -43,7 +43,7 @@ def profile_homes(tmp_path, monkeypatch):
     home = tmp_path / ".hermes"
     sec = home / "profiles" / "sec"
     sec.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     monkeypatch.setattr("hermes_cli.profiles._get_default_hermes_home", lambda: home)
     monkeypatch.setattr("hermes_cli.profiles._get_profiles_root", lambda: home / "profiles")
     (sec / "config.yaml").write_text(

@@ -724,7 +724,7 @@ def test_service_uses_low_idle_poll_with_immediate_wakeup(tmp_path: Path):
 
 
 def test_service_derives_room_deadline_from_agent_timeout(tmp_path: Path, monkeypatch):
-    monkeypatch.setenv("HERMES_AGENT_TIMEOUT", "90")
+    monkeypatch.setenv("STARDUST_AGENT_TIMEOUT", "90")
 
     service = HostedRoomService(_server(), db_path=tmp_path / "state.db")
 

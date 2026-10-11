@@ -54,7 +54,7 @@ def test_current_stamp_does_not_hide_damaged_output(bundle, damage):
 
 
 def test_default_root_is_the_imported_checkout_not_cwd(tmp_path, monkeypatch):
-    # The Windows hand-off is spawned from HERMES_HOME; the receipt must describe the checkout anyway.
+    # The Windows hand-off is spawned from STARDUST_HOME; the receipt must describe the checkout anyway.
     monkeypatch.chdir(tmp_path)
     seen = {}
     monkeypatch.setattr(verify, '_desktop_packaged_executable', lambda desktop: seen.setdefault('desktop', desktop) and None)

@@ -12,8 +12,8 @@ def test_foreign_rpc_preview_import_and_profile_isolation(tmp_path, monkeypatch)
     from tui_gateway import server
 
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
-    monkeypatch.delenv("HERMES_DESKTOP", raising=False)
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.delenv("STARDUST_DESKTOP", raising=False)
     folder = tmp_path / ".claude" / "projects" / "project"
     folder.mkdir(parents=True)
     log = folder / "session.jsonl"
@@ -64,7 +64,7 @@ def test_foreign_pages_confine_handles_and_failed_import_rolls_back(tmp_path, mo
     from hermes_state import SessionDB
 
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
     folder = tmp_path / ".codex" / "sessions"
     folder.mkdir(parents=True)
     for index in range(3):

@@ -30,7 +30,7 @@ def profile_homes(tmp_path, monkeypatch):
     root = tmp_path / "hermes"
     secondary = root / "profiles" / "secondary"
     secondary.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(root))
+    monkeypatch.setenv("STARDUST_HOME", str(root))
     monkeypatch.setattr(hermes_state, "DEFAULT_DB_PATH", hermes_state._IMPORT_DEFAULT_DB_PATH)
     return root, secondary
 

@@ -679,7 +679,7 @@ def _guarded_global_root(global_path: Optional[Path]) -> Optional[Path]:
     """Apply the pytest seat belt to a resolved global-root auth.json path.
 
     ``None`` means classic mode (profile == root) or "refuse": under pytest,
-    never write the real user's ``~/.hermes/auth.json`` even when HERMES_HOME
+    never write the real user's ``~/.hermes/auth.json`` even when STARDUST_HOME
     points at a profile path (mirrors the read-side guard in
     ``_load_global_auth_store``). Uses the unmodified HOME env, not
     ``Path.home()`` which fixtures may monkeypatch.
@@ -868,8 +868,8 @@ REFRESHABLE_OAUTH_PROVIDERS = frozenset({"anthropic", "nous", *_TOKENS_SINGLETON
 _SINGLE_USE_REFRESH_PROVIDERS = ("openai-codex", "xai-oauth", "anthropic")
 
 _REFRESH_TIMEOUT_ENV_VARS = {
-    "openai-codex": "HERMES_CODEX_REFRESH_TIMEOUT_SECONDS",
-    "xai-oauth": "HERMES_XAI_REFRESH_TIMEOUT_SECONDS",
+    "openai-codex": "STARDUST_CODEX_REFRESH_TIMEOUT_SECONDS",
+    "xai-oauth": "STARDUST_XAI_REFRESH_TIMEOUT_SECONDS",
 }
 
 # Singleton-seeded source whose exhausted/DEAD pool row may be revived by a
@@ -1460,7 +1460,7 @@ class CredentialPool(CredentialPoolAdminMixin):
 
     def _single_use_refresh_lock_timeout(self) -> float:
         """Configured refresh POST timeout plus margin, so a slow token endpoint cannot starve the flock."""
-        env_var = _REFRESH_TIMEOUT_ENV_VARS.get(self.provider, "HERMES_ANTHROPIC_REFRESH_TIMEOUT_SECONDS")
+        env_var = _REFRESH_TIMEOUT_ENV_VARS.get(self.provider, "STARDUST_ANTHROPIC_REFRESH_TIMEOUT_SECONDS")
         refresh_timeout_seconds = auth_mod.env_float(env_var, 20)
         return max(float(auth_mod.AUTH_LOCK_TIMEOUT_SECONDS), float(refresh_timeout_seconds) + 5.0)
 

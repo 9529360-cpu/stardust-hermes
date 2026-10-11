@@ -64,7 +64,7 @@ _SESSION_DRAIN_TIMEOUT = 10.0
 _DEFERRED_COMMIT_TIMEOUT = (_TIMEOUT * 2) + 5.0
 _SESSION_MESSAGE_BATCH_LIMIT = 100
 _REMOTE_RESOURCE_PREFIXES = ("http://", "https://", "git@", "ssh://", "git://")
-_SYNC_TRACE_ENV = "HERMES_OPENVIKING_SYNC_TRACE"
+_SYNC_TRACE_ENV = "STARDUST_OPENVIKING_SYNC_TRACE"
 _RECALL_QUERY_MIN_CHARS = 5
 _RECALL_MIN_TIMEOUT_SECONDS = 0.05
 _READ_BATCH_LIMIT = 3
@@ -2128,7 +2128,7 @@ class OpenVikingMemoryProvider(MemoryProvider):
             (self._committed_session_ids.add if committed else self._committed_session_ids.discard)(sid)
 
     def _state_path(self, kind: str, name: str) -> Optional[Path]:
-        """Marker/lock file under HERMES_HOME: ``pending`` -> pending_sessions/<sid>.json,
+        """Marker/lock file under STARDUST_HOME: ``pending`` -> pending_sessions/<sid>.json,
         ``lock`` -> runs/<run_id>.lock; an empty run id maps to the legacy recovery lock."""
         name = str(name or "").strip()
         if not self._hermes_home or (not name and kind != "lock"):

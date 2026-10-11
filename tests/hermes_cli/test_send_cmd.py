@@ -218,7 +218,7 @@ def test_load_hermes_env_bridges_config_yaml_scalars(tmp_path, monkeypatch):
         "TELEGRAM_HOME_CHANNEL: '5550001111'\nnested:\n  ignored: true\n"
     )
 
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     monkeypatch.delenv("TELEGRAM_HOME_CHANNEL", raising=False)
     monkeypatch.delenv("SOME_TOKEN", raising=False)
 
@@ -250,7 +250,7 @@ def test_load_hermes_env_utf8_bom_preserves_first_key(tmp_path, monkeypatch):
         b"\xef\xbb\xbfSEND_BOM_BOT_TOKEN=tok-first\nSEND_BOM_SECOND=two\n"
     )
 
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     monkeypatch.delenv("SEND_BOM_BOT_TOKEN", raising=False)
     monkeypatch.delenv("SEND_BOM_SECOND", raising=False)
 
@@ -272,7 +272,7 @@ def test_load_hermes_env_bomless_utf8_still_loads(tmp_path, monkeypatch):
     hermes_home.mkdir()
     (hermes_home / ".env").write_bytes(b"SEND_PLAIN_TOKEN=plain-val\n")
 
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     monkeypatch.delenv("SEND_PLAIN_TOKEN", raising=False)
 
     from importlib import reload
@@ -297,7 +297,7 @@ def test_load_hermes_env_latin1_fallback_still_loads(tmp_path, monkeypatch):
         b"\xef\xbb\xbfSEND_L1_TOKEN=tok-l1\nSEND_L1_NOTE=caf\xe9\n"
     )
 
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     monkeypatch.delenv("SEND_L1_TOKEN", raising=False)
     monkeypatch.delenv("SEND_L1_NOTE", raising=False)
 
@@ -322,7 +322,7 @@ def test_load_hermes_env_latin1_fallback_overrides_shell(tmp_path, monkeypatch):
     # 0xE9 forces the UnicodeDecodeError \u2192 latin-1 stream fallback.
     (hermes_home / ".env").write_bytes(b"SEND_OVR_LABEL=caf\xe9-file\n")
 
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     monkeypatch.setenv("SEND_OVR_LABEL", "stale-shell-value")
 
     from importlib import reload
@@ -343,7 +343,7 @@ def test_load_hermes_env_fallback_read_error_is_swallowed(tmp_path, monkeypatch)
     # Invalid UTF-8 so the fallback (and its read_bytes call) is reached.
     (hermes_home / ".env").write_bytes(b"SEND_ERR_TOKEN=caf\xe9\n")
 
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
     def _boom(self):
         raise OSError("disk went away")
@@ -365,7 +365,7 @@ def test_load_hermes_env_bom_only_env_is_noop(tmp_path, monkeypatch):
     hermes_home.mkdir()
     (hermes_home / ".env").write_bytes(b"\xef\xbb\xbf")
 
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
     from importlib import reload
     import hermes_cli.config as _hc_config

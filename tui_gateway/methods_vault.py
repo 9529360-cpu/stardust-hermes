@@ -18,7 +18,7 @@ JSON-RPC channel every other Settings surface uses. Contracts:
   or logged.
 
 Every handler honours ``params.profile`` (app-global remote mode serves several profiles from one
-backend): the requested profile's HERMES_HOME and secret scope are bound around the body, so the
+backend): the requested profile's STARDUST_HOME and secret scope are bound around the body, so the
 vault file, manager config and manager tokens all resolve to that profile.
 
 Handlers are rebound onto server.py's globals at install time (see

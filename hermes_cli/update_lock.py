@@ -28,7 +28,7 @@ MARKER_NAME = ".hermes-update-in-progress"
 # spawning `hermes update` as a child stage; the parent holds the marker for its whole run,
 # so without this the child would refuse its own parent's lock. Keep in sync with
 # update_child_env in apps/bootstrap-installer/src-tauri/src/update.rs.
-HANDOFF_PID_ENV = "HERMES_UPDATE_HANDOFF_PID"
+HANDOFF_PID_ENV = "STARDUST_UPDATE_HANDOFF_PID"
 
 # Exit code meaning "another updater/instance owns this install right now" — the same
 # contract as the Windows shim / venv-holder guards in _cmd_update_impl, matched by the
@@ -40,7 +40,7 @@ def update_marker_path() -> Path:
     """Path of the shared update marker.
 
     Uses the *process* Hermes home (never the context-local profile override): the Rust
-    updater resolves ``$HERMES_HOME`` or the platform default and the desktop pins that same
+    updater resolves ``$STARDUST_HOME`` or the platform default and the desktop pins that same
     value into the updater's env, so a profile-scoped path would be one the other owners never look at.
     """
     from hermes_constants import get_process_hermes_home

@@ -11,8 +11,8 @@ from agent.redact import mask_secret, redact_cdp_url, redact_sensitive_text, Red
 
 @pytest.fixture(autouse=True)
 def _ensure_redaction_enabled(monkeypatch):
-    """Ensure HERMES_REDACT_SECRETS is not disabled by prior test imports."""
-    monkeypatch.delenv("HERMES_REDACT_SECRETS", raising=False)
+    """Ensure STARDUST_REDACT_SECRETS is not disabled by prior test imports."""
+    monkeypatch.delenv("STARDUST_REDACT_SECRETS", raising=False)
     # Also patch the module-level snapshot so it reflects the cleared env var
     monkeypatch.setattr("agent.redact._REDACT_ENABLED", True)
 
@@ -1086,12 +1086,12 @@ class TestTerminalOutputRedaction:
             ),
             ("sed -n '1,20p' ~/.zprofile", "api_key: zprofileSecret789", "zprofileSecret789"),
             (
-                'cat "$HERMES_HOME/config.yaml"',
+                'cat "$STARDUST_HOME/config.yaml"',
                 "SERVICE_TOKEN=variablePathSecret123456789",
                 "variablePathSecret123456789",
             ),
             (
-                'cat "${HERMES_HOME}/config.yaml"',
+                'cat "${STARDUST_HOME}/config.yaml"',
                 "SERVICE_TOKEN=variablePathSecret123456789",
                 "variablePathSecret123456789",
             ),
@@ -1292,7 +1292,7 @@ class TestSecretFileAssignmentRedaction:
 class TestHermesHomePathClassification:
     """``_is_secret_file_arg`` must see the RESOLVED Hermes home: a managed Windows home
     (``%LOCALAPPDATA%\\hermes``) has no ``.hermes`` segment and a resolved path never spells
-    ``$HERMES_HOME``, so the literal test alone classified its ``config.yaml`` as ordinary YAML."""
+    ``$STARDUST_HOME``, so the literal test alone classified its ``config.yaml`` as ordinary YAML."""
 
     def test_resolved_home_config_is_secret_bearing_but_project_config_is_not(self, tmp_path, monkeypatch):
         import agent.file_safety as file_safety

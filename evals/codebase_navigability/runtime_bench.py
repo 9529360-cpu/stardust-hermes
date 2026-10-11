@@ -1,6 +1,6 @@
 """Runtime benchmarks for one tree. Usage: python runtime_bench.py <tree> <label> [reps]
 
-Each probe runs in a FRESH subprocess with an isolated HERMES_HOME so nothing is cached across reps.
+Each probe runs in a FRESH subprocess with an isolated STARDUST_HOME so nothing is cached across reps.
 Reports medians + min over reps. Writes <label>.runtime.json.
 """
 import json, os, statistics, subprocess, sys, tempfile, time, shutil
@@ -11,10 +11,10 @@ PY = os.environ.get("NAV_PY", sys.executable)
 HOME = tempfile.mkdtemp(prefix=f"hh_{LABEL}_")
 os.makedirs(f"{HOME}/skills", exist_ok=True)
 open(f"{HOME}/config.yaml", "w", encoding="utf-8").write("model:\n  default: openai/gpt-4o-mini\n  provider: openrouter\nterminal:\n  backend: local\n")
-ENV = {**os.environ, "HERMES_HOME": HOME, "PYTHONPATH": TREE, "PYTHONDONTWRITEBYTECODE": "0", "OPENROUTER_API_KEY": "sk-bench-placeholder",
-       "HERMES_SKIP_UPDATE_CHECK": "1", "NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "120"}
+ENV = {**os.environ, "STARDUST_HOME": HOME, "PYTHONPATH": TREE, "PYTHONDONTWRITEBYTECODE": "0", "OPENROUTER_API_KEY": "sk-bench-placeholder",
+       "STARDUST_SKIP_UPDATE_CHECK": "1", "NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "120"}
 for k in list(ENV):
-    if k.startswith(("HERMES_SESSION", "HERMES_PROFILE")): ENV.pop(k)
+    if k.startswith(("STARDUST_SESSION", "STARDUST_PROFILE")): ENV.pop(k)
 
 def run(argv, code=None, timeout=300):
     t0 = time.perf_counter()

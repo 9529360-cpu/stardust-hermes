@@ -126,12 +126,12 @@ def test_macos_ps_marker_requires_full_lstart_not_a_truncated_weekday():
 
 
 def test_parent_watchdog_treats_empty_marker_env_as_absent(monkeypatch):
-    """Blank inherited HERMES_PARENT_START_MARKER/NONCE degrade to PID-only tracking."""
+    """Blank inherited STARDUST_PARENT_START_MARKER/NONCE degrade to PID-only tracking."""
     from hermes_cli import web_server_lifecycle
 
-    monkeypatch.setenv("HERMES_PARENT_PID", "4242")
-    monkeypatch.setenv("HERMES_PARENT_START_MARKER", "")
-    monkeypatch.setenv("HERMES_PARENT_NONCE", "")
+    monkeypatch.setenv("STARDUST_PARENT_PID", "4242")
+    monkeypatch.setenv("STARDUST_PARENT_START_MARKER", "")
+    monkeypatch.setenv("STARDUST_PARENT_NONCE", "")
     seen = {}
 
     def fake_orphaned(pid, marker):
@@ -161,9 +161,9 @@ def test_parent_watchdog_warns_when_disarmed_by_unusable_marker(monkeypatch, cap
 
     from hermes_cli import web_server_lifecycle
 
-    monkeypatch.setenv("HERMES_PARENT_PID", "4242")
-    monkeypatch.setenv("HERMES_PARENT_START_MARKER", "ps:Sat")
-    monkeypatch.setenv("HERMES_PARENT_NONCE", "n")
+    monkeypatch.setenv("STARDUST_PARENT_PID", "4242")
+    monkeypatch.setenv("STARDUST_PARENT_START_MARKER", "ps:Sat")
+    monkeypatch.setenv("STARDUST_PARENT_NONCE", "n")
     started = []
     monkeypatch.setattr(
         web_server_lifecycle.threading, "Thread", lambda *a, **k: started.append(1) or _NoThread()

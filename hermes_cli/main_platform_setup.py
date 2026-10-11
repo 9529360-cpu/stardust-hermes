@@ -299,10 +299,10 @@ def _sync_status(ssc) -> int:
     elif not status.get("nous_admin"):
         _err("\nSync is not enabled for your account yet.")
     elif not status.get("feature_enabled"):
-        _err("\nSync feature is off for this instance (set HERMES_SYNC_ENABLED=1 "
+        _err("\nSync feature is off for this instance (set STARDUST_SYNC_ENABLED=1 "
              "or config.yaml sync.enabled: true). Sync is inert.")
     elif not status.get("base_url"):
-        _err("\nNo sync base URL configured (config.yaml sync.base_url or HERMES_SYNC_BASE_URL). Sync is inert.")
+        _err("\nNo sync base URL configured (config.yaml sync.base_url or STARDUST_SYNC_BASE_URL). Sync is inert.")
     return 0
 
 
@@ -362,7 +362,7 @@ def cmd_sync(args):
         _err("sync unavailable: not enabled for your account yet.")
         return 1
     if not ssc.resolve_sync_base_url():
-        _err("sync inert: no sync base URL configured (config.yaml sync.base_url or HERMES_SYNC_BASE_URL).")
+        _err("sync inert: no sync base URL configured (config.yaml sync.base_url or STARDUST_SYNC_BASE_URL).")
         return 1
 
     action = _SYNC_GATED.get(sub)

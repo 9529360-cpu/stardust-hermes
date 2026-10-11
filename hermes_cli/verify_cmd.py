@@ -95,7 +95,7 @@ def _record_evidence(root: Path, recipe, result, *, partial: bool) -> None:
             tails.append(f"[start] {recipe.start} -> {_readiness_status(result.readiness)}")
         record_verify_run(
             root=root,
-            session_id=os.environ.get("HERMES_SESSION_ID"),
+            session_id=os.environ.get("STARDUST_SESSION_ID"),
             ok=result.ok,
             command="hermes verify",
             scope="targeted" if partial else "full",

@@ -30,8 +30,8 @@ param(
     # existing tree pass -ForceCommit.
     [switch]$ForceCommit,
     [string]$Tag = "",
-    [string]$HermesHome = $(if ($env:HERMES_HOME) { $env:HERMES_HOME } else { "$env:LOCALAPPDATA\hermes" }),
-    [string]$InstallDir = $(if ($env:HERMES_HOME) { "$env:HERMES_HOME\hermes-agent" } else { "$env:LOCALAPPDATA\hermes\hermes-agent" }),
+    [string]$HermesHome = $(if ($env:STARDUST_HOME) { $env:STARDUST_HOME } else { "$env:LOCALAPPDATA\hermes" }),
+    [string]$InstallDir = $(if ($env:STARDUST_HOME) { "$env:STARDUST_HOME\hermes-agent" } else { "$env:LOCALAPPDATA\hermes\hermes-agent" }),
 
     # --- Stage protocol (additive; default invocation behaves as before) ----
     # See the "Stage protocol" section near the bottom of the file for the
@@ -112,7 +112,7 @@ try {
 # STONE~1.ZEN), or an accented character ("Ruben" spelled with an acute e ->
 # RUBN~1). It can then expose %TEMP%, %TMP%, %LOCALAPPDATA%, %APPDATA% and
 # %USERPROFILE% -- plus everything derived from them, including the default
-# HERMES_HOME and InstallDir -- in that short form:
+# STARDUST_HOME and InstallDir -- in that short form:
 #   C:\Users\FIRST~1.LAS\AppData\Local\Temp
 #
 # PowerShell's FileSystem provider mishandles the aliased component when such a
@@ -345,14 +345,14 @@ if ($PSBoundParameters.ContainsKey('HermesHome')) {
     $HermesHome = ConvertTo-LongPath $HermesHome
 } else {
     $HermesHome = ConvertTo-LongPath $(
-        if ($env:HERMES_HOME) { $env:HERMES_HOME } else { "$env:LOCALAPPDATA\hermes" }
+        if ($env:STARDUST_HOME) { $env:STARDUST_HOME } else { "$env:LOCALAPPDATA\hermes" }
     )
 }
 if ($PSBoundParameters.ContainsKey('InstallDir')) {
     $InstallDir = ConvertTo-LongPath $InstallDir
 } else {
     $InstallDir = ConvertTo-LongPath $(
-        if ($env:HERMES_HOME) { "$env:HERMES_HOME\hermes-agent" } else { "$env:LOCALAPPDATA\hermes\hermes-agent" }
+        if ($env:STARDUST_HOME) { "$env:STARDUST_HOME\hermes-agent" } else { "$env:LOCALAPPDATA\hermes\hermes-agent" }
     )
 }
 if ($script:NormalizedProfilePaths) {
@@ -1148,7 +1148,7 @@ function Resolve-UvCmd {
     }
 
     # Fall back to PATH (covers edge cases where the installer ran in a
-    # sibling process and HERMES_HOME wasn't propagated).
+    # sibling process and STARDUST_HOME wasn't propagated).
     if (Get-Command uv -ErrorAction SilentlyContinue) {
         $script:UvCmd = "uv"
         return
@@ -1451,7 +1451,7 @@ function Install-Git {
     and re-running this installer fully recovers.
 
     After install we locate ``bash.exe`` and persist the path in
-    ``HERMES_GIT_BASH_PATH`` (User scope) so Hermes can find it in a fresh
+    ``STARDUST_GIT_BASH_PATH`` (User scope) so Hermes can find it in a fresh
     shell without a second PATH refresh.
     #>
     $script:GitInstallFailureReason = $null
@@ -1621,7 +1621,7 @@ function Set-GitBashEnvVar {
     <#
     .SYNOPSIS
     Locate ``bash.exe`` from an already-installed Git and persist the path in
-    ``HERMES_GIT_BASH_PATH`` (User env scope) so Hermes can find it even before
+    ``STARDUST_GIT_BASH_PATH`` (User env scope) so Hermes can find it even before
     PATH propagation completes in a newly-spawned shell.
     #>
     $script:GitBashPath = $null
@@ -1659,16 +1659,16 @@ function Set-GitBashEnvVar {
 
     foreach ($candidate in $candidates) {
         if ($candidate -and (Test-Path $candidate)) {
-            [Environment]::SetEnvironmentVariable("HERMES_GIT_BASH_PATH", $candidate, "User")
-            $env:HERMES_GIT_BASH_PATH = $candidate
+            [Environment]::SetEnvironmentVariable("STARDUST_GIT_BASH_PATH", $candidate, "User")
+            $env:STARDUST_GIT_BASH_PATH = $candidate
             $script:GitBashPath = $candidate
-            Write-Info "Set HERMES_GIT_BASH_PATH=$candidate"
+            Write-Info "Set STARDUST_GIT_BASH_PATH=$candidate"
             return
         }
     }
 
     Write-Warn "Could not locate bash.exe -- Hermes may not find Git Bash."
-    Write-Info "If needed, set HERMES_GIT_BASH_PATH manually to your bash.exe path."
+    Write-Info "If needed, set STARDUST_GIT_BASH_PATH manually to your bash.exe path."
 }
 
 # The dependency tree supports Node 22.22+, 24.11+, and 26+. nanoid 6 excludes
@@ -3243,15 +3243,15 @@ function Set-PathVariable {
         Write-Info "PATH already configured"
     }
     
-    # Set HERMES_HOME so the Python code finds config/data in the right place.
+    # Set STARDUST_HOME so the Python code finds config/data in the right place.
     # Only needed on Windows where we install to %LOCALAPPDATA%\hermes instead
     # of the Unix default ~/.hermes
-    $currentHermesHome = [Environment]::GetEnvironmentVariable("HERMES_HOME", "User")
+    $currentHermesHome = [Environment]::GetEnvironmentVariable("STARDUST_HOME", "User")
     if (-not $currentHermesHome -or $currentHermesHome -ne $HermesHome) {
-        [Environment]::SetEnvironmentVariable("HERMES_HOME", $HermesHome, "User")
-        Write-Success "Set HERMES_HOME=$HermesHome"
+        [Environment]::SetEnvironmentVariable("STARDUST_HOME", $HermesHome, "User")
+        Write-Success "Set STARDUST_HOME=$HermesHome"
     }
-    $env:HERMES_HOME = $HermesHome
+    $env:STARDUST_HOME = $HermesHome
     
     # Update current session
     $env:Path = "$hermesBin;$env:Path"
@@ -3339,7 +3339,7 @@ function Write-BootstrapMarker {
 function Copy-ConfigTemplates {
     Write-Info "Setting up configuration files..."
     
-    # Create the HERMES_HOME directory structure ($HermesHome, default %LOCALAPPDATA%\hermes)
+    # Create the STARDUST_HOME directory structure ($HermesHome, default %LOCALAPPDATA%\hermes)
     New-Item -ItemType Directory -Force -Path "$HermesHome\cron" | Out-Null
     New-Item -ItemType Directory -Force -Path "$HermesHome\sessions" | Out-Null
     New-Item -ItemType Directory -Force -Path "$HermesHome\logs" | Out-Null

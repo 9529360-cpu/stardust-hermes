@@ -78,14 +78,14 @@ def test_nebius_canonical_provider_and_label():
 
 def test_nebius_provider_module_overlay():
     from hermes_cli.providers import (
-        HERMES_OVERLAYS,
+        STARDUST_OVERLAYS,
         determine_api_mode,
         get_label,
         get_provider,
         normalize_provider as normalize_provider_in_providers,
     )
 
-    overlay = HERMES_OVERLAYS["nebius-token-factory"]
+    overlay = STARDUST_OVERLAYS["nebius-token-factory"]
     assert overlay.transport == "openai_chat"
     assert overlay.base_url_override == "https://api.tokenfactory.nebius.com/v1"
     assert overlay.base_url_env_var == "NEBIUS_BASE_URL"

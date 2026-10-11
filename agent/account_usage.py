@@ -194,7 +194,7 @@ def _fetch_portal_account(timeout: float):
 def nous_credits_lines(*, markdown: bool = False, timeout: float = 10.0) -> list[str]:
     """Rendered Nous-credits /usage lines, or [] when there's nothing to show. Independent of any live agent
     (logged-in gate, then a bounded portal fetch); shared by CLI ``_show_usage`` and the TUI ``session.usage`` RPC.
-    Fail-open: any hiccup or timeout → []. HERMES_DEV_CREDITS_FIXTURE renders from the fixture instead of the portal."""
+    Fail-open: any hiccup or timeout → []. STARDUST_DEV_CREDITS_FIXTURE renders from the fixture instead of the portal."""
     try:
         from agent.credits_tracker import dev_fixture_credits_state
         fixture = dev_fixture_credits_state()
@@ -235,7 +235,7 @@ def _snapshot_from_credits_state(state) -> Optional[AccountUsageSnapshot]:
                 details.append(f"{label}: ${value}")
         if getattr(state, "paid_access", True) is False:
             details.append(_DEPLETED_LINE)
-        return _nous_snapshot(windows, details, ["(dev fixture — HERMES_DEV_CREDITS_FIXTURE)"], source="dev-fixture")
+        return _nous_snapshot(windows, details, ["(dev fixture — STARDUST_DEV_CREDITS_FIXTURE)"], source="dev-fixture")
     except (AttributeError, TypeError):
         return None
 

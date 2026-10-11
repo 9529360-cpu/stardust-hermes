@@ -220,7 +220,7 @@ class _Relay:
 @pytest.fixture
 def direct_runtime(tmp_path, monkeypatch):
     fake = _Relay()
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes-home"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "hermes-home"))
     monkeypatch.setattr(relay_runtime, "_load_nemo_relay", lambda: fake)
     monkeypatch.setattr(
         "hermes_cli.config.read_raw_config_readonly",
@@ -243,7 +243,7 @@ def real_binding_runtime(tmp_path, monkeypatch):
     relay = pytest.importorskip("nemo_relay")
     if getattr(relay, "_native", None) is None:
         pytest.skip("NeMo Relay native binding is unavailable on this platform")
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes-home"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "hermes-home"))
     monkeypatch.setattr(
         "hermes_cli.config.read_raw_config_readonly",
         lambda: {"telemetry": {"shared_metrics": {"enabled": True}}},
@@ -1167,7 +1167,7 @@ def test_managed_config_cannot_override_shared_metrics_consent(
         f"    enabled: {str(managed_enabled).lower()}\n",
         encoding="utf-8",
     )
-    monkeypatch.setenv("HERMES_MANAGED_DIR", str(managed))
+    monkeypatch.setenv("STARDUST_MANAGED_DIR", str(managed))
     config._LOAD_CONFIG_CACHE.clear()
     config._RAW_CONFIG_CACHE.clear()
     managed_scope.invalidate_managed_cache()
@@ -1196,7 +1196,7 @@ def test_disabling_shared_metrics_stops_collection_and_shutdown_export(
     fake = _Relay()
     profile = tmp_path / "profile"
     policy = {"enabled": True}
-    monkeypatch.setenv("HERMES_HOME", str(profile))
+    monkeypatch.setenv("STARDUST_HOME", str(profile))
     monkeypatch.setattr(relay_runtime, "_load_nemo_relay", lambda: fake)
     monkeypatch.setattr(
         "hermes_cli.config.read_raw_config_readonly",

@@ -403,7 +403,7 @@ def _get_model_config() -> Dict[str, Any]:
 
 
 def resolve_requested_provider(requested: Optional[str] = None) -> str:
-    """Provider request from explicit arg, then config, then ``HERMES_INFERENCE_PROVIDER``, else
+    """Provider request from explicit arg, then config, then ``STARDUST_INFERENCE_PROVIDER``, else
     "auto". Config beats the env so chat uses the endpoint the user last saved, not a stale
     shell/.env override."""
     if requested and requested.strip():
@@ -411,7 +411,7 @@ def resolve_requested_provider(requested: Optional[str] = None) -> str:
     cfg_provider = _get_model_config().get("provider")
     if isinstance(cfg_provider, str) and cfg_provider.strip():
         return cfg_provider.strip().lower()
-    return get_secret_str("HERMES_INFERENCE_PROVIDER", "").strip().lower() or "auto"
+    return get_secret_str("STARDUST_INFERENCE_PROVIDER", "").strip().lower() or "auto"
 
 
 # ── extracted collaborators (re-exported; see module docstring) ────────────────────────────
@@ -451,9 +451,9 @@ def _pool_entry_mode_and_url(provider, entry, model_cfg, effective_model, base_u
         api_mode, default_url = _POOL_ENTRY_SIMPLE_MODES[provider]
         if provider == "openai-codex":
             # Pool entries retain the canonical ChatGPT URL, but the profile-wide
-            # HERMES_CODEX_BASE_URL override must apply consistently to every
+            # STARDUST_CODEX_BASE_URL override must apply consistently to every
             # credential source, including pooled OAuth credentials.
-            override_url = get_secret_str("HERMES_CODEX_BASE_URL", "").strip().rstrip("/")
+            override_url = get_secret_str("STARDUST_CODEX_BASE_URL", "").strip().rstrip("/")
             if override_url:
                 return api_mode, override_url
         return api_mode, base_url or (default_url() if callable(default_url) else default_url)

@@ -3,7 +3,7 @@
 Hook ``{"context": ...}`` output rides EVERY subsequent API call, so a large blob
 inflates every turn and breaks the prompt-cache prefix. Above
 ``hooks.output_spill.max_chars`` (default 10000) the text is written under
-``hooks.output_spill.directory`` (default ``<HERMES_HOME>/hook_outputs/<session>``)
+``hooks.output_spill.directory`` (default ``<STARDUST_HOME>/hook_outputs/<session>``)
 and the payload becomes a ``preview_head``/``preview_tail`` excerpt plus the path.
 ``enabled: false`` disables. Never raises: an I/O failure still returns a preview.
 """

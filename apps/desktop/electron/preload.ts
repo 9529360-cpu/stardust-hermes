@@ -19,10 +19,10 @@ contextBridge.exposeInMainWorld('stardustDesktop', {
   // show the local-models surfaces. Static for the window's lifetime.
   localModelsEnabled: launchFlags?.localModels === true,
   // Launch-flag fact: the Nous free tier is on for this launch
-  // (HERMES_GUEST_ONBOARDING=1 or --guest-onboarding). Read-only; the same
+  // (STARDUST_GUEST_ONBOARDING=1 or --guest-onboarding). Read-only; the same
   // decision is stamped onto every backend the app spawns.
   guestOnboardingEnabled: launchFlags?.guestOnboarding === true,
-  // Launch-flag fact: skip the first-run film (HERMES_SKIP_INTRO=1 or
+  // Launch-flag fact: skip the first-run film (STARDUST_SKIP_INTRO=1 or
   // --skip-intro). Rehearsal aid for the guided chat behind it.
   skipIntro: launchFlags?.skipIntro === true,
   getConnection: (profile, opts) => ipcRenderer.invoke('stardust:connection', profile, opts),

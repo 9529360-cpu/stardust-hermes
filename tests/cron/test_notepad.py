@@ -29,16 +29,16 @@ def notepad(monkeypatch, tmp_path):
 
 @pytest.fixture
 def cron_env(tmp_path, monkeypatch, notepad):
-    """Isolated cron environment with temp HERMES_HOME (mirrors test_cron_context_from)."""
+    """Isolated cron environment with temp STARDUST_HOME (mirrors test_cron_context_from)."""
     hermes_home = tmp_path / ".hermes"
     hermes_home.mkdir()
     (hermes_home / "cron").mkdir()
     (hermes_home / "cron" / "output").mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
     import cron.jobs as jobs_mod
 
-    monkeypatch.setattr(jobs_mod, "HERMES_DIR", hermes_home)
+    monkeypatch.setattr(jobs_mod, "STARDUST_DIR", hermes_home)
     monkeypatch.setattr(jobs_mod, "CRON_DIR", hermes_home / "cron")
     monkeypatch.setattr(jobs_mod, "JOBS_FILE", hermes_home / "cron" / "jobs.json")
     monkeypatch.setattr(jobs_mod, "OUTPUT_DIR", hermes_home / "cron" / "output")

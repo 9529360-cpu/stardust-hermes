@@ -69,10 +69,10 @@ def _clean_spent_registry():
 
 @pytest.fixture
 def hermes_home(tmp_path, monkeypatch):
-    """Real on-disk HERMES_HOME so ``load_pool()`` re-reads what we persisted."""
+    """Real on-disk STARDUST_HOME so ``load_pool()`` re-reads what we persisted."""
     home = tmp_path / "hermes"
     home.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv("ANTHROPIC_TOKEN", raising=False)
     (home / "auth.json").write_text(
@@ -309,7 +309,7 @@ def test_reauthentication_clears_the_persist_failure_quarantine(
     # Restore a working filesystem, then simulate the re-login rewriting the
     # authoritative file with a genuinely new pair.
     monkeypatch.undo()
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv("ANTHROPIC_TOKEN", raising=False)
     monkeypatch.setattr(

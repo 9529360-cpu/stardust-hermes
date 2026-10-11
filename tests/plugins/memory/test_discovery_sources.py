@@ -89,7 +89,7 @@ def test_project_dir_is_ignored_without_opt_in(tmp_path, monkeypatch):
     """A repo you merely cd into must not be able to offer a memory backend."""
     _write_provider_dir(tmp_path / ".hermes" / "plugins", "projectmem")
     monkeypatch.chdir(tmp_path)
-    monkeypatch.delenv("HERMES_ENABLE_PROJECT_PLUGINS", raising=False)
+    monkeypatch.delenv("STARDUST_ENABLE_PROJECT_PLUGINS", raising=False)
 
     assert "projectmem" not in memory_plugins.list_memory_provider_names()
     assert memory_plugins.find_provider_dir("projectmem") is None
@@ -98,7 +98,7 @@ def test_project_dir_is_ignored_without_opt_in(tmp_path, monkeypatch):
 def test_project_dir_is_discovered_when_opted_in(tmp_path, monkeypatch):
     provider = _write_provider_dir(tmp_path / ".hermes" / "plugins", "projectmem")
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("HERMES_ENABLE_PROJECT_PLUGINS", "1")
+    monkeypatch.setenv("STARDUST_ENABLE_PROJECT_PLUGINS", "1")
 
     assert "projectmem" in memory_plugins.list_memory_provider_names()
     assert memory_plugins.find_provider_dir("projectmem") == provider
@@ -111,7 +111,7 @@ def test_bundled_still_wins_over_project(tmp_path, monkeypatch):
     shipped one and silently redirect the agent's memory."""
     _write_provider_dir(tmp_path / ".hermes" / "plugins", "honcho")
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("HERMES_ENABLE_PROJECT_PLUGINS", "1")
+    monkeypatch.setenv("STARDUST_ENABLE_PROJECT_PLUGINS", "1")
 
     resolved = memory_plugins.find_provider_dir("honcho")
     assert resolved == Path(memory_plugins.__file__).parent / "honcho"
@@ -201,7 +201,7 @@ def test_a_secondary_registration_cannot_cost_the_provider(tmp_path, monkeypatch
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
 
     loaded = memory_plugins.load_memory_provider("auxmem")
     assert loaded is not None
@@ -216,6 +216,6 @@ def test_activation_is_not_gated_on_plugins_enabled(tmp_path, monkeypatch):
     requiring the plugin in plugins.enabled — that would break every existing
     user-installed provider."""
     _write_provider_dir(tmp_path / "plugins", "gatedmem")
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
 
     assert memory_plugins.load_memory_provider("gatedmem") is not None

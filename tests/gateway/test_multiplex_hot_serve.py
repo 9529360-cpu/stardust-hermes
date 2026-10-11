@@ -35,7 +35,7 @@ class _Adapter:
 def _runner(tmp_path, monkeypatch):
     home = tmp_path / ".hermes"
     (home / "profiles").mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     runner = object.__new__(GatewayRunner)
     runner.config = GatewayConfig(multiplex_profiles=True)

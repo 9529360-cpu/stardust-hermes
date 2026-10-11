@@ -10,7 +10,7 @@ there is not fetched — set ``_remote_home`` on the environment to opt in.
 
 The remote path is screened against the same denylist as local deliveries BEFORE any bytes move,
 and again after ``readlink -f`` (fail closed when it cannot resolve) — a remote fetch must never
-become a bypass of the host denylist. Strict mode (``HERMES_MEDIA_DELIVERY_STRICT``) keeps its
+become a bypass of the host denylist. Strict mode (``STARDUST_MEDIA_DELIVERY_STRICT``) keeps its
 pre-existing behaviour: nothing is fetched, since a fetched copy would land in an allowlisted root
 and skip the recency gate strict mode exists for.
 """
@@ -72,7 +72,7 @@ def _active_remote_env():
     backend = _tenv("TERMINAL_ENV", "local").strip().lower()
     if backend not in _REMOTE_TERMINAL_BACKENDS and not _plugin_backend_is_remote(backend):
         return None
-    return get_active_env(get_session_env("HERMES_SESSION_ID") or get_session_env("HERMES_SESSION_KEY") or "default")
+    return get_active_env(get_session_env("STARDUST_SESSION_ID") or get_session_env("STARDUST_SESSION_KEY") or "default")
 
 
 def fetch_remote_media(path: str) -> Optional[str]:

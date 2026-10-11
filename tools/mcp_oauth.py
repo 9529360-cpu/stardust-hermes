@@ -224,7 +224,7 @@ _USER_SKIPPED_SENTINEL = "__hermes_user_skipped__"
 
 
 def _get_token_dir(hermes_home: str | Path | None = None) -> Path:
-    """``HERMES_HOME/mcp-tokens/`` — per-profile token directory."""
+    """``STARDUST_HOME/mcp-tokens/`` — per-profile token directory."""
     from hermes_constants import get_hermes_home
 
     return Path(hermes_home if hermes_home is not None else get_hermes_home()) / "mcp-tokens"
@@ -397,7 +397,7 @@ def _model_json(model: Any) -> dict:
 
 
 class HermesTokenStorage:
-    """Persist OAuth state as ``HERMES_HOME/mcp-tokens/<server_name>`` + ``.json`` (tokens),
+    """Persist OAuth state as ``STARDUST_HOME/mcp-tokens/<server_name>`` + ``.json`` (tokens),
     ``.client.json`` (client info), ``.meta.json`` (server metadata), ``.cimd-off`` (CIMD refused)."""
 
     def __init__(self, server_name: str, *, hermes_home: str | Path | None = None):

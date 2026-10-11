@@ -264,7 +264,7 @@ def _write_user_path_raw(entries: list[str], kind: int) -> None:
 def migrate_windows_bin_path(
     root, *, windows: bool | None = None, read_user_path=None, write_user_path=None,
 ) -> bool:
-    """One-time PATH migration to the ``HERMES_HOME\\bin`` launcher layout (``hermes update`` tail).
+    """One-time PATH migration to the ``STARDUST_HOME\\bin`` launcher layout (``hermes update`` tail).
 
     1. stage launchers into the managed binary dir; 2. verify both are present — otherwise STOP,
     leaving the user PATH untouched (never strip a working entry before its replacement is proven);

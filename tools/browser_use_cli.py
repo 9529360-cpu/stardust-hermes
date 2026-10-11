@@ -265,12 +265,12 @@ def default_downgrade_notice() -> Optional[str]:
 
 
 def _managed_bin_dir() -> str:
-    """$HERMES_HOME/bin — where install.sh puts uv/uvx and install_cli() links browser-use."""
+    """$STARDUST_HOME/bin — where install.sh puts uv/uvx and install_cli() links browser-use."""
     return str(Path(get_hermes_home()) / "bin")
 
 
 def _find_cli() -> Optional[List[str]]:
-    """Locate the browser-use CLI, or None when it can't be run. MANAGED-FIRST: Hermes' own ``$HERMES_HOME/bin``
+    """Locate the browser-use CLI, or None when it can't be run. MANAGED-FIRST: Hermes' own ``$STARDUST_HOME/bin``
     copy always wins so every session drives one Hermes-controlled binary; PATH and the user-level tool dir
     (~/.local/bin, or uv's %APPDATA%/uv/bin on Windows — Desktop/TUI workers may start with a minimal PATH
     that omits it) are fallbacks; uvx zero-install (same probe order) is last."""
@@ -290,7 +290,7 @@ def _find_cli() -> Optional[List[str]]:
 
 def install_cli(timeout_s: int = 600) -> Tuple[bool, str]:
     """Install the browser-use CLI via ``uv tool install`` (managed uv via ``ensure_uv`` → uv on PATH), linking
-    the binary into ``$HERMES_HOME/bin`` (``UV_TOOL_BIN_DIR``) so ``_find_cli()`` resolves it for every profile.
+    the binary into ``$STARDUST_HOME/bin`` (``UV_TOOL_BIN_DIR``) so ``_find_cli()`` resolves it for every profile.
     Returns ``(ok, message)``; never raises. MANAGED-FIRST: only the managed copy short-circuits — a browser-use
     on PATH is a user-level side install and must not block provisioning the canonical copy (version drift)."""
     bin_dir = _managed_bin_dir()

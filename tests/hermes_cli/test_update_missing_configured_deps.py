@@ -48,7 +48,7 @@ def test_configured_features_probe_reads_the_fresh_target_interpreter(tmp_path, 
     (home / "config.yaml").write_text(
         "platforms:\n  feishu:\n    enabled: true\n    extra:\n      app_id: cli_x\n      app_secret: y\n",
         encoding="utf-8")
-    env = {**os.environ, "HERMES_HOME": str(home)}
+    env = {**os.environ, "STARDUST_HOME": str(home)}
     monkeypatch.setattr(main_install_repair, "_resolve_install_target_python", lambda *a, **k: Path(sys.executable))
     real_probe = main_install_repair._venv_probe
 

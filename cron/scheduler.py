@@ -369,7 +369,7 @@ def _inflight_min_allowance_minutes() -> float:
             val = float(_cfg_val)
             if val > 0:
                 return val
-    raw = cron_env_setting("HERMES_CRON_INFLIGHT_MAX_MINUTES").strip()
+    raw = cron_env_setting("STARDUST_CRON_INFLIGHT_MAX_MINUTES").strip()
     if raw:
         try:
             val = float(raw)
@@ -377,7 +377,7 @@ def _inflight_min_allowance_minutes() -> float:
                 return val
         except (ValueError, TypeError):
             logger.warning(
-                "Invalid HERMES_CRON_INFLIGHT_MAX_MINUTES=%r; using default %s",
+                "Invalid STARDUST_CRON_INFLIGHT_MAX_MINUTES=%r; using default %s",
                 raw,
                 _INFLIGHT_MIN_ALLOWANCE_MINUTES)
     return _INFLIGHT_MIN_ALLOWANCE_MINUTES
@@ -697,16 +697,16 @@ def _inactivity_watchdog_loop(
 
 
 def _cron_inactivity_seconds() -> float:
-    """Parse HERMES_CRON_TIMEOUT (seconds). 0 = unlimited; bad input = 600. Shared by the
+    """Parse STARDUST_CRON_TIMEOUT (seconds). 0 = unlimited; bad input = 600. Shared by the
     inactivity monitor and the cwd-lock bound so they can't drift: the lock bound must stay >= the
     inactivity limit or waiters fail while a healthy holder runs."""
-    raw = cron_env_setting("HERMES_CRON_TIMEOUT").strip()
+    raw = cron_env_setting("STARDUST_CRON_TIMEOUT").strip()
     if not raw:
         return 600.0
     try:
         return float(raw)
     except (ValueError, TypeError):
-        logger.warning("Invalid HERMES_CRON_TIMEOUT=%r; using default 600s", raw)
+        logger.warning("Invalid STARDUST_CRON_TIMEOUT=%r; using default 600s", raw)
         return 600.0
 
 
@@ -782,7 +782,7 @@ def _get_hermes_home() -> Path:
     this at import or anchor it at the shared default root — either breaks profile isolation.
 
     Cron is per-profile by design (#4707): the in-process ticker runs inside a profile-scoped gateway, so
-    resolving the active HERMES_HOME at call time means a profile's jobs are stored AND executed under that
+    resolving the active STARDUST_HOME at call time means a profile's jobs are stored AND executed under that
     profile's home (its .env, config.yaml, scripts, skills).
     """
     return _hermes_home or get_hermes_home()
@@ -1683,13 +1683,13 @@ def _sweep_stale_inflight_for_tick(due_jobs: list) -> None:
 
 
 def _resolve_max_parallel_workers() -> Optional[int]:
-    """Max workers: env > config.yaml > unbounded (HERMES_CRON_MAX_PARALLEL=1 restores serial)."""
+    """Max workers: env > config.yaml > unbounded (STARDUST_CRON_MAX_PARALLEL=1 restores serial)."""
     try:
-        _env_par = cron_env_setting("HERMES_CRON_MAX_PARALLEL").strip()
+        _env_par = cron_env_setting("STARDUST_CRON_MAX_PARALLEL").strip()
         if _env_par:
             return int(_env_par) or None
     except (ValueError, TypeError):
-        logger.warning("Invalid HERMES_CRON_MAX_PARALLEL value; defaulting to unbounded")
+        logger.warning("Invalid STARDUST_CRON_MAX_PARALLEL value; defaulting to unbounded")
     with contextlib.suppress(Exception):
         _ucfg = load_config() or {}
         _cfg_par = (_ucfg.get("cron", {}) if isinstance(_ucfg, dict) else {}).get("max_parallel_jobs")

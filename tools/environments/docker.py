@@ -207,15 +207,15 @@ def _docker_query(
 
 
 def find_docker() -> Optional[str]:
-    """Locate the docker/podman CLI (cached): ``HERMES_DOCKER_BINARY`` override, ``docker``
+    """Locate the docker/podman CLI (cached): ``STARDUST_DOCKER_BINARY`` override, ``docker``
     on PATH, ``podman`` on PATH, then macOS Docker Desktop locations; ``None`` if absent."""
     global _docker_executable
     if _docker_executable is not None:
         return _docker_executable
 
-    override = os.getenv("HERMES_DOCKER_BINARY")
+    override = os.getenv("STARDUST_DOCKER_BINARY")
     if override and _is_executable(override):
-        logger.info("Using HERMES_DOCKER_BINARY override: %s", override)
+        logger.info("Using STARDUST_DOCKER_BINARY override: %s", override)
         found = override
     elif found := shutil.which("docker"):
         pass

@@ -126,8 +126,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
     # Keep Hermes' own banners off stdout (the MCP wire).
-    os.environ.setdefault("HERMES_QUIET", "1")
-    os.environ.setdefault("HERMES_REDACT_SECRETS", "true")
+    os.environ.setdefault("STARDUST_QUIET", "1")
+    os.environ.setdefault("STARDUST_REDACT_SECRETS", "true")
 
     try:
         server = _build_server()

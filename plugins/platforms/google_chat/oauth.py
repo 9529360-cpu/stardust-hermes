@@ -5,7 +5,7 @@ attachments each user grants the bot ``chat.messages.create`` ONCE in their own 
 the bot stores per-user refresh tokens and uploads *as the user*
 (https://developers.google.com/chat/api/guides/auth/users). Library API for the
 adapter plus a CLI driven by ``/setup-files`` (``--help``; ``--email`` omitted ==
-legacy single-user mode). Files under ``${HERMES_HOME}``: ``google_chat_user_tokens/
+legacy single-user mode). Files under ``${STARDUST_HOME}``: ``google_chat_user_tokens/
 <email>.json`` (per-user) / ``google_chat_user_token.json`` (legacy); pending PKCE state
 in ``google_chat_user_oauth_pending[/<email>].json``; ``google_chat_user_client_secret.json``.
 """
@@ -61,7 +61,7 @@ def _sanitize_email(email: str) -> str:
 
 
 def _token_rel(email: Optional[str]) -> str:
-    """HERMES_HOME-relative token file: per-user under the tokens dir, else the legacy path."""
+    """STARDUST_HOME-relative token file: per-user under the tokens dir, else the legacy path."""
     return f"google_chat_user_tokens/{_sanitize_email(email)}.json" if email else "google_chat_user_token.json"
 
 
@@ -239,7 +239,7 @@ def install_deps() -> bool:
     try:
         from tools.lazy_deps import FeatureUnavailable, ensure as _lazy_ensure
 
-        # lazy_deps honors HERMES_LAZY_INSTALL_TARGET on sealed hosted images;
+        # lazy_deps honors STARDUST_LAZY_INSTALL_TARGET on sealed hosted images;
         # _pip_install always writes the venv and Permission-denied there.
         _lazy_ensure("platform.google_chat", prompt=False)
         remaining = _missing_required_packages()
@@ -271,7 +271,7 @@ def check_auth(email: Optional[str] = None) -> bool:
 
 
 def store_client_secret(path: str) -> None:
-    """Validate and copy the user's OAuth client_secret.json into HERMES_HOME."""
+    """Validate and copy the user's OAuth client_secret.json into STARDUST_HOME."""
     src = Path(path).expanduser().resolve()
     if not src.exists():
         _fail(f"ERROR: File not found: {src}")

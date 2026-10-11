@@ -25,8 +25,8 @@ def git_repo(tmp_path, monkeypatch):
     repo_dir = tmp_path / "hermes-agent"
     repo_dir.mkdir()
     (repo_dir / ".git").mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    monkeypatch.delenv("HERMES_REVISION", raising=False)
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
+    monkeypatch.delenv("STARDUST_REVISION", raising=False)
     monkeypatch.setattr(banner, "_resolve_repo_dir", lambda: repo_dir)
     monkeypatch.setattr("hermes_cli.config.detect_install_method", lambda root: "git")
     monkeypatch.setattr("hermes_cli.config.get_project_root", lambda: repo_dir)

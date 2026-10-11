@@ -100,7 +100,7 @@ _cfg_cache: dict | None = None
 _cfg_sig: tuple | None = None
 _cfg_path = None
 _session_resume_lock = threading.Lock()
-_SLASH_WORKER_TIMEOUT_S = max(5.0, env_float("HERMES_TUI_SLASH_TIMEOUT_S", 45.0))
+_SLASH_WORKER_TIMEOUT_S = max(5.0, env_float("STARDUST_TUI_SLASH_TIMEOUT_S", 45.0))
 
 def _ws_orphan_setting(env_var: str, cfg_key: str, default: float) -> float:
     """``dashboard.<cfg_key>`` seconds; the env var is an internal override that wins when set."""
@@ -127,13 +127,13 @@ def _resolve_ws_orphan_reap_grace() -> float:
     """Grace before an orphaned WS session is interrupted/reaped (0 = park forever): ws.py parks a
     disconnected session for a quick reattach, but a browser refresh mints a NEW sid and never
     reattaches the old one (leaking its slash worker)."""
-    return _ws_orphan_setting("HERMES_TUI_WS_ORPHAN_REAP_GRACE_S", "ws_orphan_reap_grace_s", 20.0)
+    return _ws_orphan_setting("STARDUST_TUI_WS_ORPHAN_REAP_GRACE_S", "ws_orphan_reap_grace_s", 20.0)
 
 
 _WS_ORPHAN_REAP_GRACE_S = _resolve_ws_orphan_reap_grace()
 # A detached RUNNING turn is interrupted only once its activity clock (API waits, stream tokens, tool
 # heartbeats) idled this long; 600s = the turn-liveness watchdog so "wedged" means the same. 0 disables.
-_WS_ORPHAN_ACTIVITY_STALE_S = _ws_orphan_setting("HERMES_TUI_WS_ORPHAN_ACTIVITY_STALE_S", "ws_orphan_activity_stale_s", 600.0)
+_WS_ORPHAN_ACTIVITY_STALE_S = _ws_orphan_setting("STARDUST_TUI_WS_ORPHAN_ACTIVITY_STALE_S", "ws_orphan_activity_stale_s", 600.0)
 _WS_ORPHAN_INTERRUPT_REAP_POLL_S = 1.0
 # Interrupt-then-reap poll budget: a turn that never settles (thread hung in a syscall) would
 # reschedule the 1s poll forever; after this many polls, log loudly and force-reap.
@@ -174,7 +174,7 @@ _LONG_HANDLERS = frozenset({
     "command.dispatch",  # /goal draft invokes the auxiliary model; never block the RPC reader
 })
 
-_rpc_pool_workers = max(2, env_int("HERMES_TUI_RPC_POOL_WORKERS", 8))
+_rpc_pool_workers = max(2, env_int("STARDUST_TUI_RPC_POOL_WORKERS", 8))
 _pool = concurrent.futures.ThreadPoolExecutor(max_workers=_rpc_pool_workers, thread_name_prefix="tui-rpc")
 atexit.register(lambda: _pool.shutdown(wait=False, cancel_futures=True))
 
@@ -237,7 +237,7 @@ class _SlashWorker:
         # slash_worker runs the Hermes agent → needs provider credentials. Tier-1 secrets
         # (gateway/GitHub/infra) are still stripped (#29157). Global-remote / multi-profile sessions: the
         # worker must resolve config/skills/state against the session's profile home, not the gateway's
-        # launch HERMES_HOME (#40677).
+        # launch STARDUST_HOME (#40677).
         from tools.environments.local import served_profile_child_env
 
         # The worker runs the agent → needs provider credentials; tier-1 secrets (gateway/GitHub/
@@ -352,12 +352,12 @@ def _shutdown_sessions() -> None:
 # Session reaping / flushing knobs (session_reaper.py). TTL is the last-resort net for disconnect paths that
 # slip past the WS finally; hours-scale because last_active freezes during a long turn and on passive
 # viewing — running/pending/starting/live-transport are hard exemptions.
-_SESSION_TTL_S = max(0.0, env_float("HERMES_TUI_SESSION_TTL_S", float(6 * 3600)))
+_SESSION_TTL_S = max(0.0, env_float("STARDUST_TUI_SESSION_TTL_S", float(6 * 3600)))
 _REAPER_SCAN_S = 300.0
 # Flush-on-kill budget + periodic incremental flush (piggybacks the reaper scan): a SIGTERM/SIGKILL
 # mid-update loses at most one flush interval of session state.
-_EXIT_FLUSH_BUDGET_S = max(0.0, env_float("HERMES_TUI_EXIT_FLUSH_BUDGET_S", 5.0))
-_INCREMENTAL_FLUSH_INTERVAL_S = max(0.0, env_float("HERMES_TUI_SESSION_FLUSH_INTERVAL_S", _REAPER_SCAN_S))
+_EXIT_FLUSH_BUDGET_S = max(0.0, env_float("STARDUST_TUI_EXIT_FLUSH_BUDGET_S", 5.0))
+_INCREMENTAL_FLUSH_INTERVAL_S = max(0.0, env_float("STARDUST_TUI_SESSION_FLUSH_INTERVAL_S", _REAPER_SCAN_S))
 
 
 def _start_idle_reaper() -> None:
@@ -496,7 +496,7 @@ def _db_unavailable_error(rid, *, code: int):
 
 
 # ── Per-session profile scoping: the desktop's app-global remote mode points every profile at this
-# backend, so calls carry ``profile`` → open that profile's db and bind its HERMES_HOME (ContextVar
+# backend, so calls carry ``profile`` → open that profile's db and bind its STARDUST_HOME (ContextVar
 # override) so config/skills/model/persistence resolve to it. Omitted/own profile → launch profile.
 class ProfileUnavailableError(FileNotFoundError):
     """An explicit ``profile`` param names no live profile on this host. Raised out of the method
@@ -534,7 +534,7 @@ _served_profile_homes: set[Path] = set()
 
 
 def _profile_scoped(handler):
-    """Bind ``params['profile']``'s full runtime scope (HERMES_HOME + secrets + terminal policy) around a
+    """Bind ``params['profile']``'s full runtime scope (STARDUST_HOME + secrets + terminal policy) around a
     handler, so config.yaml ``${VAR}`` refs, provider credential checks and ``.env`` writes resolve to
     THAT profile (app-global remote mode hits the focused profile). Home alone left ``get_secret`` on the
     launch process's ``os.environ``: ``config.get full`` for a secondary shipped the default profile's
@@ -983,7 +983,7 @@ def _wait_agent_for_prompt(session: dict, rid: str, sid: str) -> dict | None:
 
 
 def _bind_build_profile_scopes(profile_home: "str | None") -> "_TurnScopes | None":
-    """Bind a session profile's HERMES_HOME / secret / terminal scopes for an agent build. ``None`` is the
+    """Bind a session profile's STARDUST_HOME / secret / terminal scopes for an agent build. ``None`` is the
     launch profile: unscoped in a single-profile process, its own frozen-env scope once multiplexing is
     active (a hosted-room turn for a default member otherwise died at build with ``UnscopedSecretError``
     because the launch profile was treated as "no scope"). Fail-open per scope (the build must not die on
@@ -1144,7 +1144,7 @@ def _start_agent_build(sid: str, session: dict) -> None:
             if not _await_resume_history(sid, current):
                 return
             tokens = _set_session_context(key)
-            # Global-remote: bind the session profile's HERMES_HOME and hand the agent that profile's db —
+            # Global-remote: bind the session profile's STARDUST_HOME and hand the agent that profile's db —
             # DEDICATED and ours until _transfer_db_to_agent in the finally; FAIL CLOSED rather than
             # binding the launch DB and bleeding rows into the wrong state.db.
             scopes = _bind_build_profile_scopes(profile_home)
@@ -1313,7 +1313,7 @@ def _set_session_context(session_key: str, cwd: str | None = None, *, ui_session
         resolved = cwd if cwd is not None else (str(sess.get("cwd") or "") if sess is not None else "")
         source = _resolve_session_platform()
         browser_control_principal = browser_control_transport_family = ""
-        # Live conversation id for subprocess HERMES_SESSION_ID: an explicitly empty contextvar is authoritative
+        # Live conversation id for subprocess STARDUST_SESSION_ID: an explicitly empty contextvar is authoritative
         # (no os.environ fallback), so never leave it "" — agent's durable session_id, then session_key.
         session_id = session_key
         if sess is not None:
@@ -1351,7 +1351,7 @@ def _clear_session_context(tokens: list) -> None:
 
 def _enable_gateway_prompts() -> None:
     """Route approvals through gateway callbacks instead of CLI input()."""
-    os.environ.update(HERMES_GATEWAY_SESSION="1", HERMES_EXEC_ASK="1", HERMES_INTERACTIVE="1")
+    os.environ.update(STARDUST_GATEWAY_SESSION="1", STARDUST_EXEC_ASK="1", STARDUST_INTERACTIVE="1")
 
 
 # ── Blocking prompt factory ──────────────────────────────────────────
@@ -1449,7 +1449,7 @@ def _clear_pending(sid: str | None = None) -> None:
 
 def _env_model_seed() -> str:
     """The launch-scoped model seed (``hermes --tui -m``, hosted provisioning); "" when unset."""
-    return (os.environ.get("HERMES_MODEL", "") or os.environ.get("HERMES_INFERENCE_MODEL", "")).strip()
+    return (os.environ.get("STARDUST_MODEL", "") or os.environ.get("STARDUST_INFERENCE_MODEL", "")).strip()
 
 
 def _resolve_model() -> str:
@@ -1468,10 +1468,10 @@ def _resolve_model() -> str:
 
 
 def _resolve_session_platform() -> str:
-    """``HERMES_DESKTOP=1`` without ``HERMES_DESKTOP_TERMINAL`` → "desktop" (chat panel; the agent then
+    """``STARDUST_DESKTOP=1`` without ``STARDUST_DESKTOP_TERMINAL`` → "desktop" (chat panel; the agent then
     suggests TUI-only slash commands), else "tui" (embedded terminal pane or standalone ``hermes --tui``)."""
-    desktop = is_truthy_value(os.environ.get("HERMES_DESKTOP"))
-    return "desktop" if desktop and not is_truthy_value(os.environ.get("HERMES_DESKTOP_TERMINAL")) else "tui"
+    desktop = is_truthy_value(os.environ.get("STARDUST_DESKTOP"))
+    return "desktop" if desktop and not is_truthy_value(os.environ.get("STARDUST_DESKTOP_TERMINAL")) else "tui"
 
 
 def _resolve_session_source(explicit: str | None) -> str:
@@ -1485,7 +1485,7 @@ def _resolve_agent_platform(source: str | None) -> str:
 
 
 def _config_model_target() -> tuple[str, str]:
-    """(model, provider) selected by config.yaml — and ONLY config: the HERMES_MODEL launch seed fed into
+    """(model, provider) selected by config.yaml — and ONLY config: the STARDUST_MODEL launch seed fed into
     the per-turn sync would be replayed as a /model switch and persisted globally, or pin the session so
     dashboard/CLI model changes never reach an open chat. Empty model = "no preference" → no-op sync."""
     cfg_model = _load_cfg().get("model")
@@ -1497,7 +1497,7 @@ def _config_model_target() -> tuple[str, str]:
 
 def _resolve_startup_runtime() -> tuple[str, str | None]:
     model = _resolve_model()
-    if explicit_provider := os.environ.get("HERMES_TUI_PROVIDER", "").strip():
+    if explicit_provider := os.environ.get("STARDUST_TUI_PROVIDER", "").strip():
         return model, explicit_provider
     if not (explicit_model := _env_model_seed()):
         return model, None
@@ -1505,7 +1505,7 @@ def _resolve_startup_runtime() -> tuple[str, str | None]:
         from hermes_cli.models import detect_static_provider_for_model
         cfg = _load_cfg().get("model") or {}
         current_provider = ((str(cfg.get("provider") or "").strip().lower() if isinstance(cfg, dict) else "")
-                            or os.environ.get("HERMES_INFERENCE_PROVIDER", "").strip().lower() or "auto")
+                            or os.environ.get("STARDUST_INFERENCE_PROVIDER", "").strip().lower() or "auto")
         if detected := detect_static_provider_for_model(explicit_model, current_provider):
             provider, detected_model = detected
             return detected_model, provider
@@ -1673,7 +1673,7 @@ def _persist_live_session_system_prompt(session: dict | None) -> None:
     if live is None or not hasattr(live[0], "_build_system_prompt") or not hasattr(live[2], "update_system_prompt"):
         return
     agent, session_key, db = live
-    # Re-bind the session's profile HERMES_HOME (the build's finally reset it → root profile's SOUL.md/skills)
+    # Re-bind the session's profile STARDUST_HOME (the build's finally reset it → root profile's SOUL.md/skills)
     # and session context (on the RPC thread _SESSION_CWD is unset → the process TERMINAL_CWD would persist).
     # Without this, _start_agent_build's finally block has already reset the override and the rebuilt prompt
     # silently uses the root profile's SOUL.md and skills. See issue #50233.
@@ -1843,7 +1843,7 @@ _TOOL_PROGRESS_MODES = frozenset({"off", "new", "all", "verbose"})
 
 
 def _load_tool_progress_mode() -> str:
-    env = os.environ.get("HERMES_TUI_TOOL_PROGRESS", "").strip().lower()
+    env = os.environ.get("STARDUST_TUI_TOOL_PROGRESS", "").strip().lower()
     if env in _TOOL_PROGRESS_MODES:
         return env
     raw = _display_cfg().get("tool_progress", "all")
@@ -1856,7 +1856,7 @@ def _load_tool_progress_mode() -> str:
 def _gui_surface_toolsets(platform: str) -> set[str]:
     """Toolsets that exist because of the CLIENT (all off ``_HERMES_CORE_TOOLS``; this is the one gate).
     ``platform`` is the SESSION's source, never a process env var: the desktop may drive a URL/cloud
-    backend where ``HERMES_DESKTOP`` is unset (AGENTS.md surface rule).
+    backend where ``STARDUST_DESKTOP`` is unset (AGENTS.md surface rule).
 
     Model/provider mutation is deliberately desktop-only: messaging, webhook and generic API sessions
     must never gain profile credential/config authority merely because they share this backend.
@@ -1869,7 +1869,7 @@ def _tui_notice(text: str) -> None:
 
 
 def _resolve_explicit_toolsets(explicit: list[str], validate_toolset) -> list[str] | None | bool:
-    """Resolve a HERMES_TUI_TOOLSETS pin: list, None for "all", False when nothing was valid."""
+    """Resolve a STARDUST_TUI_TOOLSETS pin: list, None for "all", False when nothing was valid."""
     built_in = [name for name in explicit if validate_toolset(name)]
     unresolved = [name for name in explicit if name not in built_in]
     if unresolved:
@@ -1883,7 +1883,7 @@ def _resolve_explicit_toolsets(explicit: list[str], validate_toolset) -> list[st
         unresolved = [name for name in unresolved if name not in plugin_valid]
     if any(name in {"all", "*"} for name in built_in):
         if ignored := [name for name in explicit if name not in {"all", "*"}]:
-            _tui_notice(f"[tui] HERMES_TUI_TOOLSETS=all enables every toolset; ignoring additional entries: {', '.join(ignored)}")
+            _tui_notice(f"[tui] STARDUST_TUI_TOOLSETS=all enables every toolset; ignoring additional entries: {', '.join(ignored)}")
         return None
     if not unresolved:
         return built_in
@@ -1903,9 +1903,9 @@ def _resolve_explicit_toolsets(explicit: list[str], validate_toolset) -> list[st
     disabled = [name for name in unresolved if name in mcp_disabled]
     unknown = [name for name in unresolved if name not in mcp_names and name not in mcp_disabled]
     if unknown:
-        _tui_notice(f"[tui] ignoring unknown HERMES_TUI_TOOLSETS entries: {', '.join(unknown)}")
+        _tui_notice(f"[tui] ignoring unknown STARDUST_TUI_TOOLSETS entries: {', '.join(unknown)}")
     if disabled:
-        _tui_notice("[tui] ignoring disabled MCP servers in HERMES_TUI_TOOLSETS "
+        _tui_notice("[tui] ignoring disabled MCP servers in STARDUST_TUI_TOOLSETS "
                     f"(set enabled: true in config.yaml to use): {', '.join(disabled)}")
     return (built_in + mcp_valid) or False
 
@@ -1913,13 +1913,13 @@ def _resolve_explicit_toolsets(explicit: list[str], validate_toolset) -> list[st
 def _load_enabled_toolsets(
     platform: str | None = None, *, coding_context_allowed: bool = True,
 ) -> list[str] | None:
-    """The agent's toolsets for this session (None = all): an explicit HERMES_TUI_TOOLSETS pin; else the
+    """The agent's toolsets for this session (None = all): an explicit STARDUST_TUI_TOOLSETS pin; else the
     coding posture (coding_context collapses to coding toolset + enabled MCP servers in a code workspace);
     else the configured CLI toolsets. ``coding_context_allowed=False`` is the Desktop launch-artifact path:
     the backend's install directory must not collapse a personal-assistant session to coding-only tools.
     Client-surface toolsets fold in here — only this surface can answer them."""
     session_platform = platform or _resolve_session_platform()
-    explicit = [item.strip() for item in os.environ.get("HERMES_TUI_TOOLSETS", "").split(",") if item.strip()]
+    explicit = [item.strip() for item in os.environ.get("STARDUST_TUI_TOOLSETS", "").split(",") if item.strip()]
     fallback_notice = None
     if not explicit and coding_context_allowed:
         with contextlib.suppress(Exception):
@@ -1935,7 +1935,7 @@ def _load_enabled_toolsets(
         resolved = _resolve_explicit_toolsets(explicit, validate_toolset)
         if resolved is not False:
             return resolved
-        fallback_notice = "[tui] no valid HERMES_TUI_TOOLSETS entries; using configured CLI toolsets"
+        fallback_notice = "[tui] no valid STARDUST_TUI_TOOLSETS entries; using configured CLI toolsets"
     try:
         from hermes_cli.config import load_config
         from hermes_cli.tools_config import _get_platform_tools
@@ -1951,7 +1951,7 @@ def _load_enabled_toolsets(
         return sorted(enabled | _gui_surface_toolsets(session_platform)) if enabled else None
     except Exception:
         if fallback_notice is not None:
-            _tui_notice("[tui] no valid HERMES_TUI_TOOLSETS entries and configured CLI toolsets could not be loaded; enabling all toolsets")
+            _tui_notice("[tui] no valid STARDUST_TUI_TOOLSETS entries and configured CLI toolsets could not be loaded; enabling all toolsets")
         return None
 
 
@@ -2035,8 +2035,8 @@ def _get_usage(agent) -> dict:
     with contextlib.suppress(Exception):
         from tools.async_delegation import active_count as _async_active_count
         usage["active_subagents"] = _async_active_count()
-    # Dev-only live credits-spent readout, gated on HERMES_DEV_CREDITS so the payload stays clean otherwise.
-    if is_truthy_value(os.environ.get("HERMES_DEV_CREDITS")):
+    # Dev-only live credits-spent readout, gated on STARDUST_DEV_CREDITS so the payload stays clean otherwise.
+    if is_truthy_value(os.environ.get("STARDUST_DEV_CREDITS")):
         with contextlib.suppress(Exception):
             spent = agent.get_credits_spent_micros()
             if spent is not None:
@@ -2337,7 +2337,7 @@ def _resolve_agent_model_runtime(model_override, provider_override) -> tuple[str
 
 
 def _startup_system_prompt(cfg: dict, task_id: str) -> str:
-    """Config ephemeral system prompt + HERMES_TUI_SKILLS preload block. Hard-fails only when EVERY requested
+    """Config ephemeral system prompt + STARDUST_TUI_SKILLS preload block. Hard-fails only when EVERY requested
     skill is missing (cli.py parity): a typo'd name must not auto-block the Kanban task."""
     from hermes_cli.config import resolve_ephemeral_system_prompt_from_config
     system_prompt = resolve_ephemeral_system_prompt_from_config(cfg)
@@ -2402,7 +2402,7 @@ def _make_agent(
     model, runtime = _resolve_agent_model_runtime(model_override, provider_override)
     _pr = _load_provider_routing()
     platform = _resolve_agent_platform(platform_override)
-    ignore_rules = is_truthy_value(os.environ.get("HERMES_IGNORE_RULES"))
+    ignore_rules = is_truthy_value(os.environ.get("STARDUST_IGNORE_RULES"))
     with _sessions_lock:
         session = _sessions.get(sid)
     if context_cwd_is_launch_artifact is None:
@@ -2426,8 +2426,8 @@ def _make_agent(
         # Builds that run before the record exists (branch, eager resume, compute host) pass it explicitly.
         user_id=auth_user_id if auth_user_id is not None else _session_auth_user_id(session),
         session_db=session_db if session_db is not None else _get_db(), ephemeral_system_prompt=system_prompt or None,
-        checkpoints_enabled=is_truthy_value(os.environ.get("HERMES_TUI_CHECKPOINTS")),
-        pass_session_id=is_truthy_value(os.environ.get("HERMES_TUI_PASS_SESSION_ID")),
+        checkpoints_enabled=is_truthy_value(os.environ.get("STARDUST_TUI_CHECKPOINTS")),
+        pass_session_id=is_truthy_value(os.environ.get("STARDUST_TUI_PASS_SESSION_ID")),
         skip_context_files=ignore_rules, skip_memory=ignore_rules, fallback_model=_load_fallback_model(),
         **_agent_cbs(sid))
     agent._context_cwd_is_launch_artifact = bool(context_cwd_is_launch_artifact)
@@ -2479,7 +2479,7 @@ def _init_session(
             "explicit_cwd": bool(explicit_cwd), "cols": cols, "slash_worker": None,
             "show_reasoning": _load_show_reasoning(), "source": _resolve_session_source(source),
             "tool_progress_mode": _load_tool_progress_mode(), "edit_snapshots": {}, "tool_started_at": {},
-            # Profile-scoped HERMES_HOME (None = launch); SessionBranch copies the parent's (same state.db).
+            # Profile-scoped STARDUST_HOME (None = launch); SessionBranch copies the parent's (same state.db).
             "profile_home": profile_home,
             # In-session /model switch, honored on rebuild (/new, resume) — never leaks to siblings via env vars.
             "model_override": None,
@@ -3037,7 +3037,7 @@ _pet_cancel_lock = threading.Lock()
 _pet_cancelled: set[str] = set()
 _PET_REFERENCE_MIME_EXT = {"png": "png", "jpeg": "jpg", "jpg": "jpg", "webp": "webp", "gif": "gif"}
 try:
-    _PET_REFERENCE_MAX_BYTES = max(1, int(os.environ.get("HERMES_PET_REFERENCE_MAX_BYTES") or str(16 * 1024 * 1024)))
+    _PET_REFERENCE_MAX_BYTES = max(1, int(os.environ.get("STARDUST_PET_REFERENCE_MAX_BYTES") or str(16 * 1024 * 1024)))
 except (TypeError, ValueError):
     _PET_REFERENCE_MAX_BYTES = 16 * 1024 * 1024
 

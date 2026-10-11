@@ -69,7 +69,7 @@ def secondary_scope(tmp_path, monkeypatch):
     secondary.mkdir(parents=True)
     (default_home / "config.yaml").write_text("gateway:\n  multiplex_profiles: true\n")
     (secondary / "config.yaml").write_text(_SECONDARY_YAML)
-    monkeypatch.setenv("HERMES_HOME", str(default_home))
+    monkeypatch.setenv("STARDUST_HOME", str(default_home))
     for name in _BRIDGED_ENV:
         monkeypatch.delenv(name, raising=False)
     set_multiplex_active(True)

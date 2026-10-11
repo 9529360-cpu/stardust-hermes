@@ -55,7 +55,7 @@ except ImportError:
             f"Install with: {sys.executable} -m pip install 'fastapi' 'uvicorn[standard]'"
         )
 
-WEB_DIST = Path(os.environ["HERMES_WEB_DIST"]) if "HERMES_WEB_DIST" in os.environ else Path(__file__).parent / "web_dist"
+WEB_DIST = Path(os.environ["STARDUST_WEB_DIST"]) if "STARDUST_WEB_DIST" in os.environ else Path(__file__).parent / "web_dist"
 _log = logging.getLogger(__name__)
 
 
@@ -191,12 +191,12 @@ async def _lifespan(app: "FastAPI"):
     )
     hosted_room_start_thread.start()
 
-    # Desktop-spawned backends (HERMES_DESKTOP=1) fire cron jobs themselves,
+    # Desktop-spawned backends (STARDUST_DESKTOP=1) fire cron jobs themselves,
     # since the app has no gateway running the scheduler. Server `hermes
     # dashboard` is unaffected — it relies on its own gateway.
     cron_stop: "threading.Event | None" = None
     cron_thread: "threading.Thread | None" = None
-    if os.getenv("HERMES_DESKTOP") == "1":
+    if os.getenv("STARDUST_DESKTOP") == "1":
         # Reap an orphaned gateway from an abnormal previous exit (reparented to
         # launchd, still holding the platform WebSocket) before forking a fresh
         # one that would race the same credential (#77276). Runs
@@ -241,7 +241,7 @@ async def _lifespan(app: "FastAPI"):
     threading.Thread(target=_boot_local_runtime, daemon=True, name="local-runtime-boot").start()
 
     # Nous free tier: the ONE place its identity is created. Inventories credentials, mints only
-    # when HERMES_GUEST_ONBOARDING=1, records the answer for setup.status / free_tier.status and
+    # when STARDUST_GUEST_ONBOARDING=1, records the answer for setup.status / free_tier.status and
     # broadcasts `setup.ready`. Off-thread so a slow portal never delays the socket; the desktop's
     # first setup.status waits on the record (bounded) instead.
     from hermes_cli.free_tier_bootstrap import start_background_bootstrap
@@ -267,7 +267,7 @@ async def _lifespan(app: "FastAPI"):
             shutdown_local_runtime()
         except Exception:  # noqa: BLE001
             pass
-        if os.getenv("HERMES_DESKTOP") == "1":
+        if os.getenv("STARDUST_DESKTOP") == "1":
             _terminate_desktop_managed_gateway()
 
 
@@ -302,10 +302,10 @@ from hermes_cli.memory_oauth import router as _memory_oauth_router  # noqa: E402
 app.include_router(_memory_oauth_router)
 
 # Session token for sensitive endpoints. The desktop shell mints it via
-# HERMES_DASHBOARD_SESSION_TOKEN; otherwise fresh per server start. It dies with
+# STARDUST_DASHBOARD_SESSION_TOKEN; otherwise fresh per server start. It dies with
 # the process and is injected into the SPA HTML so only the web UI can use it.
 def _resolve_session_token() -> str:
-    return os.environ.get("HERMES_DASHBOARD_SESSION_TOKEN") or secrets.token_urlsafe(32)
+    return os.environ.get("STARDUST_DASHBOARD_SESSION_TOKEN") or secrets.token_urlsafe(32)
 
 
 _SESSION_TOKEN = _resolve_session_token()
@@ -490,13 +490,13 @@ def _desktop_loopback_auth_exempt(
     per-spawn session token the gate's WS path refuses — Desktop could not boot.
     The public dashboard is a separate non-loopback process that stays gated, so
     this never opens the public surface. Requires ALL of: loopback bind,
-    ``HERMES_DESKTOP=1``, and an operator-minted credential (env token, SSH
+    ``STARDUST_DESKTOP=1``, and an operator-minted credential (env token, SSH
     session token, or owner nonce).
     """
     return (
         host in _LOOPBACK_HOST_VALUES
-        and os.environ.get("HERMES_DESKTOP") == "1"
-        and bool(os.environ.get("HERMES_DASHBOARD_SESSION_TOKEN") or ssh_session_token or ssh_owner_nonce)
+        and os.environ.get("STARDUST_DESKTOP") == "1"
+        and bool(os.environ.get("STARDUST_DASHBOARD_SESSION_TOKEN") or ssh_session_token or ssh_owner_nonce)
     )
 
 
@@ -814,7 +814,7 @@ _FS_DATA_URL_MAX_BYTES = 16 * 1024 * 1024
 _UPLOAD_CHUNK_BYTES = 1024 * 1024
 
 # Stable install identity for /api/status: one uuid4 hex per physical install,
-# persisted under the ROOT Hermes home (not the profile HERMES_HOME) so every
+# persisted under the ROOT Hermes home (not the profile STARDUST_HOME) so every
 # profile reports the same id and the desktop can collapse duplicate roster rows
 # for one backend. Must never change across restarts, so cached per process.
 _INSTALL_ID_CACHE: Dict[str, Optional[str]] = {"root": None, "value": None}
@@ -1014,7 +1014,7 @@ def _no_auth_provider_message(host: str) -> str:
         fix_hint = (
             "If this dashboard should be LOCAL-ONLY (no reverse "
             "proxy), remove dashboard.public_url from config.yaml "
-            "(and unset HERMES_DASHBOARD_PUBLIC_URL) to restore the "
+            "(and unset STARDUST_DASHBOARD_PUBLIC_URL) to restore the "
             "unauthenticated loopback mode.\n"
         )
     else:
@@ -1028,8 +1028,8 @@ def _no_auth_provider_message(host: str) -> str:
         "    (hash with: python -c \"from "
         "plugins.dashboard_auth.basic import hash_password; "
         "print(hash_password('your-password'))\")\n"
-        "  • OIDC: set HERMES_DASHBOARD_OIDC_ISSUER + "
-        "HERMES_DASHBOARD_OIDC_CLIENT_ID (or dashboard.oauth.self_hosted "
+        "  • OIDC: set STARDUST_DASHBOARD_OIDC_ISSUER + "
+        "STARDUST_DASHBOARD_OIDC_CLIENT_ID (or dashboard.oauth.self_hosted "
         "in config.yaml), or install a DashboardAuthProvider plugin.\n"
         "There is no unauthenticated public-dashboard option. For "
         "local-only use, bind 127.0.0.1 and leave dashboard.public_url "
@@ -1217,13 +1217,13 @@ def _on_server_started(
 
         reap_orphaned_mcp_helpers()
 
-    if os.getenv("HERMES_DESKTOP") == "1":
+    if os.getenv("STARDUST_DESKTOP") == "1":
         _best_effort("orphan desktop-local serve reap", _reap_desktop_serves)
     # Same sweep for stdio MCP helpers (#61514): positive identity only (spawn
     # ledger + spawner provably dead); anything alive or unprovable is untouched.
     _best_effort("orphan MCP helper reap", _reap_mcp_helpers)
 
-    # No-op for standalone `hermes serve` (no HERMES_PARENT_PID).
+    # No-op for standalone `hermes serve` (no STARDUST_PARENT_PID).
     _start_parent_death_watchdog()
     # SSH-isolated backends are detached from any parent on purpose (#91668); their liveness signal
     # is "does a client still hold a WebSocket" (#101626).
@@ -1257,7 +1257,7 @@ def _on_server_started(
     # Port-discovery sentinel parsed by the Desktop spawn (matches either
     # token). Written to fd 1: tui_gateway.server redirects sys.stdout to
     # stderr at import, and the Desktop watches child.stdout (#96282).
-    ready_token = "HERMES_BACKEND_READY" if headless else "HERMES_DASHBOARD_READY"
+    ready_token = "STARDUST_BACKEND_READY" if headless else "STARDUST_DASHBOARD_READY"
     _write_machine_sentinel_line(f"{ready_token} port={actual_port}")
     if headless:
         # Auth-gated JSON-RPC/WS only — announce the bind, not a URL. flush:
@@ -1368,7 +1368,7 @@ def start_server(
 
     ``initial_profile`` is appended to the auto-opened URL as ``?profile=<name>``
     (profile alias ``<profile> dashboard``). ``headless`` is the ``serve`` path:
-    JSON-RPC/WS backend, no UI build, no SPA mount (``HERMES_SERVE_HEADLESS``).
+    JSON-RPC/WS backend, no UI build, no SPA mount (``STARDUST_SERVE_HEADLESS``).
     ``ssh_session_token``/``ssh_owner_nonce`` are process-local Desktop SSH
     bootstrap state, never persisted or exported to children.
     ``start_mcp_discovery_after_bind`` (Desktop ``serve``) defers MCP discovery

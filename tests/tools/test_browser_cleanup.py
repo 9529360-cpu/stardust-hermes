@@ -123,7 +123,7 @@ class TestInactivityJanitorMultiplex:
             get_hermes_home, reset_hermes_home_override, set_hermes_home_override,
         )
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         monkeypatch.delenv("CAMOFOX_URL", raising=False)
         monkeypatch.delenv("BROWSER_CDP_URL", raising=False)
         p1 = tmp_path / "profiles" / "p1"

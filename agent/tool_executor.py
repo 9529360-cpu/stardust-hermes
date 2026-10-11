@@ -167,13 +167,13 @@ def _parse_tool_arguments(raw_arguments: Any) -> tuple[dict, Optional[str]]:
 
 def _resolve_concurrent_tool_timeout() -> float | None:
     """Per-batch concurrent deadline: ``timeouts.tools.concurrent_batch`` wins,
-    ``HERMES_CONCURRENT_TOOL_TIMEOUT_S`` is the legacy bridge, ``0``/negative disables."""
+    ``STARDUST_CONCURRENT_TOOL_TIMEOUT_S`` is the legacy bridge, ``0``/negative disables."""
     from agent.deadline import resolve_timeout
 
     return resolve_timeout(
         "tools.concurrent_batch",
         default=_DEFAULT_CONCURRENT_TOOL_TIMEOUT_S,
-        env_var="HERMES_CONCURRENT_TOOL_TIMEOUT_S",
+        env_var="STARDUST_CONCURRENT_TOOL_TIMEOUT_S",
     )
 
 

@@ -2,7 +2,7 @@
 reconciliation that recreates per-profile gateway s6 service slots
 from the persistent profiles directory.
 
-These tests run against a fake $HERMES_HOME under tmp_path; no real
+These tests run against a fake $STARDUST_HOME under tmp_path; no real
 s6 supervision tree is required. The in-container integration test
 covering end-to-end "docker restart" survival lives in
 tests/docker/test_container_restart.py.
@@ -86,7 +86,7 @@ def _seed_default_root(
     with_pid: bool = False,
 ) -> None:
     """Populate gateway_state.json / stale runtime files at the
-    HERMES_HOME root (the implicit default profile)."""
+    STARDUST_HOME root (the implicit default profile)."""
     if state is not None:
         (hermes_home / "gateway_state.json").write_text(json.dumps({
             "gateway_state": state, "timestamp": 1234567890,
@@ -151,7 +151,7 @@ def test_boot_honors_config_multiplex_profiles(
         f"multiplex_profiles: {config_value}\n",
         encoding="utf-8",
     )
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     if env_value is None:
         monkeypatch.delenv("GATEWAY_MULTIPLEX_PROFILES", raising=False)
     else:
@@ -300,7 +300,7 @@ def test_main_skips_reconcile_in_dashboard_container_s6v3(
 
     scandir = tmp_path / "run-service"; scandir.mkdir()
     _make_profile(tmp_path, "worker", state="running")
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     monkeypatch.setenv("S6_PROFILE_GATEWAY_SCANDIR", str(scandir))
     monkeypatch.setattr(
         container_boot,

@@ -285,7 +285,7 @@ class HermesProviderMixin:
         if not (200 <= response.status_code < 300):
             self._hermes_logger.warning("Token refresh failed: %s", response.status_code)
             # A writer outside the fence (interactive `hermes mcp login`, or a
-            # pre-fence Hermes sharing this HERMES_HOME) may have rotated the
+            # pre-fence Hermes sharing this STARDUST_HOME) may have rotated the
             # grant and persisted the replacement. Providers issuing single-use
             # refresh tokens reject our stale copy with a 400. Re-read disk
             # before destroying the session.

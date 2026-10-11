@@ -10,7 +10,7 @@ A handful of payloads stay ``extra="allow"`` on purpose: their closed shape is o
 module (the skin engine, the pet store, the goal/loop/heartbeat state files, the free-tier bootstrap
 record) or they are watcher signals whose payload is ``{}`` today and may grow. Everything else is
 closed, so a drifted emitter fails the suite (``registry.check_payload`` raises under
-``HERMES_TEST_ISOLATION``).
+``STARDUST_TEST_ISOLATION``).
 """
 
 from __future__ import annotations

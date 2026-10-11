@@ -1,6 +1,6 @@
 """Run the read-tool eval through the REAL Hermes AIAgent.
 
-For each task: fresh temp HERMES_HOME, fresh fixture workspace, real
+For each task: fresh temp STARDUST_HOME, fresh fixture workspace, real
 AIAgent with the file+terminal+search toolsets, real provider API. Collects
 accuracy plus efficiency metrics (API turns, tool calls, read_file calls,
 prompt/completion tokens, wall time).
@@ -79,7 +79,7 @@ def run_task(task, model: str, provider: str, timeout_mult: float,
     build_workspace(ws)
 
     old_env = dict(os.environ)
-    os.environ["HERMES_HOME"] = str(hermes_home)
+    os.environ["STARDUST_HOME"] = str(hermes_home)
     os.environ["TERMINAL_CWD"] = str(ws)
     # Keep only the API key the run needs; hide the rest so provider
     # auto-detection can't wander (mirrors run_tests.sh hermeticity).

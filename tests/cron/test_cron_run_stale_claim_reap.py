@@ -29,7 +29,7 @@ def test_stale_claim_from_a_dead_one_shot_process_blocks_new_execution_creation(
     home = tmp_path / "home"
     repo = Path(__file__).resolve().parents[2]
     env = os.environ.copy()
-    env["HERMES_HOME"] = str(home)
+    env["STARDUST_HOME"] = str(home)
     env["PYTHONPATH"] = str(repo)
 
     # Simulate the dispatched runner's owner process dying mid-flight,
@@ -71,7 +71,7 @@ def test_recover_interrupted_executions_reaps_the_stale_claim_from_a_dead_proces
     home = tmp_path / "home"
     repo = Path(__file__).resolve().parents[2]
     env = os.environ.copy()
-    env["HERMES_HOME"] = str(home)
+    env["STARDUST_HOME"] = str(home)
     env["PYTHONPATH"] = str(repo)
 
     create = subprocess.run(

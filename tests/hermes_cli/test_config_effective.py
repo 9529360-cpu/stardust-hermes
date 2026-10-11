@@ -13,8 +13,8 @@ def homes(tmp_path, monkeypatch):
     home.mkdir()
     managed = tmp_path / "managed"
     managed.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.setenv("HERMES_MANAGED_DIR", str(managed))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
+    monkeypatch.setenv("STARDUST_MANAGED_DIR", str(managed))
     monkeypatch.setenv("FIXTURE_USER_KEY", "user-secret")
     monkeypatch.setenv("FIXTURE_MANAGED_URL", "https://managed.example")
     _reset_caches()

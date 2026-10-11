@@ -50,7 +50,7 @@ def _run_migrate_config_fresh(*, interactive: bool = False, quiet: bool = False)
 
 def _migrate_sibling_profile_configs() -> list[tuple[str, int, int]]:
     """Migrate every SIBLING profile's config.yaml (the shared checkout serves all profiles). Per
-    sibling (active skipped): scope via the context-local HERMES_HOME override (never ``os.environ``)
+    sibling (active skipped): scope via the context-local STARDUST_HOME override (never ``os.environ``)
     and run the NON-INTERACTIVE quiet migration — prompt-requiring settings wait for that profile's
     own session. Returns ``[(name, from_version, to_version), ...]``; never raises.
 
@@ -252,7 +252,7 @@ def _check_and_apply_config_migration(
         print("  ✓ Configuration is up to date")
 
     # The migration above touched only the active profile; run the same NON-INTERACTIVE
-    # migration per sibling home via the context-local HERMES_HOME override (never os.environ).
+    # migration per sibling home via the context-local STARDUST_HOME override (never os.environ).
     with _best_effort('Sibling config migration failed: %s'):
         for _name, _from_ver, _to_ver in _migrate_sibling_profile_configs():
             print(f"  ✓ Profile '{_name}': config format updated (v{_from_ver} → v{_to_ver})")

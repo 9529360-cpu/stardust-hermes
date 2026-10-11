@@ -3,7 +3,7 @@
  *
  * "This device" is the Electron-managed local backend (mock inference). The
  * second gateway, "Homelab", is a REAL second `hermes serve` this spec spawns
- * with its own HERMES_HOME, profiles and session token, registered in the v2
+ * with its own STARDUST_HOME, profiles and session token, registered in the v2
  * connections.json as a remote URL connection. A click on an at-rest square
  * therefore performs the same dial → commit → re-home the statusbar switcher
  * does, against a real backend — not a stub.
@@ -82,7 +82,7 @@ function seedProfiles(home: string, names: string[]): void {
 
 /**
  * Spawn a second, fully real `hermes serve` as the remote gateway. Its
- * session token is pinned through HERMES_DASHBOARD_SESSION_TOKEN so the
+ * session token is pinned through STARDUST_DASHBOARD_SESSION_TOKEN so the
  * registry entry can carry a plaintext token envelope.
  */
 async function startRemoteGateway(root: string, mockUrl: string, profiles: string[]): Promise<RemoteGateway> {
@@ -103,8 +103,8 @@ async function startRemoteGateway(root: string, mockUrl: string, profiles: strin
       detached: true,
       env: {
         ...process.env,
-        HERMES_HOME: home,
-        HERMES_DASHBOARD_SESSION_TOKEN: REMOTE_TOKEN,
+        STARDUST_HOME: home,
+        STARDUST_DASHBOARD_SESSION_TOKEN: REMOTE_TOKEN,
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     },

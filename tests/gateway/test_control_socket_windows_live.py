@@ -36,7 +36,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _CHILD_CODE = r"""
 import asyncio, os, sys
 sys.path.insert(0, sys.argv[1])
-os.environ["HERMES_HOME"] = sys.argv[2]
+os.environ["STARDUST_HOME"] = sys.argv[2]
 from gateway.control_socket import GatewayControlServer
 
 async def main():

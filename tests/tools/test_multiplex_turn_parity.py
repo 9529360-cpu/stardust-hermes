@@ -1,6 +1,6 @@
 """Multiplexed-gateway parity for what a TURN sees: a profile served by the default multiplexer
 (``_profile_runtime_scope``) must observe the same tool-side policy its standalone gateway
-(``HERMES_HOME=<profile>``) would — never the launch profile's values frozen into process caches or
+(``STARDUST_HOME=<profile>``) would — never the launch profile's values frozen into process caches or
 read from the process env.
 
 Every test warms the site under launch home A, then reads under routed profile B with different
@@ -19,12 +19,12 @@ from hermes_constants import reset_hermes_home_override, set_hermes_home_overrid
 
 @pytest.fixture
 def two_homes(tmp_path, monkeypatch):
-    """Launch home A (HERMES_HOME) and routed profile B, differing in every setting under test."""
+    """Launch home A (STARDUST_HOME) and routed profile B, differing in every setting under test."""
     a = tmp_path / ".hermes"
     b = a / "profiles" / "b"
     b.mkdir(parents=True)
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(a))
+    monkeypatch.setenv("STARDUST_HOME", str(a))
     for name, home in (("a", a), ("b", b)):
         (home / f"cred_{name}.txt").write_text("x", encoding="utf-8")
         (home / "config.yaml").write_text(yaml.safe_dump({

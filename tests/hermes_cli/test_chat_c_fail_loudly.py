@@ -20,10 +20,10 @@ import pytest
 
 @pytest.fixture
 def isolated_home(tmp_path, monkeypatch):
-    """Point HERMES_HOME at a temp dir so session creation stays isolated."""
+    """Point STARDUST_HOME at a temp dir so session creation stays isolated."""
     home = tmp_path / "hermes_home"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     return home
 
 

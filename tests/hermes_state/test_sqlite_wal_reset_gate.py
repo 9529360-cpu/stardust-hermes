@@ -396,7 +396,7 @@ def test_doctor_warns_without_adding_issues(monkeypatch, tmp_path, capsys):
 
     home = tmp_path / ".hermes"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     monkeypatch.setattr("hermes_constants.get_hermes_home", lambda: home)
     monkeypatch.setattr(
         hermes_state_wal, "is_sqlite_wal_reset_vulnerable", lambda version_info=None: True

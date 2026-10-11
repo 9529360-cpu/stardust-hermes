@@ -255,7 +255,7 @@ _GATEWAY_SERVICE_REMOVERS = {
     "Windows": (_remove_windows_gateway, "Could not check Windows gateway service")}
 
 # Windows helpers. install.ps1 leaves four things no rc file covers: User-scope env vars
-# HERMES_HOME / HERMES_GIT_BASH_PATH (HKCU\Environment), User-scope PATH entries
+# STARDUST_HOME / STARDUST_GIT_BASH_PATH (HKCU\Environment), User-scope PATH entries
 # (%LOCALAPPDATA%\hermes\git\{cmd,bin,usr\bin}, ...\hermes\node), PortableGit + Node copies
 # (~200MB) and the gateway-service dir. Direct winreg writes (not PowerShell): no subprocess, and
 # they work under Constrained Language Mode; new shells see them without WM_SETTINGCHANGE.
@@ -291,9 +291,9 @@ def remove_path_from_windows_registry(hermes_home: Path, *, include_managed_bin:
 
 
 def remove_hermes_env_vars_windows() -> list[str]:
-    """Delete HERMES_HOME and HERMES_GIT_BASH_PATH from User-scope env vars."""
+    """Delete STARDUST_HOME and STARDUST_GIT_BASH_PATH from User-scope env vars."""
     def edit(winreg, key, removed):
-        for name in ("HERMES_HOME", "HERMES_GIT_BASH_PATH"):
+        for name in ("STARDUST_HOME", "STARDUST_GIT_BASH_PATH"):
             try:
                 winreg.QueryValueEx(key, name)
             except FileNotFoundError:
@@ -388,7 +388,7 @@ def _discover_named_profiles():
 def _uninstall_profile(profile) -> None:
     """Fully uninstall a named profile: stop its gateway, remove its alias, wipe its home. Shells
     out to ``hermes -p <name> gateway stop|uninstall`` because service names / unit paths derive
-    from the current HERMES_HOME and can't be switched in-process."""
+    from the current STARDUST_HOME and can't be switched in-process."""
     name = profile.name
     log_info(f"Uninstalling profile '{name}'...")
 
@@ -412,7 +412,7 @@ def _uninstall_profile(profile) -> None:
             log_success(f"  Removed alias {alias_path}")
         except Exception as e:
             log_warn(f"  Could not remove alias {alias_path}: {e}")
-    # 3. Wipe the profile's HERMES_HOME directory.
+    # 3. Wipe the profile's STARDUST_HOME directory.
     _rmtree_step(profile.path, indent="  ", fully=False)
 
 
@@ -476,7 +476,7 @@ def run_uninstall(args):
         return
 
     # Named profiles (only when uninstalling from the default root) are offered for cleanup too,
-    # instead of leaving zombie HERMES_HOMEs and systemd units behind.
+    # instead of leaving zombie STARDUST_HOMEs and systemd units behind.
     is_default_profile = _is_default_hermes_home(hermes_home)
     named_profiles = _discover_named_profiles() if is_default_profile else []
 
@@ -529,7 +529,7 @@ def run_uninstall(args):
     full_uninstall = (choice == "2")
 
     # Full uninstall from the default profile: offer to remove named profiles too (gateway
-    # services, alias wrappers, HERMES_HOME dirs) — otherwise they leave zombie services behind.
+    # services, alias wrappers, STARDUST_HOME dirs) — otherwise they leave zombie services behind.
     remove_profiles = False
     n_profiles = len(named_profiles)
     profile_names = ", ".join(p.name for p in named_profiles)
@@ -616,7 +616,7 @@ def _perform_uninstall(
     named_profiles: list) -> None:
     """The uninstall steps shared by the interactive and ``--yes`` paths: stop gateway -> strip PATH
     (rc files + Windows registry) -> wrapper/launchers/node symlinks -> Chat GUI artifacts -> delete
-    the checkout -> (Windows) PortableGit/Node -> optionally ``$HERMES_HOME`` and named profiles."""
+    the checkout -> (Windows) PortableGit/Node -> optionally ``$STARDUST_HOME`` and named profiles."""
     print()
     print(color("Uninstalling...", Colors.CYAN, Colors.BOLD))
     print()
@@ -639,7 +639,7 @@ def _perform_uninstall(
          lambda: remove_path_from_windows_registry(
              Path(os.path.expandvars(str(hermes_home))), include_managed_bin=sweep_managed_bin),
          "Removed from User PATH: {}", "No Hermes-owned PATH entries in User environment"),
-        (windows, "Removing HERMES_HOME / HERMES_GIT_BASH_PATH User env vars...",
+        (windows, "Removing STARDUST_HOME / STARDUST_GIT_BASH_PATH User env vars...",
          remove_hermes_env_vars_windows, "Removed User env var: {}", "No Hermes-set User env vars to remove"),
         (True, "Removing hermes command...", remove_wrapper_script, "Removed {}", "No wrapper script found"),
         (windows, "Removing Windows hermes launchers...",
@@ -651,7 +651,7 @@ def _perform_uninstall(
             _remove_step(label, remove, success_fmt, none_msg)
 
     # 3c. Chat GUI artifacts go with the agent code. uninstall_gui() never touches config/sessions/
-    #     .env (safe in keep-data mode); the packaged app + Electron userData live OUTSIDE HERMES_HOME.
+    #     .env (safe in keep-data mode); the packaged app + Electron userData live OUTSIDE STARDUST_HOME.
     log_info("Removing Stardust Desktop artifacts...")
     try:
         from hermes_cli.gui_uninstall import uninstall_gui

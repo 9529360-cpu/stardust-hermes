@@ -1,7 +1,7 @@
 """Nous free-tier identity: the ``anonymous`` auth method of the ``nous`` provider.
 
 The identity is created in exactly one place, at boot (``hermes_cli.free_tier_bootstrap``), and only
-while ``HERMES_GUEST_ONBOARDING=1`` (see ``guest_enabled``). The bootstrap mints an anonymous Nous
+while ``STARDUST_GUEST_ONBOARDING=1`` (see ``guest_enabled``). The bootstrap mints an anonymous Nous
 account (``POST /api/anonymous/create``); its ``anon_`` credential is later exchanged for short-lived
 JWTs (``POST /api/anonymous/token``). The result is persisted as the singleton ``providers.nous``; it
 becomes ``active_provider`` only when the bootstrap's inventory found nothing else usable, so an
@@ -44,12 +44,12 @@ GUEST_MODEL = "nous/welcome"
 ANON_SECRET_HEADER = "x-anonymous-api-secret"
 # The shared secret gates the anonymous surface during its integration phase. It is a deployment
 # secret (Sid's), read from the environment only.
-ANON_SECRET_ENV = "HERMES_ANON_API_SECRET"
+ANON_SECRET_ENV = "STARDUST_ANON_API_SECRET"
 # Launch gate for the whole free tier while it is pre-GA: exactly "1" turns it on for this process
 # (CLI, gateway, serve backend alike); anything else leaves every surface behaving as if the free
 # tier did not exist. ``guest_enabled`` is the only reader. Not a user preference: never written to
 # config.yaml or .env, never shown in setup. Deleted at GA together with this comment.
-GUEST_ONBOARDING_ENV = "HERMES_GUEST_ONBOARDING"
+GUEST_ONBOARDING_ENV = "STARDUST_GUEST_ONBOARDING"
 GUEST_MINT_TIMEOUT_SECONDS = 5.0
 # Copy shared by every surface that names the free tier (R-USR-1): never guest / anonymous / account.
 FREE_TIER_LABEL = "Nous · free tier"

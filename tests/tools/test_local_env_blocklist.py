@@ -208,7 +208,7 @@ class TestProviderEnvBlocklist:
             "HASS_TOKEN": "ha-secret",
             "EMAIL_PASSWORD": "email-secret",
             "FIRECRAWL_API_KEY": "fc-secret",
-            "HERMES_DASHBOARD_SESSION_TOKEN": "dashboard-session-secret",
+            "STARDUST_DASHBOARD_SESSION_TOKEN": "dashboard-session-secret",
             "BROWSERBASE_PROJECT_ID": "bb-project",
             "ELEVENLABS_API_KEY": "el-secret",
             "GITHUB_TOKEN": "ghp_secret",
@@ -352,7 +352,7 @@ class TestTerminalFirstPartyPlatformEnv:
         from tools.environments.local import _make_run_env, _sanitize_subprocess_env
 
         monkeypatch.delenv("BUZZ_MANAGED_AGENT", raising=False)
-        monkeypatch.delenv("HERMES_SESSION_PLATFORM", raising=False)
+        monkeypatch.delenv("STARDUST_SESSION_PLATFORM", raising=False)
         buzz_vars = {
             "BUZZ_PRIVATE_KEY": "nsec1faketestkey",
             "BUZZ_AUTH_TAG": '["tag","data","kind","sig"]',
@@ -1076,7 +1076,7 @@ class TestPythonpathSelectiveStrip:
             _make_directory_link(configured_home, physical_home)
         except OSError as exc:
             pytest.skip(f"directory link unavailable on this host: {exc}")
-        monkeypatch.setenv("HERMES_HOME", str(configured_home))
+        monkeypatch.setenv("STARDUST_HOME", str(configured_home))
 
         launcher_entry = Path(_preserve_hermes_home_path(physical_root))
         aliases = local_pythonpath._build_hermes_repo_root_aliases(
@@ -1107,9 +1107,9 @@ class TestPythonpathSelectiveStrip:
     def test_profile_rehome_keeps_junction_lexical_alias(self, tmp_path, monkeypatch):
         """Profile re-home must not lose the launcher's lexical repo-root spelling.
 
-        The desktop/CLI spawn children with HERMES_HOME and PYTHONPATH in the
+        The desktop/CLI spawn children with STARDUST_HOME and PYTHONPATH in the
         configured (junction) spelling, but --profile / sticky active_profile
-        re-home HERMES_HOME through resolve_profile_env() before the
+        re-home STARDUST_HOME through resolve_profile_env() before the
         sanitizer loads.  Regression (junction + profile re-home): the alias
         builder must still recover the lexical root so the inherited lexical
         repo-root entry is stripped.
@@ -1129,7 +1129,7 @@ class TestPythonpathSelectiveStrip:
             pytest.skip(f"directory link unavailable on this host: {exc}")
 
         # Launcher contract: the configured spelling is the env and the root.
-        monkeypatch.setenv("HERMES_HOME", str(configured_home))
+        monkeypatch.setenv("STARDUST_HOME", str(configured_home))
         lexical_root = configured_home / "hermes-agent"
 
         # Profile re-home keeps the configured spelling (physically identical
@@ -1137,7 +1137,7 @@ class TestPythonpathSelectiveStrip:
         assert Path(resolve_profile_env("default")) == configured_home
         assert Path(resolve_profile_env("coder")) == configured_home / "profiles" / "coder"
 
-        # The sanitizer now runs under the re-homed (profile) HERMES_HOME.
+        # The sanitizer now runs under the re-homed (profile) STARDUST_HOME.
         aliases = local_pythonpath._build_hermes_repo_root_aliases(
             physical_root.resolve(),
             physical_root,
@@ -1540,7 +1540,7 @@ class TestBlocklistCoverage:
             "EMAIL_SMTP_HOST",
             "EMAIL_HOME_ADDRESS",
             "EMAIL_HOME_ADDRESS_NAME",
-            "HERMES_DASHBOARD_SESSION_TOKEN",
+            "STARDUST_DASHBOARD_SESSION_TOKEN",
             "GATEWAY_ALLOWED_USERS",
             "GH_TOKEN",
             "GITHUB_APP_ID",

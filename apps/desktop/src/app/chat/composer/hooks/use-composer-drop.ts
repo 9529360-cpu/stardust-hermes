@@ -6,7 +6,7 @@ import { isSessionRemote } from '@/store/session-states'
 
 import {
   extractDroppedFiles,
-  HERMES_PATHS_MIME,
+  STARDUST_PATHS_MIME,
   type OsDropStagingContext,
   partitionDroppedFiles
 } from '../../hooks/use-composer-actions'
@@ -50,7 +50,7 @@ export function useComposerDrop({
   }
 
   const handleDragEnter = (event: ReactDragEvent<HTMLFormElement>) => {
-    if (!onAttachDroppedItems || !dragHasAttachments(event.dataTransfer, HERMES_PATHS_MIME)) {
+    if (!onAttachDroppedItems || !dragHasAttachments(event.dataTransfer, STARDUST_PATHS_MIME)) {
       return
     }
 
@@ -63,7 +63,7 @@ export function useComposerDrop({
   }
 
   const handleDragOver = (event: ReactDragEvent<HTMLFormElement>) => {
-    if (!onAttachDroppedItems || !dragHasAttachments(event.dataTransfer, HERMES_PATHS_MIME)) {
+    if (!onAttachDroppedItems || !dragHasAttachments(event.dataTransfer, STARDUST_PATHS_MIME)) {
       return
     }
 
@@ -120,7 +120,7 @@ export function useComposerDrop({
   }
 
   const handleInputDragOver = (event: ReactDragEvent<HTMLDivElement>) => {
-    if (!dragHasAttachments(event.dataTransfer, HERMES_PATHS_MIME)) {
+    if (!dragHasAttachments(event.dataTransfer, STARDUST_PATHS_MIME)) {
       return
     }
 
@@ -130,7 +130,7 @@ export function useComposerDrop({
   }
 
   const handleInputDrop = (event: ReactDragEvent<HTMLDivElement>) => {
-    if (!dragHasAttachments(event.dataTransfer, HERMES_PATHS_MIME)) {
+    if (!dragHasAttachments(event.dataTransfer, STARDUST_PATHS_MIME)) {
       return
     }
 

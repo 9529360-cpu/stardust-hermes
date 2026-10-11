@@ -24,7 +24,7 @@ import hermes_time
 
 @pytest.fixture(autouse=True)
 def _fresh_tz_cache(monkeypatch):
-    monkeypatch.delenv("HERMES_TIMEZONE", raising=False)
+    monkeypatch.delenv("STARDUST_TIMEZONE", raising=False)
     hermes_time.reset_cache()
     yield
     hermes_time.reset_cache()
@@ -46,7 +46,7 @@ def test_foreign_process_tick_persists_owning_profile_offset(
         "timezone: America/New_York\n", encoding="utf-8"
     )
 
-    monkeypatch.setenv("HERMES_HOME", str(backend_home))
+    monkeypatch.setenv("STARDUST_HOME", str(backend_home))
 
     # Backend process resolves its own timezone first (process startup).
     assert hermes_time.now().utcoffset() == datetime.now(

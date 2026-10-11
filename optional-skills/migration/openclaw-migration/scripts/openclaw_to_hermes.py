@@ -2562,7 +2562,7 @@ class Migrator:
         # Extract gateway auth token to .env if present
         auth = gateway.get("auth") or {}
         if auth.get("token") and self.migrate_secrets:
-            self._set_env_var("HERMES_GATEWAY_TOKEN", auth["token"], "gateway.auth.token")
+            self._set_env_var("STARDUST_GATEWAY_TOKEN", auth["token"], "gateway.auth.token")
 
     # ── Session config ────────────────────────────────────────
     def migrate_session_config(self, config: Optional[Dict[str, Any]] = None) -> None:
@@ -3070,7 +3070,7 @@ class Migrator:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Migrate OpenClaw user state into Hermes Agent.")
     parser.add_argument("--source", default=str(Path.home() / ".openclaw"), help="OpenClaw home directory")
-    parser.add_argument("--target", default=os.environ.get("HERMES_HOME") or str(Path.home() / ".hermes"), help="Hermes home directory")
+    parser.add_argument("--target", default=os.environ.get("STARDUST_HOME") or str(Path.home() / ".hermes"), help="Hermes home directory")
     parser.add_argument(
         "--workspace-target",
         help="Optional workspace root where the workspace instructions file should be copied",

@@ -12,7 +12,7 @@ def test_load_soul_md_drops_legacy_protocol_section(tmp_path, monkeypatch):
 
     home = tmp_path / ".hermes"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     (home / "SOUL.md").write_text(LEGACY + "\n## Symbols\n\nuse ◆\n", encoding="utf-8")
 
     soul = prompt_builder.load_soul_md(home_override=home)
@@ -31,7 +31,7 @@ def test_migration_41_strips_every_profile_soul_once(tmp_path, monkeypatch):
 
     home = tmp_path / ".hermes"
     (home / "profiles" / "worker").mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     (home / "SOUL.md").write_text(LEGACY, encoding="utf-8")
     (home / "profiles" / "worker" / "SOUL.md").write_text("# Worker\n\n## Messaging other agents\nx\n", encoding="utf-8")
 

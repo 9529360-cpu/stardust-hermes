@@ -1,10 +1,10 @@
 """Tests for issue #89315 — ``--replace`` must never signal a gateway it
-cannot prove belongs to this HERMES_HOME.
+cannot prove belongs to this STARDUST_HOME.
 
 Design contract (v3, after andrexibiza's second review): ownership is decided
 by the persisted identity record ALONE — exact ``_same_hermes_home`` equality
 bound to the live target by exact PID + start-time. A readable live argv
-carries no HERMES_HOME, so it can never prove home ownership; it only feeds a
+carries no STARDUST_HOME, so it can never prove home ownership; it only feeds a
 token-exact CONSISTENCY check that refuses explicit contradictions.
 
 Pinned surfaces:
@@ -31,11 +31,11 @@ import pytest
 
 @pytest.fixture()
 def profile_env(tmp_path, monkeypatch):
-    """Isolated HERMES_HOME mirroring tests/hermes_cli/test_profiles.py."""
+    """Isolated STARDUST_HOME mirroring tests/hermes_cli/test_profiles.py."""
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     default_home = tmp_path / ".hermes"
     default_home.mkdir(exist_ok=True)
-    monkeypatch.setenv("HERMES_HOME", str(default_home))
+    monkeypatch.setenv("STARDUST_HOME", str(default_home))
     return tmp_home if (tmp_home := default_home) else default_home
 
 
@@ -232,7 +232,7 @@ class TestArgvConsistencyCheck:
         )
 
     def test_explicit_home_flag_exact_compare(self, profile_env):
-        """HERMES_HOME= on the argv compares path-exactly, not by prefix."""
+        """STARDUST_HOME= on the argv compares path-exactly, not by prefix."""
         from gateway.run import (
             _looks_like_profile_conflict_from_cmdline as conflict,
         )
@@ -240,7 +240,7 @@ class TestArgvConsistencyCheck:
         tim_home = Path("/home/x/.hermes/profiles/tim")
         assert (
             conflict(
-                "python -m hermes_cli.main HERMES_HOME=/home/x/.hermes/profiles/timothy gateway run",
+                "python -m hermes_cli.main STARDUST_HOME=/home/x/.hermes/profiles/timothy gateway run",
                 tim_home,
             )
             is True

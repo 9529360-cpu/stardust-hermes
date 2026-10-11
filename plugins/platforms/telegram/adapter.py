@@ -457,7 +457,7 @@ class TelegramAdapter(BasePlatformAdapter):
         self._telegram_typing_cooldown_seconds: float = self._coerce_float_extra(
             "typing_cooldown_seconds", 30.0, min_value=1.0, max_value=300.0)
         # Buffer album/photo bursts into a single MessageEvent instead of self-interrupting turns.
-        self._media_batch_delay_seconds = env_float("HERMES_TELEGRAM_MEDIA_BATCH_DELAY_SECONDS", 0.8)
+        self._media_batch_delay_seconds = env_float("STARDUST_TELEGRAM_MEDIA_BATCH_DELAY_SECONDS", 0.8)
         self._pending_photo_batches: Dict[str, MessageEvent] = {}
         self._pending_photo_batch_tasks: Dict[str, asyncio.Task] = {}
         self._media_group_events: Dict[str, MessageEvent] = {}
@@ -465,9 +465,9 @@ class TelegramAdapter(BasePlatformAdapter):
         # Aggregate client-side splits of long messages into one MessageEvent; bounds are conservative
         # for Telegram's ~1 edit/s flood envelope.
         self._text_batch_delay_seconds = self._env_float_clamped(
-            "HERMES_TELEGRAM_TEXT_BATCH_DELAY_SECONDS", 0.3, min_value=0.08, max_value=2.0)
+            "STARDUST_TELEGRAM_TEXT_BATCH_DELAY_SECONDS", 0.3, min_value=0.08, max_value=2.0)
         self._text_batch_split_delay_seconds = self._env_float_clamped(
-            "HERMES_TELEGRAM_TEXT_BATCH_SPLIT_DELAY_SECONDS", 1.0, min_value=self._text_batch_delay_seconds, max_value=4.0)
+            "STARDUST_TELEGRAM_TEXT_BATCH_SPLIT_DELAY_SECONDS", 1.0, min_value=self._text_batch_delay_seconds, max_value=4.0)
         self._drop_delayed_deliveries = False
         # Held across disconnect: PTB advances the offset before our drop-guard runs, so Telegram won't
         # redeliver — dropping is permanent loss (see _hold_inbound_event).
@@ -2768,11 +2768,11 @@ class TelegramAdapter(BasePlatformAdapter):
         direct DNS; the getUpdates request is instrumented for polling-progress tracking."""
         # PTB's pool_timeout=1s default trips "Pool timeout" on flaky networks; safer defaults + env overrides.
         request_kwargs = {
-            "connection_pool_size": env_int("HERMES_TELEGRAM_HTTP_POOL_SIZE", 512),
-            "pool_timeout": env_float("HERMES_TELEGRAM_HTTP_POOL_TIMEOUT", 8.0),
-            "connect_timeout": env_float("HERMES_TELEGRAM_HTTP_CONNECT_TIMEOUT", 10.0),
-            "read_timeout": env_float("HERMES_TELEGRAM_HTTP_READ_TIMEOUT", 20.0),
-            "write_timeout": env_float("HERMES_TELEGRAM_HTTP_WRITE_TIMEOUT", 20.0),
+            "connection_pool_size": env_int("STARDUST_TELEGRAM_HTTP_POOL_SIZE", 512),
+            "pool_timeout": env_float("STARDUST_TELEGRAM_HTTP_POOL_TIMEOUT", 8.0),
+            "connect_timeout": env_float("STARDUST_TELEGRAM_HTTP_CONNECT_TIMEOUT", 10.0),
+            "read_timeout": env_float("STARDUST_TELEGRAM_HTTP_READ_TIMEOUT", 20.0),
+            "write_timeout": env_float("STARDUST_TELEGRAM_HTTP_WRITE_TIMEOUT", 20.0),
             # PTB routes file requests to media_write_timeout; httpx budgets it per socket write (stall
             # tolerance, not bandwidth), so 60s rides out congested-link buffer stalls.
             "media_write_timeout": 60.0,
@@ -2807,10 +2807,10 @@ class TelegramAdapter(BasePlatformAdapter):
                 kwargs["limits"] = _pool_limits
             return kwargs
 
-        disable_fallback = os.getenv("HERMES_TELEGRAM_DISABLE_FALLBACK_IPS", "").strip().lower() in {"1", "true", "yes", "on"}
+        disable_fallback = os.getenv("STARDUST_TELEGRAM_DISABLE_FALLBACK_IPS", "").strip().lower() in {"1", "true", "yes", "on"}
         fallback_ips = [] if disable_fallback else self._fallback_ips()
         if not fallback_ips and not disable_fallback:
-            discovery_timeout = self._env_float_clamped("HERMES_TELEGRAM_FALLBACK_DISCOVERY_TIMEOUT", 5.0, min_value=0.0)
+            discovery_timeout = self._env_float_clamped("STARDUST_TELEGRAM_FALLBACK_DISCOVERY_TIMEOUT", 5.0, min_value=0.0)
             logger.warning("[%s] Discovering Telegram API fallback IPs via DNS-over-HTTPS…", self.name)
             try:
                 fallback_ips = await _await_with_thread_deadline(discover_fallback_ips(), timeout=discovery_timeout)
@@ -2861,7 +2861,7 @@ class TelegramAdapter(BasePlatformAdapter):
         """``app.initialize()`` with a bounded retry ladder; rebuilds ``self._app``/``self._bot`` from
         ``builder`` after each failed attempt; OSError when the per-attempt or total watchdog expires."""
         _max_connect = 8
-        _init_timeout = env_float("HERMES_TELEGRAM_INIT_TIMEOUT", 30.0)  # per attempt
+        _init_timeout = env_float("STARDUST_TELEGRAM_INIT_TIMEOUT", 30.0)  # per attempt
         # Total watchdog: bounds the whole connect loop even if the retry loop silently stalls.
         _total_deadline = asyncio.get_running_loop().time() + _init_timeout * _max_connect + 120.0
         _timed_out = f"Telegram initialization timed out after {_max_connect} attempts ({_init_timeout:.0f}s each)"
@@ -2871,8 +2871,8 @@ class TelegramAdapter(BasePlatformAdapter):
                 if asyncio.get_running_loop().time() >= _total_deadline:
                     raise OSError(
                         f"{_timed_out} — total connect watchdog deadline ({_init_timeout * _max_connect + 120.0:.0f}s) exceeded. "
-                        f"Check network connectivity to api.telegram.org or set HERMES_TELEGRAM_HTTP_CONNECT_TIMEOUT / "
-                        f"HERMES_TELEGRAM_INIT_TIMEOUT to a lower value.")
+                        f"Check network connectivity to api.telegram.org or set STARDUST_TELEGRAM_HTTP_CONNECT_TIMEOUT / "
+                        f"STARDUST_TELEGRAM_INIT_TIMEOUT to a lower value.")
                 logger.warning("[%s] Connecting to Telegram (attempt %d/%d)…", self.name, _attempt + 1, _max_connect)
                 # On timeout the (possibly shielded) initialize() task is abandoned; release the half-built
                 # app's httpx client so it isn't leaked across the ladder.
@@ -2884,7 +2884,7 @@ class TelegramAdapter(BasePlatformAdapter):
                 if _attempt >= _max_connect - 1:
                     raise OSError(
                         f"{_timed_out}. Check network connectivity to api.telegram.org "
-                        f"or set HERMES_TELEGRAM_HTTP_CONNECT_TIMEOUT to a lower value.")
+                        f"or set STARDUST_TELEGRAM_HTTP_CONNECT_TIMEOUT to a lower value.")
                 wait = min(2 ** _attempt, 15)
                 logger.warning(
                     "[%s] Connect attempt %d/%d timed out after %.0fs — retrying in %ds", self.name, _attempt + 1,
@@ -6630,7 +6630,7 @@ class TelegramAdapter(BasePlatformAdapter):
 # is needed. ──────────────────────────────────────────────────────────────────────────
 def _resolve_notifications_mode() -> str:
     """Notification mode (all/important) from env, else config.yaml display.platforms.telegram.notifications."""
-    mode = os.getenv("HERMES_TELEGRAM_NOTIFICATIONS", "")
+    mode = os.getenv("STARDUST_TELEGRAM_NOTIFICATIONS", "")
     if not mode:
         try:
             from gateway.config import load_gateway_config

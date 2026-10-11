@@ -270,7 +270,7 @@ class SessionManager:
 
     def _get_db(self):
         """Lazily acquire the process-shared SessionDB; ``None`` if unavailable (e.g. import
-        error in a minimal test env). ``HERMES_HOME`` is resolved here, not via the import-time
+        error in a minimal test env). ``STARDUST_HOME`` is resolved here, not via the import-time
         ``DEFAULT_DB_PATH``, so test fixtures that change the env var later are honoured. The
         registry handle is the one in-process tools (delegation, session_search, goals) also
         acquire, so the ACP server holds ONE writer on state.db instead of two (#100896)."""

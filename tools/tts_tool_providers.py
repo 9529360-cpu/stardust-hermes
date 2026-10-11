@@ -470,7 +470,7 @@ def _generate_mistral_tts(text: str, output_path: str, tts_config: Dict[str, Any
 
 # --- Google Gemini TTS ---
 def _read_gemini_persona_prompt(gemini_config: Dict[str, Any]) -> str:
-    """Read ``tts.gemini.persona_prompt_file`` (relative -> under HERMES_HOME), failing soft."""
+    """Read ``tts.gemini.persona_prompt_file`` (relative -> under STARDUST_HOME), failing soft."""
     raw = gemini_config.get("persona_prompt_file")
     if not isinstance(raw, str) or not raw.strip():
         return ""

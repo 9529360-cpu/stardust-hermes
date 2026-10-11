@@ -407,9 +407,9 @@ class TestManagedPythonStore:
         from hermes_cli.managed_uv import managed_python_install_dir
 
         checkout = tmp_path / "checkout"
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "profiles" / "alpha"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "profiles" / "alpha"))
         alpha = managed_python_install_dir(checkout)
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "profiles" / "beta"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "profiles" / "beta"))
         beta = managed_python_install_dir(checkout)
 
         expected = checkout / ".hermes-runtime" / "python"

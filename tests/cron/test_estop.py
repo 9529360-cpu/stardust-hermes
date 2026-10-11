@@ -23,8 +23,8 @@ from agent import estop
 
 @pytest.fixture
 def hermes_home(tmp_path, monkeypatch):
-    """Point HERMES_HOME at a temp dir and reset estop module log state."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    """Point STARDUST_HOME at a temp dir and reset estop module log state."""
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     estop._logged_components.clear()
     return tmp_path
 
@@ -335,7 +335,7 @@ def test_status_line_when_paused(hermes_home):
 
 def test_is_engaged_fails_safe_on_stat_error(hermes_home, monkeypatch):
     """A stat failure must report ENGAGED (fail safe) — the pause has to
-    hold even when HERMES_HOME is misbehaving, matching the module's
+    hold even when STARDUST_HOME is misbehaving, matching the module's
     corrupt-sentinel doctrine."""
     class _BoomPath:
         def exists(self):
@@ -436,16 +436,16 @@ def test_pause_command_registered_for_gateway():
 
 
 def test_profile_gateway_honors_canonical_root_estop(tmp_path, monkeypatch):
-    """fleet-analyst-class: HERMES_HOME is a profile dir; pause lives at root.
+    """fleet-analyst-class: STARDUST_HOME is a profile dir; pause lives at root.
 
-    A process launched with HERMES_HOME=~/.hermes/profiles/fleet-analyst must
+    A process launched with STARDUST_HOME=~/.hermes/profiles/fleet-analyst must
     still treat ~/.hermes/ESTOP as engaged. Otherwise `hermes pause` is not
     a global emergency stop (t_7b65ff88).
     """
     root = tmp_path / "hermes-root"
     profile = root / "profiles" / "fleet-analyst"
     profile.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(profile))
+    monkeypatch.setenv("STARDUST_HOME", str(profile))
     estop._logged_components.clear()
 
     assert estop.is_engaged() is False

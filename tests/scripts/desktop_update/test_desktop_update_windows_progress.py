@@ -74,7 +74,7 @@ def test_progress_advances_while_the_orchestrator_blocks(tmp_path: Path) -> None
     # stability window + retry sleeps), so: 30s, and every sampling deadline
     # below is derived from the moment the held stage lands, keeping the
     # whole window comfortably inside the hold.
-    env["HERMES_SELFTEST_HOLD_SECONDS"] = "30"
+    env["STARDUST_SELFTEST_HOLD_SECONDS"] = "30"
 
     with output_path.open("wb") as output:
         process = subprocess.Popen(

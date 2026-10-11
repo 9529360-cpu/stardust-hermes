@@ -1,8 +1,8 @@
 """Mem0 memory plugin — MemoryProvider interface.
 
 Server-side fact extraction and semantic search via the Mem0 Platform API (cloud), a
-self-hosted Mem0 server (MEM0_HOST, HTTP), or OSS Memory. Secrets live in $HERMES_HOME/.env
-(MEM0_API_KEY, MEM0_HOST); settings in $HERMES_HOME/mem0.json via `hermes memory setup`:
+self-hosted Mem0 server (MEM0_HOST, HTTP), or OSS Memory. Secrets live in $STARDUST_HOME/.env
+(MEM0_API_KEY, MEM0_HOST); settings in $STARDUST_HOME/mem0.json via `hermes memory setup`:
 mode ("platform"|"oss"), host, user_id (canonical id across gateways; unset → gateway-native
 id), agent_id. MEM0_* env vars remain a fallback.
 """
@@ -74,7 +74,7 @@ def _is_client_error(exc: Exception) -> bool:
 
 
 def _load_config() -> dict:
-    """Env vars provide defaults; $HERMES_HOME/mem0.json overrides individual keys.
+    """Env vars provide defaults; $STARDUST_HOME/mem0.json overrides individual keys.
     Layering avoids a silent failure when the JSON file exists but lacks fields
     like ``api_key`` that the user set in ``.env``."""
     from hermes_constants import get_hermes_home
@@ -147,7 +147,7 @@ class Mem0MemoryProvider(MemoryProvider):
         return bool(cfg.get("api_key") or cfg.get("host"))  # platform needs a key; self-hosted a host (key optional with AUTH_DISABLED)
 
     def save_config(self, values, hermes_home):
-        """Merge-write config to $HERMES_HOME/mem0.json."""
+        """Merge-write config to $STARDUST_HOME/mem0.json."""
         config_path = Path(hermes_home) / "mem0.json"
         atomic_json_write(config_path, {**read_json_or_empty(config_path), **values}, mode=0o600)
 

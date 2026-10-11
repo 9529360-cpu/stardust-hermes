@@ -123,7 +123,7 @@ class GatewayAdapterLifecycleMixin:
     def _adapter_disconnect_timeout_secs(self) -> float:
         """Return the per-adapter disconnect timeout used during shutdown."""
         from gateway.run import _ADAPTER_DISCONNECT_TIMEOUT_SECS_DEFAULT
-        override = self._env_timeout_override("HERMES_GATEWAY_ADAPTER_DISCONNECT_TIMEOUT")
+        override = self._env_timeout_override("STARDUST_GATEWAY_ADAPTER_DISCONNECT_TIMEOUT")
         return _ADAPTER_DISCONNECT_TIMEOUT_SECS_DEFAULT if override is None else override
 
     def _platform_connect_timeout_secs(self, platform=None, *, initial: bool = False) -> float:
@@ -138,7 +138,7 @@ class GatewayAdapterLifecycleMixin:
             _PLATFORM_CONNECT_TIMEOUT_SECS_DEFAULT, _TELEGRAM_CONNECT_TIMEOUT_SECS_DEFAULT,
             _TELEGRAM_INITIAL_CONNECT_TIMEOUT_SECS_DEFAULT,
         )
-        override = self._env_timeout_override("HERMES_GATEWAY_PLATFORM_CONNECT_TIMEOUT")
+        override = self._env_timeout_override("STARDUST_GATEWAY_PLATFORM_CONNECT_TIMEOUT")
         if override is not None:
             return override
         if platform != Platform.TELEGRAM:
@@ -824,7 +824,7 @@ class GatewayAdapterLifecycleMixin:
 
     async def _start_secondary_profile_adapters(self) -> int:
         """Bring up adapters for every non-active profile (multiplex only); returns connected count.
-        Each profile connects under its own HERMES_HOME + secret scope; credential/listener collisions
+        Each profile connects under its own STARDUST_HOME + secret scope; credential/listener collisions
         are refused here — the only point seeing every profile's credentials together."""
         from gateway.run import MultiplexConfigError, _multiplex_profile_homes
         from gateway.run_profile_reconcile import profile_serve_signature

@@ -146,7 +146,7 @@ RUN set -eu; \
 # updated.
 COPY --chmod=0755 docker/tini-shim.sh /usr/bin/tini
 
-# Non-root user for runtime; UID can be overridden via HERMES_UID at runtime
+# Non-root user for runtime; UID can be overridden via STARDUST_UID at runtime
 RUN useradd -u 10000 -m -d /opt/data hermes
 
 COPY --chmod=0755 --from=uv_source /usr/local/bin/uv /usr/local/bin/uvx /usr/local/bin/
@@ -264,7 +264,7 @@ RUN cd plugins/platforms/photon/sidecar && \
 # Google Chat's [google-chat] extra (google-cloud-pubsub + Chat API clients)
 # is baked so hosted/immutable images can enable the adapter without writing
 # the sealed venv. Runtime --install-deps still routes through lazy_deps into
-# HERMES_LAZY_INSTALL_TARGET when the extra is not present.
+# STARDUST_LAZY_INSTALL_TARGET when the extra is not present.
 #
 # The editable link is created after the source copy below.
 COPY pyproject.toml uv.lock ./
@@ -306,28 +306,28 @@ RUN mkdir -p /opt/hermes/bin && \
     chmod 0755 /opt/hermes /opt/hermes/bin/hermes && \
     printf 'docker\n' > /opt/hermes/.install_method
 # The ``.install_method`` stamp is baked next to the running code (the install
-# tree), NOT into $HERMES_HOME. $HERMES_HOME (/opt/data) is a shared data
+# tree), NOT into $STARDUST_HOME. $STARDUST_HOME (/opt/data) is a shared data
 # volume that is commonly bind-mounted from the host and even shared with a
 # host-side Desktop/CLI install; stamping it at boot used to clobber that
 # host install's marker and wrongly block its ``hermes update``. A code-scoped
 # stamp is read first by detect_install_method() and is immune to the share.
 # Start as root so the s6-overlay stage2 hook can usermod/groupmod and chown
 # the data volume. Each supervised service then drops to the hermes user via
-# `s6-setuidgid hermes` in its run script. If HERMES_UID is unset, services
+# `s6-setuidgid hermes` in its run script. If STARDUST_UID is unset, services
 # run as the default hermes user (UID 10000).
 
 # ---------- Bake image provenance + build-time git revision ----------
 # The versioned, non-secret provenance marker is the authoritative runtime
 # signal that this filesystem came from an immutable image.  It deliberately
 # lives outside both /opt/hermes (which operators sometimes bind-mount as a
-# checkout) and /opt/data (the mutable HERMES_HOME volume).
+# checkout) and /opt/data (the mutable STARDUST_HOME volume).
 # .dockerignore excludes .git, so `git rev-parse HEAD` from inside the
 # container always returns nothing — meaning `hermes dump` reports
 # "(unknown)" and the startup banner drops its `· upstream <sha>` suffix.
 # That makes support triage from container bug reports impossible:
 # we can't tell which commit the user is actually running.
 #
-# Fix: write the commit SHA passed via the HERMES_GIT_SHA build-arg to
+# Fix: write the commit SHA passed via the STARDUST_GIT_SHA build-arg to
 # /opt/hermes/.hermes_build_sha at build time, and have
 # hermes_cli/build_info.py read it at runtime.  Both `hermes dump` and
 # banner.get_git_banner_state() try the baked SHA first, then fall back
@@ -338,13 +338,13 @@ RUN mkdir -p /opt/hermes/bin && \
 # to live-git lookup.  Stardust CI
 # (.github/workflows/stardust-docker-smoke.yml) passes ${{ github.sha }} so
 # every CI-built Stardust image has it.
-ARG HERMES_GIT_SHA=
+ARG STARDUST_GIT_SHA=
 RUN set -eu; \
-    if [ -n "${HERMES_GIT_SHA}" ]; then \
-        printf '%s\n' "${HERMES_GIT_SHA}" > /opt/hermes/.hermes_build_sha; \
+    if [ -n "${STARDUST_GIT_SHA}" ]; then \
+        printf '%s\n' "${STARDUST_GIT_SHA}" > /opt/hermes/.hermes_build_sha; \
     fi; \
     mkdir -p /etc/hermes; \
-    HERMES_GIT_SHA="${HERMES_GIT_SHA}" python3 -c 'import json, os, pathlib, tomllib; project = tomllib.loads(pathlib.Path("/opt/hermes/pyproject.toml").read_text(encoding="utf-8"))["project"]; marker = pathlib.Path("/etc/hermes/image-provenance.json"); marker.write_text(json.dumps({"schema": 1, "deployment_kind": "image", "manager": "docker", "image": "stardust-hermes", "version": project["version"], "revision": os.environ.get("HERMES_GIT_SHA") or None}, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8"); marker.chmod(0o444)'
+    STARDUST_GIT_SHA="${STARDUST_GIT_SHA}" python3 -c 'import json, os, pathlib, tomllib; project = tomllib.loads(pathlib.Path("/opt/hermes/pyproject.toml").read_text(encoding="utf-8"))["project"]; marker = pathlib.Path("/etc/hermes/image-provenance.json"); marker.write_text(json.dumps({"schema": 1, "deployment_kind": "image", "manager": "docker", "image": "stardust-hermes", "version": project["version"], "revision": os.environ.get("STARDUST_GIT_SHA") or None}, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8"); marker.chmod(0o444)'
 
 # ---------- s6-overlay service wiring ----------
 # Static services declared at build time: main-hermes + dashboard.
@@ -360,7 +360,7 @@ COPY docker/s6-rc.d/ /etc/s6-overlay/s6-rc.d/
 # runs before user services start.
 #
 # 02-reconcile-profiles re-creates per-profile gateway s6 service
-# slots from $HERMES_HOME/profiles/<name>/ after a container restart
+# slots from $STARDUST_HOME/profiles/<name>/ after a container restart
 # (the /run/service/ scandir is tmpfs and wiped on restart). Phase 4.
 RUN mkdir -p /etc/cont-init.d && \
     printf '#!/command/with-contenv sh\nexec /opt/hermes/docker/stage2-hook.sh\n' \
@@ -370,7 +370,7 @@ COPY --chmod=0755 docker/cont-init.d/015-supervise-perms /etc/cont-init.d/015-su
 COPY --chmod=0755 docker/cont-init.d/02-reconcile-profiles /etc/cont-init.d/02-reconcile-profiles
 
 # ---------- Runtime ----------
-ENV HERMES_WEB_DIST=/opt/hermes/hermes_cli/web_dist
+ENV STARDUST_WEB_DIST=/opt/hermes/hermes_cli/web_dist
 # Point the TUI launcher at the prebuilt bundle baked at build time (Layer 8:
 # `ui-tui && npm run build`). This makes _make_tui_argv take the prebuilt-bundle
 # fast path (`node --expose-gc /opt/hermes/ui-tui/dist/entry.js`) and skip the
@@ -387,10 +387,10 @@ ENV HERMES_WEB_DIST=/opt/hermes/hermes_cli/web_dist
 # embedded-chat (/api/pty) connections → ENOTEMPTY → the chat tab dies with a
 # 502 / "[session ended]". Pointing at the prebuilt bundle sidesteps the whole
 # check. (A separate launcher hardening is tracked independently.)
-ENV HERMES_TUI_DIR=/opt/hermes/ui-tui
-ENV HERMES_HOME=/opt/data
-ENV HERMES_WRITE_SAFE_ROOT=/opt/data
-ENV HERMES_DISABLE_LAZY_INSTALLS=1
+ENV STARDUST_TUI_DIR=/opt/hermes/ui-tui
+ENV STARDUST_HOME=/opt/data
+ENV STARDUST_WRITE_SAFE_ROOT=/opt/data
+ENV STARDUST_DISABLE_LAZY_INSTALLS=1
 # The published image seals /opt/hermes (root-owned, read-only) so a runtime
 # lazy install can't mutate the agent's own venv and brick it. But opt-in
 # backends (Firecrawl web search, Exa, Feishu, …) keep their SDKs in
@@ -403,11 +403,11 @@ ENV HERMES_DISABLE_LAZY_INSTALLS=1
 # is seeded + chowned to the hermes user by docker/stage2-hook.sh and lives
 # on the /opt/data volume, so it persists across container recreates / image
 # updates (an ABI stamp invalidates it if a rebuild bumps the interpreter).
-ENV HERMES_LAZY_INSTALL_TARGET=/opt/data/lazy-packages
+ENV STARDUST_LAZY_INSTALL_TARGET=/opt/data/lazy-packages
 
 # `docker exec` privilege-drop shim. When operators run
 # `docker exec <c> hermes ...` they default to root, and any file the
-# command writes under $HERMES_HOME (auth.json, .env, config.yaml) ends
+# command writes under $STARDUST_HOME (auth.json, .env, config.yaml) ends
 # up root-owned and unreadable to the supervised gateway (UID 10000).
 # The shim lives at /opt/hermes/bin/hermes, sits earliest on PATH, and
 # transparently re-exec's the real venv binary via `s6-setuidgid hermes`
@@ -415,7 +415,7 @@ ENV HERMES_LAZY_INSTALL_TARGET=/opt/data/lazy-packages
 # `--user hermes`, etc.) hit the short-circuit path with no overhead.
 # Recursion is impossible because the shim exec's the venv binary by
 # absolute path (/opt/hermes/.venv/bin/hermes). See the shim source for
-# the opt-out env var (HERMES_DOCKER_EXEC_AS_ROOT=1).
+# the opt-out env var (STARDUST_DOCKER_EXEC_AS_ROOT=1).
 COPY --chmod=0755 docker/hermes-exec-shim.sh /opt/hermes/bin/hermes
 COPY --chmod=0755 docker/entrypoint-dispatch.sh /opt/hermes/docker/entrypoint-dispatch.sh
 

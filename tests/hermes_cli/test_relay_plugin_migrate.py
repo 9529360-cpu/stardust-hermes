@@ -1,4 +1,4 @@
-"""``hermes update`` / ``hermes migrate relay``: legacy ``HERMES_NEMO_RELAY_ATIF_*``/``ATOF_*`` vars
+"""``hermes update`` / ``hermes migrate relay``: legacy ``STARDUST_NEMO_RELAY_ATIF_*``/``ATOF_*`` vars
 become a validated ``relay-plugins.toml`` per profile home, selected from ``.env``."""
 
 from __future__ import annotations
@@ -16,14 +16,14 @@ from hermes_cli.relay_plugin_cutover import RELAY_PLUGINS_CONFIG_ENV, configured
 nemo_relay = pytest.importorskip("nemo_relay")
 
 LEGACY_ENV = """OPENAI_API_KEY=sk-test
-HERMES_NEMO_RELAY_ATOF_ENABLED=1
-HERMES_NEMO_RELAY_ATOF_OUTPUT_DIRECTORY={home}/telemetry/atof
-HERMES_NEMO_RELAY_ATOF_FILENAME=hermes-atof.jsonl
-HERMES_NEMO_RELAY_ATOF_MODE=append
-HERMES_NEMO_RELAY_ATIF_ENABLED=1
-HERMES_NEMO_RELAY_ATIF_OUTPUT_DIRECTORY={home}/telemetry/atif
-HERMES_NEMO_RELAY_ATIF_FILENAME_TEMPLATE=trajectory-{{session_id}}.json
-HERMES_NEMO_RELAY_ATIF_SUBAGENT_EXPORT_MODE=all
+STARDUST_NEMO_RELAY_ATOF_ENABLED=1
+STARDUST_NEMO_RELAY_ATOF_OUTPUT_DIRECTORY={home}/telemetry/atof
+STARDUST_NEMO_RELAY_ATOF_FILENAME=hermes-atof.jsonl
+STARDUST_NEMO_RELAY_ATOF_MODE=append
+STARDUST_NEMO_RELAY_ATIF_ENABLED=1
+STARDUST_NEMO_RELAY_ATIF_OUTPUT_DIRECTORY={home}/telemetry/atif
+STARDUST_NEMO_RELAY_ATIF_FILENAME_TEMPLATE=trajectory-{{session_id}}.json
+STARDUST_NEMO_RELAY_ATIF_SUBAGENT_EXPORT_MODE=all
 """
 
 
@@ -41,7 +41,7 @@ def profile_env(tmp_path, monkeypatch):
     home = tmp_path / ".hermes"
     home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     return home
 
 
@@ -67,7 +67,7 @@ def test_legacy_env_becomes_validated_toml_selected_from_env(profile_env):
     assert env[RELAY_PLUGINS_CONFIG_ENV] == str(toml_path)
     assert env["OPENAI_API_KEY"] == "sk-test"
     assert configured_legacy_relay_env_vars(env) == ()
-    assert "# migrated to relay-plugins.toml: HERMES_NEMO_RELAY_ATOF_ENABLED=1" in (profile_env / ".env").read_text(encoding="utf-8")
+    assert "# migrated to relay-plugins.toml: STARDUST_NEMO_RELAY_ATOF_ENABLED=1" in (profile_env / ".env").read_text(encoding="utf-8")
     assert migrate_profile_relay_env(profile_env).skipped_reason == "no legacy exporter variables"
 
 

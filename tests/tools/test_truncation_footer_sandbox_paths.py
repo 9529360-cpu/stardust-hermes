@@ -17,7 +17,7 @@ def _footer_path(text: str) -> str:
 
 def test_truncation_footers_render_the_sandbox_visible_cache_path(tmp_path, monkeypatch):
     home = tmp_path / ".hermes"
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     monkeypatch.setenv("TERMINAL_ENV", "docker")
     body = "\n".join(f"row {i}" for i in range(5000))
 
@@ -28,13 +28,13 @@ def test_truncation_footers_render_the_sandbox_visible_cache_path(tmp_path, monk
     for text, subdir in ((web_out, "cache/web"), (snap_out, "cache/web"), (deleg_out, "cache/delegation")):
         path = _footer_path(text)
         assert path.startswith(f"/root/.hermes/{subdir}/"), path
-        # The bytes still live on the host under HERMES_HOME; only the rendered path is translated.
+        # The bytes still live on the host under STARDUST_HOME; only the rendered path is translated.
         assert os.path.exists(str(home / subdir / os.path.basename(path)))
 
 
 def test_local_backend_footer_keeps_the_host_path(tmp_path, monkeypatch):
     home = tmp_path / ".hermes"
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     monkeypatch.setenv("TERMINAL_ENV", "local")
     body = "\n".join(f"row {i}" for i in range(5000))
     out, _ = web_tools_truncate._truncate_with_footer(body, "https://example.com/doc", 3000)

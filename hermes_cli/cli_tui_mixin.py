@@ -1862,7 +1862,7 @@ class CLITuiMixin:
         self._voice_last_tts_text = ""  # most recently spoken TTS text (echo guard, #75780)
         self._voice_barge_phase = None  # "generation" or "playback" phase of the last barge trip
 
-        if os.environ.get("HERMES_DEFER_AGENT_STARTUP") != "1":
+        if os.environ.get("STARDUST_DEFER_AGENT_STARTUP") != "1":
             self._install_tool_callbacks()
             self._ensure_tirith_security()
 

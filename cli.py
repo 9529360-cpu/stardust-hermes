@@ -28,7 +28,7 @@ from typing import List, Dict, Any, Optional, Mapping
 
 logger = logging.getLogger(__name__)
 
-os.environ["HERMES_QUIET"] = "1"  # suppress our modules' startup chatter
+os.environ["STARDUST_QUIET"] = "1"  # suppress our modules' startup chatter
 
 from hermes_cli.fallback_config import get_fallback_chain
 from hermes_cli.cli_agent_setup_mixin import CLIAgentSetupMixin
@@ -260,7 +260,7 @@ def _resolve_prefill_messages_file(config: Dict[str, Any]) -> str:
     """Prefill file path: env, then top-level ``prefill_messages_file``, then legacy ``agent.*``."""
     agent_cfg = config.get("agent", {})
     return (
-        os.getenv("HERMES_PREFILL_MESSAGES_FILE", "").strip()
+        os.getenv("STARDUST_PREFILL_MESSAGES_FILE", "").strip()
         or str(config.get("prefill_messages_file", "") or "").strip()
         or (str(agent_cfg.get("prefill_messages_file", "") or "").strip() if isinstance(agent_cfg, dict) else "")
     )
@@ -371,15 +371,15 @@ def _mirror_config_to_env(defaults, _file_has_terminal_config):
     if isinstance(security_config, dict):
         redact = security_config.get("redact_secrets")
         if redact is not None:
-            os.environ["HERMES_REDACT_SECRETS"] = str(redact).lower()
+            os.environ["STARDUST_REDACT_SECRETS"] = str(redact).lower()
 
     # Session-search index knobs (hermes_state reads the env carriers).
     sessions_config = defaults.get("sessions", {})
     if isinstance(sessions_config, dict):
         if "cjk_fts" in sessions_config:
-            os.environ["HERMES_CJK_FTS"] = str(sessions_config["cjk_fts"])
+            os.environ["STARDUST_CJK_FTS"] = str(sessions_config["cjk_fts"])
         if "search_slow_ms" in sessions_config:
-            os.environ["HERMES_SEARCH_SLOW_MS"] = str(sessions_config["search_slow_ms"])
+            os.environ["STARDUST_SEARCH_SLOW_MS"] = str(sessions_config["search_slow_ms"])
 
 
 def _cli_config_defaults():
@@ -462,10 +462,10 @@ def _merge_file_config(defaults: Dict[str, Any], file_config: Dict[str, Any]) ->
 def load_cli_config() -> Dict[str, Any]:
     """~/.hermes/config.yaml (else ./cli-config.yaml) over built-in defaults; env vars win.
 
-    ``HERMES_IGNORE_USER_CONFIG=1`` skips the user config entirely (``.env`` still loads).
+    ``STARDUST_IGNORE_USER_CONFIG=1`` skips the user config entirely (``.env`` still loads).
     """
     config_path = _hermes_home / 'config.yaml'
-    if not config_path.exists() or os.environ.get("HERMES_IGNORE_USER_CONFIG") == "1":
+    if not config_path.exists() or os.environ.get("STARDUST_IGNORE_USER_CONFIG") == "1":
         config_path = Path(__file__).parent / 'cli-config.yaml'
 
     defaults = _cli_config_defaults()
@@ -633,10 +633,10 @@ def _prepare_deferred_agent_startup() -> None:
     global _deferred_agent_startup_done
     if _deferred_agent_startup_done:
         return
-    if os.environ.get("HERMES_DEFER_AGENT_STARTUP") != "1":
+    if os.environ.get("STARDUST_DEFER_AGENT_STARTUP") != "1":
         return
     _deferred_agent_startup_done = True
-    _accept_hooks = os.environ.get("HERMES_ACCEPT_HOOKS", "").lower() in {"1", "true", "yes", "on"}
+    _accept_hooks = os.environ.get("STARDUST_ACCEPT_HOOKS", "").lower() in {"1", "true", "yes", "on"}
     try:
         from hermes_cli.plugins import discover_plugins
 
@@ -679,8 +679,8 @@ def _float_env(name: str, default: float) -> float:
 
 
 def _exit_watchdog_timeout() -> float:
-    """``HERMES_EXIT_WATCHDOG_S`` as a float (default 30; ``0`` disables)."""
-    return _float_env("HERMES_EXIT_WATCHDOG_S", 30.0)
+    """``STARDUST_EXIT_WATCHDOG_S`` as a float (default 30; ``0`` disables)."""
+    return _float_env("STARDUST_EXIT_WATCHDOG_S", 30.0)
 
 
 def _arm_exit_watchdog(timeout_s: float | None = None, *, from_signal: bool = False) -> None:
@@ -688,7 +688,7 @@ def _arm_exit_watchdog(timeout_s: float | None = None, *, from_signal: bool = Fa
 
     Backstop for a cleanup step wedged on network I/O and for interpreter teardown
     blocked joining non-daemon threads (ThreadPoolExecutor's atexit join). The daemon
-    timer survives ``Py_FinalizeEx``'s joins. ``HERMES_EXIT_WATCHDOG_S=0`` disables.
+    timer survives ``Py_FinalizeEx``'s joins. ``STARDUST_EXIT_WATCHDOG_S=0`` disables.
 
     1. 2. Interpreter teardown blocked joining non-daemon threads — stdlib ``ThreadPoolExecutor`` workers
     are joined unconditionally by ``concurrent.futures``' atexit hook even after ``shutdown(wait=False)``,
@@ -1177,7 +1177,7 @@ def _hex_to_ansi(hex_color: str, *, bold: bool = False) -> str:
 
 
 # Light/dark terminal detection (mirrors ui-tui/src/theme.ts detectLightMode()). Priority:
-# HERMES_LIGHT/HERMES_TUI_LIGHT env, HERMES_TUI_THEME, HERMES_TUI_BACKGROUND, COLORFGBG
+# STARDUST_LIGHT/STARDUST_TUI_LIGHT env, STARDUST_TUI_THEME, STARDUST_TUI_BACKGROUND, COLORFGBG
 # (bg slot 7/15 = light), OSC 11 query, default dark. Cached so the terminal is queried once.
 _LIGHT_MODE_CACHE: bool | None = None
 _TRUE_RE = re.compile(r"^(1|true|on|yes|y)$")
@@ -1304,18 +1304,18 @@ def _heal_cooked_mode_drift(fd: int) -> bool:
 
 def _detect_light_mode_uncached() -> bool:
     """The detection ladder documented above; may raise (caller maps errors to dark)."""
-    for var in ("HERMES_LIGHT", "HERMES_TUI_LIGHT"):
+    for var in ("STARDUST_LIGHT", "STARDUST_TUI_LIGHT"):
         v = (os.environ.get(var) or "").strip().lower()
         if _TRUE_RE.match(v):
             return True
         if _FALSE_RE.match(v):
             return False
-    theme = (os.environ.get("HERMES_TUI_THEME") or "").strip().lower()
+    theme = (os.environ.get("STARDUST_TUI_THEME") or "").strip().lower()
     if theme == "light":
         return True
     if theme == "dark":
         return False
-    bg_lum = _luminance_from_hex(os.environ.get("HERMES_TUI_BACKGROUND") or "")
+    bg_lum = _luminance_from_hex(os.environ.get("STARDUST_TUI_BACKGROUND") or "")
     if bg_lum is not None:
         return bg_lum >= 0.5
     last = (os.environ.get("COLORFGBG") or "").strip().split(";")[-1]
@@ -2321,7 +2321,7 @@ def _build_compact_banner() -> str:
         tiny_line = _skin.get_branding("agent_name", "Hermes Agent") if _skin else "Hermes Agent"
     line1 = f"{tiny_line} - AI Agent Framework"
 
-    if os.environ.get("HERMES_FAST_STARTUP_BANNER") == "1":
+    if os.environ.get("STARDUST_FAST_STARTUP_BANNER") == "1":
         from hermes_cli import __release_date__ as _release_date
         from hermes_cli import __version__ as _version
 
@@ -2413,7 +2413,7 @@ def _parse_skills_argument(skills: str | list[str] | tuple[str, ...] | None) -> 
 
 
 def save_config_value(key_path: str, value: any) -> bool:
-    """Persist dot-separated ``key_path`` = value into HERMES_HOME/config.yaml; True on success.
+    """Persist dot-separated ``key_path`` = value into STARDUST_HOME/config.yaml; True on success.
 
     Never the repo's cli-config.yaml: no config reader loads it, so the value would vanish.
     """
@@ -2668,7 +2668,7 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
         # resume must not clobber an explicit -m with the session's stored model.
         self._explicit_model_override = bool(model)
         self.model = model or _config_model or ""
-        _cfg_provider = _model_config.get("provider") or os.getenv("HERMES_INFERENCE_PROVIDER")
+        _cfg_provider = _model_config.get("provider") or os.getenv("STARDUST_INFERENCE_PROVIDER")
         _startup_provider_override = _startup_base_url_override = _startup_api_key_override = ""
         if self.model:
             from hermes_cli.model_switch import resolve_startup_model_route
@@ -2751,7 +2751,7 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
         from hermes_cli.config import resolve_turn_limit as _resolve_turn_limit
         self.max_turns = _resolve_turn_limit(next(
             (v for v in (max_turns, CLI_CONFIG["agent"].get("max_turns"), CLI_CONFIG.get("max_turns")) if v is not None),
-            os.getenv("HERMES_MAX_ITERATIONS"),
+            os.getenv("STARDUST_MAX_ITERATIONS"),
         ))
         self.run_budget_seconds = run_budget if run_budget is not None else CLI_CONFIG["agent"].get("run_budget_seconds")
 
@@ -2778,14 +2778,14 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
         self.checkpoint_max_file_size_mb = cp_cfg.get("max_file_size_mb", 10)
         self.pass_session_id = pass_session_id
         # --ignore-rules: AIAgent skips context files (AGENTS.md/SOUL.md/...) and memory.
-        self.ignore_rules = ignore_rules or is_truthy_value(os.environ.get("HERMES_IGNORE_RULES"))
+        self.ignore_rules = ignore_rules or is_truthy_value(os.environ.get("STARDUST_IGNORE_RULES"))
 
     def _init_prompt_and_reasoning(self, reasoning):
         """Ephemeral system prompt/prefill, reasoning + service tier, OpenRouter routing knobs, fallback chain."""
         # Env var wins, then hermes_cli.personality (single owner of overlay resolution).
         from hermes_cli.personality import available_personalities, resolve_ephemeral_system_prompt
 
-        self.system_prompt = os.getenv("HERMES_EPHEMERAL_SYSTEM_PROMPT", "") or resolve_ephemeral_system_prompt(CLI_CONFIG)
+        self.system_prompt = os.getenv("STARDUST_EPHEMERAL_SYSTEM_PROMPT", "") or resolve_ephemeral_system_prompt(CLI_CONFIG)
         self.personalities = available_personalities(CLI_CONFIG)
 
         self.prefill_messages = _load_prefill_messages(_resolve_prefill_messages_file(CLI_CONFIG))
@@ -3713,7 +3713,7 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
         # Pre-import the agent runtime (~1.5s: run_agent + OpenAI SDK) off-thread; the import
         # lock makes an early submit block on the remaining work rather than redo it.
         # Skipped when Termux defers agent startup on purpose.
-        if os.environ.get("HERMES_DEFER_AGENT_STARTUP") != "1":
+        if os.environ.get("STARDUST_DEFER_AGENT_STARTUP") != "1":
             def _prewarm_agent_runtime() -> None:
                 try:
                     import run_agent  # noqa: F401  (imports model_tools + tool registry)
@@ -3728,11 +3728,11 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
             # The redactor snapshots its state at import time so any toggle now won't affect the running
             # process — we just want the operator to see that they're running without the safety net. See
             # #17691.
-            _redact_raw = os.getenv("HERMES_REDACT_SECRETS", "true")
+            _redact_raw = os.getenv("STARDUST_REDACT_SECRETS", "true")
             if _redact_raw.lower() not in {"1", "true", "yes", "on"}:
                 self._console_print(
                     "[bold red]⚠  Secret redaction is DISABLED[/] "
-                    f"(HERMES_REDACT_SECRETS={_redact_raw}). "
+                    f"(STARDUST_REDACT_SECRETS={_redact_raw}). "
                     "API keys and tokens may appear verbatim in chat output, "
                     "session JSONs, and logs. Set "
                     "[cyan]security.redact_secrets: true[/] in config.yaml "
@@ -4038,7 +4038,7 @@ def _int_or(value, default: int) -> int:
 
 
 def _interrupt_agent_for_signal(agent, signum) -> None:
-    """Hard-interrupt ``agent`` for a shutdown signal, then sleep ``HERMES_SIGTERM_GRACE`` (1.5 s).
+    """Hard-interrupt ``agent`` for a shutdown signal, then sleep ``STARDUST_SIGTERM_GRACE`` (1.5 s).
 
     The grace lets the agent thread kill the tool's setsid subprocess group before the
     main thread unwinds (else an orphan child). Never raises.
@@ -4046,7 +4046,7 @@ def _interrupt_agent_for_signal(agent, signum) -> None:
     try:
         if agent is not None:
             request_hard_interrupt(agent, f"received signal {signum}")
-            _grace = _float_env("HERMES_SIGTERM_GRACE", 1.5)
+            _grace = _float_env("STARDUST_SIGTERM_GRACE", 1.5)
             if _grace > 0:
                 time.sleep(_grace)
     except Exception:
@@ -4062,7 +4062,7 @@ def _sync_cli_session_id_from_agent(cli) -> None:
 def _run_quiet_single_query(cli, effective_query, emitter=None):
     """Quiet (-Q) one-shot turn: run, print the response (stderr for errors/session_id), then sys.exit with the automation exit code.
     With a ``StreamJsonEmitter`` the final answer and the exit line become the terminal ``result`` JSONL record instead.
-    HERMES_TURN_AUTHOR (set only by a bot-to-bot dispatcher) is consumed here so tool subprocesses do not inherit it.
+    STARDUST_TURN_AUTHOR (set only by a bot-to-bot dispatcher) is consumed here so tool subprocesses do not inherit it.
     Nested Bot Mode notifies bind this session's key (not the dispatcher's) and resume in-process
     before stdout is printed, so a teammate reply is the quiet run's final answer rather than a
     stranded receipt."""
@@ -4255,7 +4255,7 @@ def _build_cli_from_args(model, toolsets, provider, reasoning, api_key, base_url
 
     # skills.auto_load rides the same background preload as -s; --ignore-rules skips it with
     # the rest of the auto-injected context. Resolved here (not lazily in the agent) so the
-    # session id is real for ${HERMES_SESSION_ID} and -s can dedupe against it.
+    # session id is real for ${STARDUST_SESSION_ID} and -s can dedupe against it.
     from agent.skill_commands import build_auto_load_prompt, resolve_auto_load_skills
     auto_load_names = [] if getattr(cli, "ignore_rules", ignore_rules) else resolve_auto_load_skills(CLI_CONFIG)
     if not auto_load_names:
@@ -4377,12 +4377,12 @@ def _run_single_query_mode(cli, query, image, quiet, oneshot, stream_json: bool 
     # No user can answer approval prompts: the approval gate takes the deterministic path.
     # One-shot mode: no between-turns MCP late-binding refresh, so the agent must wait the full MCP
     # cold-start bound before its first (and only) tool snapshot. See #51316.
-    # Mark single-query for the approval gate. cli.py sets HERMES_INTERACTIVE earlier for interactive sudo
+    # Mark single-query for the approval gate. cli.py sets STARDUST_INTERACTIVE earlier for interactive sudo
     # prompts, but a -q run has NO user waiting to answer approval prompts. The gate reads this marker (via
     # gateway.session_context.get_session_env, which falls back to os.environ when the session-context layer
     # isn't engaged) and takes the deterministic approvals.single_query_mode path instead of waiting the
     # full timeout. See #86878.
-    os.environ["HERMES_SINGLE_QUERY_SESSION"] = "1"
+    os.environ["STARDUST_SINGLE_QUERY_SESSION"] = "1"
     if not cli._claim_active_session("cli", stderr=bool(quiet)):
         sys.exit(1)
     try:
@@ -4501,7 +4501,7 @@ def main(
         from hermes_cli.stdio import configure_windows_stdio
         configure_windows_stdio()
 
-    os.environ["HERMES_INTERACTIVE"] = "1"  # terminal_tool: interactive sudo prompts with timeout
+    os.environ["STARDUST_INTERACTIVE"] = "1"  # terminal_tool: interactive sudo prompts with timeout
 
     if gateway:
         _run_legacy_gateway()

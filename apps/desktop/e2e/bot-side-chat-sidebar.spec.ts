@@ -41,7 +41,7 @@ interface StoredRow {
   title: string | null
 }
 
-// One SQLite file under the sandbox HERMES_HOME: its session rows and the
+// One SQLite file under the sandbox STARDUST_HOME: its session rows and the
 // message count per session.
 interface DbFile {
   messages: Array<[string, unknown]>
@@ -49,7 +49,7 @@ interface DbFile {
   sessions: Array<[string, string | null, number, number]>
 }
 
-// Every .db file under this run's HERMES_HOME, read with the repo backend's
+// Every .db file under this run's STARDUST_HOME, read with the repo backend's
 // interpreter. Read-only: nothing is written.
 function dbReport(hermesHome: string): DbFile[] {
   const python = process.env.STARDUST_DESKTOP_PYTHON

@@ -2,7 +2,7 @@
 scope (home + secrets) and never mutate the dashboard process environment.
 
 Regression for the cross-profile leak class in ``hermes dashboard`` / ``hermes serve``:
-``_config_profile_scope`` bound only HERMES_HOME, so ``GET /api/config?profile=B`` expanded B's
+``_config_profile_scope`` bound only STARDUST_HOME, so ``GET /api/config?profile=B`` expanded B's
 ``${VAR}`` refs to the DEFAULT profile's plaintext credentials (its ``os.environ``), and console
 ``send`` for B (``send_cmd._load_hermes_env``) copied B's ``.env`` into the shared process env with
 ``override=True``, so every later default-profile read saw B's tokens.
@@ -34,7 +34,7 @@ def two_homes(tmp_path, monkeypatch):
             "model:\n  default: openai/gpt-4o-mini\n  api_key: ${A_ONLY_TOKEN}\n"
             "custom_probe:\n  a_ref: ${A_ONLY_TOKEN}\n  b_ref: ${B_ONLY_TOKEN}\n",
             encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(root))
+    monkeypatch.setenv("STARDUST_HOME", str(root))
     monkeypatch.setenv("A_ONLY_TOKEN", A_VAL)  # the dashboard process loaded its own .env
     monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
     from agent import secret_scope
@@ -87,7 +87,7 @@ def test_console_send_for_named_profile_does_not_write_process_env(two_homes, mo
         send_cmd._load_hermes_env()
         seen["loader_sees"] = _getenv("TELEGRAM_BOT_TOKEN")
         seen["environ_has"] = "TELEGRAM_BOT_TOKEN" in os.environ
-        seen["home"] = Path(os.environ.get("HERMES_HOME", ""))
+        seen["home"] = Path(os.environ.get("STARDUST_HOME", ""))
         return '{"success": true}'
 
     class Engine:

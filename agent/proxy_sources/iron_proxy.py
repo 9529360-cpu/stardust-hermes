@@ -47,7 +47,7 @@ _STARTUP_GRACE_SECONDS = 5
 
 # Management API (v0.39): loopback POST /v1/reload hot-swaps the ruleset.  Bearer key minted at
 # setup (0600 at <proxy>/management.token), injected under this env name; empty => daemon refuses to start.
-_MGMT_API_KEY_ENV = "HERMES_IRON_PROXY_MGMT_KEY"
+_MGMT_API_KEY_ENV = "STARDUST_IRON_PROXY_MGMT_KEY"
 _MGMT_PORT_OFFSET = 2  # tunnel_port is CONNECT/MITM, +1 is plain-HTTP forward, +2 is management
 _MGMT_RELOAD_TIMEOUT = 15
 
@@ -120,7 +120,7 @@ _VERSION_CACHE: Dict[str, str] = {}
 
 # Nonce planted in the daemon env so ``_pid_alive`` can prove a PID is still *our* binary across
 # PID recycling (a fresh process can't inherit our arbitrary env value).
-_HERMES_IRON_PROXY_NONCE_ENV = "HERMES_IRON_PROXY_NONCE"
+_HERMES_IRON_PROXY_NONCE_ENV = "STARDUST_IRON_PROXY_NONCE"
 _proxy_nonce: Optional[str] = None
 
 

@@ -51,7 +51,7 @@ def _token_fingerprint(token: Any) -> Optional[str]:
 
 
 def _oauth_trace(event: str, *, sequence_id: Optional[str] = None, **fields: Any) -> None:
-    if os.getenv("HERMES_OAUTH_TRACE", "").strip().lower() not in {"1", "true", "yes", "on"}:
+    if os.getenv("STARDUST_OAUTH_TRACE", "").strip().lower() not in {"1", "true", "yes", "on"}:
         return
     payload: Dict[str, Any] = {"event": event}
     if sequence_id:
@@ -312,13 +312,13 @@ _nous_shared_lock_holder = threading.local()
 
 
 def _nous_shared_auth_dir() -> Path:
-    """Directory of the shared Nous token store: ``HERMES_SHARED_AUTH_DIR`` or ``<root>/shared/``.
+    """Directory of the shared Nous token store: ``STARDUST_SHARED_AUTH_DIR`` or ``<root>/shared/``.
 
     Outside any named profile so all profiles share it (``hermes --profile X auth add nous --type
     oauth`` one-tap imports it). Written on login AND every runtime refresh so the refresh_token
     stays current across profiles; a stale token just falls back to device-code.
     """
-    override = os.getenv("HERMES_SHARED_AUTH_DIR", "").strip()
+    override = os.getenv("STARDUST_SHARED_AUTH_DIR", "").strip()
     if override:
         return Path(override).expanduser()
     from hermes_constants import get_default_hermes_root
@@ -328,7 +328,7 @@ def _nous_shared_auth_dir() -> Path:
 def _nous_shared_store_path() -> Path:
     path = _nous_shared_auth_dir() / NOUS_SHARED_STORE_FILENAME
     # Seat belt (mirrors the _auth_file_path() guard): under pytest, refuse a path under the real
-    # user's Hermes root so a test that forgot HERMES_SHARED_AUTH_DIR fails loudly instead of
+    # user's Hermes root so a test that forgot STARDUST_SHARED_AUTH_DIR fails loudly instead of
     # corrupting cross-profile state.
     if os.environ.get("PYTEST_CURRENT_TEST"):
         from hermes_constants import get_default_hermes_root
@@ -341,7 +341,7 @@ def _nous_shared_store_path() -> Path:
         if resolved == real_home_shared:
             raise RuntimeError(
                 f"Refusing to touch real user shared Nous auth store during test run: "
-                f"{path}. Set HERMES_SHARED_AUTH_DIR to a tmp_path in your test fixture.")
+                f"{path}. Set STARDUST_SHARED_AUTH_DIR to a tmp_path in your test fixture.")
     return path
 
 
@@ -356,7 +356,7 @@ def _nous_shared_store_lock(timeout_seconds: float = AUTH_LOCK_TIMEOUT_SECONDS):
     try:
         lock_path = _nous_shared_store_path().with_suffix(".lock")
     except RuntimeError:
-        yield  # No HERMES_HOME yet (pre-setup): fall through without locking.
+        yield  # No STARDUST_HOME yet (pre-setup): fall through without locking.
         return
     with _file_lock(
         lock_path, _nous_shared_lock_holder, timeout_seconds,
@@ -1526,7 +1526,7 @@ def _login_nous(args, pconfig: ProviderConfig) -> None:
         _write_shared_nous_state, format_auth_error)
     timeout_seconds = getattr(args, "timeout", None) or 15.0
     ca_bundle = (
-        getattr(args, "ca_bundle", None) or os.getenv("HERMES_CA_BUNDLE")
+        getattr(args, "ca_bundle", None) or os.getenv("STARDUST_CA_BUNDLE")
         or os.getenv("SSL_CERT_FILE"))
     try:
         auth_state = _offer_shared_nous_import(timeout_seconds)

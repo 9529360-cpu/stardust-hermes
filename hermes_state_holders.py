@@ -134,7 +134,7 @@ def canonical_sqlite_path(path: str) -> str:
 def _argv_scoped_to_other_home(argv: Sequence[str], db_path: Path) -> bool:
     """Return whether argv proves the process belongs to a DIFFERENT instance.
 
-    ``state.db`` lives at the HERMES_HOME root, so an absolute-path token
+    ``state.db`` lives at the STARDUST_HOME root, so an absolute-path token
     containing a ``/.hermes`` segment (or naming a ``state.db``/WAL/SHM under
     some other parent) identifies that token's own Hermes home.  When at least
     one such token exists AND no token references this instance's state.db,
@@ -195,7 +195,7 @@ def foreign_state_db_holders(db_path: Path) -> List[Tuple[int, str]]:
         return []
 
     # realpath, not abspath: psutil/libproc report the kernel-resolved pathname, so a symlinked
-    # HERMES_HOME would otherwise make every holder invisible and let maintenance proceed.
+    # STARDUST_HOME would otherwise make every holder invisible and let maintenance proceed.
     db_path_str = os.path.realpath(os.fspath(db_path))
     watched = {
         canonical_sqlite_path(db_path_str),

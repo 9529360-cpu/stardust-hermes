@@ -73,7 +73,7 @@ def normalize_reference_images(value: Any) -> Optional[List[str]]:
 
 
 def save_b64_image(b64_data: str, *, prefix: str = "image", extension: str = "png") -> Path:
-    """Decode base64 image data into ``$HERMES_HOME/cache/images/``; return the path."""
+    """Decode base64 image data into ``$STARDUST_HOME/cache/images/``; return the path."""
     return provider_media.save_b64("images", b64_data, prefix=prefix, extension=extension)
 
 
@@ -85,7 +85,7 @@ _URL_IMAGE_CONTENT_TYPES = {
 def save_url_image(
     url: str, *, prefix: str = "image", timeout: float = 60.0, max_bytes: int = 25 * 1024 * 1024,
 ) -> Path:
-    """Download an (often ephemeral) image URL into ``$HERMES_HOME/cache/images/``. Raises on
+    """Download an (often ephemeral) image URL into ``$STARDUST_HOME/cache/images/``. Raises on
     network / HTTP / oversize / empty errors so callers can fall back to the bare URL."""
     return provider_media.save_url(
         "images", url, prefix=prefix, timeout=timeout, max_bytes=max_bytes,

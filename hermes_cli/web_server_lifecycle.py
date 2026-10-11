@@ -201,12 +201,12 @@ def _read_bound_port(server: "uvicorn.Server", fallback: int) -> int:
 
 
 def _write_dashboard_ready_file(actual_port: int) -> None:
-    """Publish the port through an atomic ready file when ``HERMES_DESKTOP_READY_FILE`` is set.
+    """Publish the port through an atomic ready file when ``STARDUST_DESKTOP_READY_FILE`` is set.
 
     Windows Desktop launches via ``pythonw.exe`` (no console flash) cannot use
     stdout for the port announcement, so Electron waits for this JSON instead.
     """
-    target = os.environ.get("HERMES_DESKTOP_READY_FILE")
+    target = os.environ.get("STARDUST_DESKTOP_READY_FILE")
     if not target:
         return
 
@@ -260,7 +260,7 @@ def _is_serve_orphaned(
 ) -> bool:
     """True when the exact Desktop process that owns this backend is gone.
 
-    ``HERMES_PARENT_PID`` is the Electron PID, not necessarily our PPID (the
+    ``STARDUST_PARENT_PID`` is the Electron PID, not necessarily our PPID (the
     Windows ``hermes.exe`` launcher adds shims), so never compare getppid().
     The start marker (newer Desktops) defeats PID recycling; PID-only probing
     stays for older ones. Any inconclusive failure keeps serving (fail-safe).
@@ -298,10 +298,10 @@ def _start_parent_death_watchdog() -> None:
     reuse) plus a per-spawn nonce (makes mixed-version plumbing fail safe:
     marker without nonce or vice versa disables the watchdog).
     """
-    raw_pid = os.environ.get("HERMES_PARENT_PID")
+    raw_pid = os.environ.get("STARDUST_PARENT_PID")
     # Empty inherited values mean "absent", not "marker present but blank".
-    start_marker = os.environ.get("HERMES_PARENT_START_MARKER") or None
-    nonce = os.environ.get("HERMES_PARENT_NONCE") or None
+    start_marker = os.environ.get("STARDUST_PARENT_START_MARKER") or None
+    nonce = os.environ.get("STARDUST_PARENT_NONCE") or None
 
     try:
         desktop_pid = int(raw_pid or "")
@@ -317,7 +317,7 @@ def _start_parent_death_watchdog() -> None:
         # Disarming is fail-safe (the backend keeps serving) but must not be
         # traceless: this backend will never reap itself if the Desktop dies.
         _log.warning(
-            "Parent-death watchdog disabled: unusable HERMES_PARENT_START_MARKER=%r / nonce; "
+            "Parent-death watchdog disabled: unusable STARDUST_PARENT_START_MARKER=%r / nonce; "
             "falling back to no parent tracking for desktop PID %s.",
             start_marker,
             desktop_pid,
@@ -325,7 +325,7 @@ def _start_parent_death_watchdog() -> None:
         return
 
     try:
-        poll = max(0.5, float(os.environ.get("HERMES_SERVE_WATCHDOG_POLL_S", "2.0")))
+        poll = max(0.5, float(os.environ.get("STARDUST_SERVE_WATCHDOG_POLL_S", "2.0")))
     except (TypeError, ValueError):
         poll = 2.0
 

@@ -422,7 +422,7 @@ class TestInstallCuaDriverUpgrade:
     def test_incompatible_explicit_override_is_not_replaced(self, monkeypatch):
         from hermes_cli import tools_config_cua as tools_config
 
-        monkeypatch.setenv("HERMES_CUA_DRIVER_CMD", "/opt/custom/cua-driver")
+        monkeypatch.setenv("STARDUST_CUA_DRIVER_CMD", "/opt/custom/cua-driver")
         incompatible = {
             "ready": False,
             "version": "0.19.4",
@@ -449,7 +449,7 @@ class TestInstallCuaDriverUpgrade:
     ):
         from hermes_cli import tools_config_cua as tools_config
 
-        monkeypatch.setenv("HERMES_CUA_DRIVER_CMD", "/missing/custom/cua-driver")
+        monkeypatch.setenv("STARDUST_CUA_DRIVER_CMD", "/missing/custom/cua-driver")
         with patch.object(
                  tools_config,
                  "_resolved_cua_driver_cmd",
@@ -1636,7 +1636,7 @@ class TestWindowsAutostartRepair:
 class TestCuaVersionSummary:
     """`hermes computer-use status` prints one line, whatever the binary says.
 
-    A binary chosen by HERMES_CUA_DRIVER_CMD is under no obligation to answer
+    A binary chosen by STARDUST_CUA_DRIVER_CMD is under no obligation to answer
     `--version` the way cua-driver does, and its output used to be spliced
     verbatim into the status line.
     """

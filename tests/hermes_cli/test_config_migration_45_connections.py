@@ -22,7 +22,7 @@ class TestConnectionsToolsetMigration:
         from hermes_cli.config_migrations import run_migrations
 
         results = {"env_added": [], "config_added": [], "warnings": []}
-        with patch.dict(os.environ, {"HERMES_HOME": str(tmp_path)}):
+        with patch.dict(os.environ, {"STARDUST_HOME": str(tmp_path)}):
             run_migrations(current_ver, results, quiet=True)
         return results
 
@@ -152,7 +152,7 @@ class TestConnectionsToolsetMigration:
             tmp_path,
             {"_config_version": 42, "platform_toolsets": {"cli": ["file", "terminal"]}},
         )
-        with patch.dict(os.environ, {"HERMES_HOME": str(tmp_path)}):
+        with patch.dict(os.environ, {"STARDUST_HOME": str(tmp_path)}):
             migrate_config(interactive=False, quiet=True)
         raw = self._read_config(tmp_path)
 

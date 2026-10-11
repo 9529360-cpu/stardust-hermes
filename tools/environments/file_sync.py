@@ -36,7 +36,7 @@ _sleep = time.sleep
 _monotonic = time.monotonic
 
 _SYNC_INTERVAL_SECONDS = 5.0
-_FORCE_SYNC_ENV = "HERMES_FORCE_FILE_SYNC"
+_FORCE_SYNC_ENV = "STARDUST_FORCE_FILE_SYNC"
 
 # Transport callbacks provided by each backend
 UploadFn = Callable[[str, str], None]  # (host_path, remote_path) -> raises on failure
@@ -172,7 +172,7 @@ class FileSyncManager:
 
     def sync(self, *, force: bool = False) -> None:
         """Run a sync cycle: upload changed files, delete removed files. Rate-limited to once
-        per ``sync_interval`` unless *force* or ``HERMES_FORCE_FILE_SYNC=1``. Transactional:
+        per ``sync_interval`` unless *force* or ``STARDUST_FORCE_FILE_SYNC=1``. Transactional:
         state is committed only if ALL operations succeed; on failure it rolls back so the
         next cycle retries everything."""
         with self._transaction_lock:

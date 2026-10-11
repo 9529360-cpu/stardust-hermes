@@ -57,8 +57,8 @@ copilot_acp = CopilotACPProfile(
     # hermes_cli/auth.py), so existing setups keep working.
     process_command="copilot",
     process_args=("--acp", "--stdio"),
-    process_command_env_vars=("HERMES_COPILOT_ACP_COMMAND", "COPILOT_CLI_PATH"),
-    process_args_env_var="HERMES_COPILOT_ACP_ARGS",
+    process_command_env_vars=("STARDUST_COPILOT_ACP_COMMAND", "COPILOT_CLI_PATH"),
+    process_args_env_var="STARDUST_COPILOT_ACP_ARGS",
 )
 
 register_provider(copilot_acp)

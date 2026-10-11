@@ -141,7 +141,7 @@ async def update_config(
         # REST saves bypass the config.set RPC (which re-emits itself), so
         # refresh live sessions' cached approval/YOLO indicators after a mode
         # change. Own-profile saves only: a profile-scoped save targets a
-        # different HERMES_HOME than this process's gateway sessions.
+        # different STARDUST_HOME than this process's gateway sessions.
         if approvals_mode_changed and not _is_other_profile(body.profile or profile):
             _broadcast_gateway_session_info()
         return {"ok": True}
@@ -593,7 +593,7 @@ def list_custom_endpoints(profile: Optional[str] = None):
 
     Scoped to the requested profile's config.yaml: the desktop settings UI
     targets the active profile, so read/write must resolve that profile's home
-    rather than the process-level HERMES_HOME (mirrors ``/api/config``).
+    rather than the process-level STARDUST_HOME (mirrors ``/api/config``).
     """
     with http_failure("GET /api/providers/custom-endpoints failed", 500, detail="Failed to list custom endpoints"):
         with _config_profile_scope(profile):

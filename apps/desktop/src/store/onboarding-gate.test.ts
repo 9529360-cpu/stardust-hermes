@@ -45,7 +45,7 @@ it('a skipped intro still queues the guided flow, and never replays the film', a
   const { $onboardingGate } = await import('./onboarding-gate')
 
   expect($onboardingGate.get()).toEqual({ phase: 'cinematic', guideQueued: true })
-  // The film is recorded as watched: a later launch without HERMES_SKIP_INTRO
+  // The film is recorded as watched: a later launch without STARDUST_SKIP_INTRO
   // must adopt the persisted guide, not play the film over it.
   expect(hasSeenIntroReveal()).toBe(true)
 

@@ -62,7 +62,7 @@ def _codex_access_token_is_expiring(access_token: Any, skew_seconds: int) -> boo
 
 
 def _codex_base_url() -> str:
-    return os.getenv("HERMES_CODEX_BASE_URL", "").strip().rstrip("/") or DEFAULT_CODEX_BASE_URL
+    return os.getenv("STARDUST_CODEX_BASE_URL", "").strip().rstrip("/") or DEFAULT_CODEX_BASE_URL
 
 
 def _codex_runtime_result(
@@ -499,7 +499,7 @@ def resolve_codex_runtime_credentials(
         raise _codex_err(_NO_CREDENTIALS_MSG, "codex_auth_missing", relogin=True)
     tokens = dict(data["tokens"])
     access_token = _stripped(tokens.get("access_token"))
-    refresh_timeout_seconds = env_float("HERMES_CODEX_REFRESH_TIMEOUT_SECONDS", 20)
+    refresh_timeout_seconds = env_float("STARDUST_CODEX_REFRESH_TIMEOUT_SECONDS", 20)
 
     def _should_refresh(token: str) -> bool:
         return bool(force_refresh) or (

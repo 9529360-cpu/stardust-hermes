@@ -66,7 +66,7 @@ def _env_disconnect_budget_s() -> float:
     gateway/run.py:_adapter_disconnect_timeout_secs), apportioned by callers
     across go_idle / monitor teardown / drain."""
     budget = 5.0
-    raw = os.getenv("HERMES_GATEWAY_ADAPTER_DISCONNECT_TIMEOUT", "").strip()
+    raw = os.getenv("STARDUST_GATEWAY_ADAPTER_DISCONNECT_TIMEOUT", "").strip()
     if raw:
         with contextlib.suppress(ValueError):
             budget = max(0.0, float(raw))

@@ -317,7 +317,7 @@ async def test_ephemeral_delete_targets_the_adapter_that_sent_the_final(tmp_path
     must still go to the transport that produced ``result.message_id``."""
     from gateway.platforms.event import MessageEvent
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     sender = _telegram_adapter()
     replacement = _telegram_adapter()
     sender._schedule_ephemeral_delete = MagicMock()

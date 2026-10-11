@@ -1,4 +1,4 @@
-"""Plugin data paths follow the active profile's HERMES_HOME, including the ContextVar override.
+"""Plugin data paths follow the active profile's STARDUST_HOME, including the ContextVar override.
 
 Several plugins carried a ``~/.hermes`` fallback (guarding an ImportError of ``hermes_constants``
 that cannot happen for a bundled plugin) or resolved the home at import time. Both are wrong on
@@ -37,7 +37,7 @@ _RESOLVERS = {"a2a": _a2a_conversation, "photon": _photon_auth, "mem0-qdrant": _
 
 @pytest.mark.parametrize("name", sorted(_RESOLVERS))
 def test_plugin_path_follows_profile_override(name, tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "default"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "default"))
     monkeypatch.setenv("HOME", str(tmp_path / "user-home"))
     profile = tmp_path / "profiles" / "b"
     profile.mkdir(parents=True)

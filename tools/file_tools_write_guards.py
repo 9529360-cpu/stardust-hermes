@@ -57,7 +57,7 @@ def _hermes_home_real() -> str:
 def _get_hermes_config_resolved() -> str | None:
     """Resolved absolute path of the Hermes config file for the ACTIVE profile.
 
-    Resolved per call so it tracks the per-turn ``HERMES_HOME`` scope (#107327);
+    Resolved per call so it tracks the per-turn ``STARDUST_HOME`` scope (#107327);
     a test may pin it via ``_hermes_config_resolved`` + ``_hermes_config_resolved_loaded``."""
     if _hermes_config_resolved_loaded:
         return _hermes_config_resolved
@@ -67,7 +67,7 @@ def _get_hermes_config_resolved() -> str | None:
         # Resolver failure must stay bound to the ACTIVE profile's home, not the
         # subprocess HOME. ``_expand_tilde("~/...")`` follows the subprocess-HOME
         # contract, which under host ``auto`` mode can be the real/default user
-        # home rather than the active multiplex ``HERMES_HOME`` — comparing
+        # home rather than the active multiplex ``STARDUST_HOME`` — comparing
         # beta's ``config.yaml`` against the default/root config would let the
         # hard-block fail open on the exception path. Re-derive from the same
         # ``get_hermes_home()`` key the happy path uses, and substitute no
@@ -82,7 +82,7 @@ def _get_hermes_config_resolved() -> str | None:
 def _get_real_hermes_home() -> str | None:
     """Realpath of the authoritative Hermes home for the ACTIVE profile.
 
-    Resolved per call so it tracks the per-turn ``HERMES_HOME`` scope (#107327);
+    Resolved per call so it tracks the per-turn ``STARDUST_HOME`` scope (#107327);
     a test may pin it via ``_real_hermes_home_cached`` + ``_real_hermes_home_loaded``.
     Consumers exempting a whole TREE want ``_hermes_exempt_homes()``: under a named
     profile this home is ``<root>/profiles/<name>`` and the root is exempt too."""
@@ -114,7 +114,7 @@ def _hermes_exempt_homes() -> tuple[str, ...]:
     (#110630). They are the agent's own store, governed by their own guards, exactly like
     ``~/.hermes`` under the default profile. The root is added only when the shape really is a
     named profile (``named_profile_home``), so a coincidental ``profiles/`` dir elsewhere never
-    exempts its parent; the home comes from the ACTIVE scope, never ``HERMES_HOME`` alone."""
+    exempts its parent; the home comes from the ACTIVE scope, never ``STARDUST_HOME`` alone."""
     home = _get_real_hermes_home()
     if not home:
         return ()

@@ -102,7 +102,7 @@ param(
     # Repo checkout whose HEAD is the update target.
     [string]$RepoRoot = "",
 
-    [string]$WorkRoot = $(if ($env:HERMES_E2E_WORKROOT) { $env:HERMES_E2E_WORKROOT } else { Join-Path $env:TEMP "hermes-desktop-gui-e2e" }),
+    [string]$WorkRoot = $(if ($env:STARDUST_E2E_WORKROOT) { $env:STARDUST_E2E_WORKROOT } else { Join-Path $env:TEMP "hermes-desktop-gui-e2e" }),
 
     [string]$SetupExeUrl = "https://hermes-assets.nousresearch.com/Hermes-Setup.exe",
 
@@ -401,9 +401,9 @@ function Invoke-HermesDesktopAppUpdate([string]$TargetSha) {
 
     $capDir = Join-Path $AssetsDir "launch-capture"
     $prevPy = $env:PYTHONPATH
-    $prevCap = $env:HERMES_E2E_CAPTURE_LAUNCH
+    $prevCap = $env:STARDUST_E2E_CAPTURE_LAUNCH
     $env:PYTHONPATH = if ($prevPy) { "$capDir;$prevPy" } else { $capDir }
-    $env:HERMES_E2E_CAPTURE_LAUNCH = $spec
+    $env:STARDUST_E2E_CAPTURE_LAUNCH = $spec
     $prevEap = $ErrorActionPreference; $ErrorActionPreference = "Continue"
     Push-Location $InstallDir
     try {
@@ -413,7 +413,7 @@ function Invoke-HermesDesktopAppUpdate([string]$TargetSha) {
         Pop-Location
         $ErrorActionPreference = $prevEap
         $env:PYTHONPATH = $prevPy
-        $env:HERMES_E2E_CAPTURE_LAUNCH = $prevCap
+        $env:STARDUST_E2E_CAPTURE_LAUNCH = $prevCap
     }
     Write-LogGroup "hermes desktop (launch capture) transcript" $log
     Assert-True ($capExit -eq 0) "hermes desktop exited 0 during launch capture"
@@ -630,10 +630,10 @@ function Invoke-PhaseInstallGui {
     # relative to the script dir).
     Copy-Item -Path (Join-Path $AssetsDir "install-and-launch.ahk"), (Join-Path $AssetsDir "install-button.png"), (Join-Path $AssetsDir "launch-button.png") -Destination $AhkDir -Force
 
-    $env:HERMES_HOME = $HermesHome
+    $env:STARDUST_HOME = $HermesHome
     # As shipped: NO dev-root override, no pin override. Ensure a stray
     # local dev checkout can't hijack resolution.
-    Remove-Item Env:HERMES_SETUP_DEV_REPO_ROOT -ErrorAction SilentlyContinue
+    Remove-Item Env:STARDUST_SETUP_DEV_REPO_ROOT -ErrorAction SilentlyContinue
     New-Item -ItemType Directory -Path $HermesHome -Force | Out-Null
 
     $recorder = Start-DesktopRecorder (Join-Path $proof "desktop-frames")
@@ -717,7 +717,7 @@ function Invoke-GuiUpdateDesktopRoute([string]$TargetSha) {
     $proof = Join-Path $ProofRoot "update-gui"
     New-Item -ItemType Directory -Path $proof -Force | Out-Null
 
-    $env:HERMES_HOME = $HermesHome
+    $env:STARDUST_HOME = $HermesHome
 
     # The update becomes available the way it does for a real user: the
     # remote's main moves forward. (Install ran against main = OLD.)
@@ -890,7 +890,7 @@ function Invoke-PhaseInstall {
     # looks like a fork to the updater, whose "add the official repo as
     # upstream?" prompt would hang a headless run - the marker is the
     # product's own suppression mechanism.
-    $env:HERMES_HOME = $HermesHome
+    $env:STARDUST_HOME = $HermesHome
     New-Item -ItemType Directory -Path $HermesHome -Force | Out-Null
     switch ($InstallMethod) {
         "desktop-installer@latest" {
@@ -914,7 +914,7 @@ function Invoke-PhaseInstall {
 
 function Invoke-PhaseUpdate {
     $state = Read-State
-    $env:HERMES_HOME = $HermesHome
+    $env:STARDUST_HOME = $HermesHome
     # Match the POSIX driver's explicit opt-out when a detached updater bypasses
     # the PATH shim and sees our local transport as a fork.
     New-Item -ItemType File -Path (Join-Path $HermesHome ".skip_upstream_prompt") -Force | Out-Null

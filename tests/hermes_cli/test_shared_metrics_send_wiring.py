@@ -321,7 +321,7 @@ class TestConsentWindows:
         from hermes_cli.sqlite_util import write_txn
 
         # Lay the store out exactly as production does, under a redirected
-        # HERMES_HOME: the boot reconciler probes the default path (without
+        # STARDUST_HOME: the boot reconciler probes the default path (without
         # constructing the store — the constructor creates directories), so
         # the probe and the store must agree the way they do in production.
         home = tmp_path / "home"

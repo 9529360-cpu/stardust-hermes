@@ -155,7 +155,7 @@ def test_missing_node_message_names_cli_fallback(monkeypatch, capsys):
 
     monkeypatch.setattr("hermes_constants.find_node_executable", lambda _b: None)
     monkeypatch.setattr("hermes_cli.dep_ensure.ensure_dependency", lambda _n: False, raising=False)
-    monkeypatch.delenv("HERMES_NODE", raising=False)
+    monkeypatch.delenv("STARDUST_NODE", raising=False)
     with pytest.raises(SystemExit):
         _tui._tui_node_bin("node")
     text = capsys.readouterr().out

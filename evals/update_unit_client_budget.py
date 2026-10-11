@@ -14,7 +14,7 @@ if not tag.isalnum():
 home = Path(tempfile.mkdtemp(prefix=f"updater-{tag}-"))
 allowed = {key: os.environ[key] for key in ("PATH", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS") if key in os.environ}
 os.environ.clear()
-os.environ.update(allowed, HOME=str(home), HERMES_HOME=str(home / "hermes"))
+os.environ.update(allowed, HOME=str(home), STARDUST_HOME=str(home / "hermes"))
 sys.path.insert(0, repo)
 from hermes_cli import update_cmd_fleet as fleet
 _systemctl_reset_and_restart = fleet._systemctl_reset_and_restart

@@ -1,6 +1,6 @@
 """Profile scope must survive the Feishu adapter's thread hops under a multiplexed gateway.
 
-The adapter is constructed and connected inside ``_profile_runtime_scope`` (HERMES_HOME override +
+The adapter is constructed and connected inside ``_profile_runtime_scope`` (STARDUST_HOME override +
 secret scope as contextvars). Two hops used to start from an EMPTY context, so the work ran under
 the LAUNCH profile: the drive-comment agent turn (a full ``AIAgent`` on a bare default executor)
 and the lark WS client thread (every SDK callback, and its ``run_coroutine_threadsafe`` hop back

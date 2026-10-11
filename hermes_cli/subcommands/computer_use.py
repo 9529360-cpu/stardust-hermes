@@ -22,7 +22,7 @@ def _cu_status(args) -> int:
     # Must match the runtime resolver: Desktop/TUI processes can omit
     # ~/.local/bin even though the official installer put the driver there.
     path = resolve_cua_driver_cmd()
-    override = _os.environ.get("HERMES_CUA_DRIVER_CMD", "").strip()
+    override = _os.environ.get("STARDUST_CUA_DRIVER_CMD", "").strip()
     if not path:
         print("cua-driver: not installed")
         print("  Run: hermes computer-use install")
@@ -42,14 +42,14 @@ def _cu_status(args) -> int:
     # Name the override here too. Without it the operator is told to repair an
     # install that `hermes computer-use install` will (correctly) refuse to touch,
     # with nothing pointing at the env var that actually selected the binary.
-    origin = " [custom binary from HERMES_CUA_DRIVER_CMD]" if override else ""
+    origin = " [custom binary from STARDUST_CUA_DRIVER_CMD]" if override else ""
     print(f"cua-driver: installed at {path}{origin}" + (f" ({version})" if version else ""))
     contract = _cua_driver_contract_status(path)
     if not contract.get("ready"):
         print("  ⚠ Repair required: " + (contract.get("reason") or "runtime contract is incomplete"))
         if override:
             print(
-                "    Update the binary selected by HERMES_CUA_DRIVER_CMD, or unset "
+                "    Update the binary selected by STARDUST_CUA_DRIVER_CMD, or unset "
                 "the override and run: hermes computer-use install --upgrade")
         else:
             print("    Run: hermes computer-use install")

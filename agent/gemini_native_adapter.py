@@ -692,8 +692,8 @@ class GeminiNativeClient:
     """Minimal OpenAI-SDK-compatible facade (``client.chat.completions.create(**kwargs)``) over Gemini's native REST API."""
 
     # For agent/auxiliary_client.py: a complete client, never re-dispatched through a wire adapter.
-    # (No HERMES_SKIP_ASYNC_WRAP — the async path has a real conversion, AsyncGeminiNativeClient.)
-    HERMES_SKIP_TRANSPORT_WRAP = True
+    # (No STARDUST_SKIP_ASYNC_WRAP — the async path has a real conversion, AsyncGeminiNativeClient.)
+    STARDUST_SKIP_TRANSPORT_WRAP = True
 
     def __init__(
         self, *, api_key: str, base_url: Optional[str] = None, default_headers: Optional[Dict[str, str]] = None,

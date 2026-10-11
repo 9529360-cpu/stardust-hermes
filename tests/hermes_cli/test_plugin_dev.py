@@ -158,7 +158,7 @@ def test_doctor_default_target_does_not_copy_cwd(
     """``hermes plugins doctor`` with no argument defaults to ``.``.
 
     Before the manifest guard, that copied the whole working directory into
-    a temporary HERMES_HOME — running it from ``$HOME`` copied the home
+    a temporary STARDUST_HOME — running it from ``$HOME`` copied the home
     directory, cloud-storage placeholders included.
     """
     import os

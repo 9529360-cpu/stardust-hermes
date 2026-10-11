@@ -95,7 +95,7 @@ export function resolveUpdateScriptHandoff(
  * Replaces the in-app posix updater: the Desktop spawns the script detached
  * and QUITS, the script waits it out, runs `hermes update`, swaps/relaunches
  * the app, and writes .hermes-update-result.json. With the app gone before
- * the update starts, the HERMES_DESKTOP_CHILD_PID reaper-exclusion dance is
+ * the update starts, the STARDUST_DESKTOP_CHILD_PID reaper-exclusion dance is
  * unnecessary — there are no live desktop backends to spare.
  *
  * Null when the checkout predates the script (caller surfaces the manual
@@ -245,7 +245,7 @@ function stagedFileMtimeMs(candidate: string): number | null {
 /**
  * Decide which staged installer binary — if any — may be handed an update.
  *
- * The Tauri installer self-copies into HERMES_HOME on *every* platform
+ * The Tauri installer self-copies into STARDUST_HOME on *every* platform
  * (`hermes-setup.exe` on Windows, `hermes-setup` elsewhere — see
  * apps/bootstrap-installer `paths::installer_dest` and
  * `bootstrap::copy_self_to_hermes_home`), so finding that binary on macOS or
@@ -296,7 +296,7 @@ export function resolveStagedUpdaterBinary(
  * pulls the permanent fixes. See shouldPrewriteUpdateMarker.
  *
  * We cannot ask the binary its version without executing it, so use its mtime:
- * the installer is written to HERMES_HOME at install/repair time, making mtime
+ * the installer is written to STARDUST_HOME at install/repair time, making mtime
  * a faithful stamp of which installer generation produced it.
  *
  * Unreadable mtime counts as UNSUPPORTED — the pre-write is a best-effort

@@ -34,12 +34,12 @@ import {
 const execFileAsync = promisify(execFile)
 
 test('redactSecrets scrubs the spawn-time session token env var', () => {
-  const line = 'setsid env HERMES_DASHBOARD_SESSION_TOKEN=abc123deadbeef HERMES_DESKTOP=1 hermes dashboard'
+  const line = 'setsid env STARDUST_DASHBOARD_SESSION_TOKEN=abc123deadbeef STARDUST_DESKTOP=1 hermes dashboard'
   const out = redactSecrets(line)
   assert.ok(!out.includes('abc123deadbeef'))
-  assert.match(out, /HERMES_DASHBOARD_SESSION_TOKEN=<redacted>/)
+  assert.match(out, /STARDUST_DASHBOARD_SESSION_TOKEN=<redacted>/)
   // non-secret env vars are preserved
-  assert.match(out, /HERMES_DESKTOP=1/)
+  assert.match(out, /STARDUST_DESKTOP=1/)
 })
 
 test('redactSecrets scrubs ?token= and ?ticket= URL params', () => {

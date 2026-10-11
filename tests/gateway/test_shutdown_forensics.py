@@ -56,7 +56,7 @@ class TestSnapshotShutdownContext:
 
 
     def test_detects_takeover_marker_for_self(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         marker = tmp_path / ".gateway-takeover.json"
         marker.write_text(
             f'{{"target_pid": {os.getpid()}, "replacer_pid": 99999}}',

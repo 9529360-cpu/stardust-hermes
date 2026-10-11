@@ -311,7 +311,7 @@ def test_scan_sessions_never_opens_a_writable_session_db(plugin_api, tmp_path, m
     import hermes_state
     from hermes_state import SessionDB
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     monkeypatch.setattr(hermes_state, "DEFAULT_DB_PATH", tmp_path / "state.db")
     seed = SessionDB(db_path=tmp_path / "state.db")
     seed.create_session("s1", source="cli")

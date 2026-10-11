@@ -5,7 +5,7 @@ Env: SIMPLEX_WS_URL (required; default ws://127.0.0.1:5225) · SIMPLEX_ALLOWED_U
 contactIds — stable across renames, see ``/contacts`` — or display names) · SIMPLEX_ALLOW_ALL_USERS ·
 SIMPLEX_AUTO_ACCEPT ('false' disables contact-request auto-accept; default true) ·
 SIMPLEX_GROUP_ALLOWED (group IDs or '*'; omit to ignore groups) · SIMPLEX_HOME_CHANNEL[_NAME] ·
-HERMES_SIMPLEX_TEXT_BATCH_DELAY (quiet seconds, default 0.8, merging rapid-fire inbound text).
+STARDUST_SIMPLEX_TEXT_BATCH_DELAY (quiet seconds, default 0.8, merging rapid-fire inbound text).
 ``websockets`` is imported lazily so the plugin stays discoverable when the package is missing.
 """
 
@@ -119,7 +119,7 @@ class SimplexAdapter(BasePlatformAdapter):
         self._pending_responses: Dict[str, asyncio.Future] = {}  # awaited command replies
         self._corr_counter = 0
         # SimpleX has no client-side split, so the split delay equals the plain one.
-        self._text_batch_delay_seconds = float(os.getenv("HERMES_SIMPLEX_TEXT_BATCH_DELAY", "0.8"))
+        self._text_batch_delay_seconds = float(os.getenv("STARDUST_SIMPLEX_TEXT_BATCH_DELAY", "0.8"))
         self._text_batch_split_delay_seconds = self._text_batch_delay_seconds
         logger.info(
             "SimpleX adapter initialized: url=%s auto_accept=%s groups=%s",

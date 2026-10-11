@@ -51,7 +51,7 @@ def _nonce(value: str) -> str:
 def _root() -> Path:
     # The helper uploads the token before the child applies `--profile`; read_token() runs after
     # profile activation. Anchor both to the machine root so a named profile (or custom
-    # HERMES_HOME) cannot move the reader away from the helper's token.
+    # STARDUST_HOME) cannot move the reader away from the helper's token.
     return get_default_hermes_root() / "desktop-ssh"
 
 

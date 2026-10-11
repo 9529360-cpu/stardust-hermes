@@ -68,7 +68,7 @@ export function terminalScriptEnv(
   }
 
   if (hermesHome) {
-    out.HERMES_HOME = hermesHome
+    out.STARDUST_HOME = hermesHome
   }
 
   return out

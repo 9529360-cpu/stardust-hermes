@@ -108,7 +108,7 @@ class TestBypassSdkRequestTransform:
         assert bypassed is kwargs
 
     def test_env_escape_hatch_restores_passthrough(self, monkeypatch):
-        monkeypatch.setenv("HERMES_CODEX_SDK_TRANSFORM", "1")
+        monkeypatch.setenv("STARDUST_CODEX_SDK_TRANSFORM", "1")
         kwargs = _wire_kwargs()
 
         assert _bypass_sdk_request_transform(kwargs) is kwargs

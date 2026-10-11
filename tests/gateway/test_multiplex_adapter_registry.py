@@ -873,7 +873,7 @@ class TestSecondaryProfileConfigHandling:
         import json
         from gateway.status import read_runtime_status
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         (tmp_path / "gateway_state.json").write_text(json.dumps(
             {"pid": 1, "gateway_state": "stopped", "served_profiles": ["default", "coder"]}))
         runner = GatewayRunner.__new__(GatewayRunner)

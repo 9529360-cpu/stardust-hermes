@@ -1418,7 +1418,7 @@ class CLICommandsMixin:
         # even after the parent is re-ended with a different end_reason.
         try:
             self._session_db.create_session(
-                session_id=new_session_id, source=os.environ.get("HERMES_SESSION_SOURCE", "cli"),
+                session_id=new_session_id, source=os.environ.get("STARDUST_SESSION_SOURCE", "cli"),
                 model=self.model, parent_session_id=parent_session_id,
                 model_config={"max_iterations": self.max_turns, "reasoning_config": self.reasoning_config,
                               "_branched_from": parent_session_id})

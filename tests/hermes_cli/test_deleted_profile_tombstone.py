@@ -33,7 +33,7 @@ def profile_env(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     default_home = tmp_path / ".hermes"
     default_home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(default_home))
+    monkeypatch.setenv("STARDUST_HOME", str(default_home))
     return tmp_path
 
 
@@ -59,12 +59,12 @@ class TestDeletedProfileTombstone:
         assert not profile_dir.exists()
         assert "worker" not in _named_homes(profile_env)
 
-        monkeypatch.setenv("HERMES_HOME", str(profile_dir))
+        monkeypatch.setenv("STARDUST_HOME", str(profile_dir))
         with pytest.raises(FileNotFoundError, match="Named profile home does not exist"):
             setup_logging(hermes_home=profile_dir, force=True)
 
         assert not profile_dir.exists()
-        monkeypatch.setenv("HERMES_HOME", str(profile_env / ".hermes"))
+        monkeypatch.setenv("STARDUST_HOME", str(profile_env / ".hermes"))
         assert "worker" not in _named_homes(profile_env)
 
     def test_empty_shell_after_delete_is_not_listed_or_served(self, profile_env):
@@ -90,7 +90,7 @@ class TestDeletedProfileTombstone:
             delete_profile("worker", yes=True)
         profile_dir.mkdir(parents=True)
 
-        monkeypatch.setenv("HERMES_HOME", str(profile_dir))
+        monkeypatch.setenv("STARDUST_HOME", str(profile_dir))
         with pytest.raises(FileNotFoundError, match="Named profile home does not exist"):
             ensure_hermes_home()
         assert not (profile_dir / "sessions").exists()

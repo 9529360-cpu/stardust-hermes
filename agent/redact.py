@@ -86,17 +86,17 @@ _SENSITIVE_QUERY_PARAMS = frozenset({
 })
 
 # Snapshot at import time so runtime env mutations (e.g. an LLM-generated
-# `export HERMES_REDACT_SECRETS=false`) cannot disable redaction mid-session.
+# `export STARDUST_REDACT_SECRETS=false`) cannot disable redaction mid-session.
 # ON by default; `security.redact_secrets: false` bridges to this env var.
 # ON by default — secure default per issue #17691. Users who need raw credential values in tool output (e.g.
 # working on the redactor itself) can opt out via `security.redact_secrets: false` in config.yaml (bridged
-# to this env var in hermes_cli/main.py, gateway/run.py, and cli.py) or `HERMES_REDACT_SECRETS=false` in
+# to this env var in hermes_cli/main.py, gateway/run.py, and cli.py) or `STARDUST_REDACT_SECRETS=false` in
 # ~/.hermes/.env. An opt-out warning is logged at gateway and CLI startup so operators see the downgrade —
 # see `_log_redaction_status()` in gateway/run.py and cli.py.
-_REDACT_ENABLED = os.getenv("HERMES_REDACT_SECRETS", "true").lower() in {"1", "true", "yes", "on"}
+_REDACT_ENABLED = os.getenv("STARDUST_REDACT_SECRETS", "true").lower() in {"1", "true", "yes", "on"}
 
 # Routed multiplex profiles: the import-time snapshot above is the LAUNCH profile's policy. A profile
-# served under a HERMES_HOME override resolves its own ``security.redact_secrets`` (its ``.env``
+# served under a STARDUST_HOME override resolves its own ``security.redact_secrets`` (its ``.env``
 # value first, like the standalone bridge in hermes_cli/main.py), cached per home so the hot path
 # stays a dict lookup. Still not a live ``os.environ`` read, so a shell ``export`` cannot flip it.
 _REDACT_ENABLED_BY_HOME: dict = {}
@@ -116,7 +116,7 @@ def _redact_enabled() -> bool:
     try:
         from agent.secret_scope import current_secret_scope
         scope = current_secret_scope()
-        raw = scope.get("HERMES_REDACT_SECRETS") if scope else None
+        raw = scope.get("STARDUST_REDACT_SECRETS") if scope else None
         if raw is None:
             from hermes_cli.config import load_config_readonly
             cfg_val = (load_config_readonly().get("security") or {}).get("redact_secrets")
@@ -956,7 +956,7 @@ _SHELL_RC_BASENAMES = frozenset({
 # Filter readers take a PATTERN/program as their first positional; only the operands after
 # it are files, so ``grep .bashrc app.py`` must not gate on the pattern.
 _PATTERN_FIRST_COMMANDS = frozenset({"grep", "awk", "sed"})
-_HERMES_HOME_PREFIXES = ("$HERMES_HOME/", "${HERMES_HOME}/")
+_HERMES_HOME_PREFIXES = ("$STARDUST_HOME/", "${STARDUST_HOME}/")
 # ``$HOME/.hermes/config.yaml`` keeps the ``.hermes`` segment, so stripping the prefix is
 # enough to gate it; ``~/`` already survives the ``$``-bearing-path bail-out.
 _HOME_PREFIXES = ("$HOME/", "${HOME}/")
@@ -996,7 +996,7 @@ def _is_under_hermes_home(path: str) -> bool:
     """True when an absolute ``config.yaml`` path sits under the active Hermes home or root.
 
     The default home's basename is an installation detail — ``.hermes`` on POSIX, ``hermes``
-    under ``AppData/Local`` on Windows — and a resolved path never spells ``$HERMES_HOME``,
+    under ``AppData/Local`` on Windows — and a resolved path never spells ``$STARDUST_HOME``,
     so the literal-segment test in ``_is_secret_file_arg`` cannot see a native Windows path.
     Compare against the resolved homes instead. Only reached for a ``config.yaml`` basename,
     so the resolve cost stays off the per-token command scan.
@@ -1019,7 +1019,7 @@ def _is_under_hermes_home(path: str) -> bool:
 
 def _is_secret_file_arg(arg: str) -> bool:
     """``.env``-style or shell rc basename anywhere; ``config.yaml`` only under a
-    ``.hermes`` directory, ``$HERMES_HOME``, or the resolved Hermes home (never arbitrary
+    ``.hermes`` directory, ``$STARDUST_HOME``, or the resolved Hermes home (never arbitrary
     YAML). The resolved-home arm is what covers native Windows, where the home directory
     is ``%LOCALAPPDATA%\\hermes`` and carries no ``.hermes`` segment."""
     path = arg.strip("\"'").replace("\\", "/")

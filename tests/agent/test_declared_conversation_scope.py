@@ -775,7 +775,7 @@ class TestSourceOverrideDomain:
 
     ``_agent_source`` used ``agent.platform`` before the row landed while
     persistence uses ``_session_source_for_agent``, which honors
-    ``HERMES_SESSION_SOURCE``. Under an override both sides of a ``/new``
+    ``STARDUST_SESSION_SOURCE``. Under an override both sides of a ``/new``
     queried the platform domain, missed the boundary stored under the
     override, and hashed the same scope (@andrexibiza on #98811).
     """
@@ -785,7 +785,7 @@ class TestSourceOverrideDomain:
     def test_the_pre_row_source_matches_persistence(self, db, monkeypatch):
         from agent.prompt_cache_scope import _agent_source
 
-        monkeypatch.setenv("HERMES_SESSION_SOURCE", "override-src")
+        monkeypatch.setenv("STARDUST_SESSION_SOURCE", "override-src")
         agent = SimpleNamespace(
             session_id="s-none", _session_db=db, _gateway_session_key=self.KEY,
             platform="telegram",
@@ -793,7 +793,7 @@ class TestSourceOverrideDomain:
         assert _agent_source(agent, "", db) == "override-src"
 
     def test_new_rotates_under_a_source_override(self, db, monkeypatch):
-        monkeypatch.setenv("HERMES_SESSION_SOURCE", "override-src")
+        monkeypatch.setenv("STARDUST_SESSION_SOURCE", "override-src")
 
         def keyed(sid):
             db.create_session(

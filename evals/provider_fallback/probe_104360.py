@@ -6,11 +6,11 @@ os.environ.clear()
 home = tempfile.mkdtemp(prefix="hermes-104360-")
 os.environ.update(
     HOME=home,
-    HERMES_HOME=home + "/.hermes",
+    STARDUST_HOME=home + "/.hermes",
     PATH="/usr/bin:/bin",
     PYTHONDONTWRITEBYTECODE="1",
 )
-Path(os.environ["HERMES_HOME"]).mkdir()
+Path(os.environ["STARDUST_HOME"]).mkdir()
 sys.dont_write_bytecode = True
 repo = sys.argv[1]
 sys.path.insert(0, repo)
@@ -96,7 +96,7 @@ config = {
     },
     "fallback_providers": [{"provider": "fixture-provider", "model": "model-b"}],
 }
-Path(os.environ["HERMES_HOME"] + "/config.yaml").write_text(
+Path(os.environ["STARDUST_HOME"] + "/config.yaml").write_text(
     yaml.safe_dump(config), encoding="utf-8"
 )
 from hermes_cli.runtime_provider import resolve_runtime_provider
@@ -146,7 +146,7 @@ rebuilt = OpenAI(**agent._client_kwargs, max_retries=0)
 request("fallback-rebuilt-from-production-kwargs", rebuilt, "model-b")
 # Configured timeout forces the production swap to rebuild before its first request.
 config["providers"]["fixture-provider"]["request_timeout_seconds"] = 15
-Path(os.environ["HERMES_HOME"] + "/config.yaml").write_text(
+Path(os.environ["STARDUST_HOME"] + "/config.yaml").write_text(
     yaml.safe_dump(config), encoding="utf-8"
 )
 from hermes_cli.config import load_config_readonly

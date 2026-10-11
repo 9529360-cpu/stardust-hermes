@@ -13,7 +13,7 @@ def memory_env(tmp_path, monkeypatch):
     hermes_home = tmp_path / ".hermes"
     memories = hermes_home / "memories"
     memories.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     (memories / "MEMORY.md").write_text(
         "§\nHermes repo is at ~/.hermes/hermes-agent\n§\nUser prefers dark themes",
         encoding="utf-8",
@@ -49,7 +49,7 @@ class TestMemoryReset:
         hermes_home = tmp_path / ".hermes"
         memories = hermes_home / "memories"
         memories.mkdir(parents=True)
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
         _reset("all")
 

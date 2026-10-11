@@ -108,7 +108,7 @@ jobs:
       # collide with the checkout itself. NOTE: ${{ runner.temp }} is NOT
       # available in job-level env (only github/inputs/matrix/needs/
       # secrets/strategy/vars).
-      HERMES_E2E_WORKROOT: ${{ github.workspace }}\..\hermes-desktop-gui-e2e
+      STARDUST_E2E_WORKROOT: ${{ github.workspace }}\..\hermes-desktop-gui-e2e
 
     steps:
       # Full history: the driver bare-clones this checkout as the repo the
@@ -146,7 +146,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path gui-e2e-proof -Force | Out-Null
-          Copy-Item -LiteralPath (Join-Path $env:HERMES_E2E_WORKROOT 'known-failure.json') -Destination gui-e2e-proof/known-failure.json
+          Copy-Item -LiteralPath (Join-Path $env:STARDUST_E2E_WORKROOT 'known-failure.json') -Destination gui-e2e-proof/known-failure.json
 
       - name: Upload known-failure receipt
         if: steps.update.outputs.known_failure != ''
@@ -179,7 +179,7 @@ jobs:
         run: |
           $out = "gui-e2e-proof"
           New-Item -ItemType Directory -Path $out -Force | Out-Null
-          $work = $env:HERMES_E2E_WORKROOT
+          $work = $env:STARDUST_E2E_WORKROOT
           $home_ = Join-Path $work "hermes-home"
           foreach ($pair in @(
             @{ src = (Join-Path $work "proof");                          dst = "proof" },

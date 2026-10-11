@@ -26,7 +26,7 @@ def register_synthetic_package(name: str, search_locations: List[str]) -> None:
 
 
 def user_plugins_dir() -> Optional[Path]:
-    """Return ``$HERMES_HOME/plugins/`` or None if unavailable."""
+    """Return ``$STARDUST_HOME/plugins/`` or None if unavailable."""
     try:
         from hermes_constants import get_hermes_home
         d = get_hermes_home() / "plugins"

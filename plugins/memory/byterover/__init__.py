@@ -3,7 +3,7 @@
 Persistent memory via the ByteRover CLI (``brv``): hierarchical context tree with tiered retrieval
 (fuzzy text → LLM-driven search), local-first with optional cloud sync (BRV_API_KEY). Requires the
 ``brv`` CLI (npm install -g byterover-cli, or byterover.dev/install.sh). Working directory is
-$HERMES_HOME/byterover/ (profile-scoped); ``memory.byterover.auto_extract: false`` disables curate hooks.
+$STARDUST_HOME/byterover/ (profile-scoped); ``memory.byterover.auto_extract: false`` disables curate hooks.
 """
 
 from __future__ import annotations

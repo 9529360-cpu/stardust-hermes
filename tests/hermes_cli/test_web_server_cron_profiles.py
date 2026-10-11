@@ -1271,7 +1271,7 @@ async def test_create_cron_job_without_profile_uses_backend_own_profile(
     from hermes_cli import web_server
 
     monkeypatch.setenv(
-        "HERMES_HOME", str(isolated_profiles["worker_alpha"])
+        "STARDUST_HOME", str(isolated_profiles["worker_alpha"])
     )
 
     job = await _rt_cron.create_cron_job(
@@ -1292,11 +1292,11 @@ async def test_create_cron_job_without_profile_uses_backend_own_profile(
 async def test_create_cron_job_without_profile_defaults_when_unscoped(
     isolated_profiles, monkeypatch
 ):
-    """HERMES_HOME at the default home (or unrecognized) keeps the legacy
+    """STARDUST_HOME at the default home (or unrecognized) keeps the legacy
     ``default`` fallback."""
     from hermes_cli import web_server
 
-    monkeypatch.setenv("HERMES_HOME", str(isolated_profiles["default"]))
+    monkeypatch.setenv("STARDUST_HOME", str(isolated_profiles["default"]))
 
     job = await _rt_cron.create_cron_job(
         _web_models.CronJobCreate(

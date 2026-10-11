@@ -19,7 +19,7 @@ _FAKE_URL_SECRET = "https://hooks.example/send?access_token=sk_live_ABCDEF012345
 
 @pytest.fixture(autouse=True)
 def _redaction_on(monkeypatch):
-    # The switch is snapshotted at import; a developer shell with HERMES_REDACT_SECRETS=false must not
+    # The switch is snapshotted at import; a developer shell with STARDUST_REDACT_SECRETS=false must not
     # turn this contract test into a no-op.
     monkeypatch.setattr(_redact, "_REDACT_ENABLED", True)
 

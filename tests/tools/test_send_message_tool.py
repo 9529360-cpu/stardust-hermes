@@ -324,8 +324,8 @@ class TestSendMessageTool:
         # not auto-accepted by the trust window. (Recency trust is covered
         # in test_platform_base.py. The public default flipped to non-strict
         # in 2026-05; this test pins strict on explicitly.)
-        monkeypatch.setenv("HERMES_MEDIA_DELIVERY_STRICT", "1")
-        monkeypatch.setenv("HERMES_MEDIA_TRUST_RECENT_FILES", "0")
+        monkeypatch.setenv("STARDUST_MEDIA_DELIVERY_STRICT", "1")
+        monkeypatch.setenv("STARDUST_MEDIA_TRUST_RECENT_FILES", "0")
         config, telegram_cfg = _make_config()
         secret = tmp_path / "secret.pdf"
         secret.write_bytes(b"%PDF secret")

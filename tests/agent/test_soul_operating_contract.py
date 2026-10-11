@@ -46,7 +46,7 @@ def _stable_with_soul(tmp_path, monkeypatch, soul_text, **agent_overrides):
     home = tmp_path / "hermes-home"
     home.mkdir()
     (home / "SOUL.md").write_text(soul_text, encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     with (
         patch("agent.prompt_builder.build_environment_hints", return_value=""),
         patch("agent.prompt_builder.build_context_files_prompt", return_value=""),

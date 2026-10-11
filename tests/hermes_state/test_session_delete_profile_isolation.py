@@ -2,7 +2,7 @@
 
 The desktop bug is routing: messaging rows owned by ``winefox`` were DELETE'd
 against the primary ``default`` backend. This uses real SessionDB files under a
-temp HERMES_HOME — two profile databases, no mocks — and shows:
+temp STARDUST_HOME — two profile databases, no mocks — and shows:
 
 - default DELETE does not remove the winefox row (already_absent)
 - winefox DELETE removes it

@@ -38,7 +38,7 @@ _cached: dict[str, str] = {}
 
 
 def _default_home() -> str:
-    """Ambient process HERMES_HOME (env, else the platform default) as a string."""
+    """Ambient process STARDUST_HOME (env, else the platform default) as a string."""
     from hermes_constants import get_process_hermes_home
     return str(get_process_hermes_home())
 
@@ -231,7 +231,7 @@ def _build_section(home: Path) -> str:
 
 def get_bot_mode_protocol_section(home: str | os.PathLike | None = None, *, force_refresh: bool = False) -> str:
     """Cached probe entry point — one filesystem pass per (process, home). ``home`` should be
-    the AGENT'S OWN resolved home (session-db derived), not ambient HERMES_HOME — build threads
+    the AGENT'S OWN resolved home (session-db derived), not ambient STARDUST_HOME — build threads
     can lose the ContextVar override and the env var would then name the wrong profile."""
     resolved = str(_resolve_home(home))
     with _lock:

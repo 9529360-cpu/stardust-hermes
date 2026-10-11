@@ -195,7 +195,7 @@ def _spawn_bash_ls(root: str, ctx: ServerContext) -> Optional[SpawnSpec]:
 def _find_pses_bundle(ctx: ServerContext) -> Optional[str]:
     """Locate the PowerShellEditorServices bundle dir (release zip, manual install).  Resolution order:
     ``lsp.servers.powershell.command[0]`` when a directory, ``init_overrides["powershell"]["bundlePath"]``,
-    ``PSES_BUNDLE_PATH`` env, then ``<HERMES_HOME>/lsp/PowerShellEditorServices``."""
+    ``PSES_BUNDLE_PATH`` env, then ``<STARDUST_HOME>/lsp/PowerShellEditorServices``."""
     from hermes_constants import get_hermes_home
     override = ctx.binary_overrides.get("powershell")
     init = ctx.init_overrides.get("powershell", {})
@@ -217,7 +217,7 @@ def _find_pses_bundle(ctx: ServerContext) -> Optional[str]:
 _PSES_MISSING_MSG = (
     "powershell: pwsh found but the PowerShellEditorServices bundle is missing. Download the release zip from "
     "https://github.com/PowerShell/PowerShellEditorServices/releases, extract it, and either set "
-    "lsp.servers.powershell.command to the bundle path or unzip it to <HERMES_HOME>/lsp/PowerShellEditorServices."
+    "lsp.servers.powershell.command to the bundle path or unzip it to <STARDUST_HOME>/lsp/PowerShellEditorServices."
 )
 
 

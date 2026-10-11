@@ -28,7 +28,7 @@ def served_root(tmp_path, monkeypatch):
             "webhook": {"state": "fatal", "error_code": "port_in_use"},
             "alpha:telegram": {"state": "connected"},
         }}))
-    monkeypatch.setenv("HERMES_HOME", str(root))
+    monkeypatch.setenv("STARDUST_HOME", str(root))
     monkeypatch.delenv("GATEWAY_MULTIPLEX_PROFILES", raising=False)
     import hermes_constants
     import gateway.status as status

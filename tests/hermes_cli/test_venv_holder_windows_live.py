@@ -341,7 +341,7 @@ class TestUpdaterOwnedBackendDeferral:
     def test_dead_spawner_serve_is_deferred_live(self, tmp_path, monkeypatch):
         """A REAL serve-argv process, ledger-registered with a provably dead
         spawner, must classify as updater-owned (deferred, not a blocker)."""
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
 
         import psutil
 
@@ -370,7 +370,7 @@ class TestUpdaterOwnedBackendDeferral:
     def test_live_foreign_spawner_serve_still_blocks_live(self, tmp_path, monkeypatch):
         """Same real serve process, but its recorded spawner is a LIVE
         process outside this scan's ancestry — must keep blocking."""
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
 
         import psutil
 
@@ -397,7 +397,7 @@ class TestUpdaterOwnedBackendDeferral:
     def test_unregistered_serve_still_blocks_live(self, tmp_path, monkeypatch):
         """A serve-argv process with NO ledger entry keeps blocking —
         positive identity only, never argv-shape alone."""
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
 
         import psutil
 
@@ -414,7 +414,7 @@ class TestUpdaterOwnedBackendDeferral:
         """The #98336 field topology: the recorded spawner is the scan's own
         ANCESTOR (the Desktop performing the hand-off). Run the check in a
         real child process whose parent chain contains the spawner."""
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
 
         import json as _json
 
@@ -463,7 +463,7 @@ class TestUpdaterOwnedBackendDeferral:
                 text=True,
                 cwd=str(PROJECT_ROOT),
                 timeout=120,
-                env={**os.environ, "HERMES_HOME": str(tmp_path)},
+                env={**os.environ, "STARDUST_HOME": str(tmp_path)},
             )
             line = result.stdout.strip().splitlines()[-1] if result.stdout.strip() else "{}"
             payload = _json.loads(line)

@@ -47,9 +47,9 @@ def _session_source_for_agent(platform: Optional[str]) -> str:
     try:
         from gateway.session_context import get_session_env
 
-        source = get_session_env("HERMES_SESSION_SOURCE", "")
+        source = get_session_env("STARDUST_SESSION_SOURCE", "")
     except Exception:
-        source = os.environ.get("HERMES_SESSION_SOURCE", "")
+        source = os.environ.get("STARDUST_SESSION_SOURCE", "")
     return str(source or "").strip() or platform or "cli"
 
 
@@ -547,11 +547,11 @@ class AIAgent(
         if isinstance(override, (int, float)) and not isinstance(override, bool) and override > 0:
             return float(override)
         cfg = get_provider_request_timeout(self.provider, self.model)
-        return cfg if cfg is not None else env_float("HERMES_API_TIMEOUT", 1800.0)
+        return cfg if cfg is not None else env_float("STARDUST_API_TIMEOUT", 1800.0)
 
     def _resolved_api_call_stale_timeout_base(self) -> tuple[float, bool]:
         """Base non-stream stale timeout: per-model ``stale_timeout_seconds`` > provider-wide >
-        ``HERMES_API_CALL_STALE_TIMEOUT`` > reasoning floor > 90s.
+        ``STARDUST_API_CALL_STALE_TIMEOUT`` > reasoning floor > 90s.
 
         Returns ``(seconds, uses_implicit_default)``; the implicit flag lets callers auto-disable the detector
         for local endpoints only when the user configured nothing.
@@ -559,7 +559,7 @@ class AIAgent(
         cfg = get_provider_stale_timeout(self.provider, self.model)
         if cfg is not None:
             return cfg, False
-        env_timeout = os.getenv("HERMES_API_CALL_STALE_TIMEOUT")
+        env_timeout = os.getenv("STARDUST_API_CALL_STALE_TIMEOUT")
         if env_timeout is not None:
             return float(env_timeout), False
         # Reasoning-model floor (cloud gateways idle-kill mid-think); not "implicit" so the local-endpoint
@@ -594,7 +594,7 @@ class AIAgent(
         """True when the user explicitly configured the stale timeout (config or env var); implicit values
         (reasoning floors, the 90s default) yield to the run-budget cap, explicit ones never do."""
         return (get_provider_stale_timeout(self.provider, self.model) is not None
-                or os.getenv("HERMES_API_CALL_STALE_TIMEOUT") is not None)
+                or os.getenv("STARDUST_API_CALL_STALE_TIMEOUT") is not None)
 
     def _codex_silent_hang_hint(self, model: Optional[str] = None) -> Optional[str]:
         """Actionable hint when the request matches a known Codex silent-reject shape (currently the ``gpt-5.5``

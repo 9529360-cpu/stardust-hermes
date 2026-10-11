@@ -154,7 +154,7 @@ def test_admission_apt_and_nix_refuse(tmp_path, monkeypatch):
 
 
 def test_refusal_receipt_written_as_refused(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     import hermes_cli.update_receipt as ur
 
     monkeypatch.setattr(ur, "_receipt_dir", lambda: tmp_path / "receipts")

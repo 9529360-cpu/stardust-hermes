@@ -653,7 +653,7 @@ class GatewayStartupMixin:
         exact = 0
         fallback = 0
         with _log_suppressed(logging.WARNING, "Exact active-turn recovery on startup failed: %s"):
-            agent_timeout = max(1.0, _float_env("HERMES_AGENT_TIMEOUT", 1800))
+            agent_timeout = max(1.0, _float_env("STARDUST_AGENT_TIMEOUT", 1800))
             exact = await self.async_session_store.recover_interrupted_turns(
                 max_age_seconds=max(60 * 60, int(agent_timeout * 2))
             )
@@ -760,14 +760,14 @@ class GatewayStartupMixin:
         with suppress(Exception):
             logger.info(
                 "Agent budget: max_iterations=%d (agent.max_turns from config.yaml, "
-                "or HERMES_MAX_ITERATIONS from .env, or default 500)",
-                int(os.getenv("HERMES_MAX_ITERATIONS", "500")),
+                "or STARDUST_MAX_ITERATIONS from .env, or default 500)",
+                int(os.getenv("STARDUST_MAX_ITERATIONS", "500")),
             )
         # Warn prominently when redaction is opted out; the redactor snapshots its state at import time,
         # so this line is the source of truth for the process lifetime.
         with suppress(Exception):
             # Redaction status: ON by default (#17691).
-            _redact_raw = os.getenv("HERMES_REDACT_SECRETS", "true")
+            _redact_raw = os.getenv("STARDUST_REDACT_SECRETS", "true")
             if _redact_raw.lower() in {"1", "true", "yes", "on"}:
                 logger.info(
                     "Secret redaction: ENABLED (tool output, logs, and chat "
@@ -775,7 +775,7 @@ class GatewayStartupMixin:
                 )
             else:
                 logger.warning(
-                    "Secret redaction: DISABLED (HERMES_REDACT_SECRETS=%s). API keys and tokens may appear "
+                    "Secret redaction: DISABLED (STARDUST_REDACT_SECRETS=%s). API keys and tokens may appear "
                     "verbatim in chat output, session JSONs, and logs. Set security.redact_secrets: true "
                     "in config.yaml to re-enable.", _redact_raw,
                 )
@@ -918,7 +918,7 @@ class GatewayStartupMixin:
     def _register_config_hooks(fail_fmt: str, *fail_args, level: int = logging.DEBUG) -> None:
         """Register declarative shell hooks + outbound webhooks from the CURRENT scope's config.
 
-        Gateway has no TTY, so consent must come from --accept-hooks, HERMES_ACCEPT_HOOKS, or
+        Gateway has no TTY, so consent must come from --accept-hooks, STARDUST_ACCEPT_HOOKS, or
         hooks_auto_accept: true; ``accept_hooks=False`` lets register_from_config resolve env + config.
         Never raises (logged at ``level``).
         """

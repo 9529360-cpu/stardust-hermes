@@ -116,7 +116,7 @@ class TestFallbackChainAdvancement:
     def test_releases_half_open_probe_when_local_activation_fails(self, monkeypatch, tmp_path):
         url = "https://openrouter.ai/api/v1"
         model = "openai/gpt-5.6-sol"
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         route_health.reset_for_tests()
         route_health.record_failure("openrouter", model, url, FailoverReason.timeout)
         state = route_health.snapshot()
@@ -178,7 +178,7 @@ class TestFallbackChainAdvancement:
 
     def test_explicit_base_url_prechecks_normalized_route_health(self, monkeypatch, tmp_path):
         url = "https://openrouter.ai/api/v1"
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         route_health.reset_for_tests()
         route_health.record_failure(
             "openrouter", "openai/gpt-5.6-sol", url, FailoverReason.timeout,

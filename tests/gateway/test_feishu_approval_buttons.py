@@ -614,7 +614,7 @@ class TestResolveUpdatePrompt:
     @pytest.mark.asyncio
     async def test_writes_response_file(self, tmp_path, monkeypatch):
         adapter = _make_adapter()
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
         (tmp_path / ".hermes").mkdir()
         adapter._update_prompt_state[1] = {
             "session_key": "sess-up-1",
@@ -630,7 +630,7 @@ class TestResolveUpdatePrompt:
     @pytest.mark.asyncio
     async def test_unauthorized_operator_does_not_write_response(self, tmp_path, monkeypatch):
         adapter = _make_adapter()
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
         (tmp_path / ".hermes").mkdir()
         adapter._allowed_group_users = {"ou_allowed"}
         adapter._group_policy = "open"
@@ -649,7 +649,7 @@ class TestResolveUpdatePrompt:
     @pytest.mark.asyncio
     async def test_missing_operator_identity_does_not_write_response(self, tmp_path, monkeypatch):
         adapter = _make_adapter()
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
         (tmp_path / ".hermes").mkdir()
         adapter._allowed_group_users = {"ou_allowed"}
         adapter._update_prompt_state[3] = {

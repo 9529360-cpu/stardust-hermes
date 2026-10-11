@@ -957,7 +957,7 @@ def _record_attested_cold_start_profiles(token: dict, running_profiles: set) -> 
 
 
 def _cold_start_attested_profiles(token: dict) -> None:
-    """Spawn each ``cold_start_profiles`` entry under its own HERMES_HOME and consume exactly the
+    """Spawn each ``cold_start_profiles`` entry under its own STARDUST_HOME and consume exactly the
     generation that authorized it; one profile's failure never aborts the others (#110959)."""
     from hermes_cli import gateway_windows
     from hermes_cli.profiles import get_profile_dir
@@ -1068,7 +1068,7 @@ def _refresh_windows_gateway_launchers() -> None:
 
 
 def _refresh_bootstrap_cache_scripts(branch: str = "main") -> None:
-    """Overwrite ``$HERMES_HOME/bootstrap-cache/install-<ref>.{ps1,sh}`` for *branch* from the fresh checkout.
+    """Overwrite ``$STARDUST_HOME/bootstrap-cache/install-<ref>.{ps1,sh}`` for *branch* from the fresh checkout.
 
     Old ``hermes-setup.exe`` builds NEVER re-download a cached branch-ref script, so a stale one runs
     months-old code forever. Guards mirror ``install_script.rs``: only the sanitized *branch* key is rewritten;

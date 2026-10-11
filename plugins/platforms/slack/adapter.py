@@ -6526,7 +6526,7 @@ _SETUP_HOME_CHANNEL_HELP = (
 
 
 def _write_slack_manifest_and_instruct() -> None:
-    """Write the manifest under HERMES_HOME and print paste instructions; non-fatal."""
+    """Write the manifest under STARDUST_HOME and print paste instructions; non-fatal."""
     from hermes_cli.cli_output import print_info, print_success, print_warning
     try:
         from hermes_cli.slack_cli import _build_full_manifest

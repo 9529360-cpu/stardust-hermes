@@ -197,7 +197,7 @@ def test_binary_reference_block_maps_host_attachment_to_container_path(tmp_path:
     payload = attachments / "archive.zip"
     payload.write_bytes(b"PK\x03\x04binary-zip-bytes")
 
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     monkeypatch.setenv("TERMINAL_ENV", "docker")
 
     result = preprocess_context_references(
@@ -223,7 +223,7 @@ def test_oversized_text_reference_maps_host_attachment_to_container_path(
     payload = attachments / "large.txt"
     payload.write_text("x" * 8_000, encoding="utf-8")
 
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     monkeypatch.setenv("TERMINAL_ENV", "docker")
 
     result = preprocess_context_references(
@@ -249,7 +249,7 @@ def test_binary_reference_block_keeps_host_path_on_local_backend(tmp_path: Path,
     payload = attachments / "archive.zip"
     payload.write_bytes(b"PK\x03\x04binary-zip-bytes")
 
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     monkeypatch.setenv("TERMINAL_ENV", "local")
 
     result = preprocess_context_references(
@@ -291,7 +291,7 @@ async def test_blocks_canonical_read_denylist_credential_stores(tmp_path: Path, 
     from agent.context_references import preprocess_context_references_async
 
     monkeypatch.setenv("HOME", str(tmp_path))
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
 
     hermes_home = tmp_path / ".hermes"
     (hermes_home).mkdir(parents=True)
@@ -343,7 +343,7 @@ async def test_canonical_guard_fails_closed_when_lookup_raises(tmp_path: Path, m
     from agent.context_references import preprocess_context_references_async
 
     monkeypatch.setenv("HOME", str(tmp_path))
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".hermes"))
 
     hermes_home = tmp_path / ".hermes"
     hermes_home.mkdir(parents=True)

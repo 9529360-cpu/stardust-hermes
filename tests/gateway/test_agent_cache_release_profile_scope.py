@@ -43,7 +43,7 @@ def test_unscoped_housekeeping_sweep_enters_the_owning_profile_scope(tmp_path, m
     prof_b = default_home / "profiles" / "b"
     prof_b.mkdir(parents=True)
     (prof_b / ".env").write_text("HINDSIGHT_LLM_API_KEY=key-of-b\n")
-    monkeypatch.setenv("HERMES_HOME", str(default_home))
+    monkeypatch.setenv("STARDUST_HOME", str(default_home))
     secret_scope.set_multiplex_active(True)
     try:
         # The housekeeping watcher runs with NO scope installed.
@@ -56,7 +56,7 @@ def test_unscoped_housekeeping_sweep_enters_the_owning_profile_scope(tmp_path, m
 
 
 def test_in_turn_cap_eviction_keeps_the_callers_scope(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     secret_scope.set_multiplex_active(True)
     token = secret_scope.set_secret_scope({"MARKER": "turn-scope"})
     try:
@@ -76,7 +76,7 @@ def test_in_turn_cap_eviction_of_another_profiles_agent_enters_the_owners_scope(
     prof_a, prof_b = default_home / "profiles" / "a", default_home / "profiles" / "b"
     prof_a.mkdir(parents=True), prof_b.mkdir(parents=True)
     (prof_b / ".env").write_text("HINDSIGHT_LLM_API_KEY=key-of-b\n")
-    monkeypatch.setenv("HERMES_HOME", str(default_home))
+    monkeypatch.setenv("STARDUST_HOME", str(default_home))
     secret_scope.set_multiplex_active(True)
     home_token = set_hermes_home_override(str(prof_a))
     scope_token = secret_scope.set_secret_scope({"HINDSIGHT_LLM_API_KEY": "key-of-a"})
@@ -98,7 +98,7 @@ def test_in_turn_cap_eviction_of_a_default_profile_agent_leaves_the_secondarys_s
     default_home = tmp_path / ".hermes"
     prof_a = default_home / "profiles" / "a"
     prof_a.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(default_home))
+    monkeypatch.setenv("STARDUST_HOME", str(default_home))
     secret_scope.set_multiplex_active(True)
     home_token = set_hermes_home_override(str(prof_a))
     scope_token = secret_scope.set_secret_scope({"MARKER": "profile-a"})
@@ -113,7 +113,7 @@ def test_in_turn_cap_eviction_of_a_default_profile_agent_leaves_the_secondarys_s
 
 
 def test_default_profile_owner_is_the_root_even_when_launched_under_a_named_profile(tmp_path, monkeypatch):
-    """``hermes -p x gateway`` sets HERMES_HOME to x's home and serves the default profile as a
+    """``hermes -p x gateway`` sets STARDUST_HOME to x's home and serves the default profile as a
     secondary. An ``agent:main:`` session still belongs to the default profile at the ROOT, not to
     the launch profile x — otherwise x's turn would commit default's transcript under x."""
     from hermes_constants import reset_hermes_home_override, set_hermes_home_override
@@ -122,7 +122,7 @@ def test_default_profile_owner_is_the_root_even_when_launched_under_a_named_prof
     prof_x = root / "profiles" / "x"
     prof_x.mkdir(parents=True)
     (root / ".env").write_text("MARKER=default-root\n")
-    monkeypatch.setenv("HERMES_HOME", str(prof_x))  # launched under x
+    monkeypatch.setenv("STARDUST_HOME", str(prof_x))  # launched under x
     secret_scope.set_multiplex_active(True)
     home_token = set_hermes_home_override(str(prof_x))
     scope_token = secret_scope.set_secret_scope({"MARKER": "profile-x"})

@@ -170,7 +170,7 @@ class TestFireOverdueJobs:
         catches up through the ordinary claim_fire path."""
         from agent import estop
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         estop._logged_components.clear()
         job = create_job(prompt="p", schedule="every 1h")
         _park_in_past(job["id"], minutes=30)

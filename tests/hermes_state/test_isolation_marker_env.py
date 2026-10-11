@@ -3,11 +3,11 @@
 ``PYTEST_CURRENT_TEST`` / ``PYTEST_VERSION`` are pytest's vars: tests that
 spawn children and rebuild the child environment routinely strip them so the
 child "looks like a real CLI" — which used to disarm the live-DB guard in the
-child at the same moment the child lost the ``HERMES_HOME`` redirect. That
+child at the same moment the child lost the ``STARDUST_HOME`` redirect. That
 pairing is exactly how fixture rows (dm:123 / chat-1 / wx-chat) landed in a
 developer's production state.db.
 
-``HERMES_TEST_ISOLATION`` is Hermes's own marker: the hermetic conftest
+``STARDUST_TEST_ISOLATION`` is Hermes's own marker: the hermetic conftest
 exports it (value = the isolation root) before any test module imports, it
 inherits into children by default, and ``hermes_state`` honors it as a
 test-context signal. These tests pin all three properties.
@@ -69,8 +69,8 @@ def _minimal_env(**extra) -> dict:
 
 def test_conftest_exports_the_marker():
     """The hermetic conftest must export the marker before tests run."""
-    assert os.environ.get("HERMES_TEST_ISOLATION"), (
-        "HERMES_TEST_ISOLATION must be exported by tests/conftest.py so "
+    assert os.environ.get("STARDUST_TEST_ISOLATION"), (
+        "STARDUST_TEST_ISOLATION must be exported by tests/conftest.py so "
         "subprocess children inherit a test-context signal that survives "
         "PYTEST_* scrubbing"
     )
@@ -79,7 +79,7 @@ def test_conftest_exports_the_marker():
 def test_marker_alone_reports_test_context(monkeypatch):
     monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
     monkeypatch.delenv("PYTEST_VERSION", raising=False)
-    monkeypatch.setenv("HERMES_TEST_ISOLATION", "/tmp/some-isolation-root")
+    monkeypatch.setenv("STARDUST_TEST_ISOLATION", "/tmp/some-isolation-root")
     assert hermes_state_guard._running_under_pytest() is True
 
 
@@ -88,15 +88,15 @@ def test_no_signals_reports_production(monkeypatch):
     off the env (ancestry may still arm it in a real child — not this seam)."""
     monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
     monkeypatch.delenv("PYTEST_VERSION", raising=False)
-    monkeypatch.delenv("HERMES_TEST_ISOLATION", raising=False)
+    monkeypatch.delenv("STARDUST_TEST_ISOLATION", raising=False)
     assert hermes_state_guard._running_under_pytest() is False
 
 
 def test_child_with_rebuilt_env_keeping_marker_refuses_production_db():
     """THE regression: a child whose env was rebuilt from scratch (PYTEST_*
-    stripped, HERMES_HOME lost) but which keeps the marker must still refuse
+    stripped, STARDUST_HOME lost) but which keeps the marker must still refuse
     to open the production state.db."""
-    env = _minimal_env(HERMES_TEST_ISOLATION="/tmp/pytest-isolation-root")
+    env = _minimal_env(STARDUST_TEST_ISOLATION="/tmp/pytest-isolation-root")
     result = _spawn_probe(env)
     assert result["armed"] is True
     assert result["fired"] is True, (
@@ -107,10 +107,10 @@ def test_child_with_rebuilt_env_keeping_marker_refuses_production_db():
 
 def test_child_bypass_env_disarms_guard_even_with_marker():
     """The sanctioned escape hatch for children that genuinely need a real
-    DB: HERMES_STATE_DB_GUARD_BYPASS=1, not marker-stripping."""
+    DB: STARDUST_STATE_DB_GUARD_BYPASS=1, not marker-stripping."""
     env = _minimal_env(
-        HERMES_TEST_ISOLATION="/tmp/pytest-isolation-root",
-        HERMES_STATE_DB_GUARD_BYPASS="1",
+        STARDUST_TEST_ISOLATION="/tmp/pytest-isolation-root",
+        STARDUST_STATE_DB_GUARD_BYPASS="1",
     )
     result = _spawn_probe(env)
     assert result["fired"] is False

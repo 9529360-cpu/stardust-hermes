@@ -92,17 +92,17 @@ test('resolves with the announced port', async () => {
   assert.equal(await p, 54321)
 })
 
-test('resolves with a HERMES_BACKEND_READY port (headless `serve`)', async () => {
+test('resolves with a STARDUST_BACKEND_READY port (headless `serve`)', async () => {
   const child = makeFakeChild()
   const p = waitForDashboardPort(child, 1000)
-  child.stdout.emit('data', 'HERMES_BACKEND_READY port=43210\n')
+  child.stdout.emit('data', 'STARDUST_BACKEND_READY port=43210\n')
   assert.equal(await p, 43210)
 })
 
 test('parses the port even when the line arrives split across chunks', async () => {
   const child = makeFakeChild()
   const p = waitForDashboardPort(child, 1000)
-  child.stdout.emit('data', 'HERMES_DASHBOARD_READY po')
+  child.stdout.emit('data', 'STARDUST_DASHBOARD_READY po')
   child.stdout.emit('data', 'rt=8080\n')
   assert.equal(await p, 8080)
 })
@@ -135,7 +135,7 @@ test('a late announcement after timeout does not throw (listeners torn down)', a
   // The orphaned backend may still print its READY line later; the watcher
   // must have detached so this emit is a no-op rather than a double-settle.
   assert.doesNotThrow(() => {
-    child.stdout.emit('data', 'HERMES_DASHBOARD_READY port=9999\n')
+    child.stdout.emit('data', 'STARDUST_DASHBOARD_READY port=9999\n')
   })
 })
 
@@ -283,11 +283,11 @@ test('resolves from bufferedOutput when the sentinel was consumed before the wai
   assert.equal(port, 43211)
 })
 
-test('bufferedOutput accepts the legacy HERMES_DASHBOARD_READY sentinel too', async () => {
+test('bufferedOutput accepts the legacy STARDUST_DASHBOARD_READY sentinel too', async () => {
   const child = makeFakeChild()
 
   const port = await waitForDashboardPortAnnouncement(child, {
-    bufferedOutput: () => 'HERMES_DASHBOARD_READY port=43212\n',
+    bufferedOutput: () => 'STARDUST_DASHBOARD_READY port=43212\n',
     timeoutMs: 500
   })
 
@@ -302,7 +302,7 @@ test('bufferedOutput without a sentinel still resolves from later live stdout', 
     timeoutMs: 1000
   })
 
-  child.stdout.emit('data', Buffer.from('HERMES_BACKEND_READY port=43213\n'))
+  child.stdout.emit('data', Buffer.from('STARDUST_BACKEND_READY port=43213\n'))
 
   assert.equal(await wait, 43213)
 })
@@ -325,7 +325,7 @@ test('the merged-tail seed recovers a sentinel spliced onto a partial stderr lin
 
   // uvicorn's stderr chunk has no trailing newline, so the tail is not line-accurate.
   const port = await waitForDashboardPortAnnouncement(child, {
-    bufferedOutput: () => 'INFO  Started server process [4711]HERMES_BACKEND_READY port=65238',
+    bufferedOutput: () => 'INFO  Started server process [4711]STARDUST_BACKEND_READY port=65238',
     timeoutMs: 500
   })
 
@@ -339,7 +339,7 @@ test('the merged-tail seed does not match prose that merely names the sentinel',
     child,
     50,
     () => '',
-    () => 'still waiting for HERMES_BACKEND_READY from the backend\n'
+    () => 'still waiting for STARDUST_BACKEND_READY from the backend\n'
   )
 
   await assert.rejects(wait, /Timed out waiting/)

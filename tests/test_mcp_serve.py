@@ -26,8 +26,8 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def _isolate_hermes_home(tmp_path, monkeypatch):
-    """Redirect HERMES_HOME to a temp directory."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    """Redirect STARDUST_HOME to a temp directory."""
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     try:
         import hermes_constants
         monkeypatch.setattr(hermes_constants, "get_hermes_home", lambda: tmp_path)
@@ -1011,7 +1011,7 @@ class TestCliIntegration:
         assert args.verbose is True
 
     def test_dispatcher_routes_serve(self, monkeypatch, tmp_path):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         mock_run = MagicMock()
         monkeypatch.setattr("mcp_serve.run_mcp_server", mock_run)
 
@@ -1259,8 +1259,8 @@ class TestEventBridgePollE2E:
         sessions_dir.mkdir()
         monkeypatch.setattr(mcp_serve, "_get_sessions_dir", lambda: sessions_dir)
 
-        # _poll_once reads <HERMES_HOME>/state.db for its mtime gate; the autouse
-        # fixture points HERMES_HOME at tmp_path.
+        # _poll_once reads <STARDUST_HOME>/state.db for its mtime gate; the autouse
+        # fixture points STARDUST_HOME at tmp_path.
         db_path = tmp_path / "state.db"
         db_path.write_text("placeholder")
 

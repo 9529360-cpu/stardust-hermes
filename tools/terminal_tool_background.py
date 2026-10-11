@@ -53,17 +53,17 @@ _ASYNC_UNSUPPORTED_NOTE = (
     "background; retrieve its result with process(action='poll') or process(action='wait')."
 )
 
-# proc_session attribute -> HERMES_SESSION_* env var carrying it.
+# proc_session attribute -> STARDUST_SESSION_* env var carrying it.
 _ROUTING_FIELDS = (
-    ("watcher_chat_id", "HERMES_SESSION_CHAT_ID"),
-    ("watcher_user_id", "HERMES_SESSION_USER_ID"),
-    ("watcher_user_name", "HERMES_SESSION_USER_NAME"),
-    ("watcher_thread_id", "HERMES_SESSION_THREAD_ID"),
-    ("watcher_message_id", "HERMES_SESSION_MESSAGE_ID"),
+    ("watcher_chat_id", "STARDUST_SESSION_CHAT_ID"),
+    ("watcher_user_id", "STARDUST_SESSION_USER_ID"),
+    ("watcher_user_name", "STARDUST_SESSION_USER_NAME"),
+    ("watcher_thread_id", "STARDUST_SESSION_THREAD_ID"),
+    ("watcher_message_id", "STARDUST_SESSION_MESSAGE_ID"),
     # The spawning conversation's session-db id lets the gateway's completion
     # pre-flight drop the notification if the user closed this session (/new)
     # before the process finished, instead of injecting it into the NEW one.
-    ("parent_session_id", "HERMES_SESSION_ID"),
+    ("parent_session_id", "STARDUST_SESSION_ID"),
 )
 
 
@@ -77,7 +77,7 @@ def _looks_like_homebrew_ci_poller(command: str) -> bool:
 def _stamp_gateway_routing(proc_session, get_session_env) -> None:
     """Copy the spawning chat's routing metadata onto the process session so
     completion / watch notifications reach the right chat/thread."""
-    platform = get_session_env("HERMES_SESSION_PLATFORM", "")
+    platform = get_session_env("STARDUST_SESSION_PLATFORM", "")
     if not platform:
         return
     proc_session.watcher_platform = platform
@@ -185,7 +185,7 @@ def spawn_background_process(
                 result_data["subagent_note"] = _SUBAGENT_NOTIFY_NOTE
         else:
             from gateway.session_context import get_session_env
-            if get_session_env("HERMES_SINGLE_QUERY_SESSION") == "1":
+            if get_session_env("STARDUST_SINGLE_QUERY_SESSION") == "1":
                 result_data["finite_session_note"] = _FINITE_SESSION_PROCESS_NOTE
         if watch_patterns:
             proc_session.watch_patterns = list(watch_patterns)

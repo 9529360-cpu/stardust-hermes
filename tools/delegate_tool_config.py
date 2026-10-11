@@ -385,10 +385,10 @@ def _resolve_delegation_credentials(cfg: dict, parent_agent) -> dict:
 
 def _load_config() -> dict:
     """The ``delegation`` config section (read-only — do NOT mutate). Prefers the shared ``load_config_readonly()``
-    (follows HERMES_HOME/profile; no deepcopy, since this runs on every get_definitions() rebuild) over the legacy
-    ``cli.CLI_CONFIG``, which can hide user-set keys — except that ``HERMES_IGNORE_USER_CONFIG=1`` is only honored
+    (follows STARDUST_HOME/profile; no deepcopy, since this runs on every get_definitions() rebuild) over the legacy
+    ``cli.CLI_CONFIG``, which can hide user-set keys — except that ``STARDUST_IGNORE_USER_CONFIG=1`` is only honored
     by the legacy loader, so it stays authoritative when that flag is set."""
-    if os.environ.get("HERMES_IGNORE_USER_CONFIG") != "1":
+    if os.environ.get("STARDUST_IGNORE_USER_CONFIG") != "1":
         try:
             from hermes_cli.config import load_config_readonly
             cfg = load_config_readonly().get("delegation") or {}

@@ -78,7 +78,7 @@ def verify_windows_desktop_update(project_root: Path | None = None) -> None:
     """Raise when a zero-exit updater left an incomplete or stale packaged app.
 
     The root defaults to the imported checkout, never the caller's cwd: the hand-off
-    is spawned from HERMES_HOME by the pre-update Desktop, and a cwd-derived root
+    is spawned from STARDUST_HOME by the pre-update Desktop, and a cwd-derived root
     reported a healthy install as "Desktop executable is missing" (Sep 2026).
     """
     if project_root is None:

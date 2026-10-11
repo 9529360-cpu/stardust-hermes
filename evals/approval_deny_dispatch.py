@@ -15,8 +15,8 @@ with tempfile.TemporaryDirectory(prefix="hermes-deny-dispatch-") as directory:
     home = Path(directory)
     os.environ.clear()
     # The terminal's own NOPASSWD probe must also resolve to our inert fixture.
-    os.environ.update(PATH=directory + ":/usr/bin:/bin", HOME=directory, HERMES_HOME=directory,
-                      HERMES_INTERACTIVE="1", TERMINAL_ENV="local")
+    os.environ.update(PATH=directory + ":/usr/bin:/bin", HOME=directory, STARDUST_HOME=directory,
+                      STARDUST_INTERACTIVE="1", TERMINAL_ENV="local")
     (home / "config.yaml").write_text(
         'approvals:\n  mode: "off"\n  deny: ["sudo *", "printf SAFE", "git status"]\n'
         'security:\n  tirith_enabled: false\n', encoding="utf-8")

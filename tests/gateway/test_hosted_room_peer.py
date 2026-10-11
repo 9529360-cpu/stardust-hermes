@@ -37,7 +37,7 @@ def test_gateway_room_grant_secret_is_private_persistent_and_not_an_api_key(
     home = tmp_path / ".hermes"
     profile_home = home / "profiles" / "reviewer"
     profile_home.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
 
     first = gateway_room_grant_secret()
     token = set_hermes_home_override(str(profile_home))
@@ -58,7 +58,7 @@ def test_gateway_room_grant_secret_is_atomic_across_concurrent_workers(
     tmp_path, monkeypatch
 ):
     home = tmp_path / ".hermes"
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
 
     with ThreadPoolExecutor(max_workers=8) as pool:
         secrets = list(pool.map(lambda _index: gateway_room_grant_secret(), range(8)))
@@ -71,7 +71,7 @@ def test_gateway_room_grant_secret_is_cached_by_installation_root(
     tmp_path, monkeypatch
 ):
     home = tmp_path / ".hermes"
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
 
     first = gateway_room_grant_secret()
     original_read = Path.read_bytes
@@ -105,8 +105,8 @@ def test_room_link_endpoint_reads_supported_config_with_env_override(
         "gateway:\n  room_link_url: https://configured.example.test/hermes\n",
         encoding="utf-8",
     )
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.delenv("HERMES_ROOM_LINK_URL", raising=False)
+    monkeypatch.setenv("STARDUST_HOME", str(home))
+    monkeypatch.delenv("STARDUST_ROOM_LINK_URL", raising=False)
     assert local_room_link_endpoint() == {
         "available": True,
         "url": "https://configured.example.test/hermes",
@@ -114,7 +114,7 @@ def test_room_link_endpoint_reads_supported_config_with_env_override(
     }
 
     monkeypatch.setenv(
-        "HERMES_ROOM_LINK_URL", "https://override.example.test/hermes"
+        "STARDUST_ROOM_LINK_URL", "https://override.example.test/hermes"
     )
     assert local_room_link_endpoint()["url"] == (
         "https://override.example.test/hermes"
@@ -130,8 +130,8 @@ def test_named_profile_inherits_gateway_room_link_endpoint(tmp_path, monkeypatch
         encoding="utf-8",
     )
     (profile / "config.yaml").write_text("gateway: {}\n", encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(root))
-    monkeypatch.delenv("HERMES_ROOM_LINK_URL", raising=False)
+    monkeypatch.setenv("STARDUST_HOME", str(root))
+    monkeypatch.delenv("STARDUST_ROOM_LINK_URL", raising=False)
 
     token = set_hermes_home_override(profile)
     try:
@@ -158,8 +158,8 @@ def test_named_profile_room_link_override_wins_over_gateway_root(
         "gateway:\n  room_link_url: https://profile.example.test/hermes\n",
         encoding="utf-8",
     )
-    monkeypatch.setenv("HERMES_HOME", str(root))
-    monkeypatch.delenv("HERMES_ROOM_LINK_URL", raising=False)
+    monkeypatch.setenv("STARDUST_HOME", str(root))
+    monkeypatch.delenv("STARDUST_ROOM_LINK_URL", raising=False)
 
     token = set_hermes_home_override(profile)
     try:
@@ -293,7 +293,7 @@ def test_room_grant_fails_closed_for_tamper_expiry_and_permission():
 def test_local_catalog_is_honest_for_app_managed_process(monkeypatch):
     from gateway.hosted_room_peer import local_catalog_mapping
 
-    monkeypatch.setenv("HERMES_DESKTOP", "1")
+    monkeypatch.setenv("STARDUST_DESKTOP", "1")
     catalog = local_catalog_mapping(installation_id="install-desktop")
     assert catalog["persistent_process"] is False
     assert catalog["link_modes"] == ["direct"]
@@ -314,9 +314,9 @@ def test_self_advertised_endpoint_is_explicit_and_validated(
     from gateway.hosted_room_peer import local_catalog_mapping
 
     if configured is None:
-        monkeypatch.delenv("HERMES_ROOM_LINK_URL", raising=False)
+        monkeypatch.delenv("STARDUST_ROOM_LINK_URL", raising=False)
     else:
-        monkeypatch.setenv("HERMES_ROOM_LINK_URL", configured)
+        monkeypatch.setenv("STARDUST_ROOM_LINK_URL", configured)
     endpoint = local_catalog_mapping(installation_id="install-peer")["endpoint"]
     assert endpoint["available"] is available
     if reason is not None:

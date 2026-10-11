@@ -52,7 +52,7 @@ def test_installers_seed_soul_from_canonical_repository_source() -> None:
     shell = _read("scripts/install.sh")
     powershell = _read("scripts/install.ps1")
 
-    assert 'cp "$INSTALL_DIR/SOUL.md" "$HERMES_HOME/SOUL.md"' in shell
+    assert 'cp "$INSTALL_DIR/SOUL.md" "$STARDUST_HOME/SOUL.md"' in shell
     assert '$canonicalSoulPath = "$InstallDir\\SOUL.md"' in powershell
     assert "Copy-Item -LiteralPath $canonicalSoulPath -Destination $soulPath" in powershell
     assert "You are Hermes Agent, built by Nous Research" not in shell
@@ -373,7 +373,7 @@ def test_skills_index_defaults_belong_to_stardust() -> None:
         "https://github.com/9529360-cpu/stardust-hermes"
         "/releases/download/stardust-skills-index/skills-index.json"
     )
-    assert skills_hub_search.HERMES_INDEX_URL == canonical
+    assert skills_hub_search.STARDUST_INDEX_URL == canonical
     assert skills_hub_search._hermes_index_cache_file().name == (
         "stardust-skills-index-v1.json"
     )

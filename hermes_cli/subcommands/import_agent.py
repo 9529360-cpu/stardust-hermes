@@ -31,6 +31,6 @@ def build_import_agent_parser(subparsers, *, cmd_import_agent: Callable) -> None
     parser.add_argument(
         "--sync", action="store_true",
         help="Re-import every previously imported source whose files changed since the last "
-             "import (registered in HERMES_HOME/import-sync.json). Runs without prompts; "
+             "import (registered in STARDUST_HOME/import-sync.json). Runs without prompts; "
              "combine with --dry-run to preview.")
     parser.set_defaults(func=cmd_import_agent)

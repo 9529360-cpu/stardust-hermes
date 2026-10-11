@@ -16,7 +16,7 @@ def test_delete_profile_after_stdio_probe(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     home = tmp_path / ".hermes"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     # Do not manage host services or scan unrelated developer processes in this test.
     monkeypatch.setattr(profiles, "_cleanup_gateway_service", lambda *_: None)
     monkeypatch.setattr(profiles, "_stop_profile_backends", lambda *_: None)

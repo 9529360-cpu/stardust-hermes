@@ -56,7 +56,7 @@ secrets:
         text=True,
         timeout=120,
         cwd=REPO_ROOT,
-        env={**os.environ, "HERMES_HOME": str(home), "BWS_ACCESS_TOKEN": ""},
+        env={**os.environ, "STARDUST_HOME": str(home), "BWS_ACCESS_TOKEN": ""},
     )
     assert result.returncode == 0, result.stderr
     line = next(
@@ -136,7 +136,7 @@ def test_update_probe_children_skip_external_secret_sources(tmp_path):
          "from hermes_cli.update_cmd_deps import _validate_critical_modules_import\n"
          "print('PROBE=' + repr(_validate_critical_modules_import(__import__('os').getcwd())))"],
         capture_output=True, text=True, timeout=180, cwd=REPO_ROOT,
-        env={**os.environ, "HERMES_HOME": str(home)},
+        env={**os.environ, "STARDUST_HOME": str(home)},
     )
     assert result.returncode == 0, result.stderr
     assert "PROBE=(True, None, None)" in result.stdout, result.stdout + result.stderr

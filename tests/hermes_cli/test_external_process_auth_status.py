@@ -8,7 +8,7 @@ Covers the copilot-acp fix class:
     (env token or on-disk GitHub Copilot credential store) while remaining
     honest — no evidence means unknown, never "signed out".
   * The Accounts-tab sign-in ``cli_command`` reflects the executable the
-    user actually configured (``HERMES_COPILOT_ACP_COMMAND`` /
+    user actually configured (``STARDUST_COPILOT_ACP_COMMAND`` /
     ``COPILOT_CLI_PATH``), and its default is a valid Copilot CLI
     invocation (``copilot login`` — ``copilot /login`` is not a command).
 """
@@ -28,8 +28,8 @@ def _clean_copilot_env(monkeypatch):
     """Neutralize host state so tests pin behaviour, not this machine."""
     for var in (
         "COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN",
-        "HERMES_COPILOT_ACP_COMMAND", "COPILOT_CLI_PATH",
-        "HERMES_COPILOT_ACP_ARGS", "COPILOT_ACP_BASE_URL",
+        "STARDUST_COPILOT_ACP_COMMAND", "COPILOT_CLI_PATH",
+        "STARDUST_COPILOT_ACP_ARGS", "COPILOT_ACP_BASE_URL",
     ):
         monkeypatch.delenv(var, raising=False)
 
@@ -43,7 +43,7 @@ def test_get_auth_status_dispatches_external_process_by_auth_type(
     fake = tmp_path / ("copilot.exe" if os.name == "nt" else "copilot")
     fake.write_text("", encoding="utf-8")
     fake.chmod(0o755)
-    monkeypatch.setenv("HERMES_COPILOT_ACP_COMMAND", str(fake))
+    monkeypatch.setenv("STARDUST_COPILOT_ACP_COMMAND", str(fake))
     # Point HOME somewhere empty so on-disk credential stores don't leak in.
     monkeypatch.setenv("HOME", str(tmp_path))
 
@@ -219,7 +219,7 @@ def test_cli_command_reflects_configured_executable(tmp_path, monkeypatch, _clea
     fake = tmp_path / ("copilot.exe" if os.name == "nt" else "copilot")
     fake.write_text("", encoding="utf-8")
     fake.chmod(0o755)
-    monkeypatch.setenv("HERMES_COPILOT_ACP_COMMAND", str(fake))
+    monkeypatch.setenv("STARDUST_COPILOT_ACP_COMMAND", str(fake))
 
     rendered = _external_process_cli_command("copilot-acp", "copilot login")
 

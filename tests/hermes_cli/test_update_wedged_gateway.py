@@ -49,7 +49,7 @@ _NEEDS_UNIX_SOCKETS = pytest.mark.skipif(
 def tmp_path():
     """Short-path override for this module (macOS AF_UNIX ~104-byte limit).
 
-    The loop-tick witness tests bind real UNIX sockets under HERMES_HOME.
+    The loop-tick witness tests bind real UNIX sockets under STARDUST_HOME.
     pytest's default tmp_path nests deep enough on macOS that
     ``state/gateway.loop-tick.<pid>.sock`` exceeds the sockaddr_un limit and
     ``bind()`` raises ``OSError: AF_UNIX path too long``. A mkdtemp directly

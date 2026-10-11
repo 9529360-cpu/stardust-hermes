@@ -15,7 +15,7 @@ import gateway.run_startup as run_startup
 
 @pytest.mark.asyncio
 async def test_gateway_boot_runs_the_free_tier_bootstrap_before_any_adapter_connects(monkeypatch, tmp_path):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     order: list[str] = []
 
     def fake_bootstrap() -> None:

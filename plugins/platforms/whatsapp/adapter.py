@@ -397,9 +397,9 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
             bridge_env["WHATSAPP_ALLOWED_USERS"] = allowed
         else:
             bridge_env.pop("WHATSAPP_ALLOWED_USERS", None)
-        # Without these the bridge hardcodes ~/.hermes/{image,audio,document}_cache (wrong under HERMES_HOME/profiles/cache layout).
+        # Without these the bridge hardcodes ~/.hermes/{image,audio,document}_cache (wrong under STARDUST_HOME/profiles/cache layout).
         img_dir, audio_dir, _video_dir, doc_dir = _cache_dirs()
-        bridge_env.update(HERMES_IMAGE_CACHE_DIR=str(img_dir), HERMES_AUDIO_CACHE_DIR=str(audio_dir), HERMES_DOCUMENT_CACHE_DIR=str(doc_dir))
+        bridge_env.update(STARDUST_IMAGE_CACHE_DIR=str(img_dir), STARDUST_AUDIO_CACHE_DIR=str(audio_dir), STARDUST_DOCUMENT_CACHE_DIR=str(doc_dir))
         return bridge_env
 
     def _bridge_died(self, detail: str) -> bool:

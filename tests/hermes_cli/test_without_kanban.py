@@ -20,7 +20,7 @@ def test_standard_toolsets_keep_delegation_scheduling_and_planning(monkeypatch):
     from model_tools import get_tool_definitions
     from tools.registry import invalidate_check_fn_cache
 
-    monkeypatch.setenv("HERMES_INTERACTIVE", "1")
+    monkeypatch.setenv("STARDUST_INTERACTIVE", "1")
     invalidate_check_fn_cache()
 
     definitions = get_tool_definitions(
@@ -37,7 +37,7 @@ def test_only_unmodified_old_default_personas_are_upgraded(tmp_path, monkeypatch
     from hermes_cli.config import ensure_hermes_home
     from hermes_cli.default_soul import DEFAULT_SOUL_MD, _PRE_KANBAN_DEFAULT_SOUL
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     soul = tmp_path / "SOUL.md"
     soul.write_text(_PRE_KANBAN_DEFAULT_SOUL, encoding="utf-8")
     ensure_hermes_home()

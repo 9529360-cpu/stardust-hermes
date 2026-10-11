@@ -84,7 +84,7 @@ REPO_URL_HTTPS="https://github.com/NousResearch/hermes-agent.git"
 # Everything lives OUTSIDE the checkout; an untracked dir inside the repo
 # would make later dirty-tree checks lie.
 WORK_ROOT="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/hermes-installer-script-e2e"
-LOG_DIR="${HERMES_E2E_LOG_DIR:-$WORK_ROOT/logs}"
+LOG_DIR="${STARDUST_E2E_LOG_DIR:-$WORK_ROOT/logs}"
 SERVE_REPO="$WORK_ROOT/serve.git"
 
 step() { printf '\n=== %s ===\n' "$*"; }
@@ -195,15 +195,15 @@ arm_redirect
 
 # Isolated HOME: the runner's real one may carry a preinstalled hermes or a
 # developer config, and old installer scripts hardcode $HOME/.hermes (the
-# HERMES_HOME env override is newer than tags we sample). GIT_CONFIG_GLOBAL
+# STARDUST_HOME env override is newer than tags we sample). GIT_CONFIG_GLOBAL
 # above keeps working -- an explicit path wins over $HOME/.gitconfig.
 export HOME="$WORK_ROOT/home"
 mkdir -p "$HOME/.local/bin"
 export PATH="$HOME/.local/bin:$PATH"
-export HERMES_HOME="$HOME/.hermes"
-mkdir -p "$HERMES_HOME"
+export STARDUST_HOME="$HOME/.hermes"
+mkdir -p "$STARDUST_HOME"
 
-INSTALL_DIR="$HERMES_HOME/hermes-agent"
+INSTALL_DIR="$STARDUST_HOME/hermes-agent"
 
 # Does the installer script at REF accept FLAG? Read that ref's own
 # install.sh rather than assuming this checkout's flag set: the point of the
@@ -366,7 +366,7 @@ case "$UPDATE_METHOD" in
     SPEC="$WORK_ROOT/launch-spec.json"
 
     # A REAL configured provider: the mock inference server (the desktop E2E
-    # suite's own) is configured into HERMES_HOME exactly like the dev:mock
+    # suite's own) is configured into STARDUST_HOME exactly like the dev:mock
     # flow does. The app then boots genuinely configured - no onboarding
     # overlay (a fullscreen div that intercepts every click) - and the chat
     # surface is real too.
@@ -378,7 +378,7 @@ case "$UPDATE_METHOD" in
     rc=0
     (cd "$INSTALL_DIR" && \
       PYTHONPATH="$ASSETS/launch-capture${PYTHONPATH:+:$PYTHONPATH}" \
-      HERMES_E2E_CAPTURE_LAUNCH="$SPEC" \
+      STARDUST_E2E_CAPTURE_LAUNCH="$SPEC" \
       "$HERMES" desktop < /dev/null 2>&1 | ts_prefix > "$LOG_DIR/desktop-launch-capture.log") || rc=$?
     log_group "hermes desktop (launch capture) transcript" "$LOG_DIR/desktop-launch-capture.log"
     [ "$rc" -eq 0 ] || fail "hermes desktop exited $rc during launch capture; transcript above"
@@ -400,7 +400,7 @@ case "$UPDATE_METHOD" in
     rc=0
     (cd "$PW_DIR" && node launch-from-spec.mjs \
       --spec "$SPEC" \
-      --result "$HERMES_HOME/.hermes-update-result.json" \
+      --result "$STARDUST_HOME/.hermes-update-result.json" \
       --expect-sha "$HEAD_SHA" \
       --repo-dir "$INSTALL_DIR" 2>&1 \
       | ts_prefix > "$LOG_DIR/app-update.log") || rc=$?
@@ -472,12 +472,12 @@ esac
 # of the driver; the evidence must already be on disk when they do.
 ildest="$LOG_DIR/install-logs"
 mkdir -p "$ildest"
-cp -R "$HERMES_HOME/logs" "$ildest/hermes-logs" 2>/dev/null || true
+cp -R "$STARDUST_HOME/logs" "$ildest/hermes-logs" 2>/dev/null || true
 if [ -n "${XDG_DATA_HOME:-}" ]; then
   cp -R "$XDG_DATA_HOME/hermes/logs" "$ildest/desktop-userdata-logs" 2>/dev/null || true
 fi
-cp "$HERMES_HOME/.hermes-update-result.json" "$ildest" 2>/dev/null || true
-ls -la "$HERMES_HOME" > "$ildest/hermes-home-ls.txt" 2>/dev/null || true
+cp "$STARDUST_HOME/.hermes-update-result.json" "$ildest" 2>/dev/null || true
+ls -la "$STARDUST_HOME" > "$ildest/hermes-home-ls.txt" 2>/dev/null || true
 ls -la "$INSTALL_DIR/venv/bin" > "$ildest/venv-bin-ls.txt" 2>/dev/null || true
 ok "collected install-side logs to $ildest"
 

@@ -5,7 +5,7 @@ Real processes with real Hermes-shaped argv, real inventory collection
 reconciliation. No mocks on the components under test.
 
  1. Spawn a real process registered as a profile gateway (PID file + state
-    file in a temp HERMES_HOME) — real collect_runtime_inventory() must find
+    file in a temp STARDUST_HOME) — real collect_runtime_inventory() must find
     it, classify supervisor=manual, mechanism id 'manual'.
  2. Reconcile with bookkeeping that MISSES it -> unaccounted + escalation.
  3. Reconcile with it in killed_pids -> 'stopped', no escalation.
@@ -25,7 +25,7 @@ pytestmark = pytest.mark.skipif(sys.platform != "win32", reason="live Windows E2
 def test_plan_reconciliation_live_windows(tmp_path, monkeypatch):
     home = tmp_path / ".hermes"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
 
     # Real live process standing in for a manual gateway
     child = subprocess.Popen(

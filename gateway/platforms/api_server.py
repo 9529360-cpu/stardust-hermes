@@ -2511,7 +2511,7 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
         BY RESOLVED PROFILE (on a multiplex listener profile A must never pin B to A's root).
 
         The store root lives under the profile's data directory
-        (``<HERMES_HOME>/plugin-data/.../artifacts``-style controlled root), so artifacts never escape the
+        (``<STARDUST_HOME>/plugin-data/.../artifacts``-style controlled root), so artifacts never escape the
         profile boundary. Stores are cached BY RESOLVED PROFILE — on a multiplex listener, profile A
         touching the artifact route first must never pin profile B to A's physical root (same frozen-handle
         class as the per-profile session-storage fix in #88734). The root itself is created on first use;
@@ -3097,7 +3097,7 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
             # to the requested profile) while the Channels page rendered "The gateway is not running" (it
             # did neither). Cross-container, profile-scoped, and launch-service-managed deployments each hit
             # that split. profile_home is passed when the request was scoped to a named profile:
-            # gateway/status readers resolve process-level paths and do NOT follow the HERMES_HOME
+            # gateway/status readers resolve process-level paths and do NOT follow the STARDUST_HOME
             # contextvar override (#56986 / #69143), so the profile's directory has to be handed over
             # explicitly or messaging silently reports another profile's gateway (#71211).
             runtime=runtime,
@@ -3608,7 +3608,7 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
         declaration or fingerprint-derived identity keeps delegation synchronous.
 
         ``profile`` is the ``/p/<profile>/`` prefix serving the request (``""`` = default). It must
-        reach ``HERMES_SESSION_PROFILE``: the persistent-Docker container key is derived from it, so an
+        reach ``STARDUST_SESSION_PROFILE``: the persistent-Docker container key is derived from it, so an
         unbound profile collapses every profile's turns onto the default sandbox (#96370)."""
         from gateway.session_context import set_session_vars
         return set_session_vars(

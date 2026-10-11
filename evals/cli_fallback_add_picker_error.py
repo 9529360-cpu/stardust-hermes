@@ -57,7 +57,7 @@ def run(root: Path, output: Path) -> dict:
         shim = Path(home) / "shim" / "curses"
         shim.mkdir(parents=True)
         (shim / "__init__.py").write_text("raise ImportError('curses disabled for PTY harness')\n")
-        env = {"PATH": os.environ["PATH"], "HOME": home, "HERMES_HOME": str(hh),
+        env = {"PATH": os.environ["PATH"], "HOME": home, "STARDUST_HOME": str(hh),
                "PYTHONPATH": f"{shim.parent}{os.pathsep}{root}", "PYTHONUNBUFFERED": "1",
                "TERM": "dumb", "LANG": "C.UTF-8"}
         master, slave = pty.openpty()

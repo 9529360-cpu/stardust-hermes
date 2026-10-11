@@ -38,7 +38,7 @@ class TestLoginNous:
         import hermes_cli.nous_subscription as ns
 
         seen: dict = {}
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         monkeypatch.setattr(
             auth_mod,
             "_nous_device_code_login",

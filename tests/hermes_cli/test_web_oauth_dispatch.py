@@ -40,7 +40,7 @@ HEADERS = {"X-Hermes-Session-Token": _SESSION_TOKEN}
 
 
 def _make_profile_home(tmp_path, monkeypatch, profile="coder"):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     profile_home = tmp_path / "profiles" / profile
     profile_home.mkdir(parents=True)
     return profile_home
@@ -126,7 +126,7 @@ def test_minimax_start_route_honors_poller_mock_on_owning_module(tmp_path, monke
     """
     import threading
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     fake_user_code_resp = {
         "user_code": "ABCD-1234",
         "verification_uri": "https://api.minimax.io/oauth/verify",
@@ -231,7 +231,7 @@ def test_oauth_session_cannot_be_polled_or_cancelled_from_another_profile(
     """A named-profile OAuth session must reject default-profile retargeting."""
     from hermes_cli import web_server as ws
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     (tmp_path / "profiles" / "worker").mkdir(parents=True)
     session_id, _session = _rt_oauth._new_oauth_session(
         "xai-oauth", "device_code", profile="worker"
@@ -848,8 +848,8 @@ def test_xai_dashboard_poller_seeds_single_entry_and_clears_suppression(tmp_path
     from hermes_cli import web_server as ws
     from agent.credential_pool import load_pool
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    monkeypatch.delenv("HERMES_XAI_BASE_URL", raising=False)
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
+    monkeypatch.delenv("STARDUST_XAI_BASE_URL", raising=False)
     monkeypatch.delenv("XAI_BASE_URL", raising=False)
 
     # Existing chat provider must not be overwritten by dashboard OAuth.

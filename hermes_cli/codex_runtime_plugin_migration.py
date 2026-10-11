@@ -126,7 +126,7 @@ def _translate_one_server(name: str, hermes_cfg: dict) -> tuple[Optional[dict], 
 
 # TOML basic-string escapes. Order matters: backslash first so the others aren't re-escaped.
 # Control chars must be \-escaped — a literal one is invalid TOML that codex refuses to load;
-# env-var passthrough (HERMES_HOME, PYTHONPATH) could carry one in pathological cases.
+# env-var passthrough (STARDUST_HOME, PYTHONPATH) could carry one in pathological cases.
 _TOML_ESCAPES = (
     ("\\", "\\\\"), ('"', '\\"'), ("\b", "\\b"), ("\t", "\\t"),
     ("\n", "\\n"), ("\f", "\\f"), ("\r", "\\r"))
@@ -329,7 +329,7 @@ _TEST_TEMPDIR_NEEDLES = ("pytest-of-", "/pytest-", "/tmp/pytest", "/private/var/
 def _looks_like_test_tempdir(path: str) -> bool:
     """Heuristic: does ``path`` look like a pytest/transient tempdir?
 
-    Such dirs are reaped between sessions; a HERMES_HOME pointing there burned into
+    Such dirs are reaped between sessions; a STARDUST_HOME pointing there burned into
     ``~/.codex/config.toml`` makes every codex-routed call fail silently once GC'd. Err on
     refusing: a false positive is far less harmful than silently bricking codex's tool surface.
     """
@@ -340,30 +340,30 @@ def _build_hermes_tools_mcp_entry() -> dict:
     """Codex stdio entry launching Hermes' own tool surface as an MCP server (browser/web/
     delegate_task/vision/memory/skills call-backs).
 
-    HERMES_HOME passes through only IF SET, read from os.environ (not get_hermes_home()): when
-    unset the codex subprocess must inherit its launcher's runtime HERMES_HOME (systemd, gateway,
+    STARDUST_HOME passes through only IF SET, read from os.environ (not get_hermes_home()): when
+    unset the codex subprocess must inherit its launcher's runtime STARDUST_HOME (systemd, gateway,
     kanban), not a migrate-time default burned into config.toml that pins the wrong profile. The
-    pytest-tempdir guard keeps a sibling test's monkeypatched HERMES_HOME out of the user's real
+    pytest-tempdir guard keeps a sibling test's monkeypatched STARDUST_HOME out of the user's real
     config. PYTHONPATH passes through so a worktree-launched hermes finds the branch's modules.
     """
     import sys
     env: dict[str, str] = {}
-    # HERMES_HOME passes through IF SET so the MCP subprocess sees the same config / auth / sessions DB as
+    # STARDUST_HOME passes through IF SET so the MCP subprocess sees the same config / auth / sessions DB as
     # the parent CLI. Read from os.environ (not get_hermes_home()) on purpose: when the env var is unset we
-    # want codex's subprocess to inherit whatever HERMES_HOME its launcher sets at runtime (systemd unit,
+    # want codex's subprocess to inherit whatever STARDUST_HOME its launcher sets at runtime (systemd unit,
     # gateway, kanban dispatcher, custom shell), rather than burning the migrate-time resolved default into
-    # config.toml — that would override the launcher's HERMES_HOME and pin the subprocess to the wrong
+    # config.toml — that would override the launcher's STARDUST_HOME and pin the subprocess to the wrong
     # profile. The pytest-tempdir guard below catches the issue #26250 Bug C scenario: a sibling test's
-    # monkeypatch.setenv("HERMES_HOME", tmp_path) would otherwise leak a transient pytest tempdir into the
+    # monkeypatch.setenv("STARDUST_HOME", tmp_path) would otherwise leak a transient pytest tempdir into the
     # user's real ~/.codex/config.toml and silently brick codex once the tempdir is GC'd.
-    hermes_home = os.environ.get("HERMES_HOME") or ""
+    hermes_home = os.environ.get("STARDUST_HOME") or ""
     if hermes_home and not _looks_like_test_tempdir(hermes_home):
-        env["HERMES_HOME"] = hermes_home
+        env["STARDUST_HOME"] = hermes_home
     if os.environ.get("PYTHONPATH"):
         env["PYTHONPATH"] = os.environ["PYTHONPATH"]
     # Quiet mode + redaction defaults so the MCP wire stays clean.
-    env["HERMES_QUIET"] = "1"
-    env["HERMES_REDACT_SECRETS"] = env.get("HERMES_REDACT_SECRETS", "true")
+    env["STARDUST_QUIET"] = "1"
+    env["STARDUST_REDACT_SECRETS"] = env.get("STARDUST_REDACT_SECRETS", "true")
     return {
         "command": sys.executable,
         "args": ["-m", "agent.transports.hermes_tools_mcp_server"],

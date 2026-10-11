@@ -47,7 +47,7 @@ CANON = "Bot Chat"
 
 @pytest.fixture
 def home(tmp_path, monkeypatch):
-    """Temp HERMES_HOME so the gateway resolvers read a throwaway state.db.
+    """Temp STARDUST_HOME so the gateway resolvers read a throwaway state.db.
 
     ``session.list`` reaches the DB through the gateway's shared launch
     handle (``srv._get_db``), which is bound at process launch — so, like
@@ -57,7 +57,7 @@ def home(tmp_path, monkeypatch):
     """
     h = tmp_path / ".hermes"
     h.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(h))
+    monkeypatch.setenv("STARDUST_HOME", str(h))
 
     from hermes_state import SessionDB
 

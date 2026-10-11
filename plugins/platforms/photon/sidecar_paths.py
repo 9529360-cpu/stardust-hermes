@@ -4,7 +4,7 @@ Hosted images keep the plugin tree read-only (EROFS), so, mirroring
 ``resolve_whatsapp_bridge_dir``: (1) ``PHOTON_SIDECAR_DIR`` override as-is; (2) writable
 source dir → run in place; (3) read-only with baked, current ``node_modules`` → in place;
 (4) read-only and deps missing/stale → mirror the source files to
-``$HERMES_HOME/photon/sidecar``. The mirror is refreshed by content compare; ``node_modules``
+``$STARDUST_HOME/photon/sidecar``. The mirror is refreshed by content compare; ``node_modules``
 is left alone so the lockfile-vs-install-marker check triggers ``npm ci`` inside the mirror.
 Resolution never happens at import time (it probes/copies on disk).
 """

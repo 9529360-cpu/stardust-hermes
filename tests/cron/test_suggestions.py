@@ -2,7 +2,7 @@
 
 Covers the store (add/dedup/cap/accept/dismiss/latch), catalog seeding, the
 blueprint->suggestion bridge, and the shared command handler. Uses an isolated
-HERMES_HOME so the real suggestions.json is never touched.
+STARDUST_HOME so the real suggestions.json is never touched.
 """
 
 from concurrent.futures import ThreadPoolExecutor
@@ -17,10 +17,10 @@ import pytest
 
 @pytest.fixture
 def store(tmp_path, monkeypatch):
-    """A cron.suggestions module bound to an isolated HERMES_HOME."""
+    """A cron.suggestions module bound to an isolated STARDUST_HOME."""
     home = tmp_path / ".hermes"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     import hermes_constants
     importlib.reload(hermes_constants)
     import cron.suggestions as s

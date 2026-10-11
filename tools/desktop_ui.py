@@ -2,7 +2,7 @@
 """Bridge desktop-only tools to Hermes-desktop renderer events.
 
 The desktop ``tui_gateway`` installs an emitter via :func:`set_emitter`; elsewhere it
-stays ``None`` and tools report "desktop only". Routing keys off ``HERMES_UI_SESSION_ID``
+stays ``None`` and tools report "desktop only". Routing keys off ``STARDUST_UI_SESSION_ID``
 so the event lands on the window that owns the turn (the sink is lock-guarded).
 """
 
@@ -47,7 +47,7 @@ def emit(event: str, payload: dict) -> bool:
     """Route ``event`` to the window owning the current turn; False when no emitter."""
     if _emit is None:
         return False
-    _emit(get_session_env("HERMES_UI_SESSION_ID", ""), event, payload)
+    _emit(get_session_env("STARDUST_UI_SESSION_ID", ""), event, payload)
     return True
 
 

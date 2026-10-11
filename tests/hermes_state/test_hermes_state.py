@@ -5130,7 +5130,7 @@ def test_peer_fallback_never_adopts_a_sibling_profiles_row(tmp_path, monkeypatch
 
     root = tmp_path / "hermes"
     root.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(root))
+    monkeypatch.setenv("STARDUST_HOME", str(root))
     monkeypatch.setattr(hermes_state, "DEFAULT_DB_PATH", hermes_state._IMPORT_DEFAULT_DB_PATH)
     store = SessionDB(db_path=root / "state.db")  # owner: default
     try:
@@ -6183,7 +6183,7 @@ class TestPerformancePragmasEndToEnd:
         )
         home = tmp_path / "hermes_home"
         home.mkdir()
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         if config_text is not None:
             (home / "config.yaml").write_text(config_text)
         return home

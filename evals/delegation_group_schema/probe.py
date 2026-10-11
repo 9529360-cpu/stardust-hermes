@@ -16,7 +16,7 @@ sys.path.insert(0, root)
 os.chdir(root)
 with tempfile.TemporaryDirectory(prefix="delegate-schema-") as home:
     os.environ.clear()
-    os.environ.update(HOME=home, HERMES_HOME=home, PATH="/usr/bin:/bin", HERMES_PLATFORM="cli")
+    os.environ.update(HOME=home, STARDUST_HOME=home, PATH="/usr/bin:/bin", STARDUST_PLATFORM="cli")
     config = {"tools": {"tool_search": {"defer": []}}}
     if "--independent" in sys.argv:
         config["delegation"] = {"independent_completions": True}

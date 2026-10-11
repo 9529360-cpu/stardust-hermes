@@ -1,7 +1,7 @@
 """``hermes`` must survive git operations on the checkout (launcher layout).
 
 The Windows ``hermes`` command is a launcher derived from the venv console
-script. Its canonical home is the managed binary dir ``HERMES_HOME\\bin`` —
+script. Its canonical home is the managed binary dir ``STARDUST_HOME\\bin`` —
 OUTSIDE the git checkout — because the earlier in-checkout home
 (``hermes-agent\\bin``) was swept by ``hermes update``'s autostash
 (``git stash push --include-untracked``) and, with the desktop updater's
@@ -33,7 +33,7 @@ from hermes_cli._install_repair import (
 
 
 def _make_managed(tmp_path, monkeypatch, *, relocatable: bool = False):
-    """Fake managed layout: HERMES_HOME/hermes-agent/venv/Scripts + launchers."""
+    """Fake managed layout: STARDUST_HOME/hermes-agent/venv/Scripts + launchers."""
     home = tmp_path / "hermes"
     root = home / "hermes-agent"
     scripts = root / "venv" / "Scripts"
@@ -44,7 +44,7 @@ def _make_managed(tmp_path, monkeypatch, *, relocatable: bool = False):
     if relocatable:
         cfg += "relocatable = true\n"
     (root / "venv" / "pyvenv.cfg").write_text(cfg, encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     return home, root
 
 
@@ -128,10 +128,10 @@ def test_legacy_bin_not_restaged_without_path_consent(managed_install):
 
 
 def test_source_checkout_untouched(tmp_path, monkeypatch):
-    """A checkout NOT under HERMES_HOME gains nothing anywhere."""
+    """A checkout NOT under STARDUST_HOME gains nothing anywhere."""
     home = tmp_path / "hermes-home"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     root = tmp_path / "src" / "hermes-agent"
     scripts = root / "venv" / "Scripts"
     scripts.mkdir(parents=True)
@@ -151,7 +151,7 @@ def test_noop_on_posix(managed_install):
 
 
 def test_profile_session_still_heals_the_shared_bin(tmp_path, monkeypatch):
-    """Under ``hermes -p <name>`` HERMES_HOME points inside profiles/<name>;
+    """Under ``hermes -p <name>`` STARDUST_HOME points inside profiles/<name>;
     the launcher dir is per-machine, so the heal must anchor on the default
     root and fire anyway — a habitual profile user gets the same repair."""
     home = tmp_path / "hermes"
@@ -161,7 +161,7 @@ def test_profile_session_still_heals_the_shared_bin(tmp_path, monkeypatch):
     for name in _WINDOWS_BIN_LAUNCHERS:
         (scripts / f"{name}.exe").write_bytes(b"MZ")
     (root / "venv" / "pyvenv.cfg").write_text("home = X\n", encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(home / "profiles" / "work"))
+    monkeypatch.setenv("STARDUST_HOME", str(home / "profiles" / "work"))
 
     restored = ensure_windows_bin_launchers(root, windows=True, user_path_entries=[])
 
@@ -176,7 +176,7 @@ def test_noop_when_console_scripts_missing(tmp_path, monkeypatch):
     home = tmp_path / "hermes"
     root = home / "hermes-agent"
     (root / "venv" / "Scripts").mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
 
     assert ensure_windows_bin_launchers(root, windows=True, user_path_entries=[]) == []
 
@@ -274,7 +274,7 @@ def test_migration_never_strips_path_when_staging_fails(tmp_path, monkeypatch):
     home = tmp_path / "hermes"
     root = home / "hermes-agent"
     (root / "venv" / "Scripts").mkdir(parents=True)  # no launcher exes inside
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     legacy_bin = str(root / "bin")
     state, read, write = _fake_registry([legacy_bin])
 
@@ -290,7 +290,7 @@ def test_migration_never_strips_path_when_staging_fails(tmp_path, monkeypatch):
 def test_migration_skips_source_checkouts(tmp_path, monkeypatch):
     home = tmp_path / "hermes-home"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     root = tmp_path / "src" / "hermes-agent"
     scripts = root / "venv" / "Scripts"
     scripts.mkdir(parents=True)

@@ -339,7 +339,7 @@ def _install_memory_provider_pip_dependencies(dependencies: List[str]) -> List[D
         return [_command_result(kind="pip", name=", ".join(dependencies), status="already_installed")]
     # Route through the lazy-install pipeline rather than pip against
     # sys.executable: on hosted/immutable images the agent venv is sealed
-    # read-only and installs must go to HERMES_LAZY_INSTALL_TARGET, which
+    # read-only and installs must go to STARDUST_LAZY_INSTALL_TARGET, which
     # install_specs also activates on sys.path so the recheck sees the packages.
     name = ", ".join(missing)
     try:

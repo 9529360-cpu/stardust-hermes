@@ -227,7 +227,7 @@ def test_no_socket_returns_none_fast(home: Path):
 
 def test_default_identify_payload_shape(home: Path, monkeypatch):
     """The real identify handler carries the fleet-consumer contract fields."""
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
 
     async def scenario():
         server = GatewayControlServer(home)  # default handlers

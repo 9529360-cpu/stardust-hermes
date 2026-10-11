@@ -32,7 +32,7 @@ _TRANSCRIPT_SPOOL_SEQ = itertools.count()
 
 
 def _get_flush_dir():
-    """Return the pending-messages flush directory under the active HERMES_HOME."""
+    """Return the pending-messages flush directory under the active STARDUST_HOME."""
     from hermes_constants import get_hermes_home
     flush_dir = get_hermes_home() / "pending_messages"
     flush_dir.mkdir(parents=True, exist_ok=True, mode=0o700)

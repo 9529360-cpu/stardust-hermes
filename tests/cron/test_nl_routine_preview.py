@@ -17,11 +17,11 @@ import pytest
 
 @pytest.fixture
 def hermes_env(tmp_path, monkeypatch):
-    """Isolate HERMES_HOME per test and reload the modules that cache it."""
+    """Isolate STARDUST_HOME per test and reload the modules that cache it."""
     home = tmp_path / ".hermes"
     (home / "cron").mkdir(parents=True)
     (home / "scripts").mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
 
     import hermes_constants
 

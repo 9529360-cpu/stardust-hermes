@@ -102,11 +102,11 @@ def test_cloud_agent_context_binds_registration_principal_and_transport_family()
     tokens = []
     try:
         tokens = server._set_session_context("stored-context-session")
-        assert get_session_env("HERMES_BROWSER_CONTROL_PRINCIPAL") == _principal_digest(
+        assert get_session_env("STARDUST_BROWSER_CONTROL_PRINCIPAL") == _principal_digest(
             identity
         )
         assert (
-            get_session_env("HERMES_BROWSER_CONTROL_TRANSPORT_FAMILY")
+            get_session_env("STARDUST_BROWSER_CONTROL_TRANSPORT_FAMILY")
             == "cloud-ticket-ws"
         )
     finally:

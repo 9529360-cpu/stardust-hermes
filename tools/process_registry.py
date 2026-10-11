@@ -45,7 +45,7 @@ _CHECKPOINT_PATH_AT_IMPORT = CHECKPOINT_PATH
 
 def _checkpoint_path() -> Path:
     """Active profile's checkpoint file at call time: the patched ``CHECKPOINT_PATH`` when a test
-    changed it, else live profile-scoped HERMES_HOME — the multiplexed gateway serves every
+    changed it, else live profile-scoped STARDUST_HOME — the multiplexed gateway serves every
     profile from one process, so the import-time constant would pin every profile's process
     checkpoint to the launch home."""
     return CHECKPOINT_PATH if CHECKPOINT_PATH != _CHECKPOINT_PATH_AT_IMPORT else get_hermes_home() / "processes.json"
@@ -906,7 +906,7 @@ class ProcessRegistry(ProcessCheckpointMixin):
             id=f"proc_{uuid.uuid4().hex[:12]}", command=command, task_id=task_id,
             owner_task_id=owner_task_id or task_id, session_key=session_key, cwd=cwd,
             owner_home=hermes_home_key(),
-            parent_session_id=get_session_env("HERMES_SESSION_ID", ""),
+            parent_session_id=get_session_env("STARDUST_SESSION_ID", ""),
             started_at=time.time(), **extra)
 
     @staticmethod

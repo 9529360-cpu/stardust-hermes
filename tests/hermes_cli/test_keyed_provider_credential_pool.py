@@ -21,7 +21,7 @@ ENDPOINT = "https://api.b.ai/v1"
 def _write_keyed_provider_home(tmp_path, monkeypatch, *, pool_id="b-ai", extra_config=None):
     hermes_home = tmp_path / ".hermes"
     hermes_home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     config = {
         "model": {"default": "b-ai-model", "provider": "b-ai"},
         "providers": {
@@ -139,7 +139,7 @@ def test_prune_keeps_active_legacy_pool_for_keyed_provider(tmp_path, monkeypatch
     }
     hermes_home = tmp_path / ".hermes"
     hermes_home.mkdir(exist_ok=True)
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     (hermes_home / "config.yaml").write_text(yaml.safe_dump(config), encoding="utf-8")
     (hermes_home / "auth.json").write_text(
         json.dumps(
@@ -194,7 +194,7 @@ def test_seed_custom_pool_matches_legacy_named_pool(tmp_path, monkeypatch):
     }
     hermes_home = tmp_path / ".hermes"
     hermes_home.mkdir(exist_ok=True)
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     (hermes_home / "config.yaml").write_text(yaml.safe_dump(config), encoding="utf-8")
     (hermes_home / "auth.json").write_text(
         json.dumps(

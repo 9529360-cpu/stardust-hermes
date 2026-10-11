@@ -87,7 +87,7 @@ class _SuccessfulAdapter(BasePlatformAdapter):
 @pytest.mark.asyncio
 async def test_start_gateway_verbosity_imports_redacting_formatter(monkeypatch, tmp_path):
     """Verbosity != None must not crash with NameError on RedactingFormatter (#8044)."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
 
     class _CleanExitRunner:
         def __init__(self, config):
@@ -129,7 +129,7 @@ async def test_start_gateway_replace_aborts_when_force_killed_pid_still_alive(
     file / scoped locks and start a fresh instance — that leaves two live
     gateways fighting over the same token. It should abort instead.
     """
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
 
     calls = []
     removed_pid = False
@@ -204,7 +204,7 @@ async def test_start_gateway_replace_writes_takeover_marker_before_sigterm(
     Without the marker, PR #5646's signal-recovery path would revive the
     target via systemd Restart=on-failure, starting a flap loop.
     """
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
 
     # Record the ORDER of marker-write + terminate_pid calls
     events: list[str] = []
@@ -303,7 +303,7 @@ async def test_start_gateway_replace_clears_marker_on_permission_denied(
 ):
     """If we fail to kill the existing PID (permission denied), clean up the
     marker so it doesn't grief an unrelated future shutdown."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
 
     def write_marker(target_pid: int) -> bool:
         from gateway.status import _get_takeover_marker_path, _write_json_file
@@ -345,7 +345,7 @@ async def test_runner_degrades_gracefully_when_all_adapters_missing(monkeypatch,
     In fleet deployments the same config.yaml is shared across nodes that may only
     have credentials for a subset of platforms.  Requiring perfect credentials on
     every node makes fleet operation impossible."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     config = GatewayConfig(
         platforms={
             Platform.TELEGRAM: PlatformConfig(enabled=True, token="***"),
@@ -405,7 +405,7 @@ async def test_runner_exits_with_ex_config_on_nonretryable_startup_error(monkeyp
     """Non-retryable startup errors (token collision, no platforms) must
     set exit_code to 78 (EX_CONFIG) so the s6 finish script can translate
     it to exit 125 (permanent failure).  See #51228."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     config = GatewayConfig(
         platforms={
             Platform.DISCORD: PlatformConfig(enabled=True, token="***")
@@ -435,7 +435,7 @@ async def test_start_gateway_propagates_fatal_config_exit_code(monkeypatch, tmp_
     requests a clean exit, but start_gateway()'s clean-exit branch used to
     `return True` before the SystemExit(exit_code) site, so main() exited 0
     and s6 crash-looped anyway (#51228)."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
 
     class _FatalConfigRunner:
         def __init__(self, config):
@@ -498,8 +498,8 @@ async def test_live_foreign_token_lock_at_startup_exits_ex_config(monkeypatch, t
     *mid-run* reconnect can recover once the holder exits.  The startup router
     used to key solely off that flag, so the gateway stayed alive, deaf, and
     retry-queued forever instead of exiting 78 (EX_CONFIG)."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    monkeypatch.setenv("HERMES_GATEWAY_LOCK_DIR", str(tmp_path / "locks"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_GATEWAY_LOCK_DIR", str(tmp_path / "locks"))
     # A live foreign holder: acquire_scoped_lock reports (False, record).
     monkeypatch.setattr(
         "gateway.status.acquire_scoped_lock",
@@ -534,8 +534,8 @@ async def test_token_lock_plus_retryable_peer_stays_alive(monkeypatch, tmp_path)
     """A lock conflict alongside a genuinely transient peer failure is the
     NS-609 mixed mode: the lock is parked fatal, the peer keeps its retry, and
     the gateway stays alive (no exit 78)."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    monkeypatch.setenv("HERMES_GATEWAY_LOCK_DIR", str(tmp_path / "locks"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_GATEWAY_LOCK_DIR", str(tmp_path / "locks"))
     monkeypatch.setattr(
         "gateway.status.acquire_scoped_lock",
         lambda scope, identity, metadata=None: (False, {"pid": 424242, "start_time": 1}),

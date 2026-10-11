@@ -194,7 +194,7 @@ def ensure_google_chat_deps() -> bool:
     """ACTIVE installer (registry ``ensure_deps_fn``).
 
     Routes through ``tools.lazy_deps`` so sealed hosted/Docker images write
-    ``HERMES_LAZY_INSTALL_TARGET`` instead of the read-only venv. Resets the
+    ``STARDUST_LAZY_INSTALL_TARGET`` instead of the read-only venv. Resets the
     failed-import cache so ``create_adapter()`` can load modules after install.
     ``FeatureUnavailable`` propagates: the registry logs its ``reason`` (quarantine
     404, no writable target, network), which is exactly what a hosted operator needs.
@@ -385,7 +385,7 @@ class GoogleChatAdapter(BasePlatformAdapter):
         self._project_id = self._subscription_path = self._bot_user_id = None  # bot id is users/{id}
         self._supervisor_task: Optional[asyncio.Task] = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
-        # The profile scope this adapter was connected under (multiplex: HERMES_HOME override + secret
+        # The profile scope this adapter was connected under (multiplex: STARDUST_HOME override + secret
         # scope). Pub/Sub callbacks arrive on the gRPC SubscriberClient's own threads with an EMPTY
         # context, and ``run_coroutine_threadsafe`` copies THAT context onto the loop task — so
         # ``_dispatch_message`` and everything it reaches (attachment cache, per-user OAuth token

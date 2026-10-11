@@ -58,7 +58,7 @@ _FS_READDIR_HIDDEN = {
 
 # Basenames the managed-files API must never list, read or download: credential
 # stores that become live secrets in the browsable tree the moment an operator
-# points the managed root at HERMES_HOME. Mirrors the two canonical guards
+# points the managed root at STARDUST_HOME. Mirrors the two canonical guards
 # (agent.file_safety.get_read_block_error, gateway.platforms.base
 # ._ROOT_CREDENTIAL_FILES) so the Files tab never lags behind them.
 # These typically contain credentials (API keys, tokens) and exposing them through the dashboard file
@@ -74,7 +74,7 @@ _SENSITIVE_MANAGED_FILE_BASENAMES = frozenset({
 # guards deny these as trees: _ROOT_CREDENTIAL_DIRS and the mcp-tokens/ prefix
 # match). The browser can descend into subdirs, so a basename-only guard would
 # still expose ``mcp-tokens/<server>.json``; match on ANY path component so the
-# trees are blocked wherever they sit under the root, no HERMES_HOME resolution.
+# trees are blocked wherever they sit under the root, no STARDUST_HOME resolution.
 _SENSITIVE_MANAGED_DIR_NAMES = frozenset({"mcp-tokens", "pairing"})
 
 
@@ -325,7 +325,7 @@ async def upload_chat_image(payload: ChatImageUpload, profile: Optional[str] = N
 
     Browser clipboard bytes aren't visible to the server-side clipboard, so the
     /chat page uploads them here and drives the TUI's ``/image <path>`` with
-    the returned gateway-visible path under ``HERMES_HOME/images/`` (the same
+    the returned gateway-visible path under ``STARDUST_HOME/images/`` (the same
     dir ``clipboard.paste`` / ``image.attach`` use).
     """
     def _run():

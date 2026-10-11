@@ -108,7 +108,7 @@ def _current_session_key() -> str:
     the ``get_session_env`` os.environ fallback for CLI/cron/tests)."""
     from gateway.session_context import get_session_env
 
-    return get_session_env("HERMES_SESSION_KEY", "")
+    return get_session_env("STARDUST_SESSION_KEY", "")
 
 
 def _current_session_profile() -> str:
@@ -116,7 +116,7 @@ def _current_session_profile() -> str:
     :func:`_current_session_key`)."""
     from gateway.session_context import get_session_env
 
-    return get_session_env("HERMES_SESSION_PROFILE", "")
+    return get_session_env("STARDUST_SESSION_PROFILE", "")
 
 
 from tools.approval import (
@@ -542,7 +542,7 @@ def _ensure_terminal_env_bridged() -> None:
     env would re-create the first-writer-wins cross-profile leak the scope fixes.
 
     Ambient ``os.environ`` is the *launch* profile's authority only. Under a
-    context-local ``HERMES_HOME`` override (multiplexed dashboard / gateway
+    context-local ``STARDUST_HOME`` override (multiplexed dashboard / gateway
     secondary profile), this bridge is a no-op — otherwise the first unscoped
     call under that override would latch the secondary profile's ``terminal.*``
     into process-global env and poison later unscoped launch-profile turns

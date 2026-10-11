@@ -14,8 +14,8 @@ def test_message_pages_identify_the_serving_profile(tmp_path, monkeypatch, servi
     work_home = default_home / "profiles" / "work" if serving_profile else default_home / "custom-home"
     default_home.mkdir(parents=True)
     work_home.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(work_home))
-    # conftest redirects this legacy override independently of HERMES_HOME.
+    monkeypatch.setenv("STARDUST_HOME", str(work_home))
+    # conftest redirects this legacy override independently of STARDUST_HOME.
     monkeypatch.setattr("hermes_state.DEFAULT_DB_PATH", work_home / "state.db")
 
     for home, count in ((default_home, 1), (work_home, 199)):

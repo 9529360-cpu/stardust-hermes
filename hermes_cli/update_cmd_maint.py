@@ -371,7 +371,7 @@ def _print_update_completion(message: str) -> None:
     """
     from hermes_cli.update_cmd import _branch_head_suffix
     print(f"{message}{_branch_head_suffix()}")
-    action_id = os.environ.get("HERMES_ACTION_ID", "")
+    action_id = os.environ.get("STARDUST_ACTION_ID", "")
     if len(action_id) == 32 and all(char in "0123456789abcdef" for char in action_id):
         print(f"=== hermes-update completed {action_id} ===")
 
@@ -795,7 +795,7 @@ def _run_quick_snapshots() -> Optional[str]:
 
 
 def _run_full_backup() -> None:
-    """Zip HERMES_HOME under ``backups/`` (restorable via ``hermes import``). Never raises."""
+    """Zip STARDUST_HOME under ``backups/`` (restorable via ``hermes import``). Never raises."""
     try:
         from hermes_cli.backup import create_pre_update_backup
     except Exception as exc:
@@ -848,7 +848,7 @@ def _run_pre_update_backup(args) -> Optional[str]:
 
     ``off`` — nothing. ``quick`` (default) — snapshot of critical small files under
     ``state-snapshots/``, files over 1 GiB skipped so a bloated state.db can't stall the update.
-    ``full`` — quick snapshot PLUS a zip of HERMES_HOME under ``backups/`` (``hermes import``).
+    ``full`` — quick snapshot PLUS a zip of STARDUST_HOME under ``backups/`` (``hermes import``).
 
     Explicit user opt-out is honored fully. See #34600.
     """
@@ -905,7 +905,7 @@ def _profile_skill_sync_status(r) -> str:
 def _sync_profiles_after_update() -> None:
     """Best-effort per-profile syncs: bundled skills, ``.env`` backfill, Honcho profiles."""
     # All profiles incl. the active one: seed_profile_skills() subprocesses with an explicit
-    # HERMES_HOME, so sync_skills()'s module-level HERMES_HOME cache can't skew it.
+    # STARDUST_HOME, so sync_skills()'s module-level STARDUST_HOME cache can't skew it.
     with suppress(Exception):
         from hermes_cli.profiles import list_profiles, seed_profile_skills
         all_profiles = list_profiles()
@@ -974,7 +974,7 @@ def _print_post_update_notices_and_self_heals() -> None:
         ('hermes-acp launcher self-heal failed: %s', _ensure_acp_launcher),
         ('Windows bin launcher migration failed: %s', _migrate_windows_bin_path),
         ('cua-driver refresh failed: %s', _refresh_cua_driver_after_update),
-        # Legacy HERMES_NEMO_RELAY_ATIF_*/ATOF_* vars produce no traces since the Relay cutover;
+        # Legacy STARDUST_NEMO_RELAY_ATIF_*/ATOF_* vars produce no traces since the Relay cutover;
         # generate each profile's relay-plugins.toml instead of leaving exports silently dead.
         ('Relay exporter migration failed: %s', _migrate_relay_exporter_env),
     ):

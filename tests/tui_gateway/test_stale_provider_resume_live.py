@@ -40,7 +40,7 @@ NEW_URL = "https://new-endpoint.invalid/v1"
 
 @pytest.fixture()
 def live_home(monkeypatch):
-    """A REAL isolated HERMES_HOME with a config.yaml + state.db on disk."""
+    """A REAL isolated STARDUST_HOME with a config.yaml + state.db on disk."""
     tmp = Path(tempfile.mkdtemp(prefix="hermes-live-staleprov-"))
     home = tmp / ".hermes"
     home.mkdir(parents=True)
@@ -56,7 +56,7 @@ def live_home(monkeypatch):
         ],
     }
     (home / "config.yaml").write_text(yaml.safe_dump(config))
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     # hermes_constants caches the resolved home at first read — the env var
     # alone doesn't repoint an already-imported process. Use the override API
     # (the same mechanism profile-scoped resumes use).

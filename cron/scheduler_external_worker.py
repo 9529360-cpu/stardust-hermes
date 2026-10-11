@@ -176,19 +176,19 @@ def _launch_external_cron_worker(job: dict) -> bool:
         worker_env = strip_launch_profile_env(build_subprocess_env(
             scrub_secrets=multiplex_active,
             inherit_profile_home=True,
-            extra={"HERMES_HOME": str(profile_home)},
+            extra={"STARDUST_HOME": str(profile_home)},
         ))
     finally:
         reset_secret_scope(secret_token)
     worker_env = systemd_user_bus_env(worker_env)
-    # Unattended worker: the gateway sets HERMES_EXEC_ASK at startup (interactive launches set
+    # Unattended worker: the gateway sets STARDUST_EXEC_ASK at startup (interactive launches set
     # the other two), and an inherited presence var makes every env-fallback consumer in the
     # child (`_is_interactive_cli`, sudo prompting, `check_cronjob_requirements`) believe a
     # human is present to answer (#110932).
     for _presence_var in (
-        "HERMES_INTERACTIVE",
-        "HERMES_GATEWAY_SESSION",
-        "HERMES_EXEC_ASK",
+        "STARDUST_INTERACTIVE",
+        "STARDUST_GATEWAY_SESSION",
+        "STARDUST_EXEC_ASK",
     ):
         worker_env.pop(_presence_var, None)
     try:

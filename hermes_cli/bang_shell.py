@@ -51,8 +51,8 @@ def bang_shell_enabled() -> bool:
         def env_var_enabled(name, default=""):  # type: ignore[misc]
             return str(os.getenv(name, default)).strip().lower() in {"1", "true", "yes", "on"}
 
-    return not (env_var_enabled("HERMES_GATEWAY_SESSION") or env_var_enabled("HERMES_CRON_SESSION")
-                or (os.getenv("HERMES_SESSION_PLATFORM") or "").strip())
+    return not (env_var_enabled("STARDUST_GATEWAY_SESSION") or env_var_enabled("STARDUST_CRON_SESSION")
+                or (os.getenv("STARDUST_SESSION_PLATFORM") or "").strip())
 
 
 def resolve_bang_cwd(session_key: Optional[str] = None) -> Optional[str]:

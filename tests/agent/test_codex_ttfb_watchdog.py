@@ -38,7 +38,7 @@ def _make_codex_agent(
     provider="openai-codex",
     base_url="https://chatgpt.com/backend-api/codex",
 ):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     (tmp_path / ".env").write_text("", encoding="utf-8")
     (tmp_path / "config.yaml").write_text("{}\n", encoding="utf-8")
     from run_agent import AIAgent
@@ -67,7 +67,7 @@ def _make_codex_agent(
 
 def _shorten_implicit_idle_watchdog(monkeypatch, helpers, timeout=2.0):
     """Keep the resolver on its implicit branch while scaling time for tests."""
-    monkeypatch.delenv("HERMES_CODEX_EVENT_STALE_TIMEOUT_SECONDS", raising=False)
+    monkeypatch.delenv("STARDUST_CODEX_EVENT_STALE_TIMEOUT_SECONDS", raising=False)
     original = helpers._resolve_nonstream_watchdogs
 
     def resolve(agent, api_kwargs):
@@ -103,7 +103,7 @@ def test_ttfb_includes_silent_hang_hint_for_gpt_5_5(tmp_path, monkeypatch):
     from agent import chat_completion_helpers as h
 
     agent = _make_codex_agent(tmp_path, monkeypatch)
-    monkeypatch.setenv("HERMES_CODEX_TTFB_TIMEOUT_SECONDS", "0.4")
+    monkeypatch.setenv("STARDUST_CODEX_TTFB_TIMEOUT_SECONDS", "0.4")
 
     closes: list = []
     statuses: list[str] = []
@@ -159,7 +159,7 @@ def test_ttfb_installs_and_retires_the_codex_request_token(tmp_path, monkeypatch
     from agent import chat_completion_helpers as h
 
     agent = _make_codex_agent(tmp_path, monkeypatch)
-    monkeypatch.setenv("HERMES_CODEX_TTFB_TIMEOUT_SECONDS", "1")
+    monkeypatch.setenv("STARDUST_CODEX_TTFB_TIMEOUT_SECONDS", "1")
 
     closes: list = []
     seen = {"token_while_running": None}
@@ -235,7 +235,7 @@ def test_ttfb_does_not_kill_when_events_flow(tmp_path, monkeypatch):
     from agent import chat_completion_helpers as h
 
     agent = _make_codex_agent(tmp_path, monkeypatch)
-    monkeypatch.setenv("HERMES_CODEX_TTFB_TIMEOUT_SECONDS", "0.4")
+    monkeypatch.setenv("STARDUST_CODEX_TTFB_TIMEOUT_SECONDS", "0.4")
 
     closes: list = []
     dummy_client = SimpleNamespace()
@@ -282,7 +282,7 @@ def test_per_agent_codex_idle_timeout_override_wins_over_env(tmp_path, monkeypat
         provider="custom",
         base_url="https://gateway.example/v1",
     )
-    monkeypatch.setenv("HERMES_CODEX_EVENT_STALE_TIMEOUT_SECONDS", "2")
+    monkeypatch.setenv("STARDUST_CODEX_EVENT_STALE_TIMEOUT_SECONDS", "2")
     agent._codex_event_stale_timeout_override = 600.0
 
     watchdogs = h._resolve_nonstream_watchdogs(
@@ -323,9 +323,9 @@ def test_idle_phase_policy_is_narrow_and_preserves_operator_overrides(
         tmp_path, monkeypatch, provider=provider, base_url=base_url
     )
     if idle_env is None:
-        monkeypatch.delenv("HERMES_CODEX_EVENT_STALE_TIMEOUT_SECONDS", raising=False)
+        monkeypatch.delenv("STARDUST_CODEX_EVENT_STALE_TIMEOUT_SECONDS", raising=False)
     else:
-        monkeypatch.setenv("HERMES_CODEX_EVENT_STALE_TIMEOUT_SECONDS", idle_env)
+        monkeypatch.setenv("STARDUST_CODEX_EVENT_STALE_TIMEOUT_SECONDS", idle_env)
 
     watchdogs = h._resolve_nonstream_watchdogs(
         agent, {"model": "gpt-5.6-sol", "input": "x" * input_chars}
@@ -347,9 +347,9 @@ def test_event_stale_phase_is_scoped_to_physical_stream_attempt(
 
     agent = _make_codex_agent(tmp_path, monkeypatch)
     _shorten_implicit_idle_watchdog(monkeypatch, h)
-    monkeypatch.setenv("HERMES_CODEX_TTFB_TIMEOUT_SECONDS", "2")
-    monkeypatch.setenv("HERMES_CODEX_TTFB_STRICT", "1")
-    monkeypatch.setenv("HERMES_CODEX_HARD_TIMEOUT_SECONDS", "5")
+    monkeypatch.setenv("STARDUST_CODEX_TTFB_TIMEOUT_SECONDS", "2")
+    monkeypatch.setenv("STARDUST_CODEX_TTFB_STRICT", "1")
+    monkeypatch.setenv("STARDUST_CODEX_HARD_TIMEOUT_SECONDS", "5")
 
     closes: list = []
     attempts = {"count": 0}
@@ -575,9 +575,9 @@ def test_large_codex_request_hard_ceiling_reclaims_silent_stall(tmp_path, monkey
     from agent import chat_completion_helpers as h
 
     agent = _make_codex_agent(tmp_path, monkeypatch)
-    # Real default TTFB threshold (no HERMES_CODEX_TTFB_* override) → for a
+    # Real default TTFB threshold (no STARDUST_CODEX_TTFB_* override) → for a
     # >10k-token request the no-event TTFB watchdog is auto-disabled.
-    monkeypatch.setenv("HERMES_CODEX_HARD_TIMEOUT_SECONDS", "3")
+    monkeypatch.setenv("STARDUST_CODEX_HARD_TIMEOUT_SECONDS", "3")
 
     closes: list = []
     dummy_client = SimpleNamespace()

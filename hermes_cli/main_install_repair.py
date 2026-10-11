@@ -82,7 +82,7 @@ def _load_installable_optional_extras(group: str = "all") -> list[str]:
     return referenced
 
 
-# Install-scoped breadcrumbs live next to the venv (not under $HERMES_HOME)
+# Install-scoped breadcrumbs live next to the venv (not under $STARDUST_HOME)
 # because the venv is shared across profiles.
 #   ``.update-incomplete``       — generic core ``.[all]`` install was interrupted;
 #     cleared only after a confirmed full dependency reinstall/recovery.
@@ -353,7 +353,7 @@ def _windows_running_hermes_launcher_locked() -> bool:
 
 
 # Set on the re-exec'd child so it can never spawn another one.
-_UPDATE_REEXEC_ENV = "HERMES_UPDATE_REEXEC"
+_UPDATE_REEXEC_ENV = "STARDUST_UPDATE_REEXEC"
 
 
 def _reexec_dependency_sync_off_windows_shim() -> bool:

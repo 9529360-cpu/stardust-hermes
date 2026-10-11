@@ -298,7 +298,7 @@ def test_subprocess_killall_hermes_blocked():
 
 def test_subprocess_popen_real_gateway_restart_blocked():
     """``python -m hermes_cli.main gateway restart`` is a detached child that
-    inherits the pytest-tmp HERMES_HOME, resolves the developer's real
+    inherits the pytest-tmp STARDUST_HOME, resolves the developer's real
     ``hermes-gateway`` unit, and outlives the test (39 six-day orphans squatted
     the webhook port, 2026-09-03). Blocked at the spawn primitive."""
     with pytest.raises(RuntimeError, match="live-system guard"):

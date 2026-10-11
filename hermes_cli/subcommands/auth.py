@@ -62,7 +62,7 @@ def build_auth_parser(subparsers, *, cmd_auth: Callable) -> None:
     auth_spotify.add_argument(
         "spotify_action", nargs="?", choices=["login", "status", "logout"], default="login")
     auth_spotify.add_argument(
-        "--client-id", help="Spotify app client_id (or set HERMES_SPOTIFY_CLIENT_ID)")
+        "--client-id", help="Spotify app client_id (or set STARDUST_SPOTIFY_CLIENT_ID)")
     auth_spotify.add_argument(
         "--redirect-uri", help="Allow-listed localhost redirect URI for your Spotify app")
     auth_spotify.add_argument("--scope", help="Override requested Spotify scopes")

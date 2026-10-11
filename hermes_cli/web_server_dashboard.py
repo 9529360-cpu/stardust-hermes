@@ -107,7 +107,7 @@ def mount_spa(application: FastAPI):
 
     # `hermes serve` is the headless backend: it must NEVER serve the browser SPA, even if a
     # dist is lying around, so only the JSON-RPC/WS/API surface is reachable.
-    if os.environ.get("HERMES_SERVE_HEADLESS") == "1":
+    if os.environ.get("STARDUST_SERVE_HEADLESS") == "1":
 
         @application.get("/{full_path:path}")
         async def no_frontend(full_path: str):
@@ -404,7 +404,7 @@ def _discover_user_themes() -> list:
     """Fully-normalised user themes from ``<launch home>/dashboard-themes/*.yaml``.
 
     Uses the process launch home, not ``get_hermes_home()``, so a transient profile override
-    from embedded chat does not hide themes under the server's own ``HERMES_HOME``.
+    from embedded chat does not hide themes under the server's own ``STARDUST_HOME``.
     """
     themes_dir = get_process_hermes_home() / "dashboard-themes"
     if not themes_dir.is_dir():
@@ -455,7 +455,7 @@ def _dashboard_plugin_search_dirs() -> List[tuple]:
 
     User dashboard plugins are a dashboard-owned asset (like theme YAML): resolved from the
     process launch home so they don't vanish when a request is scoped to another profile.
-    When the process itself is profile-scoped (``HERMES_HOME=<root>/profiles/<name>``) the
+    When the process itself is profile-scoped (``STARDUST_HOME=<root>/profiles/<name>``) the
     launch home has no ``plugins/`` — user plugins live in the hermes root — so the default
     root is scanned too; profile-local plugins stay authoritative over same-named root ones.
     The project source is gated on shared truthy semantics (``1``/``true``/``yes``/``on``):
@@ -467,11 +467,11 @@ def _dashboard_plugin_search_dirs() -> List[tuple]:
     bundled_root = get_bundled_plugins_dir()
     # User dashboard plugins are a dashboard-owned asset (same category as theme YAML): resolve them from
     # the process launch home so they don't vanish when a request is scoped to another profile via a
-    # context-local HERMES_HOME override (e.g. embedded /chat under --open-profile). #87197: when the
-    # process itself is profile-scoped (``--profile <name>`` sets ``HERMES_HOME=<root>/profiles/<name>``),
+    # context-local STARDUST_HOME override (e.g. embedded /chat under --open-profile). #87197: when the
+    # process itself is profile-scoped (``--profile <name>`` sets ``STARDUST_HOME=<root>/profiles/<name>``),
     # the launch home is the profile directory, which has no ``plugins/`` — user plugins are installed in
     # the hermes root (``~/.hermes/plugins``). Scan the default root as well (``get_default_hermes_root()``
-    # unwraps ``<root>/profiles/<name>`` → ``<root>`` and returns a custom ``HERMES_HOME`` unchanged when it
+    # unwraps ``<root>/profiles/<name>`` → ``<root>`` and returns a custom ``STARDUST_HOME`` unchanged when it
     # *is* the root), mirroring how ``hermes_cli.plugins`` resolves plugin install locations. The
     # ``seen_names`` dedupe below keeps profile-local plugins (if any) authoritative over same-named root
     # plugins.
@@ -488,7 +488,7 @@ def _dashboard_plugin_search_dirs() -> List[tuple]:
     # this turned the opt-in into a sticky always-on switch. Use the shared truthy semantics (``1`` /
     # ``true`` / ``yes`` / ``on``) so the gate matches ``hermes_cli/plugins.py`` and the documented user
     # contract.
-    if env_var_enabled("HERMES_ENABLE_PROJECT_PLUGINS"):
+    if env_var_enabled("STARDUST_ENABLE_PROJECT_PLUGINS"):
         search_dirs.append((Path.cwd() / ".hermes" / "plugins", "project"))
     return search_dirs
 

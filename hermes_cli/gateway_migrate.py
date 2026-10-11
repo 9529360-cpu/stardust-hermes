@@ -41,7 +41,7 @@ class ProfileGateway:
     services: list[tuple[str, bool]] = field(default_factory=list)
     run_as_user: Optional[str] = None  # User= recorded by a system-scope systemd unit
     uid: Optional[int] = None  # owner of the gateway process/unit; None = unknown (never "different")
-    runtime_home: Optional[Path] = None  # HERMES_HOME the installed unit pins, when it differs from ``home``
+    runtime_home: Optional[Path] = None  # STARDUST_HOME the installed unit pins, when it differs from ``home``
 
     @property
     def is_default(self) -> bool:
@@ -158,23 +158,23 @@ class MigrationPlan:
 
 @contextlib.contextmanager
 def _home_env(home: Path) -> Iterator[None]:
-    """Run service-manager helpers as if ``home`` were the active HERMES_HOME. Both the contextvar
+    """Run service-manager helpers as if ``home`` were the active STARDUST_HOME. Both the contextvar
     override (``get_hermes_home``) and ``os.environ`` (``gateway.status`` identity files, unit
     generation) are switched, then restored."""
     from hermes_constants import reset_hermes_home_override, set_hermes_home_override
     import hermes_constants
-    previous = os.environ.get("HERMES_HOME")
+    previous = os.environ.get("STARDUST_HOME")
     token = set_hermes_home_override(str(home))
-    os.environ["HERMES_HOME"] = str(home)
+    os.environ["STARDUST_HOME"] = str(home)
     hermes_constants._default_hermes_root_memo = None
     try:
         yield
     finally:
         reset_hermes_home_override(token)
         if previous is None:
-            os.environ.pop("HERMES_HOME", None)
+            os.environ.pop("STARDUST_HOME", None)
         else:
-            os.environ["HERMES_HOME"] = previous
+            os.environ["STARDUST_HOME"] = previous
         hermes_constants._default_hermes_root_memo = None
 
 
@@ -890,7 +890,7 @@ def maybe_auto_migrate_after_update() -> None:
     """``hermes update`` hook: with >= 2 profiles, per-profile gateways present and multiplex off,
     migrate automatically when unblocked (deterministic, never prompts) or print the blocker block.
     ``gateway.auto_multiplex_migration: false`` on the default profile opts out; a secondary behind a
-    service-domain / UNIX-user / HERMES_HOME boundary blocks this path only (the explicit command decides)."""
+    service-domain / UNIX-user / STARDUST_HOME boundary blocks this path only (the explicit command decides)."""
     from hermes_cli.gateway_migrate_guards import auto_migration_blockers, auto_migration_opted_out
     if _host_supports_migration() is not None or auto_migration_opted_out(_default_home()):
         return

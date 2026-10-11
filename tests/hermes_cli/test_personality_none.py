@@ -97,10 +97,10 @@ class TestGatewayPersonalityNone:
     def _gateway_env(self, tmp_path):
         # The gateway reads via _load_gateway_config (rooted at
         # gateway.run._hermes_home) and persists via persist_personality
-        # (rooted at HERMES_HOME) — point both at the same tmp dir.
+        # (rooted at STARDUST_HOME) — point both at the same tmp dir.
         return (
             patch("gateway.run._hermes_home", tmp_path),
-            patch.dict(os.environ, {"HERMES_HOME": str(tmp_path)}),
+            patch.dict(os.environ, {"STARDUST_HOME": str(tmp_path)}),
         )
 
     @pytest.mark.asyncio

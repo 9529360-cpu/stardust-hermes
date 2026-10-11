@@ -106,7 +106,7 @@ class PlatformRegistry:
     def __init__(self) -> None:
         self._lock = threading.RLock()
         self._entries: dict[str, PlatformEntry] = {}  # process-global (e.g. the built-in relay)
-        # Plugin adapters are isolated per resolved HERMES_HOME and overlay the
+        # Plugin adapters are isolated per resolved STARDUST_HOME and overlay the
         # process-global entries for lookups in that profile's runtime scope.
         self._scoped_entries: dict[str, dict[str, PlatformEntry]] = {}
         # Deferred loaders: name -> callable importing the owning plugin module (which calls

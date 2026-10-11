@@ -288,7 +288,7 @@ def _apply_personality_to_session(
 def _cfg_max_turns(cfg: dict, default: int) -> int:
     from hermes_cli.config import resolve_turn_limit as _resolve_turn_limit
     # Env override wins; resolve_turn_limit makes "none"/"unlimited"/0 first-class spellings.
-    if env_val := os.environ.get("HERMES_TUI_MAX_TURNS"):
+    if env_val := os.environ.get("STARDUST_TUI_MAX_TURNS"):
         return _resolve_turn_limit(env_val, default=default)
     raw = (cfg.get("agent") or {}).get("max_turns")
     if raw is None:
@@ -297,7 +297,7 @@ def _cfg_max_turns(cfg: dict, default: int) -> int:
 
 
 def _parse_tui_skills_env() -> list[str]:
-    raw = os.environ.get("HERMES_TUI_SKILLS", "")
+    raw = os.environ.get("STARDUST_TUI_SKILLS", "")
     return list(dict.fromkeys(p.strip() for p in raw.replace("\n", ",").split(",") if p.strip()))
 
 

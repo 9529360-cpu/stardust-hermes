@@ -287,7 +287,7 @@ def _active_profile_name(home_path: Optional[Path]) -> str:
         resolved = Path(home_path)
         if resolved.parent.name == "profiles" and resolved.name:
             return resolved.name
-    for env_name in ("HERMES_PROFILE_NAME", "HERMES_PROFILE"):
+    for env_name in ("STARDUST_PROFILE_NAME", "STARDUST_PROFILE"):
         value = os.environ.get(env_name, "").strip()
         if value and value != "default":
             return value

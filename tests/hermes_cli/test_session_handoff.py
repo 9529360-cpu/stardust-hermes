@@ -27,7 +27,7 @@ class TestHandoffStateDB:
     def db(self, tmp_path, monkeypatch):
         home = tmp_path / ".hermes"
         home.mkdir()
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         return SessionDB(db_path=home / "state.db")
 
     def _make_session(self, db, session_id, source="cli", title=None):

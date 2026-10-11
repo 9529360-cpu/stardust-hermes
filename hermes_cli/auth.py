@@ -348,7 +348,7 @@ def _model_level_key_env(provider_id: str) -> str:
     """``model.key_env`` when config.yaml's main model targets *provider_id*, else ``""``.
 
     The Desktop settings UI saves registry-provider keys as a credential pointer
-    (``model.key_env`` → ``$HERMES_HOME/.env``) instead of the registry's canonical env var,
+    (``model.key_env`` → ``$STARDUST_HOME/.env``) instead of the registry's canonical env var,
     so credential resolution must consult it (#106336).
     """
     try:
@@ -384,7 +384,7 @@ def _resolve_api_key_provider_secret(provider_id: str, pconfig: ProviderConfig) 
     from hermes_cli.config import get_env_value_prefer_dotenv
 
     # Desktop-saved credential pointer: the settings UI persists registry-provider keys as
-    # model.key_env → $HERMES_HOME/.env (e.g. HERMES_CUSTOM_LMSTUDIO_API_KEY) while keeping
+    # model.key_env → $STARDUST_HOME/.env (e.g. STARDUST_CUSTOM_LMSTUDIO_API_KEY) while keeping
     # model.provider on the registry id, so the pointer must be honored here or the UI-saved
     # key is silently ignored and lmstudio falls through to its no-auth placeholder (#106336).
     key_env = _model_level_key_env(provider_id)
@@ -470,12 +470,12 @@ def _nonempty_str(value: Any) -> bool:
 def _auth_file_path() -> Path:
     path = get_hermes_home() / "auth.json"
     # Seat belt: under pytest, refuse to touch the real user's auth store (tests that forgot to
-    # monkeypatch HERMES_HOME or escaped the hermetic conftest). In production: one dict lookup.
+    # monkeypatch STARDUST_HOME or escaped the hermetic conftest). In production: one dict lookup.
     if (os.environ.get("PYTEST_CURRENT_TEST")
             and _same_path(path, Path.home() / ".hermes" / "auth.json")):
         raise RuntimeError(
             f"Refusing to touch real user auth store during test run: {path}. "
-            "Set HERMES_HOME to a tmp_path in your test fixture, or run "
+            "Set STARDUST_HOME to a tmp_path in your test fixture, or run "
             "via scripts/run_tests.sh for hermetic CI-parity env.")
     return path
 
@@ -1591,7 +1591,7 @@ _NOUS_PORTAL_ALLOWED_HOSTS: FrozenSet[str] = frozenset({
 # each would trigger its own ~15s blocking refresh of an expired token; a short-TTL memo collapses
 # the burst into one round-trip. Callers needing freshness use force_fresh/refresh_nous_oauth_pure.
 # Keyed by hermes_home_key(): the resolution itself is profile-scoped (_auth_file_path reads the
-# per-turn HERMES_HOME override a multiplex gateway sets), so a single slot would hand profile A's
+# per-turn STARDUST_HOME override a multiplex gateway sets), so a single slot would hand profile A's
 # Portal bearer to profile B for up to the TTL.
 _RESOLVE_TOKEN_CACHE_LOCK = threading.Lock()
 _RESOLVE_TOKEN_CACHE: "dict[str, tuple[float, str]]" = {}
@@ -1844,8 +1844,8 @@ def _provider_env_base_url(pconfig: ProviderConfig) -> str:
 def _provider_is_keyless(provider_id: str) -> bool:
     """HermesOverlay keyless flag — the same source the provider catalog and GUI contract tests use."""
     try:
-        from hermes_cli.providers import HERMES_OVERLAYS
-        return bool(getattr(HERMES_OVERLAYS.get(provider_id), "keyless", False))
+        from hermes_cli.providers import STARDUST_OVERLAYS
+        return bool(getattr(STARDUST_OVERLAYS.get(provider_id), "keyless", False))
     except Exception:
         return False
 
@@ -1926,8 +1926,8 @@ def _external_process_spec(
     pconfig: ProviderConfig) -> tuple[str, List[str], str, Optional[str], tuple[str, ...]]:
     """``(command, args, base_url, resolved_command, command_env_vars)`` for an ACP provider.
 
-    Launch details come from the provider's own profile (copilot-acp: HERMES_COPILOT_ACP_COMMAND /
-    COPILOT_CLI_PATH / HERMES_COPILOT_ACP_ARGS), so out-of-tree providers describe their binary."""
+    Launch details come from the provider's own profile (copilot-acp: STARDUST_COPILOT_ACP_COMMAND /
+    COPILOT_CLI_PATH / STARDUST_COPILOT_ACP_ARGS), so out-of-tree providers describe their binary."""
     base_url = _provider_env_base_url(pconfig) or pconfig.inference_base_url
     try:
         from providers import get_provider_profile as _get_provider_profile

@@ -254,7 +254,7 @@ declare global {
         // interrupting the live gateway workspace switch.
         remember: (name: string | null) => Promise<DesktopActiveProfile>
         // Persists the desktop's profile choice and relaunches the local
-        // backend under the new HERMES_HOME (reloads the window). Pass null to
+        // backend under the new STARDUST_HOME (reloads the window). Pass null to
         // clear the preference.
         set: (name: string | null) => Promise<DesktopActiveProfile>
       }
@@ -351,11 +351,11 @@ declare global {
        *  local-models GUI surfaces. Absent/false = every local surface hides. */
       localModelsEnabled?: boolean
       /** Launch flag: the Nous free tier is on for this launch
-       *  (HERMES_GUEST_ONBOARDING=1 or --guest-onboarding). Read-only fact the
+       *  (STARDUST_GUEST_ONBOARDING=1 or --guest-onboarding). Read-only fact the
        *  main process also stamps onto every backend it spawns. */
       guestOnboardingEnabled?: boolean
-      /** Launch flag: skip the first-run film (HERMES_SKIP_INTRO=1 or
-       *  --skip-intro) so a fresh HERMES_HOME lands on the guided chat. */
+      /** Launch flag: skip the first-run film (STARDUST_SKIP_INTRO=1 or
+       *  --skip-intro) so a fresh STARDUST_HOME lands on the guided chat. */
       skipIntro?: boolean
       setTranslucency?: (payload: TranslucencyState) => void
       setKeepAwake?: (on: boolean) => void
@@ -407,11 +407,11 @@ declare global {
       revealPath?: (path: string) => Promise<boolean>
       // Open a DIRECTORY (created if missing) in the OS file manager.
       openDir?: (path: string) => Promise<{ ok: boolean; error?: string }>
-      // Local Desktop runtime-plugin root (<HERMES_HOME>/desktop-plugins),
+      // Local Desktop runtime-plugin root (<STARDUST_HOME>/desktop-plugins),
       // resolved by Electron independently of the connected backend (#66899).
       // Created on demand; returns the normalized absolute path.
       desktopPluginsRoot?: () => Promise<string>
-      /** LOCAL `<HERMES_HOME>/logs` (profile-aware) — error card "Open Logs". */
+      /** LOCAL `<STARDUST_HOME>/logs` (profile-aware) — error card "Open Logs". */
       logsRoot?: () => Promise<string>
       /** Re-copy unified packages' desktop halves into the app-level root; returns touched paths. */
       reconcileDesktopPlugins?: () => Promise<string[]>

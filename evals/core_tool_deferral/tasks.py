@@ -48,7 +48,7 @@ def _called(ctx, name):
 
 
 def _grep_home(ctx, needle):
-    """Binary-safe grep of the entire HERMES_HOME tree (sqlite included)."""
+    """Binary-safe grep of the entire STARDUST_HOME tree (sqlite included)."""
     nb = needle.encode()
     for root, _dirs, files in os.walk(ctx["hermes_home"]):
         for fn in files:

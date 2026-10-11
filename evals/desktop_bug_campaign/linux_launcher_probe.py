@@ -27,10 +27,10 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     root = Path(tempfile.mkdtemp(prefix="linux-launcher-", dir=args.output))
     env = {"PATH": "/usr/bin:/bin", "HOME": str(root / "home"),
-           "HERMES_HOME": str(root / "home/.hermes"),
+           "STARDUST_HOME": str(root / "home/.hermes"),
            "XDG_DATA_HOME": str(root / "xdg"), "LANG": "C.UTF-8",
-           "HERMES_NONINTERACTIVE": "1"}
-    Path(env["HERMES_HOME"]).mkdir(parents=True)
+           "STARDUST_NONINTERACTIVE": "1"}
+    Path(env["STARDUST_HOME"]).mkdir(parents=True)
     venv_dir = root / "venv"
     venv.EnvBuilder(with_pip=False, symlinks=True).create(venv_dir)
     python = venv_dir / "bin/python"
@@ -64,7 +64,7 @@ def main():
     rows["stable_rewrite"] = entry.read_bytes() == original
     custom = original.replace(b"Name=Hermes\n", b"Name=Hermes custom\n").replace(b"Terminal=false", b"Terminal=true")
     entry.write_bytes(custom)
-    config = Path(env["HERMES_HOME"]) / "config.yaml"
+    config = Path(env["STARDUST_HOME"]) / "config.yaml"
     config.write_text("desktop:\n  manage_launcher_entry: false\n")
     rows["custom_install"] = run([str(python), "-c", install], env, "/")
     rows["custom_preserved"] = entry.read_bytes() == custom

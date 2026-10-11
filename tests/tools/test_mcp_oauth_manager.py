@@ -50,7 +50,7 @@ def test_manager_rebuilds_provider_when_oauth_config_changes(tmp_path, monkeypat
 
     from tools.mcp_oauth_manager import MCPOAuthManager
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     manager = MCPOAuthManager()
     builds = []
 
@@ -77,7 +77,7 @@ def test_manager_rebuilds_provider_when_oauth_config_changes(tmp_path, monkeypat
 def test_manager_restore_entry_preserves_newer_concurrent_entry(tmp_path, monkeypatch):
     from tools.mcp_oauth_manager import MCPOAuthManager
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     _set_interactive_stdin(monkeypatch)
     manager = MCPOAuthManager()
     old_provider = manager.get_or_build_provider("shared", "https://old.example", {})
@@ -118,7 +118,7 @@ async def test_disk_watch_invalidates_on_mtime_change(tmp_path, monkeypatch):
     invalidateOAuthCacheIfDiskChanged (CC-1096 / GH#24317) and is the core
     fix for Cthulhu's external-cron refresh workflow.
     """
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     from tools.mcp_oauth_manager import MCPOAuthManager, reset_manager_for_tests
 
     reset_manager_for_tests()
@@ -165,7 +165,7 @@ async def test_handle_401_tracks_inflight_task_to_prevent_gc(tmp_path, monkeypat
     """
     import asyncio
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     from tools.mcp_oauth_manager import MCPOAuthManager, _ProviderEntry
 
     class _TrackedSet(set):
@@ -225,7 +225,7 @@ async def test_handle_401_dedup_survives_even_if_task_reference_dropped(tmp_path
     import asyncio
     import gc
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     from tools.mcp_oauth_manager import MCPOAuthManager, _ProviderEntry
 
     mgr = MCPOAuthManager()
@@ -294,7 +294,7 @@ def _provider_with_token_endpoint(tmp_path, oauth_config, token_endpoint, monkey
 
 def test_invalid_client_at_token_endpoint_poisons(tmp_path, monkeypatch):
     """400 invalid_client on the token endpoint deletes the dead client.json."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     d = tmp_path / "mcp-tokens"
     d.mkdir(parents=True)
     (d / "srv.client.json").write_text('{"client_id": "dead"}', encoding="utf-8")
@@ -316,7 +316,7 @@ def test_invalid_client_at_token_endpoint_poisons(tmp_path, monkeypatch):
 
 def test_invalid_client_metadata_does_not_trip(tmp_path, monkeypatch):
     """RFC 7591 `invalid_client_metadata` must NOT be mistaken for invalid_client."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     d = tmp_path / "mcp-tokens"
     d.mkdir(parents=True)
     (d / "srv.client.json").write_text('{"client_id": "live"}', encoding="utf-8")
@@ -351,7 +351,7 @@ def test_bridge_forwards_requests_and_poisons_on_token_endpoint_400(
     genuinely fragile part. A patched SDK base generator stands in for the
     real OAuth flow so we control exactly which response the bridge sees.
     """
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     token_ep = "https://idp.example.com/oauth/token"
     d = tmp_path / "mcp-tokens"
     d.mkdir(parents=True)
@@ -401,7 +401,7 @@ async def test_manager_provider_token_exchange_includes_dcr_secret(tmp_path, mon
     from tools.mcp_oauth_manager import MCPOAuthManager, reset_manager_for_tests
 
     reset_manager_for_tests()
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     _set_interactive_stdin(monkeypatch)
 
     mgr = MCPOAuthManager()
@@ -430,7 +430,7 @@ async def test_manager_malformed_201_token_response_does_not_expose_body(
 ):
     from mcp.client.auth.oauth2 import OAuthTokenError
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     provider = _provider_with_token_endpoint(
         tmp_path, {}, "https://idp.example.com/oauth/token", monkeypatch
     )
@@ -452,7 +452,7 @@ async def test_manager_token_read_error_does_not_expose_body(tmp_path, monkeypat
     import httpx
     from mcp.client.auth.oauth2 import OAuthTokenError
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     provider = _provider_with_token_endpoint(
         tmp_path, {}, "https://idp.example.com/oauth/token", monkeypatch
     )
@@ -476,7 +476,7 @@ async def test_manager_malformed_201_refresh_response_clears_tokens(
 ):
     import logging
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     provider = _provider_with_token_endpoint(
         tmp_path, {}, "https://idp.example.com/oauth/token", monkeypatch
     )
@@ -499,7 +499,7 @@ async def test_manager_malformed_201_refresh_response_clears_tokens(
 async def test_manager_refresh_read_error_clears_tokens(tmp_path, monkeypatch):
     import httpx
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     provider = _provider_with_token_endpoint(
         tmp_path, {}, "https://idp.example.com/oauth/token", monkeypatch
     )
@@ -524,7 +524,7 @@ async def test_refresh_response_without_refresh_token_keeps_stored_one(tmp_path,
     import json
     from mcp.shared.auth import OAuthToken
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     provider = _provider_with_token_endpoint(
         tmp_path, {}, "https://idp.example.com/oauth/token", monkeypatch
     )
@@ -551,7 +551,7 @@ async def test_refresh_response_with_new_refresh_token_rotates(tmp_path, monkeyp
     import json
     from mcp.shared.auth import OAuthToken
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     provider = _provider_with_token_endpoint(
         tmp_path, {}, "https://idp.example.com/oauth/token", monkeypatch
     )
@@ -571,7 +571,7 @@ async def test_refresh_response_with_new_refresh_token_rotates(tmp_path, monkeyp
 # ---------------------------------------------------------------------------
 # Cross-process refresh-token rotation (single-use refresh tokens)
 #
-# Two Hermes backends routinely share one HERMES_HOME (desktop `serve` +
+# Two Hermes backends routinely share one STARDUST_HOME (desktop `serve` +
 # `gateway run`). With a provider that rotates refresh tokens, the loser of the
 # race POSTs a token the winner already consumed and gets 400 — while a valid
 # replacement sits on disk. Clearing state there forces an interactive browser
@@ -593,7 +593,7 @@ def _token(access, refresh, expires_in=3600):
 @pytest.mark.asyncio
 async def test_refresh_400_recovers_token_rotated_by_peer(tmp_path, monkeypatch):
     """A peer rotated the refresh token: recover from disk instead of clearing."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     provider = _provider_with_token_endpoint(
         tmp_path, {}, "https://idp.example.com/oauth/token", monkeypatch
     )
@@ -624,7 +624,7 @@ async def test_refresh_400_rejects_disk_token_without_refresh_token(
     defers the reauth to expiry, with no way to refresh in between. Recovery
     must require a refresh token to recover *onto*.
     """
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     provider = _provider_with_token_endpoint(
         tmp_path, {}, "https://idp.example.com/oauth/token", monkeypatch
     )
@@ -654,7 +654,7 @@ async def test_refresh_400_does_not_strand_a_rejected_token_in_the_context(
     difference: without the restore, current_tokens still points at the
     rejected candidate when the helper returns.
     """
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     provider = _provider_with_token_endpoint(
         tmp_path, {}, "https://idp.example.com/oauth/token", monkeypatch
     )
@@ -682,7 +682,7 @@ async def test_refresh_400_does_not_strand_a_rejected_token_in_the_context(
 async def test_refresh_400_still_clears_when_disk_is_same_token(tmp_path, monkeypatch):
 
     """No peer wrote anything: the credential really is dead — clear it."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     provider = _provider_with_token_endpoint(
         tmp_path, {}, "https://idp.example.com/oauth/token", monkeypatch
     )
@@ -702,7 +702,7 @@ async def test_refresh_400_still_clears_when_disk_is_same_token(tmp_path, monkey
 @pytest.mark.asyncio
 async def test_refresh_400_does_not_recover_expired_disk_token(tmp_path, monkeypatch):
     """A *different* but already-expired disk token is not a recovery."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     provider = _provider_with_token_endpoint(
         tmp_path, {}, "https://idp.example.com/oauth/token", monkeypatch
     )
@@ -724,7 +724,7 @@ async def test_refresh_400_does_not_recover_tokenless_disk_entry(
     tmp_path, monkeypatch
 ):
     """A disk entry without an access token is not a recovery."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     provider = _provider_with_token_endpoint(
         tmp_path, {}, "https://idp.example.com/oauth/token", monkeypatch
     )
@@ -750,7 +750,7 @@ async def test_refresh_400_recovery_never_logs_token_material(
     """The recovery path must not leak secrets into logs."""
     import logging
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     provider = _provider_with_token_endpoint(
         tmp_path, {}, "https://idp.example.com/oauth/token", monkeypatch
     )
@@ -822,7 +822,7 @@ async def test_concurrent_refresh_presents_single_use_token_exactly_once(tmp_pat
     """Two providers on one token store: R1 is POSTed once, both end on the rotated pair."""
     from urllib.parse import parse_qs
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     endpoint = "https://idp.example.com/oauth/token"
     a = _fenced_provider(tmp_path, monkeypatch, endpoint)
     b = _fenced_provider(tmp_path, monkeypatch, endpoint)
@@ -857,7 +857,7 @@ async def test_refresh_fails_closed_while_a_peer_holds_the_fence(tmp_path, monke
 
     import tools.mcp_oauth as mcp_oauth
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     endpoint = "https://idp.example.com/oauth/token"
     provider = _fenced_provider(tmp_path, monkeypatch, endpoint)
     await provider.context.storage.set_tokens(_token("A1", "R1"))
@@ -889,7 +889,7 @@ async def test_refresh_adopts_expired_peer_pair_and_posts_its_refresh_token(tmp_
     """
     from urllib.parse import parse_qs
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     endpoint = "https://idp.example.com/oauth/token"
     provider = _fenced_provider(tmp_path, monkeypatch, endpoint)
     await provider.context.storage.set_tokens(_token("A2", "R2", expires_in=0))
@@ -916,7 +916,7 @@ async def test_refresh_adopts_peer_pair_without_expiry_and_skips_the_post(tmp_pa
     Treating a missing expiry as expired would POST R2 needlessly and burn a
     generation on a single-use provider.
     """
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     endpoint = "https://idp.example.com/oauth/token"
     provider = _fenced_provider(tmp_path, monkeypatch, endpoint)
     await provider.context.storage.set_tokens(_token("A2", "R2", expires_in=None))
@@ -944,7 +944,7 @@ async def test_refresh_restarts_flow_when_disk_pair_is_from_another_issuer(tmp_p
     """
     from tools.mcp_oauth_provider import _RefreshCompletedByPeer
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     endpoint = "https://idp.example.com/oauth/token"
     provider = _fenced_provider(tmp_path, monkeypatch, endpoint)
     storage = provider.context.storage
@@ -989,7 +989,7 @@ async def test_refresh_400_recovery_rejects_disk_pair_from_another_issuer(tmp_pa
     is not a recovery, so the session is cleared as on any dead grant and the
     foreign refresh token never survives on disk.
     """
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     endpoint = "https://idp.example.com/oauth/token"
     provider = _fenced_provider(tmp_path, monkeypatch, endpoint)
     storage = provider.context.storage

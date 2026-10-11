@@ -14,8 +14,8 @@ _ADAPTER_FILES = sorted(
 
 
 def _write_config(tmp_path, monkeypatch, body: str) -> None:
-    # load_config caches on (path, mtime) — a fresh tmp HERMES_HOME per test is a fresh cache key.
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    # load_config caches on (path, mtime) — a fresh tmp STARDUST_HOME per test is a fresh cache key.
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     (tmp_path / "config.yaml").write_text(body)
 
 

@@ -349,7 +349,7 @@ def _profile_action_environment(
 
     Named-profile actions therefore start from Hermes' standard scrubbed subprocess env, then drop
     the profile-managed keys plus every key declared by the dashboard/default profile dotenv files
-    and their hydrated secret sources, and pin ``HERMES_HOME`` to the target profile. The child's
+    and their hydrated secret sources, and pin ``STARDUST_HOME`` to the target profile. The child's
     normal startup then loads that profile's own ``.env``. Actions without a profile selector keep
     the historical environment exactly.
     """
@@ -382,10 +382,10 @@ def _profile_action_environment(
 
         # Pin the child before import-time startup runs; the explicit -p flag stays authoritative
         # and resolves to the same validated directory.
-        action_env["HERMES_HOME"] = str(target_home)
+        action_env["STARDUST_HOME"] = str(target_home)
         apply_subprocess_home_env(action_env)
 
-    action_env["HERMES_NONINTERACTIVE"] = "1"
+    action_env["STARDUST_NONINTERACTIVE"] = "1"
     # A config.yaml allow_all_users grant bridged into os.environ must not outlive the config that
     # produced it: drop it so the restarted child re-derives the posture from its own config.yaml.
     from gateway.config_loader import drop_bridged_env
@@ -429,7 +429,7 @@ def _action_targets_system_gateway(subcommand: List[str]) -> bool:
     profile = _named_profile_from_action(subcommand)
     if profile is None:
         return _select_systemd_scope(False)
-    # Unit names are derived from HERMES_HOME, so a selector-bearing action must be resolved
+    # Unit names are derived from STARDUST_HOME, so a selector-bearing action must be resolved
     # against the TARGET profile's home (``-p default gateway restart`` from a pooled named
     # dashboard asks about the default unit, not about its own).
     from hermes_cli.web_server_profiles import _resolve_profile_dir
@@ -454,7 +454,7 @@ def _spawn_hermes_action(
         # A system-scope lifecycle verb spawned as the dashboard's own user can only ever write
         # "System gateway <verb> requires root" into this log, so the button never worked on a
         # system install (#110820). Elevate — the CLI is sudo-aware: it adopts the unit's
-        # HERMES_HOME past sudo's env_reset and reads SUDO_USER for the service identity.
+        # STARDUST_HOME past sudo's env_reset and reads SUDO_USER for the service identity.
         # ``-n`` never prompts (stdin is DEVNULL anyway); without a passwordless path the
         # REQUEST fails instead of reporting a started action whose child refuses. Same
         # two-step gate as the ``hermes update`` fleet restart: a refused blanket probe falls
@@ -483,7 +483,7 @@ def _spawn_hermes_action(
     _ACTION_RESULTS.pop(name, None)
     _ACTION_COMMANDS[name] = tuple(subcommand)
     _ACTION_PROCS[name] = proc
-    action_id = (env_overrides or {}).get("HERMES_ACTION_ID")
+    action_id = (env_overrides or {}).get("STARDUST_ACTION_ID")
     if action_id:
         _ACTION_IDS[name] = action_id
     else:
@@ -509,7 +509,7 @@ def _gateway_subcommand(profile: Optional[str], verb: str) -> List[str]:
     that actually serves X — a ``-p X gateway restart`` child only exits 78 into the action log while the
     UI reports "restarted"); ``start``/``stop`` are refused by the caller (``multiplexed_profile_refusal``).
     The multiplexer is addressed as ``-p default`` explicitly: a bare ``gateway restart`` spawned from a
-    pooled ``--profile X serve`` would inherit X's ``HERMES_HOME`` and hit the same exit-78 refusal."""
+    pooled ``--profile X serve`` would inherit X's ``STARDUST_HOME`` and hit the same exit-78 refusal."""
     from hermes_cli.web_server_profiles import _profile_cli_args
     profile = _own_profile_selector(profile)
     args = _profile_cli_args(profile)

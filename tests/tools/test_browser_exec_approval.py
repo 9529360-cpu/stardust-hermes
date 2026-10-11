@@ -1,5 +1,5 @@
 """browser_exec runs Python on the agent host, so its approval gate is tested end to end: through the tool
-registry, with the real approval engine and a temporary HERMES_HOME, and directly for what the prompt shows."""
+registry, with the real approval engine and a temporary STARDUST_HOME, and directly for what the prompt shows."""
 
 import json
 import subprocess
@@ -19,8 +19,8 @@ def _cli_installed(monkeypatch):
 
 @pytest.fixture
 def standing_approvals(monkeypatch, tmp_path):
-    """Permanent approvals for one test only: HERMES_HOME is temporary and the allowlist is in memory."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    """Permanent approvals for one test only: STARDUST_HOME is temporary and the allowlist is in memory."""
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     patterns: set = set()
     monkeypatch.setattr(approval, "_permanent_set", lambda: patterns)
     return patterns

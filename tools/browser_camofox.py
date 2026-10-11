@@ -558,7 +558,7 @@ def _vision_llm_settings() -> tuple[float, float]:
 
 
 def _save_screenshot(content: bytes) -> str:
-    """Write PNG bytes under ``$HERMES_HOME/browser_screenshots`` and return the path."""
+    """Write PNG bytes under ``$STARDUST_HOME/browser_screenshots`` and return the path."""
     from hermes_constants import get_hermes_home
     screenshots_dir = get_hermes_home() / "browser_screenshots"
     screenshots_dir.mkdir(parents=True, exist_ok=True)

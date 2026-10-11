@@ -59,7 +59,7 @@ def _nobody_to_ask(monkeypatch):
     """No interactive CLI, no gateway, no per-thread terminal callback, yolo off."""
     from tools import approval
 
-    for name in ("HERMES_INTERACTIVE", "HERMES_GATEWAY_SESSION", "HERMES_EXEC_ASK", "HERMES_YOLO_MODE"):
+    for name in ("STARDUST_INTERACTIVE", "STARDUST_GATEWAY_SESSION", "STARDUST_EXEC_ASK", "STARDUST_YOLO_MODE"):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr(approval, "_YOLO_MODE_FROZEN", False)
     monkeypatch.setattr("tools.terminal_tool._get_approval_callback", lambda: None)
@@ -128,7 +128,7 @@ def test_always_grant_lands_in_the_shared_store(monkeypatch):
     from tools.approval_context import reset_current_session_key, set_current_session_key
     from tools.computer_use import tool as cu_tool
 
-    monkeypatch.setenv("HERMES_INTERACTIVE", "1")
+    monkeypatch.setenv("STARDUST_INTERACTIVE", "1")
     monkeypatch.setattr(approval, "_YOLO_MODE_FROZEN", False)
     monkeypatch.setattr(approval, "save_permanent_allowlist", lambda patterns: None)
     prompts = []
@@ -153,7 +153,7 @@ def test_smart_mode_can_autoapprove_low_risk_desktop_action(monkeypatch):
     from tools.approval_context import reset_current_session_key, set_current_session_key
     from tools.computer_use import tool as cu_tool
 
-    monkeypatch.setenv("HERMES_INTERACTIVE", "1")
+    monkeypatch.setenv("STARDUST_INTERACTIVE", "1")
     monkeypatch.setattr(approval, "_YOLO_MODE_FROZEN", False)
     monkeypatch.setattr(approval_context, "_get_approval_mode", lambda: "smart")
     monkeypatch.setattr(approval, "_smart_verdict", lambda *args, **kwargs: "approve")
@@ -174,7 +174,7 @@ def test_manual_mode_still_prompts_for_desktop_action(monkeypatch):
     from tools.approval_context import reset_current_session_key, set_current_session_key
     from tools.computer_use import tool as cu_tool
 
-    monkeypatch.setenv("HERMES_INTERACTIVE", "1")
+    monkeypatch.setenv("STARDUST_INTERACTIVE", "1")
     monkeypatch.setattr(approval, "_YOLO_MODE_FROZEN", False)
     monkeypatch.setattr(approval_context, "_get_approval_mode", lambda: "manual")
     prompts = []
@@ -205,7 +205,7 @@ def test_b_still_dispatches_after_the_polluter(monkeypatch):
     in the shared gate, so if the polluter's raising one had leaked, this click would be denied."""
     from tools.computer_use import tool as cu_tool
 
-    monkeypatch.setenv("HERMES_INTERACTIVE", "1")
+    monkeypatch.setenv("STARDUST_INTERACTIVE", "1")
     monkeypatch.setattr("tools.terminal_tool._get_approval_callback", lambda: lambda command, description, **kw: "once")
     backend = _install_backend(cu_tool)
     result = cu_tool.handle_computer_use({"action": "click", "element": 3})

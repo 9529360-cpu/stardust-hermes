@@ -83,8 +83,8 @@ def _provider_default_routes(provider: str) -> set[str]:
             routes.add(route)
 
     with suppress(Exception):
-        from hermes_cli.providers import HERMES_OVERLAYS, get_provider
-        overlay = HERMES_OVERLAYS.get(provider)
+        from hermes_cli.providers import STARDUST_OVERLAYS, get_provider
+        overlay = STARDUST_OVERLAYS.get(provider)
         provider_def = get_provider(provider, allow_network=False)
         add(getattr(overlay, "base_url_override", ""))
         add(getattr(provider_def, "base_url", ""))
@@ -203,7 +203,7 @@ def _resolve_compression_threshold(
 
 
 def _codex_gpt55_autoraise_notice_marker():
-    """Per-profile marker path (``$HERMES_HOME`` is profile-scoped; not a config key)."""
+    """Per-profile marker path (``$STARDUST_HOME`` is profile-scoped; not a config key)."""
     return get_hermes_home() / ".codex_gpt55_autoraise_notice"
 
 
@@ -569,7 +569,7 @@ _TURN_STATE: Dict[str, Any] = {
     # a stale rebuild instead of clobbering a newer one.
     "_tool_snapshot_generation": 0,
     "_rate_limit_state": None,  # from x-ratelimit-* headers; read by /usage
-    # Credits tracking (dev-only, HERMES_DEV_CREDITS) from x-nous-credits-* headers; session
+    # Credits tracking (dev-only, STARDUST_DEV_CREDITS) from x-nous-credits-* headers; session
     # start is latched on the first header so cumulative spend can be reported.
     "_credits_state": None,
     "_credits_session_start_micros": None,
@@ -1051,7 +1051,7 @@ def _init_fallback_chain(agent, fallback_model):
 
 
 def _load_tools(agent, enabled_toolsets, disabled_toolsets):
-    # A multiplexed gateway may have switched HERMES_HOME since model_tools was imported;
+    # A multiplexed gateway may have switched STARDUST_HOME since model_tools was imported;
     # make sure this profile's plugins are discovered before the tool snapshot.
     try:
         from hermes_cli.plugins import discover_plugins
@@ -1118,7 +1118,7 @@ def _publish_session_id(session_id: str) -> None:
         except Exception:
             delegated_child = False
         if not delegated_child:
-            os.environ["HERMES_SESSION_ID"] = session_id
+            os.environ["STARDUST_SESSION_ID"] = session_id
 
 
 def _init_session_state(agent, session_id, session_db, parent_session_id, reasoning_config, max_tokens,

@@ -18,14 +18,14 @@ from hermes_constants import display_hermes_home
 logger = logging.getLogger(__name__)
 
 # Heartbeat cadence keeping the caller's inactivity watchdog at bay while a manual
-# `cronjob(action="run")` executes in-process (comfortably below HERMES_AGENT_TIMEOUT).
+# `cronjob(action="run")` executes in-process (comfortably below STARDUST_AGENT_TIMEOUT).
 # Mirrors the 10s cadence of tools/environments/base.py::touch_activity_if_due (delegate_task's heartbeat
-# uses 30s) — comfortably below the 1800s default HERMES_AGENT_TIMEOUT. See #76502.
+# uses 30s) — comfortably below the 1800s default STARDUST_AGENT_TIMEOUT. See #76502.
 _CRON_RUN_HEARTBEAT_INTERVAL = 10.0
-# Hard ceiling: with HERMES_CRON_TIMEOUT=0 a truly hung run would otherwise mask the
+# Hard ceiling: with STARDUST_CRON_TIMEOUT=0 a truly hung run would otherwise mask the
 # gateway watchdog forever; past this the heartbeat stops and the watchdog regains authority.
-# The child cron run has its own inactivity watchdog (HERMES_CRON_TIMEOUT, default 600s) that bounds a
-# wedged job, but with HERMES_CRON_TIMEOUT=0 (explicit "unlimited") a truly hung run_one_job would otherwise
+# The child cron run has its own inactivity watchdog (STARDUST_CRON_TIMEOUT, default 600s) that bounds a
+# wedged job, but with STARDUST_CRON_TIMEOUT=0 (explicit "unlimited") a truly hung run_one_job would otherwise
 # mask the gateway watchdog forever — pre-#76502 the parent was at least reaped at ~1800s.
 _CRON_RUN_HEARTBEAT_CEILING = 6 * 3600.0
 
@@ -556,7 +556,7 @@ def _try_dispatch_background_run(
     origin_ui_session_id = ""
     try:
         from gateway.session_context import get_session_env
-        origin_ui_session_id = get_session_env("HERMES_UI_SESSION_ID", "") or ""
+        origin_ui_session_id = get_session_env("STARDUST_UI_SESSION_ID", "") or ""
     except Exception:
         pass
 
@@ -1246,7 +1246,7 @@ Jobs run in a fresh session. Normally they have no current-chat context, so prom
             },
             "script": {
                 "type": "string",
-                "description": _script_description("the profile HERMES_HOME")
+                "description": _script_description("the profile STARDUST_HOME")
             },
             "monitor": {
                 "type": "string",
@@ -1302,10 +1302,10 @@ def check_cronjob_requirements() -> bool:
     from gateway.session_context import get_session_env
     from utils import env_var_enabled, is_truthy_value
     return (
-        env_var_enabled("HERMES_INTERACTIVE")
-        or env_var_enabled("HERMES_GATEWAY_SESSION")
-        or env_var_enabled("HERMES_EXEC_ASK")
-        or is_truthy_value(get_session_env("HERMES_CRON_SESSION", ""))
+        env_var_enabled("STARDUST_INTERACTIVE")
+        or env_var_enabled("STARDUST_GATEWAY_SESSION")
+        or env_var_enabled("STARDUST_EXEC_ASK")
+        or is_truthy_value(get_session_env("STARDUST_CRON_SESSION", ""))
     )
 
 

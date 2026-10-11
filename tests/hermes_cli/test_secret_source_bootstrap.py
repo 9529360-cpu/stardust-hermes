@@ -233,24 +233,24 @@ def test_real_plugin_source_discovery_applies_dotenv(monkeypatch, tmp_path):
         "    shape = 'bulk'\n\n"
         "    def fetch(self, cfg: dict, home_path: Path) -> FetchResult:\n"
         "        return FetchResult(secrets={\n"
-        "            'HERMES_TEST_PLUGIN_BOOTSTRAP': 'from-plugin',\n"
+        "            'STARDUST_TEST_PLUGIN_BOOTSTRAP': 'from-plugin',\n"
         "        })\n\n"
         "def register(ctx):\n"
         "    ctx.register_secret_source(FixtureVault())\n",
         encoding="utf-8",
     )
 
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.delenv("HERMES_TEST_PLUGIN_BOOTSTRAP", raising=False)
+    monkeypatch.setenv("STARDUST_HOME", str(home))
+    monkeypatch.delenv("STARDUST_TEST_PLUGIN_BOOTSTRAP", raising=False)
 
     try:
         PluginManager().discover_and_load()
 
-        assert os.environ["HERMES_TEST_PLUGIN_BOOTSTRAP"] == "from-plugin"
+        assert os.environ["STARDUST_TEST_PLUGIN_BOOTSTRAP"] == "from-plugin"
         assert [source.name for source in reg.list_plugin_sources()] == [
             "fixturevault"
         ]
     finally:
-        os.environ.pop("HERMES_TEST_PLUGIN_BOOTSTRAP", None)
+        os.environ.pop("STARDUST_TEST_PLUGIN_BOOTSTRAP", None)
         reg._reset_registry_for_tests()
         env_loader.reset_secret_source_cache()

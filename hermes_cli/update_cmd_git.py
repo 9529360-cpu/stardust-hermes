@@ -384,10 +384,10 @@ def _git_is_trampoline(git_cmd: list) -> bool:
 
 def _portable_git_candidates() -> list:
     """PortableGit candidates: shared root first (where the managed tree actually lives, not the
-    profile-scoped HERMES_HOME), then profile home as a fallback for custom layouts.
+    profile-scoped STARDUST_HOME), then profile home as a fallback for custom layouts.
 
     The Hermes-managed PortableGit tree lives under the SHARED root (``<root>/git/...``), not the
-    profile-scoped HERMES_HOME (``<root>/profiles/<name>``), so a profile-scoped ``hermes update`` must look
+    profile-scoped STARDUST_HOME (``<root>/profiles/<name>``), so a profile-scoped ``hermes update`` must look
     there (monerostar review, #87876).
     """
     from hermes_cli.update_cmd import get_default_hermes_root, get_hermes_home

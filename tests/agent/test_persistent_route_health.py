@@ -49,7 +49,7 @@ def _child_result(proc: subprocess.Popen):
 
 
 def _home(monkeypatch, tmp_path):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     route_health.reset_for_tests()
 
 
