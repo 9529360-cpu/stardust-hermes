@@ -11,6 +11,7 @@ import { Sidebar, SidebarContent } from '@/components/ui/sidebar'
 import { Tip } from '@/components/ui/tooltip'
 import type { SessionInfo } from '@/hermes'
 import { useI18n } from '@/i18n'
+import { isCanonicalBotChatSession } from '@/lib/session-title'
 import { cn } from '@/lib/utils'
 import { $activeConnectionId } from '@/store/connections'
 import {
@@ -346,9 +347,17 @@ export function ChatSidebar({
     prFilter.length > 0 ||
     (showAllProfiles && profileFilter.length > 0)
 
+  // A canonical Bot Chat is reached only through its bot row, so it is never a
+  // conversation in this list, focused or not. The session cache still holds it
+  // while it is open (its header and tab read that row); the list leaves it out.
+  const listedSessions = useMemo(
+    () => scopedSessions.filter(session => !isCanonicalBotChatSession(session)),
+    [scopedSessions]
+  )
+
   const visibleSessions = useMemo(
-    () => (filtersNarrow ? scopedSessions.filter(sessionMatchesFilters) : scopedSessions),
-    [scopedSessions, filtersNarrow, sessionMatchesFilters]
+    () => (filtersNarrow ? listedSessions.filter(sessionMatchesFilters) : listedSessions),
+    [listedSessions, filtersNarrow, sessionMatchesFilters]
   )
 
   const visibleCronSessions = useMemo(

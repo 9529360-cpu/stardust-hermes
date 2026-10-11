@@ -31,6 +31,8 @@ export interface ScriptedMessage {
 
 export interface ScriptedSession {
   contracts?: { follow_profile_config: boolean; room_plumbing: boolean }
+  /** Created with `hidden: true` (room members and canonical Bot Chats are born hidden). */
+  hidden?: boolean
   messages: ScriptedMessage[]
   profile: string
   runtime: string
@@ -228,6 +230,7 @@ export function createGroupGateway(options: GatewayOptions = {}): ScriptedGatewa
           follow_profile_config: params.follow_profile_config === true,
           room_plumbing: params.room_plumbing === true
         },
+        hidden: params.hidden === true,
         messages: [],
         profile,
         runtime: `rt-${profile}-${sequence}`,
