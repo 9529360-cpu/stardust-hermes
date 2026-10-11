@@ -572,30 +572,21 @@ describe('SkillsView toolset management', { timeout: 60_000 }, () => {
 
   it('shows Chinese catalog copy and retains the capability overview for an optional skill', async () => {
     getSkills.mockResolvedValue([])
-    getOfficialSkills.mockResolvedValue({
-      skills: [
-        {
-          name: 'baoyu-article-illustrator',
-          description: 'Article illustrations: type × style × palette consistency.',
-          identifier: 'official/creative/baoyu-article-illustrator',
-          category: 'creative',
-          installed: false,
-          tags: []
-        }
-      ]
-    })
-    previewSkillHub.mockResolvedValue({
-      skill_md:
-        '---\nname: baoyu-article-illustrator\ndescription: Article illustrations\n---\n# Article illustrator\n\nAdapted for an English tool ecosystem.'
-    })
+    getOfficialSkills.mockResolvedValue({ skills: [{
+      name: 'baoyu-article-illustrator',
+      description: 'Article illustrations: type × style × palette consistency.',
+      identifier: 'official/creative/baoyu-article-illustrator',
+      category: 'creative',
+      installed: false,
+      tags: []
+    }] })
+    previewSkillHub.mockResolvedValue({ skill_md: '---\nname: baoyu-article-illustrator\ndescription: Article illustrations\n---\n# Article illustrator\n\nAdapted for an English tool ecosystem.' })
 
     await act(async () => {
       render(
         <I18nProvider configClient={null} initialLocale="zh">
           <QueryClientProvider client={queryClient}>
-            <MemoryRouter initialEntries={['/skills?tab=skills']}>
-              <SkillsView />
-            </MemoryRouter>
+            <MemoryRouter initialEntries={['/skills?tab=skills']}><SkillsView /></MemoryRouter>
           </QueryClientProvider>
         </I18nProvider>
       )

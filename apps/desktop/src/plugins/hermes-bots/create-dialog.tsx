@@ -1380,9 +1380,7 @@ export function CreateGroupChatDialog({ open, roster, onClose, onCreated }: Crea
             {t.common.cancel}
           </Button>
           {canCreate ? (
-            <Button onClick={create}>
-              {selected.length ? b.group.createGroupWithCount(selected.length) : b.group.createGroup}
-            </Button>
+            <Button onClick={create}>{selected.length ? b.group.createGroupWithCount(selected.length) : b.group.createGroup}</Button>
           ) : (
             <Tip label={b.group.pickAtLeastTwo}>
               <span className="inline-flex">

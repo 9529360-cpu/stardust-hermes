@@ -7620,6 +7620,7 @@ function openOauthLoginWindow(baseUrl) {
         clearInterval(pollTimer)
       }
 
+
       try {
         if (win && !win.isDestroyed()) {
           win.destroy()
@@ -14180,9 +14181,7 @@ function createWindow() {
 
 const browserControlBridgeSupervisor = new BrowserControlBridgeSupervisor({
   resourcesPath: app.getAppPath(),
-  packagedBridgeEntry: app.isPackaged
-    ? appPath => path.join(appPath, 'experiments', 'playwright-mcp-host-bridge', 'src', 'main.mjs')
-    : undefined
+  packagedBridgeEntry: app.isPackaged ? appPath => path.join(appPath, 'experiments', 'playwright-mcp-host-bridge', 'src', 'main.mjs') : undefined
 })
 
 ipcMain.handle('stardust:browser-control:bridge:start', async (event, payload) => {
@@ -14200,11 +14199,7 @@ ipcMain.handle('stardust:browser-control:bridge:start', async (event, payload) =
   event.sender.send('stardust:browser-control:bridge:status', status)
   return status
 })
-ipcMain.handle('stardust:browser-control:bridge:stop', async event => {
-  const status = await browserControlBridgeSupervisor.stop()
-  event.sender.send('stardust:browser-control:bridge:status', status)
-  return status
-})
+ipcMain.handle('stardust:browser-control:bridge:stop', async event => { const status = await browserControlBridgeSupervisor.stop(); event.sender.send('stardust:browser-control:bridge:status', status); return status })
 ipcMain.handle('stardust:browser-control:bridge:status', () => browserControlBridgeSupervisor.status())
 
 ipcMain.handle('stardust:connection', async (_event, profile, extra) => {
@@ -17277,9 +17272,7 @@ ipcMain.handle('stardust:uninstall:run', async (_event, payload) => {
 ipcMain.handle('stardust:vscode-theme:fetch', async (_event, id) => fetchMarketplaceThemes(String(id || '')))
 
 // Search the Marketplace for color-theme extensions (empty query = top installs).
-ipcMain.handle('stardust:vscode-theme:search', async (_event, query) =>
-  searchMarketplaceThemes(String(query || ''), 20)
-)
+ipcMain.handle('stardust:vscode-theme:search', async (_event, query) => searchMarketplaceThemes(String(query || ''), 20))
 
 // ---------------------------------------------------------------------------
 // stardust:// deep links (e.g. stardust://blueprint/morning-brief?time=08:00,

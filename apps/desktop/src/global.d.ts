@@ -196,12 +196,7 @@ declare global {
         onShown: (callback: () => void) => () => void
       }
       browserControl: {
-        start: (payload: {
-          profile?: string | null
-          launchContext: object
-          chromeProfileDir: string
-          packageSpec: string
-        }) => Promise<BrowserBridgeStatus>
+        start: (payload: { profile?: string | null; launchContext: object; chromeProfileDir: string; packageSpec: string }) => Promise<BrowserBridgeStatus>
         stop: () => Promise<BrowserBridgeStatus>
         status: () => Promise<BrowserBridgeStatus>
         onStatus: (callback: (status: BrowserBridgeStatus) => void) => () => void

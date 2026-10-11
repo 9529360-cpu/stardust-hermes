@@ -43,17 +43,11 @@ test('fails immediately when an already-bound local backend refuses the probe', 
 
   await assert.rejects(
     waitForHermesReady('http://127.0.0.1:53150', {
-      fetchPublicJson: async () => {
-        throw refused
-      },
-      fetchJson: async () => {
-        throw refused
-      },
+      fetchPublicJson: async () => { throw refused },
+      fetchJson: async () => { throw refused },
       alreadyBound: true,
       timeoutMs: 60_000,
-      sleep: async () => {
-        sleeps += 1
-      }
+      sleep: async () => { sleeps += 1 }
     }),
     /ECONNREFUSED/
   )
