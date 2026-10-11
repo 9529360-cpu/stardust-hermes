@@ -42,13 +42,16 @@ describe('desktop copy names the product Stardust', () => {
     })
   }
 
-  it('Chinese bundles no longer use the older 星尘 name', () => {
-    expect(bundleSource('zh')).not.toContain('星尘')
-    expect(bundleSource('zh-hant')).not.toContain('星尘')
+  it('Chinese bundles no longer use the older 星尘 or 星塵 name', () => {
+    for (const locale of ['zh', 'zh-hant'] as const) {
+      expect(bundleSource(locale)).not.toContain('星尘')
+      expect(bundleSource(locale)).not.toContain('星塵')
+    }
   })
 
   it('English possessives read "Stardust\'s", not the Hermes-era "Hermes\'" form', () => {
     expect(bundleSource('en')).not.toMatch(/Stardust' [a-z]/)
+    expect(bundleSource('en')).toContain("Stardust's background service")
   })
 
   it('install copy points at the Stardust installer, never the upstream script', () => {

@@ -245,19 +245,19 @@ export const zhHant = defineLocale({
   sendDiagnostics: {
     title: '儲存診斷資訊',
     privacyNotice:
-      '星塵會在後端建立一個強制遮罩機密資訊的本機診斷 ZIP。內容包括系統資訊（作業系統、版本、服務商、已設定的 API 金鑰種類——絕不包含金鑰本身）以及近期的 agent、gateway 與桌面端日誌，其中可能包含對話內容、工具輸出和檔案路徑。預設流程不會將這些內容上傳到任何支援服務。儲存嘗試結束後，星塵會要求後端刪除暫存副本；異常退出遺留的暫存檔也會自動清理。',
+      'Stardust 會在後端建立一個強制遮罩機密資訊的本機診斷 ZIP。內容包括系統資訊（作業系統、版本、服務商、已設定的 API 金鑰種類——絕不包含金鑰本身）以及近期的 agent、gateway 與桌面端日誌，其中可能包含對話內容、工具輸出和檔案路徑。預設流程不會將這些內容上傳到任何支援服務。儲存嘗試結束後，Stardust 會要求後端刪除暫存副本；異常退出遺留的暫存檔也會自動清理。',
     save: '建立並儲存',
     preparing: '正在準備…',
     cancel: '取消',
     close: '關閉',
     copyPath: '複製路徑',
     doneTitle: '診斷資訊已儲存',
-    doneDescription: '已將遮罩後的診斷套件儲存到您的電腦。如需支援，可將此檔案附加到星塵的 GitHub Issue。',
+    doneDescription: '已將遮罩後的診斷套件儲存到您的電腦。如需支援，可將此檔案附加到 Stardust 的 GitHub Issue。',
     failedTitle: '無法儲存診斷資訊',
-    failedHint: '請更新星塵與後端後重試。此流程不會退回到把日誌上傳到支援服務的舊路徑。',
+    failedHint: '請更新 Stardust 與後端後重試。此流程不會退回到把日誌上傳到支援服務的舊路徑。',
     handoffLead: '需要協助？',
     links: {
-      github: '星塵 GitHub Issues'
+      github: 'Stardust GitHub Issues'
     }
   },
 
@@ -3773,21 +3773,21 @@ export const zhHant = defineLocale({
         billing: '額度用完了',
         disk: '磁碟已滿',
         endpoint: '連不上你的模型伺服器',
-        gateway: '星塵遇到了問題',
-        generic: '星塵沒能完成這次回覆',
+        gateway: 'Stardust 遇到了問題',
+        generic: 'Stardust 沒能完成這次回覆',
         provider: '模型服務回傳了錯誤',
-        runtime: '星塵遇到了問題',
+        runtime: 'Stardust 遇到了問題',
         streaming: '回覆中途斷開了'
       },
       errorLayerBodies: {
         auth: '模型服務沒有接受你的登入憑證。檢查這個服務的金鑰或登入，然後重新傳送。',
         billing: '這個服務的帳戶額度已用完。儲值或切換服務商，然後重新傳送。',
-        disk: '磁碟已滿，星塵無法儲存這段對話。清出一些空間後重試。',
-        endpoint: '星塵連不上你的自訂模型伺服器。確認它正在執行，然後重新傳送。',
-        gateway: '星塵開始回覆時遇到內部問題。重新傳送一次；如果反覆出現，請傳送診斷資訊。',
-        generic: '星塵回覆時出了問題。可以重試；如果反覆出現，請複製錯誤詳細資訊。',
+        disk: '磁碟已滿，Stardust 無法儲存這段對話。清出一些空間後重試。',
+        endpoint: 'Stardust 連不上你的自訂模型伺服器。確認它正在執行，然後重新傳送。',
+        gateway: 'Stardust 開始回覆時遇到內部問題。重新傳送一次；如果反覆出現，請傳送診斷資訊。',
+        generic: 'Stardust 回覆時出了問題。可以重試；如果反覆出現，請複製錯誤詳細資訊。',
         provider: '模型服務沒能完成這次請求。稍後重試，或切換服務商。',
-        runtime: '星塵開始回覆時遇到內部問題。重新傳送一次；如果反覆出現，請傳送診斷資訊。',
+        runtime: 'Stardust 開始回覆時遇到內部問題。重新傳送一次；如果反覆出現，請傳送診斷資訊。',
         streaming: '回覆還沒寫完連線就斷了。點「重試」重新傳送。'
       },
       errorCodes: {
@@ -3829,7 +3829,7 @@ export const zhHant = defineLocale({
         },
         ssl_cert_verification: {
           title: '安全連線失敗',
-          body: provider => `星塵無法驗證與 ${provider} 的安全連線。檢查網路或 Proxy 設定，或切換服務商，然後重新傳送。`
+          body: provider => `Stardust 無法驗證與 ${provider} 的安全連線。檢查網路或 Proxy 設定，或切換服務商，然後重新傳送。`
         },
         context_overflow: {
           title: '這段對話太長了',
@@ -3861,23 +3861,23 @@ export const zhHant = defineLocale({
         },
         invalid_response: {
           title: '模型服務回傳了無法讀取的內容',
-          body: provider => `${provider} 回傳的內容星塵讀不懂。稍後重試。`
+          body: provider => `${provider} 回傳的內容 Stardust 讀不懂。稍後重試。`
         },
         empty_response: {
           title: '模型服務回傳了空白回覆',
           body: provider => `${provider} 對這則訊息什麼也沒回傳。稍後重試。`
         },
         loop_error: {
-          title: '星塵陷入了迴圈',
-          body: '回覆一直重複同樣的步驟，星塵把它停了下來。可以重試；如果再次出現，開始新對話。'
+          title: 'Stardust 陷入了迴圈',
+          body: '回覆一直重複同樣的步驟，Stardust 把它停了下來。可以重試；如果再次出現，開始新對話。'
         },
         SESSION_NOT_OWNED: {
           title: '這段對話正在別處開啟',
-          body: '這段對話正在另一個星塵視窗或終端機中開啟。在那邊關閉後重新傳送，或在這裡開始新對話。'
+          body: '這段對話正在另一個 Stardust 視窗或終端機中開啟。在那邊關閉後重新傳送，或在這裡開始新對話。'
         },
         disk_full: {
           title: '磁碟已滿',
-          body: '磁碟已滿，星塵無法儲存這段對話。清出一些空間後重試。'
+          body: '磁碟已滿，Stardust 無法儲存這段對話。清出一些空間後重試。'
         }
       },
       errorAuthKinds: {
@@ -3891,7 +3891,7 @@ export const zhHant = defineLocale({
       },
       errorDetails: '詳細資訊',
       errorGenericProvider: '模型服務',
-      errorToastTitle: '星塵沒能完成這次回覆',
+      errorToastTitle: 'Stardust 沒能完成這次回覆',
       errorRetry: '重試',
       errorStartNewSession: '開始新對話',
       errorSwitchProvider: '切換服務商',
@@ -3902,8 +3902,8 @@ export const zhHant = defineLocale({
       errorChooseModel: '選擇模型',
       errorCompressConversation: '壓縮對話',
       errorCompressFailed: '無法壓縮對話',
-      errorOpenHermesFolder: '開啟星塵資料夾',
-      errorOpenHermesFolderFailed: '無法開啟星塵資料夾',
+      errorOpenHermesFolder: '開啟 Stardust 資料夾',
+      errorOpenHermesFolderFailed: '無法開啟 Stardust 資料夾',
       errorUpdateApiKey: '更新 API 金鑰',
       errorOpenLogs: '開啟日誌',
       errorOpenLogsFailed: '無法開啟日誌資料夾',
