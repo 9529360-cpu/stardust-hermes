@@ -182,6 +182,7 @@ export function cronSubtitle(argsRecord: Record<string, unknown>, resultRecord: 
   }
 
   const action = cronActionLabel(firstStringField(argsRecord, ['action']) || 'manage')
+
   const name =
     firstStringField(cronJobFields(resultRecord), ['name']) || firstStringField(argsRecord, ['name', 'job_id'])
 
@@ -190,8 +191,8 @@ export function cronSubtitle(argsRecord: Record<string, unknown>, resultRecord: 
     : translateNow('assistant.tool.cron.actionOnly', action)
 }
 
-// One labelled line per field a saved job reports. Each line is its own block, for the
-// same markdown reason as the preview.
+// The labelled fields a saved job reports, in one paragraph. The detail area is only
+// about two lines tall, so one row per line would scroll the next run out of sight.
 function cronJobDetail(fields: Record<string, unknown>): string {
   const nextRun = cronScalar(fields.next_run_at)
 
@@ -205,7 +206,7 @@ function cronJobDetail(fields: Record<string, unknown>): string {
   return rows
     .filter(([, value]) => value)
     .map(([label, value]) => `${label}: ${value}`)
-    .join('\n\n')
+    .join(' · ')
 }
 
 function cronJobListDetail(jobs: unknown[]): string {

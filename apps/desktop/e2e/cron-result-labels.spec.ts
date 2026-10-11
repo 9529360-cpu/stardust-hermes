@@ -72,6 +72,7 @@ test('a saved routine card reads in Chinese at 1220x800', async () => {
     .locator('[data-tool-row]')
     .filter({ hasText: /Cron 任务|定时任务/ })
     .first()
+
   await expect(card).toBeVisible({ timeout: 20_000 })
   await card.locator('[aria-expanded]').first().click()
   await page.waitForTimeout(300)
@@ -83,5 +84,6 @@ test('a saved routine card reads in Chinese at 1220x800', async () => {
   expect(text).toContain('排程: 0 9 * * *')
   expect(text).toContain('重复: 永久')
   expect(text).toContain('投递: 当前对话')
+  expect(text).toContain('下次运行: ')
   expect(text).not.toMatch(/[A-Za-z]/)
 })
