@@ -2076,6 +2076,7 @@ export const ar = defineLocale({
       home: 'الرئيسية',
       autoDiscovered: 'مكتشف تلقائيًا',
       newButton: 'مشروع جديد',
+      emptyTitle: 'لا توجد مشاريع بعد',
       createTitle: 'مشروع جديد',
       createDesc: 'سمِّ مساحة العمل وأضف مجلدا أو أكثر.',
       renameTitle: 'إعادة تسمية المشروع',
@@ -2764,8 +2765,12 @@ export const ar = defineLocale({
       viewAllLogs: 'عرض كل السجلات',
       messagingPlatforms: 'منصات المراسلة'
     },
+    approvalMode: {
+      unknown: 'غير معروف'
+    },
     statusbar: {
       unknown: 'غير معروف',
+      reading: 'جارٍ القراءة',
       restart: 'إعادة تشغيل',
       update: 'تحديث',
       updateInProgress: 'التحديث جار',

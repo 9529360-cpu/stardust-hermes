@@ -45,6 +45,7 @@ export function ComposerControls({
   hasComposerPayload,
   hideModelPill = false,
   minimal = false,
+  narrowModelPill = false,
   state,
   voiceStatus,
   onDictate,
@@ -62,6 +63,8 @@ export function ComposerControls({
   hasComposerPayload: boolean
   hideModelPill?: boolean
   minimal?: boolean
+  /** Narrow row: the model pill keeps its name, truncated; the effort pill stays out of the row. */
+  narrowModelPill?: boolean
   state: ChatBarState
   voiceStatus: VoiceStatus
   onDictate: () => void
@@ -113,8 +116,13 @@ export function ComposerControls({
         <>
           {hideModelPill ? null : (
             <>
-              <ModelPill compact={compactModelPill} disabled={disabled} model={state.model} />
-              {compactModelPill ? null : <ReasoningPill disabled={disabled} model={state.model} />}
+              <ModelPill
+                compact={compactModelPill}
+                disabled={disabled}
+                model={state.model}
+                narrow={narrowModelPill}
+              />
+              {compactModelPill || narrowModelPill ? null : <ReasoningPill disabled={disabled} model={state.model} />}
             </>
           )}
           {voiceControls}

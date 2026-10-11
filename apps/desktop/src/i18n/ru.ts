@@ -2686,6 +2686,7 @@ export const ru = defineLocale({
       sectionLabel: 'Проекты',
       home: 'Главная',
       newButton: 'Новый проект',
+      emptyTitle: 'Проектов пока нет',
       createTitle: 'Новый проект',
       createDesc: 'Назовите рабочее пространство и добавьте одну или несколько папок.',
       renameTitle: 'Переименовать проект',
@@ -3511,10 +3512,12 @@ export const ru = defineLocale({
       smart: 'Умный',
       smartDescription: 'Автоматически оценивать действия и спрашивать при необходимости',
       off: 'Выкл',
-      offDescription: 'Выполнять без запросов подтверждения'
+      offDescription: 'Выполнять без запросов подтверждения',
+      unknown: 'Неизвестно'
     },
     statusbar: {
       unknown: 'неизвестно',
+      reading: 'Чтение',
       restart: 'перезапуск',
       update: 'обновление',
       updateInProgress: 'Обновление выполняется',

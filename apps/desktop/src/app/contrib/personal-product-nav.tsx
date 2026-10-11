@@ -13,6 +13,7 @@ import { $newChatProfile, $profileScope, ALL_PROFILES } from '@/store/profile'
 import {
   $activeProjectId,
   $projectScope,
+  $projectsRpcAvailable,
   $projectTree,
   enterProject,
   exitProjectScope,
@@ -119,6 +120,7 @@ export function PersonalProductNav({
   const [enteredProject, setEnteredProject] = useState<null | SidebarProjectTree>(null)
   const [projectLoadFailed, setProjectLoadFailed] = useState(false)
   const projects = useStore($projectTree)
+  const projectsRead = useStore($projectsRpcAvailable) === true
   const profileScope = useStore($profileScope)
   const projectScope = useStore($projectScope)
   const activeProjectId = useStore($activeProjectId)
@@ -401,6 +403,10 @@ export function PersonalProductNav({
                 </div>
               )
             })}
+            {/* Only once the tree has been read: before that an empty list says nothing yet. */}
+            {projectsRead && projects.length === 0 && (
+              <div className="px-2 py-1 text-xs text-(--ui-text-tertiary)">{t.sidebar.projects.emptyTitle}</div>
+            )}
             <button
               className="flex min-h-8 w-full items-center gap-2 rounded-md px-2 text-left text-[0.72rem] text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-(--ui-text-primary)"
               onClick={openProjectCreate}

@@ -40,11 +40,14 @@ const PILL = cn(
 export function ModelPill({
   compact = false,
   disabled,
-  model
+  model,
+  narrow = false
 }: {
   compact?: boolean
   disabled: boolean
   model: ChatBarState['model']
+  /** Narrow row: keep the model name, truncated to a shorter pill. `compact` wins over it. */
+  narrow?: boolean
 }) {
   const copy = useI18n().t.shell.statusbar
   // Two return branches below, one handle: only ever one of them mounts.
@@ -129,7 +132,7 @@ export function ModelPill({
   ) : (
     <>
       {currentModel.trim() ? (
-        <span className="truncate">{formatModelPillLabel(currentModel, { fastMode })}</span>
+        <span className="min-w-0 truncate">{formatModelPillLabel(currentModel, { fastMode })}</span>
       ) : (
         <GlyphSpinner className="opacity-50" spinner="braille" />
       )}
@@ -146,13 +149,16 @@ export function ModelPill({
   )
 
   // Compact (floating composer): a snug square holding just the chevron — no pill
-  // padding, sized to match the other composer icon buttons.
+  // padding, sized to match the other composer icon buttons. Narrow (docked, short
+  // row): the name stays visible in a shorter pill, so the model is still readable.
   const pillClass = compact
     ? cn(
         'size-(--composer-control-size) shrink-0 justify-center gap-0 rounded-md p-0',
         'text-(--ui-text-tertiary) hover:bg-(--chrome-action-hover) hover:text-foreground'
       )
-    : PILL
+    : narrow
+      ? cn(PILL, 'max-w-24')
+      : PILL
 
   const baseTitle = currentProvider
     ? copy.modelTitle(currentProvider, currentModel || copy.modelNone)

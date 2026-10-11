@@ -53,6 +53,9 @@ export function useContextBreakdown({ busy, enabled, requestGateway, sessionId }
 
     return () => {
       cancelled = true
+      // A read superseded by a switch, a turn or a draft is no longer in flight, so the
+      // flag must not outlive it: the next effect run either reads again or leaves it clear.
+      setLoading(false)
     }
   }, [busy, enabled, requestGateway, sessionId])
 

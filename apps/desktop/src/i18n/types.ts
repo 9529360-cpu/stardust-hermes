@@ -2678,6 +2678,7 @@ export interface Translations {
       home: string
       autoDiscovered: string
       newButton: string
+      emptyTitle: string
       createTitle: string
       createDesc: string
       renameTitle: string
@@ -3490,9 +3491,11 @@ export interface Translations {
       smartDescription: string
       off: string
       offDescription: string
+      unknown: string
     }
     statusbar: {
       unknown: string
+      reading: string
       restart: string
       update: string
       updateInProgress: string
