@@ -13,7 +13,8 @@ test.afterAll(async () => {
   fixture = null
 })
 
-test('personal assistant workspace keeps conversation primary and navigation unclipped', async (_fixtures, testInfo) => {
+// eslint-disable-next-line no-empty-pattern -- Playwright needs the object pattern here
+test('personal assistant workspace keeps conversation primary and navigation unclipped', async ({}, testInfo) => {
   const page = fixture!.page
   const consoleErrors: string[] = []
   const pageErrors: string[] = []

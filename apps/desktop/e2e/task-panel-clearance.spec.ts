@@ -84,7 +84,8 @@ test.describe('working-session task-panel clearance', () => {
     fixture = null
   })
 
-  test('window focus reanchors a working session above the expanded task panel', async (_fixtures, testInfo) => {
+  // eslint-disable-next-line no-empty-pattern -- Playwright needs the object pattern here
+  test('window focus reanchors a working session above the expanded task panel', async ({}, testInfo) => {
     const page = fixture!.page
 
     await send(page, PROMPT)

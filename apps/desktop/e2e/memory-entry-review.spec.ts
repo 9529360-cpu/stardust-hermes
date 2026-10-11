@@ -13,7 +13,8 @@ import {
 } from './fixtures'
 import { expect, test } from './test'
 
-test('reviews and removes one built-in memory entry in an isolated profile', async (_fixtures, testInfo) => {
+// eslint-disable-next-line no-empty-pattern -- Playwright needs the object pattern here
+test('reviews and removes one built-in memory entry in an isolated profile', async ({}, testInfo) => {
   const taskTemp = process.env.STARDUST_TASK_TEMP
 
   if (!taskTemp) {throw new Error('STARDUST_TASK_TEMP must point to the D-drive task temp directory')}

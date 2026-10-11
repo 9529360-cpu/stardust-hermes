@@ -109,7 +109,7 @@ async function startTurnAndSwitchAway(page: Page) {
 
   // Switch to a new session — session A is no longer $selectedStoredSessionId.
   // This is required: openSessionTile bails if the session is already selected.
-  await page.locator('button:has-text("New chat")').first().click()
+  await page.locator('button:has-text("New chat"), button:has-text("新建对话")').first().click()
   await page.waitForTimeout(2000)
 }
 

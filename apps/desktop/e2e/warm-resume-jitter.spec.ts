@@ -330,7 +330,7 @@ async function openFreshDraft(page: Page, priorText: string): Promise<void> {
 
 /** Stack an empty tab while leaving the current transcript mounted and warm. */
 async function openNewSessionTab(page: Page, priorText: string): Promise<void> {
-  await page.locator('[data-slot="sidebar"] button[aria-label="New chat"]').first().click()
+  await page.locator('[data-slot="sidebar"] button[aria-label="New chat"], [data-slot="sidebar"] button[aria-label="新建对话"]').first().click()
   await waitForActiveTranscriptWithoutText(page, priorText)
 }
 
@@ -394,7 +394,8 @@ function assertNoJitter(result: { bursts: number; mutations: number; timeline: n
   ).toBe(0)
 }
 
-test('tab reactivation preserves the mounted transcript without repainting', async (_fixtures, testInfo) => {
+// eslint-disable-next-line no-empty-pattern -- Playwright needs the object pattern here
+test('tab reactivation preserves the mounted transcript without repainting', async ({}, testInfo) => {
   const page = fixture!.page
 
   // Wait for the sidebar to populate with our seeded session.
@@ -436,7 +437,8 @@ test('tab reactivation preserves the mounted transcript without repainting', asy
   assertNoRepaint(result)
 })
 
-test('warm-route resume after background inference completes (no jitter)', async (_fixtures, testInfo) => {
+// eslint-disable-next-line no-empty-pattern -- Playwright needs the object pattern here
+test('warm-route resume after background inference completes (no jitter)', async ({}, testInfo) => {
   test.fixme(
     true,
     'Warm resume repaints after inference: expected one additive burst, got two ([18,1]).',
