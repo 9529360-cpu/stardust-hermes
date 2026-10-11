@@ -111,6 +111,8 @@ class StreamDeltaPayload(Payload):
     text: str
     rendered: str | None = None
     verbose: bool | None = None
+    # Backend clock (Unix seconds) at emission; the desktop times reasoning and answer segments from it.
+    timestamp: float | None = None
 
 
 event("message.delta", StreamDeltaPayload, doc="One streamed chunk of the assistant reply.")
@@ -124,6 +126,7 @@ class MessageInterimPayload(Payload):
 
     text: str
     already_streamed: bool
+    timestamp: float | None = None
 
 
 event("message.interim", MessageInterimPayload,
@@ -178,6 +181,7 @@ class MessageCompletePayload(Payload):
     response_previewed: bool | None = None
     billing: BillingBlock | None = None
     failure_reason: str | None = None
+    timestamp: float | None = None
     rendered: str | None = None
     error: str | None = None
     recoverable: bool | None = None
@@ -249,6 +253,7 @@ class ToolStartPayload(Payload):
     args: dict[str, JsonValue] | None = None
     args_text: str | None = None
     preview: str | None = None
+    timestamp: float | None = None
 
 
 event("tool.start", ToolStartPayload, doc="A tool call began (stable id + full args).")
@@ -267,6 +272,7 @@ class ToolCompletePayload(Payload):
     inline_diff: str | None = None
     todos: list[JsonValue] | None = None
     revision: int | None = None
+    timestamp: float | None = None
 
 
 event("tool.complete", ToolCompletePayload, doc="A tool call finished: parsed result, summary, optional diff / todo snapshot.")

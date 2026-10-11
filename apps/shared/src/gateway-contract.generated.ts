@@ -4025,11 +4025,13 @@ export interface StreamDeltaPayload {
   text: string
   rendered?: string | null
   verbose?: boolean | null
+  timestamp?: number | null
 }
 /** ``prompt_turn._interim_assistant_cb`` / ``agent_callbacks`` interim_assistant_callback. */
 export interface MessageInterimPayload {
   text: string
   already_streamed: boolean
+  timestamp?: number | null
 }
 /** ``prompt_turn._complete_turn_payload`` / ``session_auto_continue._emit_terminal_turn_error`` / ``agent_callbacks._mirror_subagent_to_child`` (child watch mirror: ``text`` only) / ``compute_host_bridge`` (``text`` + ``status``). */
 export interface MessageCompletePayload {
@@ -4041,6 +4043,7 @@ export interface MessageCompletePayload {
   response_previewed?: boolean | null
   billing?: BillingBlock | null
   failure_reason?: string | null
+  timestamp?: number | null
   rendered?: string | null
   error?: string | null
   recoverable?: boolean | null
@@ -4100,6 +4103,7 @@ export interface ToolStartPayload {
   args?: Record<string, unknown> | null
   args_text?: string | null
   preview?: string | null
+  timestamp?: number | null
 }
 /** ``tool_progress._on_tool_complete``; ``todos``/``revision`` merged in for the todo tools. */
 export interface ToolCompletePayload {
@@ -4113,6 +4117,7 @@ export interface ToolCompletePayload {
   inline_diff?: string | null
   todos?: unknown[] | null
   revision?: number | null
+  timestamp?: number | null
 }
 /** ``agent_callbacks`` tool_gen_callback. */
 export interface ToolGeneratingPayload {

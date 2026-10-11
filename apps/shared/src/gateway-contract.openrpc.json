@@ -15866,6 +15866,18 @@
             "default": null,
             "title": "Failure Reason"
           },
+          "timestamp": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Timestamp"
+          },
           "rendered": {
             "anyOf": [
               {
@@ -15940,6 +15952,18 @@
           "already_streamed": {
             "title": "Already Streamed",
             "type": "boolean"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Timestamp"
           }
         },
         "required": [
@@ -29900,6 +29924,18 @@
             ],
             "default": null,
             "title": "Verbose"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Timestamp"
           }
         },
         "required": [
@@ -31633,6 +31669,18 @@
             ],
             "default": null,
             "title": "Revision"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Timestamp"
           }
         },
         "required": [
@@ -31796,6 +31844,18 @@
             ],
             "default": null,
             "title": "Preview"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Timestamp"
           }
         },
         "required": [
