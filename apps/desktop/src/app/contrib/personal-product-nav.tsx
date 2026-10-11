@@ -233,7 +233,7 @@ export function PersonalProductNav({
       id: 'settings',
       label: t.personalization.moreSettings,
       icon: NULL_ICON,
-      route: `${SETTINGS_ROUTE}?tab=appearance`
+      route: `${SETTINGS_ROUTE}?tab=config:appearance`
     })
   }
 

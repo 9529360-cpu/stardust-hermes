@@ -156,7 +156,7 @@ describe('PersonalProductNav', () => {
     fireEvent.click(screen.getByRole('button', { name: '更多外观设置' }))
 
     expect(onNavigate).toHaveBeenLastCalledWith(
-      expect.objectContaining({ id: 'settings', route: '/settings?tab=appearance' })
+      expect.objectContaining({ id: 'settings', route: '/settings?tab=config:appearance' })
     )
   })
 
