@@ -3060,6 +3060,7 @@ export const en: Translations = {
       home: 'Home',
       autoDiscovered: 'Auto-discovered',
       newButton: 'New project',
+      emptyTitle: 'No projects yet',
       createTitle: 'New project',
       createDesc: 'Name a workspace and add one or more folders.',
       renameTitle: 'Rename project',
@@ -3968,10 +3969,12 @@ export const en: Translations = {
       smart: 'Smart',
       smartDescription: 'Automatically assess actions and ask when needed',
       off: 'Off',
-      offDescription: 'Run without approval prompts'
+      offDescription: 'Run without approval prompts',
+      unknown: 'Unknown'
     },
     statusbar: {
       unknown: 'unknown',
+      reading: 'Reading',
       restart: 'restart',
       update: 'update',
       updateInProgress: 'Update in progress',
