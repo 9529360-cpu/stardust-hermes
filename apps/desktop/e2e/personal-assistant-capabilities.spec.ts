@@ -14,7 +14,7 @@ test.afterAll(async () => {
   fixture = null
 })
 
-test('tools and plugins are direct primary navigation destinations', async ({}, testInfo) => {
+test('tools is a direct primary navigation destination, and plugins open from it', async ({}, testInfo) => {
   const page = fixture!.page
   const productNav = page.locator('[data-personal-product-nav]')
 
@@ -64,8 +64,11 @@ test('tools and plugins are direct primary navigation destinations', async ({}, 
   await expect(rawInstructions).not.toHaveAttribute('open', '')
   await page.screenshot({ path: testInfo.outputPath('personal-assistant-capabilities-skills.png') })
 
-  await productNav.getByRole('button', { name: '插件', exact: true }).click()
-  await expect(productNav.getByRole('button', { name: '插件', exact: true })).toHaveAttribute('aria-current', 'page')
+  // Plugins is the Plugins tab of the Tools page; the nav carries only Tools.
+  await page.evaluate(() => {
+    window.location.hash = '#/skills?tab=plugins'
+  })
+  await expect(productNav.getByRole('button', { name: '工具', exact: true })).toHaveAttribute('aria-current', 'page')
   await expect(page.getByRole('columnheader', { name: '桌面', exact: true })).toBeVisible()
   await expect(page.getByRole('columnheader', { name: '默认配置 中的智能体', exact: true })).toBeVisible()
   await expect(page.getByText('智能体', { exact: true }).first()).toBeVisible()
