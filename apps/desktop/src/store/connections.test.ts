@@ -372,7 +372,7 @@ describe('selectConnection', () => {
     expect($connection.get()?.connectionId).toBe('local')
   })
 
-  it.each(['remote', 'cloud'] as const)(
+  it.each(['remote'] as const)(
     'requires protected REST auth on a warm %s socket before discarding the current workspace',
     async kind => {
       const oauthRegistry: DesktopConnectionsRegistry = {

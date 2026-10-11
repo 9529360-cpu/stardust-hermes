@@ -3,14 +3,15 @@ import { resolve } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
+import { TRANSLATIONS } from './catalog'
+
 // The desktop speaks as Stardust. The inherited name survives only where it still
-// names something real upstream (the hosted Hermes Cloud service) or an executable
-// that is still called `hermes` (the SSH path field and its recovery copy).
+// names an executable that is still called `hermes` (the SSH path field and its
+// recovery copy).
 
 const LOCALES = ['en', 'zh', 'zh-hant', 'ja', 'ru', 'ar'] as const
 
 const INHERITED_NAME_ALLOWED = [
-  'Hermes Cloud',
   'Hermes path (optional)',
   'set the Hermes path.',
   'Hermes 路径（可选）',
@@ -52,6 +53,14 @@ describe('desktop copy names the product Stardust', () => {
   it('English possessives read "Stardust\'s", not the Hermes-era "Hermes\'" form', () => {
     expect(bundleSource('en')).not.toMatch(/Stardust' [a-z]/)
     expect(bundleSource('en')).toContain("Stardust's background service")
+  })
+
+  it('every bundle gives the same Stardust installer command for a missing remote hermes', () => {
+    for (const locale of Object.keys(TRANSLATIONS) as Array<keyof typeof TRANSLATIONS>) {
+      expect(TRANSLATIONS[locale].settings.gateway.sshErrNotInstalled).toContain(
+        'curl -fsSL https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust.sh | bash'
+      )
+    }
   })
 
   it('install copy points at the Stardust installer, never the upstream script', () => {

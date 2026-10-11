@@ -57,7 +57,7 @@ async function probeWindowsRemote(ssh, explicitHermesPath = '') {
     '$candidates+=$fallbackProfileCandidate',
     '$hermes=$null',
     'foreach($candidate in $candidates){Assert-NoReparse $candidate $true;$candidatePython=[IO.Path]::Combine([IO.Path]::GetDirectoryName($candidate), "python.exe");Assert-NoReparse $candidatePython $true;try{$item=Get-Item -LiteralPath $candidate -Force -ErrorAction Stop;if(($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0 -and -not $item.PSIsContainer){$hermes=$item.FullName;break}}catch [Management.Automation.ItemNotFoundException]{continue}}',
-    'if(-not $hermes){throw "Hermes is not installed on the remote Windows host."}',
+    'if(-not $hermes){throw "Stardust is not installed on the remote Windows host."}',
     'Assert-NoReparse $hermes $false',
     'if($explicit -and $hermes -ne $explicit){throw "The configured Hermes path is not an executable file."}',
     '$python=[IO.Path]::Combine([IO.Path]::GetDirectoryName($hermes), "python.exe")',
@@ -148,7 +148,7 @@ async function assertWindowsRemoteInstallUpdateClear(ssh, hermesHome) {
         .split(/\r?\n/)
         .pop() || ''
   } catch (cause) {
-    const error: any = new Error('Could not prove that the remote Hermes install is clear for SSH startup.')
+    const error: any = new Error('Could not prove that the remote Stardust install is clear for SSH startup.')
     error.kind = 'update-in-progress'
     error.cause = cause
     throw error
@@ -162,8 +162,8 @@ async function assertWindowsRemoteInstallUpdateClear(ssh, hermesHome) {
 
   const error: any = new Error(
     live
-      ? `Remote Hermes update process ${live[1]} is still running; SSH startup is paused.`
-      : 'The remote Hermes update marker is unreadable or malformed; refusing SSH startup.'
+      ? `Remote Stardust update process ${live[1]} is still running; SSH startup is paused.`
+      : 'The remote Stardust update marker is unreadable or malformed; refusing SSH startup.'
   )
 
   error.kind = 'update-in-progress'
@@ -568,7 +568,7 @@ async function connectWindowsRemote(deps) {
   const inspection = await helper(ssh, runtime, 'inspect', [runtime.hermesPath])
 
   if (!inspection.supported) {
-    const error: any = new Error('Update Hermes on the remote Windows host before connecting with Desktop SSH.')
+    const error: any = new Error('Update Stardust on the remote Windows host before connecting with Desktop SSH.')
     error.kind = 'update-required'
     throw error
   }

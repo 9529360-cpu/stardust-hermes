@@ -43,8 +43,7 @@ const remoteToken = {
   remoteOauthConnected: false,
   remoteTokenPreview: null,
   remoteTokenSet: true,
-  remoteUrl: 'http://100.116.104.53:9191',
-  cloudOrg: ''
+  remoteUrl: 'http://100.116.104.53:9191'
 }
 
 beforeEach(() => {
@@ -147,20 +146,16 @@ describe('BootFailureOverlay', () => {
     }
   })
 
-  // Stardust no longer ships a built-in "Hermes Cloud" (Nous Portal
-  // discovery/login) mode. A connection an older install saved under
-  // mode: 'cloud' is remote-shaped already (a gateway URL + OAuth), so its
-  // reauth recovers through the same generic embedded OAuth flow as any
-  // other remote gateway — no `desktop.cloud` portal-session bridge call.
-  it('recovers a saved cloud-mode connection through generic OAuth, not a portal cascade', async () => {
-    const gatewayUrl = 'https://agent-1.agents.nousresearch.com'
+  // A remote OAuth connection re-authenticates through the generic embedded OAuth flow.
+  it('recovers a saved remote OAuth connection through generic OAuth', async () => {
+    const gatewayUrl = 'https://agent-1.example.com'
     const logout = vi.fn().mockResolvedValue({ ok: true, connected: false })
     const nativeLogin = vi.fn().mockResolvedValue({ ok: true, connected: true })
 
     const restore = stubDesktop(
       {
         ...remoteToken,
-        mode: 'cloud',
+        mode: 'remote',
         remoteAuthMode: 'oauth',
         remoteOauthConnected: false,
         remoteTokenSet: false,
@@ -180,43 +175,6 @@ describe('BootFailureOverlay', () => {
       await waitFor(() => expect(nativeLogin).toHaveBeenCalledWith(gatewayUrl))
       expect(logout).toHaveBeenCalledWith(gatewayUrl)
       expect((window.stardustDesktop as any).cloud).toBeUndefined()
-    } finally {
-      restore()
-    }
-  })
-
-  it('shows the Nous Cloud down recovery when the backend flags isCloudBackendDown', async () => {
-    const restore = stubDesktop(remoteToken)
-    $desktopBoot.set({
-      error: 'Nous Cloud agent ares-3009.agents.nousresearch.com is down (HTTP 503: server-side fault).',
-      fakeMode: false,
-      isCloudBackendDown: true,
-      message: 'boot failed',
-      phase: 'renderer.error',
-      progress: 40,
-      running: false,
-      statusCode: 503,
-      timestamp: Date.now(),
-      visible: true
-    })
-
-    try {
-      render(<BootFailureOverlay />)
-      // Cloud-specific title + actionable recovery instead of the generic
-      // remote-failure copy.
-      expect(await screen.findByText(/Nous Cloud agent is down/i)).toBeTruthy()
-      // Portal and Discord are dedicated action buttons (localized labels
-      // can't drift the URLs, which live in code).
-      expect(screen.getByRole('button', { name: /check portal status/i })).toBeTruthy()
-      expect(screen.getByRole('button', { name: /get help on discord/i })).toBeTruthy()
-      // Cloud-down is a remote failure: local-only Repair is dropped; the
-      // actionable paths are Gateway settings + Use local gateway.
-      expect(screen.queryByRole('button', { name: /repair/i })).toBeNull()
-      expect(screen.getByRole('button', { name: /gateway settings/i })).toBeTruthy()
-      expect(screen.getByRole('button', { name: /use local gateway/i })).toBeTruthy()
-      // The electron-built error message (portal / local mode / Discord) is
-      // still surfaced in the error box.
-      expect(screen.getByText(/ares-3009\.agents\.nousresearch\.com/i)).toBeTruthy()
     } finally {
       restore()
     }

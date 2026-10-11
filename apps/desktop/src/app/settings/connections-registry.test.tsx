@@ -135,7 +135,7 @@ describe('ConnectionsRegistrySection', () => {
     })
   })
 
-  it('offers every kind on create and disables Local while the managed entry exists', async () => {
+  it('offers Local, Remote gateway and SSH on create, and disables Local while the managed entry exists', async () => {
     render(<ConnectionsRegistrySection />)
 
     await waitFor(() => expect(screen.getByText('Homelab')).toBeTruthy())
@@ -143,7 +143,7 @@ describe('ConnectionsRegistrySection', () => {
 
     const localKind = screen.getByRole('button', { name: 'Local' }) as HTMLButtonElement
     expect(localKind.disabled).toBe(true)
-    expect(screen.getByRole('button', { name: 'Hermes Cloud' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Hermes Cloud' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Remote gateway' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'SSH' })).toBeTruthy()
   })
@@ -355,10 +355,10 @@ describe('dedupe helpers', () => {
     ).toBeNull()
   })
 
-  it('keys remote/cloud dupes on the normalized URL across both kinds', () => {
+  it('keys remote dupes on the normalized URL regardless of letter case or trailing slash', () => {
     expect(
       findDuplicateConnection(
-        { host: '', id: null, kind: 'cloud', remoteProfile: '', url: 'http://HOMELAB.lan:9119/' },
+        { host: '', id: null, kind: 'remote', remoteProfile: '', url: 'http://HOMELAB.lan:9119/' },
         registry.connections
       )
     ).toMatchObject({ id: 'homelab' })
