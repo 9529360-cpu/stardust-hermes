@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client'
 
 import { OverlayErrorBoundary } from '@/components/overlay-error-boundary'
 import { isOnboardingEnabled } from '@/lib/onboarding-enabled'
+import { PRODUCT_NAME } from '@/product-brand'
 
 import { IntroRevealSurface } from './intro-reveal-surface'
 
@@ -12,7 +13,7 @@ export function mountIntroReveal(): void {
     return
   }
 
-  document.title = 'Hermes'
+  document.title = PRODUCT_NAME
   // Every intro measure is in rem, so this one root size scales the whole
   // composition. The app's default 16 px root is sized for a working window, which
   // is too small on a display the user sits back from.

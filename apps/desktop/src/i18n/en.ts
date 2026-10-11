@@ -32,19 +32,19 @@ export const en: Translations = {
     ownerMissing: 'Reopen this conversation to manage its connections.',
     search: 'Find an app',
     empty: 'No matching apps',
-    disclaimer: 'Connecting is optional. Only authorize the apps you want Hermes to use.',
+    disclaimer: 'Connecting is optional. Only authorize the apps you want Stardust to use.',
     execution: 'Connector tools',
     skipThis: 'Skip this',
     setupUnavailable: 'Connections aren’t available right now — this can be set up later.',
     nothingYet: 'Nothing connects yet.',
-    nothingYetBody: 'Hermes will offer to link these when a task needs them, and asks before reading anything.',
+    nothingYetBody: 'Stardust will offer to link these when a task needs them, and asks before reading anything.',
     noneOfThese: 'None of these',
     continueWithCount: (count: number) => `Continue with ${count}`
   },
 
   sessionImport: {
     title: 'Continue from another app',
-    subtitle: 'Bring a conversation into Hermes and pick up where you left off.',
+    subtitle: 'Bring a conversation into Stardust and pick up where you left off.',
     action: 'Import chat',
     readingFrom: 'Reading from',
     connectedComputer: 'the connected computer',
@@ -62,18 +62,18 @@ export const en: Translations = {
     more: 'Load more chats',
     messages: 'messages',
     choose: 'A conversation worth continuing',
-    chooseHelp: 'Choose a chat to read its history before bringing it into Hermes.',
+    chooseHelp: 'Choose a chat to read its history before bringing it into Stardust.',
     previewLoading: 'Opening preview',
     previewError: 'Preview unavailable',
     previewHelp: 'The source may have moved or changed. Refresh the list and try again.',
     previewLimit: 'Preview shortened for readability. The complete conversation is imported.',
     you: 'You',
-    snapshot: 'This conversation is already in Hermes. Open your existing copy to continue.',
+    snapshot: 'This conversation is already in Stardust. Open your existing copy to continue.',
     copyNotice:
       'Copies conversation text. Source files stay unchanged. Tool output and reasoning are not carried over.',
     importing: 'Importing…',
-    open: 'Open in Hermes',
-    continue: 'Continue in Hermes',
+    open: 'Open in Stardust',
+    continue: 'Continue in Stardust',
     importError: 'Could not import this conversation.'
   },
   common: {
@@ -138,48 +138,48 @@ export const en: Translations = {
   },
 
   boot: {
-    ready: 'Hermes Desktop is ready',
+    ready: 'Stardust Desktop is ready',
     desktopBootFailedWithMessage: message => `Desktop boot failed: ${message}`,
     steps: {
       connectingGateway: 'Connecting live desktop gateway',
-      loadingSettings: 'Loading Hermes settings',
+      loadingSettings: 'Loading Stardust settings',
       loadingSessions: 'Loading recent chats',
-      retryingRemoteBackend: 'Reconnecting to the remote Hermes backend…',
+      retryingRemoteBackend: 'Reconnecting to the remote Stardust backend…',
       startingDesktopConnection: 'Starting desktop connection',
-      startingHermesDesktop: 'Starting Hermes Desktop…'
+      startingHermesDesktop: 'Starting Stardust Desktop…'
     },
     errors: {
       backgroundExited:
         'The service that runs your chats closed unexpectedly. Restart it to keep going — your chats and settings are safe.',
-      backgroundExitedDuringStartup: 'Hermes stopped right after it started.',
-      backendStopped: 'Hermes stopped working in the background',
-      restartHermes: 'Restart Hermes',
+      backgroundExitedDuringStartup: 'Stardust stopped right after it started.',
+      backendStopped: 'Stardust stopped working in the background',
+      restartHermes: 'Restart Stardust',
       openLogs: 'Open logs',
-      desktopBootFailed: "Hermes couldn't start",
-      gatewayConnectionLost: 'Hermes lost its connection',
+      desktopBootFailed: "Stardust couldn't start",
+      gatewayConnectionLost: 'Stardust lost its connection',
       gatewayConnectionLostDetail:
         'Still trying to reconnect. You can keep reading and drafting. If this keeps up, reconnect now or check your connection settings.',
       reconnectNow: 'Reconnect now',
       connectionSettings: 'Connection settings',
-      gatewaySignInRequired: 'Your remote Hermes signed you out',
+      gatewaySignInRequired: 'Your remote Stardust signed you out',
       gatewaySignInRequiredDetail: 'Sign in again to reconnect. Your chats and settings are safe.',
       signInAgain: 'Sign in again',
-      ipcBridgeUnavailable: "Hermes Desktop couldn't talk to its own background layer. Restart the app."
+      ipcBridgeUnavailable: "Stardust Desktop couldn't talk to its own background layer. Restart the app."
     },
     // Plain causes for a local backend boot failure (`classifyBootFailure`);
     // the raw output stays behind "Show recent logs".
     causes: {
-      exitedEarly: "Hermes' background service stopped right after starting.",
-      timedOut: "Hermes' background service didn't answer in time.",
-      permission: "Hermes couldn't write to its data folder (permission problem).",
-      diskFull: 'The disk is full, so Hermes could not start.',
-      portInUse: 'Another program is using the network port Hermes needs.',
-      installMissing: "Part of Hermes' installation is missing. Choose Repair install to put it back."
+      exitedEarly: "Stardust's background service stopped right after starting.",
+      timedOut: "Stardust's background service didn't answer in time.",
+      permission: "Stardust couldn't write to its data folder (permission problem).",
+      diskFull: 'The disk is full, so Stardust could not start.',
+      portInUse: 'Another program is using the network port Stardust needs.',
+      installMissing: "Part of Stardust's installation is missing. Choose Repair install to put it back."
     },
     failure: {
-      title: "Hermes couldn't start",
+      title: "Stardust couldn't start",
       description:
-        "Hermes' background service didn't come up. Try one of the recovery steps below. Nothing here deletes your chats or settings.",
+        "Stardust's background service didn't come up. Try one of the recovery steps below. Nothing here deletes your chats or settings.",
       details: 'Details',
       remoteTitle: 'Remote gateway sign-in required',
       remoteDescription:
@@ -227,9 +227,9 @@ export const en: Translations = {
     copyDetailFailed: 'Could not copy notification detail',
     backendOutOfDateTitle: 'Backend out of date',
     backendOutOfDateMessage:
-      'Your Hermes backend is older than this desktop build and may not work correctly. Update to align them.',
+      'Your Stardust backend is older than this desktop build and may not work correctly. Update to align them.',
     installMethodUnsupportedTitle: 'Unsupported install method',
-    updateHermes: 'Update Hermes',
+    updateHermes: 'Update Stardust',
     updateReadyTitle: 'Update ready',
     updateReadyMessage: count => `${count} new change${count === 1 ? '' : 's'} available.`,
     updateReadyMessageUnknown: 'A new update is available.',
@@ -249,20 +249,20 @@ export const en: Translations = {
       elevenLabsNeedsKey: 'Voice input needs an ElevenLabs key. Add one in Settings → Keys.',
       elevenLabsRejectedKey: "ElevenLabs didn't accept your API key. Update it in Settings → Keys, then try again.",
       diskFull: 'Disk full — free some space, then try again.',
-      storageFailure: "Hermes couldn't save to its data folder. Open Maintenance to check and repair it.",
+      storageFailure: "Stardust couldn't save to its data folder. Open Maintenance to check and repair it.",
       gatewayAuthFailed:
-        'This Hermes no longer accepts your saved sign-in. Open Gateways and sign in again (or paste a new access token), then retry.',
+        'This Stardust no longer accepts your saved sign-in. Open Gateways and sign in again (or paste a new access token), then retry.',
       methodNotAllowed:
-        "Hermes' background service is out of step with the app, probably after an update. Restart it to fix this.",
+        "Stardust's background service is out of step with the app, probably after an update. Restart it to fix this.",
       microphonePermission: 'Microphone permission was denied.',
       openaiRejectedApiKey: "OpenAI didn't accept your API key. Update it in Settings → Keys, then try again.",
       openaiTtsNeedsKey: 'Voice needs an OpenAI key. Add one in Settings → Keys.',
       codeSkewRestartRequired:
-        'Hermes was updated but is still running the old version. Restart it to finish the update.',
-      restartHermesFailed: "Couldn't restart Hermes"
+        'Stardust was updated but is still running the old version. Restart it to finish the update.',
+      restartHermesFailed: "Couldn't restart Stardust"
     },
     actions: {
-      restartHermes: 'Restart Hermes',
+      restartHermes: 'Restart Stardust',
       openKeys: 'Open Keys',
       openGateways: 'Open Gateways',
       openMaintenance: 'Open Maintenance'
@@ -532,7 +532,7 @@ export const en: Translations = {
     exportConfig: 'Export config',
     importConfig: 'Import config',
     resetToDefaults: 'Reset to defaults',
-    resetConfirm: 'Reset all settings to Hermes defaults?',
+    resetConfirm: 'Reset all settings to Stardust defaults?',
     exportFailed: 'Export failed',
     resetFailed: 'Reset failed',
     nav: {
@@ -596,7 +596,7 @@ export const en: Translations = {
         agentTargetLocal: (profile, dir) => `Installs into the ${profile} backend (${dir})`,
         agentTargetRemote: profile => `Installs into the connected ${profile} backend`,
         catalogPinned: (name, sha) =>
-          `Hermes catalog entry "${name}" — the agent component installs at the reviewed pin${sha ? ` ${sha}` : ''}, not the branch tip.`,
+          `Stardust catalog entry "${name}" — the agent component installs at the reviewed pin${sha ? ` ${sha}` : ''}, not the branch tip.`,
         reviewedHeading: 'Reviewed catalog entry',
         reviewedIntro:
           'This entry was human-reviewed at its pinned commit. You can still inspect the exact code below.',
@@ -692,7 +692,7 @@ export const en: Translations = {
       deleteAction: 'Remove saved item',
       otpField: 'Authenticator key',
       otpPlaceholder: 'Base32 secret or otpauth:// link',
-      otpHint: 'The "setup key" the site shows when you enable 2FA. With it saved, Hermes generates the codes itself.',
+      otpHint: 'The "setup key" the site shows when you enable 2FA. With it saved, Stardust generates the codes itself.',
       twoFactorBadge: '2FA auto',
       deleteTitle: 'Delete this item?',
       deleteDescription: label => `"${label}" will be removed. This cannot be undone.`,
@@ -703,10 +703,10 @@ export const en: Translations = {
           'Installed password managers are picked up automatically. The agent asks you to unlock one the first time it needs a login from it (once per session); only a session token stays in memory, and the agent never sees your master password or any login.',
         toggleFailed: 'Could not update password manager',
         notInstalled: name =>
-          `Not detected. Install the ${name} command-line tool and sign in to it; Hermes picks it up automatically.`,
-        disabledDesc: 'Detected but turned off for Hermes.',
+          `Not detected. Install the ${name} command-line tool and sign in to it; Stardust picks it up automatically.`,
+        disabledDesc: 'Detected but turned off for Stardust.',
         lockedDesc: 'Detected. The agent will ask you to unlock it when it needs a login, or unlock now.',
-        unlockedDesc: 'Unlocked for this session. Locks automatically after 30 minutes idle or when Hermes closes.',
+        unlockedDesc: 'Unlocked for this session. Locks automatically after 30 minutes idle or when Stardust closes.',
         statusLocked: 'Locked',
         statusNotDetected: 'Not detected',
         statusOff: 'Off',
@@ -726,7 +726,7 @@ export const en: Translations = {
       intro: 'OS notifications (not in-app toasts). Per device.',
       enableAll: 'Enable notifications',
       enableAllDesc: 'Off silences every notification below.',
-      focusedHint: 'Completion alerts only fire while Hermes is in the background.',
+      focusedHint: 'Completion alerts only fire while Stardust is in the background.',
       kinds: {
         approval: {
           label: 'Approval needed',
@@ -734,11 +734,11 @@ export const en: Translations = {
         },
         input: {
           label: 'Input needed',
-          description: 'Hermes asked a question or needs a password or secret.'
+          description: 'Stardust asked a question or needs a password or secret.'
         },
         turnDone: {
           label: 'Response ready',
-          description: 'A turn finished while Hermes was in the background.'
+          description: 'A turn finished while Stardust was in the background.'
         },
         turnError: {
           label: 'Turn failed',
@@ -754,11 +754,11 @@ export const en: Translations = {
         },
         plugin: {
           label: 'Plugin notifications',
-          description: 'A desktop plugin sent a notification while Hermes was in the background.'
+          description: 'A desktop plugin sent a notification while Stardust was in the background.'
         }
       },
       test: 'Send test notification',
-      testTitle: 'Hermes',
+      testTitle: 'Stardust',
       testBody: 'Notifications are working.',
       testSent: 'Test sent. If nothing appears, check your OS notification permissions and Focus/Do Not Disturb.',
       testUnsupported: 'This system does not support native notifications.',
@@ -778,7 +778,7 @@ export const en: Translations = {
       advanced: 'Advanced'
     },
     searchPlaceholder: {
-      about: 'About Hermes Desktop',
+      about: 'About Stardust Desktop',
       config: 'Search settings...',
       gateway: 'Gateway connection...',
       keys: 'Search API keys...',
@@ -794,7 +794,7 @@ export const en: Translations = {
       title: 'Appearance',
       intro: 'Desktop-only. Mode is brightness; theme is palette and chat chrome.',
       colorMode: 'Color Mode',
-      colorModeDesc: 'Pick a fixed mode or let Hermes follow your system setting.',
+      colorModeDesc: 'Pick a fixed mode or let Stardust follow your system setting.',
       toolViewTitle: 'Tool Call Display',
       toolViewDesc: 'Product hides raw tool payloads; Technical shows full input/output.',
       reasoningCollapsedTitle: 'Collapse thinking by default',
@@ -857,14 +857,14 @@ export const en: Translations = {
       introSplashTitle: 'Intro Splash',
       introSplashDesc: 'The wordmark and prompt shown on an empty chat.',
       reactionsTitle: 'Message Reactions',
-      reactionsDesc: 'iMessage-style emoji tapbacks — react to messages, and Hermes can react to yours.',
+      reactionsDesc: 'iMessage-style emoji tapbacks — react to messages, and Stardust can react to yours.',
       tipsTitle: 'In-App Tips',
       tipsDesc:
-        'Occasional hints from the app and Hermes. Each tip appears once. Turns off automatically after your first 30 days; you can turn it back on.',
+        'Occasional hints from the app and Stardust. Each tip appears once. Turns off automatically after your first 30 days; you can turn it back on.',
       tipsReset: (count: number) => `Show ${count} ${count === 1 ? 'tip' : 'tips'} again`,
       toursTitle: 'Guided Tours',
       toursDesc:
-        'Let Hermes spotlight each step as it guides you through the app. Turns off automatically after your first 30 days; you can turn it back on.',
+        'Let Stardust spotlight each step as it guides you through the app. Turns off automatically after your first 30 days; you can turn it back on.',
       composerPopoutTitle: 'Floating Composer',
       composerPopoutDesc: 'Allow dragging the composer out of its dock. Turn this off to keep it locked at the bottom.',
       vibeHeartsTitle: 'Vibe Hearts',
@@ -901,9 +901,9 @@ export const en: Translations = {
       pet: {
         title: 'Pet',
         intro:
-          'Adopt an animated petdex mascot that floats over the app and reacts to what Hermes is doing — running while tools execute, celebrating on success, sulking on errors.',
+          'Adopt an animated petdex mascot that floats over the app and reacts to what Stardust is doing — running while tools execute, celebrating on success, sulking on errors.',
         restartHint:
-          'Pets need a quick restart — the running app started before this feature was added. Quit and reopen Hermes, then come back here.',
+          'Pets need a quick restart — the running app started before this feature was added. Quit and reopen Stardust, then come back here.',
         on: 'On',
         off: 'Off',
         scaleTitle: 'Size',
@@ -946,7 +946,7 @@ export const en: Translations = {
     uninstallSection: {
       dangerZone: 'Danger zone',
       confirmUninstall: 'Confirm uninstall',
-      uninstallHermes: 'Uninstall Hermes',
+      uninstallHermes: 'Uninstall Stardust',
       checkingInstalled: "Checking what's installed…",
       guiOnlyTitle: 'Uninstall desktop app only',
       guiOnlyDescription: 'Remove this desktop app. The agent, your config, and chats all stay.',
@@ -1026,7 +1026,7 @@ export const en: Translations = {
       installBackend: 'Install the cua-driver backend below to drive this machine.',
       grantHint: ' Then grant Accessibility and Screen Recording here.',
       grantIdentity:
-        'Grants attach to CuaDriver\'s own identity (com.trycua.driver), not Hermes — so the dialog is attributed to the process that drives your Mac.',
+        'Grants attach to CuaDriver\'s own identity (com.trycua.driver), not Stardust — so the dialog is attributed to the process that drives your Mac.',
       recheck: 'Recheck',
       ready: 'Computer Use is ready. Ask the agent to capture an app and click around.',
       platformNoteLinux: 'Drives your desktop via the X11/XWayland accessibility stack — no permission prompt.',
@@ -1047,17 +1047,17 @@ export const en: Translations = {
       readFailed: 'Could not read Computer Use status'
     },
     about: {
-      heading: 'Hermes Desktop',
+      heading: 'Stardust Desktop',
       version: value => `Version ${value}`,
       versionUnavailable: 'Version unavailable',
       bundleOutOfSync: 'App build out of date',
       bundleOutOfSyncDesc:
-        'The Hermes runtime was updated, but the desktop app itself is still an older build — new interface features (like Bot Mode) will be missing until it updates. Run the update below to rebuild the app. If that doesn\u2019t clear this warning, reinstall from the latest desktop installer.',
+        'The Stardust runtime was updated, but the desktop app itself is still an older build — new interface features (like Bot Mode) will be missing until it updates. Run the update below to rebuild the app. If that doesn\u2019t clear this warning, reinstall from the latest desktop installer.',
       bundleOutOfSyncAction: 'Get the installer',
       bundleSwapPending: 'Restart to finish the update',
       bundleSwapPendingDesc:
-        'The updated app is already installed — Hermes only needs to restart to load it. Chats and settings are untouched.',
-      bundleSwapPendingAction: 'Restart Hermes',
+        'The updated app is already installed — Stardust only needs to restart to load it. Chats and settings are untouched.',
+      bundleSwapPendingAction: 'Restart Stardust',
       updates: 'Updates',
       checkNow: 'Check now',
       checking: 'Checking…',
@@ -1075,7 +1075,7 @@ export const en: Translations = {
       justNowSuffix: ' · just now',
       automaticUpdates: 'Automatic updates',
       automaticUpdatesDesc:
-        'Hermes checks for updates automatically in the background and lets you know when one is ready.',
+        'Stardust checks for updates automatically in the background and lets you know when one is ready.',
       branchCommit: (branch, commit) => `Branch ${branch} · Commit ${commit}`,
       never: 'never',
       justNow: 'just now',
@@ -1092,7 +1092,7 @@ export const en: Translations = {
       searchPlaceholder: 'Search…',
       noResults: 'No results found',
       systemDefault: 'System default',
-      loading: 'Loading Hermes configuration...',
+      loading: 'Loading Stardust configuration...',
       emptyTitle: 'Nothing to configure',
       emptyDesc: 'This section has no adjustable settings.',
       failedLoad: 'Settings failed to load',
@@ -1115,14 +1115,14 @@ export const en: Translations = {
     quickEntry: {
       enabledTitle: 'Quick Entry',
       enabledDesc:
-        'Summon a small composer from anywhere with a global shortcut and fire a prompt without opening Hermes.',
+        'Summon a small composer from anywhere with a global shortcut and fire a prompt without opening Stardust.',
       shortcutTitle: 'Quick Entry shortcut',
       shortcutDesc: 'Needs at least one modifier, e.g. CommandOrControl+Shift+Space.',
       active: 'Shortcut is active.',
       takenBy: 'Another app already uses this shortcut — pick a different one.',
       invalidShortcut: 'Not a valid shortcut. Include at least one modifier key.',
-      askPlaceholder: 'Ask Hermes…',
-      disconnectedPlaceholder: 'Not connected — open Hermes to reconnect',
+      askPlaceholder: 'Ask Stardust…',
+      disconnectedPlaceholder: 'Not connected — open Stardust to reconnect',
       sendTo: 'Send to',
       targetLabel: 'Target chat',
       currentChat: 'Current chat',
@@ -1151,7 +1151,7 @@ export const en: Translations = {
     // v2 multi-connection registry: Settings → Gateways.
     connections: {
       title: 'Registered gateways',
-      intro: 'Manage this device and every Hermes gateway it can reach through remote, SSH, or Cloud connections.',
+      intro: 'Manage this device and every Stardust gateway it can reach through remote, SSH, or Cloud connections.',
       stagedNote:
         'Switch gateways from Chats. Profiles, chats, messaging, and cron jobs stay with their gateway; work on other gateways keeps running.',
       launchModeTitle: 'At startup, return to Chats on the last-used gateway',
@@ -1185,10 +1185,10 @@ export const en: Translations = {
       kindRemote: 'Remote gateway',
       kindCloud: 'Hermes Cloud',
       kindSsh: 'SSH',
-      kindLocalDesc: 'The Hermes runtime managed by this app.',
-      kindRemoteDesc: 'A Hermes gateway reachable over HTTP(S) — LAN, Tailscale, or the internet.',
+      kindLocalDesc: 'The Stardust runtime managed by this app.',
+      kindRemoteDesc: 'A Stardust gateway reachable over HTTP(S) — LAN, Tailscale, or the internet.',
       kindCloudDesc: 'A hosted instance discovered through your Hermes Cloud account.',
-      kindSshDesc: 'A Hermes install reached over SSH.',
+      kindSshDesc: 'A Stardust install reached over SSH.',
       labelTitle: 'Name',
       labelDesc: 'Required. Shown everywhere this instance appears; must be unique (e.g. “Homelab”, “Work laptop”).',
       labelPlaceholder: 'Homelab',
@@ -1196,7 +1196,7 @@ export const en: Translations = {
       sshHostTitle: 'SSH host',
       headersTitle: 'Extra gateway headers',
       headersDesc:
-        'Sent with every HTTP and WebSocket request to this gateway — for access proxies such as Cloudflare Access (CF-Access-Client-Id / CF-Access-Client-Secret). Values are stored encrypted. Headers Hermes manages (Authorization, Cookie, Host…) are ignored.',
+        'Sent with every HTTP and WebSocket request to this gateway — for access proxies such as Cloudflare Access (CF-Access-Client-Id / CF-Access-Client-Secret). Values are stored encrypted. Headers Stardust manages (Authorization, Cookie, Host…) are ignored.',
       headerValuePlaceholder: 'Value',
       headerValueSaved: 'Saved — leave blank to keep',
       headerAdd: 'Add header',
@@ -1235,19 +1235,19 @@ export const en: Translations = {
       loading: 'Loading gateway settings...',
       unavailableTitle: 'Gateway settings unavailable',
       unavailableDesc:
-        'Connection settings can only be changed from the Hermes Desktop app on the computer running it.',
+        'Connection settings can only be changed from the Stardust Desktop app on the computer running it.',
       title: 'Gateway Connection',
       envOverride: 'env override',
       intro:
-        'Local by default. Use remote when this app should drive a Hermes backend elsewhere. Gateway connections are machine-level; profiles are discovered from the gateways you connect.',
-      envOverrideTitle: 'This connection was fixed by the way Hermes was launched.',
+        'Local by default. Use remote when this app should drive a Stardust backend elsewhere. Gateway connections are machine-level; profiles are discovered from the gateways you connect.',
+      envOverrideTitle: 'This connection was fixed by the way Stardust was launched.',
       envOverrideDesc:
-        'A startup setting outside the app chose this connection, so the options below are read-only. Restart Hermes without that setting — or ask whoever set it up — to change it here.',
+        'A startup setting outside the app chose this connection, so the options below are read-only. Restart Stardust without that setting — or ask whoever set it up — to change it here.',
       modeTitle: 'Connection mode',
       localTitle: 'Local gateway',
-      localDesc: 'Start a private Hermes backend on localhost. This is the default and works offline.',
+      localDesc: 'Start a private Stardust backend on localhost. This is the default and works offline.',
       remoteTitle: 'Remote gateway',
-      remoteDesc: 'Connect this desktop shell to a remote Hermes backend.',
+      remoteDesc: 'Connect this desktop shell to a remote Stardust backend.',
       remoteAuthHint: 'Hosted gateways use OAuth or a username and password; self-hosted ones may use a session token.',
       cloudTitle: 'Hermes Cloud',
       cloudDesc: 'Sign in once to Hermes Cloud and pick from the agents on your account — no URL to paste.',
@@ -1289,7 +1289,7 @@ export const en: Translations = {
       remoteUrlDesc: 'Base URL for the remote dashboard backend. Path prefixes are supported, for example /hermes.',
       probing: 'Checking how this gateway authenticates…',
       probeError:
-        "Hermes can't reach that address. Check the URL and that the other computer is running Hermes — sign-in options appear once it answers.",
+        "Stardust can't reach that address. Check the URL and that the other computer is running Stardust — sign-in options appear once it answers.",
       signedIn: 'Signed in',
       signIn: 'Sign in',
       signOut: 'Sign out',
@@ -1332,7 +1332,7 @@ export const en: Translations = {
       savedTitle: 'Gateway settings saved',
       restartingMessage: 'Stardust Desktop will reconnect using the saved settings — the shell stays open.',
       savedMessage: 'Saved for the next restart.',
-      connectedTo: (baseUrl, version) => `Connected to ${baseUrl}${version ? ` · Hermes ${version}` : ''}`,
+      connectedTo: (baseUrl, version) => `Connected to ${baseUrl}${version ? ` · Stardust ${version}` : ''}`,
       reachableTitle: 'Remote gateway reachable',
       signedOutTitle: 'Signed out',
       signedOutMessage: 'Cleared the remote gateway session.',
@@ -1344,7 +1344,7 @@ export const en: Translations = {
       saveFailed: 'Could not save gateway settings',
       sshTitle: 'Connect via SSH',
       sshDesc:
-        'Hermes is launched on the remote over SSH and tunneled to this app — nothing to start or expose yourself. Requires working key-based SSH access to the host.',
+        'Stardust is launched on the remote over SSH and tunneled to this app — nothing to start or expose yourself. Requires working key-based SSH access to the host.',
       sshTrustHint: 'The first presented host key is trusted and pinned; later changes fail closed.',
       sshHostTitle: 'Host',
       sshHostDesc: 'user@host, or a Host alias from ~/.ssh/config.',
@@ -1365,19 +1365,19 @@ export const en: Translations = {
       sshTestConnection: 'Test SSH',
       sshConnect: 'Connect',
       sshButtonsHint: 'Save applies on the next launch. Connect reconnects now.',
-      sshReachable: (host, platform) => `Reachable: ${host} (${platform}) — Hermes found`,
+      sshReachable: (host, platform) => `Reachable: ${host} (${platform}) — Stardust found`,
       sshIncompleteHost: 'Enter an SSH host before connecting.',
       sshErrUnreachable: 'Could not reach that host over SSH. Check the host, port, and your network.',
       sshErrAuth:
-        'SSH authentication failed. Load your key into the ssh-agent (ssh-add) or set an IdentityFile in ~/.ssh/config — Hermes runs ssh non-interactively.',
+        'SSH authentication failed. Load your key into the ssh-agent (ssh-add) or set an IdentityFile in ~/.ssh/config — Stardust runs ssh non-interactively.',
       sshErrHostKey:
         'The host key has CHANGED since you last connected. Verify this is expected, then run ssh-keygen -R <host> and reconnect.',
       sshErrNotInstalled:
-        'Hermes is not installed on the remote host. Install it there (curl -fsSL https://hermes-agent.nousresearch.com/install.sh | sh) or set the Hermes path.',
+        'Stardust is not installed on the remote host. Install it there (curl -fsSL https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust.sh | bash) or set the Hermes path.',
       sshErrPlatform:
-        'Unsupported remote platform. Hermes Desktop SSH mode supports Linux, macOS, and Windows remote hosts.',
+        'Unsupported remote platform. Stardust Desktop SSH mode supports Linux, macOS, and Windows remote hosts.',
       sshErrTimeout: 'SSH connection timed out. The host may be unreachable or asleep.',
-      sshErrUpdateRequired: 'Update Hermes on the remote host before connecting with Desktop SSH.',
+      sshErrUpdateRequired: 'Update Stardust on the remote host before connecting with Desktop SSH.',
       sshErrUnknown: 'SSH connection failed.'
     },
     keys: {
@@ -1463,7 +1463,7 @@ export const en: Translations = {
       noOutput: 'No output yet.',
       deepLinkTitle: 'Add MCP server?',
       deepLinkDescription:
-        'A link asked to add this MCP server to Hermes. Review the exact configuration below — it comes from the link, not from Hermes.',
+        'A link asked to add this MCP server to Stardust. Review the exact configuration below — it comes from the link, not from Stardust.',
       deepLinkStdioWarning:
         'This server runs a local process on your machine with the command shown below. Only continue if you trust its source.',
       deepLinkConfirm: 'Add server',
@@ -1570,7 +1570,7 @@ export const en: Translations = {
       serverRunning: 'Running',
       runtimeInstalled: 'llama.cpp runtime installed',
       runtimeInstalledDetail: (tag, backend) =>
-        `Build ${tag}, ${backend} backend. Hermes starts and manages the server for you.`,
+        `Build ${tag}, ${backend} backend. Stardust starts and manages the server for you.`,
       installTitle: 'Install the local runtime',
       installDetail:
         'Downloads the llama.cpp inference engine (a few hundred MB). Models you download run entirely on this machine — no account, nothing leaves your computer.',
@@ -1708,7 +1708,7 @@ export const en: Translations = {
       noKeysMatch: 'No providers match your search.',
       localEndpoint: {
         title: 'Local / custom endpoint',
-        description: 'Point Hermes at any OpenAI-compatible endpoint (Zyphra, vLLM, llama.cpp, Ollama, etc).'
+        description: 'Point Stardust at any OpenAI-compatible endpoint (Zyphra, vLLM, llama.cpp, Ollama, etc).'
       },
       loading: 'Loading providers...'
     },
@@ -1818,7 +1818,7 @@ export const en: Translations = {
         needsSetupHint: 'You can select this option now — commands will fail until setup is complete.',
         unavailableTitle: 'Terminal commands are unavailable',
         unavailableMessage: backend =>
-          `Hermes can't run shell commands right now: ${backend} isn't ready. Switch to Local, or finish setting up ${backend} and try again.`,
+          `Stardust can't run shell commands right now: ${backend} isn't ready. Switch to Local, or finish setting up ${backend} and try again.`,
         openBackendSettings: 'Open terminal settings',
         useLocal: 'Use Local',
         switchedToLocal: 'Terminal commands now run locally. Applies to new chats.'
@@ -1973,7 +1973,7 @@ export const en: Translations = {
       halfDesktopHint: 'this app, same for every profile',
       halfAgent: 'Agent',
       halfAgentIn: (profile: string) => `Agent in ${profile}`,
-      defaultProfile: 'Hermes (default)',
+      defaultProfile: 'Stardust (default)',
       kindAgent: 'Agent',
       kindDesktop: 'Desktop',
       kindBoth: 'Agent + Desktop',
@@ -1990,7 +1990,7 @@ export const en: Translations = {
       emptyHint: 'Browse the catalog below and install a reviewed plugin with one click.',
       loadFailed: 'Could not load agent plugins',
       toggleFailed: (name: string) => `Could not toggle ${name}`,
-      legacyBackend: 'This backend predates key-addressed plugin toggles — update Hermes to manage it here.',
+      legacyBackend: 'This backend predates key-addressed plugin toggles — update Stardust to manage it here.',
       portableBadge: 'portable',
       catalogTitle: 'Plugin catalog',
       catalogBrowse: 'Browse',
@@ -1998,7 +1998,7 @@ export const en: Translations = {
       catalogHint:
         'Hit "+ Add to this Agent" on any plugin — reviewed entries install at their pinned commit into the selected profile. Bundled agent+desktop plugins offer both halves.',
       alreadyInstalled: (name: string) => `${name} is already installed in this profile.`,
-      catalogProvenance: (sha: string) => `Installed from the Hermes catalog${sha ? ` at pin ${sha}` : ''}.`,
+      catalogProvenance: (sha: string) => `Installed from the Stardust catalog${sha ? ` at pin ${sha}` : ''}.`,
       pinnedProvenance: (sha: string) =>
         `Pinned to commit ${sha}. Updates are refused until it is reinstalled with a new pin.`,
       pinnedBadge: (sha: string) => `pinned @ ${sha}`,
@@ -2083,7 +2083,7 @@ export const en: Translations = {
     loadFailed: 'Could not load memory graph',
     loading: 'Loading…',
     emptyTitle: 'Nothing learned yet',
-    emptyDesc: 'As Hermes builds skills and memories for your work, they appear here.',
+    emptyDesc: 'As Stardust builds skills and memories for your work, they appear here.',
     share: 'Share map',
     shareHint:
       'Copy the code to share this map, or paste one to load. It only includes the layout, not your memory or skill text.',
@@ -2182,7 +2182,7 @@ export const en: Translations = {
       placeholder: 'Search pets…',
       loading: 'Loading petdex gallery…',
       error: 'Could not reach the petdex gallery.',
-      staleBackend: 'Restart Hermes to use pets — the backend predates this feature.',
+      staleBackend: 'Restart Stardust to use pets — the backend predates this feature.',
       empty: 'No matching pets.',
       turnOff: 'Turn off',
       turnOn: 'Turn on',
@@ -2209,8 +2209,8 @@ export const en: Translations = {
       hatchComposing: 'Piecing it together…',
       hatchSaving: 'Almost there…',
       namePlaceholder: 'Name your pet',
-      staleBackend: 'Update Hermes to generate pets.',
-      backgroundHint: 'You can close this — Hermes will notify you when it’s done.',
+      staleBackend: 'Update Stardust to generate pets.',
+      backgroundHint: 'You can close this — Stardust will notify you when it’s done.',
       slowProviderHint: 'This can take several minutes',
       remix: 'Remix',
       remixConfirmTitle: 'Remix this look?',
@@ -2253,7 +2253,7 @@ export const en: Translations = {
     },
     nav: {
       newChat: { title: 'New chat', detail: 'Start a fresh chat' },
-      settings: { title: 'Settings', detail: 'Configure Hermes desktop' },
+      settings: { title: 'Settings', detail: 'Configure Stardust desktop' },
       skills: { title: 'Capabilities', detail: 'Skills, tools, MCP servers, and plugins' },
       messaging: { title: 'Messaging', detail: 'Set up Telegram, Slack, Discord, and more' },
       artifacts: { title: 'Artifacts', detail: 'Browse generated outputs' }
@@ -2275,7 +2275,7 @@ export const en: Translations = {
     noSessions: 'No chats yet.',
     gatewayRunning: 'Messaging gateway running',
     gatewayStopped: 'Messaging gateway stopped',
-    hermesActiveSessions: (version, count) => `Hermes ${version} · Active chats ${count}`,
+    hermesActiveSessions: (version, count) => `Stardust ${version} · Active chats ${count}`,
     restartGateway: 'Restart gateway',
     openBrowser: 'Open browser',
     gatewayRestartFailed: 'Gateway restart failed.',
@@ -2283,7 +2283,7 @@ export const en: Translations = {
     sharedGatewayRestartDescription: bots => `All bots on this device reconnect: ${bots}`,
     sharedGatewayRestartConfirm: 'Restart all',
     sharedGatewayRestarted: count => `Shared gateway restarted (${count} ${count === 1 ? 'bot' : 'bots'})`,
-    updateHermes: 'Update Hermes',
+    updateHermes: 'Update Stardust',
     reloadWindow: 'Reload window',
     actionRunning: 'running',
     actionDone: 'done',
@@ -2447,17 +2447,17 @@ export const en: Translations = {
     restartNeeded: 'Saved. Restart the messaging gateway so the new settings take effect.',
     restartNow: 'Restart now',
     restarting: 'Restarting…',
-    restartFailedManual: "Hermes couldn't restart to apply your messaging settings",
+    restartFailedManual: "Stardust couldn't restart to apply your messaging settings",
     restartFailedManualDetail: 'Try Restart again; if it still fails, open the logs and send diagnostics.',
     restartAgain: 'Restart again',
     openLogs: 'Open logs',
     telegramQr: {
       title: 'Choose how to connect your Telegram bot',
-      subtitle: 'Both options connect a bot you control and save its credentials only to this Hermes installation.',
+      subtitle: 'Both options connect a bot you control and save its credentials only to this Stardust installation.',
       quickSetup: 'Quick setup',
       recommended: 'Recommended',
       quickHelp:
-        'Scan a QR code and confirm in Telegram. Hermes creates the bot and detects your Telegram user ID automatically.',
+        'Scan a QR code and confirm in Telegram. Stardust creates the bot and detects your Telegram user ID automatically.',
       createWithQr: 'Create with QR',
       starting: 'Starting…',
       replaceWarning:
@@ -2669,7 +2669,7 @@ export const en: Translations = {
       menuItem: 'Connect to a remote host…',
       badge: (host: string) => `Runs on ${host}`,
       title: (profile: string) => `Connect ${profile} to a remote host`,
-      description: 'Chats in this profile will run on the remote Hermes you point it at, instead of this computer.',
+      description: 'Chats in this profile will run on the remote Stardust you point it at, instead of this computer.',
       urlLabel: 'Remote address',
       urlPlaceholder: 'https://hermes.example.com',
       urlInvalid: 'Enter a full address starting with http:// or https://',
@@ -2734,7 +2734,7 @@ export const en: Translations = {
     deleteDescMid: ' and remove its ',
     deleteDescSuffix: ' directory. This cannot be undone.',
     deleting: 'Deleting...',
-    createDesc: 'Profiles are independent Hermes environments: separate config, skills, and SOUL.md.',
+    createDesc: 'Profiles are independent Stardust environments: separate config, skills, and SOUL.md.',
     nameLabel: 'Name',
     cloneFrom: 'Clone from',
     cloneFromNone: 'None (blank)',
@@ -2800,7 +2800,7 @@ export const en: Translations = {
         `${count} unpinned scheduled ${count === 1 ? 'job keeps' : 'jobs keep'} running on the model ${count === 1 ? 'it was' : 'they were'} created under. Pin ${count === 1 ? 'it' : 'them'} or set cron.model to move ${count === 1 ? 'it' : 'them'}.`,
       detailMore: (names, remaining) => `${names} and ${remaining} more`,
       review: 'Review scheduled jobs',
-      saveFailed: 'Hermes did not save that model change.',
+      saveFailed: 'Stardust did not save that model change.',
       confirmTitle: 'Model Selection Warning',
       confirmDetail: 'Confirm only if you accept this trade-off.',
       confirmAction: 'Confirm',
@@ -2865,7 +2865,7 @@ export const en: Translations = {
     everyHourAt: minute => `Every hour at :${minute}`,
     newCron: 'New cron',
     emptyDescNew:
-      'Schedule a prompt to run on a cron expression. Hermes will run it and deliver results to the destination you pick.',
+      'Schedule a prompt to run on a cron expression. Stardust will run it and deliver results to the destination you pick.',
     emptyDescSearch: 'Try a broader search query.',
     emptyTitleNew: 'No scheduled jobs yet',
     emptyTitleSearch: 'No matches',
@@ -3095,8 +3095,8 @@ export const en: Translations = {
       removeFromSidebar: 'Hide from sidebar',
       createFailed: 'Could not create project',
       staleBackend:
-        'Update the Hermes backend to create projects — your backend is older than this desktop app (Settings → Updates → Backend).',
-      deleteConfirm: 'This removes the saved project from Hermes. Files, git repos, and worktrees stay untouched.',
+        'Update the Stardust backend to create projects — your backend is older than this desktop app (Settings → Updates → Backend).',
+      deleteConfirm: 'This removes the saved project from Stardust. Files, git repos, and worktrees stay untouched.',
       startWork: 'New worktree',
       newWorktreeTitle: 'New worktree',
       newWorktreeDesc: 'Name the branch for this worktree.',
@@ -3106,7 +3106,7 @@ export const en: Translations = {
       baseBranchNone: 'No branches found',
       startWorkFailed: 'Could not create worktree',
       worktreeStaleBackend:
-        'Update the Hermes backend to create worktrees over this remote connection — it predates the git worktree API.',
+        'Update the Stardust backend to create worktrees over this remote connection — it predates the git worktree API.',
       worktreeProjectLabel: 'Project',
       worktreeProjectPlaceholder: 'Search projects…',
       worktreeProjectNone: 'No projects with a folder',
@@ -3272,8 +3272,8 @@ export const en: Translations = {
     transcribingDictation: 'Transcribing dictation',
     voiceControls: 'Voice',
     voiceEngine: 'Voice chat engine',
-    voiceEngineChained: 'Speech-to-text + Hermes voice',
-    voiceEngineLive: 'GPT-Live (full-duplex, delegates to Hermes)',
+    voiceEngineChained: 'Speech-to-text + Stardust voice',
+    voiceEngineLive: 'GPT-Live (full-duplex, delegates to Stardust)',
     voiceEngineLiveNeedsKey: 'Needs an OpenAI API key',
     voiceEngineChangeFailed: 'Could not change the voice chat engine',
     voiceEngineChainedShort: 'speech-to-text',
@@ -3310,7 +3310,7 @@ export const en: Translations = {
       'composer.history': 'cycle popover / history'
     },
     attachUrlTitle: 'Attach a URL',
-    attachUrlDesc: 'Hermes will fetch the page and include it as context for this turn.',
+    attachUrlDesc: 'Stardust will fetch the page and include it as context for this turn.',
     urlPlaceholder: 'https://example.com/post',
     urlHintPre: 'Include the full URL, e.g. ',
     attach: 'Attach',
@@ -3584,9 +3584,9 @@ export const en: Translations = {
       fetch: 'Downloading…',
       pull: 'Almost there…',
       pydeps: 'Finishing up…',
-      update: 'Updating Hermes…',
+      update: 'Updating Stardust…',
       rebuild: 'Rebuilding the desktop app…',
-      restart: 'Restarting Hermes…',
+      restart: 'Restarting Stardust…',
       done: 'Update complete',
       manual: 'Update from your terminal',
       guiSkew: 'Update the desktop app',
@@ -3596,46 +3596,46 @@ export const en: Translations = {
     checkFailedTitle: 'Couldn’t check for updates',
     tryAgain: 'Try again',
     notAvailableTitle: 'Update not available',
-    unsupportedMessage: 'This version of Hermes can’t update itself from inside the app.',
+    unsupportedMessage: 'This version of Stardust can’t update itself from inside the app.',
     connectionRetry:
-      "Hermes couldn't reach the update server. Check your internet connection and try again. If you use a remote Hermes, make sure it is online.",
+      "Stardust couldn't reach the update server. Check your internet connection and try again. If you use a remote Stardust, make sure it is online.",
     connectionSettings: 'Connection settings',
     openDownloadPage: 'Open download page',
     latestBody: 'You’re running the latest version.',
     latestBodyBackend: 'The backend is running the latest version.',
     allSetTitle: 'You’re all set',
     availableTitle: 'New update available',
-    availableBody: 'A new version of Hermes is ready to install.',
+    availableBody: 'A new version of Stardust is ready to install.',
     availableTitleBackend: 'Backend update available',
-    availableBodyBackend: 'A newer version of the connected Hermes backend is ready to install.',
+    availableBodyBackend: 'A newer version of the connected Stardust backend is ready to install.',
     availableBodyNoChangelog: 'A newer version is ready. Release notes aren’t available for this install type.',
     updateNow: 'Update now',
     maybeLater: 'Maybe later',
     moreChanges: count => `+ ${count} more change${count === 1 ? '' : 's'} included.`,
     manualTitle: 'Update from your terminal',
-    manualBody: 'You installed Hermes from the command line, so updates run there too. Paste this into your terminal:',
-    manualPickedUp: 'Hermes will pick up the new version next time you launch it.',
+    manualBody: 'You installed Stardust from the command line, so updates run there too. Paste this into your terminal:',
+    manualPickedUp: 'Stardust will pick up the new version next time you launch it.',
     guiSkewTitle: 'Update the desktop app',
     guiSkewBody:
-      'The backend was updated, but this desktop app package wasn’t changed. Update or reinstall the Hermes desktop app (your AppImage / .deb / .rpm) to match.',
+      'The backend was updated, but this desktop app package wasn’t changed. Update or reinstall the Stardust desktop app (your AppImage / .deb / .rpm) to match.',
     copy: 'Copy',
     copied: 'Copied',
     done: 'Done',
     applyingBody:
-      'The Hermes updater takes over in its own window and reopens Hermes automatically when it’s done. Please don’t reopen Hermes yourself while it’s updating.',
+      'The Stardust updater takes over in its own window and reopens Stardust automatically when it’s done. Please don’t reopen Stardust yourself while it’s updating.',
     applyingBodyBackend:
-      'The remote backend is applying the update and will restart. Hermes reconnects automatically when it’s back.',
-    applyingClose: 'This window will close while the update runs, then Hermes reopens on its own.',
+      'The remote backend is applying the update and will restart. Stardust reconnects automatically when it’s back.',
+    applyingClose: 'This window will close while the update runs, then Stardust reopens on its own.',
     errorTitle: 'Update didn’t finish',
     errorBody: 'No worries — nothing was lost. You can try again now.',
-    blockerTitle: 'Close local previews to update Hermes?',
+    blockerTitle: 'Close local previews to update Stardust?',
     blockerBody:
-      'Hermes needs to stop these local previews before updating. This will not modify or delete your files.',
-    foreignBlockerTitle: 'Close other processes to update Hermes',
+      'Stardust needs to stop these local previews before updating. This will not modify or delete your files.',
+    foreignBlockerTitle: 'Close other processes to update Stardust',
     foreignBlockerBody:
-      'Hermes can’t safely close these processes automatically. Close the app, terminal, or service that owns each one, then try the update again.',
+      'Stardust can’t safely close these processes automatically. Close the app, terminal, or service that owns each one, then try the update again.',
     mixedBlockerBody:
-      'Hermes can close the local previews listed below. Other processes must be closed manually before the update can continue.',
+      'Stardust can close the local previews listed below. Other processes must be closed manually before the update can continue.',
     closePreviewsAndUpdate: 'Close previews and update',
     closePreviewsAndCheckAgain: 'Close previews and check again',
     localPreview: 'Local preview',
@@ -3668,8 +3668,8 @@ export const en: Translations = {
     sessionsTitle: 'Each profile keeps its own chats',
     sessionsText:
       'This list belongs to the default profile. New chat starts one on whichever profile is selected. Switch profiles on the rail and the list changes with it.',
-    stayTitle: 'Hermes is one click away',
-    stayText: 'Switch to the setup profile and open Welcome to Hermes whenever you want a hand. It stays there.'
+    stayTitle: 'Stardust is one click away',
+    stayText: 'Switch to the setup profile and open Welcome to Stardust whenever you want a hand. It stays there.'
   },
   guidedGreeting: {
     line: "Hey, come on in. I'm Stardust. Give me two minutes to set the place up around you, then we'll put me to work on something you actually want done.\n\nFirst though, what should I call you?",
@@ -3693,21 +3693,21 @@ export const en: Translations = {
     retryAfterRun: 'I’ve run it -- retry',
     setupChoiceTitle: 'Set up Stardust Desktop',
     setupChoiceDesc:
-      'Connect this app to a Hermes gateway you already run, or install Hermes locally on this computer.',
-    connectExistingTitle: 'Connect to existing Hermes',
+      'Connect this app to a Stardust gateway you already run, or install Stardust locally on this computer.',
+    connectExistingTitle: 'Connect to existing Stardust',
     connectExistingShort: 'Connect existing',
     connectExistingDesc: 'Use a remote backend with a session token or browser sign-in. No local install will start.',
-    installLocalTitle: 'Install Hermes locally',
-    installLocalDesc: 'Download Hermes, create its Python environment, and run the backend on this computer.',
+    installLocalTitle: 'Install Stardust locally',
+    installLocalDesc: 'Download Stardust, create its Python environment, and run the backend on this computer.',
     localStartUnavailable: 'Local installation could not start. Restart Stardust Desktop and try again.',
-    remoteSetupTitle: 'Connect to existing Hermes',
-    remoteSetupDesc: 'Enter your gateway URL. Hermes Desktop will detect whether it needs a token or browser sign-in.',
+    remoteSetupTitle: 'Connect to existing Stardust',
+    remoteSetupDesc: 'Enter your gateway URL. Stardust Desktop will detect whether it needs a token or browser sign-in.',
     remoteUrlTitle: 'Gateway URL',
-    remoteUrlDesc: 'Use the base URL of the Hermes gateway, including https:// when remote.',
+    remoteUrlDesc: 'Use the base URL of the Stardust gateway, including https:// when remote.',
     remoteUrlPlaceholder: 'https://gateway.example.com/hermes',
     probing: 'Detecting gateway authentication...',
     probeError:
-      "Hermes can't reach that address. Check the URL and that the other computer is running Hermes — sign-in options appear once it answers.",
+      "Stardust can't reach that address. Check the URL and that the other computer is running Stardust — sign-in options appear once it answers.",
     probeErrorDetails: 'Details',
     identityProvider: 'your identity provider',
     authTitle: 'Authentication',
@@ -3731,9 +3731,9 @@ export const en: Translations = {
     settingUpTitle: 'Setting up Stardust Agent',
     finishingTitle: 'Finishing up',
     failedDesc:
-      'One of the setup steps did not finish. This can happen when another copy of Hermes is running, the internet connection dropped, or antivirus blocked the installer. Close other Hermes windows, then choose Reload and retry. If it fails again, open the logs and send them to support.',
+      'One of the setup steps did not finish. This can happen when another copy of Stardust is running, the internet connection dropped, or antivirus blocked the installer. Close other Stardust windows, then choose Reload and retry. If it fails again, open the logs and send them to support.',
     activeDesc:
-      'This is a one-time setup. The Hermes installer is downloading dependencies and configuring your machine. Subsequent launches will skip this step.',
+      'This is a one-time setup. The Stardust installer is downloading dependencies and configuring your machine. Subsequent launches will skip this step.',
     progress: (completed, total) => `${completed} of ${total} steps complete`,
     currentStage: stage => ` -- now: ${stage}`,
     fetchingManifest: 'Fetching installer manifest...',
@@ -3980,7 +3980,7 @@ export const en: Translations = {
       update: 'update',
       updateInProgress: 'Update in progress',
       commitsBehind: (count, branch) => `${count} commit${count === 1 ? '' : 's'} behind ${branch}`,
-      desktopVersion: version => `Hermes Desktop v${version}`,
+      desktopVersion: version => `Stardust Desktop v${version}`,
       backendVersion: version => `Backend v${version}`,
       clientLabel: version => `client v${version}`,
       connectionSsh: host => `SSH: ${host}`,
@@ -4150,7 +4150,7 @@ export const en: Translations = {
     binaryTitle: 'This looks like a binary file',
     binaryBody: label => `Previewing ${label} may show unreadable text.`,
     largeTitle: 'This file is large',
-    largeBody: (label, size) => `${label} is ${size}. Hermes will only show the first 512 KB.`,
+    largeBody: (label, size) => `${label} is ${size}. Stardust will only show the first 512 KB.`,
     previewAnyway: 'Preview anyway',
     truncated: 'Showing first 512 KB.',
     noInlineTitle: 'No inline preview',
@@ -4216,7 +4216,7 @@ export const en: Translations = {
       restartFailedTitle: 'Preview restart failed',
       restartFailedMessage: 'Stardust could not restart the server.',
       stillWorking:
-        'Hermes is still working, but no restart result has arrived yet. The server command may be running in the foreground.',
+        'Stardust is still working, but no restart result has arrived yet. The server command may be running in the foreground.',
       workspaceReloading: 'Workspace changed, reloading preview',
       fileChanged: url => `File changed, reloading preview: ${url}`,
       filesChanged: (count, url) => `${count} file changes, reloading preview: ${url}`,
@@ -4354,24 +4354,24 @@ export const en: Translations = {
         billing: 'Out of credits',
         disk: 'Disk full',
         endpoint: "Can't reach your model server",
-        gateway: 'Hermes hit a problem',
-        generic: "Hermes couldn't finish this reply",
+        gateway: 'Stardust hit a problem',
+        generic: "Stardust couldn't finish this reply",
         provider: 'The AI service returned an error',
-        runtime: 'Hermes hit a problem',
+        runtime: 'Stardust hit a problem',
         streaming: 'The reply was cut off'
       },
       errorLayerBodies: {
         auth: 'The AI service rejected your sign-in. Check the credentials for this provider, then send your message again.',
         billing: 'Your account has no credits left for this provider. Top up or switch provider, then send again.',
-        disk: 'Your disk is full, so Hermes could not save this conversation. Free some space, then retry.',
+        disk: 'Your disk is full, so Stardust could not save this conversation. Free some space, then retry.',
         endpoint:
-          "Hermes can't reach your custom model server. Check that it is running, then send your message again.",
+          "Stardust can't reach your custom model server. Check that it is running, then send your message again.",
         gateway:
-          'Hermes hit an internal problem starting this reply. Send your message again; if it keeps happening, send diagnostics.',
-        generic: 'Something went wrong while Hermes was replying. Retry, or copy the details if it keeps happening.',
+          'Stardust hit an internal problem starting this reply. Send your message again; if it keeps happening, send diagnostics.',
+        generic: 'Something went wrong while Stardust was replying. Retry, or copy the details if it keeps happening.',
         provider: 'The AI service could not complete this request. Retry in a moment or switch provider.',
         runtime:
-          'Hermes hit an internal problem starting this reply. Send your message again; if it keeps happening, send diagnostics.',
+          'Stardust hit an internal problem starting this reply. Send your message again; if it keeps happening, send diagnostics.',
         streaming: 'The connection dropped before the reply finished. Retry to send it again.'
       },
       errorCodes: {
@@ -4416,7 +4416,7 @@ export const en: Translations = {
         ssl_cert_verification: {
           title: 'Secure connection failed',
           body: provider =>
-            `Hermes could not verify the secure connection to ${provider}. Check your network or proxy settings, or switch provider, then send your message again.`
+            `Stardust could not verify the secure connection to ${provider}. Check your network or proxy settings, or switch provider, then send your message again.`
         },
         context_overflow: {
           title: 'This conversation is too long',
@@ -4451,23 +4451,23 @@ export const en: Translations = {
         },
         invalid_response: {
           title: 'The AI service sent an unreadable reply',
-          body: provider => `${provider} returned something Hermes could not read. Retry in a moment.`
+          body: provider => `${provider} returned something Stardust could not read. Retry in a moment.`
         },
         empty_response: {
           title: 'The AI service sent an empty reply',
           body: provider => `${provider} returned nothing for this message. Retry in a moment.`
         },
         loop_error: {
-          title: 'Hermes got stuck in a loop',
-          body: 'The reply kept repeating the same steps, so Hermes stopped it. Retry, or start a new chat if it happens again.'
+          title: 'Stardust got stuck in a loop',
+          body: 'The reply kept repeating the same steps, so Stardust stopped it. Retry, or start a new chat if it happens again.'
         },
         SESSION_NOT_OWNED: {
           title: 'This chat is open somewhere else',
-          body: 'This chat is currently open in another Hermes window or terminal. Close it there and send your message again, or start a new chat here.'
+          body: 'This chat is currently open in another Stardust window or terminal. Close it there and send your message again, or start a new chat here.'
         },
         disk_full: {
           title: 'Disk full',
-          body: 'Your disk is full, so Hermes could not save this conversation. Free some space, then retry.'
+          body: 'Your disk is full, so Stardust could not save this conversation. Free some space, then retry.'
         }
       },
       errorAuthKinds: {
@@ -4481,7 +4481,7 @@ export const en: Translations = {
       },
       errorDetails: 'Details',
       errorGenericProvider: 'The AI service',
-      errorToastTitle: "Hermes couldn't finish the reply",
+      errorToastTitle: "Stardust couldn't finish the reply",
       errorRetry: 'Retry',
       errorStartNewSession: 'Start new chat',
       errorSwitchProvider: 'Switch provider',
@@ -4489,8 +4489,8 @@ export const en: Translations = {
       errorChooseModel: 'Choose a model',
       errorCompressConversation: 'Compress conversation',
       errorCompressFailed: 'Could not compress the conversation',
-      errorOpenHermesFolder: 'Open Hermes folder',
-      errorOpenHermesFolderFailed: 'Could not open the Hermes folder',
+      errorOpenHermesFolder: 'Open Stardust folder',
+      errorOpenHermesFolderFailed: 'Could not open the Stardust folder',
       errorUpdateApiKey: 'Update API key',
       errorSignInAgain: provider => `Sign in to ${provider} again`,
       errorOauthExpired: provider =>
@@ -4526,14 +4526,14 @@ export const en: Translations = {
       repliedTo: (sender: string) => `Replied to ${sender}`,
       showReply: 'show reply',
       conversationTimeline: 'Conversation timeline',
-      hermesWorking: 'Hermes is working',
+      hermesWorking: 'Stardust is working',
       toolPayload: 'Tool payload',
       toolSearch: 'Search',
       emojiSearch: 'Search…',
       loadingEmoji: 'Loading emoji…',
       noEmoji: 'No emoji found.',
       moreEmoji: 'More emoji',
-      reactedByHermes: 'Reacted by Hermes',
+      reactedByHermes: 'Reacted by Stardust',
       deliveryPending: 'Messaging',
       deliveryDone: 'Messaged',
       removeReaction: (emoji: string) => `Remove ${emoji} reaction`,
@@ -4542,11 +4542,11 @@ export const en: Translations = {
     },
     approval: {
       gatewayDisconnected:
-        'Hermes is offline right now. The command is still waiting for your answer (until the approval timeout). Reconnect, then send it again.',
+        'Stardust is offline right now. The command is still waiting for your answer (until the approval timeout). Reconnect, then send it again.',
       sendFailed: 'Could not send your answer',
       reconnect: 'Reconnect',
       timedOutSystemLine:
-        'Approval timed out — the command was not run. Ask Hermes to try again, or raise the limit in Settings → Safety → Approval timeout.',
+        'Approval timed out — the command was not run. Ask Stardust to try again, or raise the limit in Settings → Safety → Approval timeout.',
       openSafetySettings: 'Open Safety settings',
       run: 'Run',
       command: 'Command',
@@ -4557,12 +4557,12 @@ export const en: Translations = {
       reject: 'Reject',
       alwaysTitle: 'Always allow this command?',
       alwaysDescription: pattern =>
-        `This adds the “${pattern}” pattern to your permanent allowlist (~/.hermes/config.yaml). Hermes won’t ask again for commands like this — in this chat or any future one.`,
+        `This adds the “${pattern}” pattern to your permanent allowlist (~/.hermes/config.yaml). Stardust won’t ask again for commands like this — in this chat or any future one.`,
       alwaysAllow: 'Always allow'
     },
     clarify: {
       notReady: 'Clarify request is not ready yet',
-      gatewayDisconnected: 'Hermes is offline right now. Reconnect, then send it again.',
+      gatewayDisconnected: 'Stardust is offline right now. Reconnect, then send it again.',
       sendFailed: 'Could not send clarify response',
       loadingQuestion: 'Loading question…',
       other: 'Other (type your answer)',
@@ -4593,7 +4593,7 @@ export const en: Translations = {
       envRequired: 'Fill in the required credentials first',
       sendFailed: 'Could not send MCP setup response',
       reloadFailed: 'Server saved, but reloading MCP tools failed — they load next chat',
-      gatewayDisconnected: 'Hermes is offline right now. Reconnect, then send it again.'
+      gatewayDisconnected: 'Stardust is offline right now. Reconnect, then send it again.'
     },
     tool: {
       copyCode: 'Copy code',
@@ -4775,7 +4775,7 @@ export const en: Translations = {
   },
 
   prompts: {
-    gatewayDisconnected: 'Hermes is offline right now. Reconnect, then send it again.',
+    gatewayDisconnected: 'Stardust is offline right now. Reconnect, then send it again.',
     reconnect: 'Reconnect',
     sudoSendFailed: 'Could not send sudo password',
     secretSendFailed: 'Could not send secret',
@@ -4786,7 +4786,7 @@ export const en: Translations = {
       'This agent did not provide the command. Cancel if you cannot verify it in the conversation.',
     sudoPlaceholder: 'sudo password',
     secretTitle: 'Secret required',
-    secretDesc: 'Hermes needs a credential to continue.',
+    secretDesc: 'Stardust needs a credential to continue.',
     secretPlaceholder: 'secret value',
     vaultUnlockSendFailed: 'Could not send master password',
     vaultUnlockTitle: name => `Unlock ${name}`,
@@ -4798,7 +4798,7 @@ export const en: Translations = {
     vaultSaveSendFailed: 'Could not save the login',
     vaultSaveTitle: site => `Save your ${site} login?`,
     vaultSaveDesc: origin =>
-      `Hermes reached a sign-in page at ${origin} and has no login for it. Enter it once here; it is encrypted on this machine and filled into the page without the model ever seeing the password.`,
+      `Stardust reached a sign-in page at ${origin} and has no login for it. Enter it once here; it is encrypted on this machine and filled into the page without the model ever seeing the password.`,
     vaultSaveIdentifierLabel: 'Email or username',
     vaultSaveIdentifierPlaceholder: 'you@example.com',
     vaultSavePasswordPlaceholder: 'Password',
@@ -4808,10 +4808,10 @@ export const en: Translations = {
     vaultCodeSendFailed: 'Could not send the code',
     vaultCodeTitle: site => `Verification code for ${site}`,
     vaultCodeDesc: site =>
-      `${site} is asking for a one-time code (text message, email or authenticator app). Enter it here and Hermes types it into the page; the model never sees it.`,
+      `${site} is asking for a one-time code (text message, email or authenticator app). Enter it here and Stardust types it into the page; the model never sees it.`,
     vaultCodeLabel: 'Code',
     vaultCodeFootnote:
-      'Tip: save the authenticator key with this login in Settings → Passwords & Logins and Hermes enters codes for you.',
+      'Tip: save the authenticator key with this login in Settings → Passwords & Logins and Stardust enters codes for you.',
     vaultCodeSkip: 'Skip',
     vaultCodeConfirm: 'Enter code'
   },
@@ -4873,8 +4873,8 @@ export const en: Translations = {
     sessionExportFailed: 'Could not export chat',
     imageSaved: 'Image saved',
     downloadStarted: 'Download started',
-    restartToUseSaveImage: 'Restart Hermes Desktop to use Save Image.',
-    restartToSaveImages: 'Restart Hermes Desktop to save images',
+    restartToUseSaveImage: 'Restart Stardust Desktop to use Save Image.',
+    restartToSaveImages: 'Restart Stardust Desktop to save images',
     imageDownloadFailed: 'Image download failed',
     openImage: 'Open image',
     downloadImage: 'Download image',
@@ -4896,7 +4896,7 @@ export const en: Translations = {
       systemNote: platform => `↻ Handed off to ${platform} — resume here anytime.`,
       failed: error => `Handoff failed: ${error}`,
       timedOut:
-        "Hermes couldn't reach your messaging connection. Start it from Settings → Messaging, then try the handoff again.",
+        "Stardust couldn't reach your messaging connection. Start it from Settings → Messaging, then try the handoff again.",
       startMessaging: 'Start messaging'
     }
   },
@@ -4910,14 +4910,14 @@ export const en: Translations = {
       },
       skills: {
         title: 'Teach it once',
-        text: 'Skills are folders of instructions Hermes loads when the work calls for them.'
+        text: 'Skills are folders of instructions Stardust loads when the work calls for them.'
       },
       messaging: {
-        title: 'Hermes away from your desk',
+        title: 'Stardust away from your desk',
         text: 'Connect Telegram, Discord, Slack and more — same agent, same memory.'
       },
       artifacts: {
-        title: 'Everything Hermes made',
+        title: 'Everything Stardust made',
         text: 'Images, files and links from every chat, indexed in one place.'
       },
       cron: {
@@ -4930,7 +4930,7 @@ export const en: Translations = {
       },
       profiles: {
         title: 'Profiles are separate',
-        text: 'Each one is its own Hermes — own keys, own memory, own chats.'
+        text: 'Each one is its own Stardust — own keys, own memory, own chats.'
       },
       'composer-mentions': {
         title: 'Attach and command',

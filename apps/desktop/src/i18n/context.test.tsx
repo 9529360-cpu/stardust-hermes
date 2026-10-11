@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { HermesConfigRecord } from '@/hermes'
 
 import { TRANSLATIONS } from './catalog'
-import { type I18nConfigClient, I18nProvider, normalizeStardustProductCopy, useI18n } from './context'
+import { type I18nConfigClient, I18nProvider, useI18n } from './context'
 import type { Locale } from './types'
 
 function LanguageProbe({ target = 'zh' }: { target?: Locale }) {
@@ -31,18 +31,19 @@ describe('I18nProvider', () => {
     vi.restoreAllMocks()
   })
 
-  it('normalizes inherited SSH recovery copy to Stardust without renaming the compatibility path', () => {
-    const copy = normalizeStardustProductCopy(TRANSLATIONS.en).settings.gateway
+  it('ships the Stardust installer and keeps the inherited hermes path in SSH recovery copy', () => {
+    const copy = TRANSLATIONS.en.settings.gateway
 
     expect(copy.sshErrNotInstalled).toContain('Stardust is not installed')
     expect(copy.sshErrNotInstalled).toContain('install-stardust.sh')
+    // The SSH path field points at the remote hermes executable, so the name stays.
     expect(copy.sshErrNotInstalled).toContain('set the Hermes path')
     expect(copy.sshErrNotInstalled).not.toContain('hermes-agent.nousresearch.com')
     expect(copy.sshErrPlatform).toContain('Stardust Desktop')
   })
 
-  it('normalizes product-facing settings copy while leaving provider identities alone', () => {
-    const settings = normalizeStardustProductCopy(TRANSLATIONS.en).settings
+  it('shows the product name in English settings copy while leaving provider identities alone', () => {
+    const settings = TRANSLATIONS.en.settings
 
     expect(settings.resetConfirm).toContain('Stardust')
     expect(settings.searchPlaceholder.about).toContain('Stardust Desktop')
@@ -57,8 +58,8 @@ describe('I18nProvider', () => {
     expect(settings.providers.intro).not.toContain('Hermes')
   })
 
-  it('normalizes visible product copy without rewriting compatibility commands', () => {
-    const copy = normalizeStardustProductCopy(TRANSLATIONS.zh)
+  it('shows the product name in Chinese copy without rewriting compatibility commands', () => {
+    const copy = TRANSLATIONS.zh
 
     expect(copy.connectors.disclaimer).toContain('Stardust')
     expect(copy.sessionImport.subtitle).toContain('Stardust')
