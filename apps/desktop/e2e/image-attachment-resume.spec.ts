@@ -126,6 +126,9 @@ async function openSeededSession(page: Page): Promise<void> {
  * surface is empty rather than waiting for the old caption to leave the page.
  */
 async function openNewSession(page: Page): Promise<void> {
+  // After a reload the pointer can rest on a session row, and that row's tooltip then covers the
+  // button. Move the pointer into the chat area first so no tooltip is open when the click lands.
+  await page.mouse.move(640, 400)
   await page.locator('[data-slot="sidebar"] button[aria-label="New chat"], [data-slot="sidebar"] button[aria-label="新建对话"]').first().click()
   await page.waitForFunction(
     ([expected, surfaceSelector]: [string, string]) => {
