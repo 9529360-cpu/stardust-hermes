@@ -164,6 +164,70 @@ describe('room listing', () => {
     expect(stripPreviewMarkdown('- [x] 已完成的事')).toBe('已完成的事')
     expect(stripPreviewMarkdown('前面\n---\n后面')).toBe('前面 后面')
   })
+
+  it('a real newline between table rows is a row break', () => {
+    const { stripPreviewMarkdown } = modules.labels
+
+    expect(stripPreviewMarkdown('| a | b |\n| --- | --- |\n| c | d |')).toBe('a · b; c · d')
+  })
+
+  it('an empty table cell does not start a new row inside a delimited table', () => {
+    const { stripPreviewMarkdown } = modules.labels
+
+    // A blank cell is a missing value. Only a newline or a delimiter row starts a new row.
+    expect(stripPreviewMarkdown('| 任务 | 状态 | 备注 |\n| --- | --- | --- |\n| 整理周报 |  | 已完成 |')).toBe(
+      '任务 · 状态 · 备注; 整理周报 · 已完成'
+    )
+  })
+
+  it('an outer-pipe row flattens its cells without a delimiter row and drops empty cells', () => {
+    const { stripPreviewMarkdown } = modules.labels
+
+    expect(stripPreviewMarkdown('| 整理周报 |  | 已完成 |')).toBe('整理周报 · 已完成')
+  })
+
+  it('prose that shares a string with a table stays prose, separated by a space', () => {
+    const { stripPreviewMarkdown } = modules.labels
+
+    expect(stripPreviewMarkdown('Summary below\n| a | b |\n| --- | --- |\n| c | d |')).toBe(
+      'Summary below a · b; c · d'
+    )
+    // Prose after the table is not another row of it.
+    expect(stripPreviewMarkdown('| a | b |\n| --- | --- |\n| c | d |\nNote after the table')).toBe(
+      'a · b; c · d Note after the table'
+    )
+  })
+
+  it('delimiter rows without outer pipes, or with one hyphen per cell, flatten like GFM tables', () => {
+    const { stripPreviewMarkdown } = modules.labels
+
+    expect(stripPreviewMarkdown('Task | Status\n--- | ---\nPlan | done')).toBe('Task · Status; Plan · done')
+    expect(stripPreviewMarkdown('| a | b |\n| - | - |\n| c | d |')).toBe('a · b; c · d')
+  })
+
+  it('an escaped pipe stays inside its cell', () => {
+    const { stripPreviewMarkdown } = modules.labels
+
+    expect(stripPreviewMarkdown('| a \\| b | c |')).toBe('a | b · c')
+    expect(stripPreviewMarkdown('| a \\| b | c |\n| --- | --- |\n| d | e |')).toBe('a | b · c; d · e')
+  })
+
+  it('a single-line table with its delimiter row embedded keeps header and body apart', () => {
+    const { stripPreviewMarkdown } = modules.labels
+
+    expect(stripPreviewMarkdown('| a | b | | --- | --- | | c | d |')).toBe('a · b; c · d')
+    expect(
+      stripPreviewMarkdown(
+        '| 任务 | 状态 | 负责人 | 截止日期 | | --- | --- | --- | --- | | 整理周报 | 已完成 | 小星 | 10 月 9 日 |'
+      )
+    ).toBe('任务 · 状态 · 负责人 · 截止日期; 整理周报 · 已完成 · 小星 · 10 月 9 日')
+  })
+
+  it('prose with a pipe and no delimiter row is unchanged', () => {
+    const { stripPreviewMarkdown } = modules.labels
+
+    expect(stripPreviewMarkdown('Use a | b to pipe the output')).toBe('Use a | b to pipe the output')
+  })
 })
 
 describe('seating a room', () => {
