@@ -465,7 +465,7 @@ def _spawn_hermes_action(
             message = (
                 f"{name} targets the system-scope gateway service, which requires root, and "
                 "passwordless sudo is unavailable for the dashboard user. Run "
-                f"'sudo hermes {' '.join(subcommand)}' on the host, or grant that user NOPASSWD sudo."
+                f"'sudo stardust {' '.join(subcommand)}' on the host, or grant that user NOPASSWD sudo."
             )
             log_file.write(f"{message}\n".encode())
             log_file.close()

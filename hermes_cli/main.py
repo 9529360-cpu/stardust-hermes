@@ -382,7 +382,7 @@ def _require_tty(command_name: str) -> None:
     """Exit 1 if stdin is not a terminal: curses/input() prompts spin at 100% CPU on a pipe."""
     if not sys.stdin.isatty():
         print(
-            f"Error: 'hermes {command_name}' requires an interactive terminal.\n"
+            f"Error: 'stardust {command_name}' requires an interactive terminal.\n"
             f"It cannot be run through a pipe or non-interactive subprocess.\n"
             f"Run it directly in your terminal instead.",
             file=sys.stderr,
@@ -1287,7 +1287,7 @@ def _exec_in_container(container_info: dict, cli_args: list):
         if not sudo_path:
             print(
                 f"Error: container '{container_name}' not found via {backend}.\n"
-                f"The container may be running under root. Try: sudo hermes {' '.join(cli_args)}",
+                f"The container may be running under root. Try: sudo stardust {' '.join(cli_args)}",
                 file=sys.stderr,
             )
             sys.exit(1)
@@ -1308,7 +1308,7 @@ def _exec_in_container(container_info: dict, cli_args: list):
                 f'    commands = [{{ command = "{runtime}"; options = [ "NOPASSWD" ]; }}];\n'
                 f"  }}];\n"
                 f"\n"
-                f"Or run: sudo hermes {' '.join(cli_args)}",
+                f"Or run: sudo stardust {' '.join(cli_args)}",
                 file=sys.stderr,
             )
             sys.exit(1)

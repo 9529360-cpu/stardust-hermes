@@ -26,9 +26,12 @@ def _find_stale_dashboard_pids(*, exclude_pids: set[int] | None = None) -> list[
 
 def _parse_dashboard_runtime(command: str) -> tuple[str, str, int] | None:
     """Best-effort parse of a dashboard/server cmdline into mode, host, and port."""
+    from hermes_cli.dashboard_procs import _DASHBOARD_PATTERNS
+
     mode = None
     for candidate in ("dashboard", "serve"):
-        patterns = (f"hermes {candidate}", f"hermes_cli.main {candidate}", f"hermes_cli/main.py {candidate}")
+        # Same launcher table the process scan uses, so a process the scan finds is never dropped here.
+        patterns = tuple(p for p in _DASHBOARD_PATTERNS if p.endswith(f" {candidate}"))
         if any(pattern in command for pattern in patterns):
             mode = candidate
             break

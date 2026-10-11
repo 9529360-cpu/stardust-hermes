@@ -866,17 +866,17 @@ class GatewayNotificationsMixin:
             message = (
                 "⚠️ Session database corruption detected. Messages may not be "
                 "persisted. Recovery options:\n"
-                f"1. Run `hermes {profile_arg}doctor --fix`\n"
+                f"1. Run `stardust {profile_arg}doctor --fix`\n"
                 "2. Stop the gateway, then recover with:\n"
-                f"   hermes {profile_arg}sessions recover --source {db_path} "
+                f"   stardust {profile_arg}sessions recover --source {db_path} "
                 "--inspect-only\n"
-                f"   (if it reports recoverable) hermes {profile_arg}sessions recover "
+                f"   (if it reports recoverable) stardust {profile_arg}sessions recover "
                 f"--source {db_path} --output recovered-state.db\n"
                 "   — recovery snapshots the damaged file first; do NOT run "
                 "`sqlite3 ... \".recover\"` against the live state.db, a "
                 "vulnerable sqlite3 CLI can corrupt it further\n"
                 f"3. Restore from a backup in {backups_dir}/\n"
-                f"Run `hermes {profile_arg}doctor` for sanitized diagnostics."
+                f"Run `stardust {profile_arg}doctor` for sanitized diagnostics."
             )
         elif cause == "fts_index":
             # Index-scoped corruption: the message tables are not damaged, so the recover /
@@ -884,7 +884,7 @@ class GatewayNotificationsMixin:
             message = (
                 "⚠️ Session database reported a corruption error confined to the search index "
                 "(FTS5); the message tables are not damaged. Messages may not be persisted until "
-                f"it is repaired: run `hermes {profile_arg}doctor --fix`, then restart the gateway. Do not run "
+                f"it is repaired: run `stardust {profile_arg}doctor --fix`, then restart the gateway. Do not run "
                 "recovery tools or restore a backup unless `stardust doctor` confirms damage."
             )
         else:
@@ -892,7 +892,7 @@ class GatewayNotificationsMixin:
             failure = describe_storage_failure(error)
             message = (
                 "⚠️ Session database unavailable — messages may not be saved and /resume will be "
-                f"empty. Cause: {failure.gloss}. Run `hermes {profile_arg}doctor --fix` on the "
+                f"empty. Cause: {failure.gloss}. Run `stardust {profile_arg}doctor --fix` on the "
                 "gateway machine, then `stardust gateway restart`."
             )
         logger.warning("Broadcasting state.db failure warning to home channels: %s", error)

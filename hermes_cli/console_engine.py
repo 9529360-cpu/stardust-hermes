@@ -151,7 +151,7 @@ def _clean_summary(text: str | None) -> str:
     if not text or text is argparse.SUPPRESS:
         return ""
     summary = " ".join(str(text).split())
-    return "" if summary.startswith("Run `hermes ") else summary
+    return "" if summary.startswith(("Run `stardust ", "Run `hermes ")) else summary
 
 
 def _choice_help(action: argparse._SubParsersAction, name: str) -> str:
@@ -339,8 +339,8 @@ def _register_command_family(
             return _dispatch(surface, root, fixed, args, namespace_update)
 
         engine.register(
-            full_path, usage, summaries.get(full_path) or f"Run `hermes {usage}`.", handler,
-            mutating=mutating, confirmation=f"Run `hermes {usage}`?")
+            full_path, usage, summaries.get(full_path) or f"Run `stardust {usage}`.", handler,
+            mutating=mutating, confirmation=f"Run `stardust {usage}`?")
 
 
 _BLOCKED_TOP = frozenset(
@@ -463,7 +463,7 @@ class HermesConsoleEngine:
         if first.startswith("-"):
             return f"{first} is not available in Hermes Console."
         if first in _BLOCKED_TOP:
-            return f"`hermes {first}` is not available in Hermes Console."
+            return f"`stardust {first}` is not available in Hermes Console."
         return _BLOCKED_PAIRS.get(tuple(tokens[:2]), "")
 
     def _cap_output(self, output: str) -> str:

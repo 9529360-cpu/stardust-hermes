@@ -242,8 +242,8 @@ _STATE_DB_REPAIRS = {
 }
 _STATE_DB_STRUCTURAL_ISSUE = (
     "state.db structural corruption (canonical tables/indexes damaged, not the FTS index) — an FTS rebuild "
-    "cannot repair it. Stop the gateway, then run 'hermes {profile_arg}sessions recover --source {db_path} "
-    "--inspect-only' and, if it reports recoverable, 'hermes {profile_arg}sessions recover --source {db_path} "
+    "cannot repair it. Stop the gateway, then run 'stardust {profile_arg}sessions recover --source {db_path} "
+    "--inspect-only' and, if it reports recoverable, 'stardust {profile_arg}sessions recover --source {db_path} "
     "--output recovered-state.db'. Do NOT restore a .malformed-backup copy beside state.db: it is a snapshot "
     "of the same corrupt file."
 )

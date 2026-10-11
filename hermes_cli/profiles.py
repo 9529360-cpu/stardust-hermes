@@ -215,7 +215,7 @@ def _invalid_profile_name_error(name: str) -> ValueError:
     suggestion = _suggest_profile_name(name)
     return ValueError(
         f"{name!r} is not a valid profile name. {_PROFILE_NAME_RULE} (for example: {suggestion}). "
-        f"Then run `hermes profile create {suggestion}`."
+        f"Then run `stardust profile create {suggestion}`."
     )
 
 
@@ -1000,8 +1000,8 @@ def _finish_profile_layout(profile_dir: Path, *, no_skills: bool, clone_all: boo
     if no_skills:
         _seed_file_if_missing(
             profile_dir / NO_BUNDLED_SKILLS_MARKER,
-            "This profile opted out of bundled-skill seeding (`hermes profile create --no-skills`).\n"
-            "Delete this file to re-enable sync on the next `hermes update`.\n",
+            "This profile opted out of bundled-skill seeding (`stardust profile create --no-skills`).\n"
+            "Delete this file to re-enable sync on the next `stardust update`.\n",
         )
 
     # Migrate config-only clones now so desktop/status don't warn that a just-created

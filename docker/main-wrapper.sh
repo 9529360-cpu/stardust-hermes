@@ -17,7 +17,7 @@
 #   first arg is an executable    → exec it directly (sleep, bash, sh, …)
 #   first arg is anything else    → exec `stardust <args>` (subcommand passthrough)
 #
-# Drop to hermes via s6-setuidgid, but skip it when already non-root.
+# Drop to the hermes user via s6-setuidgid, but skip it when already non-root.
 set -e
 
 if [ -z "${STARDUST_MAIN_WRAPPER_ENV_READY:-}" ] && \
@@ -79,7 +79,7 @@ cd /opt/data
 cd "$_hermes_orig_cwd"
 
 if [ $# -eq 0 ]; then
-    drop hermes
+    drop stardust
 fi
 
 if command -v "$1" >/dev/null 2>&1; then
@@ -87,5 +87,5 @@ if command -v "$1" >/dev/null 2>&1; then
     drop "$@"
 fi
 
-# Hermes subcommand pass-through.
-drop hermes "$@"
+# stardust subcommand pass-through.
+drop stardust "$@"

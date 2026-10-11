@@ -2516,7 +2516,7 @@ def _log_empty_non_final_heal(healed: int) -> None:
                     "⚠️ Your session transcript required repeated repair "
                     f"({total_events} heal passes so far). Replies keep "
                     "working, but a corrupted turn is stuck in this "
-                    "session's history — run /debug share or `hermes "
+                    "session's history — run /debug share or `stardust "
                     "doctor` to capture diagnostics, or /new to start a clean session."
                 )
     if escalate:
