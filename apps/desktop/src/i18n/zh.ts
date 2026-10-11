@@ -778,6 +778,9 @@ export const zh = defineLocale({
       introSplashDesc: '空白对话中显示的字标和提示语。',
       reactionsTitle: '消息回应',
       reactionsDesc: 'iMessage 风格的表情回应 — 你可以给消息添加回应，Stardust 也能回应你的消息。',
+      autoShowFilesTitle: '自动展示生成的文件',
+      autoShowFilesDesc:
+        '助手在当前工作区写入 PDF、网页、图片或 Markdown 文件时，自动在对话旁的预览中打开。工作区之外的文件、程序、脚本和压缩包不会自动打开。',
       tipsTitle: '应用内提示',
       tipsDesc: '偶尔显示来自应用和 Stardust 的提示，每条提示只出现一次。开始使用满30天后自动关闭，你可以重新开启。',
       tipsReset: (count: number) => `再次显示 ${count} 条提示`,

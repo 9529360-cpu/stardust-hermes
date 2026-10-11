@@ -49,7 +49,6 @@ import { toolResultRecord } from '@/lib/tool-result-metadata'
 import { extractToolErrorMessage } from '@/lib/tool-result-summary'
 import { useEnterAnimation } from '@/lib/use-enter-animation'
 import { cn } from '@/lib/utils'
-import { openPreviewFromToolResult } from '@/store/preview'
 import { recordPreviewArtifact } from '@/store/preview-status'
 import { sessionApprovalRequest } from '@/store/prompts'
 import { $toolInlineDiff } from '@/store/tool-diffs'
@@ -64,7 +63,6 @@ import {
   CONNECTION_CARD_KEY,
   countDiffLineStats,
   inlineDiffFromResult,
-  isAutoOpenTarget,
   isCardTool,
   isFileEditTool,
   isPreviewableTarget,
@@ -412,10 +410,11 @@ function ToolEntry({ part }: ToolEntryProps) {
     return buildToolView(p, inlineDiff)
   }, [inlineDiff, isPending, result, stablePart])
 
-  // Surface a previewable artifact (HTML file / localhost URL) as a compact link
-  // in the composer status stack rather than a bulky inline card. Uses the same
-  // detected target the old inline card did. Idempotent + dedup'd, so re-renders
-  // don't churn.
+  // Offer a previewable artifact (HTML file / localhost URL) as a compact link in
+  // the composer status stack rather than a bulky inline card. This row never
+  // opens the rail: what opens by itself is decided from the gateway's
+  // tool.complete event (lib/auto-show.ts), so reads and history replays cannot
+  // yank it. Idempotent + dedup'd, so re-renders don't churn.
   const previewTarget = view.previewTarget
   // The session whose transcript this row is IN, which is not necessarily the
   // primary one: a tool row inside a session tile must feed that tile's composer.
@@ -435,17 +434,7 @@ function ToolEntry({ part }: ToolEntryProps) {
       return
     }
 
-    const cwd = $sessionCwd.get() || ''
-    const isNewArtifact = recordPreviewArtifact(sessionId, previewTarget, cwd)
-
-    // Auto-open only a genuinely new web page or PDF (never plain source), and
-    // only once — a re-render of the same tool row must not re-yank the rail
-    // open after the user has closed it. This row is only mounted while its
-    // session's transcript is on screen, so there is no separate visibility
-    // gate to check here.
-    if (isNewArtifact && isAutoOpenTarget(previewTarget)) {
-      void openPreviewFromToolResult(previewTarget, cwd)
-    }
+    recordPreviewArtifact(sessionId, previewTarget, $sessionCwd.get() || '')
   }, [$sessionCwd, $sessionRuntimeId, isPending, previewTarget])
 
   const detailSections = useMemo(() => {

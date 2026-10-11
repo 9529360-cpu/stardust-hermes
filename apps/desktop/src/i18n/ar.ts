@@ -623,6 +623,9 @@ export const ar = defineLocale({
       introSplashDesc: 'الشعار النصي والعبارة التمهيدية في محادثة فارغة.',
       reactionsTitle: 'تفاعلات الرسائل',
       reactionsDesc: 'تفاعلات إيموجي بأسلوب iMessage — تفاعل مع الرسائل، ويمكن لـ Stardust التفاعل مع رسائلك.',
+      autoShowFilesTitle: 'Show generated files automatically',
+      autoShowFilesDesc:
+        'When the assistant writes a PDF, web page, image, or Markdown file in this workspace, it opens in the preview beside the chat. Files outside the workspace, programs, scripts, and archives never open by themselves.',
       tipsTitle: 'نصائح داخل التطبيق',
       tipsDesc:
         'نصائح تظهر أحيانًا من التطبيق وStardust. تظهر كل نصيحة مرة واحدة. تُعطّل تلقائيًا بعد أول 30 يومًا من الاستخدام، ويمكنك تفعيلها مجددًا.',

@@ -1,10 +1,12 @@
 import type { GatewayEvent } from '@stardust/shared'
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { revealTreePane } from '@/components/pane-shell/tree/store'
+import { createAutoShowLedger, decideAutoShow } from '@/lib/auto-show'
 import { gatewayEventCompletedFileDiff } from '@/lib/gateway-events'
 import { normalizeOrLocalPreviewTarget } from '@/lib/local-preview'
 import { reachablePreviewUrl } from '@/lib/preview-reach'
+import { $autoShowGeneratedFiles } from '@/store/generated-files-auto-show'
 import { $rightRailActiveTabId } from '@/store/layout'
 import {
   $dockedPreviewTabs,
@@ -19,7 +21,7 @@ import {
 } from '@/store/preview'
 import { $rightContextOpen, setRightContextOpen } from '@/store/right-context'
 import { $activeSessionId, $currentCwd } from '@/store/session'
-import { $focusedRuntimeId, $sessionTiles } from '@/store/session-states'
+import { $focusedRuntimeId, $sessionStates, $sessionTiles } from '@/store/session-states'
 
 type EventHandler = (event: GatewayEvent) => void
 
@@ -27,6 +29,11 @@ interface PreviewRoutingOptions {
   baseHandleGatewayEvent: EventHandler
   currentCwd: string
   requestGateway: <T = unknown>(method: string, params?: Record<string, unknown>) => Promise<T>
+}
+
+interface RailVisibility {
+  dismissed: Set<string>
+  revealed: Set<string>
 }
 
 function asRecord(payload: unknown): Record<string, unknown> {
@@ -41,11 +48,61 @@ function sessionIsOnScreen(sessionId: string): boolean {
   )
 }
 
+/** The workspace a session's files are judged against: its own cwd, never another session's. */
+function workspaceOf(sessionId: string | undefined, fallback: string): string {
+  if (!sessionId) {
+    return ''
+  }
+
+  const own = $sessionStates.get()[sessionId]?.cwd?.trim()
+
+  if (own) {
+    return own
+  }
+
+  return sessionId === $activeSessionId.get() ? $currentCwd.get() || fallback : ''
+}
+
+/**
+ * Resolve `input` and open it as a rail tab. The rail reveals itself unless the
+ * user already hid it this turn; the tab still lands, so it waits there when
+ * they look. Nothing here moves focus, so the composer keeps the caret.
+ */
+async function openInRail(
+  input: string,
+  workspace: string,
+  sessionId: string | undefined,
+  label: string,
+  visibility: RailVisibility
+) {
+  const resolved = await normalizeOrLocalPreviewTarget(input, workspace || undefined)
+
+  // Resolution is asynchronous. A user may switch sessions while it runs, and a
+  // stale result must not reveal another session's browser or file.
+  if (!resolved || (sessionId && !sessionIsOnScreen(sessionId))) {
+    return
+  }
+
+  const url = resolved.kind === 'url' ? await reachablePreviewUrl(resolved.url) : resolved.url
+  // The agent's loopback is the GATEWAY's loopback. Keep the original as the
+  // label so the user still sees the address the agent named.
+  const reached = url === resolved.url ? resolved : { ...resolved, label: resolved.label || input, url }
+  const reveal = !sessionId || !visibility.dismissed.has(sessionId)
+
+  if (reveal && sessionId) {
+    visibility.revealed.add(sessionId)
+  }
+
+  openPreview(label ? { ...reached, label } : reached, 'tool-result', undefined, reveal)
+}
+
 export function usePreviewRouting({ baseHandleGatewayEvent, currentCwd, requestGateway }: PreviewRoutingOptions) {
   // A browser action is foreground intent once per turn. Hiding the viewer is
   // not permission to reopen it after every click; the live page keeps working
   // until a new turn, even if another preview.open navigates the same tab.
-  const browserVisibility = useRef({ dismissed: new Set<string>(), revealed: new Set<string>() })
+  const browserVisibility = useRef<RailVisibility>({ dismissed: new Set<string>(), revealed: new Set<string>() })
+  // Which turn is live and which files it already opened (lib/auto-show.ts).
+  const [autoShowLedger] = useState(createAutoShowLedger)
 
   useEffect(
     () =>
@@ -103,6 +160,34 @@ export function usePreviewRouting({ baseHandleGatewayEvent, currentCwd, requestG
         browserVisibility.current.revealed.delete(sessionId)
       }
 
+      if (sessionId && event.type === 'message.start') {
+        autoShowLedger.begin(sessionId)
+      } else if (sessionId && event.type === 'message.complete') {
+        autoShowLedger.end(sessionId)
+      }
+
+      // A file the assistant just wrote in a live turn opens by itself, once per
+      // turn, on the session the owner is looking at. A completion outside a
+      // live turn is a replay, and it never opens anything.
+      if (
+        event.type === 'tool.complete' &&
+        sessionId &&
+        sessionIsOnScreen(sessionId) &&
+        $autoShowGeneratedFiles.get() &&
+        autoShowLedger.isLive(sessionId)
+      ) {
+        const workspace = workspaceOf(sessionId, currentCwd)
+        const decision = decideAutoShow(event, workspace)
+
+        if (decision.open && decision.origin === 'written-file') {
+          for (const target of decision.targets) {
+            if (target.kind === 'file' && autoShowLedger.claim(sessionId, `file:${target.path}`)) {
+              void openInRail(target.path, workspace, sessionId, '', browserVisibility.current)
+            }
+          }
+        }
+      }
+
       if (event.type === 'tool.start' && sessionId && sessionIsOnScreen(sessionId)) {
         const { name, args } = asRecord(event.payload)
         const action = asRecord(args).action
@@ -142,37 +227,35 @@ export function usePreviewRouting({ baseHandleGatewayEvent, currentCwd, requestG
         // the user's click had moved focus to a different zone by the time
         // the tool ran (an "open reddit" they explicitly asked for). A
         // session that is NOT visible anywhere still can't yank the pane
-        // open (offer, don't hijack). Routes through the same normalizer as
-        // the file browser so URLs, localhost, and file paths all resolve.
-        const { url, label } = asRecord(event.payload)
-        const target = typeof url === 'string' ? url.trim() : ''
+        // open (offer, don't hijack). The auto-show policy decides what may
+        // open: a file must sit inside this session's workspace and be a type
+        // that is never a program, script, installer, or archive.
+        const { label } = asRecord(event.payload)
 
-        if (target && (!event.session_id || sessionIsOnScreen(event.session_id))) {
-          void normalizeOrLocalPreviewTarget(target, $currentCwd.get() || currentCwd || undefined).then(
-            async resolved => {
-              // URL normalization / reachability is asynchronous. A user may
-              // switch sessions while it resolves; a stale foreground event
-              // must not reveal another session's browser.
-              if (!resolved || (event.session_id && !sessionIsOnScreen(event.session_id))) {
-                return
-              }
-
-              const trimmedLabel = typeof label === 'string' ? label.trim() : ''
-              // The agent's loopback is the GATEWAY's loopback. Give the pane a
-              // URL this machine can load, keeping the original as the label so
-              // the user still sees the address the agent named.
-              const url = resolved.kind === 'url' ? await reachablePreviewUrl(resolved.url) : resolved.url
-              const reached = url === resolved.url ? resolved : { ...resolved, label: resolved.label || target, url }
-
-              openPreview(
-                trimmedLabel ? { ...reached, label: trimmedLabel } : reached,
-                'tool-result',
-                undefined,
-                !event.session_id || !browserVisibility.current.dismissed.has(event.session_id)
-              )
-            }
-          )
+        if (sessionId && !sessionIsOnScreen(sessionId)) {
+          return
         }
+
+        const workspace = workspaceOf(sessionId, currentCwd)
+        const decision = decideAutoShow(event, workspace)
+        const target = decision.open ? decision.targets[0] : undefined
+
+        // A file opens once per turn. An explicit URL is never deduplicated: the
+        // assistant asked for that page, and the open just re-fronts its tab.
+        if (
+          !target ||
+          (target.kind === 'file' && !(sessionId && autoShowLedger.claim(sessionId, `file:${target.path}`)))
+        ) {
+          return
+        }
+
+        void openInRail(
+          target.kind === 'url' ? target.url : target.path,
+          workspace,
+          sessionId,
+          typeof label === 'string' ? label.trim() : '',
+          browserVisibility.current
+        )
 
         return
       }
@@ -242,7 +325,7 @@ export function usePreviewRouting({ baseHandleGatewayEvent, currentCwd, requestG
         requestPreviewReload()
       }
     },
-    [baseHandleGatewayEvent, currentCwd]
+    [autoShowLedger, baseHandleGatewayEvent, currentCwd]
   )
 
   return { handleDesktopGatewayEvent, restartPreviewServer }

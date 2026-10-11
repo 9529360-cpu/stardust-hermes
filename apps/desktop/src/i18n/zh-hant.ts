@@ -567,6 +567,9 @@ export const zhHant = defineLocale({
       introSplashDesc: '空白對話中顯示的字標和提示語。',
       reactionsTitle: '訊息回應',
       reactionsDesc: 'iMessage 風格的表情回應 — 你可以對訊息做出回應，Stardust 也能回應你的訊息。',
+      autoShowFilesTitle: '自動展示生成的檔案',
+      autoShowFilesDesc:
+        '助理在目前的工作區寫入 PDF、網頁、圖片或 Markdown 檔案時，自動在對話旁的預覽中開啟。工作區之外的檔案、程式、指令稿和壓縮檔不會自動開啟。',
       tipsTitle: '應用程式內提示',
       tipsDesc: '偶爾顯示來自應用程式和 Stardust 的提示，每則提示只出現一次。開始使用滿30天後自動關閉，你可以重新開啟。',
       tipsReset: (count: number) => `再次顯示 ${count} 則提示`,

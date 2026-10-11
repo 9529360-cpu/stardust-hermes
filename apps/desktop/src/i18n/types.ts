@@ -737,6 +737,8 @@ export interface Translations {
       introSplashDesc: string
       reactionsTitle: string
       reactionsDesc: string
+      autoShowFilesTitle: string
+      autoShowFilesDesc: string
       tipsTitle: string
       tipsDesc: string
       tipsReset: (count: number) => string

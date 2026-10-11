@@ -4,9 +4,10 @@ import { previewName } from '@/lib/preview-targets'
 
 /**
  * Session-scoped feed of previewable artifacts (HTML files, localhost dev URLs)
- * a tool produced. Surfaced as compact links in the composer status stack —
- * NOT auto-opened and NOT a bulky inline card. Click opens the rail preview or
- * the browser; both are manual.
+ * a tool produced. Surfaced as compact links in the composer status stack: an
+ * offer, not a bulky inline card. This feed never opens the rail; the auto-show
+ * policy (lib/auto-show.ts) decides that from gateway events. Click opens the
+ * rail preview or the browser; both are manual.
  *
  * Fed from the tool row itself (see tool-fallback.tsx) using the same detected
  * target the inline card used, so detection parity is exact.
@@ -46,27 +47,21 @@ const writePreviews = (sid: string, items: PreviewArtifact[]) => {
  * Record a detected artifact, newest last, capped. Idempotent: a target already
  * in the list keeps its slot (the tool row re-registers on every render, so this
  * must not churn the atom or reorder rows).
- *
- * Returns whether `target` was newly added (vs. already tracked), so a caller
- * can gate a one-time action (e.g. auto-opening it) on genuine novelty rather
- * than firing again on every re-render of the same tool row.
  */
-export function recordPreviewArtifact(sid: string, target: string, cwd: string): boolean {
+export function recordPreviewArtifact(sid: string, target: string, cwd: string): void {
   const raw = target.trim()
 
   if (!sid || !raw) {
-    return false
+    return
   }
 
   const list = $previewStatusBySession.get()[sid] ?? []
 
   if (list.some(item => item.id === raw)) {
-    return false
+    return
   }
 
   writePreviews(sid, [...list, { cwd, id: raw, label: previewName(raw), target: raw }].slice(-MAX_PER_SESSION))
-
-  return true
 }
 
 export function dismissPreviewArtifact(sid: string, id: string) {

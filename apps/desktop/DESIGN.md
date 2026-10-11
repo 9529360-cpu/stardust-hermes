@@ -57,6 +57,12 @@ one-off at the call site.
   and casual chat do not force it open. Explicit project, Browser/Preview,
   Files, Review, Terminal, or development actions may reveal it; passive
   background updates may refresh hidden state but must not steal attention.
+  One owner-approved exception: a file the assistant writes in the session
+  workspace (PDF, HTML, common images, SVG, Markdown) opens by itself while
+  Settings → Appearance → "Show generated files automatically" is on (default).
+  The rule lives in `src/lib/auto-show.ts`. It applies only to the foreground
+  session, opens each file once per turn, never moves focus, and never hands a
+  file to the OS. Every other tool result stays link-only.
 - **One Browser tool, two explicit real targets.** Frontground desktop web
   automation enters through the session-scoped `browser` tool. Target
   `in_app` drives the actual right-rail WebView using the existing preview
@@ -312,9 +318,11 @@ so glass and message-bubble transparency do not reveal scrolling text.
   The action stays visible for a 500ms grace period while the pointer crosses
   from the chip to the floating pill; leaving both dismisses it.
 - A passive tool result may expose an inline action that opens a preview;
-  it must not open the rail automatically. A foreground action that actually
-  uses the in-app browser is the exception defined above: it reveals the live
-  browser once, while respecting a user's subsequent dismissal.
+  it must not open the rail automatically. Two exceptions are defined above:
+  a foreground action that actually uses the in-app browser reveals the live
+  browser once, while respecting a user's subsequent dismissal; and a generated
+  file opens by itself through the auto-show policy. The tool row never opens
+  the rail. It only offers the file as a composer status link.
 - Tool rows reserve destructive red for explicit failures. Missing read paths and
   ambiguous exit-1 results use neutral notices, with details still available.
   Errors described inside returned data are not tool failures. Expanded failures

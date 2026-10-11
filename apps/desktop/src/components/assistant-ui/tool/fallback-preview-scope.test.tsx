@@ -89,25 +89,35 @@ describe('tool row preview recording', () => {
   })
 })
 
-describe('tool row preview auto-open', () => {
-  it('auto-opens a newly written web page', async () => {
+// The rail opens by itself only from the gateway's tool.complete event
+// (lib/auto-show.ts). The tool row is a render-time view of a finished call, so
+// it can only offer a status link; it must never open the rail, or a re-render
+// or a replayed transcript would yank the owner's attention.
+describe('tool row preview offer', () => {
+  it('offers a newly written web page as a status link and leaves the rail alone', async () => {
     $activeSessionId.set(PRIMARY_ID)
     $currentCwd.set('/primary/work')
 
     renderToolRow(node => node, '/primary/work/index.html')
 
-    await waitFor(() => expect($previewTabs.get()).toHaveLength(1))
-    expect($previewTabs.get()[0]?.target.path).toBe('/primary/work/index.html')
+    await waitFor(() =>
+      expect($previewStatusBySession.get()[PRIMARY_ID]?.map(item => item.target)).toEqual(['/primary/work/index.html'])
+    )
+    await Promise.resolve()
+    expect($previewTabs.get()).toHaveLength(0)
   })
 
-  it('auto-opens a newly written PDF', async () => {
+  it('offers a newly written PDF as a status link and leaves the rail alone', async () => {
     $activeSessionId.set(PRIMARY_ID)
     $currentCwd.set('/primary/work')
 
     renderToolRow(node => node, '/primary/work/report.pdf')
 
-    await waitFor(() => expect($previewTabs.get()).toHaveLength(1))
-    expect($previewTabs.get()[0]?.target.path).toBe('/primary/work/report.pdf')
+    await waitFor(() =>
+      expect($previewStatusBySession.get()[PRIMARY_ID]?.map(item => item.target)).toEqual(['/primary/work/report.pdf'])
+    )
+    await Promise.resolve()
+    expect($previewTabs.get()).toHaveLength(0)
   })
 
   it('does not open a preview for plain source output', async () => {
@@ -121,29 +131,5 @@ describe('tool row preview auto-open', () => {
     await Promise.resolve()
     expect($previewTabs.get()).toHaveLength(0)
     expect(window.stardustDesktop.normalizePreviewTarget).not.toHaveBeenCalled()
-  })
-
-  it('does not re-open after the user closes it and the same tool row re-renders', async () => {
-    $activeSessionId.set(PRIMARY_ID)
-    $currentCwd.set('/primary/work')
-
-    const { rerender } = render(<ToolFallback {...({ args: { path: '/primary/work/index.html' }, result: { path: '/primary/work/index.html' }, toolCallId: 'call-1', toolName: 'write_file' } as unknown as ComponentProps<typeof ToolFallback>)} />)
-
-    await waitFor(() => expect($previewTabs.get()).toHaveLength(1))
-    $previewTabs.set([])
-
-    rerender(
-      <ToolFallback
-        {...({
-          args: { path: '/primary/work/index.html' },
-          result: { path: '/primary/work/index.html' },
-          toolCallId: 'call-1',
-          toolName: 'write_file'
-        } as unknown as ComponentProps<typeof ToolFallback>)}
-      />
-    )
-
-    await Promise.resolve()
-    expect($previewTabs.get()).toHaveLength(0)
   })
 })

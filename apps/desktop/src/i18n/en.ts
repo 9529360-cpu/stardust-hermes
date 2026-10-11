@@ -851,6 +851,9 @@ export const en: Translations = {
       introSplashDesc: 'The wordmark and prompt shown on an empty chat.',
       reactionsTitle: 'Message Reactions',
       reactionsDesc: 'iMessage-style emoji tapbacks — react to messages, and Stardust can react to yours.',
+      autoShowFilesTitle: 'Show generated files automatically',
+      autoShowFilesDesc:
+        'When the assistant writes a PDF, web page, image, or Markdown file in this workspace, it opens in the preview beside the chat. Files outside the workspace, programs, scripts, and archives never open by themselves.',
       tipsTitle: 'In-App Tips',
       tipsDesc:
         'Occasional hints from the app and Stardust. Each tip appears once. Turns off automatically after your first 30 days; you can turn it back on.',
