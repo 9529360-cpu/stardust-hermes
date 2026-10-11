@@ -101,6 +101,19 @@ describe('session resolution', () => {
     })
   })
 
+  it('creates room member sessions born hidden, so they never reach the sidebar list', async () => {
+    const room = await loadRoom()
+
+    room.chat.updateGroupChat('Hidden', current => {
+      current.roomId = 'r-hidden'
+
+      return current
+    })
+    const handle = await room.turns.ensureGroupChatSession('Hidden', { name: 'research', title: '' }, 't1')
+
+    expect(room.gateway.sessions.get(String(handle.stored))?.hidden).toBe(true)
+  })
+
   it('mints fresh member sessions when a same-name group is recreated after disband', async () => {
     const room = await loadRoom()
     const member: GroupMember = { name: 'research', title: '' }

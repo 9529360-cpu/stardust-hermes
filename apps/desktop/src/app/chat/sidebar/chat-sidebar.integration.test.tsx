@@ -207,4 +207,74 @@ describe('ChatSidebar compact conversation surface', () => {
     expect(screen.getByText('Manual chat')).toBeTruthy()
     expect(screen.getByText('Repo chat')).toBeTruthy()
   })
+
+  // A bot's canonical Bot Chat is hidden by design and reachable only through
+  // its bot row. Opening it caches the row in $sessions (for its own header and
+  // tab), but the conversation list must never show it: as an untitled row
+  // while it is focused, or once it has moved on.
+  const botChatRow = (overrides: Parameters<typeof makeSessionInfo>[0] = {}) =>
+    makeSessionInfo({
+      hidden: 1,
+      id: 'bot-chat',
+      last_active: 3,
+      profile: 'default',
+      started_at: 3,
+      title: 'Bot Chat',
+      ...overrides
+    })
+
+  it('never lists the canonical Bot Chat while it is the focused chat', () => {
+    act(() => {
+      $sessionsLoading.set(false)
+      $sessions.set([botChatRow(), ...sessionRows])
+      $selectedStoredSessionId.set('bot-chat')
+    })
+
+    renderSidebar('/', 'chat')
+
+    expect(screen.getByText('Tile one')).toBeTruthy()
+    expect(screen.queryByText('Untitled session')).toBeNull()
+    expect(screen.queryByText('Bot Chat')).toBeNull()
+  })
+
+  it('never lists the canonical Bot Chat once another chat is focused', () => {
+    act(() => {
+      $sessionsLoading.set(false)
+      $sessions.set([botChatRow(), ...sessionRows])
+      $selectedStoredSessionId.set('tile-one')
+    })
+
+    renderSidebar('/', 'chat')
+
+    expect(screen.getByText('Tile one')).toBeTruthy()
+    expect(screen.queryByText('Untitled session')).toBeNull()
+    expect(screen.queryByText('Bot Chat')).toBeNull()
+  })
+
+  it('keeps the canonical Bot Chat out of Pinned even when its id is pinned', () => {
+    act(() => {
+      $sessionsLoading.set(false)
+      $sessions.set([botChatRow(), ...sessionRows])
+      $pinnedSessionIds.set(['bot-chat'])
+    })
+
+    renderSidebar('/', 'chat')
+
+    expect(screen.queryByText('Pinned chats')).toBeNull()
+    expect(screen.queryByText('Untitled session')).toBeNull()
+  })
+
+  it('still lists a hidden side-chat that keeps its own name', () => {
+    // A `+` side-chat in Bot Mode is created hidden, but it is an ordinary
+    // conversation with its own title, not the canonical registry row.
+    act(() => {
+      $sessionsLoading.set(false)
+      $sessions.set([botChatRow({ id: 'side-chat', title: 'Side question' }), ...sessionRows])
+      $selectedStoredSessionId.set('side-chat')
+    })
+
+    renderSidebar('/', 'chat')
+
+    expect(screen.getByText('Side question')).toBeTruthy()
+  })
 })

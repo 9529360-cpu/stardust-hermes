@@ -812,10 +812,10 @@ export function useSessionActions({
         const cwd =
           options?.cwd === null ? '' : typeof options?.cwd === 'string' ? options.cwd.trim() : resolveNewSessionCwd()
 
-        const params = {
-          ...(await desktopSessionCreateParams(cwd, capturedRoute)),
-          ...(workspaceScope.workspaceMode === 'bots' ? { hidden: true } : {})
-        }
+        // A Bot Mode side-chat is an ordinary conversation and stays visible in the
+        // sidebar. Only the canonical registry chat and group room members are born
+        // hidden, and their own creators set that (canonical-chat.ts, group-turns.ts).
+        const params = await desktopSessionCreateParams(cwd, capturedRoute)
 
         // Same lease chain as createBackendSessionForSend: owner socket held
         // across the create, then the foreground hold carries it until the

@@ -4340,6 +4340,41 @@ describe('openNewSessionTile workspace target', () => {
     expect(createParams).not.toHaveProperty('cwd')
   })
 
+  it('creates a Bot Mode side-chat visible, not born hidden', async () => {
+    // A `+` side-chat in a bot's workspace is an ordinary conversation. Born
+    // hidden, it never reaches the sidebar list, which only shows what the
+    // backend lists. The canonical Bot Chat is hidden by its own creator.
+    let createParams: Record<string, unknown> | undefined
+
+    const requestGateway = vi.fn(async (method: string, params?: Record<string, unknown>) => {
+      if (method === 'session.create') {
+        createParams = params
+
+        return {
+          info: { cwd: '', model: 'test-model', tools: {}, skills: {} },
+          session_id: RUNTIME_SESSION_ID,
+          stored_session_id: 'stored-bot-side-chat'
+        } as never
+      }
+
+      return {} as never
+    })
+
+    let handle: HarnessHandle | null = null
+    render(<Harness onReady={value => (handle = value)} requestGateway={requestGateway} />)
+    await waitFor(() => expect(handle).not.toBeNull())
+
+    await act(async () => {
+      await handle!.openNewSessionTile('center', {
+        listed: false,
+        workspaceScope: { workspaceMode: 'bots', workspaceOwnerKey: 'bot-owner' }
+      })
+    })
+
+    expect(createParams).toBeDefined()
+    expect(createParams).not.toHaveProperty('hidden')
+  })
+
   it('keeps an unlisted named local legacy-profile tile owned by its bare profile', async () => {
     const storedSessionId = 'stored-unlisted-omar'
     setConnection({ mode: 'local' } as never)
