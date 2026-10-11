@@ -1206,6 +1206,7 @@ export const ja = defineLocale({
       restartBackend: 'バックエンドを再起動',
       restartingBackend: 'バックエンドを再起動中...',
       restartFailed: 'バックエンドを再起動できませんでした',
+      reasoningOff: 'オフ',
       auxiliaryTitle: '補助モデル',
       resetAllToMain: 'すべてメインにリセット',
       auxiliaryDesc:

@@ -1,24 +1,26 @@
 import { DEFAULT_REASONING_EFFORT, isReasoningEffort } from '@hermes/shared'
 
+import { TRANSLATIONS } from '@/i18n/catalog'
+import { getRuntimeI18nLocale } from '@/i18n/runtime'
+import type { Translations } from '@/i18n/types'
 import { normalize } from '@/lib/text'
 
-/** Compact labels for chrome where space is tight (pill, picker rows). Menus
- *  and settings use the translated `shell.modelOptions` strings instead. */
-const SHORT_LABELS: Record<string, string> = {
-  none: 'Off',
-  minimal: 'Min',
-  low: 'Low',
-  medium: 'Med',
-  high: 'High',
-  xhigh: 'XHigh',
-  max: 'Max',
-  ultra: 'Ultra'
-}
-
-export function reasoningEffortLabel(effort: string): string {
+/** The word for a level in one locale: the `shell.modelOptions` words the
+ *  Settings select shows, and `settings.model.reasoningOff` for off. Surfaces
+ *  pass their `useI18n().t` so a locale switch re-renders them; a caller with no
+ *  React context (a plugin) gets the active locale. */
+export function reasoningEffortLabel(effort: string, t: Translations = TRANSLATIONS[getRuntimeI18nLocale()]): string {
   const key = normalize(effort)
 
-  return key ? (SHORT_LABELS[key] ?? effort) : ''
+  if (!key) {
+    return ''
+  }
+
+  if (key === 'none') {
+    return t.settings.model.reasoningOff
+  }
+
+  return isReasoningEffort(key) ? t.shell.modelOptions[key] : effort
 }
 
 /** Thinking is on unless a level explicitly says otherwise; an empty value

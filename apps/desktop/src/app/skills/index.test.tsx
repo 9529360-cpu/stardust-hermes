@@ -147,6 +147,20 @@ describe('SkillsView toolset management', { timeout: 60_000 }, () => {
     expect(setToolsetEnabled.mock.calls[0].slice(0, 2)).toEqual(['web', false])
   })
 
+  it('does not list a config-only toolset with no tools as a toggle row', async () => {
+    // Speech-to-text has no tool schemas; its on/off switch is `stt.enabled`,
+    // owned by Settings → Voice. A live switch here would describe no tool.
+    getToolsets.mockResolvedValue([
+      toolset(),
+      toolset({ name: 'stt', label: '🎙️ Speech-to-Text', description: 'voice transcription', tools: [] })
+    ])
+
+    await renderSkills()
+
+    await screen.findByRole('switch', { name: 'Turn Web Search toolset off' })
+    expect(screen.queryByRole('switch', { name: /Speech-to-Text/ })).toBeNull()
+  })
+
   it('renders toolset titles without leading emoji', async () => {
     getToolsets.mockResolvedValue([toolset({ name: 'cronjob', label: '⏰ Cron Jobs', description: 'cron tools' })])
 
