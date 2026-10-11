@@ -2678,7 +2678,6 @@ export interface Translations {
       sectionLabel: string
       home: string
       autoDiscovered: string
-      noProjects: string
       newButton: string
       emptyTitle: string
       createTitle: string

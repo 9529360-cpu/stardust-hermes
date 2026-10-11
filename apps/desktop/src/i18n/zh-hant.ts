@@ -2664,7 +2664,6 @@ export const zhHant = defineLocale({
       sectionLabel: '專案',
       home: '主頁',
       autoDiscovered: '自動探索',
-      noProjects: '尚無專案',
       newButton: '新增專案',
       emptyTitle: '尚無專案',
       createTitle: '新增專案',

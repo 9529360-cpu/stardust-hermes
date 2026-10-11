@@ -3060,7 +3060,6 @@ export const en: Translations = {
       sectionLabel: 'Projects',
       home: 'Home',
       autoDiscovered: 'Auto-discovered',
-      noProjects: 'No projects yet',
       newButton: 'New project',
       emptyTitle: 'No projects yet',
       createTitle: 'New project',

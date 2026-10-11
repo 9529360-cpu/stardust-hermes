@@ -2424,7 +2424,6 @@ export const ja = defineLocale({
       sectionLabel: 'プロジェクト',
       home: 'ホーム',
       autoDiscovered: '自動検出',
-      noProjects: 'プロジェクトはまだありません',
       newButton: '新規プロジェクト',
       emptyTitle: 'プロジェクトはまだありません',
       createTitle: '新規プロジェクト',

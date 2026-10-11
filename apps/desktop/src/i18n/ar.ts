@@ -2076,7 +2076,6 @@ export const ar = defineLocale({
       sectionLabel: 'المشاريع',
       home: 'الرئيسية',
       autoDiscovered: 'مكتشف تلقائيًا',
-      noProjects: 'لا توجد مشاريع بعد',
       newButton: 'مشروع جديد',
       emptyTitle: 'لا توجد مشاريع بعد',
       createTitle: 'مشروع جديد',

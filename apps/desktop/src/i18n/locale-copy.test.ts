@@ -14,7 +14,7 @@ describe('desktop locale bundles', () => {
     it(`${locale} translates the Projects empty line and the Tools and Plugins page titles`, () => {
       const copy = TRANSLATIONS[locale]
 
-      expect(copy.sidebar.projects.noProjects).not.toBe(english.sidebar.projects.noProjects)
+      expect(copy.sidebar.projects.emptyTitle).not.toBe(english.sidebar.projects.emptyTitle)
       expect(copy.skills.pageTitles.toolsets).not.toBe(english.skills.pageTitles.toolsets)
       expect(copy.skills.pageTitles.plugins).not.toBe(english.skills.pageTitles.plugins)
     })

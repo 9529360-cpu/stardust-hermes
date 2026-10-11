@@ -3375,7 +3375,6 @@ export const zh = defineLocale({
       sectionLabel: '项目',
       home: '主页',
       autoDiscovered: '自动发现',
-      noProjects: '暂无项目',
       newButton: '新建项目',
       emptyTitle: '暂无项目',
       createTitle: '新建项目',

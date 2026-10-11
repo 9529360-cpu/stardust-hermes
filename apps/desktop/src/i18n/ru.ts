@@ -2685,7 +2685,6 @@ export const ru = defineLocale({
     projects: {
       showAllSessions: 'Показать все чаты',
       sectionLabel: 'Проекты',
-      noProjects: 'Проектов пока нет',
       home: 'Главная',
       newButton: 'Новый проект',
       emptyTitle: 'Проектов пока нет',
