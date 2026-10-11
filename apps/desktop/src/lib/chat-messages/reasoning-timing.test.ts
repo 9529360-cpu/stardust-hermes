@@ -38,6 +38,7 @@ describe('reasoning duration across a reload', () => {
       'running',
       ANSWERED
     )
+
     const liveBlock = reasoningOf(live)
     const stored = reloadedReasoning({ reasoning_timing: { started_at: STARTED, completed_at: ANSWERED } })
 
