@@ -353,6 +353,19 @@ def _is_managed_shim(body: bytes) -> bool:
     return len(lines) > 1 and lines[1].rstrip(b"\r") == MANAGED_SHIM_MARKER.encode("ascii")
 
 
+def _retire_shadowing_exe(launcher: Path, stamp: str) -> None:
+    """Move a managed-bin ``<name>.exe`` aside so the ``.cmd`` shim beside it takes effect.
+
+    PowerShell and cmd resolve ``.EXE`` before ``.CMD``. install.ps1 copies a launcher into the bin for a
+    non-relocatable venv, and that leftover kept winning, so the refreshed ``.cmd`` never ran. The move keeps the bytes
+    as ``<name>.exe.bak-<stamp>``. A launcher that cannot be moved (in use) stays where it is, with no copy left behind.
+    """
+    if not launcher.is_file():
+        return
+    with contextlib.suppress(OSError):
+        os.replace(launcher, launcher.with_name(f"{launcher.name}.bak-{stamp}"))
+
+
 def refresh_managed_shims(root, *, windows: bool | None = None, install_authority: bool = False) -> list[str]:
     r"""Point the managed ``stardust.cmd`` and ``hermes.cmd`` at *root*'s venv console script.
 
@@ -362,7 +375,8 @@ def refresh_managed_shims(root, *, windows: bool | None = None, install_authorit
     never takes over the ``stardust`` command. Nothing is written unless the venv's ``Scripts\stardust.exe``
     exists, so a shim is never repointed at a missing script. A shim that already matches is left alone. A file
     with one of these names that is not ours (no marker line) is copied to ``<name>.bak-<UTC timestamp>`` first,
-    and kept if that copy fails. Never raises; returns the paths written.
+    and kept if that copy fails. A managed ``<name>.exe`` beside them is moved aside the same way, because PowerShell
+    and cmd run ``.EXE`` before ``.CMD``. Never raises; returns the paths written.
     """
     if windows is None:
         windows = _is_windows()
@@ -385,6 +399,8 @@ def refresh_managed_shims(root, *, windows: bool | None = None, install_authorit
         bin_dir.mkdir(parents=True, exist_ok=True)
     except OSError:
         return []
+    for name in MANAGED_SHIM_NAMES:
+        _retire_shadowing_exe(bin_dir / f"{name}.exe", stamp)
     written: list[str] = []
     for name in MANAGED_SHIM_NAMES:
         final = bin_dir / f"{name}.cmd"

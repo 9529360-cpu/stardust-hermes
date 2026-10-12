@@ -101,6 +101,25 @@ def test_our_stale_shim_is_rewritten_without_a_backup(install):
     assert not list((home / "bin").glob("*.bak-*"))
 
 
+def test_stale_managed_launchers_are_moved_aside_so_the_cmd_shims_take_effect(install):
+    home, root, make_venv = install
+    make_venv()
+    bin_dir = home / "bin"
+    bin_dir.mkdir(parents=True)
+    stale = {name: bin_dir / f"{name}.exe" for name in ("stardust", "hermes")}
+    for name, path in stale.items():
+        path.write_bytes(f"MZ stale {name} launcher".encode("ascii"))
+
+    written = refresh_managed_shims(root, windows=True)
+
+    assert str(bin_dir / "stardust.cmd") in written
+    assert (bin_dir / "stardust.cmd").read_bytes() == _body(root / "venv" / "Scripts" / "stardust.exe")
+    for name, path in stale.items():
+        assert not path.exists()
+        backups = list(bin_dir.glob(f"{name}.exe.bak-*"))
+        assert [backup.read_bytes() for backup in backups] == [f"MZ stale {name} launcher".encode("ascii")]
+
+
 def test_nothing_is_written_when_the_venv_script_is_missing(install):
     home, root, _make_venv = install
     (root / "venv" / "Scripts").mkdir(parents=True)
