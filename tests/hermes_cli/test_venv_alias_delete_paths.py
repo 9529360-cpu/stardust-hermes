@@ -8,7 +8,7 @@ real with ``mklink /J`` (no elevation) and checks one of three things:
 * a recursive delete of an install root (the uninstaller's checkout and home removal, a failed worktree) removes the
   alias and the real ``.venv``, and never reaches a folder outside the tree that a junction points to.
 * a mutation that touches a venv or .venv folder under the install root is refused, by name and whether or not links are
-  involved. Only the alias itself can be unlinked.
+  involved. Only the alias itself can be unlinked. Names compare case-insensitively here, so ``Venv`` is refused like ``venv``.
 
 ``shutil.rmtree`` removes a junction entry without descending into it, so the recursive deletes need no unlink step
 first. The guard tests below fail if that stops being true.
@@ -576,3 +576,109 @@ def test_failed_worktree_fallback_removes_the_alias_and_keeps_the_target(tmp_pat
     finally:
         _release_junction(wt_path / "venv")
         _release_junction(wt_path / "outside-link")
+
+
+def _mixed_case_venv(checkout: Path) -> Path:
+    """A real venv folder spelled ``Venv`` under ``tools2``. On NTFS, ``venv`` and ``VENV`` name the same folder."""
+    mixed = checkout / "tools2" / "Venv"
+    (mixed / "Lib").mkdir(parents=True)
+    (mixed / "Lib" / "keep.txt").write_text("mixed venv", encoding="utf-8")
+    return mixed
+
+
+def test_mixed_case_venv_is_refused_by_upload(dashboard_client):
+    client, managed = dashboard_client
+    checkout = managed / "hermes-agent"
+    _build_checkout(checkout)
+    mixed = _mixed_case_venv(checkout)
+    try:
+        response = client.post(
+            "/api/files/upload",
+            json={
+                "path": str(mixed / "Lib" / "planted.txt"),
+                "data_url": "data:text/plain;base64,eA==",
+                "overwrite": True,
+            },
+        )
+
+        assert response.status_code == 403, response.text
+        assert not (mixed / "Lib" / "planted.txt").exists()
+        assert (mixed / "Lib" / "keep.txt").read_text(encoding="utf-8") == "mixed venv"
+    finally:
+        _release_junction(checkout / "venv")
+
+
+def test_mixed_case_venv_is_refused_by_upload_stream(dashboard_client):
+    client, managed = dashboard_client
+    checkout = managed / "hermes-agent"
+    _build_checkout(checkout)
+    mixed = _mixed_case_venv(checkout)
+    try:
+        # Upper case names the same folder as Venv on NTFS, and is not the lower-case spelling the guard lists.
+        response = client.post(
+            "/api/files/upload-stream",
+            data={"path": str(checkout / "tools2" / "VENV" / "Lib" / "planted.txt"), "overwrite": "true"},
+            files={"file": ("planted.txt", b"planted", "text/plain")},
+        )
+
+        assert response.status_code == 403, response.text
+        assert not (mixed / "Lib" / "planted.txt").exists()
+        assert (mixed / "Lib" / "keep.txt").read_text(encoding="utf-8") == "mixed venv"
+    finally:
+        _release_junction(checkout / "venv")
+
+
+def test_mixed_case_venv_is_refused_by_mkdir(dashboard_client):
+    client, managed = dashboard_client
+    checkout = managed / "hermes-agent"
+    _build_checkout(checkout)
+    mixed = _mixed_case_venv(checkout)
+    try:
+        response = client.post(
+            "/api/files/mkdir", json={"path": str(checkout / "tools2" / "VENV" / "Lib" / "newdir")}
+        )
+
+        assert response.status_code == 403, response.text
+        assert not (mixed / "Lib" / "newdir").exists()
+        assert (mixed / "Lib" / "keep.txt").read_text(encoding="utf-8") == "mixed venv"
+    finally:
+        _release_junction(checkout / "venv")
+
+
+def test_mixed_case_venv_is_refused_by_write_text(dashboard_client):
+    client, managed = dashboard_client
+    checkout = managed / "hermes-agent"
+    _build_checkout(checkout)
+    mixed = _mixed_case_venv(checkout)
+    try:
+        response = client.post(
+            "/api/fs/write-text", json={"path": str(mixed / "Lib" / "keep.txt"), "content": "changed"}
+        )
+
+        assert response.status_code == 403, response.text
+        assert (mixed / "Lib" / "keep.txt").read_text(encoding="utf-8") == "mixed venv"
+    finally:
+        _release_junction(checkout / "venv")
+
+
+def test_recursive_delete_of_a_folder_holding_a_mixed_case_venv_is_refused(dashboard_client):
+    client, managed = dashboard_client
+    checkout = managed / "hermes-agent"
+    venv = _build_checkout(checkout)
+    mixed = _mixed_case_venv(checkout)
+    try:
+        whole = client.request("DELETE", "/api/files", json={"path": str(checkout / "tools2"), "recursive": True})
+        inside = client.request(
+            "DELETE", "/api/files", json={"path": str(checkout / "tools2" / "VENV" / "Lib"), "recursive": True}
+        )
+        dotted = client.request(
+            "DELETE", "/api/files", json={"path": str(checkout / ".VENV" / "Lib"), "recursive": True}
+        )
+
+        assert whole.status_code == 403, whole.text
+        assert inside.status_code == 403, inside.text
+        assert dotted.status_code == 403, dotted.text
+        assert (mixed / "Lib" / "keep.txt").read_text(encoding="utf-8") == "mixed venv"
+        assert (venv / "Lib" / "keep.txt").read_text(encoding="utf-8") == "venv file"
+    finally:
+        _release_junction(checkout / "venv")

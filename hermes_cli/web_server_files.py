@@ -95,28 +95,58 @@ def _install_root() -> Path:
 _VENV_FOLDER_NAMES = (DEFAULT_VENV_NAME, UV_VENV_NAME)
 
 
+def _name_key(text: str) -> str:
+    """Comparison key for names and paths: case-folded on Windows (NTFS is case-insensitive), exact elsewhere."""
+    return os.path.normcase(text)
+
+
+_VENV_FOLDER_KEYS = frozenset(_name_key(name) for name in _VENV_FOLDER_NAMES)
+
+
+def _is_same_path(first: Path, second: Path) -> bool:
+    return _name_key(str(first)) == _name_key(str(second))
+
+
+def _parts_below(path: Path, root: Path) -> tuple[str, ...] | None:
+    """The parts of *path* below *root*, or None when *path* is not under *root*. Compared with :func:`_name_key`."""
+    root_keys = tuple(_name_key(part) for part in root.parts)
+    if tuple(_name_key(part) for part in path.parts[: len(root_keys)]) != root_keys:
+        return None
+    return path.parts[len(root_keys):]
+
+
+def _contains_path(entry: Path, root: Path) -> bool:
+    """True when *entry* is *root* or one of its ancestors."""
+    return _name_key(str(entry)) in {_name_key(str(location)) for location in (root, *root.parents)}
+
+
 def _inside_venv_folder(path: Path, root: Path, anchors: list[Path]) -> bool:
     """True when *path* is a venv folder under the install root, or lies inside one.
 
-    A venv folder is recognised by name, ``venv`` or ``.venv``, with or without an interpreter. *anchors* are the
-    resolved venv folders of the install, so a path that reaches one through a link is caught as well.
+    A venv folder is recognised by name, ``venv`` or ``.venv``, with or without an interpreter, and the names are
+    compared case-insensitively on Windows, where ``Venv`` and ``venv`` are one folder. *anchors* are the resolved
+    venv folders of the install, so a path that reaches one through a link is caught as well.
     """
-    if any(path == anchor or anchor in path.parents for anchor in anchors):
+    anchor_keys = {_name_key(str(anchor)) for anchor in anchors}
+    if any(_name_key(str(location)) in anchor_keys for location in (path, *path.parents)):
         return True
-    try:
-        relative = path.relative_to(root)
-    except ValueError:
-        return False
-    return any(part in _VENV_FOLDER_NAMES for part in relative.parts)
+    relative = _parts_below(path, root)
+    return relative is not None and any(_name_key(part) in _VENV_FOLDER_KEYS for part in relative)
 
 
 def _subtree_has_venv_folder(folder: Path) -> bool:
-    """True when a venv folder name appears below *folder*. Links are not followed; a walk error counts as found."""
-    errors: list[OSError] = []
-    for _dirpath, dirnames, _filenames in os.walk(folder, onerror=errors.append):
-        if any(name in _VENV_FOLDER_NAMES for name in dirnames):
+    """True when a venv folder name appears below *folder*. Links are not followed.
+
+    Raises OSError when a folder below *folder* cannot be read and no venv folder was found, so an unverified tree can
+    be told apart from one that holds a venv.
+    """
+    unreadable: list[OSError] = []
+    for _dirpath, dirnames, _filenames in os.walk(folder, onerror=unreadable.append):
+        if any(_name_key(name) in _VENV_FOLDER_KEYS for name in dirnames):
             return True
-    return bool(errors)
+    if unreadable:
+        raise unreadable[0]
+    return False
 
 
 def _refuse_venv_mutation(candidate: Path, *, mutation: str, recursive: bool = False) -> None:
@@ -126,13 +156,14 @@ def _refuse_venv_mutation(candidate: Path, *, mutation: str, recursive: bool = F
     path as addressed. The check covers the path as addressed, the entry with its ancestors resolved, and the fully
     resolved target. One exception: deleting the alias itself, a final link named ``venv`` directly in the install
     root. That link is unlinked and its target is left alone. A recursive delete is also refused when the folder
-    contains the install root, or holds a venv folder.
+    contains the install root, or holds a venv folder. Names compare case-insensitively on Windows. A folder that
+    cannot be read to check it is a 500 with a message, not a refusal, and nothing is deleted.
     """
     root = _install_root().resolve(strict=False)
     anchors = [(root / name).resolve(strict=False) for name in _VENV_FOLDER_NAMES]
     try:
         entry = candidate.parent.resolve(strict=False) / candidate.name
-        if mutation == "delete" and entry == root / DEFAULT_VENV_NAME and is_link_entry(entry):
+        if mutation == "delete" and _is_same_path(entry, root / DEFAULT_VENV_NAME) and is_link_entry(entry):
             return
         target = entry.resolve(strict=False)
     except (OSError, RuntimeError):
@@ -141,10 +172,18 @@ def _refuse_venv_mutation(candidate: Path, *, mutation: str, recursive: bool = F
         if _inside_venv_folder(location, root, anchors):
             raise HTTPException(status_code=403, detail="Path is inside a venv folder")
     if mutation == "delete" and recursive and not is_link_entry(entry) and os.path.isdir(entry):
-        if entry == root or entry in root.parents:
+        if _contains_path(entry, root):
             raise HTTPException(status_code=403, detail="Path contains the install root")
-        if root in entry.parents and _subtree_has_venv_folder(entry):
-            raise HTTPException(status_code=403, detail="Path contains a venv folder")
+        if _parts_below(entry, root):
+            try:
+                holds_venv = _subtree_has_venv_folder(entry)
+            except OSError as exc:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Could not read the folder to check it for venv folders. Nothing was deleted.",
+                ) from exc
+            if holds_venv:
+                raise HTTPException(status_code=403, detail="Path contains a venv folder")
 
 
 def _path_text(raw_path: str | None) -> str:

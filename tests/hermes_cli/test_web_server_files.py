@@ -1,6 +1,7 @@
 """Tests for the dashboard-managed file browser API."""
 
 import base64
+import os
 from types import SimpleNamespace
 
 import pytest
@@ -119,6 +120,83 @@ def test_mutations_do_not_reach_a_venv_through_a_symlink(forced_files_client, mo
     assert removed.status_code == 200, removed.text
     assert not alias.is_symlink()
     assert (venv / "lib" / "keep.txt").read_text(encoding="utf-8") == "venv file"
+
+
+def test_upload_stream_into_dot_venv_is_refused(forced_files_client, monkeypatch):
+    client, root = forced_files_client
+    checkout = root / "hermes-agent"
+    monkeypatch.setattr(web_server_files, "_install_root", lambda: checkout)
+    venv = checkout / ".venv"
+    (venv / "Lib").mkdir(parents=True)
+    (venv / "Lib" / "keep.txt").write_text("venv file", encoding="utf-8")
+
+    response = client.post(
+        "/api/files/upload-stream",
+        data={"path": str(venv / "Lib" / "planted.txt"), "overwrite": "true"},
+        files={"file": ("planted.txt", b"planted", "text/plain")},
+    )
+
+    assert response.status_code == 403, response.text
+    assert not (venv / "Lib" / "planted.txt").exists()
+    assert (venv / "Lib" / "keep.txt").read_text(encoding="utf-8") == "venv file"
+
+
+def test_upload_stream_outside_the_venv_still_writes(forced_files_client, monkeypatch):
+    client, root = forced_files_client
+    checkout = root / "hermes-agent"
+    monkeypatch.setattr(web_server_files, "_install_root", lambda: checkout)
+    (checkout / "docs").mkdir(parents=True)
+
+    response = client.post(
+        "/api/files/upload-stream",
+        data={"path": str(checkout / "docs" / "note.txt"), "overwrite": "true"},
+        files={"file": ("note.txt", b"note", "text/plain")},
+    )
+
+    assert response.status_code == 200, response.text
+    assert (checkout / "docs" / "note.txt").read_bytes() == b"note"
+
+
+def _unreadable_walk(monkeypatch, *, venv_after_error: bool) -> None:
+    """Make os.walk report an unreadable folder first; *venv_after_error* adds a venv folder after that report."""
+
+    def walk(top, *args, onerror=None, **kwargs):
+        onerror(PermissionError(13, "Access is denied", str(top)))
+        if venv_after_error:
+            yield str(top), ["venv"], []
+
+    monkeypatch.setattr(os, "walk", walk)
+
+
+def test_a_tree_that_cannot_be_read_is_a_server_error_and_nothing_is_deleted(forced_files_client, monkeypatch):
+    client, root = forced_files_client
+    checkout = root / "hermes-agent"
+    monkeypatch.setattr(web_server_files, "_install_root", lambda: checkout)
+    tools = checkout / "tools"
+    (tools / "sub").mkdir(parents=True)
+    (tools / "sub" / "keep.txt").write_text("keep", encoding="utf-8")
+    _unreadable_walk(monkeypatch, venv_after_error=False)
+
+    response = client.request("DELETE", "/api/files", json={"path": str(tools), "recursive": True})
+
+    assert response.status_code == 500, response.text
+    assert "Nothing was deleted" in response.text
+    assert (tools / "sub" / "keep.txt").read_text(encoding="utf-8") == "keep"
+
+
+def test_a_venv_found_despite_an_unreadable_folder_is_still_refused(forced_files_client, monkeypatch):
+    client, root = forced_files_client
+    checkout = root / "hermes-agent"
+    monkeypatch.setattr(web_server_files, "_install_root", lambda: checkout)
+    tools = checkout / "tools"
+    (tools / "helper" / "venv" / "Lib").mkdir(parents=True)
+    (tools / "helper" / "venv" / "Lib" / "keep.txt").write_text("nested venv", encoding="utf-8")
+    _unreadable_walk(monkeypatch, venv_after_error=True)
+
+    response = client.request("DELETE", "/api/files", json={"path": str(tools), "recursive": True})
+
+    assert response.status_code == 403, response.text
+    assert (tools / "helper" / "venv" / "Lib" / "keep.txt").read_text(encoding="utf-8") == "nested venv"
 
 
 def test_download_authenticates_via_query_token(forced_files_client):
