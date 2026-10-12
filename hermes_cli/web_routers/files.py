@@ -25,6 +25,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 
 from hermes_cli._subprocess_compat import windows_hide_flags
+from hermes_cli.venv_layout import is_link_entry, unlink_link_entry, unlink_venv_aliases
 from hermes_cli.web_deps import late
 from hermes_cli.web_server_files import (
     _fs_path, _managed_file_entry, _managed_response_meta, _resolve_managed_path,
@@ -577,7 +578,8 @@ async def create_managed_directory(payload: ManagedDirectoryCreate, request: Req
 
 @router.delete("/api/files")
 async def delete_managed_file(payload: ManagedFileDelete, request: Request):
-    policy, target, display_path = _resolve_managed_path(payload.path, request)
+    # keep_link_leaf: a selected venv alias is unlinked as itself; resolving it would delete the real .venv.
+    policy, target, display_path = _resolve_managed_path(payload.path, request, keep_link_leaf=True)
     if policy.locked_root is not None and target == policy.locked_root:
         raise HTTPException(status_code=400, detail="Cannot delete the managed files root")
     if target.parent == target:
@@ -586,8 +588,13 @@ async def delete_managed_file(payload: ManagedFileDelete, request: Request):
         raise HTTPException(status_code=404, detail="Path not found")
 
     try:
-        if target.is_dir():
+        if is_link_entry(target):
+            # A selected link (the venv alias is a junction) is removed as itself; what it points to is left alone.
+            unlink_link_entry(target)
+        elif target.is_dir():
             if payload.recursive:
+                # A managed folder can hold a Stardust install: unlink its venv alias before the recursive delete.
+                unlink_venv_aliases(target)
                 shutil.rmtree(target)
             else:
                 target.rmdir()

@@ -9,6 +9,8 @@ from fastapi import HTTPException, Request
 from pathlib import Path
 from typing import Any, Dict
 
+from hermes_cli.venv_layout import is_link_entry
+
 
 _MANAGED_FILES_ROOT_ENV = "STARDUST_DASHBOARD_FILES_ROOT"
 _HOSTED_MANAGED_FILES_ROOT = Path("/opt/data")
@@ -129,7 +131,7 @@ def _managed_files_policy(request: Request, *, create_root: bool = True) -> Mana
 
 
 def _resolve_managed_path(
-    raw_path: str | None, request: Request, *, for_write: bool = False
+    raw_path: str | None, request: Request, *, for_write: bool = False, keep_link_leaf: bool = False
 ) -> tuple[ManagedFilesPolicy, Path, str]:
     policy = _managed_files_policy(request)
     text = _path_text(raw_path)
@@ -154,6 +156,9 @@ def _resolve_managed_path(
     if for_write and not candidate.exists():
         parent = _canonical_path(candidate.parent)
         resolved = parent / candidate.name
+    elif keep_link_leaf and is_link_entry(candidate):
+        # A link is removed as itself: resolve its parent, keep the leaf, never follow it (the venv alias).
+        resolved = _canonical_path(candidate.parent, require_exists=True) / candidate.name
     else:
         resolved = _canonical_path(candidate, require_exists=not for_write)
 

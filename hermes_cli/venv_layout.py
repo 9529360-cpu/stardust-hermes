@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import contextlib
 import os
+import stat
 import subprocess
 import sys
 from pathlib import Path
@@ -69,3 +70,47 @@ def ensure_venv_alias(root, *, windows: bool | None = None) -> str:
             print(f"  ⚠ Could not create the venv alias ({exc}); continuing with .venv", file=sys.stderr)
         return "failed"
     return "created"
+
+
+_FILE_ATTRIBUTE_DIRECTORY = 0x10
+_FILE_ATTRIBUTE_REPARSE_POINT = 0x400
+
+
+def is_link_entry(path) -> bool:
+    """True for a symlink or a Windows reparse point (a directory junction). Never follows *path*."""
+    try:
+        st = os.lstat(path)
+    except OSError:
+        return False
+    if stat.S_ISLNK(st.st_mode):
+        return True
+    return bool(getattr(st, "st_file_attributes", 0) & _FILE_ATTRIBUTE_REPARSE_POINT)
+
+
+def unlink_link_entry(path) -> None:
+    """Remove a link entry itself, never its target: ``os.rmdir`` for a Windows directory junction, else ``os.unlink``."""
+    st = os.lstat(path)
+    if sys.platform == "win32" and getattr(st, "st_file_attributes", 0) & _FILE_ATTRIBUTE_DIRECTORY:
+        os.rmdir(path)
+    else:
+        os.unlink(path)
+
+
+def unlink_venv_aliases(tree) -> list[Path]:
+    """Remove the venv alias of *tree* and of each direct child folder (where install roots live). Only link
+    entries go, with ``os.rmdir`` (junction) or ``os.unlink`` (symlink); a real venv folder is never touched, so a
+    recursive delete of *tree* that runs next finds the real ``.venv`` as an ordinary folder. Returns what it removed.
+    """
+    base = Path(tree)
+    candidates = [base / DEFAULT_VENV_NAME]
+    try:
+        children = [child for child in base.iterdir() if child.is_dir() and not is_link_entry(child)]
+    except OSError:
+        children = []
+    candidates.extend(child / DEFAULT_VENV_NAME for child in children)
+    removed: list[Path] = []
+    for alias in candidates:
+        if is_link_entry(alias):
+            unlink_link_entry(alias)
+            removed.append(alias)
+    return removed
