@@ -7,6 +7,9 @@ import { type MockBackendFixture, setupMockBackend, waitForAppReady } from './fi
 
 let fixture: MockBackendFixture | null = null
 
+// The suggestion list row for the fixture below (PanelListRow's data-panel-row).
+const SUGGESTION_ROW = 'suggestion-e2e-important-mail'
+
 test.beforeAll(async () => {
   fixture = await setupMockBackend()
   await waitForAppReady(fixture, 120_000)
@@ -57,6 +60,7 @@ test('pending automation is localized, consent-gated, and dismissible from Sched
   await expect(page.getByText('建议的自动化', { exact: true })).toBeVisible()
   const suggestionRow = page.getByText('重要邮件监控', { exact: true }).first()
   await expect(suggestionRow).toBeVisible()
+  await expect(page.locator(`[data-panel-row="${SUGGESTION_ROW}"]`)).toBeVisible()
   await expect(page.getByText('Important-mail monitor', { exact: true })).toHaveCount(0)
 
   await suggestionRow.click()
@@ -72,5 +76,8 @@ test('pending automation is localized, consent-gated, and dismissible from Sched
 
   await expect(page.getByText('已忽略建议', { exact: true })).toBeVisible()
   await expect(page.getByText('建议的自动化', { exact: true })).toHaveCount(0)
-  await expect(page.getByText('重要邮件监控', { exact: true })).toHaveCount(0)
+  // The same title is also a blueprint card in the Scheduled jobs gallery, and the
+  // dismissal toast repeats it, so the page-wide text is not a signal here. The
+  // suggestion row is the thing that must go.
+  await expect(page.locator(`[data-panel-row="${SUGGESTION_ROW}"]`)).toHaveCount(0)
 })
