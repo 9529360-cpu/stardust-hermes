@@ -21,6 +21,13 @@ const INFERENCE_SWITCH_TRIGGER = 'E2E_INFERENCE_SWITCH_TRIGGER'
 const INFERENCE_PROMPT = `${INFERENCE_SWITCH_TRIGGER}: original inference prompt must remain singular.`
 const INFERENCE_CORRECTION = `${INFERENCE_SWITCH_TRIGGER}: correction sent while inference is live.`
 
+// Sidebar rows label an untitled session with the start of its first prompt,
+// cut at SESSION_TITLE_EXCERPT_CHARS (src/lib/session-title.ts). Match a leading
+// fragment that every cut keeps, not the full prompt.
+const OTHER_SESSION_LABEL = 'E2E persisted session'
+const ORIGINAL_LABEL = CORRECTION_SWITCH_TRIGGER
+const INFERENCE_LABEL = INFERENCE_SWITCH_TRIGGER
+
 // Inactive tabs stay mounted under a data-pane-hidden ancestor. Match the
 // renderer's keep-alive visibility policy instead of relying on DOM order.
 const SURFACE = '[data-composer-target]:not([data-pane-hidden] [data-composer-target])'
@@ -139,13 +146,12 @@ async function openSidebarSession(page: Page, sidebarText: string, expectedTrans
 }
 
 async function reopenOriginalSession(page: Page): Promise<void> {
-  // A still-running tool has not generated a final title yet, so the sidebar
-  // retains the source prompt as its provisional session title.
-  await openSidebarSession(page, ORIGINAL_PROMPT, ORIGINAL_PROMPT)
+  // Without a session title the row keeps the excerpt of the source prompt.
+  await openSidebarSession(page, ORIGINAL_LABEL, ORIGINAL_PROMPT)
 }
 
 async function reopenInferenceSession(page: Page): Promise<void> {
-  const row = page.locator('[data-slot="sidebar"] button').filter({ hasText: INFERENCE_PROMPT }).first()
+  const row = page.locator('[data-slot="sidebar"] button').filter({ hasText: INFERENCE_LABEL }).first()
   await row.waitFor({ state: 'visible', timeout: 30_000 })
   await row.click()
   await waitForTranscriptText(page, INFERENCE_PROMPT)
@@ -211,9 +217,9 @@ test.describe('correction session switch', () => {
 
     // Reproduce the observed race: switch to another persisted session while
     // the foreground tool is live, then return before its redirect settles.
-    // Sidebar rows title by the session's first user prompt (auto-title is
-    // disabled in the e2e fixture config).
-    await openSidebarSession(page, OTHER_SESSION_PROMPT, OTHER_SESSION_PROMPT)
+    // Sidebar rows title by the excerpt of the session's first user prompt
+    // (auto-title is disabled in the e2e fixture config).
+    await openSidebarSession(page, OTHER_SESSION_LABEL, OTHER_SESSION_PROMPT)
     await reopenOriginalSession(page)
     // The warm resume first paints the persisted history and then reconciles
     // the live turn (including a steer whose persistence may lag on a loaded
@@ -257,7 +263,7 @@ test.describe('correction session switch', () => {
     await send(page, INFERENCE_CORRECTION)
     await waitForTranscriptText(page, INFERENCE_CORRECTION)
 
-    await openSidebarSession(page, OTHER_SESSION_PROMPT, OTHER_SESSION_PROMPT)
+    await openSidebarSession(page, OTHER_SESSION_LABEL, OTHER_SESSION_PROMPT)
     await reopenInferenceSession(page)
 
     expect(await textNodeOccurrences(page, INFERENCE_PROMPT)).toBe(1)
