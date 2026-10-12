@@ -419,6 +419,18 @@ class TestCatalog:
         assert "never the newsletters" in seeded[0]["description"]
         assert "never the newsletters" in seeded[0]["job_spec"]["prompt"]
 
+    def test_morning_brief_starter_never_attaches_google_workspace(self, store):
+        """An unattended morning briefing cannot answer google-workspace's OAuth setup, and preflight
+        refuses the job while its credential files are missing. The starter keeps market-brief and
+        house-check instead."""
+        from cron.suggestion_catalog import seed_catalog_suggestions
+
+        seeded = seed_catalog_suggestions(add_fn=store.add_suggestion, keys=["catalog:daily-briefing"])
+        assert len(seeded) == 1
+        skills = seeded[0]["job_spec"].get("skills") or []
+        assert "google-workspace" not in skills
+        assert {"market-brief", "house-check"} <= set(skills)
+
     def test_starter_declares_no_content_fields_of_its_own(self):
         import dataclasses
 

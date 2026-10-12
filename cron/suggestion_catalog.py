@@ -48,6 +48,10 @@ class CatalogEntry:
     # Override: the description the blueprint does not give. The monitor's promise (never the
     # newsletters) lives here, so the suggestion record and the integration suggestion both carry it.
     description_override: str = ""
+    # Override: the skills this starter attaches, in place of the blueprint's. The morning briefing
+    # attaches no google-workspace: an unattended run cannot answer its OAuth setup, and preflight
+    # refuses the job while the credential files are missing.
+    skills_override: Optional[tuple[str, ...]] = None
 
     @property
     def title(self) -> str:
@@ -80,13 +84,19 @@ def starter_job_spec(entry: CatalogEntry) -> Dict[str, Any]:
         spec["schedule"] = entry.schedule
     if entry.prompt_suffix:
         spec["prompt"] = f"{spec['prompt']} {entry.prompt_suffix}"
+    if entry.skills_override is not None:
+        spec["skills"] = list(entry.skills_override)
     return spec
 
 
 # The curated set. Each key is a dedup key from the first release: a suggestion already accepted
 # or dismissed under it stays latched, and its stored record keeps working.
 CATALOG: List[CatalogEntry] = [
-    CatalogEntry(key="catalog:daily-briefing", blueprint="morning-brief"),
+    CatalogEntry(
+        key="catalog:daily-briefing",
+        blueprint="morning-brief",
+        skills_override=("market-brief", "house-check"),
+    ),
     CatalogEntry(
         key="catalog:important-mail-monitor",
         blueprint="important-mail",
