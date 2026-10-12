@@ -140,3 +140,125 @@ def test_launch_profile_agent_build_is_scoped_once_multiplexing(two_homes, monke
     finally:
         server._release_build_profile_scopes(scopes)
     assert current_secret_scope() is None
+
+
+LAUNCH_OR_KEY = "sk-or-test-launch-0004"  # fake test value; OpenRouter keys carry the sk-or- prefix
+SIBLING_OR_KEY = "sk-or-test-sibling-0005"
+
+
+def _launch_on_openrouter(root: Path, env_text: str) -> None:
+    """Launch profile on OpenRouter with the given ``.env`` text (its own key, or nothing)."""
+    (root / ".env").write_text(env_text, encoding="utf-8")
+    (root / "config.yaml").write_text(
+        "model:\n  provider: openrouter\n  default: test/launch-model\n", encoding="utf-8")
+
+
+def _serve_secondary_profile() -> None:
+    """Serving a second profile home (its status probe) turns multi-profile hosting on."""
+    server.handle_request({"id": "serve-b", "method": "setup.status", "params": {"profile": "b"}})
+
+
+def _launch_runtime_check() -> dict:
+    response = server.handle_request({"id": "launch", "method": "setup.runtime_check", "params": {}})
+    assert "error" not in response, response
+    return response["result"]
+
+
+def test_launch_runtime_check_is_ok_once_a_second_profile_is_served(two_homes, monkeypatch):
+    """Regression: once a second profile is served, the launch profile's readiness probe must run inside
+    the launch profile's secret scope. It used to read the provider key unscoped, got UnscopedSecretError,
+    and the broad except in setup.runtime_check turned that into ok:false. The desktop then treats the
+    gateway as unconfigured and shows the onboarding picker for a profile that has its key."""
+    from agent.secret_scope import is_multiplex_active
+
+    root, _b = two_homes
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    _launch_on_openrouter(root, f"OPENROUTER_API_KEY={LAUNCH_OR_KEY}\n")
+    _serve_secondary_profile()
+    assert is_multiplex_active()
+
+    result = _launch_runtime_check()
+
+    assert result["ok"] is True, result
+    assert result["provider"] == "openrouter"
+
+
+def test_unscoped_read_of_the_launch_key_still_raises_around_the_probe(two_homes, monkeypatch):
+    """Boundary: the launch scope exists only around the readiness probe. An unscoped read of the same
+    provider key still raises UnscopedSecretError before and after the probe, and the probe leaves no
+    secret scope behind."""
+    from agent.secret_scope import UnscopedSecretError, current_secret_scope, get_secret
+
+    root, _b = two_homes
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    _launch_on_openrouter(root, f"OPENROUTER_API_KEY={LAUNCH_OR_KEY}\n")
+    _serve_secondary_profile()
+    with pytest.raises(UnscopedSecretError):
+        get_secret("OPENROUTER_API_KEY")
+
+    _launch_runtime_check()
+
+    assert current_secret_scope() is None
+    with pytest.raises(UnscopedSecretError):
+        get_secret("OPENROUTER_API_KEY")
+
+
+def test_launch_readiness_never_borrows_a_secondary_profiles_key(two_homes, monkeypatch):
+    """Fail-closed stays intact: the launch scope is the launch profile's own. A launch profile without a
+    key stays ok:false even though a served secondary holds one, and the secondary's key never shows up
+    in the answer."""
+    from agent.secret_scope import is_multiplex_active
+
+    root, b = two_homes
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    _launch_on_openrouter(root, "")
+    (b / ".env").write_text(f"OPENROUTER_API_KEY={SIBLING_OR_KEY}\n", encoding="utf-8")
+    _serve_secondary_profile()
+    assert is_multiplex_active()  # otherwise the ok:false below would prove nothing
+
+    result = _launch_runtime_check()
+
+    assert result["ok"] is False
+    assert SIBLING_OR_KEY not in repr(result)
+
+
+LAUNCH_OAI_KEY = "sk-test-launch-openai-0006"
+SIBLING_OAI_KEY = "sk-test-sibling-openai-0007"
+
+
+def test_launch_setup_status_is_configured_from_its_own_secret_only(two_homes, monkeypatch):
+    """setup.status for the launch profile under multiplexing reports provider_configured true from the
+    launch profile's own secret mapping, and the probe never sees the served sibling's secret. The key is
+    in the launch process env at activation and leaves the live env afterwards, so neither os.environ nor
+    the launch .env can answer: only the launch scope can."""
+    from agent import anthropic_credentials
+    from agent.secret_scope import current_secret_scope, is_multiplex_active
+    from hermes_cli import main as hermes_main
+
+    root, b = two_homes
+    monkeypatch.setenv("OPENAI_API_KEY", LAUNCH_OAI_KEY)
+    (root / ".env").write_text("", encoding="utf-8")
+    (root / "config.yaml").write_text("model: test/launch-model\n", encoding="utf-8")
+    (b / ".env").write_text(f"OPENAI_API_KEY={SIBLING_OAI_KEY}\n", encoding="utf-8")
+    _serve_secondary_profile()
+    assert is_multiplex_active()
+    monkeypatch.delenv("OPENAI_API_KEY")
+    monkeypatch.setattr(anthropic_credentials, "read_claude_code_credentials", lambda: None)  # no host creds
+    monkeypatch.setattr("hermes_cli.free_tier_bootstrap.wait_for_record", lambda *a, **k: None)
+    probed_scopes = []
+    real_check = hermes_main._has_any_provider_configured
+
+    def spy(**kwargs):
+        probed_scopes.append(dict(current_secret_scope() or {}))
+        return real_check(**kwargs)
+
+    monkeypatch.setattr(hermes_main, "_has_any_provider_configured", spy)
+
+    response = server.handle_request({"id": "launch-status", "method": "setup.status", "params": {}})
+
+    assert "error" not in response, response
+    assert response["result"]["provider_configured"] is True, response
+    assert probed_scopes, "the launch probe never ran"
+    for scope in probed_scopes:
+        assert scope.get("OPENAI_API_KEY") == LAUNCH_OAI_KEY
+        assert SIBLING_OAI_KEY not in scope.values()
