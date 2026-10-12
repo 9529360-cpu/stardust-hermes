@@ -17,6 +17,7 @@ Two facts anchor this module:
 
 from __future__ import annotations
 
+import contextlib
 import os
 import threading
 from pathlib import Path
@@ -64,3 +65,19 @@ def launch_secret_scope(launch_home: "str | Path") -> Dict[str, str]:
     scope = {k: v for k, v in capture_launch_env().items() if not _is_global_env(k)}
     scope.update(build_profile_secret_scope(Path(launch_home)))
     return scope
+
+
+@contextlib.contextmanager
+def multiplexed_launch_secret_scope(launch_home: "str | Path"):
+    """Bind the launch profile's own secret scope around the body once this process multiplexes. The
+    ``tui_gateway.model_switch`` pattern (tui_gateway/model_switch.py:79-89) also binds a terminal scope;
+    this helper binds only the secret scope, because the readiness probe runs no terminal code. A
+    single-profile process binds nothing, so its ``os.environ`` fallthrough is unchanged; outside the body
+    an unscoped secret read still fails closed."""
+    from agent.secret_scope import is_multiplex_active, reset_secret_scope, set_secret_scope
+    token = set_secret_scope(launch_secret_scope(launch_home)) if is_multiplex_active() else None
+    try:
+        yield
+    finally:
+        if token is not None:
+            reset_secret_scope(token)

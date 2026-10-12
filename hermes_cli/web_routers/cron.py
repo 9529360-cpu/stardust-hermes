@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 
+from cron.suggestion_catalog import blueprint_key_for_starter
 from hermes_cli.web_deps import late
 from hermes_cli.config import cfg_get
 from hermes_cli.web_server_cron import (
@@ -204,13 +205,6 @@ def _delete_cron_job_sync(job_id: str, profile: Optional[str] = None):
     return {"ok": True}
 
 
-_SUGGESTION_BLUEPRINT_KEYS = {
-    "catalog:daily-briefing": "morning-brief",
-    "catalog:important-mail-monitor": "important-mail",
-    "catalog:weekly-review": "weekly-review",
-    "catalog:standup-reminder": "workday-start",
-}
-
 _SUGGESTION_RETURN_DENY_SOURCES = frozenset({"cron", "kanban", "subagent", "tool"})
 
 
@@ -224,7 +218,7 @@ def _suggestion_public_row(row: Dict[str, Any]) -> Dict[str, Any]:
         "description": str(row.get("description") or ""),
         "source": str(row.get("source") or ""),
         "created_at": row.get("created_at"),
-        "blueprint_key": _SUGGESTION_BLUEPRINT_KEYS.get(dedup_key),
+        "blueprint_key": blueprint_key_for_starter(dedup_key),
         "job_spec": {
             key: spec.get(key)
             for key in ("name", "schedule", "deliver", "skills")
