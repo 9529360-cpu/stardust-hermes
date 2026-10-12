@@ -9,7 +9,7 @@ from fastapi import HTTPException, Request
 from pathlib import Path
 from typing import Any, Dict
 
-from hermes_cli.venv_layout import is_link_entry
+from hermes_cli.venv_layout import DEFAULT_VENV_NAME, UV_VENV_NAME, is_link_entry
 
 
 _MANAGED_FILES_ROOT_ENV = "STARDUST_DASHBOARD_FILES_ROOT"
@@ -92,7 +92,7 @@ def _install_root() -> Path:
     return Path(_main.PROJECT_ROOT)
 
 
-_VENV_FOLDER_NAMES = frozenset({"venv", ".venv"})
+_VENV_FOLDER_NAMES = (DEFAULT_VENV_NAME, UV_VENV_NAME)
 
 
 def _inside_venv_folder(path: Path, root: Path, anchors: list[Path]) -> bool:
@@ -129,10 +129,10 @@ def _refuse_venv_mutation(candidate: Path, *, mutation: str, recursive: bool = F
     contains the install root, or holds a venv folder.
     """
     root = _install_root().resolve(strict=False)
-    anchors = [(root / name).resolve(strict=False) for name in ("venv", ".venv")]
+    anchors = [(root / name).resolve(strict=False) for name in _VENV_FOLDER_NAMES]
     try:
         entry = candidate.parent.resolve(strict=False) / candidate.name
-        if mutation == "delete" and entry == root / "venv" and is_link_entry(entry):
+        if mutation == "delete" and entry == root / DEFAULT_VENV_NAME and is_link_entry(entry):
             return
         target = entry.resolve(strict=False)
     except (OSError, RuntimeError):
