@@ -89,6 +89,15 @@ def starter_job_spec(entry: CatalogEntry) -> Dict[str, Any]:
     return spec
 
 
+# One rule for every starter that runs unattended against a data source. The morning briefing,
+# the weekly review and email triage can all load google-workspace, whose OAuth setup asks
+# questions nobody can answer during a cron run.
+UNATTENDED_RULE = (
+    "This is an unattended run, so nobody is there to answer questions. Do not start any sign-in, "
+    "OAuth setup or new credential step. If a source is not already set up, skip it and say so in one line."
+)
+
+
 # The curated set. Each key is a dedup key from the first release: a suggestion already accepted
 # or dismissed under it stays latched, and its stored record keeps working.
 CATALOG: List[CatalogEntry] = [
@@ -96,6 +105,7 @@ CATALOG: List[CatalogEntry] = [
         key="catalog:daily-briefing",
         blueprint="morning-brief",
         skills_override=("market-brief", "house-check"),
+        prompt_suffix=UNATTENDED_RULE,
     ),
     CatalogEntry(
         key="catalog:important-mail-monitor",
@@ -109,10 +119,14 @@ CATALOG: List[CatalogEntry] = [
             "Candidates are mail that actually needs attention — never the newsletters. "
             "For the scoring step, run `python3 -m cron.scripts.classify_items --threshold 7 "
             "--criteria ...` from the Stardust install (resolve the script path at run time; do not "
-            "assume a fixed location) and deliver ONLY what it returns."
+            "assume a fixed location) and deliver ONLY what it returns. " + UNATTENDED_RULE
         ),
     ),
-    CatalogEntry(key="catalog:weekly-review", blueprint="weekly-review"),
+    CatalogEntry(
+        key="catalog:weekly-review",
+        blueprint="weekly-review",
+        prompt_suffix=UNATTENDED_RULE,
+    ),
     CatalogEntry(key="catalog:standup-reminder", blueprint="workday-start"),
 ]
 

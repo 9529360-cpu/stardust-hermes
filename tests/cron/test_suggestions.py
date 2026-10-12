@@ -353,19 +353,17 @@ class TestCatalog:
 
     @pytest.mark.parametrize("key, blueprint_key, _schedule", LEGACY_STARTERS)
     def test_starter_prompt_is_its_blueprint_prompt(self, store, key, blueprint_key, _schedule):
+
         from cron.blueprint_catalog import fill_blueprint, get_blueprint
-        from cron.suggestion_catalog import seed_catalog_suggestions
+        from cron.suggestion_catalog import CATALOG, seed_catalog_suggestions
 
         seeded = seed_catalog_suggestions(add_fn=store.add_suggestion, keys=[key])
         assert len(seeded) == 1
         blueprint_prompt = fill_blueprint(get_blueprint(blueprint_key), {})["prompt"]
-        prompt = seeded[0]["job_spec"]["prompt"]
-        if key == "catalog:important-mail-monitor":
-            # The one starter-owned addition: the classifier command the blueprint prompt lacks.
-            assert prompt.startswith(blueprint_prompt + " ")
-            assert "cron.scripts.classify_items" in prompt[len(blueprint_prompt):]
-        else:
-            assert prompt == blueprint_prompt
+        declared = next(entry for entry in CATALOG if entry.key == key).prompt_suffix
+        # A starter adds only the suffix it declares to its blueprint prompt, nothing else.
+        expected = f"{blueprint_prompt} {declared}" if declared else blueprint_prompt
+        assert seeded[0]["job_spec"]["prompt"] == expected
 
     @pytest.mark.parametrize("key, _blueprint_key, schedule", LEGACY_STARTERS)
     def test_starter_job_keeps_the_schedule_it_always_had(self, store, key, _blueprint_key, schedule):
@@ -430,6 +428,22 @@ class TestCatalog:
         skills = seeded[0]["job_spec"].get("skills") or []
         assert "google-workspace" not in skills
         assert {"market-brief", "house-check"} <= set(skills)
+
+    def test_unattended_starters_end_with_the_no_sign_in_rule(self, store):
+        """Morning briefing, weekly review and important mail run with nobody to answer a question.
+        Each prompt must end with the shared rule: no sign-in or OAuth step, and skip a source that
+        is not set up."""
+        from cron.suggestion_catalog import UNATTENDED_RULE, seed_catalog_suggestions
+
+        keys = ["catalog:daily-briefing", "catalog:weekly-review", "catalog:important-mail-monitor"]
+        seeded = {rec["dedup_key"]: rec for rec in seed_catalog_suggestions(add_fn=store.add_suggestion, keys=keys)}
+        assert set(seeded) == set(keys)
+        for key in keys:
+            prompt = seeded[key]["job_spec"]["prompt"]
+            assert prompt.endswith(UNATTENDED_RULE), key
+            assert "unattended run" in prompt, key
+            assert "Do not start any sign-in, OAuth setup or new credential step." in prompt, key
+            assert "skip it and say so in one line" in prompt, key
 
     def test_starter_declares_no_content_fields_of_its_own(self):
         import dataclasses
