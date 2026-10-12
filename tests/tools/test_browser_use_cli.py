@@ -296,19 +296,26 @@ class TestToolSurfaceSwap:
 
         assert registered == advertised
 
-    def test_browser_exec_present_with_terminal(self, monkeypatch):
+    def test_browser_exec_deferred_but_reachable_with_terminal(self, monkeypatch):
+        """browser_exec is in the default deferred set: with terminal present it leaves the
+        initial tool list and stays callable through the tool_search bridge catalog."""
         monkeypatch.setattr(bu_cli, "is_browser_use_cli_mode", lambda: True)
         from tools.registry import registry
 
         entry = registry.get_entry("browser_exec")
         monkeypatch.setattr(entry, "check_fn", lambda: True)
         import model_tools
+        from tools.tool_search import scoped_deferrable_names
 
-        defs = model_tools.get_tool_definitions(
-            enabled_toolsets=["browser", "terminal"], quiet_mode=False
+        toolsets = ["browser", "terminal"]
+        initial = model_tools.get_tool_definitions(enabled_toolsets=toolsets, quiet_mode=False)
+        names = {t["function"]["name"] for t in initial}
+        assert "browser_exec" not in names
+        assert "tool_call" in names
+        catalog = model_tools.get_tool_definitions(
+            enabled_toolsets=toolsets, quiet_mode=False, skip_tool_search_assembly=True
         )
-        names = {t["function"]["name"] for t in defs}
-        assert "browser_exec" in names
+        assert "browser_exec" in scoped_deferrable_names(catalog)
 
 
 class TestVaultSupervisorAttach:

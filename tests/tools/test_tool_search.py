@@ -191,17 +191,6 @@ class TestClassification:
         assert "browser_navigate" not in names
         assert "drive_preview" not in names
 
-    def test_non_desktop_browser_tools_preserve_legacy_tool_visibility(self):
-        from tools.registry import discover_builtin_tools
-        from tools.tool_search import ToolSearchConfig, assemble_tool_defs
-
-        discover_builtin_tools()
-        tools = [_td("browser_navigate", "Browser"), _td("browser_click", "Browser")]
-        result = assemble_tool_defs(tools, config=ToolSearchConfig.from_raw({"enabled": "on"}))
-        assert {"browser_navigate", "browser_click"} <= {
-            td["function"]["name"] for td in result.tool_defs
-        }
-
     def test_explicit_defer_override_restores_the_old_browser_surface(self):
         from tools.tool_search import ToolSearchConfig, assemble_tool_defs
 
@@ -315,6 +304,148 @@ class TestClassification:
         names = {(td.get("function") or {}).get("name") for td in visible}
         assert "xx_unknown_tool" in names
         assert deferrable == []
+
+
+class TestBrowserEngineDeferral:
+    """Non-vault browser engines are deferred by default: their schemas leave the initial tool
+    list and each one stays callable through the bridge. The browser_vault_* tools and the
+    unified ``browser`` tool stay in the initial list."""
+
+    @pytest.fixture
+    def browser_available(self):
+        """Advertise the local browser backend so the real browser_* availability gates pass on
+        any machine (CI has no agent-browser binary). Restores the gate and both caches after."""
+        import model_tools
+        import tools.browser_tool_install as install
+        from tools.registry import discover_builtin_tools, invalidate_check_fn_cache
+
+        discover_builtin_tools()
+        original = install.check_browser_requirements
+        install.check_browser_requirements = lambda: True
+        invalidate_check_fn_cache()
+        model_tools._clear_tool_defs_cache()
+        try:
+            yield
+        finally:
+            install.check_browser_requirements = original
+            invalidate_check_fn_cache()
+            model_tools._clear_tool_defs_cache()
+
+    @staticmethod
+    def _default_engines_and_vault():
+        from toolsets import _HERMES_DEFAULT_TOOLS
+
+        engines = {n for n in _HERMES_DEFAULT_TOOLS
+                   if n.startswith("browser_") and not n.startswith("browser_vault_")}
+        vault = {n for n in _HERMES_DEFAULT_TOOLS if n.startswith("browser_vault_")}
+        return engines, vault
+
+    def test_non_desktop_engines_defer_while_vault_stays_eager(self):
+        from tools.tool_search import ToolSearchConfig, assemble_tool_defs
+
+        engines, vault = self._default_engines_and_vault()
+        assert engines and vault
+        result = assemble_tool_defs(
+            [_td(name, "Browser") for name in sorted(engines | vault)]
+            + [_td("terminal", "Run a command")],
+            config=ToolSearchConfig.from_raw({"enabled": "on"}),
+        )
+        names = {td["function"]["name"] for td in result.tool_defs}
+        assert result.activated
+        assert not (engines & names)
+        assert vault <= names
+        assert "terminal" in names
+
+    def test_desktop_surface_keeps_unified_browser_and_vault_eager(self):
+        from tools.tool_search import ToolSearchConfig, assemble_tool_defs
+
+        result = assemble_tool_defs(
+            [_td("browser", "Unified control"), _td("drive_preview", "Legacy GUI"),
+             _td("browser_navigate", "Legacy engine"), _td("browser_vault_list", "Vault")],
+            config=ToolSearchConfig.from_raw({"enabled": "on"}),
+        )
+        names = {td["function"]["name"] for td in result.tool_defs}
+        assert {"browser", "browser_vault_list"} <= names
+        assert not ({"drive_preview", "browser_navigate"} & names)
+
+    def test_default_deferred_set_covers_every_default_engine_and_no_vault_tool(self):
+        from tools.tool_search import _DEFAULT_DEFERRED_TOOLS, is_deferrable_tool_name
+
+        engines, vault = self._default_engines_and_vault()
+        assert engines <= _DEFAULT_DEFERRED_TOOLS
+        assert not (vault & _DEFAULT_DEFERRED_TOOLS)
+        assert all(is_deferrable_tool_name(name, _DEFAULT_DEFERRED_TOOLS) for name in engines)
+        assert not is_deferrable_tool_name("browser", _DEFAULT_DEFERRED_TOOLS)
+
+    def test_default_cli_surface_hides_engines_and_keeps_vault_and_bridge(self, browser_available):
+        import model_tools
+
+        engines, _vault = self._default_engines_and_vault()
+        initial = model_tools.get_tool_definitions(enabled_toolsets=["hermes-cli"], quiet_mode=True)
+        names = {td["function"]["name"] for td in initial}
+        assert not (engines & names)
+        assert {"browser_vault_list", "browser_vault_unlock"} <= names
+        assert {"tool_search", "tool_describe", "tool_call"} <= names
+
+    def test_deferred_engine_is_found_by_search_and_callable_through_the_bridge(self, browser_available):
+        import types
+
+        import model_tools
+        from agent.tool_executor import _tool_search_scoped_names
+
+        toolsets = ["hermes-cli"]
+        visible = [td["function"]["name"] for td in
+                   model_tools.get_tool_definitions(enabled_toolsets=toolsets, quiet_mode=True)]
+
+        def bridge(name, args):
+            return model_tools._dispatch_bridge_tool(
+                name, args, enabled_tools=visible, enabled_toolsets=toolsets,
+                disabled_toolsets=None, toolsets_granted=True)
+
+        searched, err = bridge("tool_search", {"queries": ["navigate the browser to a web page"]})
+        assert err is None
+        matches = {m for group in json.loads(searched)["results"] for m in group["matches"]}
+        assert "browser_navigate" in matches
+
+        described, err = bridge("tool_describe", {"names": ["browser_navigate"]})
+        assert err is None
+        assert "url" in json.loads(described)["tools"]["browser_navigate"]["parameters"]["properties"]
+
+        # The bridge hands a validated call back for dispatch; no browser is started here.
+        result, dispatch = bridge(
+            "tool_call", {"calls": [{"name": "browser_navigate", "arguments": {"url": "https://example.com"}}]})
+        assert result is None
+        assert dispatch == ("browser_navigate", {"url": "https://example.com"})
+
+        agent = types.SimpleNamespace(enabled_toolsets=toolsets, disabled_toolsets=None,
+                                      valid_tool_names=set(visible))
+        assert "browser_navigate" in _tool_search_scoped_names(agent)
+
+    def test_every_default_tool_is_visible_or_reachable_through_the_bridge(self, browser_available):
+        import model_tools
+        from tools.tool_search import BRIDGE_TOOL_NAMES, scoped_deferrable_names
+
+        toolsets = ["hermes-cli"]
+        every_raw = model_tools.get_tool_definitions(
+            enabled_toolsets=toolsets, quiet_mode=True, skip_tool_search_assembly=True)
+        initial = model_tools.get_tool_definitions(enabled_toolsets=toolsets, quiet_mode=True)
+        every = {td["function"]["name"] for td in every_raw}
+        visible = {td["function"]["name"] for td in initial} - BRIDGE_TOOL_NAMES
+        reachable = set(scoped_deferrable_names(every_raw))
+        assert "browser_navigate" in reachable
+        assert visible | reachable == every
+        assert not (visible & reachable)
+
+    def test_explicit_defer_list_replaces_the_default_and_keeps_engines_eager(self):
+        from tools.tool_search import ToolSearchConfig, assemble_tool_defs
+
+        result = assemble_tool_defs(
+            [_td("browser_navigate", "Browser"), _td("computer_use", "Drive the OS")],
+            config=ToolSearchConfig.from_raw({"enabled": "on", "defer": ["computer_use"]}),
+        )
+        names = {td["function"]["name"] for td in result.tool_defs}
+        assert "browser_navigate" in names
+        assert "computer_use" not in names
 
 
 # ---------------------------------------------------------------------------

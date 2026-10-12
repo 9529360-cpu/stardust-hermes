@@ -1,5 +1,6 @@
 """Progressive tool disclosure ("tool search"): MCP/plugin tools and a curated set of
-event-triggered built-in tools are replaced in the model-visible array by three bridge tools —
+built-in tools (event-triggered ones and the non-vault browser engines) are replaced in the
+model-visible array by three bridge tools —
 tool_search / tool_describe / tool_call. Shared default platform tools and session-gated GUI
 tools stay eager unless the effective ``defer`` set explicitly selects them; ANY deferrable
 tool activates the bridge (the listing scales with budget, not activation). The catalog is
@@ -126,13 +127,19 @@ def _default_tool_names() -> frozenset[str]:
 # pay their schema; once enabled they stay direct unless the deferral list names them.
 _DIRECT_SURFACE_TOOLSETS = frozenset({"desktop_ui", "project"})
 
-# Event-triggered built-in tools deferred BY DEFAULT (a catalog stub suffices); the ``defer``
-# config replaces this wholesale ([] = everything eager). POST-rename names. ``clarify``
-# is deliberately absent: A/B showed deferring it collapsed structured-clarify usage
-# (18/18 -> 7/18) — the ask-the-user affordance must be ambient, a stub is not enough.
+# Built-in tools deferred BY DEFAULT (a catalog stub suffices); the ``defer`` config replaces
+# this wholesale ([] = everything eager). POST-rename names. ``clarify`` is deliberately absent:
+# A/B showed deferring it collapsed structured-clarify usage (18/18 -> 7/18) — the
+# ask-the-user affordance must be ambient, a stub is not enough.
 _DEFAULT_DEFERRED_TOOLS = frozenset({
     "computer_use", "session_search", "image_generate",
     "todo_list", "process_manage", "cronjob_manage",
+    # Non-vault browser engines: large schemas, used on demand. Each stays callable through
+    # tool_call; the browser_vault_* tools and the unified `browser` tool stay in the initial list.
+    "browser_status", "browser_navigate", "browser_snapshot", "browser_click",
+    "browser_type", "browser_interact", "browser_scroll", "browser_back",
+    "browser_press", "browser_get_images", "browser_vision", "browser_console",
+    "browser_cdp", "browser_dialog", "browser_exec",
     # The visible desktop browser must stay directly callable: deferring its
     # open/drive tools makes models reach for a second, headless browser instead.
     # Other desktop GUI affordances remain on-demand.
@@ -376,14 +383,11 @@ def assemble_tool_defs(tool_defs: List[Dict[str, Any]], *, context_length: Optio
         # still win.
         defer_tools = defer_tools - {"computer_use"}
     if config.defer_tools is None and any(_fn(tool).get("name") == "browser" for tool in incoming):
-        # Browser is the unified desktop entry. The old browser_* engines and
-        # drive_preview remain callable through the existing search bridge for
-        # advanced/backward-compatible work, not a competing eager browser UI.
-        # An explicit user's defer config always wins.
-        defer_tools = defer_tools | {
-            name for name in _tool_def_names(incoming)
-            if name.startswith("browser_") and not name.startswith("browser_vault_")
-        } | {"drive_preview"}
+        # Browser is the unified desktop entry, so the legacy desktop preview is deferred too.
+        # The browser_* engines are already in _DEFAULT_DEFERRED_TOOLS (one list, no copy here).
+        # Deferred tools stay callable through the search bridge. An explicit user's defer
+        # config always wins.
+        defer_tools = defer_tools | {"drive_preview"}
     visible, deferrable = classify_tools(incoming, defer_tools)
     connections_granted = connections_in_scope(incoming)
     if not deferrable:
