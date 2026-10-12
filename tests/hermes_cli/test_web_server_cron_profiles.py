@@ -469,6 +469,26 @@ def test_catalog_suggestion_projection_exposes_blueprint_locale_key(isolated_pro
     assert "dedup_key" not in row
     assert "prompt" not in row["job_spec"]
 
+@pytest.mark.parametrize("dedup_key, blueprint_key", [
+    ("catalog:daily-briefing", "morning-brief"),
+    ("catalog:important-mail-monitor", "important-mail"),
+    ("catalog:weekly-review", "weekly-review"),
+    ("catalog:standup-reminder", "workday-start"),
+])
+def test_legacy_starter_keys_project_their_blueprint_key(isolated_profiles, dedup_key, blueprint_key):
+    rec = _web_server_cron._call_suggestions_for_profile(
+        "worker_alpha", "add_suggestion", title="Starter", description="desc",
+        source="catalog",
+        job_spec={"prompt": "private prompt", "schedule": "0 9 * * 1-5", "deliver": "origin"},
+        dedup_key=dedup_key,
+    )
+    assert rec is not None
+
+    row = _rt_cron._list_cron_suggestions_sync("worker_alpha")["suggestions"][0]
+    assert row["blueprint_key"] == blueprint_key
+    assert "dedup_key" not in row
+
+
 def test_accept_suggestion_validates_desktop_session_in_same_profile(isolated_profiles, monkeypatch):
     from hermes_state import SessionDB
 

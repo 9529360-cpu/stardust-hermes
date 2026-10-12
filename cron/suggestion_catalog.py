@@ -1,12 +1,15 @@
 """Curated catalog of starter cron-job suggestions.
 
 These are the built-in automations Hermes can offer a new user out of the box — the ``catalog``
-source of the unified suggestion surface. Each entry is a ready-to-run ``cron.jobs.create_job`` spec
-wrapped as a suggestion; the user accepts via ``/suggestions``. Nothing here auto-schedules.
+source of the unified suggestion surface. Each entry names an Automation Blueprint
+(``cron/blueprint_catalog.py``), which owns the title, description, prompt, schedule and skills;
+the suggestion carries that blueprint's ``cron.jobs.create_job`` spec. The user accepts via
+``/suggestions``. Nothing here auto-schedules.
 
 The "important-mail monitor" entry (``classify_items.py``: poll -> LLM-score urgency -> surface
-above-threshold) is ONE catalog automation, not a standalone feature. New entries: append a
-CatalogEntry with a self-contained prompt (cron jobs run with no chat context).
+above-threshold) is ONE catalog automation, not a standalone feature. New entries: add the
+automation to the blueprint catalog, then append a CatalogEntry that names it (cron jobs run
+with no chat context, so the blueprint prompt must be self-contained).
 """
 
 from __future__ import annotations
@@ -17,7 +20,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 __all__ = [
     "CatalogEntry", "CATALOG", "seed_catalog_suggestions", "seed_integration_suggestions",
-    "classify_items_script_path",
+    "classify_items_script_path", "blueprint_key_for_starter", "starter_job_spec",
 ]
 
 
@@ -28,103 +31,88 @@ def classify_items_script_path() -> str:
 
 @dataclass(frozen=True)
 class CatalogEntry:
-    """A curated starter automation offered as a suggestion."""
+    """A starter automation offered as a suggestion.
 
-    key: str                 # stable dedup key (never re-offered once dismissed)
-    title: str
-    description: str
-    job_spec: Dict[str, Any]  # kwargs for cron.jobs.create_job
+    The automation's content (title, description, prompt, schedule, skills) comes from the Automation
+    Blueprint named by ``blueprint``. ``key`` is the stable dedup key: a decision recorded under it
+    (pending, accepted or dismissed) stays authoritative, so it must never change.
+    """
+
+    key: str
+    blueprint: str
+    # Override: the schedule this starter has always used, where the blueprint's own form differs
+    # (the blueprint emits a clock-aligned cron expression; this starter always used an interval).
+    schedule: Optional[str] = None
+    # Override: the one instruction the blueprint prompt does not give, appended after its prompt.
+    prompt_suffix: str = ""
+
+    @property
+    def title(self) -> str:
+        return _blueprint_of(self).title
+
+    @property
+    def description(self) -> str:
+        return _blueprint_of(self).description
+
+    @property
+    def job_spec(self) -> Dict[str, Any]:
+        return starter_job_spec(self)
 
 
-# The curated set. Schedules use the cron/interval syntax create_job accepts.
+def _blueprint_of(entry: CatalogEntry) -> Any:
+    from cron.blueprint_catalog import get_blueprint
+
+    blueprint = get_blueprint(entry.blueprint)
+    if blueprint is None:
+        raise KeyError(f"starter {entry.key!r} names unknown blueprint {entry.blueprint!r}")
+    return blueprint
+
+
+def starter_job_spec(entry: CatalogEntry) -> Dict[str, Any]:
+    """``cron.jobs.create_job`` kwargs for a starter: its blueprint's defaults plus its overrides."""
+    from cron.blueprint_catalog import fill_blueprint
+
+    spec = fill_blueprint(_blueprint_of(entry), {})
+    if entry.schedule is not None:
+        spec["schedule"] = entry.schedule
+    if entry.prompt_suffix:
+        spec["prompt"] = f"{spec['prompt']} {entry.prompt_suffix}"
+    return spec
+
+
+# The curated set. Each key is a dedup key from the first release: a suggestion already accepted
+# or dismissed under it stays latched, and its stored record keeps working.
 CATALOG: List[CatalogEntry] = [
-    CatalogEntry(
-        key="catalog:daily-briefing",
-        title="Daily briefing",
-        description="Every morning at 8am, a short briefing: today's calendar, "
-        "weather, and anything urgent waiting on you.",
-        job_spec={
-            "prompt": (
-                "Produce a concise morning briefing for the user: today's "
-                "calendar events, the local weather, and any urgent items "
-                "(unread important email, due tasks). Keep it short and "
-                "scannable. If you have no connected data sources, give a brief "
-                "general good-morning with the date and offer to connect "
-                "calendar/email."
-            ),
-            "schedule": "0 8 * * *",
-            "name": "Daily briefing",
-            "deliver": "origin",
-        },
-    ),
+    CatalogEntry(key="catalog:daily-briefing", blueprint="morning-brief"),
     CatalogEntry(
         key="catalog:important-mail-monitor",
-        title="Important-mail monitor",
-        description="Check your inbox periodically and ping you ONLY about mail "
-        "that actually needs attention — never the newsletters.",
-        job_spec={
-            "prompt": (
-                "Check the user's inbox for new messages since the last run. "
-                "For each candidate, judge urgency against this rule: surface "
-                "only mail that needs a reply today, is from a manager/family "
-                "member, or mentions a deadline. Pipe candidates through the "
-                "urgency classifier (run `python3 -m cron.scripts.classify_items "
-                "--threshold 7 --criteria ...` from the hermes-agent install — "
-                "resolve the script path at run time, do not assume a fixed "
-                "location) and deliver ONLY what it returns. If nothing "
-                "clears the bar, respond with [SILENT] so the user is not "
-                "pinged. Requires a connected mail source; if none is "
-                "configured, explain how to connect one and then stop."
-            ),
-            "schedule": "every 30m",
-            "name": "Important-mail monitor",
-            "deliver": "origin",
-        },
+        blueprint="important-mail",
+        schedule="every 30m",
+        prompt_suffix=(
+            "For the scoring step, run `python3 -m cron.scripts.classify_items --threshold 7 "
+            "--criteria ...` from the Stardust install (resolve the script path at run time; do not "
+            "assume a fixed location) and deliver ONLY what it returns."
+        ),
     ),
-    CatalogEntry(
-        key="catalog:weekly-review",
-        title="Weekly review",
-        description="Every Sunday evening, a recap of the week: what got done, "
-        "what's still open, and what's coming up next week.",
-        job_spec={
-            "prompt": (
-                "Produce a weekly review for the user: summarize what was "
-                "accomplished this week, list still-open items, and preview "
-                "next week's calendar. Pull from whatever sources are connected "
-                "(calendar, task tools, recent conversations). Keep it tight."
-            ),
-            "schedule": "0 18 * * 0",
-            "name": "Weekly review",
-            "deliver": "origin",
-        },
-    ),
-    CatalogEntry(
-        key="catalog:standup-reminder",
-        title="Workday start reminder",
-        description="A weekday nudge at 9am with your day's agenda and top "
-        "priorities, so you start focused.",
-        job_spec={
-            "prompt": (
-                "Give the user a brief weekday start-of-day nudge: their "
-                "calendar for today and the 1-3 highest-priority things to "
-                "focus on, inferred from recent context and any task tools. "
-                "Encouraging, short, one message."
-            ),
-            "schedule": "0 9 * * 1-5",
-            "name": "Workday start reminder",
-            "deliver": "origin",
-        },
-    ),
+    CatalogEntry(key="catalog:weekly-review", blueprint="weekly-review"),
+    CatalogEntry(key="catalog:standup-reminder", blueprint="workday-start"),
 ]
+
+_STARTERS_BY_KEY: Dict[str, CatalogEntry] = {entry.key: entry for entry in CATALOG}
+
+
+def blueprint_key_for_starter(dedup_key: str) -> Optional[str]:
+    """The Automation Blueprint a starter dedup key resolves to, or None for any other key."""
+    entry = _STARTERS_BY_KEY.get(dedup_key)
+    return entry.blueprint if entry is not None else None
 
 
 # A connected managed account unlocks only automations whose required source is unambiguous.
-# The first item is the existing suggestion dedup key (preserves prior user decisions); the
-# second is the Automation Blueprint used for stable defaults such as schedule and delivery.
-_INTEGRATION_BLUEPRINTS: Dict[str, tuple[tuple[str, str], ...]] = {
-    "gmail": (("catalog:important-mail-monitor", "important-mail"),),
-    "outlook": (("catalog:important-mail-monitor", "important-mail"),),
-    "googlecalendar": (("catalog:daily-briefing", "morning-brief"),),
+# Each connector names the starters it unlocks; each starter's blueprint supplies the defaults.
+_INTEGRATION_STARTERS: Dict[str, tuple[str, ...]] = {
+    "gmail": ("catalog:important-mail-monitor",),
+    "outlook": ("catalog:important-mail-monitor",),
+    "googlecalendar": ("catalog:daily-briefing",),
 }
 
 
@@ -173,24 +161,24 @@ def seed_integration_suggestions(
     offered: set[str] = set()
     for raw in connectors:
         connector = str(raw or "").strip().lower()
-        for key, blueprint_key in _INTEGRATION_BLUEPRINTS.get(connector, ()):
+        for key in _INTEGRATION_STARTERS.get(connector, ()):
             if key in offered:
                 continue
             offered.add(key)
             entry = by_key.get(key)
-            blueprint = get_blueprint(blueprint_key)
+            blueprint = get_blueprint(entry.blueprint) if entry is not None else None
             if entry is None or blueprint is None:
                 continue
             job_spec = fill_blueprint(blueprint, {})
             # The trigger is a Nous managed connector, not the local credential files used by some
             # bundled provider skills. Keep the blueprint's schedule/defaults but pin execution to
             # the same remote connector credential the user just authorized.
-            if blueprint_key == "important-mail":
+            if blueprint.key == "important-mail":
                 job_spec["prompt"] = _MANAGED_MAIL_PROMPT
                 # Procedure-only: this skill has no credential prerequisites and explicitly supports
                 # a "relevant connector"; the prompt above owns provider/tool selection.
                 job_spec["skills"] = ["email-inbox-triage"]
-            elif blueprint_key == "morning-brief":
+            elif blueprint.key == "morning-brief":
                 job_spec["prompt"] = _MANAGED_CALENDAR_PROMPT
                 # google-workspace requires separate local OAuth files; never make a managed-connector
                 # suggestion demand a second authorization path.
