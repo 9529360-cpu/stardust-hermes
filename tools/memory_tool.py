@@ -429,7 +429,11 @@ def apply_memory_pending(payload: Dict[str, Any], store: "MemoryStore") -> Dict[
     elif current_generation:
         return store._reset_conflict(target)
     if action == "batch":
-        return store.apply_batch(target, payload.get("operations") or [])
+        # Checked against the store as it is now, the same way the live path checks a batch before proposing it.
+        operations = payload.get("operations") or []
+        if refusal := batch_cross_store_hint(store, target, operations):
+            return refusal
+        return store.apply_batch(target, operations)
     if action not in _STORE_ACTIONS:
         return {"success": False, "error": f"Unknown staged action '{action}'."}
     return _STORE_ACTIONS[action][0](store, target, payload.get("content") or "", payload.get("old_text") or "")

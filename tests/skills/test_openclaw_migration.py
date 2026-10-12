@@ -877,7 +877,7 @@ def test_forgotten_matching_agrees_with_the_hermes_reader(tmp_path: Path):
     mod = load_module()
     memories = tmp_path / "memories"
     memories.mkdir()
-    hermes.record_forgotten(["Prefers tea in the morning, always", "Ｃａｆé　ａｔ　ｎｏｏｎ"],
+    hermes.record_forgotten(["Prefers tea in the morning, always", "Ｃａｆé　ａｔ　ｎｏｏｎ", "Coffee", "咖啡很好喝"],
                             source="memory", scope="entry", memories_dir=memories)
     path = memories / "forgotten.json"
     data = json.loads(path.read_text(encoding="utf-8"))
@@ -895,10 +895,48 @@ def test_forgotten_matching_agrees_with_the_hermes_reader(tmp_path: Path):
         "The café at noon": True,
         "legacy PLAINTEXT note here, ok": True,
         "unrelated text": False,
+        "Buy a coffeemaker next week": False,  # "Coffee" is a whole word only
+        "Buy a coffee maker next week": True,
+        "我觉得咖啡很好喝呢": True,  # CJK has no spaces, so it matches inside a run
     }
     for passage, expected in passages.items():
         assert theirs.mentions(passage) is expected, passage
         assert ours.mentions(passage) == theirs.mentions(passage), passage
+
+
+def test_forgotten_budget_agrees_with_the_hermes_reader(tmp_path: Path):
+    """A passage that needs more digest checks than the budget counts as a mention in both implementations. A passage
+    within it is scanned exactly in both."""
+    from tools import memory_tombstones as hermes
+
+    mod = load_module()
+    memories = tmp_path / "memories"
+    memories.mkdir()
+    hermes.record_forgotten(["x" * length for length in range(4, 24)],  # twenty distinct lengths
+                            source="memory", scope="entry", memories_dir=memories)
+    ours = mod.load_forgotten_index(memories)
+    theirs = hermes.forgotten_index(memories, strict=True)
+
+    passages = ["咖" * 40000, "咖" * 1600, "lorem ipsum dolor " * 2000, "lorem ipsum dolor " * 2000 + " xxxxxxxx"]
+    for passage in passages:
+        assert ours.mentions(passage) == theirs.mentions(passage)
+    assert theirs.mentions("咖" * 40000)  # 40,000 positions times 20 lengths is over the budget
+    assert not theirs.mentions("咖" * 1600)
+    assert not theirs.mentions("lorem ipsum dolor " * 2000)
+    assert theirs.mentions("lorem ipsum dolor " * 2000 + " xxxxxxxx")
+
+    # The same records without fingerprints: each window costs a digest, so the budget is reached sooner.
+    path = memories / "forgotten.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    for row in data["forgotten"]:
+        row.pop("fp")
+    path.write_text(json.dumps(data), encoding="utf-8")
+    ours = mod.load_forgotten_index(memories)
+    theirs = hermes.forgotten_index(memories, strict=True)
+    for passage in passages:
+        assert ours.mentions(passage) == theirs.mentions(passage)
+    assert theirs.mentions("咖" * 40000)
+    assert not theirs.mentions("咖" * 1600)
 
 
 

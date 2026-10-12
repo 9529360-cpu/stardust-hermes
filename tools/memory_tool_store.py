@@ -89,11 +89,11 @@ def _refused(reason: str) -> Dict[str, Any]:
 
 def _with_forgotten_cleared(result: Dict[str, Any], text: str, owner_initiated: bool,
                             topic_key: Optional[str] = None) -> Dict[str, Any]:
-    """After an owner's own write succeeds, drop the forgotten records the new text contains (and, for a topic, its
-    whole-topic record). If that cannot be written, the write is reported as saved but not cleared."""
+    """After an owner's own write succeeds, drop the forgotten records that equal the new entry exactly (and, for a topic,
+    its whole-topic record). If that cannot be written, the write is reported as saved but not cleared."""
     if owner_initiated and result.get("success"):
         try:
-            cleared = clear_forgotten_for(text, topic_key=topic_key)
+            cleared = clear_forgotten_for([text], topic_key=topic_key)
         except (OSError, RuntimeError) as exc:
             return {**result, "success": False, "saved": True,
                     "error": f"The entry was saved, but its forgotten record could not be cleared ({exc})."}

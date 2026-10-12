@@ -76,8 +76,8 @@ def stage_write(subsystem: str, payload: Dict[str, Any], *, summary: str, origin
     Best-effort: on disk failure it logs and still returns a record — the write is lost, which is
     the safe failure for an approval gate (nothing silently committed).
 
-    A memory proposal that would add text the owner forgot is refused here, before anything is written to
-    the pending store, so the forgotten text never reaches disk (ForgottenProposalRefused)."""
+    A memory proposal is refused here, before anything is written to the pending store, when it would add text the owner
+    forgot or persist a phrase that repeats forgotten text (ForgottenProposalRefused), so forgotten text never reaches disk."""
     if subsystem == MEMORY:
         from tools.memory_tombstones import ForgottenProposalRefused, proposal_refusal
 

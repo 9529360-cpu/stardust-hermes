@@ -711,37 +711,116 @@ def _forgotten_digest(folded: str) -> str:
     return hashlib.sha256(folded.encode("utf-8")).hexdigest()
 
 
-def _forgotten_row(row: Any) -> Tuple[Optional[str], int]:
-    """(digest, folded length) of one record. A legacy row that holds plaintext ``text`` is hashed here, as the Hermes
-    reader does. (None, 0) when the row cannot be used."""
+def _forgotten_row(row: Any) -> Tuple[Optional[str], int, Optional[int]]:
+    """(digest, folded length, fingerprint or None) of one record. A legacy row that holds plaintext ``text`` is hashed and
+    fingerprinted here, as the Hermes reader does. (None, 0, None) when the row cannot be used."""
     if not isinstance(row, dict):
-        return None, 0
+        return None, 0, None
     digest, length = row.get("sha256"), row.get("length")
     if isinstance(digest, str) and _FORGOTTEN_DIGEST.fullmatch(digest) and isinstance(length, int) and length >= 0:
-        return digest, length
+        fp = row.get("fp")
+        return digest, length, fp if isinstance(fp, int) and 0 <= fp < FORGOTTEN_FP_MOD else None
     folded = fold_forgotten_text(row["text"]) if isinstance(row.get("text"), str) else ""
-    return (_forgotten_digest(folded), len(folded)) if folded else (None, 0)
+    if not folded:
+        return None, 0, None
+    return _forgotten_digest(folded), len(folded), _forgotten_fingerprint(folded)
+
+
+FORGOTTEN_MATCH_BUDGET = 400_000  # tools.memory_tombstones.MATCH_BUDGET
+FORGOTTEN_DIGEST_CHECK_COST = 4  # tools.memory_tombstones.DIGEST_CHECK_COST
+FORGOTTEN_FP_MOD = (1 << 61) - 1  # tools.memory_tombstones._FP_MOD
+FORGOTTEN_FP_BASE = 1_000_000_007  # tools.memory_tombstones._FP_BASE
+
+
+def _forgotten_fingerprint(folded: str) -> int:
+    """Polynomial fingerprint of a folded text (tools.memory_tombstones._fingerprint)."""
+    value = 0
+    for ch in folded:
+        value = (value * FORGOTTEN_FP_BASE + ord(ch)) % FORGOTTEN_FP_MOD
+    return value
+
+
+def _forgotten_prefix(folded: str) -> List[int]:
+    """Prefix fingerprints of a folded text (tools.memory_tombstones._prefix_fingerprints)."""
+    prefix = [0]
+    value = 0
+    for ch in folded:
+        value = (value * FORGOTTEN_FP_BASE + ord(ch)) % FORGOTTEN_FP_MOD
+        prefix.append(value)
+    return prefix
+
+
+def _is_forgotten_word(ch: str) -> bool:
+    """An ASCII letter, digit or underscore (tools.memory_tombstones._is_word)."""
+    return ch.isascii() and (ch.isalnum() or ch == "_")
+
+
+def _forgotten_boundary_bits(folded: str) -> Tuple[int, int]:
+    """Bit masks of the positions where a forgotten text may start and end (tools.memory_tombstones._boundary_bits)."""
+    size = len(folded)
+    word = [_is_forgotten_word(ch) for ch in folded]
+    starts: List[str] = []
+    ends: List[str] = []
+    for i in range(size - 1, -1, -1):  # highest position first, so that int(text, 2) puts bit i at position i
+        if folded[i] == " ":
+            starts.append("0")
+            ends.append("0")
+            continue
+        starts.append("0" if word[i] and i > 0 and word[i - 1] else "1")
+        ends.append("0" if word[i] and i + 1 < size and word[i + 1] else "1")
+    return int("".join(starts), 2), int("".join(ends), 2)
+
+
+def _forgotten_set_bits(bits: int) -> List[int]:
+    """Positions of the set bits of *bits*, highest first."""
+    text = format(bits, "b")
+    width = len(text)
+    positions: List[int] = []
+    at = text.find("1")
+    while at != -1:
+        positions.append(width - 1 - at)
+        at = text.find("1", at + 1)
+    return positions
 
 
 class ForgottenIndex:
-    """Digests of the forgotten texts, grouped by length. A passage mentions one when a window of its folded form, of
-    that length and starting and ending on a non-space character, has the same digest."""
+    """Forgotten texts indexed by length, as tools.memory_tombstones.ForgottenIndex does: a record with a fingerprint is
+    found by comparing window fingerprints and confirmed with SHA-256, and a record without one costs a SHA-256 per
+    candidate window. The candidates follow the word-boundary rule. A passage over FORGOTTEN_MATCH_BUDGET counts as
+    mentioning a forgotten text (fail closed)."""
 
-    def __init__(self, by_length: Dict[int, set]) -> None:
-        self._by_length = by_length
+    def __init__(self, fp_tables: Dict[int, Dict[int, set]], digest_only: Dict[int, set]) -> None:
+        self._fp_tables = fp_tables
+        self._digest_only = digest_only
 
     def mentions(self, text: Any) -> bool:
         folded = fold_forgotten_text(text)
         size = len(folded)
-        for length in sorted(self._by_length):
-            if length > size:
-                break
-            wanted = self._by_length[length]
-            for start in range(size - length + 1):
-                if folded[start] == " " or folded[start + length - 1] == " ":
-                    continue
-                if _forgotten_digest(folded[start:start + length]) in wanted:
-                    return True
+        lengths = sorted(length for length in set(self._fp_tables) | set(self._digest_only) if length <= size)
+        if not lengths:
+            return False
+        starts, ends = _forgotten_boundary_bits(folded)
+        candidates = {length: (starts << (length - 1)) & ends for length in lengths}
+        fingerprint_checks = sum(candidates[length].bit_count() for length in lengths if length in self._fp_tables)
+        digest_checks = sum(candidates[length].bit_count() for length in lengths if length in self._digest_only)
+        if fingerprint_checks + FORGOTTEN_DIGEST_CHECK_COST * digest_checks > FORGOTTEN_MATCH_BUDGET:
+            return True
+        prefix = _forgotten_prefix(folded) if fingerprint_checks else []
+        for length in lengths:
+            bits = candidates[length]
+            if not bits:
+                continue
+            if length in self._fp_tables:
+                table, scale = self._fp_tables[length], pow(FORGOTTEN_FP_BASE, length, FORGOTTEN_FP_MOD)
+                for end in _forgotten_set_bits(bits):
+                    start = end - length + 1
+                    for digest in table.get((prefix[end + 1] - prefix[start] * scale) % FORGOTTEN_FP_MOD, ()):
+                        if _forgotten_digest(folded[start:end + 1]) == digest:
+                            return True
+            if length in self._digest_only:
+                for end in _forgotten_set_bits(bits):
+                    if _forgotten_digest(folded[end - length + 1:end + 1]) in self._digest_only[length]:
+                        return True
         return False
 
 
@@ -752,7 +831,7 @@ def load_forgotten_index(memories_dir: Path) -> ForgottenIndex:
     try:
         raw = path.read_bytes()
     except FileNotFoundError:
-        return ForgottenIndex({})
+        return ForgottenIndex({}, {})
     except OSError as exc:
         raise ForgottenUnreadable(f"{FORGOTTEN_FILENAME} cannot be read ({exc.strerror or type(exc).__name__})") from None
     try:
@@ -762,14 +841,18 @@ def load_forgotten_index(memories_dir: Path) -> ForgottenIndex:
     rows = data.get("forgotten") if isinstance(data, dict) else None
     if not isinstance(rows, list):
         raise ForgottenUnreadable(f"{FORGOTTEN_FILENAME} has an invalid forgotten payload")
-    by_length: Dict[int, set] = {}
+    fp_tables: Dict[int, Dict[int, set]] = {}
+    digest_only: Dict[int, set] = {}
     for row in rows:
-        digest, length = _forgotten_row(row)
+        digest, length, fp = _forgotten_row(row)
         if digest is None:
             raise ForgottenUnreadable(f"{FORGOTTEN_FILENAME} has a record that cannot be read")
         if length >= FORGOTTEN_MIN_PHRASE_CHARS:
-            by_length.setdefault(length, set()).add(digest)
-    return ForgottenIndex(by_length)
+            if fp is None:
+                digest_only.setdefault(length, set()).add(digest)
+            else:
+                fp_tables.setdefault(length, {}).setdefault(fp, set()).add(digest)
+    return ForgottenIndex(fp_tables, digest_only)
 
 
 @contextmanager

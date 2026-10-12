@@ -130,10 +130,16 @@ def _refused(reason: str) -> dict[str, Any]:
     return {"success": False, "skipped": True, "reason": reason}
 
 
-def _cleared(result: dict[str, Any], text: str, key: str) -> dict[str, Any]:
-    """After an owner's own topic write: drop the records the text contains and the topic's whole-topic record."""
+def _exact_topic_texts(title: str, keywords: list[str], summary: str) -> list[str]:
+    """The texts an owner's topic write can match exactly: the title, each keyword, the summary and each of its sentences."""
+    return [title, *keywords, summary, *(sentence.strip() for sentence in _sentences(summary))]
+
+
+def _cleared(result: dict[str, Any], texts: list[str], key: str) -> dict[str, Any]:
+    """After an owner's own topic write: drop the records that equal one of *texts* exactly, and the topic's
+    whole-topic record."""
     try:
-        cleared = clear_forgotten_for(text, topic_key=key)
+        cleared = clear_forgotten_for(texts, topic_key=key)
     except (OSError, RuntimeError) as exc:
         return {**result, "success": False, "saved": True,
                 "error": f"The topic was saved, but its forgotten record could not be cleared ({exc})."}
@@ -263,23 +269,24 @@ def upsert_topic_summary(
         "message": f"Topic summary {change}",
         "version": _topic_version(row),
     }
-    return _cleared(result, candidate, key) if owner_initiated else result
+    return _cleared(result, _exact_topic_texts(clean_title, clean_keywords, clean_summary), key) if owner_initiated else result
 
 
 def reset_topic_summaries() -> bool:
     """Delete the local topic-summary store. Returns whether the file existed.
 
-    Every erased topic is recorded as forgotten first, inside the lock. An unreadable file is refused rather than
-    erased unrecorded, and a failed record raises before anything is erased."""
+    The topics that can be read are recorded as forgotten first, inside the lock. If they cannot be recorded, nothing is
+    erased. A file that cannot be parsed holds nothing recall could read, so it is erased without a record, as before."""
     path = topic_memory_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    if forget_error := forgotten_store_error():
-        raise RuntimeError(forget_error)
     with MemoryStore._file_lock(path):
         existed = path.exists()
-        erased = _read_payload(strict=True)["topics"] if existed else []
-        if erased and (error := _record_topic_rows(erased)):
-            raise RuntimeError(error["error"])
+        erased = _read_payload(strict=False)["topics"] if existed else []
+        if erased:
+            if forget_error := forgotten_store_error():
+                raise RuntimeError(forget_error)
+            if error := _record_topic_rows(erased):
+                raise RuntimeError(error["error"])
         try:
             path.unlink(missing_ok=True)
         except OSError:
@@ -438,7 +445,7 @@ def replace_topic_sentence(topic: str, phrase: str, content: str, *, owner_initi
     # A replacement supersedes the old sentence; it is not forgotten, so nothing is recorded.
     result = {"success": True, "target": "topic", "topic": key, "title": str(row.get("title") or ""),
               "message": "Topic summary sentence replaced", "version": _topic_version(topics[idx])}
-    return _cleared(result, clean, key) if owner_initiated else result
+    return _cleared(result, [clean, *(sentence.strip() for sentence in _sentences(clean))], key) if owner_initiated else result
 
 
 def _signals(text: str) -> set[str]:

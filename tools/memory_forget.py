@@ -26,7 +26,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from tools.memory_tombstones import fold_text, forgotten_store_error, sanitize_legacy
 from tools.memory_tool_store import _read_failed_error, _scan_memory_content
 from tools.topic_memory_store import (
-    forget_topic_text, get_topic_summary, load_topics, remove_topic_summary, replace_topic_sentence,
+    forget_topic_text, load_topics, remove_topic_summary, replace_topic_sentence,
     topic_forget_units, topic_search_text,
 )
 
@@ -229,12 +229,13 @@ def remove_entry(store, target: str, old_text: Optional[str]) -> Dict[str, Any]:
 
 
 def remove_topic(store, topic: str, old_text: Optional[str]) -> Dict[str, Any]:
-    """Topic-target remove. A named topic with no phrase is removed whole (the existing contract). A phrase forgets
-    that text everywhere, as a memory remove does."""
+    """Topic-target remove. Without a phrase, the named topic is removed whole, or reported "not found" when no such
+    topic exists. A phrase forgets that text everywhere, as a memory remove does. The topic name is never used as a
+    phrase, so a name that happens to appear in an unrelated entry cannot remove that entry."""
     phrase = (old_text or "").strip()
-    if topic and get_topic_summary(topic) is not None and not phrase:
+    if not phrase:
         return remove_topic_summary(topic)
-    needle = fold_text(phrase or topic)
+    needle = fold_text(phrase)
     if not needle:
         return _error("old_text cannot be empty.")
     if len(needle) < MIN_FORGET_CHARS:
@@ -323,9 +324,10 @@ def _replace_everywhere(store, target: str, needle: str, new_content: Optional[s
 
 
 def batch_cross_store_hint(store, target: str, operations: List[Any]) -> Optional[Dict[str, Any]]:
-    """A batch applies inside one store, all or nothing. Before anything is written, a remove is refused when its phrase
-    is too short, when it matches more than one entry in the target, or when it is also held by another store (naming
-    that store). A replace whose phrase is not in the target but is elsewhere is refused the same way."""
+    """Checks a batch before anything is written, on the live path and again when a staged batch is approved. A batch
+    applies inside one store, all or nothing, so each remove and each replace must meet the rules a single call meets:
+    its phrase is at least MIN_FORGET_CHARS characters, it matches exactly one entry in the target, and no other store
+    holds it. A store that holds it is named and the whole batch is refused."""
     for index, op in enumerate(operations):
         if not isinstance(op, dict) or op.get("action") not in ("remove", "replace"):
             continue
@@ -334,30 +336,21 @@ def batch_cross_store_hint(store, target: str, operations: List[Any]) -> Optiona
         if not needle:
             continue
         action = op["action"]
-        if action == "remove":
-            if len(needle) < MIN_FORGET_CHARS:
-                return _error(f"Operation {index + 1} (remove): '{raw}' is shorter than {MIN_FORGET_CHARS} characters. "
-                              "Nothing was applied. Send a longer phrase as its own call.")
-            per_store, failure = _scan(store, needle)
-            if failure is not None:
-                return failure
-            elsewhere = [label for label, units in per_store.items() if label != target and units]
-            if elsewhere:
-                return _error(f"Operation {index + 1} (remove): '{raw}' is also in {_labels(elsewhere)}. Nothing was "
-                              "applied. Send that remove as its own call without 'operations' so every store that holds "
-                              "it loses it.")
-            if len(per_store.get(target, [])) > 1:
-                return _error(f"Operation {index + 1} (remove): '{raw}' matches more than one entry in "
-                              f"{_LABELS.get(target, target)}. Nothing was applied. Use a longer phrase.")
-            continue
-        if _exact_hit(store, target, raw):
-            continue
+        where = f"Operation {index + 1} ({action})"
+        if len(needle) < MIN_FORGET_CHARS:
+            return _error(f"{where}: '{raw}' is shorter than {MIN_FORGET_CHARS} characters. Nothing was applied. "
+                          "Send a longer phrase as its own call.")
         per_store, failure = _scan(store, needle)
         if failure is not None:
             return failure
         elsewhere = [label for label, units in per_store.items() if label != target and units]
         if elsewhere:
-            return _error(f"Operation {index + 1} (replace): '{raw}' is not in {_LABELS.get(target, target)} but matches "
-                          f"{_labels(elsewhere)}. Nothing was applied. Send that replace as its own call without "
-                          "'operations' so every store is searched.")
+            return _error(f"{where}: '{raw}' is also in {_labels(elsewhere)}. Nothing was applied. A batch works inside "
+                          f"one store, so send this {action} as its own call without 'operations'.")
+        held = len(per_store.get(target, []))
+        if held > 1:
+            return _error(f"{where}: '{raw}' matches more than one entry in {_LABELS.get(target, target)}. Nothing was "
+                          "applied. Use a longer phrase.")
+        if action == "replace" and held == 0:
+            return _error(f"{where}: '{raw}' matches no entry in {_LABELS.get(target, target)}. Nothing was applied.")
     return None

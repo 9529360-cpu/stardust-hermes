@@ -311,6 +311,17 @@ def _discover_payload(db, query: str, detail: str, results: list, **extra) -> st
     return _ok(mode="discover", query=query, detail=detail, results=results, count=len(results), **extra, **rebuild)
 
 
+_SNIPPET_MARKERS = (">>>", "<<<")  # FTS5 snippet() highlight delimiters, from the snippet query in hermes_state_search
+
+
+def _unmarked(snippet: str) -> str:
+    """The snippet without its highlight delimiters. A delimiter can sit inside a phrase, so the filter checks this text
+    as well as the snippet as returned."""
+    for marker in _SNIPPET_MARKERS:
+        snippet = snippet.replace(marker, "")
+    return snippet
+
+
 def _drop_forgotten(results: List[Dict[str, Any]]) -> Optional[List[Dict[str, Any]]]:
     """Drop results whose text contains a phrase the owner forgot. Transcripts are untouched; this filters what recall
     shows (see tools/memory_tombstones.py). Returns None when forgotten.json cannot be read: recall is then suspended,
@@ -322,7 +333,8 @@ def _drop_forgotten(results: List[Dict[str, Any]]) -> Optional[List[Dict[str, An
         return results
     kept = []
     for entry in results:
-        parts = [entry.get("title"), entry.get("snippet"), entry.get("preview")]
+        snippet = entry.get("snippet") if isinstance(entry.get("snippet"), str) else ""
+        parts = [entry.get("title"), snippet, _unmarked(snippet), entry.get("preview")]
         for key in ("bookend_start", "messages", "bookend_end"):
             parts.extend(m.get("content") for m in entry.get(key) or [] if isinstance(m, dict))
         text = "\n".join(part for part in parts if isinstance(part, str))
