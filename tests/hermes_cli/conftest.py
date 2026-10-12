@@ -8,6 +8,17 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
+def _no_venv_alias_in_real_checkout(monkeypatch):
+    """The update step exposes a ``.venv``-only install as ``venv`` (a junction). Tests that run the update flow
+    without an isolated checkout would otherwise create that junction in the real repository root, where it then
+    changes what every later test resolves. The alias itself is tested directly against ``hermes_cli.venv_layout``.
+    """
+    from hermes_cli import update_cmd
+
+    monkeypatch.setattr(update_cmd, "ensure_venv_alias", lambda *args, **kwargs: "present")
+
+
+@pytest.fixture(autouse=True)
 def _suppress_concurrent_hermes_gate(request, monkeypatch):
     """Default ``_detect_concurrent_hermes_instances`` to ``[]`` for every test.
 
