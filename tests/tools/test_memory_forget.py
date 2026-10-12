@@ -1196,6 +1196,16 @@ def test_a_forget_response_never_echoes_a_topic_key(store, home):
     assert "editor-notes" not in json.dumps(not_found)
 
 
+def test_a_phrase_based_replace_response_has_no_topic_key(store, home):
+    upsert_topic_summary("coffee-notes", "Trains are on time. Coffee is in the drawer.", title="Notes")
+
+    replaced = _run(store, action="replace", target="memory", old_text="Coffee is in the drawer",
+                    content="Coffee is in the kitchen.")
+
+    assert replaced["success"] is True and replaced["replaced_in"] == "topic"
+    assert "topic" not in replaced and "coffee-notes" not in json.dumps(replaced)
+
+
 def test_a_strict_read_is_not_answered_from_an_earlier_lenient_read_of_the_same_bytes(home):
     _file(home, "forgotten.json").write_bytes(b"{broken")
 

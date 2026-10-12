@@ -334,8 +334,11 @@ def _replace_everywhere(store, target: str, needle: str, new_content: Optional[s
             return _error(f"'{needle}' is in the title, name or keywords of topic '{hit['preview']}', not in a summary "
                           "sentence. Rewrite that topic with target='topic' and topic=<its key> instead.")
         result = replace_topic_sentence(hit["topic"], needle, content, owner_initiated=owner_initiated)
-        return {**result, "done": True, "target": target, "replaced_in": "topic", "note": _NOTE} \
-            if result.get("success") else result
+        if not result.get("success"):
+            return result
+        # The caller named a phrase, not the topic, so the response leaves the key out, as forget responses do.
+        result = {key: value for key, value in result.items() if key != "topic"}
+        return {**result, "done": True, "target": target, "replaced_in": "topic", "note": _NOTE}
     result = store.replace_matching(hit["store"], needle, content, owner_initiated=owner_initiated)
     return {**result, "target": target, "replaced_in": hit["store"]} if result.get("success") else result
 
