@@ -1,4 +1,4 @@
-"""Behaviour tests for scripts/pdf_markdown.py (Markdown report to PDF with CJK text).
+"""Behaviour tests for skills/productivity/pdf/scripts/pdf_markdown.py (Markdown report to PDF with CJK text).
 
 No network and no personal state: every file lives in pytest's tmp_path. The embedding tests use
 the Vera.ttf that ships with reportlab, so they run on every host. Tests that need Chinese glyphs
@@ -21,7 +21,8 @@ import pytest
 pytest.importorskip("reportlab")
 import reportlab  # noqa: E402
 
-SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "pdf_markdown.py"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SCRIPT = REPO_ROOT / "skills" / "productivity" / "pdf" / "scripts" / "pdf_markdown.py"
 VERA = Path(reportlab.__file__).parent / "fonts" / "Vera.ttf"
 
 SAMPLE = """# Market brief 2026-10-12
