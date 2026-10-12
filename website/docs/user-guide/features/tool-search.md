@@ -16,11 +16,13 @@ tools, and the model loads each specific tool's schema on demand.
 
 :::info Built-ins use an eager working set plus curated deferral
 High-frequency foundation/default tools such as `terminal`, file tools,
-`memory`, `web_search`, browser navigation, and `clarify` stay directly
-visible. A measured set of event-triggered built-ins — including
-`computer_use`, `session_search`, `image_generate`, `todo_list`,
-`process_manage`, `cronjob_manage`, and selected desktop UI tools — is
-deferred by default through the same bridge used for MCP/plugin tools.
+`memory`, `web_search`, and `clarify` stay directly visible, and so do the
+`browser_vault_*` tools (in the desktop app, the unified `browser` tool too). A measured set of
+built-ins — including `computer_use`, `session_search`, `image_generate`,
+`todo_list`, `process_manage`, `cronjob_manage`, the headless browser engines
+(`browser_navigate`, `browser_snapshot`, `browser_click` and the other
+non-vault `browser_*` tools), and selected desktop UI tools — is deferred by
+default through the same bridge used for MCP/plugin tools.
 
 `clarify` is intentionally kept eager: the 288-run core-deferral A/B found
 that hiding its schema caused models to fall back from structured choices to
