@@ -69,9 +69,11 @@ def launch_secret_scope(launch_home: "str | Path") -> Dict[str, str]:
 
 @contextlib.contextmanager
 def multiplexed_launch_secret_scope(launch_home: "str | Path"):
-    """Bind the launch profile's own secret scope around the body once this process multiplexes (the
-    ``tui_gateway.model_switch`` pattern). A single-profile process binds nothing, so its ``os.environ``
-    fallthrough is unchanged; outside the body an unscoped secret read still fails closed."""
+    """Bind the launch profile's own secret scope around the body once this process multiplexes. The
+    ``tui_gateway.model_switch`` pattern (tui_gateway/model_switch.py:79-89) also binds a terminal scope;
+    this helper binds only the secret scope, because the readiness probe runs no terminal code. A
+    single-profile process binds nothing, so its ``os.environ`` fallthrough is unchanged; outside the body
+    an unscoped secret read still fails closed."""
     from agent.secret_scope import is_multiplex_active, reset_secret_scope, set_secret_scope
     token = set_secret_scope(launch_secret_scope(launch_home)) if is_multiplex_active() else None
     try:
