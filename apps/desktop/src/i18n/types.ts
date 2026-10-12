@@ -2472,6 +2472,33 @@ export interface Translations {
     scriptOnlyEditHint: string
     saveChanges: string
     createAction: string
+    trigger: {
+      whenLabel: string
+      whenSchedule: string
+      whenStartup: string
+      whenFolder: string
+      whenFixedHint: string
+      waiting: string
+      badgeSchedule: string
+      badgeStartup: string
+      badgeFolder: (name: string) => string
+      lastTriggeredLabel: string
+      neverTriggered: string
+      startupHint: string
+      folderLabel: string
+      folderPlaceholder: string
+      folderChoose: string
+      folderPickerTitle: string
+      folderRequired: string
+      folderNotAbsolute: string
+      folderRestriction: string
+      folderHint: string
+      patternLabel: string
+      patternPlaceholder: string
+      patternHint: string
+      patternInvalid: string
+      pickFailed: string
+    }
     tabs: {
       jobs: string
       blueprints: string

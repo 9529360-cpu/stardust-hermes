@@ -291,7 +291,11 @@ class CronJobCreate(BaseModel):
     paused: StrictBool = False
     paused_reason: Optional[str] = None
     prompt: str = ""
-    schedule: str
+    # Required for a clock job. A startup or folder job (``trigger``) takes no schedule.
+    schedule: Optional[str] = None
+    # {"type": "startup"} or {"type": "folder", "watch_dir", "pattern", "poll_seconds"}. Typed Any so a
+    # malformed value reaches cron.triggers, which returns a readable 400 instead of a schema error.
+    trigger: Optional[Any] = None
     name: str = ""
     deliver: str = "local"
     skills: Optional[List[str]] = None

@@ -2843,6 +2843,33 @@ export const en: Translations = {
     scriptOnlyEditHint: 'Script-only job (no AI prompt). Job id:',
     saveChanges: 'Save changes',
     createAction: 'Create cron',
+    trigger: {
+      whenLabel: 'When to run',
+      whenSchedule: 'On a schedule',
+      whenStartup: 'Each time Stardust starts',
+      whenFolder: 'When a new file appears in a folder',
+      whenFixedHint: 'How a task runs cannot change after it is created.',
+      waiting: 'Waiting for trigger',
+      badgeSchedule: 'On a schedule',
+      badgeStartup: 'On start',
+      badgeFolder: name => `Folder: ${name}`,
+      lastTriggeredLabel: 'Last triggered',
+      neverTriggered: 'Never',
+      startupHint: 'Runs once each time Stardust starts.',
+      folderLabel: 'Folder',
+      folderPlaceholder: 'For example D:\\Downloads',
+      folderChoose: 'Choose folder…',
+      folderPickerTitle: 'Choose a folder to watch',
+      folderRequired: 'Choose a folder to watch.',
+      folderNotAbsolute: 'Enter a full path, for example D:\\Downloads.',
+      folderRestriction: 'System folders (Windows, Program Files, ProgramData, /usr, /etc) and drive roots cannot be watched.',
+      folderHint: 'Stardust reads only the name and details of each new file. It does not open the file.',
+      patternLabel: 'File name pattern',
+      patternPlaceholder: '* or *.pdf',
+      patternHint: '* matches every file. *.pdf matches PDF files only.',
+      patternInvalid: 'A file name pattern cannot contain slashes.',
+      pickFailed: 'Could not open the folder picker.'
+    },
     tabs: {
       jobs: 'Jobs',
       blueprints: 'Blueprints'
@@ -2863,7 +2890,24 @@ export const en: Translations = {
       fieldLabels: {},
       fieldHelp: {},
       optionLabels: {},
-      catalog: {}
+      catalog: {
+        'startup-briefing': {
+          title: 'Startup briefing',
+          description: 'Each time Stardust starts, a short summary of today’s tasks and unread messages.'
+        },
+        'new-pdf-summary': {
+          title: 'New PDF summary',
+          description:
+            'When a new PDF appears in a folder you choose, a short summary of its first page, written from the file name and details only.',
+          fields: { folder: { label: 'Which folder?', help: 'A folder on this computer. A new PDF in it starts the summary.' } }
+        },
+        'downloads-report': {
+          title: 'New download report',
+          description:
+            'When a file arrives in your Downloads folder (or one you choose), a short report of what arrived. Read-only: nothing is moved, renamed or deleted.',
+          fields: { folder: { label: 'Which folder?', help: 'Defaults to your Downloads folder.' } }
+        }
+      }
     },
     suggestions: {
       tab: 'Suggested automations',

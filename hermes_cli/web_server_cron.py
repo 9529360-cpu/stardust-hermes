@@ -256,6 +256,7 @@ def _create_cron_job_sync(body: CronJobCreate, profile: Optional[str] = None):
             "create_job",
             prompt=body.prompt or "",
             schedule=body.schedule,
+            trigger=body.trigger,
             name=body.name,
             deliver=_cron_optional_text(body.deliver) or "local",
             skills=skills,
@@ -271,6 +272,10 @@ def _create_cron_job_sync(body: CronJobCreate, profile: Optional[str] = None):
                if key in body.model_fields_set})
     except HTTPException:
         raise
+    except ValueError as exc:
+        # A value the store refuses (schedule, trigger, watch folder) carries a message written for
+        # the owner. Return it as a 400, as the update path does, without logging a stack trace.
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as e:
         _raise_if_cron_registration_error(e)
         _log.exception("POST /api/cron/jobs failed")

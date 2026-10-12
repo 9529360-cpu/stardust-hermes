@@ -1956,6 +1956,51 @@ export const ar = defineLocale({
     promptScheduleRequired: 'الرسالة والجدول مطلوبان',
     saveChanges: 'حفظ التغييرات',
     createAction: 'إنشاء',
+    trigger: {
+      whenLabel: 'وقت التشغيل',
+      whenSchedule: 'حسب الجدول',
+      whenStartup: 'في كل مرة يبدأ فيها Stardust',
+      whenFolder: 'عند ظهور ملف جديد في مجلد',
+      whenFixedHint: 'لا يمكن تغيير طريقة التشغيل بعد إنشاء المهمة.',
+      waiting: 'بانتظار المحفّز',
+      badgeSchedule: 'حسب الجدول',
+      badgeStartup: 'عند البدء',
+      badgeFolder: name => `المجلد: ${name}`,
+      lastTriggeredLabel: 'آخر تشغيل بالحدث',
+      neverTriggered: 'أبدًا',
+      startupHint: 'يعمل مرة واحدة في كل مرة يبدأ فيها Stardust.',
+      folderLabel: 'المجلد',
+      folderPlaceholder: 'مثال: D:\\Downloads',
+      folderChoose: 'اختيار مجلد…',
+      folderPickerTitle: 'اختر مجلدًا للمراقبة',
+      folderRequired: 'اختر مجلدًا للمراقبة.',
+      folderNotAbsolute: 'أدخل المسار الكامل، مثل D:\\Downloads.',
+      folderRestriction: 'لا يمكن مراقبة مجلدات النظام: Windows وProgram Files وProgramData و/usr و/etc، ولا جذور الأقراص.',
+      folderHint: 'يقرأ Stardust اسم كل ملف جديد وبياناته فقط، ولا يفتح الملف.',
+      patternLabel: 'نمط اسم الملف',
+      patternPlaceholder: '* أو *.pdf',
+      patternHint: '* يطابق كل الملفات، و*.pdf يطابق ملفات PDF فقط.',
+      patternInvalid: 'لا يمكن أن يحتوي نمط اسم الملف على شرطة مائلة.',
+      pickFailed: 'تعذّر فتح منتقي المجلدات.'
+    },
+    blueprints: {
+      catalog: {
+        'startup-briefing': {
+          title: 'ملخص عند البدء',
+          description: 'في كل مرة يبدأ فيها Stardust، ملخص قصير لمهام اليوم والرسائل غير المقروءة.'
+        },
+        'new-pdf-summary': {
+          title: 'ملخص PDF جديد',
+          description: 'عند ظهور ملف PDF جديد في مجلد تختاره، ملخص قصير للصفحة الأولى مبني على اسم الملف وبياناته فقط.',
+          fields: { folder: { label: 'أي مجلد تُراقب؟', help: 'مجلد على هذا الكمبيوتر. ملف PDF جديد فيه يبدأ الملخص.' } }
+        },
+        'downloads-report': {
+          title: 'تقرير التنزيلات الجديدة',
+          description: 'عند وصول ملف جديد إلى مجلد التنزيلات (أو مجلد تختاره)، تقرير قصير بما وصل. للقراءة فقط: لا نقل ولا إعادة تسمية ولا حذف.',
+          fields: { folder: { label: 'أي مجلد تُراقب؟', help: 'الافتراضي هو مجلد التنزيلات.' } }
+        }
+      }
+    },
     suggestions: {
       tab: 'عمليات الأتمتة المقترحة',
       accept: 'جدولة',

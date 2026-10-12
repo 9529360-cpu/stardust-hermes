@@ -3,6 +3,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { AutomationBlueprint, AutomationBlueprintField } from '@/hermes'
 import type { Translations } from '@/i18n'
 
+import { WatchFolderInput } from './cron-trigger-fields'
+
 // The blueprint catalog is shared with the dashboard, so its deliver slot
 // defaults to "origin" (the chat/home-channel a dashboard or gateway job was
 // created from). Desktop has no origin chat, so seed the deliver slot to the
@@ -74,10 +76,30 @@ export function initialBlueprintValues(blueprint: AutomationBlueprint): Record<s
   return out
 }
 
-// A slot-level validation error from the backend arrives as "422: <message>"
-// (or "<code>: <message>"); strip the leading numeric code for inline display.
+// A slot-level validation error reaches the form as "422: {\"detail\": \"...\"}". Through Electron's
+// IPC bridge it is also wrapped in "Error invoking remote method '<channel>': Error: ...". Keep only
+// the message the owner needs, for inline display.
 export function cleanBlueprintFieldError(message: string): string {
-  return message.replace(/^\d+:\s*/, '')
+  const unwrapped = message
+    .replace(/^Error invoking remote method '[^']*': (?:Error: )?/, '')
+    .replace(/^\d+:\s*/, '')
+    .trim()
+
+  return blueprintErrorDetail(unwrapped) ?? unwrapped
+}
+
+function blueprintErrorDetail(text: string): null | string {
+  if (!text.startsWith('{')) {
+    return null
+  }
+
+  try {
+    const body = JSON.parse(text) as { detail?: unknown }
+
+    return typeof body.detail === 'string' && body.detail.trim() ? body.detail.trim() : null
+  } catch {
+    return null
+  }
 }
 
 // Help text to show under a slot control. The backend deliver help is
@@ -125,6 +147,20 @@ export function BlueprintSlotControl({
 
   if (field.type === 'time') {
     return <Input id={id} onChange={event => onChange(event.target.value)} type="time" value={value} />
+  }
+
+  if (field.type === 'folder') {
+    // The backend checks the folder when the job is created; its refusal shows inline in the dialog.
+    return (
+      <WatchFolderInput
+        c={c}
+        id={id}
+        invalid={false}
+        onChange={onChange}
+        placeholder={c.trigger.folderPlaceholder}
+        value={value}
+      />
+    )
   }
 
   return (
