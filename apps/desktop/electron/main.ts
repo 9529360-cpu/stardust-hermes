@@ -1,4 +1,4 @@
-import { execFileSync, spawn } from 'node:child_process'
+import { execFile, execFileSync, spawn } from 'node:child_process'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import http from 'node:http'
@@ -2608,21 +2608,23 @@ function refreshManagedShimsAtBoot() {
     return
   }
 
-  try {
-    execFileSync(
-      refresh.command,
-      refresh.args,
-      hiddenWindowsChildOptions({
-        cwd: refresh.cwd,
-        encoding: 'utf8',
-        env: { ...process.env, STARDUST_HOME },
-        stdio: ['ignore', 'ignore', 'pipe'],
-        timeout: 10_000
-      })
-    )
-  } catch (error) {
-    rememberLog(`[boot] managed shim refresh skipped: ${error instanceof Error ? error.message : String(error)}`)
-  }
+  // Runs as a child process and is not waited for: the Python writer takes a few hundred milliseconds, and a
+  // synchronous wait here held up the window on every packaged launch. The result only reaches the log.
+  execFile(
+    refresh.command,
+    refresh.args,
+    hiddenWindowsChildOptions({
+      cwd: refresh.cwd,
+      encoding: 'utf8',
+      env: { ...process.env, STARDUST_HOME },
+      timeout: 10_000
+    }),
+    (error) => {
+      if (error) {
+        rememberLog(`[boot] managed shim refresh skipped: ${error.message}`)
+      }
+    }
+  )
 }
 
 async function unwrapWindowsVenvHermesCommand(command, backendArgs) {
