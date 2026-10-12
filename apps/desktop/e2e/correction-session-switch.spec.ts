@@ -241,8 +241,12 @@ test.describe('correction session switch', () => {
     expect(correctionMessagesAfterResume[0].id).toBeTruthy()
 
     await waitForTranscriptText(page, CORRECTED_REPLY)
-    const primary = activeSurface(page).locator('[data-slot="composer-root"] button[type="submit"]')
-    await expect(primary).toHaveAttribute('aria-label', /^(Send|发送)$/, { timeout: 30_000 })
+    // An empty, idle composer intentionally switches from Stop to Start Voice;
+    // Send is only rendered for a draft payload.
+    const activeComposer = activeSurface(page).locator('[data-slot="composer-root"]')
+    await expect(
+      activeComposer.getByRole('button', { name: /^(Start voice conversation|开始语音对话)$/ }),
+    ).toBeVisible({ timeout: 15_000 })
     await testInfo.attach('correction-switch-model-requests.json', {
       body: JSON.stringify(mock.correctionSwitchRequestTrace(), null, 2),
       contentType: 'application/json',
@@ -275,16 +279,25 @@ test.describe('correction session switch', () => {
     await openSidebarSession(page, OTHER_SESSION_LABEL, OTHER_SESSION_PROMPT)
     await reopenInferenceSession(page)
 
+    await expect
+      .poll(
+        async () =>
+          (await transcriptMessageOrder(page)).filter(
+            message => message.includes(INFERENCE_PROMPT) || message.includes(INFERENCE_CORRECTION),
+          ),
+        {
+          message: 'inference prompt and correction should reconcile to one visible pair after warm resume',
+          timeout: 30_000,
+        },
+      )
+      .toEqual([INFERENCE_PROMPT, INFERENCE_CORRECTION])
+
     const originalMessages = await userMessagesContaining(page, INFERENCE_PROMPT)
     const correctionMessages = await userMessagesContaining(page, INFERENCE_CORRECTION)
     expect(originalMessages).toHaveLength(1)
     expect(originalMessages[0].id).toBeTruthy()
     expect(correctionMessages).toHaveLength(1)
     expect(correctionMessages[0].id).toBeTruthy()
-    const userMessageOrder = (await transcriptMessageOrder(page)).filter(message =>
-      message.includes(INFERENCE_PROMPT) || message.includes(INFERENCE_CORRECTION),
-    )
-    expect(userMessageOrder).toEqual([INFERENCE_PROMPT, INFERENCE_CORRECTION])
     await page.screenshot({ path: testInfo.outputPath('inference-correction-after-warm-resume.png') })
 
     mock.releaseHeldStream()
