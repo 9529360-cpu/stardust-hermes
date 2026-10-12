@@ -2589,14 +2589,18 @@ function isCommandScript(command) {
   return IS_WINDOWS && /\.(cmd|bat)$/i.test(command || '')
 }
 
-// Point the managed `stardust` / `hermes` shims at this install's venv before PATH resolution: a shim left
-// over from an older layout would be picked up and fail its probe. The Python writer
-// (hermes_cli/_install_repair.py) is the only shim writer; this only starts it. Best effort and bounded.
-// Packaged builds only: a development run (npm run dev) must never retarget the machine-wide `stardust`.
+let managedShimsRefreshedThisLaunch = false
+
+// Point the managed `stardust` / `hermes` shims at this install's venv once per launch, before any resolver rung
+// can use them (rung 4 probes `stardust` on PATH). The Python writer (hermes_cli/_install_repair.py) is the only
+// shim writer; this only starts it. Best effort and bounded. Packaged builds only: a development run
+// (npm run dev) must never retarget the machine-wide `stardust`.
 function refreshManagedShimsAtBoot() {
-  if (!IS_PACKAGED) {
+  if (!IS_PACKAGED || managedShimsRefreshedThisLaunch) {
     return
   }
+
+  managedShimsRefreshedThisLaunch = true
 
   const refresh = managedShimRefreshCommand(resolveUpdateRoot())
 
@@ -2613,7 +2617,7 @@ function refreshManagedShimsAtBoot() {
         encoding: 'utf8',
         env: { ...process.env, STARDUST_HOME },
         stdio: ['ignore', 'ignore', 'pipe'],
-        timeout: 20_000
+        timeout: 10_000
       })
     )
   } catch (error) {
@@ -5039,6 +5043,8 @@ async function createActiveBackend(backendArgs) {
 }
 
 async function resolveHermesBackend(backendArgs) {
+  refreshManagedShimsAtBoot()
+
   // 1. Explicit override -- STARDUST_DESKTOP_HERMES_ROOT points at a developer
   //    checkout. Honour it as-is (no bootstrap; the user is driving).
   const overrideRoot = process.env.STARDUST_DESKTOP_HERMES_ROOT && path.resolve(process.env.STARDUST_DESKTOP_HERMES_ROOT)
@@ -5107,7 +5113,6 @@ async function resolveHermesBackend(backendArgs) {
         rememberLog(`Ignoring Windows Stardust override under WSL: ${hermesOverride}`)
       }
     } else {
-      refreshManagedShimsAtBoot()
       hermesCommand = findOnPath('stardust')
     }
 
