@@ -469,6 +469,7 @@ def test_catalog_suggestion_projection_exposes_blueprint_locale_key(isolated_pro
     assert "dedup_key" not in row
     assert "prompt" not in row["job_spec"]
 
+
 @pytest.mark.parametrize("dedup_key, blueprint_key", [
     ("catalog:daily-briefing", "morning-brief"),
     ("catalog:important-mail-monitor", "important-mail"),
