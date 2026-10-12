@@ -1,10 +1,14 @@
 """Pipe handoff between a local process's reader thread and a reconciled exit.
 
 Shell start-up noise is removed from the head of the output however the kernel splits it, and a
-reconciled exit drains the pipe through that same path. The filter cases are pure. The pipe cases use
-real POSIX pipes and are skipped on Windows; ordering uses gate files rather than sleeps.
+reconciled exit drains the pipe through that same path. A finish that skipped or failed the drain, or
+that was followed by more output, is flagged: the completion event and the receipt say the output may
+be incomplete. The filter and message cases are pure. The pipe cases use real POSIX pipes and are
+skipped on Windows; ordering uses gate files rather than sleeps.
 """
 
+import json
+import logging
 import os
 import select
 import shlex
@@ -13,15 +17,19 @@ import subprocess
 import sys
 import threading
 import time
+from unittest.mock import MagicMock
 
 import pytest
 
+from hermes_constants import get_hermes_home
+from tools import process_registry as process_registry_module
 from tools.process_registry import (
-    _PIPE_HANDOFF_MAX_ATTEMPTS,
+    _PIPE_HANDOFF_BUDGET_SECONDS,
     _PIPE_HANDOFF_TIMEOUT_SECONDS,
     ProcessRegistry,
     ProcessSession,
 )
+from tools.process_registry_notifications import format_process_notification
 from tools.process_registry_shell_noise import filter_shell_noise_head
 
 NOISE_CPGROUP = "bash: cannot set terminal process group (-1): Inappropriate ioctl for device"
@@ -72,6 +80,89 @@ def test_reader_and_reconciled_drain_share_one_decoder():
     assert session.output_buffer == "café\n"
 
 
+def test_completion_message_says_output_may_be_incomplete():
+    event = {"type": "completion", "session_id": "proc_msg", "command": "probe", "exit_code": 0,
+             "completion_reason": "exited", "output": "tail\n"}
+    assert "Output may be incomplete" in format_process_notification({**event, "output_incomplete": True})
+    assert "Output may be incomplete" not in format_process_notification({**event, "output_incomplete": False})
+
+
+def test_late_watch_match_after_exit_is_logged(caplog):
+    registry = ProcessRegistry()
+    session = ProcessSession(id="proc_watch_late", command="probe", watch_patterns=["ready"],
+                             exited=True, exit_code=0)
+    caplog.set_level(logging.INFO, logger="tools.process_registry")
+    registry._check_watch_patterns(session, "ready now\nready again\n")
+    drops = [record for record in caplog.records if "Dropped watch match" in record.getMessage()]
+    assert len(drops) == 2  # one log line per dropped match
+    assert all(record.levelno == logging.INFO for record in drops)
+    assert registry.completion_queue.empty()
+
+
+def test_finish_reader_flush_failure_is_logged_as_warning(caplog):
+    registry = ProcessRegistry()
+    session = ProcessSession(id="proc_flush_fail", command="probe")
+    decoder = MagicMock()
+    decoder.decode.side_effect = ValueError("truncated sequence")
+    appended = []
+    caplog.set_level(logging.WARNING, logger="tools.process_registry")
+    registry._finish_reader(session, decoder, appended.append, "Process", MagicMock(), lambda: 0)
+    assert any(record.levelno == logging.WARNING and "could not be flushed" in record.getMessage()
+               for record in caplog.records)
+    assert appended == []
+    assert session.exited is True  # the finish still happens
+
+
+def test_output_after_finish_marks_the_receipt_incomplete(monkeypatch):
+    monkeypatch.setenv("STARDUST_SESSION_ID", "owner-session")
+    registry = ProcessRegistry()
+    session = ProcessSession(id="proc_late_output", command="probe", parent_session_id="owner-session",
+                             exited=True, exit_code=0, output_buffer="done\n")
+    registry._running[session.id] = session
+    registry._move_to_finished(session)
+    assert _receipt(session.id)["output_incomplete"] is False
+    registry._ingest_output(session, "late line\n")  # arrives after the finish
+    assert session.output_incomplete is True
+    record = _receipt(session.id)
+    assert record["output_incomplete"] is True
+    assert "late line" in record["output"]
+    registry._ingest_output(session, "later line\n")  # more output, after the flag was already written
+    registry._move_to_finished(session)  # the reader finishing refreshes the receipt with it
+    assert "later line" in _receipt(session.id)["output"]
+    registry._finished.pop(session.id)  # pruned from memory: get() now serves the receipt
+    fresh = ProcessRegistry()
+    recovered = fresh.get(session.id)
+    assert recovered is not None and recovered.output_incomplete is True
+    polled = fresh.poll(session.id)
+    assert polled["output_incomplete"] is True
+    assert "may be incomplete" in polled["warning"]
+
+
+def test_failed_drain_marks_the_completion_incomplete():
+    class _UnreadablePipe:
+        def fileno(self):
+            raise OSError("simulated: the pipe cannot be read")
+
+        def close(self):
+            pass
+
+    class _ExitedChild:
+        pid = 0
+        returncode = 0
+        stderr = None
+        stdin = None
+        stdout = _UnreadablePipe()
+
+        def poll(self):
+            return 0
+
+    registry = ProcessRegistry()
+    session = _local_session(_ExitedChild(), "proc_drain_failed")
+    registry._running[session.id] = session
+    registry._reconcile_local_exit(session)
+    assert _completion_for(registry, session.id)["output_incomplete"] is True
+
+
 def _spawn(script: str) -> subprocess.Popen:
     return subprocess.Popen(
         ["sh", "-c", script], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
@@ -80,7 +171,7 @@ def _spawn(script: str) -> subprocess.Popen:
     )
 
 
-def _local_session(proc: subprocess.Popen, sid: str) -> ProcessSession:
+def _local_session(proc, sid: str) -> ProcessSession:
     return ProcessSession(
         id=sid, command="probe", task_id="t", owner_task_id="o", session_key="k",
         process=proc, pid=proc.pid, notify_on_complete=True,
@@ -108,7 +199,12 @@ def _completion_for(registry: ProcessRegistry, session_id: str) -> dict:
     raise AssertionError(f"no completion event for {session_id}")
 
 
-def _reap(proc: subprocess.Popen, *readers) -> None:
+def _receipt(session_id: str) -> dict:
+    return json.loads((get_hermes_home() / "logs" / "process-results" / f"{session_id}.json").read_text(
+        encoding="utf-8"))
+
+
+def _reap(proc, *readers) -> None:
     try:
         # Kill the whole session so background descendants die with it. POSIX-only, like the tests using it.
         os.killpg(proc.pid, getattr(signal, "SIGKILL", signal.SIGTERM))  # windows-footgun: ok - POSIX-only helper
@@ -194,6 +290,7 @@ def test_reconciled_exit_drains_pipe_through_the_same_filter():
         event = _completion_for(registry, session.id)
         assert event["exit_code"] == 0
         assert event["output"] == "owner-output\n"
+        assert event["output_incomplete"] is False  # the drain completed
         assert live == ["owner-output\n"]
     finally:
         _reap(proc)
@@ -226,6 +323,53 @@ def test_normal_drain_still_drops_warnings_split_from_the_reader(tmp_path):
         _reap(proc)
 
 
+def _reader_then_drain(registry: ProcessRegistry, tmp_path, sid: str, first: str, rest: str):
+    """The reader takes `first` as its own read and holds whatever it cannot decide yet. The child then
+    writes `rest` and exits, and a reconciled exit drains it. Returns (session, live, held_after_read, proc)."""
+    gate, marker = tmp_path / "gate", tmp_path / "first"
+    script = (
+        f"printf '%s' {shlex.quote(first)}; touch {shlex.quote(str(marker))}; "
+        f"while [ ! -e {shlex.quote(str(gate))} ]; do sleep 0.01; done; printf '%s' {shlex.quote(rest)}"
+    )
+    live = []
+    registry.on_output = lambda _session, chunk: live.append(chunk)
+    proc = _spawn(script)
+    session = _local_session(proc, sid)
+    registry._running[session.id] = session  # No reader thread: this test plays the reader's reads.
+    assert _wait_until(lambda: marker.exists() and _pipe_has_data(proc.stdout))
+    registry._ingest_pipe_bytes(session, os.read(proc.stdout.fileno(), 4096))
+    held = session.output_buffer
+    gate.touch()
+    proc.wait(timeout=10)
+    registry._reconcile_local_exit(session)
+    return session, live, held, proc
+
+
+@posix_only
+def test_partial_line_held_by_the_reader_is_delivered_by_the_drain(tmp_path):
+    registry = ProcessRegistry()
+    session, live, held, proc = _reader_then_drain(registry, tmp_path, "proc_held_line", "ca", "lculator: 4\n")
+    try:
+        assert held == ""  # "ca" could still start a shell warning, so the reader holds it back
+        assert _completion_for(registry, session.id)["output"] == "calculator: 4\n"
+        assert live == ["calculator: 4\n"]
+    finally:
+        _reap(proc)
+
+
+@posix_only
+def test_held_warning_prefix_completed_by_the_drain_leaks_nothing(tmp_path):
+    registry = ProcessRegistry()
+    session, live, held, proc = _reader_then_drain(
+        registry, tmp_path, "proc_held_noise", "bash: no j", "ob control in this shell\nowner-output\n")
+    try:
+        assert held == ""
+        assert _completion_for(registry, session.id)["output"] == "owner-output\n"
+        assert live == ["owner-output\n"]
+    finally:
+        _reap(proc)
+
+
 @posix_only
 def test_stuck_output_sink_cannot_block_a_listing():
     registry = ProcessRegistry()
@@ -248,12 +392,33 @@ def test_stuck_output_sink_does_not_slow_repeated_listings():
     registry = ProcessRegistry()
     session, proc, release = _start_stuck_sink(registry, "proc_repeat")
     try:
-        # The first listing may pay the bound once. Every later listing, before the session is given up,
-        # must return at once.
+        # The first busy attempt may pay the bound once. Every later listing inside the budget must return
+        # at once.
         first, _ = _timed_listing(registry)
-        later = [_timed_listing(registry)[0] for _ in range(_PIPE_HANDOFF_MAX_ATTEMPTS - 2)]
+        later = [_timed_listing(registry)[0] for _ in range(5)]
         assert first < _PIPE_HANDOFF_TIMEOUT_SECONDS + 3, f"first listing took {first:.2f}s"
         assert max(later) < 0.5, f"repeated listings were slowed by the stuck sink: {later}"
+    finally:
+        release.set()
+        _reap(proc, session._reader_thread)
+
+
+@posix_only
+def test_quick_repeated_listings_do_not_exhaust_the_handoff_budget():
+    registry = ProcessRegistry()
+    session, proc, release = _start_stuck_sink(registry, "proc_budget")
+    try:
+        started = time.monotonic()
+        _timed_listing(registry)  # the first busy attempt pays the bound once
+        for _ in range(40):  # far more quick calls than any attempt count would allow
+            assert _timed_listing(registry)[1][0]["status"] == "running"
+        assert time.monotonic() - started < _PIPE_HANDOFF_BUDGET_SECONDS  # the burst fits inside the budget
+
+        def finished():
+            return _timed_listing(registry)[1][0]["status"] == "exited"
+
+        assert _wait_until(finished, timeout=_PIPE_HANDOFF_BUDGET_SECONDS + 10)
+        assert time.monotonic() - started >= _PIPE_HANDOFF_BUDGET_SECONDS  # the budget was spent, not skipped
     finally:
         release.set()
         _reap(proc, session._reader_thread)
@@ -264,16 +429,20 @@ def test_stuck_output_sink_does_not_keep_session_running_forever():
     registry = ProcessRegistry()
     session, proc, release = _start_stuck_sink(registry, "proc_forever")
     try:
-        rows = []
-        for _ in range(_PIPE_HANDOFF_MAX_ATTEMPTS + 2):
-            rows = _timed_listing(registry)[1]
-            if rows[0]["status"] == "exited":
-                break
-        assert rows[0]["status"] == "exited", "session stayed running while its sink stayed stuck"
-        # Finished without the unread output; the output the reader had already buffered is in the event.
+        started = time.monotonic()
+
+        def finished():
+            return _timed_listing(registry)[1][0]["status"] == "exited"
+
+        assert _wait_until(finished, timeout=_PIPE_HANDOFF_BUDGET_SECONDS + 10), (
+            "session stayed running while its sink stayed stuck")
+        assert time.monotonic() - started >= _PIPE_HANDOFF_BUDGET_SECONDS
+        # Finished without the unread output: the event and the receipt both say so.
         event = registry.completion_queue.get(timeout=5)
         assert event["session_id"] == session.id
         assert event["output"] == "owner-output\n"
+        assert event["output_incomplete"] is True
+        assert _receipt(session.id)["output_incomplete"] is True
         release.set()
         session._reader_thread.join(timeout=10)
         assert not session._reader_thread.is_alive(), "reader did not finish once its sink was released"
@@ -281,3 +450,20 @@ def test_stuck_output_sink_does_not_keep_session_running_forever():
     finally:
         release.set()
         _reap(proc, session._reader_thread)
+
+
+@posix_only
+def test_reconcile_without_a_drain_marks_the_completion_and_receipt(monkeypatch):
+    # Windows reconciles without draining; the same skip is exercised here on POSIX.
+    monkeypatch.setattr(process_registry_module, "_IS_WINDOWS", True)
+    registry = ProcessRegistry()
+    proc = _spawn("printf '%s\\n' owner-output")
+    proc.wait(timeout=10)
+    session = _local_session(proc, "proc_no_drain")
+    registry._running[session.id] = session
+    try:
+        registry._reconcile_local_exit(session)
+        assert _completion_for(registry, session.id)["output_incomplete"] is True
+        assert _receipt(session.id)["output_incomplete"] is True
+    finally:
+        _reap(proc)

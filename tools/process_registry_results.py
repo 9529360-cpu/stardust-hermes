@@ -9,6 +9,7 @@ import json
 import logging
 import re
 import sqlite3
+import threading
 import time
 from pathlib import Path
 
@@ -46,24 +47,31 @@ def _result_paths(home: Path | None = None):
     return [path for _, path in retained[:MAX_RETAINED_RESULTS]]
 
 
+# Writers take turns, and each builds its record inside the turn: the newest save, with the newest
+# output_incomplete flag, is the one left on disk.
+_RESULT_WRITE_LOCK = threading.Lock()
+
+
 def save_completed_result(session) -> None:
     from agent.redact import redact_sensitive_text, redact_terminal_output
     from tools.process_registry import MAX_OUTPUT_CHARS
 
-    with session._lock:
-        record = {key: getattr(session, key) for key in _RESULT_FIELDS}
-        record["output"] = session.output_buffer[-MAX_OUTPUT_CHARS:]
-    # Live-output opt-out must not persist raw credentials in durable receipts.
-    record["output"] = redact_terminal_output(record["output"], record["command"], force=True)
-    record["command"] = redact_sensitive_text(record["command"], code_file=True, force=True)
-    directory = (Path(session.owner_home) if session.owner_home else get_hermes_home()) / "logs" / "process-results"
-    try:
-        directory.mkdir(mode=0o700, parents=True, exist_ok=True)
-        atomic_json_write(directory / f"{session.id}.json", record, mode=0o600)
-        _result_paths(directory.parent.parent)
-    except OSError:
-        # Preserve live delivery on disk failure, but never silently claim durability.
-        logger.warning("Could not retain completed process result %s", session.id, exc_info=True)
+    with _RESULT_WRITE_LOCK:
+        with session._lock:
+            record = {key: getattr(session, key) for key in _RESULT_FIELDS}
+            record["output"] = session.output_buffer[-MAX_OUTPUT_CHARS:]
+            record["output_incomplete"] = bool(session.output_incomplete)
+        # Live-output opt-out must not persist raw credentials in durable receipts.
+        record["output"] = redact_terminal_output(record["output"], record["command"], force=True)
+        record["command"] = redact_sensitive_text(record["command"], code_file=True, force=True)
+        directory = (Path(session.owner_home) if session.owner_home else get_hermes_home()) / "logs" / "process-results"
+        try:
+            directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+            atomic_json_write(directory / f"{session.id}.json", record, mode=0o600)
+            _result_paths(directory.parent.parent)
+        except OSError:
+            # Preserve live delivery on disk failure, but never silently claim durability.
+            logger.warning("Could not retain completed process result %s", session.id, exc_info=True)
 
 
 def _owns_result(owner: str, parent: str | None) -> bool:
@@ -111,6 +119,7 @@ def load_completed_results(prefix: str = "") -> dict:
             session = ProcessSession(
                 **fields,
                 exited=True, output_buffer=record["output"],
+                output_incomplete=bool(record.get("output_incomplete", False)),  # absent in older receipts
             )
             session._completion_event.set()
             results[session.id] = session

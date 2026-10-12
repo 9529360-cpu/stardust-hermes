@@ -435,6 +435,8 @@ def format_process_notification(evt: dict) -> "str | None":
             "...(output trimmed — subagent-owned process; see the "
             "delegation's live transcript for full output)\n"
             + _out[-600:])
+    _incomplete = ("Output may be incomplete: the pipe was not fully read when the process finished, "
+                   "or output arrived after it.\n") if evt.get("output_incomplete") else ""
     return (
         f"[IMPORTANT: Background process {_sid} {_completion_status(evt)} (exit code {_exit}{_signal}).\n"
-        f"{attribution}Command: {_cmd}\nOutput:\n{_out}]")
+        f"{attribution}Command: {_cmd}\n{_incomplete}Output:\n{_out}]")
