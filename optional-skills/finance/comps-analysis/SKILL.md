@@ -15,7 +15,7 @@ metadata:
 
 This skill assumes **headless openpyxl** — you are producing an .xlsx file on disk.
 Follow the `excel-author` skill's conventions for cell coloring, formulas, named ranges, and sensitivity tables.
-Recalculate before delivery: `python /path/to/excel-author/scripts/recalc.py ./out/model.xlsx`.
+Recalculate before delivery: `python /path/to/xlsx/scripts/xlsx_recalc.py ./out/model.xlsx`, then check that its JSON reports `"recalculated": true`.
 
 # Comparable Company Analysis
 

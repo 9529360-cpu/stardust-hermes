@@ -33,7 +33,7 @@ description: "在 Excel 中构建可比公司分析——运营指标、估值�
 
 此 skill 假设使用**无界面 openpyxl**——你在磁盘上生成 .xlsx 文件。
 遵循 `excel-author` skill 关于单元格着色、公式、命名区域和敏感性表格的约定。
-交付前重新计算：`python /path/to/excel-author/scripts/recalc.py ./out/model.xlsx`。
+交付前重新计算：`python /path/to/xlsx/scripts/xlsx_recalc.py ./out/model.xlsx`，然后检查 JSON 输出是否为 `"recalculated": true`。
 
 # 可比公司分析
 

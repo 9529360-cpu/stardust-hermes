@@ -35,7 +35,7 @@ async function toComposer(page: MockBackendFixture['page']): Promise<void> {
 }
 
 async function openTasks(page: MockBackendFixture['page'], narrow: boolean): Promise<void> {
-  const tasks = page.getByRole('button', { name: /^(任务|Tasks)$/ }).first()
+  const tasks = page.getByRole('button', { name: /^(自动化|Automations)$/ }).first()
 
   if (narrow && !(await tasks.isVisible().catch(() => false))) {
     await page.keyboard.press('Control+b')
