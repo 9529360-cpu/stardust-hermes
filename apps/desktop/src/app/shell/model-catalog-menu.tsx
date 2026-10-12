@@ -114,6 +114,14 @@ interface ProviderGroup {
   provider: ModelOptionProvider
 }
 
+// Open catalog metadata is provider-owned; never derive a selectable id from a label.
+function catalogModelName(provider: ModelOptionProvider, model: string): string {
+  const names = provider.model_names ?? provider.display_names
+  const name = names && typeof names === 'object' ? (names as Record<string, unknown>)[model] : undefined
+
+  return typeof name === 'string' && name.trim() ? name : modelDisplayParts(model).name
+}
+
 /**
  * THE model catalog menu: searchable, provider-grouped, `-fast` families
  * collapsed to one row, per-row hover submenu for thinking/effort/fast, full
@@ -491,7 +499,7 @@ export function ModelCatalogMenu({
                         : null
 
                     const isCurrent = activeId !== null
-                    const name = modelDisplayParts(family.id).name
+                    const name = catalogModelName(group.provider, family.id)
                     const caps = group.provider.capabilities?.[family.id]
 
                     // Managed local model loading into memory right now:
@@ -535,6 +543,7 @@ export function ModelCatalogMenu({
                     return (
                       <DropdownMenuSub key={`${group.provider.slug}:${family.id}`}>
                         <DropdownMenuSubTrigger
+                          data-catalog-source={group.provider.source ?? undefined}
                           hideChevron
                           onClick={activate}
                           onKeyDown={event => {
@@ -542,6 +551,7 @@ export function ModelCatalogMenu({
                               activate()
                             }
                           }}
+                          title={[family.id, group.provider.source].filter(Boolean).join(' · ')}
                           {...kbRowProps(`${group.provider.slug}:${family.id}`)}
                         >
                           <span className="min-w-0 flex-1 truncate">
@@ -721,7 +731,7 @@ function groupModels(
 
     const matches = (family: ModelFamily) =>
       foldIncludes(
-        `${family.id} ${family.fastId ?? ''} ${provider.name} ${provider.slug} ${displayModelName(family.id)}`,
+        `${family.id} ${family.fastId ?? ''} ${provider.name} ${provider.slug} ${catalogModelName(provider, family.id)} ${displayModelName(family.id)}`,
         q
       )
 

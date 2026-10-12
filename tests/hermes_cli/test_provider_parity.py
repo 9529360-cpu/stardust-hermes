@@ -37,7 +37,10 @@ _VIRTUAL = {d.slug for d in provider_catalog() if d.auth_type == "virtual"}
 _KEYLESS = {d.slug for d in provider_catalog() if d.keyless}
 # Nous remains in the inherited provider universe for compatibility/migration,
 # but Stardust intentionally does not expose the Nous Portal account product in Desktop.
-_EXEMPT = {"custom", "nous"} | _VIRTUAL | _KEYLESS
+# External read-only access is configured exclusively in its owning client.
+# Stardust must not offer a credential import, login, or refresh card for it.
+_READONLY = {d.slug for d in provider_catalog() if d.auth_type == "external_access_readonly"}
+_EXEMPT = {"custom", "nous"} | _VIRTUAL | _KEYLESS | _READONLY
 
 # Providers that legitimately offer BOTH auth methods and so intentionally
 # appear on both desktop tabs (an API-key card AND an account sign-in card).
@@ -74,6 +77,13 @@ def test_every_hermes_model_provider_is_configurable_in_desktop():
         "providers shown in `stardust model` but not configurable in the desktop "
         f"Providers tabs: {missing}"
     )
+
+
+def test_external_readonly_provider_has_no_stardust_credential_card():
+    """Read-only client access must never become a Stardust-owned auth flow."""
+    assert "gpt-official" in _READONLY
+    assert "gpt-official" not in _keys_tab_providers()
+    assert "gpt-official" not in _accounts_tab_providers()
 
 
 def test_each_provider_lands_on_the_tab_its_auth_type_dictates():

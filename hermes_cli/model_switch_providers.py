@@ -606,7 +606,7 @@ def _collect_authed_provider_slugs(
     from hermes_cli.models import CANONICAL_PROVIDERS
     excluded_set = {str(p).strip().lower() for p in excluded if p}
     slugs: list[str] = []
-    seen: set[str] = set()
+    seen: set[str] = {"gpt-official"}  # no generic pool import or disk caching
 
     def _emit(slug: str, *keys: str) -> None:
         slugs.append(slug)
@@ -747,6 +747,32 @@ class _PickerBuild:
             headers=headers, api_mode=api_mode, probe_live=probe_live,
             discovery_allowed=discovery_allowed, for_picker=self.for_picker)
         return discovered, native_catalog_empty, probe_live
+
+
+def _lap_gpt_official_row(b: _PickerBuild) -> None:
+    """Uncapped original-client catalog, independent of SIWC/pools."""
+    from hermes_cli.gpt_official import PROVIDER, LABEL, model_catalog
+    from hermes_cli.auth import AuthError
+    if _skip(b.seen_slugs, b.excluded, PROVIDER):
+        return
+    b.seen_slugs.add(PROVIDER)
+    try:
+        catalog = model_catalog()
+    except AuthError as exc:
+        catalog = {"models": [], "source": "codex-models-cache-readonly"}
+        error = str(exc)
+    else:
+        error = ""
+    models = catalog["models"]
+    provenance = (f"本地官方 models_cache.json · 更新时间 {catalog.get('fetched_at', '')} · "
+                  f"原客户端 {catalog.get('client_version', '')}。账户绑定未验证；候选模型权限以真实请求为准。")
+    if catalog.get("catalog_stale"):
+        provenance += "目录超过24小时，请在原客户端更新。"
+    b.results.append({**catalog, "slug": PROVIDER, "name": LABEL,
+        "is_current": b.current_provider == PROVIDER, "is_user_defined": False,
+        "total_models": len(models), "auth_type": "external_access_readonly",
+        "auth_error": error, "warning": error or provenance, "authenticated": not bool(error)})
+
 
 
 def _lap_builtin_rows(b: _PickerBuild, data: dict, user_providers: dict) -> None:
@@ -1145,6 +1171,7 @@ def list_authenticated_providers(
         except Exception:
             pass  # best-effort; serial path still works
 
+    _lap_gpt_official_row(b)
     _lap_builtin_rows(b, data, user_providers)
     _lap_overlay_rows(b, data)
     _lap_canonical_rows(b)
@@ -1179,7 +1206,7 @@ def _finalize_picker_rows(results: list, user_providers, current_model: str) -> 
     # provider's row.
     if current_model:
         for row in results:
-            if not row.get("is_current") or row.get("native_catalog_empty"):
+            if row.get("slug") == "gpt-official" or not row.get("is_current") or row.get("native_catalog_empty"):
                 continue
             models = row.get("models") or []
             if current_model not in models:

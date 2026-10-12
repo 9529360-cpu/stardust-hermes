@@ -88,6 +88,36 @@ beforeEach(() => {
   $localModelsEnabled.set(true)
 })
 
+it('lets users manually select every GPT官方 account model', async () => {
+  const onSelect = vi.fn()
+  vi.mocked(requestModelOptions).mockResolvedValue({
+    ...OPTIONS,
+    providers: [{ slug: 'gpt-official', name: 'GPT官方',
+      models: ['gpt-6-luna', 'gpt-6.1-sol', 'gpt-6-astra', 'gpt-6-sol', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'],
+      model_names: { 'gpt-6-luna': 'GPT-6-Luna' },
+      warning: 'models_cache.json · 2026-10-12T06:21:55Z · 账户绑定未验证', authenticated: true }]
+  })
+  renderPicker({ onSelect })
+  expect(await screen.findByText('GPT官方')).toBeTruthy()
+  expect(screen.getByText('GPT-6-Luna')).toBeTruthy()
+  expect(screen.getAllByRole('option')).toHaveLength(7)
+  expect(screen.getByText(/models_cache.json/)).toBeTruthy()
+  expect(screen.getByText('gpt-5.6-sol')).toBeTruthy()
+  fireEvent.click(screen.getByRole('option', { name: /GPT-6-Luna/ }))
+  expect(onSelect).toHaveBeenCalledWith({ provider: 'gpt-official', model: 'gpt-6-luna' })
+})
+
+it('shows GPT官方 login errors even without selectable models', async () => {
+  vi.mocked(requestModelOptions).mockResolvedValue({
+    ...OPTIONS,
+    providers: [{ slug: 'gpt-official', name: 'GPT官方', models: [], authenticated: false,
+      warning: '请在原 ChatGPT/Codex 客户端重新登录' }]
+  })
+  renderPicker()
+  expect(await screen.findByText('GPT官方')).toBeTruthy()
+  expect(await screen.findByText('请在原 ChatGPT/Codex 客户端重新登录')).toBeTruthy()
+})
+
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()

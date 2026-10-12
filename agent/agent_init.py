@@ -379,7 +379,7 @@ def _resolve_api_mode(agent, api_mode, provider_name, base_url):
         agent.api_mode = "chat_completions"
     elif api_mode in _EXPLICIT_API_MODES:
         agent.api_mode = api_mode
-    elif agent.provider in {"openai-codex", "xai", "xai-oauth"}:
+    elif agent.provider in {"gpt-official", "openai-codex", "xai", "xai-oauth"}:
         agent.api_mode = "codex_responses"
     elif provider_name is None and host == "chatgpt.com" and "/backend-api/codex" in url:
         agent.api_mode = "codex_responses"
