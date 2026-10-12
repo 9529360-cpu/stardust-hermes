@@ -90,6 +90,50 @@ function renderMenu() {
 // to whichever surface mounted it. If a host had to opt in, the composer and
 // the kanban board would end up disagreeing about what "my models" means —
 // which is exactly the drift extracting this component was meant to prevent.
+describe('official catalog metadata', () => {
+  beforeEach(() => {
+    getGlobalModelOptions.mockResolvedValue({
+      providers: [
+        {
+          slug: 'gpt-official',
+          name: 'GPT官方',
+          source: 'codex-models-cache-readonly',
+          models: ['gpt-6-luna', 'gpt-6-sol'],
+          model_names: { 'gpt-6-luna': 'GPT-6 Luna', 'gpt-6-sol': 'GPT-6 Sol' }
+        }
+      ]
+    })
+  })
+
+  it('renders the authoritative name and source, but commits the unchanged slug', async () => {
+    const select = renderMenu()
+    const name = await screen.findByText('GPT-6 Luna')
+    const row = name.closest('[role="menuitem"]')!
+    expect(row.getAttribute('data-catalog-source')).toBe('codex-models-cache-readonly')
+    expect(row.getAttribute('title')).toContain('codex-models-cache-readonly')
+    fireEvent.mouseMove(window)
+    fireEvent.click(row)
+    await waitFor(() => expect(select).toHaveBeenCalledWith('gpt-6-luna', 'gpt-official'))
+  })
+
+  it('searches authoritative names, even when unlike the slug', async () => {
+    getGlobalModelOptions.mockResolvedValue({
+      providers: [
+        {
+          slug: 'gpt-official',
+          name: 'GPT官方',
+          models: ['gpt-6-luna'],
+          model_names: { 'gpt-6-luna': 'Official Moon' }
+        }
+      ]
+    })
+    renderMenu()
+    await screen.findByText('Official Moon')
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search models' }), { target: { value: 'Moon' } })
+    await waitFor(() => expect(screen.getByRole('menuitem', { name: /Official Moon/ })).toBeTruthy())
+  })
+})
+
 describe('the catalog owns model curation', () => {
   it('honours the stored Edit Models shortlist', async () => {
     setVisibleModels(new Set([modelVisibilityKey('google', 'gemini-2.5-flash')]))
