@@ -22,7 +22,7 @@ async function createAgent(page: MockBackendFixture['page'], name: string, title
 }
 
 test.beforeAll(async () => {
-  fixture = await setupMockBackend()
+  fixture = await setupMockBackend({ extraDisplayConfig: '  language: en' })
   await waitForAppReady(fixture, 120_000)
 })
 

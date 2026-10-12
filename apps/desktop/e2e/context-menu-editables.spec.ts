@@ -21,7 +21,7 @@ import { expect, test } from './test'
 let fixture: MockBackendFixture | null = null
 
 test.beforeAll(async () => {
-  fixture = await setupMockBackend()
+  fixture = await setupMockBackend({ extraDisplayConfig: '  language: en' })
   await waitForAppReady(fixture, 120_000)
 })
 

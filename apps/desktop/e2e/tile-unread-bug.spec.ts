@@ -140,6 +140,7 @@ test.describe('sidebar states — tab (hidden) unread is correct', () => {
   test.beforeAll(async () => {
     restartMockServer()
     fixture = await setupMockBackend({
+      extraDisplayConfig: '  language: en',
       extraConfig: DISABLE_AUTO_TITLE,
       mockServer: { backgroundReleasePath: bgRelease.path },
     })
@@ -205,6 +206,7 @@ test.describe.skip('sidebar states — split (visible) unread bug (RED)', () => 
   test.beforeAll(async () => {
     restartMockServer()
     fixture = await setupMockBackend({
+      extraDisplayConfig: '  language: en',
       extraConfig: DISABLE_AUTO_TITLE,
       mockServer: { backgroundReleasePath: bgRelease.path },
     })

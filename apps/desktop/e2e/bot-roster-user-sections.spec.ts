@@ -41,7 +41,7 @@ async function capture(page: Page, name: string): Promise<void> {
 async function seedBot(hermesHome: string, mockUrl: string, name: string): Promise<void> {
   const dir = path.join(hermesHome, 'profiles', name)
   fs.mkdirSync(dir, { recursive: true })
-  writeMockProviderConfig(dir, mockUrl)
+  writeMockProviderConfig(dir, mockUrl, '  language: en')
   writeEnvFile(dir)
 
   const builder = await RealSessionBuilder.start(dir)
@@ -80,7 +80,7 @@ async function layout(page: Page): Promise<Array<[string, string[]]>> {
 test.beforeAll(async () => {
   const mock = await startMockServer()
   const sandbox = createSandbox('bots-sections')
-  writeMockProviderConfig(sandbox.hermesHome, mock.url)
+  writeMockProviderConfig(sandbox.hermesHome, mock.url, '  language: en')
   writeEnvFile(sandbox.hermesHome)
 
   for (const name of ['alpha', 'beta', 'gamma']) {
