@@ -1,3 +1,5 @@
+Derived from Apache-2.0 work; the full license text is in [APACHE-2.0-LICENSE.txt](APACHE-2.0-LICENSE.txt) beside this file.
+
 # Financial model conventions (banker-grade workbooks)
 
 Moved here from the former `excel-author` skill. `optional-skills/finance/excel-author/SKILL.md` is now a pointer with the same name. Load this file when a task builds an auditable financial model (DCF, 3-statement, LBO, comps) with openpyxl. Workbook tooling (create, read, edit, verify, recalc) is in the parent `SKILL.md`.

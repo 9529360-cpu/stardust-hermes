@@ -1,3 +1,5 @@
+Derived from Apache-2.0 work; the full license text is in [APACHE-2.0-LICENSE.txt](APACHE-2.0-LICENSE.txt) beside this file.
+
 # Pitch-deck conventions (model-backed decks)
 
 Moved here from the former `pptx-author` skill. `optional-skills/finance/pptx-author/SKILL.md` is now a pointer with the same name. Load this file for model-backed decks (pitch decks, IC memos, earnings notes) where every number traces to a source workbook. For general deck creation, editing, and rendering, use the main `SKILL.md` in this skill.
