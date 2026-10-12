@@ -31,9 +31,9 @@ Reports the state of the owner's computer: free space on each drive, the size of
 ## How to Run
 
 ```bash
-python skills/productivity/house-check/scripts/house_check.py
-python skills/productivity/house-check/scripts/house_check.py --json
-python skills/productivity/house-check/scripts/house_check.py --max-seconds 30 --max-entries 500000
+python ${STARDUST_SKILL_DIR}/scripts/house_check.py
+python ${STARDUST_SKILL_DIR}/scripts/house_check.py --json
+python ${STARDUST_SKILL_DIR}/scripts/house_check.py --max-seconds 30 --max-entries 500000
 ```
 
 ## Quick Reference

@@ -45,6 +45,7 @@ and slide rendering — all offline, no PowerPoint installation required.
   chart data, swap a logo, duplicate/remove/reorder slides, set
   backgrounds, footers, hyperlinks, or speaker notes.
 - You must produce an on-brand deck from a company .pptx template.
+- The deck is model-backed (pitch deck, IC memo, earnings note) and every number must trace to a source workbook: read `references/pptx-author-conventions.md`.
 - Do NOT use this for .ppt (legacy binary) files — convert them first with
   `soffice --convert-to pptx old.ppt` if LibreOffice is available.
 

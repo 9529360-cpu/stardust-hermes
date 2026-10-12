@@ -1,16 +1,28 @@
-"""Tests for the meeting-action-items bundled skill."""
+"""Tests for the meeting-action-items bundled skill.
+
+The skill is a pointer. Its meeting procedure lives in
+document-to-action-items/references/meeting-mode.md, so the procedure and
+discipline assertions read that file.
+"""
 import re
 from pathlib import Path
 
 import yaml
 
-SKILL_PATH = (
-    Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SKILL_PATH = REPO_ROOT / "skills" / "productivity" / "meeting-action-items" / "SKILL.md"
+MEETING_MODE_PATH = (
+    REPO_ROOT
     / "skills"
     / "productivity"
-    / "meeting-action-items"
-    / "SKILL.md"
+    / "document-to-action-items"
+    / "references"
+    / "meeting-mode.md"
 )
+
+
+def _meeting_mode_text():
+    return MEETING_MODE_PATH.read_text(encoding="utf-8")
 
 
 def _frontmatter_and_body():
@@ -69,10 +81,10 @@ def test_no_phantom_connectors_in_prose():
 
 
 def test_body_structure_and_size():
-    _, body = _frontmatter_and_body()
+    body = _meeting_mode_text()
     for section in ("## When to Use", "## Procedure", "## Pitfalls", "## Verification"):
-        assert section in body, f"missing section: {section}"
-    assert len(SKILL_PATH.read_text(encoding="utf-8")) <= 100_000
+        assert section in body, f"missing section in meeting-mode.md: {section}"
+    assert len(MEETING_MODE_PATH.read_text(encoding="utf-8")) <= 100_000
 
 
 def test_no_machine_local_paths():
@@ -82,7 +94,7 @@ def test_no_machine_local_paths():
 
 
 def test_steps_have_completion_criteria():
-    _, body = _frontmatter_and_body()
+    body = _meeting_mode_text()
     steps = re.findall(r"^### \d+\..*?(?=^### \d+\.|^## )", body, re.MULTILINE | re.DOTALL)
     assert len(steps) >= 5
     for step in steps:
@@ -90,7 +102,13 @@ def test_steps_have_completion_criteria():
 
 
 def test_core_disciplines_present():
-    _, body = _frontmatter_and_body()
+    body = _meeting_mode_text()
     assert "never invent" in body, "due-date invention ban must be present"
     assert "before creating anything" in body, "reconcile-before-create must be present"
     assert "`unresolved`" in body, "missing owners/dates stay visibly unresolved"
+
+
+def test_pointer_resolves_to_meeting_mode_reference():
+    _, body = _frontmatter_and_body()
+    assert "references/meeting-mode.md" in body, "pointer must name the moved procedure"
+    assert MEETING_MODE_PATH.is_file()

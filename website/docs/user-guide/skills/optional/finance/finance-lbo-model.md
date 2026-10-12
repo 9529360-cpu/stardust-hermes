@@ -33,7 +33,7 @@ The following is the complete skill definition that Hermes loads when this skill
 
 This skill assumes **headless openpyxl** — you are producing an .xlsx file on disk.
 Follow the `excel-author` skill's conventions for cell coloring, formulas, named ranges, and sensitivity tables.
-Recalculate before delivery: `python /path/to/excel-author/scripts/recalc.py ./out/model.xlsx`.
+Recalculate before delivery: `python /path/to/xlsx/scripts/xlsx_recalc.py ./out/model.xlsx`, then check that its JSON reports `"recalculated": true`.
 
 ---
 
@@ -52,7 +52,7 @@ Before starting any LBO model:
 
 ## CRITICAL INSTRUCTIONS — READ FIRST
 
-Use Python/openpyxl. Write formula strings (`ws["D20"] = "=B5*B6"`), then run the `excel-author` skill's `recalc.py` helper before delivery.
+Use Python/openpyxl. Write formula strings (`ws["D20"] = "=B5*B6"`), then run the `xlsx` skill's `xlsx_recalc.py` helper before delivery.
 
 ### Core Principles
 * **Every calculation must be an Excel formula** - NEVER compute values in Python and hardcode results into cells. When using openpyxl, write `cell.value = "=B5*B6"` (formula string), NOT `cell.value = 1250` (computed result). The model must be dynamic and update when inputs change.
@@ -181,9 +181,9 @@ The following calculation patterns frequently cause issues across LBO models. Pa
 
 ### Run Formula Validation
 ```bash
-python /path/to/excel-author/scripts/recalc.py model.xlsx
+python /path/to/xlsx/scripts/xlsx_recalc.py model.xlsx
 ```
-Must return success with zero errors.
+Must print `"recalculated": true`, with zero error values in the recalculated formulas.
 
 ### Section Balancing
 - [ ] Any sections that must balance (Sources/Uses, Assets/Liabilities) balance exactly
