@@ -20,6 +20,7 @@ from pathlib import Path
 
 # _early_recovery owns the recovery-lock lifecycle and uv lookup; importing it is free (stdlib).
 from hermes_cli import _early_recovery as _er
+from hermes_cli.venv_layout import resolve_venv_dir
 
 
 def _is_windows() -> bool:
@@ -70,7 +71,7 @@ def _resolve_install_target(root: Path) -> tuple[list[str], dict | None]:
     if uv_bin:
         from hermes_constants import project_venv_dir
 
-        env = {**os.environ, "VIRTUAL_ENV": str(project_venv_dir(root) or root / "venv")}
+        env = {**os.environ, "VIRTUAL_ENV": str(project_venv_dir(root) or resolve_venv_dir(root))}
         if _is_termux_env(env):
             env.pop("PYTHONPATH", None)
             env.pop("PYTHONHOME", None)
@@ -331,6 +332,98 @@ def migrate_windows_bin_path(
     return True
 
 
+#: Second line of every shim the refresh writes. A ``.cmd`` in the managed bin without it is not ours.
+MANAGED_SHIM_MARKER = "rem stardust-managed-shim"
+
+#: Command names the managed bin exposes. ``hermes`` is the pre-rename command, kept for existing scripts.
+MANAGED_SHIM_NAMES = ("stardust", "hermes")
+
+
+def _managed_shim_bytes(exe: Path) -> bytes:
+    """Body of a managed shim: marker line, then the venv console script with the caller's arguments (CRLF)."""
+    text = "\r\n".join(["@echo off", MANAGED_SHIM_MARKER, f'"{exe}" %*']) + "\r\n"
+    if text.isascii():
+        return text.encode("ascii")
+    # cmd.exe reads batch files in the console code page, so a non-ASCII venv path is encoded in that page.
+    return text.encode("oem" if _is_windows() else "utf-8")
+
+
+def _is_managed_shim(body: bytes) -> bool:
+    lines = body.split(b"\n")
+    return len(lines) > 1 and lines[1].rstrip(b"\r") == MANAGED_SHIM_MARKER.encode("ascii")
+
+
+def refresh_managed_shims(root, *, windows: bool | None = None, install_authority: bool = False) -> list[str]:
+    r"""Point the managed ``stardust.cmd`` and ``hermes.cmd`` at *root*'s venv console script.
+
+    The managed bin (:func:`hermes_constants.get_default_hermes_root` ``\bin``) is shared by every checkout,
+    so a checkout only retargets it when it is the managed clone (directly under the default root), or when the
+    Desktop passes *install_authority* (its own install, via the desktop-start hook). A development checkout
+    never takes over the ``stardust`` command. Nothing is written unless the venv's ``Scripts\stardust.exe``
+    exists, so a shim is never repointed at a missing script. A shim that already matches is left alone. A file
+    with one of these names that is not ours (no marker line) is copied to ``<name>.bak-<UTC timestamp>`` first,
+    and kept if that copy fails. Never raises; returns the paths written.
+    """
+    if windows is None:
+        windows = _is_windows()
+    if not windows:
+        return []
+    home = _default_hermes_root()
+    if home is None:
+        return []
+    if not install_authority and _normalize_windows_path(Path(root).parent) != _normalize_windows_path(home):
+        return []
+    from hermes_constants import venv_bin_dir
+
+    exe = venv_bin_dir(resolve_venv_dir(Path(root), windows=True), windows=True) / "stardust.exe"
+    if not exe.is_file():
+        return []
+    bin_dir = home / "bin"
+    body = _managed_shim_bytes(exe)
+    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    try:
+        bin_dir.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return []
+    written: list[str] = []
+    for name in MANAGED_SHIM_NAMES:
+        final = bin_dir / f"{name}.cmd"
+        try:
+            current = final.read_bytes() if final.is_file() else None
+        except OSError:
+            continue
+        if current == body:
+            continue
+        if current is not None and not _is_managed_shim(current):
+            try:
+                shutil.copy2(final, final.with_name(f"{final.name}.bak-{stamp}"))
+            except OSError:
+                continue
+        staging = final.with_name(f"{final.name}.heal.{os.getpid()}")
+        try:
+            staging.write_bytes(body)
+            os.replace(staging, final)
+        except OSError:
+            with contextlib.suppress(OSError):
+                staging.unlink()
+            continue
+        written.append(str(final))
+    if written:
+        with contextlib.suppress(OSError, ValueError):
+            print("  ✓ Refreshed Stardust launcher shim(s): " + ", ".join(written), file=sys.stderr)
+    return written
+
+
+def _main(argv: list[str]) -> int:
+    """Desktop start hook: ``python -m hermes_cli._install_repair --refresh-managed-shims <install-root>``."""
+    if len(argv) != 2 or argv[0] != "--refresh-managed-shims":
+        print("usage: python -m hermes_cli._install_repair --refresh-managed-shims <install-root>",
+              file=sys.stderr)
+        return 2
+    refresh_managed_shims(Path(argv[1]), install_authority=True)
+    return 0
+
+
 def _load_console_script_names(root: Path) -> list[str]:
     """``[project.scripts]`` names from pyproject.toml (tomllib, 3.11+)."""
     project = _er._load_pyproject_project(root)
@@ -490,3 +583,7 @@ def bump_marker_attempts(marker_path: Path) -> int:
     with contextlib.suppress(OSError):
         marker_path.write_text(json.dumps({"attempts": attempts}), encoding="utf-8")
     return attempts
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main(sys.argv[1:]))

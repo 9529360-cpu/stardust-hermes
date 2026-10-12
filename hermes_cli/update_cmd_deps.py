@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Optional
 from hermes_constants import venv_python_path
 from hermes_cli._subprocess_compat import bounded_probe_run
+from hermes_cli.venv_layout import resolve_venv_dir
 
 # Log-record parity with the origin module.
 logger = logging.getLogger("hermes_cli.update_cmd")
@@ -85,7 +86,7 @@ def _critical_module_import_failures(
     try:
         interpreter = sys.executable
         with suppress(Exception):
-            venv_python = venv_python_path(Path(root) / "venv", windows=_m()._is_windows())
+            venv_python = venv_python_path(resolve_venv_dir(Path(root)), windows=_m()._is_windows())
             if venv_python.exists():
                 interpreter = str(venv_python)
         result = bounded_probe_run(
@@ -638,7 +639,7 @@ def _venv_core_imports_healthy() -> tuple[bool, str]:
     imports, catching a half-updated venv that "Already up to date!" would otherwise never re-sync.
     Returns ``(healthy, detail)``; never raises, unknown states report healthy."""
     from hermes_cli.update_cmd import _m
-    venv_dir = _m().PROJECT_ROOT / "venv"
+    venv_dir = resolve_venv_dir(_m().PROJECT_ROOT)
     venv_python = venv_python_path(venv_dir, windows=_m()._is_windows())
     if not venv_python.exists():
         # No venv: normal for a dev checkout (healthy), but on a MANAGED install (bootstrap
@@ -950,7 +951,7 @@ def _refuse_update_if_venv_foreign_owned(project_root) -> None:
 
     See #83529.
     """
-    foreign = _venv_foreign_owned_paths(Path(project_root) / "venv")
+    foreign = _venv_foreign_owned_paths(resolve_venv_dir(Path(project_root)))
     if not foreign:
         return
     print("\n✗ Update stopped: this install's venv contains files owned by another user.")

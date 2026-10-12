@@ -1259,14 +1259,20 @@ def venv_bin_dir(venv_dir, *, windows: bool | None = None) -> Path:
 
 
 def project_venv_dir(project_root) -> Path | None:
-    """The project's ``venv`` or ``.venv`` dir when one exists (``uv venv`` defaults to ``.venv``).
+    """The project's venv dir when one exists, chosen by ``hermes_cli.venv_layout.resolve_venv_dir``.
 
     ``uv venv`` defaults to ``.venv`` while our installers create ``venv``, so both layouts are in the wild.
     Call sites that only knew about ``venv`` silently no-oped on a ``.venv`` install — that is how the
-    Windows shim-lock preflight skipped itself entirely (#79542). ``venv`` wins when both exist, matching
-    what the installers write.
+    Windows shim-lock preflight skipped itself entirely (#79542). The resolver prefers the folder that holds
+    the interpreter; a half-repaired folder without one still counts as present, as before.
     """
+    # Lazy: hermes_cli.venv_layout imports this module for venv_python_path.
+    from hermes_cli.venv_layout import resolve_venv_dir
+
     root = Path(project_root)
+    picked = resolve_venv_dir(root)
+    if picked.is_dir():
+        return picked
     return next((root / n for n in ("venv", ".venv") if (root / n).is_dir()), None)
 
 

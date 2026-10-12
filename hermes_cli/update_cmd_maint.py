@@ -965,6 +965,11 @@ def _print_post_update_notices_and_self_heals() -> None:
         from hermes_cli._install_repair import migrate_windows_bin_path
         migrate_windows_bin_path(_m().PROJECT_ROOT)
 
+    def _refresh_managed_shims() -> None:
+        # The managed stardust/hermes .cmd shims must delegate to THIS checkout's venv console script.
+        from hermes_cli._install_repair import refresh_managed_shims
+        refresh_managed_shims(_m().PROJECT_ROOT)
+
     for message, step in (
         # v23 FTS layout is opt-in (existing indexes untouched); surface the command here.
         ('FTS optimize notice failed: %s', _print_fts_optimize_available_notice),
@@ -973,6 +978,7 @@ def _print_post_update_notices_and_self_heals() -> None:
         ('FHS PATH guard check failed: %s', _ensure_fhs_path_guard),
         ('hermes-acp launcher self-heal failed: %s', _ensure_acp_launcher),
         ('Windows bin launcher migration failed: %s', _migrate_windows_bin_path),
+        ('Managed launcher shim refresh failed: %s', _refresh_managed_shims),
         ('cua-driver refresh failed: %s', _refresh_cua_driver_after_update),
         # Legacy STARDUST_NEMO_RELAY_ATIF_*/ATOF_* vars produce no traces since the Relay cutover;
         # generate each profile's relay-plugins.toml instead of leaving exports silently dead.

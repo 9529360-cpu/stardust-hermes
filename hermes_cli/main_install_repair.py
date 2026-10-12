@@ -420,7 +420,8 @@ def _default_venv_install_target() -> tuple[list[str], dict[str, str] | None]:
         uv_bin = None
     if uv_bin:
         from hermes_constants import project_venv_dir
-        venv_dir = project_venv_dir(PROJECT_ROOT) or PROJECT_ROOT / "venv"
+        from hermes_cli.venv_layout import resolve_venv_dir
+        venv_dir = project_venv_dir(PROJECT_ROOT) or resolve_venv_dir(PROJECT_ROOT)
         env = {**os.environ, "VIRTUAL_ENV": str(venv_dir)}
         if _is_termux_env(env):
             env.pop("PYTHONPATH", None)

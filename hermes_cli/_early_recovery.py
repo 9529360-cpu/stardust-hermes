@@ -334,7 +334,9 @@ def _run_repair_install(specs: list[str], project_root: Path) -> bool:
     if externally_managed:
         uv = _find_uv_binary()
         if uv:
-            env = {**os.environ, "VIRTUAL_ENV": str(project_root / "venv")}
+            from hermes_cli.venv_layout import resolve_venv_dir
+
+            env = {**os.environ, "VIRTUAL_ENV": str(resolve_venv_dir(project_root))}
             env.pop("PYTHONHOME", None)
             env.pop("PYTHONPATH", None)
             return _run_installer("uv", [uv, "pip", "install", "--force-reinstall", *specs],

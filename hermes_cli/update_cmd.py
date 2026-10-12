@@ -19,6 +19,7 @@ from pathlib import Path
 from hermes_cli.config import get_hermes_home  # noqa: F401  (re-exported; patched via update_cmd)
 from hermes_cli.update_cmd_common import _best_effort
 from hermes_constants import get_default_hermes_root, venv_python_path
+from hermes_cli.venv_layout import ensure_venv_alias, resolve_venv_dir
 
 # Re-exports: every split-module name stays reachable (and monkeypatchable) as update_cmd.<name>.
 from hermes_cli.update_abort_recovery import (  # noqa: F401
@@ -626,11 +627,11 @@ def _repair_venv_on_current_checkout(
     from hermes_cli.managed_uv import ensure_uv
     repair_uv = ensure_uv()
     # Venv gone entirely (repair interrupted after the old one was moved aside): recreate.
-    venv_python_missing = not (
-        venv_python_path(_m().PROJECT_ROOT / "venv", windows=_m()._is_windows())).exists()
+    venv_dir = resolve_venv_dir(_m().PROJECT_ROOT)
+    venv_python_missing = not (venv_python_path(venv_dir, windows=_m()._is_windows())).exists()
     if venv_python_missing and repair_uv:
         print("→ Recreating virtual environment...")
-        subprocess.run([repair_uv, "venv", "venv"], cwd=_m().PROJECT_ROOT, check=False)
+        subprocess.run([repair_uv, "venv", str(venv_dir)], cwd=_m().PROJECT_ROOT, check=False)
     repair_prefix, repair_env = _pip_install_prefix(repair_uv)
     _m()._install_python_dependencies_with_optional_fallback(repair_prefix, env=repair_env, group="all")
     _m()._refresh_active_lazy_features(repair_prefix, env=repair_env, features=active_lazy_features)
@@ -668,7 +669,7 @@ def _pip_install_prefix(uv_bin) -> tuple[list[str], dict | None]:
         # See #83914.
         from hermes_cli.managed_uv import managed_python_env
         env = managed_python_env()
-        env["VIRTUAL_ENV"] = str(_m().PROJECT_ROOT / "venv")
+        env["VIRTUAL_ENV"] = str(resolve_venv_dir(_m().PROJECT_ROOT))
         return [uv_bin, "pip"], env
     return [sys.executable, "-m", "pip"], None
 
@@ -1175,8 +1176,9 @@ def _handle_update_called_process_error(
             print("  (usually network or disk space), then run `stardust update` again.")
             if _m()._is_windows():
                 print("  If `stardust update` itself will not start, retry through the venv interpreter:")
+                venv_name = resolve_venv_dir(_m().PROJECT_ROOT).name
                 print(
-                    '    venv\\Scripts\\python.exe -c '
+                    f'    {venv_name}\\Scripts\\python.exe -c '
                     '"from hermes_cli.main import main; main()" update --yes')
         else:
             print(f"✗ {stage}.")
@@ -1326,6 +1328,10 @@ def _cmd_update_impl(args, gateway_mode: bool):
     # backend). NOT bypassed by --force (desktop updater, shim guard only); --force-venv is.
     if _m()._is_windows() and not getattr(args, "force_venv", False):
         _clear_windows_venv_holders_or_exit(args, gateway_mode, _windows_gateway_resume)
+
+    # Expose a `.venv`-only install as `venv` once every fail-closed venv guard has passed (the alias is a
+    # mutation, so it never runs ahead of a refusal). Idempotent; a failed alias never blocks the update.
+    ensure_venv_alias(_m().PROJECT_ROOT)
 
     # After every fail-closed venv guard, before either path can remove the release tree.
     # Self-lock deferral moved: the venv-holder sweep above excludes this process by design (a CLI `hermes
