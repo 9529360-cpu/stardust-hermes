@@ -769,7 +769,8 @@ def _lap_gpt_official_row(b: _PickerBuild) -> None:
     b.results.append({"slug": PROVIDER, "name": LABEL,
         "is_current": b.current_provider == PROVIDER, "is_user_defined": False,
         "models": models, "total_models": len(models), "source": "external-access-readonly",
-        "auth_type": "external_access_readonly", "auth_error": error, "warning": error,
+        "auth_type": "external_access_readonly", "auth_error": error,
+        "warning": error or "账户 Codex API 模型目录，不等同 ChatGPT 网页全部模型；仅展示服务端 list 且 API 可用的常规模型。Luna 为旧代快速高效模型，并非最新型号。隐藏的 Reserve、Legacy、Auto Review 不作为普通聊天选项。",
         "authenticated": not bool(error)})
 
 

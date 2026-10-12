@@ -65,7 +65,7 @@ def test_catalog_only_live_models_luna_first_and_safe_errors(tmp_path, monkeypat
             {"slug": "gpt-6-astra"}]})
     transport = httpx.MockTransport(handle)
     monkeypatch.setattr(mod, "_http_client", lambda: httpx.Client(transport=transport))
-    assert mod.model_ids() == ["gpt-5.6-luna", "gpt-6-astra", "account-only-hidden"]
+    assert mod.model_ids() == ["gpt-5.6-luna", "gpt-6-astra"]
     assert len(requests) == 1
     assert path.read_bytes() == before
     monkeypatch.setattr(mod, "_http_client", lambda: httpx.Client(transport=httpx.MockTransport(
@@ -191,6 +191,51 @@ def test_transport_tools_are_codex_compatible_and_identity_is_honest():
                             _base_url_lower="https://chatgpt.com/backend-api/codex")
     _resolve_api_mode(agent, None, "gpt-official", agent._base_url_lower)
     assert agent.api_mode == "codex_responses"
+
+
+def test_cached_aux_request_rereads_account_and_fails_closed(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    path = auth_file(tmp_path, monkeypatch)
+    mod = module()
+    seen = []
+    client = SimpleNamespace(api_key="old", responses=SimpleNamespace(create=lambda **kw: seen.append(kw)))
+    mod.bind_readonly_client(client)
+    client.responses.create(extra_headers={"originator": "fake"})
+    replacement = token(account="replacement")
+    path.write_text(json.dumps({"tokens": {"access_token": replacement, "account_id": "replacement"}}))
+    client.responses.create()
+    assert client.api_key == replacement
+    assert seen[-1]["extra_headers"]["ChatGPT-Account-ID"] == "replacement"
+    assert seen[0]["extra_headers"]["originator"] == "hermes-agent"
+    path.unlink()
+    from hermes_cli.auth import AuthError
+    with pytest.raises(AuthError):
+        client.responses.create()
+    assert len(seen) == 2
+
+
+@pytest.mark.parametrize("async_mode", [False, True])
+def test_aux_errors_never_enter_fallback(monkeypatch, async_mode):
+    import asyncio
+    from types import SimpleNamespace
+    from agent import auxiliary_client as aux
+    req = SimpleNamespace(client=object(), kwargs={}, request_provider="gpt-official",
+                          resolved_api_mode="codex_responses", base_info="", resolved_base_url="")
+    monkeypatch.setattr(aux, "_plan_aux_call", lambda *a, **kw: (req, {}, {}))
+    monkeypatch.setattr(aux, "_should_retry_same_provider", lambda *a: False)
+    monkeypatch.setattr(aux, "_provider_requires_stream", lambda *a: False)
+    def fail(*a, **kw):
+        raise ValueError("expected account failure")
+    async def afail(*a, **kw):
+        fail()
+    monkeypatch.setattr(aux, "_relay_sync_completion", fail)
+    monkeypatch.setattr(aux, "_relay_async_completion", afail)
+    monkeypatch.setattr(aux, "_start_recovery_ladder", lambda *a, **kw: pytest.fail("fallback entered"))
+    with pytest.raises(ValueError, match="expected account failure"):
+        if async_mode:
+            asyncio.run(aux._async_call_llm_impl(provider="gpt-official", messages=[]))
+        else:
+            aux.call_llm(provider="gpt-official", messages=[])
 
 
 def test_request_boundary_rereads_external_access_without_refresh(tmp_path, monkeypatch):

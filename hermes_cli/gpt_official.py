@@ -72,13 +72,31 @@ def model_ids() -> list[str]:
         if not isinstance(rows, list):
             raise ValueError()
         models = list(dict.fromkeys(row["slug"] for row in rows
-            if isinstance(row, dict) and isinstance(row.get("slug"), str) and row["slug"]))
+            if isinstance(row, dict) and isinstance(row.get("slug"), str) and row["slug"]
+            and row.get("visibility", "list") == "list" and row.get("supported_in_api", True)))
         if DEFAULT_MODEL in models:
             models.remove(DEFAULT_MODEL)
             models.insert(0, DEFAULT_MODEL)
         return models
     except (httpx.HTTPError, ValueError, KeyError, TypeError):
         raise AuthError("GPT官方账户模型目录读取失败；未切换到其他模型或服务。") from None
+
+
+def bind_readonly_client(client):
+    """Re-read external access/account at each SDK request, including cached aux clients."""
+    create = client.responses.create
+
+    def readonly_create(**kwargs):
+        creds = read_credentials()
+        client.api_key = creds["access_token"]
+        # Request headers win over stale cached client headers and caller identity overrides.
+        kwargs["extra_headers"] = {**(kwargs.get("extra_headers") or {}),
+                                   **request_headers(creds),
+                                   "Authorization": "Bearer " + creds["access_token"]}
+        return create(**kwargs)
+
+    client.responses.create = readonly_create
+    return client
 
 
 def prepare_request(agent) -> None:

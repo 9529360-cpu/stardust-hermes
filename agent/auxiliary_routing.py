@@ -355,6 +355,8 @@ def _resolve_gpt_official_branch(req: _ResolveRequest) -> _ResolveResult:
     model = req.model or DEFAULT_MODEL
     client = _aux._create_openai_client(api_key=creds["access_token"], base_url=CODEX_AUX_BASE_URL,
                                       default_headers=request_headers(creds))
+    from hermes_cli.gpt_official import bind_readonly_client
+    bind_readonly_client(client)
     if not req.raw_codex:
         client = _aux.CodexAuxiliaryClient(client, model)
     return _route_client(req, client, model)

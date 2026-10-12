@@ -935,6 +935,7 @@ def run_codex_stream(agent, api_kwargs: dict, client: Any = None, on_first_delta
         return bool(agent._interrupt_requested)
 
     def _open_codex_stream(next_api_kwargs: dict[str, Any]):
+        nonlocal active_client
         from hermes_cli.providers import is_actual_route
 
         if is_actual_route(
@@ -944,6 +945,10 @@ def run_codex_stream(agent, api_kwargs: dict, client: Any = None, on_first_delta
             raise ValueError(
                 "Actual requests require Chat Completions; refusing to call /responses."
             )
+        if getattr(agent, "provider", "") == "gpt-official":
+            from hermes_cli.gpt_official import prepare_request
+            prepare_request(agent)
+            active_client = agent._ensure_primary_openai_client(reason="gpt_official_request")
         stream_kwargs = _sanitize_consumer_codex_request(agent, next_api_kwargs)
         stream_kwargs["stream"] = True
         return active_client.responses.create(**_bypass_sdk_request_transform(stream_kwargs))
