@@ -982,9 +982,10 @@ class TestSpawnEnvSanitization:
             def __init__(self):
                 self.commands = []
                 self._responses = iter([
-                    {"output": "6 0\nhello\n"},
-                    {"output": "1\n"},
-                    {"output": "0\n"},
+                    {"output": "6 0\nhello\n"},  # delta: new output
+                    {"output": "1\n"},  # kill -0: the process has exited
+                    {"output": "0\n"},  # the final delta after the exit: nothing new
+                    {"output": "0\n"},  # the exit code
                 ])
 
             def execute(self, command, **kwargs):
@@ -1006,7 +1007,8 @@ class TestSpawnEnvSanitization:
         assert "'/path with spaces/hermes_bg.log'" in env.commands[0][0]
         assert "cat '/path with spaces/hermes_bg.log'" not in env.commands[0][0]
         assert env.commands[1][0] == "kill -0 \"$(cat '/path with spaces/hermes_bg.pid' 2>/dev/null)\" 2>/dev/null; echo $?"
-        assert env.commands[2][0] == "cat '/path with spaces/hermes_bg.exit' 2>/dev/null"
+        assert "'/path with spaces/hermes_bg.log'" in env.commands[2][0]  # one more read after the exit was seen
+        assert env.commands[3][0] == "cat '/path with spaces/hermes_bg.exit' 2>/dev/null"
 
 
 class TestEnvPollerIncrementalRead:

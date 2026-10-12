@@ -61,6 +61,10 @@ _PIPE_HANDOFF_TIMEOUT_SECONDS = 1.0
 # finishes the session without draining it. Attempts after the first only try, so quick repeated
 # list/poll calls cannot use up this budget.
 _PIPE_HANDOFF_BUDGET_SECONDS = 4.0
+# One reconciled-exit drain reads at most this much, in pieces of the chunk size, so a writer that keeps
+# writing cannot hold the pipe lock for long. Hitting the cap means end of file was not seen.
+_DRAIN_CHUNK_BYTES = 64 * 1024
+_DRAIN_MAX_BYTES = 1024 * 1024
 
 # Watch-pattern rate limiting, PER SESSION: one watch-match notification per
 # WATCH_MIN_INTERVAL_SECONDS; a match inside the cooldown is dropped and counts as one
@@ -1214,7 +1218,9 @@ class ProcessRegistry(ProcessCheckpointMixin):
                     break  # true EOF — all writers closed
                 idle_after_exit = 0
         except Exception as e:
-            logger.debug("Process stdout reader ended: %s", e)
+            # The reader stopped before end of file, so output after this point never reached output_buffer.
+            logger.warning("Stdout reader of %s stopped early; its output may be incomplete: %s", session.id, e)
+            self._flag_output_incomplete(session, "reader stopped early")
         finally:
             # Flush the decoder's tail and any undecided first line under the pipe lock, so the flush
             # cannot interleave with a reconciled exit reading the same stream.
@@ -1222,7 +1228,9 @@ class ProcessRegistry(ProcessCheckpointMixin):
                 try:
                     self._ingest_pipe_bytes(session, b"", final=True)
                 except Exception as e:
-                    logger.debug("Final pipe flush of %s failed: %s", session.id, e)
+                    logger.warning("Final flush of %s's pipe failed; its last output may be missing: %s",
+                                   session.id, e)
+                    self._flag_output_incomplete(session, "final pipe flush failed")
             self._finish_reader(
                 session, None, lambda text: self._ingest_pipe_text(session, text), "Process",
                 session.process.wait, lambda: session.process.returncode)
@@ -1242,6 +1250,7 @@ class ProcessRegistry(ProcessCheckpointMixin):
                     append(tail)
             except Exception as e:
                 logger.warning("%s stdout tail could not be flushed; its last bytes may be lost: %s", label, e)
+                self._flag_output_incomplete(session, "tail flush failed")
         try:
             wait()
         except Exception as e:
@@ -1286,6 +1295,27 @@ class ProcessRegistry(ProcessCheckpointMixin):
             f"tail -c +$((O+1)) {quoted_log_path} 2>/dev/null | head -c $((S-O)); fi"
         )
 
+    def _ingest_env_delta(self, session: ProcessSession, env: Any, log_path: str, offset: int) -> int:
+        """Read the sandbox log from byte ``offset`` and ingest what is new through the same path the pipe
+        readers use. Returns the offset to read from next time; an unusable reply leaves it unchanged."""
+        raw = env.execute(self._log_delta_command(shlex.quote(log_path), offset), timeout=10).get("output", "")
+        header, _, delta = raw.partition("\n")
+        try:
+            size_str, offset_str = header.split()
+            new_size, used_offset = int(size_str), int(offset_str)
+        except ValueError:
+            # No usable header (command failed, shell missing a tool): skip this poll rather than act on a
+            # half-read value.
+            return offset
+        if used_offset < offset:
+            # Log rotated/truncated: what we hold no longer lines up. Restart, and say so.
+            with session._lock:
+                session.output_buffer = ""
+            self._flag_output_incomplete(session, "sandbox log was truncated")
+        if delta:
+            self._ingest_pipe_text(session, delta)
+        return new_size
+
     def _env_poller_loop(self, session: ProcessSession, env: Any, log_path: str, pid_path: str, exit_path: str):
         """Background thread: poll a sandbox log file for non-local backends."""
         q = shlex.quote
@@ -1295,37 +1325,14 @@ class ProcessRegistry(ProcessCheckpointMixin):
             time.sleep(2)
             try:
                 # Read only the bytes written since the last poll.
-                raw = env.execute(self._log_delta_command(q(log_path), prev_output_bytes),
-                                  timeout=10).get("output", "")
-                header, _, delta = raw.partition("\n")
-                try:
-                    size_str, offset_str = header.split()
-                    new_size = int(size_str)
-                    used_offset = int(offset_str)
-                except ValueError:
-                    # No usable header (command failed, shell missing a tool): skip this
-                    # poll rather than act on a half-read value.
-                    new_size = None
-                    used_offset = None
-                    delta = ""
-                if new_size is not None:
-                    if used_offset < prev_output_bytes:
-                        # Log rotated/truncated: what we hold no longer lines up. Restart.
-                        with session._lock:
-                            session.output_buffer = ""
-                    prev_output_bytes = new_size
-                if delta:
-                    with session._lock:
-                        session.output_buffer += delta
-                        if len(session.output_buffer) > session.max_output_chars:
-                            session.output_buffer = session.output_buffer[-session.max_output_chars:]
-                    self._check_watch_patterns(session, delta)
-                    self._emit_output(session, delta)
+                prev_output_bytes = self._ingest_env_delta(session, env, log_path, prev_output_bytes)
 
                 check = env.execute(
                     f"kill -0 \"$(cat {q(pid_path)} 2>/dev/null)\" 2>/dev/null; echo $?", timeout=5)
                 check_output = check.get("output", "").strip()
                 if check_output and check_output.splitlines()[-1].strip() != "0":
+                    # Exited. One more read first: output written since the last poll must not be lost.
+                    self._ingest_env_delta(session, env, log_path, prev_output_bytes)
                     # Exited -- read the exit code captured by the wrapper shell.
                     exit_str = env.execute(f"cat {q(exit_path)} 2>/dev/null", timeout=5).get("output", "").strip()
                     try:
@@ -1336,7 +1343,8 @@ class ProcessRegistry(ProcessCheckpointMixin):
                     self._finish_exited(session, exit_code)
                     return
             except Exception:
-                # Environment might be gone (sandbox reaped, etc.)
+                # Environment might be gone (sandbox reaped, etc.): whatever it wrote since the last read is lost.
+                self._flag_output_incomplete(session, "sandbox became unreachable")
                 session.exited, session.exit_code = True, -1
                 session.completion_reason, session.termination_source = "lost", "backend_lost"
                 self._move_to_finished(session)
@@ -1393,19 +1401,21 @@ class ProcessRegistry(ProcessCheckpointMixin):
         """Buffer a freshly-read chunk, then scan watch patterns and stream it live."""
         session.append_output(text)
         if session.exited:  # output after the finish: the completion and the receipt did not include it
-            self._mark_output_incomplete(session)
+            self._flag_output_incomplete(session, "output arrived after the finish")
         self._check_watch_patterns(session, text)
         self._emit_output(session, text)
 
-    def _mark_output_incomplete(self, session: ProcessSession) -> None:
-        """Flag a finished session whose output grew, and rewrite its receipt so the flag is durable."""
+    def _flag_output_incomplete(self, session: ProcessSession, why: str) -> None:
+        """Mark output_buffer as possibly missing output. A finished session's receipt is rewritten at once so
+        the flag is durable; an unfinished session carries the flag into its finish."""
         with session._lock:
             if session.output_incomplete:
                 return
             session.output_incomplete = True
-        logger.info("Process %s produced output after it finished; its completion and receipt are marked incomplete",
-                    session.id)
-        save_completed_result(session)
+            finished = session.exited
+        logger.info("Process %s: output may be incomplete (%s)", session.id, why)
+        if finished:
+            save_completed_result(session)
 
     def _ingest_pipe_bytes(self, session: ProcessSession, raw: bytes, *, final: bool = False) -> None:
         """Decode bytes read from a local pipe, then ingest them. Caller holds ``session._pipe_read_lock``."""
@@ -1416,9 +1426,10 @@ class ProcessRegistry(ProcessCheckpointMixin):
         self._ingest_pipe_text(session, session._pipe_decoder.decode(raw, final=final), final=final)
 
     def _ingest_pipe_text(self, session: ProcessSession, text: str, *, final: bool = False) -> None:
-        """The one path from a local pipe into ``output_buffer``, for the reader thread and a reconciled
-        exit alike: shell start-up noise is removed from the head of the stream, then the text is buffered,
-        watched and streamed live. Caller holds ``session._pipe_read_lock``."""
+        """The one path from a process's output stream into ``output_buffer``: the pipe reader, a reconciled
+        exit and the sandbox log poller all come through here. Shell start-up noise is removed from the head of
+        the stream, then the text is buffered, watched and streamed live. Callers that share a pipe hold
+        ``session._pipe_read_lock``."""
         emit, session._shell_head_pending, session._shell_head_open = filter_shell_noise_head(
             session._shell_head_open, session._shell_head_pending, text, final=final)
         if emit:
@@ -1809,20 +1820,26 @@ class ProcessRegistry(ProcessCheckpointMixin):
                 return
             logger.warning(
                 "Process %s: reader still busy after %.1fs; finishing without draining it", session.id, busy_for)
-            self._finalize_reconciled_exit(session, rc, keep_stdout=True, incomplete=True)
+            self._finalize_reconciled_exit(
+                session, rc, keep_stdout=self._reader_running(session), incomplete=True)
             return
         try:
-            drained = self._drain_pipe_available(session, stdout)
-            self._finalize_reconciled_exit(session, rc, incomplete=not drained)
+            eof = self._drain_pipe_available(session, stdout)
+            # Only end of file proves that no writer is left. Otherwise the pipe stays open for the reader, which
+            # keeps reading and flags what arrives after this finish; with no reader the pipe is closed here.
+            self._finalize_reconciled_exit(
+                session, rc, keep_stdout=not eof and self._reader_running(session), incomplete=not eof)
         finally:
             session._pipe_read_lock.release()
 
     def _drain_pipe_available(self, session: ProcessSession, stdout) -> bool:
-        """Ingest the bytes already in a local pipe without waiting for more. Caller holds
-        ``session._pipe_read_lock``. A reconciled exit closes the stream right after this, so the decoder
-        and any undecided first line are flushed here as well. Returns False when the pipe could not be read."""
-        raw = None
-        drained = True
+        """Ingest what the pipe holds now, without waiting for more. Caller holds ``session._pipe_read_lock``.
+
+        Returns True only when end of file was observed, which means every writer is gone and nothing is left
+        to read. Any other outcome (no bytes right now, the per-attempt cap, a read error) means a writer may
+        still hold the pipe, so its output is not known to be complete. The decoder and any undecided first
+        line are flushed only at end of file, because a live reader still needs their state."""
+        eof = False
         try:
             import fcntl
 
@@ -1831,14 +1848,31 @@ class ProcessRegistry(ProcessCheckpointMixin):
             flags = fcntl.fcntl(fd, fcntl.F_GETFL)
             fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
             try:
-                raw = stream.read()  # None when nothing is available right now
+                taken = 0
+                while taken < _DRAIN_MAX_BYTES:
+                    data = stream.read(_DRAIN_CHUNK_BYTES)  # None: nothing right now; b"": end of file
+                    if data is None:
+                        break
+                    if not data:
+                        eof = True
+                        break
+                    taken += len(data)
+                    self._ingest_pipe_bytes(session, data)
             finally:
                 fcntl.fcntl(fd, fcntl.F_SETFL, flags)
         except Exception as e:
-            drained = False
+            eof = False
             logger.warning("Could not drain the pipe of %s; its output may be incomplete: %s", session.id, e)
-        self._ingest_pipe_bytes(session, raw if isinstance(raw, bytes) else b"", final=True)
-        return drained
+        if eof:
+            self._ingest_pipe_bytes(session, b"", final=True)
+        return eof
+
+    @staticmethod
+    def _reader_running(session: ProcessSession) -> bool:
+        """True while a reader thread other than the caller is still reading the session's pipe. Sessions put
+        into _finished directly may carry no reader handle at all."""
+        reader = getattr(session, "_reader_thread", None)
+        return reader is not None and reader.is_alive() and reader is not threading.current_thread()
 
     def _finalize_reconciled_exit(self, session: ProcessSession, rc: int, *, keep_stdout: bool = False,
                                   incomplete: bool = False) -> None:
@@ -2341,7 +2375,10 @@ class ProcessRegistry(ProcessCheckpointMixin):
             # directly (defensive paths, historical checkpoints) would
             # otherwise carry its OS handles to the grave unreleased. The
             # release is idempotent, so double-closing is safe.
-            self._release_finished_handles(self._finished[sid])
+            session = self._finished[sid]
+            # A reader still running owns its pipe and closes it when it finishes; closing it here would drop
+            # output the reader has yet to read.
+            self._release_finished_handles(session, keep_stdout=self._reader_running(session))
             del self._finished[sid]
         # Belt-and-suspenders against module-lifetime growth: forget consumed /
         # poll-observed marks for any session no longer tracked at all.

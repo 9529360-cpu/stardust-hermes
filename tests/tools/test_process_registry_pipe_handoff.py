@@ -26,6 +26,7 @@ from tools import process_registry as process_registry_module
 from tools.process_registry import (
     _PIPE_HANDOFF_BUDGET_SECONDS,
     _PIPE_HANDOFF_TIMEOUT_SECONDS,
+    FINISHED_TTL_SECONDS,
     ProcessRegistry,
     ProcessSession,
 )
@@ -467,3 +468,202 @@ def test_reconcile_without_a_drain_marks_the_completion_and_receipt(monkeypatch)
         assert _receipt(session.id)["output_incomplete"] is True
     finally:
         _reap(proc)
+
+
+@posix_only
+def test_drain_reports_end_of_file_only_when_the_writer_is_gone(tmp_path):
+    gate = tmp_path / "gate"
+    proc = _spawn(f"( while [ ! -e {shlex.quote(str(gate))} ]; do sleep 0.01; done; printf 'late\\n' ) & exit 0")
+    proc.wait(timeout=10)  # The direct child is gone; the background writer still holds the pipe.
+    registry = ProcessRegistry()
+    session = _local_session(proc, "proc_drain_eof")
+    try:
+        with session._pipe_read_lock:
+            # No bytes right now, and the writer is alive: not end of file.
+            assert registry._drain_pipe_available(session, proc.stdout) is False
+            assert session.output_buffer == ""
+            gate.touch()
+            # Returns True only once the writer has written and gone, having read its last bytes.
+            assert _wait_until(lambda: registry._drain_pipe_available(session, proc.stdout))
+        assert session.output_buffer == "late\n"
+    finally:
+        _reap(proc)
+
+
+@posix_only
+def test_live_writer_after_the_drain_is_captured_and_flagged(tmp_path):
+    gate = tmp_path / "gate"
+    # Ticks every 50 ms until the gate opens, then a tail, then exit. The ticks keep the reader from idling out.
+    writer = (
+        f"( i=0; while [ ! -e {shlex.quote(str(gate))} ]; do printf 'tick%s\\n' $i; i=$((i+1)); sleep 0.05; done; "
+        "j=0; while [ $j -lt 20 ]; do printf 'tail%s\\n' $j; j=$((j+1)); sleep 0.02; done ) & exit 0"
+    )
+    registry = ProcessRegistry()
+    live = []
+    registry.on_output = lambda _session, chunk: live.append(chunk)
+    proc = _spawn(writer)
+    session = _local_session(proc, "proc_live_writer")
+    registry._track_started(session, registry._reader_loop, "live-writer-reader")
+    try:
+        proc.wait(timeout=10)  # The direct child exited; the writer is still writing.
+        registry._reconcile_local_exit(session)  # Not end of file, so the session is flagged and the pipe stays open.
+        assert session.exited and session.output_incomplete
+        assert _completion_for(registry, session.id)["output_incomplete"] is True
+        gate.touch()
+        session._reader_thread.join(timeout=15)  # The writer exits; the reader reaches end of file and finishes.
+        assert not session._reader_thread.is_alive()
+        lines = session.output_buffer.splitlines()
+        ticks = [line for line in lines if line.startswith("tick")]
+        # Nothing dropped: the ticks run from 0 without a gap, and every tail line arrived.
+        assert [int(line[4:]) for line in ticks] == list(range(len(ticks)))
+        assert [line for line in lines if line.startswith("tail")] == [f"tail{j}" for j in range(20)]
+        assert "".join(live) == session.output_buffer
+        record = _receipt(session.id)
+        assert record["output_incomplete"] is True
+        assert record["output"].endswith("tail19\n")  # the finish after end of file refreshed the receipt
+    finally:
+        _reap(proc, session._reader_thread)
+
+
+@posix_only
+def test_pruning_a_finished_session_keeps_the_pipe_its_reader_is_still_reading():
+    registry = ProcessRegistry()
+    session, proc, release = _start_stuck_sink(registry, "proc_prune_live")
+    try:
+        registry._move_to_finished(session, keep_stdout=True)  # finished while its reader is still busy
+        session.started_at -= FINISHED_TTL_SECONDS + 60  # long past the retention window
+        with registry._lock:
+            registry._prune_if_needed()
+        assert session.id not in registry._finished  # pruned from memory
+        assert not proc.stdout.closed  # but the pipe stays open for the reader
+        release.set()
+        session._reader_thread.join(timeout=15)
+        assert proc.stdout.closed  # the reader closed it when it finished
+    finally:
+        release.set()
+        _reap(proc, session._reader_thread)
+
+
+def test_reader_exception_is_logged_and_marks_output_incomplete(caplog):
+    class _Buffer:
+        def __init__(self):
+            self.reads = 0
+
+        def read1(self, _n):
+            self.reads += 1
+            if self.reads == 1:
+                return b"partial\n"
+            raise RuntimeError("stream broke")
+
+    class _Stdout:
+        def __init__(self):
+            self.buffer = _Buffer()
+
+        def close(self):
+            pass
+
+    class _Process:
+        returncode = 0
+        stderr = None
+        stdin = None
+
+        def __init__(self):
+            self.stdout = _Stdout()
+
+        def poll(self):
+            return None
+
+        def wait(self, timeout=None):
+            return 0
+
+    registry = ProcessRegistry()
+    session = ProcessSession(id="proc_reader_error", command="probe")
+    session.process = _Process()
+    caplog.set_level(logging.WARNING, logger="tools.process_registry")
+    registry._reader_loop(session)
+    assert session.output_buffer == "partial\n"
+    assert session.output_incomplete is True
+    assert any(record.levelno == logging.WARNING and "stopped early" in record.getMessage()
+               for record in caplog.records)
+
+
+def test_final_pipe_flush_failure_is_logged_and_marks_output_incomplete(caplog, monkeypatch):
+    class _Buffer:
+        def read1(self, _n):
+            return b""  # end of file at once
+
+    class _Stdout:
+        def __init__(self):
+            self.buffer = _Buffer()
+
+        def close(self):
+            pass
+
+    class _Process:
+        returncode = 0
+        stderr = None
+        stdin = None
+
+        def __init__(self):
+            self.stdout = _Stdout()
+
+        def poll(self):
+            return None
+
+        def wait(self, timeout=None):
+            return 0
+
+    registry = ProcessRegistry()
+    session = ProcessSession(id="proc_flush_error", command="probe")
+    session.process = _Process()
+    real_ingest = registry._ingest_pipe_bytes
+
+    def failing_final_flush(sess, raw, *, final=False):
+        if final:
+            raise RuntimeError("decoder broke")
+        return real_ingest(sess, raw, final=final)
+
+    monkeypatch.setattr(registry, "_ingest_pipe_bytes", failing_final_flush)
+    caplog.set_level(logging.WARNING, logger="tools.process_registry")
+    registry._reader_loop(session)
+    assert session.output_incomplete is True
+    assert any(record.levelno == logging.WARNING and "Final flush" in record.getMessage()
+               for record in caplog.records)
+
+
+class _FakeEnv:
+    def __init__(self, reply: str):
+        self.reply = reply
+
+    def execute(self, command, timeout=None):
+        return {"output": self.reply}
+
+
+def test_environment_log_output_goes_through_the_shared_filter_and_ingest():
+    delta = NOISE_JOBCONTROL + "\nready now\n"
+    registry = ProcessRegistry()
+    session = ProcessSession(id="proc_env_log", command="probe", watch_patterns=["ready"])
+    emitted = []
+    registry.on_output = lambda _session, chunk: emitted.append(chunk)
+    size = len(delta.encode("utf-8"))
+    assert registry._ingest_env_delta(session, _FakeEnv(f"{size} 0\n{delta}"), "/log", 0) == size
+    assert session.output_buffer == "ready now\n"  # the shell warning was filtered out
+    assert emitted == ["ready now\n"]  # the live sink saw the same text
+    event = registry.completion_queue.get_nowait()
+    assert event["type"] == "watch_match" and event["pattern"] == "ready"
+
+
+def test_environment_log_rotation_restarts_the_buffer_and_flags_it():
+    registry = ProcessRegistry()
+    session = ProcessSession(id="proc_env_rotated", command="probe", output_buffer="old output\n")
+    assert registry._ingest_env_delta(session, _FakeEnv("4 0\nnew\n"), "/log", 100) == 4
+    assert session.output_buffer == "new\n"
+    assert session.output_incomplete is True
+
+
+def test_environment_unusable_reply_keeps_the_offset():
+    registry = ProcessRegistry()
+    session = ProcessSession(id="proc_env_garbled", command="probe")
+    assert registry._ingest_env_delta(session, _FakeEnv("command not found\n"), "/log", 42) == 42
+    assert session.output_buffer == ""
+    assert session.output_incomplete is False
