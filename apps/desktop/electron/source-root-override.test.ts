@@ -44,6 +44,15 @@ describe('resolveSourceRootOverride', () => {
     expect(warn).toHaveBeenCalledTimes(1)
   })
 
+  it('falls back to a non-empty legacy name when the current name is empty', () => {
+    const warn = vi.fn()
+
+    expect(resolveSourceRootOverride({ [CURRENT_NAME]: '', [LEGACY_NAME]: '/legacy/root' }, warn)).toBe(
+      path.resolve('/legacy/root'),
+    )
+    expect(warn).toHaveBeenCalledTimes(1)
+  })
+
   it('does not warn when only the current name is set', () => {
     const warn = vi.fn()
 

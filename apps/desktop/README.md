@@ -80,7 +80,7 @@ Backend resolution 继续按验证后的候选链工作：
 
 候选只在通过真实 probe 后才可使用；文件存在本身不是有效运行时的证明。
 
-旧名称 `HERMES_DESKTOP_HERMES_ROOT` 仍作为兼容回退：只有在新名称未设置时才生效，每个进程只打印一次弃用警告，警告同时写入 `desktop.log`。改名后的其它变量（如 `STARDUST_DESKTOP_TERMINAL`、`STARDUST_DESKTOP_DISABLE_GPU`）使用同样的回退规则。
+旧名称 `HERMES_DESKTOP_HERMES_ROOT` 仍作为兼容回退：新名称未设置或为空字符串时，才使用非空旧值；新名称为非空值时始终优先于旧名称。仅使用旧名称时，每个进程只打印一次弃用警告，警告同时写入 `desktop.log`。改名后的其它变量（如 `STARDUST_DESKTOP_TERMINAL`、`STARDUST_DESKTOP_DISABLE_GPU`）遵循同样的新名称非空优先、旧名称回退规则。
 
 ## Connections 与 Projects
 
