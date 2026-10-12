@@ -69,6 +69,7 @@ test.describe('unread dot survives app restart', () => {
   test.beforeAll(async () => {
     restartMockServer()
     fixture = await setupMockBackend({
+      extraDisplayConfig: '  language: en',
       mockServer: { holdFirstStreamForPrompt: HELD_PROMPT },
     })
     app = fixture.app

@@ -32,11 +32,13 @@ describe('blueprint display copy', () => {
       ...blueprint([{ name: 'time', type: 'time', label: 'Time', default: '08:00', options: [], optional: false, help: '' }]),
       key: 'morning-brief',
       title: 'Morning briefing',
-      description: "A short daily briefing: today's calendar, weather, and anything urgent waiting on you."
+      description: "A daily briefing: the global market brief (PDF), a read-only house status check, and today's plan from your tasks and calendar when they can be read."
     }
 
     expect(blueprintDisplayTitle(official, c)).toBe('晨间简报')
-    expect(blueprintDisplayDescription(official, c)).toContain('今日日程')
+    expect(blueprintDisplayDescription(official, c)).toContain('全球股市')
+    expect(blueprintDisplayDescription(official, c)).toContain('只读')
+    expect(blueprintDisplayDescription(official, c)).toContain('连接后')
     expect(blueprintDisplayFieldLabel(official.key, official.fields[0], c)).toBe('时间')
     expect(blueprintDisplayOption('sunday', c)).toBe('周日')
   })

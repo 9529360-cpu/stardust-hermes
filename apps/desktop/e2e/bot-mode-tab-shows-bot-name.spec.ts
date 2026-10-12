@@ -50,7 +50,7 @@ async function openUntil(action: () => Promise<void>, expected: () => Promise<vo
 async function seedBot(hermesHome: string, mockUrl: string, name: string): Promise<void> {
   const dir = path.join(hermesHome, 'profiles', name)
   fs.mkdirSync(dir, { recursive: true })
-  writeMockProviderConfig(dir, mockUrl)
+  writeMockProviderConfig(dir, mockUrl, '  language: en')
   writeEnvFile(dir)
 
   const builder = await RealSessionBuilder.start(dir)
@@ -74,7 +74,7 @@ function mainStripTabTitles(page: Page): Promise<string[]> {
 test.beforeAll(async () => {
   const mock = await startMockServer()
   const sandbox = createSandbox('bots-tabname')
-  writeMockProviderConfig(sandbox.hermesHome, mock.url)
+  writeMockProviderConfig(sandbox.hermesHome, mock.url, '  language: en')
   writeEnvFile(sandbox.hermesHome)
   await seedBot(sandbox.hermesHome, mock.url, 'alpha')
   await seedBot(sandbox.hermesHome, mock.url, 'beta')
