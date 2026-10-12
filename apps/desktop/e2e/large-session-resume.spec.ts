@@ -247,12 +247,16 @@ test.describe('large session resume', () => {
         BACKGROUND_REPLY,
         { timeout: 60_000 },
       )
-      const activeSubmit = fixture.page
-        .locator('[data-composer-target]:not([data-pane-hidden] [data-composer-target]) [data-slot="composer-root"] button[type="submit"]')
+      // With an empty draft, an idle composer intentionally shows Start Voice,
+      // not the submit button labelled Send. While this held turn is running,
+      // its primary is Stop; Start Voice returning proves the stop chunk landed.
+      const activeComposer = fixture.page
+        .locator('[data-composer-target]:not([data-pane-hidden] [data-composer-target])')
         .last()
-      await expect(activeSubmit).toHaveAttribute('aria-label', /^(Send|发送)$/, { timeout: 60_000 })
-      // The completion label proves the stop chunk was consumed; leave the
-      // existing brief settle for the subsequent persisted-history reconcile.
+        .locator('[data-slot="composer-root"]')
+      await expect(
+        activeComposer.getByRole('button', { name: /^(Start voice conversation|开始语音对话)$/ }),
+      ).toBeVisible({ timeout: 15_000 })
       await fixture.page.waitForTimeout(300)
       await fixture.page.screenshot({ path: testInfo.outputPath(`${resumeKind}-background-inference-resume.png`), fullPage: false })
 
