@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from utils import atomic_write_bytes, atomic_write_text, fsync_directory, path_signature
+from tools.memory_tombstones import fold_text, forgotten_store_error, record_forgotten
 from tools.threat_patterns import first_threat_message as _first_threat_message
 
 logger = logging.getLogger("tools.memory_tool")
@@ -66,6 +67,16 @@ def _find_unique_match(entries: List[str], old_text: str) -> Tuple[Optional[int]
     if len({entries[i] for i in matches}) > 1:
         return None, True
     return (matches[0] if matches else None), False
+
+
+def _with_forget_record(result: Dict[str, Any], removed_texts: List[str], target: str) -> Dict[str, Any]:
+    """Record removed texts as forgotten after a successful write. A failed record is reported
+    on the result; the removal itself has already happened."""
+    if result.get("success") and removed_texts:
+        warning = record_forgotten(removed_texts, source=target)
+        if warning:
+            result["forget_record_warning"] = warning
+    return result
 
 
 class MemoryStore:
@@ -318,6 +329,9 @@ class MemoryStore:
         path.parent.mkdir(parents=True, exist_ok=True)
         marker = cls._reset_generation_path(path)
         new_generation = secrets.token_hex(16)
+        if forget_error := forgotten_store_error():
+            raise RuntimeError(forget_error)
+        erased: List[str] = []
         with cls._file_lock(path):
             if marker.is_symlink():
                 raise RuntimeError(f"Refusing reset-generation symlink: {marker}")
@@ -327,21 +341,21 @@ class MemoryStore:
                 if path.is_symlink():
                     path.unlink()
                     fsync_directory(path.parent)
-                    return True
-
-                existed = path.exists()
-                if not existed:
-                    return False
-                atomic_write_text(
-                    path,
-                    "",
-                    tmp_prefix=".mem_reset_",
-                    preserve_mode=True,
-                    fsync_dir=True,
-                )
-                with suppress(OSError):
-                    path.unlink()
-                return True
+                    existed = True
+                else:
+                    existed = path.exists()
+                    if existed:
+                        raw, read_ok = cls._read_raw_checked(path)
+                        erased = cls._parse_entries(raw) if read_ok else []
+                        atomic_write_text(
+                            path,
+                            "",
+                            tmp_prefix=".mem_reset_",
+                            preserve_mode=True,
+                            fsync_dir=True,
+                        )
+                        with suppress(OSError):
+                            path.unlink()
             except OSError as exc:
                 # Marker-first is intentional: if the process crashes after bytes are
                 # erased but before the generation advances, an old live session could
@@ -353,6 +367,11 @@ class MemoryStore:
                     f"complete. Stale sessions are fenced, but old bytes may still be "
                     f"present; retry the reset. Cause: {exc}"
                 ) from exc
+        if erased:
+            # The erased entries become forgotten records so old chats cannot resurface them.
+            if warning := record_forgotten(erased, source=target):
+                logger.warning("%s", warning)
+        return existed
 
     def _entries_for(self, target: str) -> List[str]:
         return self.user_entries if target == "user" else self.memory_entries
@@ -448,6 +467,30 @@ class MemoryStore:
         """Remove one exact entry while preserving the raw bytes of every other entry."""
         if not entry:
             return _error("entry cannot be empty.")
+        if forget_error := forgotten_store_error():
+            return _error(forget_error)
+        return self._rewrite_exact_entry(target, entry, expected_index=expected_index, new_content=None)
+
+    def replace_index(self, target: str, index: int, expected_text: str, new_content: str) -> Dict[str, Any]:
+        """Replace the entry at *index* under the byte-preserving lock, verified against *expected_text*."""
+        if target not in {"memory", "user"}:
+            return _error("target must be memory or user")
+        if type(index) is not int or index < 0:
+            return _error("index must be a non-negative integer")
+        if not expected_text:
+            return _error("expected_text cannot be empty.")
+        content = (new_content or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+        if not content:
+            return _error("new_content cannot be empty. Use 'remove' to delete entries.")
+        if scan_error := _scan_memory_content(content):
+            return _error(scan_error)
+        return self._rewrite_exact_entry(target, expected_text, expected_index=index, new_content=content)
+
+    def _rewrite_exact_entry(
+        self, target: str, entry: str, *, expected_index: int | None, new_content: str | None,
+    ) -> Dict[str, Any]:
+        """Remove (``new_content`` None) or replace one exact entry, leaving every other entry's raw bytes
+        untouched. The selection must match exactly one entry, at *expected_index* when given."""
         path = self._path_for(target)
         with self._file_lock(path):
             current_generation = self._read_reset_generation(path)
@@ -494,8 +537,22 @@ class MemoryStore:
             if len(entries) != len(set(entries)):
                 return _error("Memory entries are duplicated on disk; resolve duplicates before deleting one.")
             index = matches[0]
-            remaining = entries[:index] + entries[index + 1:]
-            remaining_bytes = raw_entry_bytes[:index] + raw_entry_bytes[index + 1:]
+            if new_content is None:
+                remaining = entries[:index] + entries[index + 1:]
+                remaining_bytes = raw_entry_bytes[:index] + raw_entry_bytes[index + 1:]
+                message = "Entry removed."
+            else:
+                self._set_entries(target, entries)
+                if new_content in entries[:index] + entries[index + 1:]:
+                    return _error("Another entry already has this exact text; remove one of the duplicates instead.")
+                remaining = entries[:index] + [new_content] + entries[index + 1:]
+                if len(ENTRY_DELIMITER.join(remaining)) > self._char_limit(target):
+                    return self._failure_with_entries(target, (
+                        f"Replacement would put {path.name} over its {self._char_limit(target):,}-char limit. "
+                        "Shorten the new content, or remove other stale entries to make room (see "
+                        "current_entries below), then retry."))
+                remaining_bytes = raw_entry_bytes[:index] + [new_content.encode("utf-8")] + raw_entry_bytes[index + 1:]
+                message = "Entry replaced."
             self._set_entries(target, remaining)
             path.parent.mkdir(parents=True, exist_ok=True)
             payload = bom + b"\n\xc2\xa7\n".join(remaining_bytes) if remaining_bytes else b""
@@ -503,7 +560,71 @@ class MemoryStore:
                 atomic_write_bytes(path, payload, tmp_prefix=".mem_")
             except OSError as exc:
                 raise RuntimeError(f"Failed to write memory file {path}: {exc}") from exc
-            return self._success_response(target, "Entry removed.")
+        if new_content is None:
+            return _with_forget_record(self._success_response(target, message), [entry], target)
+        return self._success_response(target, message)
+
+    def disk_entries(self, target: str) -> Optional[List[str]]:
+        """Entries currently on disk for *target*, read without the lock (search only). ``None`` when the
+        file exists but cannot be read."""
+        raw, read_ok = self._read_raw_checked(self._path_for(target))
+        return list(dict.fromkeys(self._parse_entries(raw))) if read_ok else None
+
+    def forget_matching(self, target: str, phrase: str) -> Dict[str, Any]:
+        """Remove every entry containing *phrase* (case-insensitive) in one locked write.
+
+        Cross-store forget: the caller found hits in this store. The removed texts are returned as
+        ``removed_texts`` and recorded as forgotten."""
+        needle = fold_text(phrase)
+        if not needle:
+            return _error("old_text cannot be empty.")
+        if forget_error := forgotten_store_error():
+            return _error(forget_error)
+        removed: List[str] = []
+
+        def _apply(entries, limit):
+            hits = [entry for entry in entries if needle in fold_text(entry)]
+            if not hits:
+                return _error(f"No entry matched '{phrase}'.")
+            removed.extend(hits)
+            keep = [entry for entry in entries if needle not in fold_text(entry)]
+            return keep, f"Removed {len(hits)} matching entr{'y' if len(hits) == 1 else 'ies'}."
+
+        result = self._mutate(target, _apply)
+        if not result.get("success"):
+            return result
+        result["removed_texts"] = list(removed)
+        return _with_forget_record(result, removed, target)
+
+    def replace_matching(self, target: str, phrase: str, new_content: str) -> Dict[str, Any]:
+        """Replace the single entry containing *phrase* (case-insensitive) in one locked write. Several hits
+        are refused: a replacement must not guess which entry the owner meant."""
+        needle = fold_text(phrase)
+        content = (new_content or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+        if not needle:
+            return _error("old_text cannot be empty.")
+        if not content:
+            return _error("new_content cannot be empty. Use 'remove' to delete entries.")
+        if scan_error := _scan_memory_content(content):
+            return _error(scan_error)
+
+        def _apply(entries, limit):
+            hits = [i for i, entry in enumerate(entries) if needle in fold_text(entry)]
+            if not hits:
+                return _error(f"No entry matched '{phrase}'.")
+            if len(hits) > 1:
+                return _error(f"Multiple entries matched '{phrase}'. Be more specific.",
+                              matches=[entries[i][:80] for i in hits])
+            replaced = entries[:hits[0]] + [content] + entries[hits[0] + 1:]
+            new_total = len(ENTRY_DELIMITER.join(replaced))
+            if new_total > limit:
+                return self._failure_with_entries(target, (
+                    f"Replacement would put memory at {new_total:,}/{limit:,} chars. Shorten the new content, "
+                    f"or 'remove' other stale or less important entries to make room (see current_entries "
+                    f"below), then retry — all in this turn."))
+            return replaced, "Entry replaced."
+
+        return self._mutate(target, _apply)
 
     def remove_index(self, target: str, index: int, expected_text: str) -> Dict[str, Any]:
         """Validate index AND exact selected text under the byte-preserving delete lock."""
@@ -514,7 +635,12 @@ class MemoryStore:
         return self.remove_exact(target, expected_text, expected_index=index)
 
     def _edit(self, target: str, old_text: str, new_content: Optional[str]) -> Dict[str, Any]:
-        """Locked replace (``new_content`` set) or remove (None) of the entry matching *old_text*."""
+        """Locked replace (``new_content`` set) or remove (None) of the entry matching *old_text*.
+        Only a removal is forgotten; a replacement supersedes the old text and records nothing."""
+        removed: List[str] = []
+        if new_content is None and (forget_error := forgotten_store_error()):
+            return _error(forget_error)
+
         def _apply(entries, limit):
             idx, ambiguous = _find_unique_match(entries, old_text)
             if ambiguous:
@@ -526,6 +652,7 @@ class MemoryStore:
                     f"of the entry you want to {'replace' if new_content else 'remove'}.", current_entries=entries))
             replaced = entries[:idx] + ([] if new_content is None else [new_content]) + entries[idx + 1:]
             if new_content is None:
+                removed.append(entries[idx])
                 return replaced, "Entry removed."
             new_total = len(ENTRY_DELIMITER.join(replaced))
             if new_total > limit:
@@ -534,11 +661,13 @@ class MemoryStore:
                     f"or 'remove' other stale or less important entries to make room (see current_entries "
                     f"below), then retry — all in this turn."))
             return replaced, "Entry replaced."
-        return self._mutate(target, _apply)
+        return _with_forget_record(self._mutate(target, _apply), removed, target)
 
     @staticmethod
-    def _apply_batch_op(working: List[str], act: str, content: str, old_text: str, pos: str) -> Optional[str]:
-        """Apply one batch op to *working* in place; return an error message or None."""
+    def _apply_batch_op(working: List[str], act: str, content: str, old_text: str, pos: str,
+                        forgotten: Optional[List[str]] = None) -> Optional[str]:
+        """Apply one batch op to *working* in place; return an error message or None. A removed entry is
+        appended to *forgotten* (a replaced one is superseded, not forgotten)."""
         if act == "add":
             if not content:
                 return f"{pos}: content is required."
@@ -556,6 +685,8 @@ class MemoryStore:
             return f"{pos}: '{old_text}' matched multiple distinct entries -- be more specific."
         if idx is None:
             return f"{pos}: no entry matched '{old_text}'."
+        if act == "remove" and forgotten is not None:
+            forgotten.append(working[idx])
         working[idx:idx + 1] = [content] if act == "replace" else []
         return None
 
@@ -572,12 +703,17 @@ class MemoryStore:
             if scan_error:
                 return _error(f"Operation {i + 1}: {scan_error}")
 
+        if any(op.get("action") == "remove" for op in ops) and (forget_error := forgotten_store_error()):
+            return _error(forget_error)
+        forgotten: List[str] = []
+
         def _apply(entries, limit):
             working = list(entries)  # only committed if the whole batch validates
             for i, op in enumerate(ops):
                 act = op.get("action")
                 msg = self._apply_batch_op(working, act, (op.get("content") or op.get("new_text") or "").strip(),
-                                           (op.get("old_text") or "").strip(), f"Operation {i + 1} ({act or 'unknown'})")
+                                           (op.get("old_text") or "").strip(), f"Operation {i + 1} ({act or 'unknown'})",
+                                           forgotten)
                 if msg:
                     return self._failure_with_entries(target, msg + " No operations were applied (batch is all-or-nothing).")
             if entries and not working:
@@ -598,7 +734,7 @@ class MemoryStore:
                     f"{new_total:,}/{limit:,} chars -- over the limit. Remove or shorten more "
                     f"entries in the same batch (see current_entries below), then retry."))
             return working, f"Applied {len(operations)} operation(s)."
-        return self._mutate(target, _apply)
+        return _with_forget_record(self._mutate(target, _apply), forgotten, target)
 
     def format_for_system_prompt(self, target: str) -> Optional[str]:
         """Frozen load-time snapshot (NOT live state — mid-session writes don't touch

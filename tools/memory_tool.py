@@ -43,6 +43,8 @@ def get_memory_dir() -> Path:
 
 from tools.memory_tool_store import (  # noqa: E402,F401  (re-exports)
     ENTRY_DELIMITER, MEMORY_BLOCK_HEADERS, MemoryStore, _scan_memory_content)
+from tools.memory_forget import (  # noqa: E402
+    batch_cross_store_hint, remove_entry, remove_topic, replace_entry)
 
 
 def load_on_disk_store() -> "MemoryStore":
@@ -89,9 +91,9 @@ def _gate_or_stage(
 _STORE_ACTIONS = {
     "add": (lambda store, target, content, old_text: store.add(target, content),
             lambda label, content, old_text: (f"add to {label}", content or "")),
-    "replace": (lambda store, target, content, old_text: store.replace(target, old_text, content),
+    "replace": (lambda store, target, content, old_text: replace_entry(store, target, old_text, content),
                 lambda label, content, old_text: (f"replace in {label}", f"old: {old_text}\nnew: {content}")),
-    "remove": (lambda store, target, content, old_text: store.remove(target, old_text),
+    "remove": (lambda store, target, content, old_text: remove_entry(store, target, old_text),
                lambda label, content, old_text: (f"remove from {label}", old_text or ""))}
 
 
@@ -221,7 +223,7 @@ def memory_tool(action: str = None, target: str = "memory", content: str = None,
             return tool_error("Memory persistence is disabled by memory.enabled. Nothing was saved.", success=False)
         if operations:
             return tool_error("Topic summaries use one upsert/remove per call; batch operations are not supported.", success=False)
-        from tools.topic_memory_store import remove_topic_summary, upsert_topic_summary
+        from tools.topic_memory_store import upsert_topic_summary
         topic_key = (topic or title or "").strip()
         if action in {"add", "replace"}:
             if not topic_key:
@@ -245,7 +247,7 @@ def memory_tool(action: str = None, target: str = "memory", content: str = None,
             )
             if gate_result is not None:
                 return gate_result
-            return json.dumps(remove_topic_summary(topic_key), ensure_ascii=False)
+            return json.dumps(remove_topic(store, topic_key, old_text), ensure_ascii=False)
         return tool_error("Unknown topic action. Use add/replace to upsert or remove to delete.", success=False)
     if store is None:
         return tool_error("Built-in MEMORY.md / USER.md is not available in this environment.", success=False)
@@ -255,6 +257,9 @@ def memory_tool(action: str = None, target: str = "memory", content: str = None,
     if operations:
         if not isinstance(operations, list):
             return tool_error("operations must be a list of {action, content?, old_text?} objects.", success=False)
+        cross_store = batch_cross_store_hint(store, target, operations)
+        if cross_store is not None:
+            return json.dumps(cross_store, ensure_ascii=False)
         denied = _background_delete_gate(action, operations, target, store=store)
         if denied is not None:
             return denied
@@ -387,14 +392,14 @@ def apply_memory_pending(payload: Dict[str, Any], store: "MemoryStore") -> Dict[
     if target == "topic":
         if not memory_persistence_enabled(fail_closed=True):
             return {"success": False, "error": "Memory persistence is disabled by memory.enabled."}
-        from tools.topic_memory_store import remove_topic_summary, upsert_topic_summary
+        from tools.topic_memory_store import upsert_topic_summary
         topic = payload.get("topic") or payload.get("title") or ""
         if action in {"add", "replace", "upsert"}:
             return upsert_topic_summary(
                 topic, payload.get("content") or "", title=payload.get("title"), keywords=payload.get("keywords")
             )
         if action == "remove":
-            return remove_topic_summary(topic)
+            return remove_topic(store, topic, payload.get("old_text") or "")
         return {"success": False, "error": f"Unknown staged topic action '{action}'."}
     target_error = _memory_target_error(store, target)
     if target_error is not None:

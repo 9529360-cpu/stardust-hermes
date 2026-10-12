@@ -19,6 +19,9 @@ from typing import Any, Iterable
 from hermes_constants import get_hermes_home
 from utils import atomic_write_text
 from tools.memory_tool_store import MemoryStore, _scan_memory_content
+from tools.memory_tombstones import (
+    fold_text, forgotten_phrases, forgotten_store_error, mentions_forgotten, record_forgotten,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -95,8 +98,23 @@ def _read_payload(*, strict: bool) -> dict[str, Any]:
     return {"version": 1, "topics": [item for item in topics if isinstance(item, dict)]}
 
 
-def load_topics() -> list[dict[str, Any]]:
-    return list(_read_payload(strict=False)["topics"])
+def load_topics(*, strict: bool = False) -> list[dict[str, Any]]:
+    return list(_read_payload(strict=strict)["topics"])
+
+
+def topic_search_text(topic: dict[str, Any]) -> str:
+    """Everything a topic is matched on by forget and recall: title, keywords, summary. Fields are joined
+    with NUL, which folding keeps, so a phrase cannot match across two fields."""
+    return "\x00".join([str(topic.get("title") or ""), *(str(k) for k in topic.get("keywords") or []),
+                        str(topic.get("summary") or "")])
+
+
+def _record_topic_forgets(rows: list[dict[str, Any]]) -> str | None:
+    """Record removed topics' title and summary as forgotten; a warning string on failure."""
+    return record_forgotten(
+        [str(text) for row in rows for text in (row.get("title"), row.get("summary")) if text],
+        source="topic",
+    )
 
 
 def _write_payload(payload: dict[str, Any]) -> None:
@@ -202,7 +220,7 @@ def upsert_topic_summary(
             topics[idx] = row
             change = "updated"
         _write_payload({"version": 1, "topics": topics})
-    return {
+    result = {
         "success": True,
         "target": "topic",
         "topic": key,
@@ -210,26 +228,37 @@ def upsert_topic_summary(
         "message": f"Topic summary {change}",
         "version": _topic_version(row),
     }
+    if mentions_forgotten(topic_search_text(row), forgotten_phrases()):
+        result["warning"] = ("This summary repeats text that was forgotten earlier. It is saved, but topic recall "
+                             "will skip it until that record is removed from forgotten.json.")
+    return result
 
 
 def reset_topic_summaries() -> bool:
     """Delete the local topic-summary store. Returns whether the file existed."""
     path = topic_memory_path()
     path.parent.mkdir(parents=True, exist_ok=True)
+    if forget_error := forgotten_store_error():
+        raise RuntimeError(forget_error)
     with MemoryStore._file_lock(path):
         existed = path.exists()
+        erased = _read_payload(strict=False)["topics"] if existed else []
         try:
             path.unlink(missing_ok=True)
         except OSError:
             # Atomic empty replacement is safer than leaving stale recallable data behind.
             atomic_write_text(path, '{"version": 1, "topics": []}\n', create_mode=0o600, fsync_dir=True)
-        return existed
+    if erased and (warning := _record_topic_forgets(erased)):
+        logger.warning("%s", warning)
+    return existed
 
 
 def remove_topic_summary(topic: str) -> dict[str, Any]:
     key = _topic_key(topic)
     if not key:
         return {"success": False, "error": "topic is required"}
+    if forget_error := forgotten_store_error():
+        return {"success": False, "error": forget_error}
     path = topic_memory_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     with MemoryStore._file_lock(path):
@@ -238,8 +267,117 @@ def remove_topic_summary(topic: str) -> dict[str, Any]:
         kept = [row for row in topics if _topic_key(row.get("key") or row.get("title")) != key]
         if len(kept) == len(topics):
             return {"success": False, "error": f"Topic '{topic}' was not found"}
+        removed = [row for row in topics if _topic_key(row.get("key") or row.get("title")) == key]
         _write_payload({"version": 1, "topics": kept})
-    return {"success": True, "target": "topic", "topic": key, "message": "Topic summary removed"}
+    result = {"success": True, "target": "topic", "topic": key, "message": "Topic summary removed"}
+    if warning := _record_topic_forgets(removed):
+        result["forget_record_warning"] = warning
+    return result
+
+
+_SENTENCE_BREAK = re.compile(r"(?<=[。.!?！？；;\n])")
+
+
+def _sentences(summary: str) -> list[str]:
+    """Summary split into sentences (each keeps its terminator), the unit a forget removes."""
+    return [piece for piece in _SENTENCE_BREAK.split(summary) if piece.strip()]
+
+
+def forget_topic_text(phrase: str, *, topic_key: str | None = None) -> dict[str, Any]:
+    """Forget *phrase* across topic summaries (or only topic *topic_key*) in one locked write.
+
+    A title match removes the whole topic: the phrase names it. Otherwise only the summary sentences and
+    keywords that contain the phrase go; the rest of the topic stays, and a topic left with an empty summary
+    is removed. Removed text is recorded as forgotten.
+    """
+    needle = fold_text(phrase)
+    if not needle:
+        return {"success": False, "error": "old_text cannot be empty."}
+    if forget_error := forgotten_store_error():
+        return {"success": False, "error": forget_error}
+    path = topic_memory_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    removed: list[dict[str, str]] = []
+    forgotten_texts: list[str] = []
+    with MemoryStore._file_lock(path):
+        payload = _read_payload(strict=True)
+        kept: list[dict[str, Any]] = []
+        for row in payload["topics"]:
+            key = _topic_key(row.get("key") or row.get("title"))
+            title = str(row.get("title") or "")
+            if topic_key is not None and key != topic_key:
+                kept.append(row)
+                continue
+            if needle in fold_text(title):
+                removed.append({"key": key, "title": title, "what": "topic", "text": title})
+                forgotten_texts += [title, str(row.get("summary") or "")]
+                continue
+            sentences = _sentences(str(row.get("summary") or ""))
+            gone = [s for s in sentences if needle in fold_text(s)]
+            keywords = [str(k) for k in row.get("keywords") or []]
+            gone_keywords = [k for k in keywords if needle in fold_text(k)]
+            if not gone and not gone_keywords:
+                kept.append(row)
+                continue
+            removed += [{"key": key, "title": title, "what": "summary sentence", "text": s.strip()} for s in gone]
+            removed += [{"key": key, "title": title, "what": "keyword", "text": k} for k in gone_keywords]
+            forgotten_texts += [s.strip() for s in gone] + gone_keywords
+            remaining = "".join(s for s in sentences if s not in gone).strip()
+            if remaining or not gone:
+                # A topic is dropped only when its last summary sentence was forgotten.
+                kept.append({**row, "summary": remaining, "keywords": [k for k in keywords if k not in gone_keywords],
+                             "updated_at": _now()})
+        if not removed:
+            return {"success": False, "error": f"No topic summary matched '{phrase}'."}
+        _write_payload({"version": 1, "topics": kept})
+    result = {
+        "success": True,
+        "target": "topic",
+        "removed": removed,
+        "message": f"Removed {len(removed)} matching topic text item{'' if len(removed) == 1 else 's'}.",
+    }
+    if warning := record_forgotten(forgotten_texts, source="topic"):
+        result["forget_record_warning"] = warning
+    return result
+
+
+def replace_topic_sentence(topic: str, phrase: str, content: str) -> dict[str, Any]:
+    """Rewrite the single summary sentence of *topic* that contains *phrase*. Refused when no sentence or
+    several sentences match: a replacement must not guess, and must not discard the rest of the summary."""
+    key = _topic_key(topic)
+    needle = fold_text(phrase)
+    clean = str(content or "").strip()
+    if not key or not needle or not clean:
+        return {"success": False, "error": "topic, phrase and content are required"}
+    if threat := _scan_memory_content(clean):
+        return {"success": False, "error": threat}
+    if forget_error := forgotten_store_error():
+        return {"success": False, "error": forget_error}
+    path = topic_memory_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with MemoryStore._file_lock(path):
+        payload = _read_payload(strict=True)
+        topics = list(payload["topics"])
+        idx = next((i for i, row in enumerate(topics) if _topic_key(row.get("key") or row.get("title")) == key), None)
+        if idx is None:
+            return {"success": False, "error": f"Topic '{topic}' was not found"}
+        row = topics[idx]
+        sentences = _sentences(str(row.get("summary") or ""))
+        hits = [i for i, s in enumerate(sentences) if needle in fold_text(s)]
+        if not hits:
+            return {"success": False, "error": f"No sentence in topic '{topic}' contains '{phrase}'."}
+        if len(hits) > 1:
+            return {"success": False, "error": f"{len(hits)} sentences in topic '{topic}' contain '{phrase}'. Be more specific."}
+        old = sentences[hits[0]]
+        sentences[hits[0]] = clean + old[len(old.rstrip()):]
+        summary = "".join(sentences).strip()
+        if len(summary) > _MAX_SUMMARY_CHARS:
+            return {"success": False, "error": f"Topic summary would be too long ({len(summary)}/{_MAX_SUMMARY_CHARS} chars)."}
+        topics[idx] = {**row, "summary": summary, "updated_at": _now()}
+        _write_payload({"version": 1, "topics": topics})
+    # A replacement supersedes the old sentence; it is not forgotten, so nothing is recorded.
+    return {"success": True, "target": "topic", "topic": key, "title": str(row.get("title") or ""),
+            "message": "Topic summary sentence replaced", "version": _topic_version(topics[idx])}
 
 
 def _signals(text: str) -> set[str]:
@@ -281,10 +419,11 @@ def recall_topic_summaries(
     if not clean_query or limit <= 0 or char_budget <= 0:
         return []
     query_signals = _signals(clean_query)
+    forgotten = forgotten_phrases()
     scored = []
     for topic in load_topics():
         score = _score(clean_query, query_signals, topic)
-        if score >= 6 and str(topic.get("summary") or "").strip():
+        if score >= 6 and str(topic.get("summary") or "").strip() and not mentions_forgotten(topic_search_text(topic), forgotten):
             scored.append((score, topic))
     scored.sort(key=lambda item: (-item[0], str(item[1].get("key") or "")))
 

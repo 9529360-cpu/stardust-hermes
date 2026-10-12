@@ -111,6 +111,12 @@ memory(action="replace", target="memory",
 
 If the substring matches multiple entries, an error is returned asking for a more specific match.
 
+### Forgetting Across Stores
+
+When the requested target has no exact match, `remove` and `replace` also search the other stores: `MEMORY.md`, `USER.md`, and topic summaries (title, keywords, and summary text, case-insensitively). A single match is acted on and the result names the store (`removed_from` or `replaced_in`). A `remove` that matches several places removes each one and lists it; a `replace` refuses to guess between several. A topic summary loses only the matching sentence or keyword, unless the phrase is its title. A phrase with no match anywhere changes nothing, and the result lists candidate entries from every store so the agent can retry with an exact phrase. An exact match in the requested target keeps its previous behavior and does not search the other stores.
+
+Each forgotten text is also recorded in `memories/forgotten.json` beside `MEMORY.md`. `session_search` and topic recall then drop results that contain a recorded phrase, so an old chat cannot bring the text back. Transcripts are never edited or deleted. Matching is verbatim, so a paraphrase inside an old chat is not filtered, and phrases shorter than four characters are not used for filtering.
+
 ## Two Targets Explained
 
 ### `memory` — Agent's Personal Notes

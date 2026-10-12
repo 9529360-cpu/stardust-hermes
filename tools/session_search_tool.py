@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Union
 
 from hermes_state_common import _BOUNDARY_END_REASONS
+from tools.memory_tombstones import forgotten_phrases, mentions_forgotten
 
 # Hidden from browsing/searching — integrations (STARDUST_SESSION_SOURCE=tool), delegate
 # subagent runs, kanban workers are not the user's history.
@@ -310,6 +311,23 @@ def _discover_payload(db, query: str, detail: str, results: list, **extra) -> st
     return _ok(mode="discover", query=query, detail=detail, results=results, count=len(results), **extra, **rebuild)
 
 
+def _drop_forgotten(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Drop results whose text contains a phrase the owner forgot. Transcripts are untouched; this filters
+    what recall shows (see tools/memory_tombstones.py)."""
+    phrases = forgotten_phrases()
+    if not phrases:
+        return results
+    kept = []
+    for entry in results:
+        parts = [entry.get("title"), entry.get("snippet"), entry.get("preview")]
+        for key in ("bookend_start", "messages", "bookend_end"):
+            parts.extend(m.get("content") for m in entry.get(key) or [] if isinstance(m, dict))
+        text = "\n".join(part for part in parts if isinstance(part, str))
+        if not mentions_forgotten(text, phrases):
+            kept.append(entry)
+    return kept
+
+
 def _bookend(view: Dict[str, Any], key: str) -> List[Dict[str, Any]]:
     return [_shape_message(m, max_content_len=1200) for m in (view.get(key) or [])
             if not _is_compaction_summary(m.get("content", ""))]
@@ -409,6 +427,7 @@ def _discover(db, query: str, role_filter: Optional[List[str]], limit: int, sort
         entry = _hydrate_hit(db, lineage_root, match_info, "full" if detail == "full" or not results else "compact")
         if entry is not None:
             results.append(entry)
+    results = _drop_forgotten(results)
     for entry in results:
         entry["link"] = _session_link(entry["session_id"], link_profile)
     return _discover_payload(db, query, detail, results, sessions_searched=len(seen_sessions), link_hint=(
@@ -480,6 +499,9 @@ def _list_recent_sessions(db, limit: int, current_session_id: str = None, link_p
         sessions = bounded_list(
             limit=limit + 15,  # extra so we can skip current / compression roots
             exclude_sources=list(_HIDDEN_SESSION_SOURCES), timeout_seconds=3.0)
+        forgotten = forgotten_phrases()
+        sessions = [s for s in sessions
+                    if not mentions_forgotten(f"{s.get('title') or ''}\n{s.get('preview') or ''}", forgotten)]
         current_root, has_compression_hop = (
             _resolve_to_parent(db, current_session_id) if current_session_id else (None, False))
         # Compression continuation: the root was summarised into the live child, so hide

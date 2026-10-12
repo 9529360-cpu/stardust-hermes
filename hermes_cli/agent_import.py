@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 import yaml
 
+from tools.memory_tombstones import forgotten_phrases, mentions_forgotten
 from utils import atomic_write_text, atomic_yaml_write
 
 logger = logging.getLogger(__name__)
@@ -376,7 +377,16 @@ class AgentImporter:
             except OSError as exc:
                 failed = True
                 self.record(kind, md_file, destination, "error", f"Could not read file: {exc}")
+        # Text the owner forgot must not come back through an import: it is skipped and counted.
+        forgotten = forgotten_phrases(destination.parent)
+        kept = [entry for entry in incoming if not mentions_forgotten(entry, forgotten)]
+        forgotten_skipped = len(incoming) - len(kept)
+        incoming = kept
         if not incoming:
+            if forgotten_skipped:
+                self.record(kind, source, destination, "skipped", "Imported entries repeat text you forgot",
+                            forgotten_skipped=forgotten_skipped)
+                return
             if not (failed and single_file):
                 self.record(kind, source, destination, "skipped", "No importable entries found")
             return
@@ -384,7 +394,7 @@ class AgentImporter:
         merged, stats = merge_entries(existing, incoming, MEMORY_CHAR_LIMIT)
         details = {"existing_entries": stats["existing"], "added_entries": stats["added"],
                    "duplicate_entries": stats["duplicates"],
-                   "overflowed_entries": stats["overflowed"]}
+                   "overflowed_entries": stats["overflowed"], "forgotten_skipped": forgotten_skipped}
         if stats["added"] == 0:
             self.record(kind, source, destination, "skipped", "No new entries to import", **details)
             return
@@ -400,7 +410,8 @@ class AgentImporter:
                     shutil.copy2(destination, backup)
                     details["backup"] = str(backup)
                 step = "write merged"
-                atomic_write_text(destination, ENTRY_DELIMITER.join(merged) + ("\n" if merged else ""))
+                # Canonical store bytes (no trailing newline), so the memory tool's byte-preserving paths accept it.
+                atomic_write_text(destination, ENTRY_DELIMITER.join(merged))
             except OSError as exc:
                 return f"Could not {step} memory file: {exc}"
             return None

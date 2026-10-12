@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 _MEMORY_FILES = {"memory": "MEMORY.md", "profile": "USER.md"}
+_STORE_TARGETS = {"memory": "memory", "profile": "user"}  # node-id source -> MemoryStore target
 
 
 def parse_node_kind(node_id: str) -> str:
@@ -56,11 +57,14 @@ def _locate_memory(node_id: str) -> tuple[Path, list[str], int]:
     return path, chunks, local
 
 
-def _write_memory(path: Path, chunks: list[str]) -> None:
-    """Atomic temp-file + rename via the memory tool, so a concurrent reader
-    never sees a half-written file (and the §-join stays single-sourced)."""
-    from tools.memory_tool import MemoryStore
-    MemoryStore._write_file(path, [c.strip() for c in chunks if c.strip()])
+def _disk_store():
+    """Store for a user-initiated edit of the files as they are on disk now. Loading it captures the current
+    reset generation, so only a reset racing this edit can fence it; a fresh store carries no generation and
+    would refuse every edit after any reset."""
+    from tools.memory_tool import load_on_disk_store
+    store = load_on_disk_store()
+    store.load_from_disk()
+    return store
 
 
 def _clear_skill_cache() -> None:
@@ -125,9 +129,11 @@ def _delete_skill(name: str) -> dict[str, Any]:
 
 
 def _delete_memory(node_id: str) -> dict[str, Any]:
+    source, _ = _parse_memory_id(node_id)
     path, chunks, local = _locate_memory(node_id)
-    del chunks[local]
-    _write_memory(path, chunks)
+    result = _disk_store().remove_index(_STORE_TARGETS[source], local, chunks[local])
+    if not result.get("success"):
+        return {"ok": False, "message": result.get("error", "delete failed")}
     return {"ok": True, "message": f"deleted memory from {path.name}"}
 
 
@@ -147,11 +153,12 @@ def _edit_skill(name: str, content: str) -> dict[str, Any]:
 
 
 def _edit_memory(node_id: str, content: str) -> dict[str, Any]:
-    _parse_memory_id(node_id)  # id errors win over the empty-body message
+    source, _ = _parse_memory_id(node_id)  # id errors win over the empty-body message
     body = content.strip()
     if not body:
         return {"ok": False, "message": "empty memory — use delete to remove it"}
     path, chunks, local = _locate_memory(node_id)
-    chunks[local] = body
-    _write_memory(path, chunks)
+    result = _disk_store().replace_index(_STORE_TARGETS[source], local, chunks[local], body)
+    if not result.get("success"):
+        return {"ok": False, "message": result.get("error", "edit failed")}
     return {"ok": True, "message": f"updated memory in {path.name}"}

@@ -456,12 +456,54 @@ class TestExistingMemoryStorePreserved:
         # ... and the imported entries are still appended after it.
         assert any("type hints" in e for e in entries[1:])
 
+    def test_import_writes_the_canonical_store_bytes(self, claude_tree, hermes_home):
+        # No trailing newline: the memory tool's byte-preserving remove/edit paths treat any other
+        # shape as drift, so an imported store must be exactly what MemoryStore itself writes.
+        run_import("claude-code", claude_tree, hermes_home, execute=True)
+        raw = (hermes_home / "memories" / "MEMORY.md").read_bytes()
+        assert raw and not raw.endswith(b"\n")
+        assert all(entry == entry.strip() for entry in raw.decode("utf-8").split("\n§\n"))
+
     def test_import_backs_up_the_previous_store(self, claude_tree, seeded_home):
         memories = seeded_home / "memories"
         run_import("claude-code", claude_tree, seeded_home, execute=True)
         backups = sorted(memories.glob("MEMORY.md.bak.*"))
         assert len(backups) == 1
         assert backups[0].read_text(encoding="utf-8") == EXISTING_MEMORY
+
+
+class TestImportRespectsForgetting:
+    """Text the owner forgot must not come back through an import: the matching entry is skipped and
+    counted on the report, the rest of the import still lands."""
+
+    def test_import_skips_entries_that_repeat_forgotten_text(self, claude_tree, hermes_home):
+        from tools.memory_tombstones import record_forgotten
+
+        assert record_forgotten(["Always use type hints"], source="memory") is None
+
+        report = run_import("claude-code", claude_tree, hermes_home, execute=True)
+
+        memory_text = (hermes_home / "memories" / "MEMORY.md").read_text(encoding="utf-8")
+        assert "type hints" not in memory_text
+        assert "pathlib" in memory_text
+        item = next(i for i in report["items"] if i["kind"] == "claude-md")
+        assert item["status"] == "imported"
+        assert item["forgotten_skipped"] == 1
+
+    def test_import_of_only_forgotten_text_writes_nothing(self, profile_env, hermes_home):
+        from tools.memory_tombstones import record_forgotten
+
+        root = profile_env / ".claude"
+        root.mkdir()
+        (root / "CLAUDE.md").write_text("- Always use type hints\n", encoding="utf-8")
+        assert record_forgotten(["Always use type hints"], source="memory") is None
+
+        report = run_import("claude-code", root, hermes_home, execute=True)
+
+        assert not (hermes_home / "memories" / "MEMORY.md").exists()
+        item = next(i for i in report["items"] if i["kind"] == "claude-md")
+        assert item["status"] == "skipped"
+        assert item["forgotten_skipped"] == 1
 
 
 # ---------------------------------------------------------------------------
