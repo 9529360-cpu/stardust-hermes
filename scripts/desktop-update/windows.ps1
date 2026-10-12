@@ -51,7 +51,8 @@ param(
     [switch]$SelfTestUi,
     [switch]$SelfTestPipeDrain,
     [switch]$SelfTestMarker,
-    [switch]$SelfTestWorkingDirectory
+    [switch]$SelfTestWorkingDirectory,
+    [switch]$SelfTestVenvLayout
 )
 
 if (-not $SelfTestUi -and -not $SelfTestPipeDrain -and -not $InstallRoot) {
@@ -1185,6 +1186,50 @@ function Set-InstallRootCurrentDirectory([string]$Root) {
     return $resolved
 }
 
+# Venv folder of an install root: `venv` when it holds the interpreter, else `.venv` when that does, else
+# `venv` (the fresh-install default). Mirrors hermes_cli/venv_layout.py and apps/desktop/electron/venv-layout.ts.
+function Resolve-VenvDir([string]$Root) {
+    foreach ($name in @("venv", ".venv")) {
+        $dir = Join-Path $Root $name
+        if (Test-Path -LiteralPath (Join-Path $dir "Scripts\python.exe") -PathType Leaf) {
+            return $dir
+        }
+    }
+    return (Join-Path $Root "venv")
+}
+
+# Expose a `.venv`-only install under `venv` as a directory junction (`mklink /J`, no elevation needed), so tools
+# that still hardcode `venv` keep working. Creates the alias only when no `venv` entry exists at all (directory,
+# junction, file or dangling link); never touches .venv. Returns created | present | no-dotvenv | failed and never
+# throws: after a failed alias, Resolve-VenvDir still finds .venv.
+$script:VenvAliasError = ""
+function Ensure-VenvAlias([string]$Root) {
+    $alias = Join-Path $Root "venv"
+    $target = Join-Path $Root ".venv"
+    $script:VenvAliasError = ""
+    if (Get-Item -LiteralPath $alias -Force -ErrorAction SilentlyContinue) {
+        return "present"
+    }
+    if (-not (Test-Path -LiteralPath $target -PathType Container)) {
+        return "no-dotvenv"
+    }
+    try {
+        New-Item -ItemType Junction -Path $alias -Target $target -ErrorAction Stop | Out-Null
+        return "created"
+    } catch {
+        $script:VenvAliasError = $_.Exception.Message
+        return "failed"
+    }
+}
+
+# -SelfTestVenvLayout: run the alias step and the venv resolver against -InstallRoot, then exit. No update.
+if ($SelfTestVenvLayout) {
+    $aliasState = Ensure-VenvAlias $InstallRoot
+    $venvDir = Resolve-VenvDir $InstallRoot
+    Write-Host "VENV-LAYOUT SELF-TEST: PASS alias=$aliasState venv=$venvDir"
+    exit 0
+}
+
 $finalCode = 1
 $finalMsg = "update did not complete"
 $script:TreeSafeToFinalize = $true
@@ -1482,8 +1527,13 @@ try {
         exit 0
     }
 
-    # Check only the interpreter here: dependency recovery belongs to update.
-    $pythonExe = Join-Path $InstallRoot "venv\Scripts\python.exe"
+    # Alias first, then resolve (see Ensure-VenvAlias): `venv`, or `.venv` through a junction, is the folder
+    # that holds the interpreter. Check only the interpreter here: dependency recovery belongs to update.
+    $aliasState = Ensure-VenvAlias $InstallRoot
+    if ($aliasState -eq "created") { Write-HandoffLog "created venv junction -> .venv" }
+    if ($aliasState -eq "failed") { Write-HandoffLog "could not create the venv junction ($script:VenvAliasError); continuing with .venv" }
+    $venvDir = Resolve-VenvDir $InstallRoot
+    $pythonExe = Join-Path $venvDir "Scripts\python.exe"
     if (-not (Test-Path -LiteralPath $pythonExe -PathType Leaf)) {
         $finalCode = 3
         $finalMsg = "Update aborted: $pythonExe is missing. Repair the installation and review antivirus quarantine before retrying."
@@ -1514,7 +1564,7 @@ try {
 
     # -- 2. Wait for the venv shim to unlock (FAIL CLOSED) ------------------
     Publish-UiProgress "Preparing Hermes files"
-    $shim = Join-Path $InstallRoot "venv\Scripts\stardust.exe"
+    $shim = Join-Path $venvDir "Scripts\stardust.exe"
     if (Test-Path -LiteralPath $shim) {
         $unlocked = $false
         $deadline = (Get-Date).AddSeconds(20)
@@ -1533,7 +1583,7 @@ try {
             # Something still maps the venv. --force-ing past it guarantees a
             # half-updated venv (the exact 2026-08-09 Access-denied brick).
             $finalCode = 5
-            $finalMsg = "Update aborted: another process is still holding the Hermes install open (venv\Scripts\stardust.exe locked after 20s). Nothing was changed. Close other Hermes windows/terminals and try again."
+            $finalMsg = "Update aborted: another process is still holding the Hermes install open ($shim locked after 20s). Nothing was changed. Close other Hermes windows/terminals and try again."
             Write-HandoffLog $finalMsg
             exit $finalCode
         }
@@ -1577,7 +1627,7 @@ try {
     #
     # posix.sh is deliberately left alone: unlinking a running executable is
     # legal there, so the equivalent call is harmless.
-    $pythonExe = Join-Path $InstallRoot "venv\Scripts\python.exe"
+    $pythonExe = Join-Path $venvDir "Scripts\python.exe"
     if (-not (Test-Path -LiteralPath $pythonExe)) {
         $finalCode = 3
         $finalMsg = "Update aborted: $pythonExe is missing. The install needs repair (run the Hermes installer or `stardust doctor`)."
