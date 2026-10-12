@@ -136,7 +136,11 @@ def _delete_memory(node_id: str) -> dict[str, Any]:
     result = forget_owner_entry(_disk_store(), _STORE_TARGETS[source], chunks[local], index=local)
     if not result.get("success"):
         return {"ok": False, "message": result.get("error", "delete failed")}
-    return {"ok": True, "message": f"deleted memory from {path.name}"}
+    message = f"deleted memory from {path.name}"
+    if result.get("failed") or result.get("candidates"):
+        message += f". {result['message']}"
+    return {"ok": True, "message": message, "failed": result.get("failed", []),
+            "candidates": result.get("candidates", [])}
 
 
 # ── Edit ────────────────────────────────────────────────────────────────────

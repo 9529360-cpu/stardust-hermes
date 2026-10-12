@@ -20,7 +20,8 @@ from hermes_constants import get_hermes_home
 from utils import atomic_write_text
 from tools.memory_tool_store import MemoryStore, _scan_memory_content
 from tools.memory_tombstones import (
-    clear_forgotten_for, fold_text, forgotten_store_error, record_forgotten, recall_index, write_refusal,
+    MIN_NAME_CHARS, clear_forgotten_for, fold_text, forgotten_store_error, name_variants, record_forgotten,
+    recall_index, write_refusal,
 )
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,18 @@ def _topic_key(value: Any) -> str:
 def _key_forms(key: str) -> list[str]:
     """A topic key as a person may type it: the key itself, and the key with its hyphens read as spaces."""
     return [key, key.replace("-", " ")]
+
+
+def _tombstone_texts(row: dict[str, Any], key: str) -> list[str]:
+    """What a removed topic leaves in recall's way: its summary, and its title and key forms when each is long enough to
+    name the topic. A shorter name is not recorded, because it would block ordinary words in recall and in writes."""
+    names = [str(row.get("title") or ""), *_key_forms(key)]
+    return [str(row.get("summary") or ""), *(name for name in names if len(fold_text(name)) >= MIN_NAME_CHARS)]
+
+
+def _block_key(key: str) -> str | None:
+    """The key a whole-topic record blocks writes to, or None when the key is too short to block (see _tombstone_texts)."""
+    return key if len(fold_text(key)) >= MIN_NAME_CHARS else None
 
 
 def _keywords(values: Any) -> list[str]:
@@ -115,15 +128,12 @@ def topic_search_text(topic: dict[str, Any]) -> str:
 
 
 def _record_topic_rows(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
-    """Record each removed topic as a whole-topic forget: its title and summary, under the hash of its key. Returns
-    an error result, or None. Call it inside the topics lock, before the write: a removal that cannot be recorded
-    does not happen."""
+    """Record each removed topic as a whole-topic forget (see _tombstone_texts). Returns an error result, or None. Call
+    it inside the topics lock, before the write: a removal that cannot be recorded does not happen."""
     try:
         for row in rows:
-            texts = [str(text) for text in (row.get("title"), row.get("summary")) if text]
             key = _topic_key(row.get("key") or row.get("title"))
-            if texts:
-                record_forgotten(texts, source="topic", scope="topic", topic_key=key)
+            record_forgotten(_tombstone_texts(row, key), source="topic", scope="topic", topic_key=_block_key(key))
     except (OSError, RuntimeError) as exc:
         return {"success": False, "error": f"Nothing was removed: the forgotten record could not be written ({exc})."}
     return None
@@ -202,12 +212,14 @@ def get_topic_summary(topic: str) -> dict[str, Any] | None:
 
 
 def topic_candidate(topic: str, summary: str, *, title: str | None = None, keywords: Any = None) -> tuple[str, str]:
-    """The topic key and the text an upsert would store: the name as given, the key, the title, the keywords and the
-    summary, joined by NUL. A forgotten-text check uses exactly this text, so a refusal and the stored topic cannot
-    disagree. The name and key are included because a topic's name is part of what it stores."""
+    """The topic key and the text an upsert would store: the name and its hyphen and space variants, the key, the title
+    and its variants, the keywords and the summary, joined by NUL. A forgotten-text check uses exactly this text, so a
+    refusal and the stored topic cannot disagree. The name and key are included because a topic's name is part of what
+    it stores."""
     key = _topic_key(topic or title)
     clean_title = str(title or topic or "").strip()[:_MAX_TITLE_CHARS]
-    return key, "\x00".join([str(topic or "").strip(), key, clean_title, *_keywords(keywords), str(summary or "").strip()])
+    names = [*name_variants(topic), key, *name_variants(clean_title)]
+    return key, "\x00".join([*names, *_keywords(keywords), str(summary or "").strip()])
 
 
 def upsert_topic_summary(
@@ -378,9 +390,8 @@ def forget_topic_text(phrase: str, *, topic_key: str | None = None) -> dict[str,
                 continue
             if units[0][0] == "topic":
                 removed.append({"key": key, "what": "topic"})
-                # The key forms are recorded too: a phrase that named the topic by its key must not stay recallable.
-                groups.setdefault((key, "topic"), []).extend(
-                    [str(row.get("title") or ""), str(row.get("summary") or ""), *_key_forms(key)])
+                # Its summary, and its name and key forms when long enough (see _tombstone_texts), are recorded.
+                groups.setdefault((key, "topic"), []).extend(_tombstone_texts(row, key))
                 continue
             sentences = _sentences(str(row.get("summary") or ""))
             gone = [s for s in sentences if needle in fold_text(s)]
@@ -406,7 +417,8 @@ def forget_topic_text(phrase: str, *, topic_key: str | None = None) -> dict[str,
                     "matches": [{"what": item["what"]} for item in removed]}  # no topic keys in a response
         for (key, scope), texts in groups.items():
             try:
-                record_forgotten(texts, source="topic", scope=scope, topic_key=key)
+                record_forgotten(texts, source="topic", scope=scope,
+                                 topic_key=_block_key(key) if scope == "topic" else key)
             except (OSError, RuntimeError) as exc:
                 return {"success": False,
                         "error": f"Nothing was removed: the forgotten record could not be written ({exc})."}

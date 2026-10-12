@@ -806,6 +806,38 @@ def test_daily_memory_entry_repeating_forgotten_text_is_skipped(tmp_path: Path):
     assert item["details"]["forgotten_entries_skipped"] == 1
 
 
+def test_the_openclaw_migrator_index_matches_the_shared_index(tmp_path: Path):
+    from tools.memory_tombstones import forgotten_index, record_forgotten
+
+    mod = load_module()
+    memories = tmp_path / "memories"
+    memories.mkdir()
+    record_forgotten(["Buy a coffee maker next week"], source="memory", scope="entry", memories_dir=memories)
+    record_forgotten(["The owner drinks green tea"], source="memory", scope="entry", memories_dir=memories)
+    record_forgotten(["Ship date is March."], source="topic", scope="topic", topic_key="shipping", memories_dir=memories)
+    record_forgotten(["tea"], source="memory", scope="entry", memories_dir=memories)  # too short to be used
+    path = memories / "forgotten.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["forgotten"].append({"text": "Visited Berlin in 2019", "source": "memory", "scope": "entry",
+                              "forgotten_at": "2026-01-01T00:00:00Z"})  # an earlier build's plaintext row
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+    shared = forgotten_index(memories, strict=True)
+    migrated = mod.load_forgotten_index(memories)
+    probes = [
+        "Please buy a coffee maker next week.",
+        "Buy a coffeemaker next week",
+        "The owner drinks ＧＲＥＥＮ　ＴＥＡ today",
+        "Ship date is March. Confirmed.",
+        "tea time",
+        "We visited Berlin in 2019 together",
+        "Nothing forgotten here",
+    ]
+    expected = {probe: shared.mentions(probe) for probe in probes}
+    assert any(expected.values()) and not all(expected.values())
+    assert {probe: migrated.mentions(probe) for probe in probes} == expected
+
+
 def test_forgotten_text_stays_out_of_the_overflow_file_and_the_report(tmp_path: Path):
     mod = load_module()
     source, target, output = tmp_path / ".openclaw", tmp_path / ".stardust", tmp_path / "out"

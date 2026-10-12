@@ -113,13 +113,13 @@ A shorter phrase is refused. So is a phrase that matches more than one entry: th
 
 ### Forgetting Across Stores
 
-A forget removes the text from every store that holds it: the requested store, `MEMORY.md`, `USER.md`, and topic summaries (title, keywords, and summary text, matched case-insensitively). Every store is scanned before anything is written. The forget goes ahead only when each store holds at most one match. Otherwise it changes nothing and lists the candidates. The result's `removed_from` lists each store that changed. A topic summary loses only the matching sentence or keyword, unless the phrase is its title. `replace` changes a single match in whichever store holds it, and refuses to guess between several. A phrase with no match anywhere changes nothing, and the result lists candidate entries from every store so the agent can retry with an exact phrase.
+A forget removes the text from every store that holds it: the requested store, `MEMORY.md`, `USER.md`, and topic summaries (title, keywords, and summary text, matched case-insensitively). Every store is scanned before anything is written. The forget goes ahead only when each store holds at most one match. Otherwise it changes nothing and lists the candidates. The result's `removed_from` lists each store that changed. A topic summary loses only the matching sentence or keyword, unless the phrase is its title. `replace` changes a single match in whichever store holds it, and refuses to guess between several. An exact match in one store is refused when another store also holds the phrase. A phrase with no match anywhere changes nothing, and the result lists candidate entries from every store so the agent can retry with an exact phrase.
 
 A batch stays inside one store and applies all or nothing. Each `remove` and `replace` in a batch must meet the same rules as a single call: at least 8 characters, exactly one entry in that store, and no other store holding the phrase. A batch that breaks a rule is refused before anything is written, and an approved batch is checked again against the store as it is when you approve it. If another store holds a phrase, send that change as its own call so every store that holds it is handled.
 
 A topic-target `remove` with no phrase removes that topic, or reports that no such topic exists. It never removes entries that happen to share the topic's name.
 
-The same forget applies when you delete an entry from the memory page or a journey card: the entry goes, and the same text is removed from the other stores. The sweep follows the same 8-character and single-match rules. A shorter or ambiguous text removes only the entry you picked.
+The same forget applies when you delete an entry from the memory page, the dashboard, or a journey card: the entry goes, and the same text is removed from the other stores. The sweep follows the same 8-character and single-match rules. If another store holds more than one match, nothing else is removed, and those matches are listed as `candidates`. If the sweep fails in one store, the entry still goes, and the result lists what was removed (`removed_from`) and what failed (`failed`). A shorter text removes only the entry you picked.
 
 ### Forgotten Text Stays Forgotten
 
@@ -135,7 +135,7 @@ Removing a whole topic records its title and summary. Its keywords are not recor
 - **Whole words.** An ASCII phrase must start and end at a word boundary, so a forgotten `Coffee` does not hide `Buy a coffeemaker next week`. Chinese, Japanese and other text without spaces matches wherever the phrase occurs.
 - **Tool calls.** Recall checks a message's tool calls and tool names as well as its text, so a phrase inside a tool call is not shown.
 - **Other profiles.** A search of another profile is filtered with that profile's own forgotten records, not yours.
-- **Topic names.** A topic whose name or key repeats forgotten text is refused for automatic writes and for proposals, and a forget that names such a topic is refused. A phrase that names a topic by its key removes the whole topic, and that phrase is hidden from recall too.
+- **Topic names.** A topic whose name or key repeats forgotten text is refused for automatic writes and for proposals, and a forget that names such a topic is refused. A phrase that names a topic by its key removes the whole topic, and that phrase is hidden from recall too. A name, title or key shorter than 8 characters is not recorded when its topic is forgotten, so it does not block ordinary words. Hyphen and space variants of a name count as the same name.
 - **Disabled stores.** A forget still removes the text from a disabled `MEMORY.md` or `USER.md` file, so it does not stay on disk.
 - **Unreadable records.** If `forgotten.json` cannot be read, every memory write is refused, the owner's included. Forgetting refuses too, and resetting refuses while it has topics to record. Nothing is written that could bring forgotten text back. A topics file that cannot be parsed holds nothing recall can read, so a reset erases it as before.
 - **Migration.** The OpenClaw migration skips entries that repeat forgotten text. It takes the same lock as Hermes when it writes `MEMORY.md` or `USER.md`, and keeps forgotten text out of its overflow file and report. If `forgotten.json` cannot be read, it writes neither file.
@@ -143,7 +143,7 @@ Removing a whole topic records its title and summary. Its keywords are not recor
 Limits:
 
 - Matching is verbatim after normalization. A paraphrase in an old chat is not filtered.
-- `session_search` by `session_id`, and the scroll mode, still show a transcript as it was. Recall filtering covers search results only.
+- Forget does not rewrite transcripts. `session_search` by `session_id` and the scroll mode still show a transcript as it was. Recall filtering covers search results only. Transcripts are history: deleting the session removes its history.
 - A phrase of fewer than four characters is recorded but never used for filtering. A remove or replace phrase must be at least 8 characters.
 - A proposal that names a forgotten phrase in the text it removes or replaces is refused, so the pending list never holds it. A phrase that is only part of a forgotten text cannot be seen, because the records hold hashes.
 - Very long passages are dropped. A passage that would need more than about 400,000 checks is withheld from recall and refused for writes, so search never runs long. Unspaced text such as Chinese reaches that limit sooner, for example at about 20,000 characters against twenty forgotten phrases, because a phrase there can match at any position. This is a deliberate trade-off.

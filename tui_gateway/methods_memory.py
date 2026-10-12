@@ -29,10 +29,10 @@ def _memory_rpc_store():
     return load_on_disk_store()
 
 
-def _memory_rpc_result(rid, result):
+def _memory_rpc_result(rid, result, details=()):
     if not result.get("success"):
         return _err(rid, 4000, result.get("error", "Memory operation failed."))
-    return _ok(rid, {"success": True})
+    return _ok(rid, {"success": True, **{key: result[key] for key in details if key in result}})
 
 
 @method("memory.list")
@@ -86,6 +86,8 @@ def _(rid, params):
     from tools.memory_forget import forget_owner_entry
 
     result = forget_owner_entry(store, target, expected_text if index is not None else text, index=index)
+    if result.get("success") and (result.get("failed") or result.get("candidates")):
+        return _memory_rpc_result(rid, result, details=("removed_from", "failed", "candidates", "message"))
     return _memory_rpc_result(rid, result)
 
 

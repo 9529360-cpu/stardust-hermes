@@ -1212,3 +1212,145 @@ def test_a_strict_read_is_not_answered_from_an_earlier_lenient_read_of_the_same_
     assert not forgotten_index(home / "memories")  # a lenient read sees no records
     with pytest.raises(RuntimeError):
         forgotten_index(home / "memories", strict=True)
+
+
+def test_forgetting_a_topic_named_routine_does_not_block_routine_in_later_recall(store, home, tmp_path):
+    upsert_topic_summary("routine", "Ship date is March.", title="Routine")
+
+    removed = _run(store, action="remove", target="topic", topic="Routine")
+
+    assert removed["success"] is True and get_topic_summary("routine") is None
+    db = SessionDB(tmp_path / "state.db")
+    db.create_session("s_routine", source="cli")
+    db.append_message("s_routine", role="user", content="My routine starts at six.")
+
+    recalled = json.loads(session_search(query="routine", db=db))
+
+    assert {r["session_id"] for r in recalled["results"]} == {"s_routine"}
+
+
+def test_an_owner_delete_removes_its_entry_and_lists_ambiguous_matches_as_candidates(store, home):
+    store.add("memory", "Atlas budget is set")
+    store.add("user", "Atlas budget is set for Q3")
+    store.add("user", "Atlas budget is set for Q4")
+    user_before = _file(home, "USER.md").read_bytes()
+
+    result = forget_owner_entry(store, "memory", "Atlas budget is set", index=0)
+
+    assert result["success"] is True
+    assert result["removed_from"] == ["memory"]
+    assert "Atlas budget is set" not in _file(home, "MEMORY.md").read_text(encoding="utf-8")
+    assert _file(home, "USER.md").read_bytes() == user_before
+    assert [c["store"] for c in result["candidates"]] == ["user", "user"]
+
+
+def test_a_journey_card_delete_with_an_ambiguous_store_removes_its_entry(store, home):
+    store.add("memory", "Atlas budget is set")
+    store.add("user", "Atlas budget is set for Q3")
+    store.add("user", "Atlas budget is set for Q4")
+
+    result = lm.delete_node("memory:memory:0")
+
+    assert result["ok"] is True
+    assert "Atlas budget is set" not in _file(home, "MEMORY.md").read_text(encoding="utf-8")
+    assert len(result["candidates"]) == 2
+
+
+def test_a_partial_owner_sweep_reports_what_was_removed_and_what_failed(store, home, monkeypatch):
+    import tools.memory_forget as memory_forget
+
+    store.add("memory", "Atlas budget is set")
+    store.add("user", "Atlas budget is set for Q3")
+    upsert_topic_summary("budget", "Atlas budget is set for the year.", title="Budget")
+
+    def locked_topic_forget(phrase, **_kwargs):
+        return {"success": False, "error": "topic summaries are locked"}
+
+    monkeypatch.setattr(memory_forget, "forget_topic_text", locked_topic_forget)
+    result = forget_owner_entry(store, "memory", "Atlas budget is set", index=0)
+
+    assert result["success"] is True and result["partial"] is True
+    assert result["removed_from"] == ["memory", "user"]
+    assert result["failed"] == [{"store": "topic", "error": "topic summaries are locked"}]
+    assert "Atlas budget is set for Q3" not in _file(home, "USER.md").read_text(encoding="utf-8")
+    assert "Atlas budget is set" not in _file(home, "MEMORY.md").read_text(encoding="utf-8")
+
+
+def test_a_hyphen_or_space_variant_of_a_forgotten_name_refuses_an_automatic_topic_write(home):
+    record_forgotten(["coffee notes"], source="memory", scope="entry")
+
+    refused = upsert_topic_summary("coffee-notes", "Trains are on time.", title="Trains")
+
+    assert refused["skipped"] is True
+    assert get_topic_summary("coffee-notes") is None
+
+
+def test_an_exact_hit_replace_refuses_when_another_store_holds_the_phrase(store, home):
+    store.add("memory", "Coffee is in the drawer")
+    store.add("user", "Coffee is in the drawer, really")
+    before = _file(home, "MEMORY.md").read_bytes()
+
+    result = _run(store, action="replace", target="memory", old_text="Coffee is in the drawer",
+                  content="Coffee is in the kitchen")
+
+    assert result["success"] is False
+    assert "USER.md" in result["error"]
+    assert _file(home, "MEMORY.md").read_bytes() == before
+
+
+@pytest.mark.parametrize("field, value", [("tool_name", "borealis-sync"), ("tool_call_id", "call-borealis-sync-1")])
+def test_a_forgotten_phrase_in_a_tool_name_or_tool_call_id_is_not_returned(home, tmp_path, field, value):
+    record_forgotten(["borealis-sync"], source="memory", scope="entry", memories_dir=home / "memories")
+    db = SessionDB(tmp_path / "state.db")
+    db.create_session("s_tool_field", source="cli")
+    db.append_message("s_tool_field", role="tool", content="Synced the calendar.", **{field: value})
+
+    result = json.loads(session_search(query="synced", db=db))
+
+    assert result["results"] == []
+    assert "borealis-sync" not in json.dumps(result)
+
+
+def test_a_forgotten_phrase_with_quotes_inside_escaped_tool_call_json_is_not_returned(home, tmp_path):
+    phrase = 'The "codename" is Atlas'
+    record_forgotten([phrase], source="memory", scope="entry", memories_dir=home / "memories")
+    db = SessionDB(tmp_path / "state.db")
+    db.create_session("s_escaped", source="cli")
+    call = {"id": "call_1", "type": "function",
+            "function": {"name": "memory", "arguments": json.dumps({"content": phrase})}}
+    db.append_message("s_escaped", role="assistant", content="Saving the note.", tool_calls=[call])
+
+    result = json.loads(session_search(query="Saving", db=db))
+
+    assert result["results"] == []
+    assert "codename" not in json.dumps(result)
+
+
+def test_a_name_only_topic_removal_records_its_key_forms(store, home):
+    upsert_topic_summary("coffee-notes", "Trains are on time.", title="Trains")
+
+    removed = _run(store, action="remove", target="topic", topic="coffee notes")
+
+    assert removed["success"] is True
+    records = forgotten_index(home / "memories", strict=True)
+    assert records.mentions("coffee notes") and records.mentions("coffee-notes")
+
+
+def test_a_phrase_based_replace_response_keeps_the_topic_title(store, home):
+    upsert_topic_summary("coffee-notes", "Trains are on time. Coffee is in the drawer.", title="Notes")
+
+    replaced = _run(store, action="replace", target="memory", old_text="Coffee is in the drawer",
+                    content="Coffee is in the kitchen.")
+
+    assert replaced["success"] is True
+    assert replaced["title"] == "Notes"
+
+
+def test_a_phrase_based_replace_omits_a_title_that_equals_its_key(store, home):
+    upsert_topic_summary("coffee-notes", "Trains are on time. Coffee is in the drawer.", title="coffee-notes")
+
+    replaced = _run(store, action="replace", target="memory", old_text="Coffee is in the drawer",
+                    content="Coffee is in the kitchen.")
+
+    assert replaced["success"] is True
+    assert "title" not in replaced and "coffee-notes" not in json.dumps(replaced)

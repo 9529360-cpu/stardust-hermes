@@ -1458,6 +1458,14 @@ export interface MemoryForgetParams {
   text?: string | null
   expected_text?: string | null
 }
+/** A forget that succeeds with more to report carries it: ``failed`` names a store the sweep could not change (the removal itself still happened), ``candidates`` lists matches in other stores that were left in place. */
+export interface MemoryForgetResult {
+  success: boolean
+  removed_from?: string[] | null
+  failed?: Record<string, string>[] | null
+  candidates?: Record<string, string>[] | null
+  message?: string | null
+}
 /** ``word`` is the token under the cursor (``@`` prefix = context reference); ``cwd`` / ``session_id`` pick the directory the listing resolves against. */
 export interface CompletePathParams {
   profile?: string | null
@@ -4537,7 +4545,7 @@ export interface RpcMethods {
   /** Connect, list tools, disconnect — an OAuth server with no token on disk is reported as not ok. */
   'mcp.servers.test': { params: McpServerNameParams; result: McpServersTestResult }
   /** Remove by exact unique text, or index plus expected_text from memory.list. Stale selections do not write. */
-  'memory.forget': { params: MemoryForgetParams; result: MemoryMutationResult }
+  'memory.forget': { params: MemoryForgetParams; result: MemoryForgetResult }
   /** List enabled curated targets with zero-based indices and explicit target status. Unreadable enabled targets return an error; disabled targets expose no entries. */
   'memory.list': { params: MemoryListParams; result: MemoryListResult }
   /** Persist a curated entry using the agent memory content and size guards. */

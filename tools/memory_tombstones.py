@@ -42,6 +42,7 @@ logger = logging.getLogger(__name__)
 
 FORGOTTEN_FILENAME = "forgotten.json"
 MIN_PHRASE_CHARS = 4  # recall and re-add checks; phrases shorter than this are recorded but never matched
+MIN_NAME_CHARS = 8  # a topic name, title or key shorter than this is not recorded, so it cannot block ordinary words
 SCOPES = ("entry", "sentence", "keyword", "topic")
 REFUSAL_TEXT = (
     "The text repeats something the owner forgot. Automatic writes cannot put it back; "
@@ -478,10 +479,18 @@ def _phrase_refusal(phrase: str, memories_dir: Optional[Path]) -> Optional[str]:
     return REFUSAL_PHRASE if index.mentions(phrase) else None
 
 
+def name_variants(name: Any) -> List[str]:
+    """A topic name as a person may type it: as given, with hyphens read as spaces, and with spaces read as hyphens. The
+    name checks treat these variants as the same name. Empty for an empty name."""
+    text = str(name or "").strip()
+    return [text, text.replace("-", " "), text.replace(" ", "-")] if text else []
+
+
 def name_refusal(names: Iterable[str], memories_dir: Optional[Path] = None) -> Optional[str]:
-    """Refusal for a topic name or key (any of *names*) that repeats forgotten text, for a forget. The name is part of the
-    topic's stored text, so a forget may not carry forgotten text into its own request either. An unreadable file refuses."""
-    wanted = [name for name in names if name]
+    """Refusal for a topic name, title or key (any of *names*) that repeats forgotten text, for a forget or a write. The
+    name is part of the topic's stored text, so a forget may not carry forgotten text into its own request either. A
+    hyphen or space variant of a name counts as the same name. An unreadable file refuses."""
+    wanted = [variant for name in names for variant in name_variants(name)]
     if not wanted:
         return None
     try:
@@ -505,8 +514,9 @@ def proposal_refusal(payload: Dict[str, Any], memories_dir: Optional[Path] = Non
 
         key, candidate = topic_candidate(payload.get("topic") or payload.get("title") or "", payload.get("content") or "",
                                          title=payload.get("title"), keywords=payload.get("keywords"))
-        phrases += [*_as_strings(payload.get("topic")), key, *_as_strings(payload.get("title")),
-                    *_as_strings(payload.get("keywords"))]
+        names = [*_as_strings(payload.get("topic")), key, *_as_strings(payload.get("title"))]
+        phrases += [variant for name in names for variant in name_variants(name)]
+        phrases += _as_strings(payload.get("keywords"))
     for phrase in phrases:
         if reason := _phrase_refusal(phrase, memories_dir):
             return reason

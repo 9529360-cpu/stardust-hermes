@@ -178,12 +178,12 @@ def _apply_unique(store, needle: str, per_store: _Scan) -> Tuple[List[str], List
         if label == "topic":
             result = forget_topic_text(needle)
             if not result.get("success"):
-                return changed, removed, result
+                return changed, removed, {**result, "failed_in": label}
             removed += [{"store": "topic", "what": item["what"]} for item in result["removed"]]
         else:
             result = store.forget_matching(label, needle)
             if not result.get("success"):
-                return changed, removed, result
+                return changed, removed, {**result, "failed_in": label}
             removed.append({"store": label, "what": "entry"})
         changed.append(label)
     return changed, removed, None
@@ -268,9 +268,12 @@ def forget_owner_entry(store, target: str, text: str, *, index: Optional[int] = 
     """Owner-initiated forget of one built-in entry: the memory page, the dashboard, or a journey card.
 
     The selected entry goes through the store's exact-match, drift and reset-generation checks (``index`` verifies its
-    position). Then the same text is removed from the other stores, as a memory-tool forget does. The sweep needs the
-    text to be at least MIN_FORGET_CHARS long and unique in every other store; if it is not, nothing changes. A shorter
-    text removes only the selected entry. The selected store keeps its other entries, because the owner picked one."""
+    position), and a failure there changes nothing. Once the entry is removed the response succeeds, and a later problem
+    is reported beside it. The same text is then swept from the other stores when it is at least MIN_FORGET_CHARS long
+    and unique in each. When another store holds more than one match, the sweep is skipped and those matches come back as
+    ``candidates``. A sweep that fails is reported as ``failed``, with the stores it did change in ``removed_from``. A
+    shorter text removes only the selected entry. The selected store keeps its other entries, because the owner picked
+    one."""
     needle = fold_text(text)
     sweep = len(needle) >= MIN_FORGET_CHARS
     others: _Scan = {}
@@ -281,25 +284,50 @@ def forget_owner_entry(store, target: str, text: str, *, index: Optional[int] = 
         if failure is not None:
             return failure
         others = {label: units for label, units in per_store.items() if label != target}
-        if any(len(units) > 1 for units in others.values()):
-            return _ambiguous(needle, others)
     base = store.remove_index(target, index, text) if index is not None else store.remove_exact(target, text)
     if not base.get("success"):
         return base
-    changed, removed, failure = _apply_unique(store, needle, others) if sweep else ([], [], None)
     selected = [{"store": target, "what": "entry"}]
+    ambiguous = [label for label, units in others.items() if len(units) > 1]
+    if ambiguous:
+        candidates = _echo([unit for units in others.values() for unit in units])
+        return {**base, "success": True, "removed_from": [target], "removed": selected, "swept": False,
+                "candidates": candidates,
+                "message": (f"Removed the entry from {_labels([target])}. {_labels(ambiguous)} hold more than one match "
+                            "of this text, so nothing else was removed; the matches are listed as candidates.")}
+    changed, removed, failure = _apply_unique(store, needle, others) if sweep else ([], [], None)
+    done = [target] + changed
     if failure is not None:
-        return _failed(failure, [target] + changed, selected + removed)
-    message = f"Removed the text from {_labels([target] + changed)}." if changed else "Entry removed."
+        failed_in = failure.get("failed_in", "")
+        error = failure.get("error", "unknown error")
+        return {**base, "success": True, "partial": True, "swept": True, "removed_from": done,
+                "removed": selected + removed, "failed": [{"store": failed_in, "error": error}],
+                "message": (f"Partial sweep: the text was removed from {_labels(done)}. It failed in "
+                            f"{_LABELS.get(failed_in, failed_in)}: {error}")}
+    message = f"Removed the text from {_labels(done)}." if changed else "Entry removed."
     if not sweep:
         message += f" Not swept: the text is shorter than {MIN_FORGET_CHARS} characters."
-    return {**base, "removed_from": [target] + changed, "removed": selected + removed, "message": message,
+    return {**base, "success": True, "removed_from": done, "removed": selected + removed, "message": message,
             "swept": sweep}
+
+
+def _held_elsewhere(store, target: str, needle: str, raw: str) -> Optional[Dict[str, Any]]:
+    """Refusal when another store also holds the phrase. An exact hit in *target* names one entry only when no other store
+    holds the phrase too, the same check a batch makes. A store that cannot be read refuses as well."""
+    per_store, failure = _scan(store, needle)
+    if failure is not None:
+        return failure
+    elsewhere = [label for label, units in per_store.items() if label != target and units]
+    if elsewhere:
+        return _error(f"'{raw}' is also in {_labels(elsewhere)}. Nothing was changed. Use a longer phrase that identifies "
+                      "one entry.")
+    return None
 
 
 def replace_entry(store, target: str, old_text: Optional[str], new_content: Optional[str], *,
                   owner_initiated: bool = False) -> Dict[str, Any]:
-    """Memory-tool replace. An exact, case-sensitive hit in *target* keeps the store's own response. Otherwise a single
+    """Memory-tool replace. An exact, case-sensitive hit in *target* keeps the store's own response, unless another store
+    also holds the phrase. Otherwise a single
     hit in any store is replaced in place. The phrase must be MIN_FORGET_CHARS long, as for a remove."""
     raw = (old_text or "").strip()
     needle = fold_text(raw)
@@ -308,6 +336,8 @@ def replace_entry(store, target: str, old_text: Optional[str], new_content: Opti
     if len(needle) < MIN_FORGET_CHARS:
         return _too_short(store, needle)
     if _exact_hit(store, target, raw):
+        if held := _held_elsewhere(store, target, needle, raw):
+            return held
         return store.replace(target, raw, new_content or "", owner_initiated=owner_initiated)
     return _replace_everywhere(store, target, needle, new_content, owner_initiated=owner_initiated)
 
@@ -336,8 +366,11 @@ def _replace_everywhere(store, target: str, needle: str, new_content: Optional[s
         result = replace_topic_sentence(hit["topic"], needle, content, owner_initiated=owner_initiated)
         if not result.get("success"):
             return result
-        # The caller named a phrase, not the topic, so the response leaves the key out, as forget responses do.
-        result = {key: value for key, value in result.items() if key != "topic"}
+        # The caller named a phrase, not the topic, so the response leaves the key out, as forget responses do. A title
+        # that normalizes to the key would repeat it, so that title is left out too.
+        result = {field: value for field, value in result.items() if field != "topic"}
+        if result.get("title") and topic_candidate(result["title"], "")[0] == hit["topic"]:
+            result.pop("title")
         return {**result, "done": True, "target": target, "replaced_in": "topic", "note": _NOTE}
     result = store.replace_matching(hit["store"], needle, content, owner_initiated=owner_initiated)
     return {**result, "target": target, "replaced_in": hit["store"]} if result.get("success") else result

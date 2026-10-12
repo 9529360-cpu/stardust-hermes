@@ -1712,7 +1712,7 @@
       "result": {
         "name": "result",
         "schema": {
-          "$ref": "#/components/schemas/MemoryMutationResult"
+          "$ref": "#/components/schemas/MemoryForgetResult"
         }
       }
     },
@@ -15680,6 +15680,84 @@
           "target"
         ],
         "title": "MemoryForgetParams",
+        "type": "object"
+      },
+      "MemoryForgetResult": {
+        "additionalProperties": false,
+        "description": "A forget that succeeds with more to report carries it: ``failed`` names a store the sweep could not change (the\nremoval itself still happened), ``candidates`` lists matches in other stores that were left in place.",
+        "properties": {
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          },
+          "removed_from": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Removed From"
+          },
+          "failed": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Failed"
+          },
+          "candidates": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Candidates"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Message"
+          }
+        },
+        "required": [
+          "success"
+        ],
+        "title": "MemoryForgetResult",
         "type": "object"
       },
       "MemoryListParams": {

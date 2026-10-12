@@ -508,7 +508,8 @@ async def delete_memory_entry(target: str, body: Dict[str, str], profile: Option
         if not result.get("success"):
             raise HTTPException(status_code=409, detail="Memory entry changed; reload the list and retry")
         return {"ok": True, "active_session_behavior": "refresh_on_next_turn",
-                "removed_from": result["removed_from"]}
+                "removed_from": result["removed_from"], "failed": result.get("failed", []),
+                "candidates": result.get("candidates", []), "message": result.get("message", "")}
 
     return await scoped_to_thread(profile, _remove)
 

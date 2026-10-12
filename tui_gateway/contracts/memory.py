@@ -39,9 +39,19 @@ class MemoryMutationResult(Result):
     success: bool
 
 
+class MemoryForgetResult(MemoryMutationResult):
+    """A forget that succeeds with more to report carries it: ``failed`` names a store the sweep could not change (the
+    removal itself still happened), ``candidates`` lists matches in other stores that were left in place."""
+
+    removed_from: list[str] | None = None
+    failed: list[dict[str, str]] | None = None
+    candidates: list[dict[str, str]] | None = None
+    message: str | None = None
+
+
 method("memory.list", params=MemoryListParams, result=MemoryListResult,
        doc="List enabled curated targets with zero-based indices and explicit target status. Unreadable enabled targets return an error; disabled targets expose no entries.")
 method("memory.remember", params=MemoryRememberParams, result=MemoryMutationResult,
        doc="Persist a curated entry using the agent memory content and size guards.")
-method("memory.forget", params=MemoryForgetParams, result=MemoryMutationResult,
+method("memory.forget", params=MemoryForgetParams, result=MemoryForgetResult,
        doc="Remove by exact unique text, or index plus expected_text from memory.list. Stale selections do not write.")
