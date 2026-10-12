@@ -327,6 +327,7 @@ export function findElectron(): string {
  */
 export async function launchDesktop(
   env: Record<string, string>,
+  options: { local?: boolean } = {},
 ): Promise<{ app: ElectronApplication; page: Page }> {
   assertDistBuilt()
 
@@ -338,6 +339,7 @@ export async function launchDesktop(
     executablePath: electronBin,
     args: [
       DESKTOP_ROOT, // `electron .` — the `.` is the desktop package dir
+      ...(options.local ? ['--local'] : []),
       '--disable-gpu',
       '--no-sandbox',
     ],
@@ -376,6 +378,8 @@ export interface MockBackendOptions {
   extraConfig?: string
   /** Override the mock model's context window for compression scenarios. */
   modelContextLength?: number
+  /** Launch with the local-model UI surfaces enabled. */
+  local?: boolean
 }
 
 /**
@@ -409,7 +413,7 @@ export async function setupMockBackend(options: MockBackendOptions = {}): Promis
 
   // 3. Build env + launch
   const env = buildAppEnv(sandbox)
-  const { app, page } = await launchDesktop(env)
+  const { app, page } = await launchDesktop(env, { local: options.local })
 
   return {
     app,

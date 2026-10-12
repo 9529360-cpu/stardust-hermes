@@ -65,11 +65,12 @@ async function checkChangedStates(
 
   await expect(page.getByText('自定义服务', { exact: true }).first()).toBeVisible({ timeout: 30_000 })
 
+  // The local-model UI is gated behind Electron's --local flag; without it,
+  // neither the runtime card nor its catalog request exists in this scenario.
   const setupCard = page.getByRole('button', { name: '为我设置' })
   const runtimeHeading = page.getByText('本地运行时', { exact: true })
-  // The runtime card renders only after the local-model catalog request resolves,
-  // and that request runs the hardware probes (hermes_cli/local_runtime/hardware.py,
-  // 5-30 s subprocess timeouts). A 30 s budget is too short on a cold CI runner.
+  // With --local enabled, this card loads the catalog and hardware probes before it appears.
+  // A cold CI runner may need longer than the usual 30 s expectation budget.
   await expect(setupCard.or(runtimeHeading).first()).toBeVisible({ timeout: 90_000 })
   await expect.soft(setupCard).toHaveCount(0)
   await expect.soft(runtimeHeading).toBeVisible()
@@ -78,7 +79,7 @@ async function checkChangedStates(
 
 test('the changed states hold at the default window size', async () => {
   test.setTimeout(300_000)
-  const fixture = await setupMockBackend()
+  const fixture = await setupMockBackend({ local: true })
 
   try {
     await waitForAppReady(fixture, 120_000)
@@ -90,7 +91,7 @@ test('the changed states hold at the default window size', async () => {
 
 test('the changed states hold at a narrow width', async () => {
   test.setTimeout(300_000)
-  const fixture = await setupMockBackend()
+  const fixture = await setupMockBackend({ local: true })
 
   try {
     await waitForAppReady(fixture, 120_000)
