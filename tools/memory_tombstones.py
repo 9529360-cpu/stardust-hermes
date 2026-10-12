@@ -55,6 +55,9 @@ REFUSAL_PHRASE = (
     "The phrase to change repeats something the owner forgot. Nothing was staged, so forgotten text is not written to "
     "the pending list."
 )
+REFUSAL_NAME = (
+    "The topic name or key repeats something the owner forgot, so this topic cannot be used here. Nothing was changed."
+)
 REFUSAL_UNREADABLE = (
     "forgotten.json cannot be read ({problem}). Repair it before any memory write, so forgotten text cannot "
     "come back."
@@ -399,11 +402,13 @@ class ForgottenIndex:
         return result
 
 
-_INDEX_CACHE: Dict[str, Tuple[str, ForgottenIndex]] = {}
+_INDEX_CACHE: Dict[str, Tuple[str, bool, ForgottenIndex]] = {}  # path -> (content digest, strict, index)
 
 
 def forgotten_index(memories_dir: Optional[Path] = None, *, strict: bool = False) -> ForgottenIndex:
-    """Index of the recorded texts. Strict callers get OSError or RuntimeError for an unreadable file."""
+    """Index of the recorded texts. Strict callers get OSError or RuntimeError for an unreadable file. A lenient read skips
+    unusable rows (and reads an unparseable file as empty), so only a strict read may filter or refuse: a strict call is
+    never answered from a lenient read of the same bytes."""
     path = forgotten_path(memories_dir)
     try:
         raw = path.read_bytes()
@@ -416,11 +421,11 @@ def forgotten_index(memories_dir: Optional[Path] = None, *, strict: bool = False
         return ForgottenIndex([])
     content = hashlib.sha256(raw).hexdigest()
     cached = _INDEX_CACHE.get(str(path))
-    if cached is not None and cached[0] == content:
-        return cached[1]
+    if cached is not None and cached[0] == content and (cached[1] or not strict):
+        return cached[2]
     records, _legacy = _load(path, strict=strict)
     index = ForgottenIndex(records)
-    _INDEX_CACHE[str(path)] = (content, index)
+    _INDEX_CACHE[str(path)] = (content, strict, index)
     return index
 
 
@@ -473,25 +478,40 @@ def _phrase_refusal(phrase: str, memories_dir: Optional[Path]) -> Optional[str]:
     return REFUSAL_PHRASE if index.mentions(phrase) else None
 
 
+def name_refusal(names: Iterable[str], memories_dir: Optional[Path] = None) -> Optional[str]:
+    """Refusal for a topic name or key (any of *names*) that repeats forgotten text, for a forget. The name is part of the
+    topic's stored text, so a forget may not carry forgotten text into its own request either. An unreadable file refuses."""
+    wanted = [name for name in names if name]
+    if not wanted:
+        return None
+    try:
+        index = forgotten_index(memories_dir, strict=True)
+    except (OSError, RuntimeError) as exc:
+        return REFUSAL_UNREADABLE.format(problem=exc)
+    return REFUSAL_NAME if any(index.mentions(name) for name in wanted) else None
+
+
 def proposal_refusal(payload: Dict[str, Any], memories_dir: Optional[Path] = None) -> Optional[str]:
     """Refusal for a staged memory proposal. A proposal is written to the pending list whole, so it is refused when any
-    text it would persist repeats forgotten text: the phrases it removes or replaces (old_text, single or in a batch, and
-    a topic's title and keywords), and the text it would add (a memory add or replace, or a topic's title, keywords and
-    summary under its topic key). Proposals are never owner-initiated, so the owner adds such text directly."""
+    text it would persist repeats forgotten text: the phrases it removes or replaces (old_text, single or in a batch), a
+    topic's name, key, title and keywords, and the text it would add (a memory add or replace, or a topic's name, key,
+    title, keywords and summary under its topic key). Proposals are never owner-initiated, so the owner adds such text
+    directly."""
     phrases = [payload.get("old_text") or ""]
     phrases += [op.get("old_text") or "" for op in payload.get("operations") or [] if isinstance(op, dict)]
+    key, candidate = "", ""
     if payload.get("target") == "topic":
-        phrases += [payload.get("title") or "", *_as_strings(payload.get("keywords"))]
+        from tools.topic_memory_store import topic_candidate  # lazy: topic_memory_store imports this module
+
+        key, candidate = topic_candidate(payload.get("topic") or payload.get("title") or "", payload.get("content") or "",
+                                         title=payload.get("title"), keywords=payload.get("keywords"))
+        phrases += [payload.get("topic") or "", key, payload.get("title") or "", *_as_strings(payload.get("keywords"))]
     for phrase in phrases:
         if reason := _phrase_refusal(phrase, memories_dir):
             return reason
     if payload.get("target") == "topic":
         if payload.get("action") not in ("upsert", "add", "replace"):
             return None
-        from tools.topic_memory_store import topic_candidate  # lazy: topic_memory_store imports this module
-
-        key, candidate = topic_candidate(payload.get("topic") or payload.get("title") or "", payload.get("content") or "",
-                                         title=payload.get("title"), keywords=payload.get("keywords"))
         return write_refusal(candidate, owner_initiated=False, topic_key=key, memories_dir=memories_dir)
     texts: List[str] = []
     if payload.get("action") in ("add", "replace"):

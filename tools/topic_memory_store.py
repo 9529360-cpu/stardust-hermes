@@ -197,10 +197,12 @@ def get_topic_summary(topic: str) -> dict[str, Any] | None:
 
 
 def topic_candidate(topic: str, summary: str, *, title: str | None = None, keywords: Any = None) -> tuple[str, str]:
-    """The topic key and the text an upsert would store (title, keywords and summary joined by NUL). A forgotten-text
-    check uses exactly this text, so a refusal and the stored topic cannot disagree."""
+    """The topic key and the text an upsert would store: the name as given, the key, the title, the keywords and the
+    summary, joined by NUL. A forgotten-text check uses exactly this text, so a refusal and the stored topic cannot
+    disagree. The name and key are included because a topic's name is part of what it stores."""
+    key = _topic_key(topic or title)
     clean_title = str(title or topic or "").strip()[:_MAX_TITLE_CHARS]
-    return _topic_key(topic or title), "\x00".join([clean_title, *_keywords(keywords), str(summary or "").strip()])
+    return key, "\x00".join([str(topic or "").strip(), key, clean_title, *_keywords(keywords), str(summary or "").strip()])
 
 
 def upsert_topic_summary(
@@ -269,7 +271,10 @@ def upsert_topic_summary(
         "message": f"Topic summary {change}",
         "version": _topic_version(row),
     }
-    return _cleared(result, _exact_topic_texts(clean_title, clean_keywords, clean_summary), key) if owner_initiated else result
+    if not owner_initiated:
+        return result
+    names = [str(topic or "").strip(), key]  # the name and key, which the owner may also re-add exactly
+    return _cleared(result, [*names, *_exact_topic_texts(clean_title, clean_keywords, clean_summary)], key)
 
 
 def reset_topic_summaries() -> bool:
@@ -325,11 +330,14 @@ def _sentences(summary: str) -> list[str]:
 
 
 def topic_forget_units(row: dict[str, Any], needle: str) -> list[tuple[str, str]]:
-    """What a forget of the folded *needle* removes from one topic row: ``("topic", title)`` when the title
-    matches (the whole topic goes), otherwise ``("sentence", text)`` for each matching summary sentence and
-    ``("keyword", text)`` for each matching keyword. The scan and the removal both use this, so they agree."""
+    """What a forget of the folded *needle* removes from one topic row: ``("topic", title)`` when the title or the topic's
+    key matches (the phrase names the topic, so the whole topic goes), otherwise ``("sentence", text)`` for each matching
+    summary sentence and ``("keyword", text)`` for each matching keyword. The scan and the removal both use this, so they
+    agree."""
     title = str(row.get("title") or "")
-    if needle in fold_text(title):
+    key = _topic_key(row.get("key") or row.get("title"))
+    key_forms = (fold_text(key), fold_text(key.replace("-", " ")))  # "morning-coffee" is also named "morning coffee"
+    if needle in fold_text(title) or any(needle in form for form in key_forms):
         return [("topic", title)]
     units = [("sentence", s.strip()) for s in _sentences(str(row.get("summary") or "")) if needle in fold_text(s)]
     units += [("keyword", str(k)) for k in row.get("keywords") or [] if needle in fold_text(k)]
@@ -390,7 +398,7 @@ def forget_topic_text(phrase: str, *, topic_key: str | None = None) -> dict[str,
             # Re-checked under the lock, before anything is recorded or written: the scan that chose this forget saw one
             # match, but another write may have added a second since then.
             return {"success": False, "error": f"'{phrase}' matches more than one topic item. Nothing was changed.",
-                    "matches": removed}
+                    "matches": [{"what": item["what"]} for item in removed]}  # no topic keys in a response
         for (key, scope), texts in groups.items():
             try:
                 record_forgotten(texts, source="topic", scope=scope, topic_key=key)

@@ -133,6 +133,10 @@ Removing a whole topic records its title and summary. Its keywords are not recor
 - **Automatic writes.** Background review, staged approvals, agent imports, and the agent's own adds and replacements skip text that repeats something you forgot, and a topic whose whole-topic record matches is not recreated automatically. A staged proposal that would add forgotten text is refused before it is saved to the pending list. Each refusal logs its reason and returns it.
 - **Your own adds.** Adding the entry yourself from the memory page, or entering it during onboarding, puts it back. It clears a record only when the new entry equals the forgotten text exactly. An entry that merely contains a forgotten phrase leaves the record in place.
 - **Whole words.** An ASCII phrase must start and end at a word boundary, so a forgotten `Coffee` does not hide `Buy a coffeemaker next week`. Chinese, Japanese and other text without spaces matches wherever the phrase occurs.
+- **Tool calls.** Recall checks a message's tool calls and tool names as well as its text, so a phrase inside a tool call is not shown.
+- **Other profiles.** A search of another profile is filtered with that profile's own forgotten records, not yours.
+- **Topic names.** A topic whose name or key repeats forgotten text is refused for automatic writes and for proposals, and a forget that names such a topic is refused.
+- **Disabled stores.** A forget still removes the text from a disabled `MEMORY.md` or `USER.md` file, so it does not stay on disk.
 - **Unreadable records.** If `forgotten.json` cannot be read, every memory write is refused, the owner's included. Forgetting refuses too, and resetting refuses while it has topics to record. Nothing is written that could bring forgotten text back. A topics file that cannot be parsed holds nothing recall can read, so a reset erases it as before.
 - **Migration.** The OpenClaw migration skips entries that repeat forgotten text. It takes the same lock as Hermes when it writes `MEMORY.md` or `USER.md`, and keeps forgotten text out of its overflow file and report. If `forgotten.json` cannot be read, it writes neither file.
 
@@ -142,7 +146,9 @@ Limits:
 - `session_search` by `session_id`, and the scroll mode, still show a transcript as it was. Recall filtering covers search results only.
 - A phrase of fewer than four characters is recorded but never used for filtering. A remove or replace phrase must be at least 8 characters.
 - A proposal that names a forgotten phrase in the text it removes or replaces is refused, so the pending list never holds it. A phrase that is only part of a forgotten text cannot be seen, because the records hold hashes.
-- Very long passages are not scanned. A passage that would need more than about 400,000 checks, for example about 20,000 Chinese characters against twenty forgotten phrases, is withheld from recall and refused for writes, so search never runs long.
+- Fragments are not blocked. A phrase that is only part of a forgotten phrase is not matched, because matching is whole-word and verbatim by design.
+- A forget removes memory entries and topic summaries, not conversation history. `session_search` by `session_id`, and the scroll mode, still show a transcript as it was.
+- Long CJK results are dropped. A passage that would need more than about 400,000 checks, for example about 20,000 Chinese characters against twenty forgotten phrases, is withheld from recall and refused for writes, so search never runs long. This is a deliberate trade-off.
 
 ## Two Targets Explained
 

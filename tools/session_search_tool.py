@@ -13,6 +13,7 @@ import logging
 import re
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 from hermes_state_common import _BOUNDARY_END_REASONS
@@ -322,11 +323,35 @@ def _unmarked(snippet: str) -> str:
     return snippet
 
 
-def _drop_forgotten(results: List[Dict[str, Any]]) -> Optional[List[Dict[str, Any]]]:
+def _leaf_strings(value: Any) -> List[str]:
+    """Every string a tool_calls field holds: the strings in a list or dict, or a JSON string's raw text and the strings it
+    decodes to. Decoding matters: JSON escapes quotes and backslashes, so the owner's phrase would not match the raw text."""
+    if isinstance(value, str):
+        try:
+            decoded = json.loads(value)
+        except ValueError:
+            return [value]
+        return [value, *_leaf_strings(decoded)]
+    if isinstance(value, dict):
+        return [text for item in value.values() for text in _leaf_strings(item)]
+    if isinstance(value, list):
+        return [text for item in value for text in _leaf_strings(item)]
+    return []
+
+
+def _message_parts(message: Dict[str, Any]) -> List[Any]:
+    """Every text a shaped message shows: its content, and its tool fields (tool_calls holds arguments and results)."""
+    return [message.get("content"), message.get("tool_name"), message.get("tool_call_id"),
+            *_leaf_strings(message.get("tool_calls"))]
+
+
+def _drop_forgotten(results: List[Dict[str, Any]], memories_dir: Optional[Path] = None) -> Optional[List[Dict[str, Any]]]:
     """Drop results whose text contains a phrase the owner forgot. Transcripts are untouched; this filters what recall
-    shows (see tools/memory_tombstones.py). Returns None when forgotten.json cannot be read: recall is then suspended,
-    because results could not be filtered."""
-    index = recall_index()
+    shows (see tools/memory_tombstones.py). The text checked is everything a result shows: its title, snippet, preview,
+    and each message's content and tool fields. *memories_dir* is the forgotten records of the profile searched (the
+    current profile's when None). Returns None when forgotten.json cannot be read: recall is then suspended, because
+    results could not be filtered."""
+    index = recall_index(memories_dir)
     if index is None:
         return None
     if not index:
@@ -336,7 +361,9 @@ def _drop_forgotten(results: List[Dict[str, Any]]) -> Optional[List[Dict[str, An
         snippet = entry.get("snippet") if isinstance(entry.get("snippet"), str) else ""
         parts = [entry.get("title"), snippet, _unmarked(snippet), entry.get("preview")]
         for key in ("bookend_start", "messages", "bookend_end"):
-            parts.extend(m.get("content") for m in entry.get(key) or [] if isinstance(m, dict))
+            for message in entry.get(key) or []:
+                if isinstance(message, dict):
+                    parts.extend(_message_parts(message))
         text = "\n".join(part for part in parts if isinstance(part, str))
         if not index.mentions(text):
             kept.append(entry)
@@ -375,7 +402,7 @@ def _hydrate_hit(db, lineage_root: str, match_info: Dict[str, Any], result_detai
 def _discover(db, query: str, role_filter: Optional[List[str]], limit: int, sort: Optional[str],
               detail: str, current_session_id: str = None, link_profile: str = None,
               after_ts: Optional[int] = None, before_ts: Optional[int] = None,
-              exclude_session_ids: Optional[List[str]] = None) -> str:
+              exclude_session_ids: Optional[List[str]] = None, memories_dir: Optional[Path] = None) -> str:
     """Discovery shape: FTS5 plus adaptive or full result hydration."""
     current_lineage_root = _resolve_lineage(db, current_session_id) if current_session_id else None
     excluded_roots = _excluded_lineage_roots(db, exclude_session_ids or [])
@@ -442,7 +469,7 @@ def _discover(db, query: str, role_filter: Optional[List[str]], limit: int, sort
         entry = _hydrate_hit(db, lineage_root, match_info, "full" if detail == "full" or not results else "compact")
         if entry is not None:
             results.append(entry)
-    results = _drop_forgotten(results)
+    results = _drop_forgotten(results, memories_dir)
     if results is None:
         return tool_error(RECALL_SUSPENDED, success=False)
     for entry in results:
@@ -466,6 +493,15 @@ def _resolve_profile_db(profile: str):
     if not profiles_mod.profile_exists(canon):
         raise ValueError(f"profile '{canon}' does not exist")
     return SessionDB(db_path=profiles_mod.get_profile_dir(canon) / "state.db", read_only=True)
+
+
+def _profile_memories_dir(profile: Optional[str]) -> Optional[Path]:
+    """The memories directory of the profile named *profile*, where its forgotten records live. None when no profile is
+    named: the current profile's records apply then."""
+    if profile is None or not str(profile).strip():
+        return None
+    from hermes_cli import profiles as profiles_mod
+    return profiles_mod.get_profile_dir(profiles_mod.normalize_profile_name(profile)) / "memories"
 
 
 def _read_session(db, session_id: str, head: int = 20, tail: int = 10, link_profile: str = None) -> str:
@@ -501,7 +537,8 @@ def _read_scoped(db, sid: str, profile: Optional[str]) -> str:
                       "profile, pass profile=<name> (or the @session:<profile>/<id> link).", success=False)
 
 
-def _list_recent_sessions(db, limit: int, current_session_id: str = None, link_profile: str = None) -> str:
+def _list_recent_sessions(db, limit: int, current_session_id: str = None, link_profile: str = None,
+                          memories_dir: Optional[Path] = None) -> str:
     """Browse shape: metadata for the most recent sessions (no LLM, no FTS5)."""
     def _browse():
         # Never use list_sessions_rich(order_by_last_active=True) here: it walks every
@@ -516,7 +553,7 @@ def _list_recent_sessions(db, limit: int, current_session_id: str = None, link_p
         sessions = bounded_list(
             limit=limit + 15,  # extra so we can skip current / compression roots
             exclude_sources=list(_HIDDEN_SESSION_SOURCES), timeout_seconds=3.0)
-        forgotten = recall_index()
+        forgotten = recall_index(memories_dir)
         if forgotten is None:
             return tool_error(RECALL_SUSPENDED, success=False)
         sessions = [s for s in sessions if not forgotten.mentions(f"{s.get('title') or ''}\n{s.get('preview') or ''}")]
@@ -624,13 +661,14 @@ def _dispatch(query, role_filter, limit, db, current_session_id, session_id,
     if profile_db is not None:
         db, current_session_id = profile_db, None
         owned_dbs.append(profile_db)
+    memories_dir = _profile_memories_dir(profile)  # the named profile's forgotten records filter its results
     if isinstance(session_id, str) and session_id.strip():
         if around_message_id is not None:
             return _scroll(db, session_id.strip(), around_message_id, window, current_session_id)
         return _read_scoped(db, session_id.strip(), profile)
     limit = _clamp_int(limit, 3, 1, 10)
     if not query or not isinstance(query, str) or not query.strip():
-        return _list_recent_sessions(db, limit, current_session_id, link_profile=profile)
+        return _list_recent_sessions(db, limit, current_session_id, link_profile=profile, memories_dir=memories_dir)
     sort_norm = sort.strip().lower() if isinstance(sort, str) else None
     try:
         after_ts, before_ts = _parse_iso_bound(after), _parse_iso_bound(before)
@@ -641,7 +679,7 @@ def _dispatch(query, role_filter, limit, db, current_session_id, session_id,
         role_filter=([r.strip() for r in role_filter.split(",") if r.strip()] or None) if isinstance(role_filter, str) else None,
         detail="full" if isinstance(detail, str) and detail.strip().lower() == "full" else "adaptive",
         current_session_id=current_session_id, link_profile=profile, after_ts=after_ts, before_ts=before_ts,
-        exclude_session_ids=_normalize_exclude_session_ids(exclude_session_ids))
+        exclude_session_ids=_normalize_exclude_session_ids(exclude_session_ids), memories_dir=memories_dir)
 
 
 def session_search(query: str = "", role_filter: str = None, limit: int = 3, db=None,

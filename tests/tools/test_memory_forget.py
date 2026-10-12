@@ -1007,3 +1007,180 @@ def test_records_written_before_fingerprints_still_match(home):
     assert index.mentions("Buy a coffee maker next week")
     assert not index.mentions("Buy a coffeemaker next week")
     assert index.mentions("我觉得咖啡很好喝呢")
+
+
+# ── review round 3: tool calls, profiles, topic names, the single-match rule, sweeps, echoes ──
+
+@pytest.mark.parametrize("detail", ["adaptive", "full"])
+def test_a_forgotten_phrase_inside_a_tool_call_is_not_returned(store, home, tmp_path, detail):
+    phrase = "The owner's codename is Atlas"
+    store.add("memory", phrase)
+    memory_tool(action="remove", target="memory", old_text="codename is Atlas", store=store)
+    db = SessionDB(tmp_path / "state.db")
+    db.create_session("s_tool", source="cli")
+    db.append_message("s_tool", role="assistant", content="Saving the Atlas note now.",
+                      tool_calls=[{"id": "call_1", "type": "function",
+                                   "function": {"name": "memory", "arguments": json.dumps({"content": phrase})}}])
+    db.create_session("s_other", source="cli")
+    db.append_message("s_other", role="user", content="Atlas the rocket launch is scheduled for Friday.")
+
+    result = json.loads(session_search(query="Atlas", db=db, detail=detail))
+
+    assert {r["session_id"] for r in result["results"]} == {"s_other"}
+    assert phrase not in json.dumps(result, ensure_ascii=False)
+
+
+def test_profile_results_are_filtered_with_that_profiles_own_forgotten_records(home, tmp_path, monkeypatch):
+    from hermes_cli import profiles as profiles_mod
+
+    work_home = tmp_path / "work-profile"
+    (work_home / "memories").mkdir(parents=True)
+    monkeypatch.setattr(profiles_mod, "normalize_profile_name", lambda name: name)
+    monkeypatch.setattr(profiles_mod, "validate_profile_name", lambda name: None)
+    monkeypatch.setattr(profiles_mod, "profile_exists", lambda name: True)
+    monkeypatch.setattr(profiles_mod, "get_profile_dir", lambda name: work_home)
+    # The current profile forgot the codename; the work profile forgot the budget. Each filters only its own results.
+    record_forgotten(["The owner's codename is Atlas"], source="memory", scope="entry", memories_dir=home / "memories")
+    record_forgotten(["The owner's budget is Borealis"], source="memory", scope="entry",
+                     memories_dir=work_home / "memories")
+    work_db = SessionDB(work_home / "state.db")
+    work_db.create_session("w_codename", source="cli")
+    work_db.append_message("w_codename", role="user", content="Reminder: The owner's codename is Atlas, keep it private.")
+    work_db.create_session("w_budget", source="cli")
+    work_db.append_message("w_budget", role="user", content="Budget note: The owner's budget is Borealis, keep it private.")
+    caller_db = SessionDB(tmp_path / "state.db")
+    caller_db.create_session("c_codename", source="cli")
+    caller_db.append_message("c_codename", role="user", content="Reminder: The owner's codename is Atlas, keep it private.")
+    caller_db.create_session("c_budget", source="cli")
+    caller_db.append_message("c_budget", role="user", content="Budget note: The owner's budget is Borealis, keep it private.")
+
+    def found(**kwargs):
+        return {r["session_id"] for r in json.loads(session_search(db=caller_db, **kwargs))["results"]}
+
+    assert found(query="owner", profile="work") == {"w_codename"}
+    assert found(query="owner") == {"c_budget"}
+    assert found(profile="work") == {"w_codename"}  # browse mode filters the same way
+
+
+def test_an_automatic_write_of_a_topic_name_that_repeats_forgotten_text_is_refused(home):
+    record_forgotten(["Coffee"], source="memory", scope="entry")
+
+    refused = upsert_topic_summary("coffee notes", "Trains are on time.", title="Trains")
+
+    assert refused["skipped"] is True
+    assert get_topic_summary("coffee notes") is None
+    accepted = upsert_topic_summary("coffee notes", "Trains are on time.", title="Trains", owner_initiated=True)
+    assert accepted["success"] is True
+
+
+def test_a_proposal_naming_a_topic_with_forgotten_text_is_refused_before_anything_is_staged(store, home, monkeypatch):
+    from tools import write_approval as wa
+
+    record_forgotten(["Coffee"], source="memory", scope="entry")
+    monkeypatch.setattr(wa, "evaluate_gate", lambda subsystem, **kwargs: wa.GateDecision(stage=True, message="staged"))
+
+    result = _run(store, action="add", target="topic", topic="coffee notes", content="Trains are on time.")
+
+    assert result["success"] is False and result["skipped"] is True
+    pending = home / "pending" / "memory"
+    assert not pending.exists() or not any(pending.glob("*.json"))
+
+
+def test_a_forget_naming_a_topic_with_forgotten_text_is_refused_and_the_topic_stays(store, home):
+    upsert_topic_summary("coffee notes", "Trains are on time.", title="Trains")
+    record_forgotten(["Coffee"], source="memory", scope="entry")
+
+    result = _run(store, action="remove", target="topic", topic="coffee notes")
+
+    assert result["success"] is False and "topic name or key" in result["error"]
+    assert get_topic_summary("coffee notes") is not None
+
+
+def test_a_phrase_naming_a_topic_by_its_key_removes_the_whole_topic(store, home):
+    upsert_topic_summary("morning-coffee-routine", "Ship date is March.", title="Routine")
+
+    result = _run(store, action="remove", target="memory", old_text="morning coffee routine")
+
+    assert result["success"] is True
+    assert result["removed_from"] == ["topic"]
+    assert get_topic_summary("morning-coffee-routine") is None
+
+
+def test_a_staged_remove_matching_two_entries_is_refused_at_approval(store, home):
+    store.add("memory", "Team meeting on Monday")
+    store.add("memory", "Team meeting on Friday")
+    before = _file(home, "MEMORY.md").read_bytes()
+
+    result = apply_memory_pending({"action": "remove", "target": "memory", "old_text": "Team meeting"}, store)
+
+    assert result["success"] is False and "more than one entry" in result["error"]
+    assert _file(home, "MEMORY.md").read_bytes() == before
+
+
+def test_a_staged_replace_matching_entries_in_two_stores_is_refused_at_approval(store, home):
+    store.add("user", "Likes Atlas budget coffee")
+    upsert_topic_summary("budget", "Atlas budget is set.", title="Budget")
+    user_before = _file(home, "USER.md").read_bytes()
+    topics_before = topic_memory_path().read_bytes()
+
+    result = apply_memory_pending({"action": "replace", "target": "memory", "old_text": "Atlas budget",
+                                   "content": "Atlas budget is closed"}, store)
+
+    assert result["success"] is False and "Multiple entries matched" in result["error"]
+    assert _file(home, "USER.md").read_bytes() == user_before
+    assert topic_memory_path().read_bytes() == topics_before
+
+
+def test_a_batch_remove_matching_two_entries_is_refused_and_changes_nothing(store, home):
+    store.add("memory", "Team meeting on Monday")
+    store.add("memory", "Team meeting on Friday")
+    before = _file(home, "MEMORY.md").read_bytes()
+
+    result = _run(store, operations=[{"action": "remove", "old_text": "Team meeting"}], target="memory")
+
+    assert result["success"] is False and "more than one entry" in result["error"]
+    assert _file(home, "MEMORY.md").read_bytes() == before
+
+
+def test_a_staged_batch_remove_matching_two_entries_is_refused_at_approval(store, home):
+    store.add("memory", "Team meeting on Monday")
+    store.add("memory", "Team meeting on Friday")
+    before = _file(home, "MEMORY.md").read_bytes()
+    payload = {"action": "batch", "target": "memory", "operations": [{"action": "remove", "old_text": "Team meeting"}]}
+
+    result = apply_memory_pending(payload, store)
+
+    assert result["success"] is False
+    assert _file(home, "MEMORY.md").read_bytes() == before
+
+
+def test_a_forget_sweeps_a_disabled_stores_file_so_the_forgotten_text_leaves_the_disk(home):
+    store = MemoryStore(memory_char_limit=500, user_char_limit=300, user_profile_enabled=False)
+    store.load_from_disk()
+    store.add("memory", "Keep this memory entry")
+    _file(home, "USER.md").write_text("Atlas budget owner is Alice", encoding="utf-8")
+
+    result = _run(store, action="remove", target="memory", old_text="Atlas budget owner")
+
+    assert result["success"] is True
+    assert result["removed_from"] == ["user"]
+    assert "Atlas budget" not in _file(home, "USER.md").read_text(encoding="utf-8")
+    assert _digest("Atlas budget owner is Alice") in {row["sha256"] for row in _records(home)}
+
+
+def test_a_forget_response_never_echoes_a_topic_key(store, home):
+    upsert_topic_summary("editor-notes", "Vim is my editor.", title="Editor")
+
+    removed = _run(store, action="remove", target="memory", old_text="Vim is my editor")
+    not_found = _run(store, action="remove", target="memory", old_text="zzz-missing-phrase")
+
+    assert removed["success"] is True and "editor-notes" not in json.dumps(removed)
+    assert "editor-notes" not in json.dumps(not_found)
+
+
+def test_a_strict_read_is_not_answered_from_an_earlier_lenient_read_of_the_same_bytes(home):
+    _file(home, "forgotten.json").write_bytes(b"{broken")
+
+    assert not forgotten_index(home / "memories")  # a lenient read sees no records
+    with pytest.raises(RuntimeError):
+        forgotten_index(home / "memories", strict=True)

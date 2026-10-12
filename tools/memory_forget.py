@@ -23,11 +23,11 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from tools.memory_tombstones import fold_text, forgotten_store_error, sanitize_legacy
+from tools.memory_tombstones import fold_text, forgotten_store_error, name_refusal, sanitize_legacy
 from tools.memory_tool_store import _read_failed_error, _scan_memory_content
 from tools.topic_memory_store import (
     forget_topic_text, load_topics, remove_topic_summary, replace_topic_sentence,
-    topic_forget_units, topic_search_text,
+    topic_candidate, topic_forget_units, topic_search_text,
 )
 
 MIN_FORGET_CHARS = 8
@@ -65,20 +65,33 @@ def _labels(stores: List[str]) -> str:
 
 
 def _enabled_labels(store) -> List[str]:
-    """Stores a forget may touch, in search order. Topic summaries are always included; a disabled built-in store is
-    skipped because its writes are refused."""
+    """Stores a write or a candidate list may use, in search order. A disabled built-in store is left out: its writes are
+    refused and its entries are not offered as candidates."""
     built_in = [name for name in ("memory", "user") if store is not None and store.target_enabled(name)]
     return built_in + ["topic"]
+
+
+def _sweep_labels() -> List[str]:
+    """Every store a forget sweeps. A disabled built-in store is swept too: its file can still hold the forgotten text,
+    and removing text from a file writes nothing new."""
+    return ["memory", "user", "topic"]
+
+
+def _echo(units: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Units as a response may show them. A topic's key is left out: a name can repeat forgotten text, and a response is
+    kept in the transcript."""
+    return [{key: value for key, value in unit.items() if key != "topic"} for unit in units]
 
 
 def _memories_dir(store) -> Optional[Path]:
     return store._path_for("memory").parent if store is not None else None
 
 
-def _scan(store, needle: str) -> Tuple[_Scan, Optional[Dict[str, Any]]]:
-    """Every current match of the folded *needle*, per enabled store, or an error when a store cannot be read."""
+def _scan(store, needle: str, *, sweep: bool = False) -> Tuple[_Scan, Optional[Dict[str, Any]]]:
+    """Every current match of the folded *needle*, per store: every store when *sweep* (a forget), else the enabled ones.
+    Returns an error when a store cannot be read."""
     per_store: _Scan = {}
-    for label in _enabled_labels(store):
+    for label in _sweep_labels() if sweep else _enabled_labels(store):
         if label == "topic":
             try:
                 rows = load_topics(strict=True)
@@ -107,7 +120,7 @@ def _candidates(store, needle: str) -> List[Dict[str, Any]]:
             for row in load_topics():
                 shared = len(wanted & _tokens(topic_search_text(row)))
                 preview = _preview(f"{row.get('title') or row.get('key')}: {row.get('summary') or ''}")
-                rows.append((shared, len(rows), {"store": "topic", "topic": str(row.get("key") or ""), "preview": preview}))
+                rows.append((shared, len(rows), {"store": "topic", "preview": preview}))
             continue
         for index, entry in enumerate(store.disk_entries(label) or []):
             rows.append((len(wanted & _tokens(entry)), len(rows),
@@ -136,7 +149,7 @@ def _too_short(store, needle: str) -> Dict[str, Any]:
 
 def _ambiguous(needle: str, per_store: _Scan) -> Dict[str, Any]:
     stores = [label for label, units in per_store.items() if len(units) > 1]
-    listed = [unit for units in per_store.values() for unit in units]
+    listed = _echo([unit for units in per_store.values() for unit in units])
     return _error(
         f"'{needle}' matches more than one entry in {_labels(stores)}. Nothing was changed. Retry with a longer phrase "
         "that identifies one entry.", matches=listed)
@@ -159,14 +172,14 @@ def _apply_unique(store, needle: str, per_store: _Scan) -> Tuple[List[str], List
     """Remove the single match in each store that holds one. The caller has checked that no store holds more."""
     changed: List[str] = []
     removed: List[Dict[str, Any]] = []
-    for label in _enabled_labels(store):
+    for label in _sweep_labels():
         if not per_store.get(label):
             continue
         if label == "topic":
             result = forget_topic_text(needle)
             if not result.get("success"):
                 return changed, removed, result
-            removed += [{"store": "topic", "topic": item["key"], "what": item["what"]} for item in result["removed"]]
+            removed += [{"store": "topic", "what": item["what"]} for item in result["removed"]]
         else:
             result = store.forget_matching(label, needle)
             if not result.get("success"):
@@ -205,7 +218,7 @@ def _forget(store, target: str, needle: str) -> Dict[str, Any]:
         _rewritten, legacy_hit = sanitize_legacy(memories_dir, needle=needle)
     except (OSError, RuntimeError) as exc:
         return _error(f"Nothing was removed: forgotten.json could not be read or rewritten ({exc}).")
-    per_store, failure = _scan(store, needle)
+    per_store, failure = _scan(store, needle, sweep=True)
     if failure is not None:
         return failure
     if not any(per_store.values()):
@@ -231,7 +244,11 @@ def remove_entry(store, target: str, old_text: Optional[str]) -> Dict[str, Any]:
 def remove_topic(store, topic: str, old_text: Optional[str]) -> Dict[str, Any]:
     """Topic-target remove. Without a phrase, the named topic is removed whole, or reported "not found" when no such
     topic exists. A phrase forgets that text everywhere, as a memory remove does. The topic name is never used as a
-    phrase, so a name that happens to appear in an unrelated entry cannot remove that entry."""
+    phrase, so a name that happens to appear in an unrelated entry cannot remove that entry. The name and its key may not
+    repeat forgotten text: the request would carry it."""
+    key = topic_candidate(topic, "")[0] if topic else ""
+    if reason := name_refusal([topic, key], _memories_dir(store)):
+        return _error(reason)
     phrase = (old_text or "").strip()
     if not phrase:
         return remove_topic_summary(topic)
@@ -260,7 +277,7 @@ def forget_owner_entry(store, target: str, text: str, *, index: Optional[int] = 
     if sweep:
         if err := forgotten_store_error(_memories_dir(store)):
             return _error(err)
-        per_store, failure = _scan(store, needle)
+        per_store, failure = _scan(store, needle, sweep=True)
         if failure is not None:
             return failure
         others = {label: units for label, units in per_store.items() if label != target}
@@ -310,7 +327,7 @@ def _replace_everywhere(store, target: str, needle: str, new_content: Optional[s
         return _not_found(store, needle)
     if len(hits) > 1:
         return _error(f"Multiple entries matched '{needle}' across stores. Nothing was changed. Be more specific.",
-                      matches=hits)
+                      matches=_echo(hits))
     hit = hits[0]
     if hit["store"] == "topic":
         if hit["what"] != "sentence":
@@ -340,7 +357,7 @@ def batch_cross_store_hint(store, target: str, operations: List[Any]) -> Optiona
         if len(needle) < MIN_FORGET_CHARS:
             return _error(f"{where}: '{raw}' is shorter than {MIN_FORGET_CHARS} characters. Nothing was applied. "
                           "Send a longer phrase as its own call.")
-        per_store, failure = _scan(store, needle)
+        per_store, failure = _scan(store, needle, sweep=action == "remove")  # a remove sweeps every store
         if failure is not None:
             return failure
         elsewhere = [label for label, units in per_store.items() if label != target and units]
