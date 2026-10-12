@@ -667,3 +667,21 @@ def test_environment_unusable_reply_keeps_the_offset():
     assert registry._ingest_env_delta(session, _FakeEnv("command not found\n"), "/log", 42) == 42
     assert session.output_buffer == ""
     assert session.output_incomplete is False
+
+
+@posix_only
+def test_orphaned_pipe_stop_marks_the_completion_incomplete():
+    registry = ProcessRegistry()
+    # The direct child exits at once; a background descendant keeps the pipe open and writes nothing, so the
+    # reader stops on its quiet-pipe guard. The writer could still write later, so the result must say so.
+    proc = _spawn("(sleep 30) & exit 0")
+    session = _local_session(proc, "proc_orphan_stop")
+    registry._track_started(session, registry._reader_loop, "orphan-reader")
+    try:
+        assert _wait_until(lambda: session.exited, timeout=15)
+        event = registry.completion_queue.get(timeout=10)  # published after the flag is set
+        assert event["session_id"] == session.id
+        assert event["output_incomplete"] is True
+        assert _receipt(session.id)["output_incomplete"] is True
+    finally:
+        _reap(proc, session._reader_thread)

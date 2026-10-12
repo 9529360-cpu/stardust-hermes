@@ -1204,6 +1204,8 @@ class ProcessRegistry(ProcessCheckpointMixin):
                             # See #68915.
                             idle_after_exit += 1
                         if idle_after_exit >= 3:
+                            # The pipe is open yet silent, so a live writer may still hold it: later output is not read.
+                            self._flag_output_incomplete(session, "pipe held open and quiet after the direct child exited")
                             break
                         continue
                 # A direct-child exit may be reconciled from list()/poll() while this reader is active.
