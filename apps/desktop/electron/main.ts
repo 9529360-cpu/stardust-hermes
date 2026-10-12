@@ -2619,9 +2619,10 @@ function refreshManagedShimsAtBoot() {
       env: { ...process.env, STARDUST_HOME },
       timeout: 10_000
     }),
-    (error) => {
+    (error, _stdout, stderr) => {
       if (error) {
-        rememberLog(`[boot] managed shim refresh skipped: ${error.message}`)
+        const detail = String(stderr).trim().split('\n')[0]
+        rememberLog(`[boot] managed shim refresh failed: ${error.message}${detail ? ` (${detail})` : ''}`)
       }
     }
   )
