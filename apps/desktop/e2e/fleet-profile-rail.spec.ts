@@ -88,7 +88,7 @@ function seedProfiles(home: string, names: string[]): void {
 async function startRemoteGateway(root: string, mockUrl: string, profiles: string[]): Promise<RemoteGateway> {
   const home = path.join(root, 'homelab-home')
   fs.mkdirSync(home, { recursive: true })
-  writeMockProviderConfig(home, mockUrl, '  language: en')
+  writeMockProviderConfig(home, mockUrl)
   writeEnvFile(home)
   seedProfiles(home, profiles)
 
@@ -225,7 +225,7 @@ test.describe('fleet profile rail — two registered gateways', () => {
     test.setTimeout(240_000)
     mock = await startMockServer()
     sandbox = createSandbox('fleet')
-    writeMockProviderConfig(sandbox.hermesHome, mock.url, '  language: en')
+    writeMockProviderConfig(sandbox.hermesHome, mock.url)
     writeEnvFile(sandbox.hermesHome)
     // A named profile on This device too, so the active group has a square
     // beside its home pill. "research" exists on BOTH gateways on purpose: the
