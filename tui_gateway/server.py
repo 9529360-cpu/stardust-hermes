@@ -26,6 +26,7 @@ from hermes_constants import (
     get_hermes_home, get_hermes_home_override, profile_name_for_home,
     reset_hermes_home_override, set_hermes_home_override)
 from hermes_cli.env_loader import load_hermes_dotenv
+from renamed_env import read_renamed_env
 from utils import is_truthy_value, path_signature
 from hermes_state_ids import new_session_id
 from tools.environments.local import hermes_subprocess_env
@@ -1471,7 +1472,7 @@ def _resolve_session_platform() -> str:
     """``STARDUST_DESKTOP=1`` without ``STARDUST_DESKTOP_TERMINAL`` → "desktop" (chat panel; the agent then
     suggests TUI-only slash commands), else "tui" (embedded terminal pane or standalone ``stardust --tui``)."""
     desktop = is_truthy_value(os.environ.get("STARDUST_DESKTOP"))
-    return "desktop" if desktop and not is_truthy_value(os.environ.get("STARDUST_DESKTOP_TERMINAL")) else "tui"
+    return "desktop" if desktop and not is_truthy_value(read_renamed_env("STARDUST_DESKTOP_TERMINAL")) else "tui"
 
 
 def _resolve_session_source(explicit: str | None) -> str:

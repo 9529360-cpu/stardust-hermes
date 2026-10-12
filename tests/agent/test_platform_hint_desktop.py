@@ -128,6 +128,12 @@ class TestPlatformHintResolutionInStablePrompt:
 
 
 
+@pytest.fixture(autouse=True)
+def _no_legacy_terminal_name(monkeypatch):
+    """A shell may still export the pre-rename HERMES_DESKTOP_TERMINAL; keep these tests on the current name."""
+    monkeypatch.delenv("HERMES_DESKTOP_TERMINAL", raising=False)
+
+
 class TestEmbeddedTuiPaneClarifier:
     """When ``STARDUST_DESKTOP_TERMINAL=1``, a standalone ``stardust --tui`` is
     running inside the desktop's embedded terminal pane. The user can
@@ -144,6 +150,12 @@ class TestEmbeddedTuiPaneClarifier:
         assert out.startswith(PLATFORM_HINTS["tui"])
         assert "embedded terminal pane" in out
         assert "Shift-drag" in out or "Option-drag" in out or "⌥" in out
+
+    def test_legacy_terminal_name_still_appends_the_clarifier(self, monkeypatch):
+        monkeypatch.delenv("STARDUST_DESKTOP_TERMINAL", raising=False)
+        monkeypatch.setenv("HERMES_DESKTOP_TERMINAL", "1")
+        out = _tui_embedded_pane_clarifier(PLATFORM_HINTS["tui"])
+        assert "embedded terminal pane" in out
 
 
 

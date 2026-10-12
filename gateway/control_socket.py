@@ -22,6 +22,8 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Optional
 
+from renamed_env import read_renamed_env
+
 logger = logging.getLogger(__name__)
 
 CONTROL_PROTOCOL_VERSION = 1
@@ -89,7 +91,7 @@ def _detect_supervisor() -> str:
     if sys.platform == "darwin" and (env.get("XPC_SERVICE_NAME", "").startswith("ai.hermes")
                                      or env.get("LAUNCHD_SOCKET")):
         return "launchd"
-    if env.get("STARDUST_DESKTOP_MANAGED"):
+    if read_renamed_env("STARDUST_DESKTOP_MANAGED", env):
         return "desktop"
     return "external" if "--external-supervisor" in sys.argv else "manual"
 

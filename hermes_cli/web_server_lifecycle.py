@@ -11,6 +11,7 @@ import threading
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
+from renamed_env import read_renamed_env
 from utils import atomic_json_write
 
 if TYPE_CHECKING:  # pragma: no cover - annotation only
@@ -206,7 +207,7 @@ def _write_dashboard_ready_file(actual_port: int) -> None:
     Windows Desktop launches via ``pythonw.exe`` (no console flash) cannot use
     stdout for the port announcement, so Electron waits for this JSON instead.
     """
-    target = os.environ.get("STARDUST_DESKTOP_READY_FILE")
+    target = read_renamed_env("STARDUST_DESKTOP_READY_FILE")
     if not target:
         return
 

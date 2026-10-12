@@ -10,6 +10,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from renamed_env import read_renamed_env
+
 # Cmdline substrings identifying the long-lived server (``serve`` = the headless name Desktop
 # spawns; reaped on update for the same reason).
 _DASHBOARD_PATTERNS = tuple(
@@ -250,7 +252,7 @@ def _filter_dashboard_respawn_candidates(
 def _exclude_pids_from_env() -> set[int]:
     """PIDs Desktop marks as live backends (``STARDUST_DESKTOP_CHILD_PID``, comma-separated)."""
     out: set[int] = set()
-    for part in os.environ.get("STARDUST_DESKTOP_CHILD_PID", "").split(","):
+    for part in (read_renamed_env("STARDUST_DESKTOP_CHILD_PID") or "").split(","):
         with contextlib.suppress(ValueError):
             out.add(int(part))
     return out

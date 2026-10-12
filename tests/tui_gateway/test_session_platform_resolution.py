@@ -36,6 +36,7 @@ def _reload_resolver():
 def clean_env(monkeypatch):
     monkeypatch.delenv("STARDUST_DESKTOP", raising=False)
     monkeypatch.delenv("STARDUST_DESKTOP_TERMINAL", raising=False)
+    monkeypatch.delenv("HERMES_DESKTOP_TERMINAL", raising=False)
     return monkeypatch
 
 
@@ -67,6 +68,12 @@ class TestResolveSessionPlatform:
         marker. An embedded TUI is a TUI, not a desktop chat surface."""
         clean_env.setenv("STARDUST_DESKTOP", "1")
         clean_env.setenv("STARDUST_DESKTOP_TERMINAL", "true")
+        _srv = _reload_resolver()
+        assert _srv._resolve_session_platform() == "tui"
+
+    def test_legacy_terminal_name_still_selects_the_embedded_pane(self, clean_env):
+        clean_env.setenv("STARDUST_DESKTOP", "1")
+        clean_env.setenv("HERMES_DESKTOP_TERMINAL", "true")
         _srv = _reload_resolver()
         assert _srv._resolve_session_platform() == "tui"
 

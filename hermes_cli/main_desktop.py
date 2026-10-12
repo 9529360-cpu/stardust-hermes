@@ -1429,6 +1429,7 @@ def _desktop_launch_env(args: argparse.Namespace) -> tuple[dict, list[str]]:
     """Electron child env + config-supplied extra flags. ``desktop.*`` config is bridged to env vars
     Electron already reads; an explicit env var wins over config (and over keychain detection)."""
     from hermes_constants import with_hermes_node_path
+    from renamed_env import renamed_env_is_set
     # with_hermes_node_path() copies os.environ when called with no arg.
     env = with_hermes_node_path()
     _prefer_wsl_d3d12(env)
@@ -1443,14 +1444,14 @@ def _desktop_launch_env(args: argparse.Namespace) -> tuple[dict, list[str]]:
 
     config_electron_flags, config_disable_gpu, config_password_store, config_ozone_hint = (
         _desktop_launch_options())
-    if config_disable_gpu != "auto" and "STARDUST_DESKTOP_DISABLE_GPU" not in os.environ:
+    if config_disable_gpu != "auto" and not renamed_env_is_set("STARDUST_DESKTOP_DISABLE_GPU"):
         env["STARDUST_DESKTOP_DISABLE_GPU"] = config_disable_gpu
     if config_ozone_hint != "auto" and "ELECTRON_OZONE_PLATFORM_HINT" not in os.environ:
         env["ELECTRON_OZONE_PLATFORM_HINT"] = config_ozone_hint
 
     # Without --password-store safeStorage.isEncryptionAvailable() is often
     # false and the desktop app refuses to persist remote gateway tokens.
-    if sys.platform == "linux" and "STARDUST_DESKTOP_PASSWORD_STORE" not in os.environ:
+    if sys.platform == "linux" and not renamed_env_is_set("STARDUST_DESKTOP_PASSWORD_STORE"):
         password_store = (
             config_password_store if config_password_store != "auto" else _detect_linux_password_store()
         )

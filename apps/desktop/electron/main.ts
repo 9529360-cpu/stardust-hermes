@@ -346,6 +346,7 @@ import {
   createRegistryGatewayWsUrlHandler,
   createRemoteWsHeaderStore
 } from './remote-ws-headers'
+import { readRenamedDesktopEnv, setRenamedDesktopEnvWarningSink, warnAboutDeprecatedDesktopEnv } from './renamed-env'
 import { missingRendererAssets } from './renderer-bundle'
 import { loadRendererLoadErrorPage } from './renderer-load-error-page'
 import { attachRendererConsoleCapture, formatRendererBoundaryReport } from './renderer-log'
@@ -909,7 +910,7 @@ const DESKTOP_LOG_MAX_BYTES = 10 * 1024 * 1024
 const DESKTOP_LOG_BACKUP_COUNT = 3
 const DESKTOP_LOG_DISCARD_BYTES = DESKTOP_LOG_MAX_BYTES * 4
 const desktopLogBackupPath = n => `${DESKTOP_LOG_PATH}.${n}`
-const BOOT_FAKE_MODE = process.env.STARDUST_DESKTOP_BOOT_FAKE === '1'
+const BOOT_FAKE_MODE = readRenamedDesktopEnv('STARDUST_DESKTOP_BOOT_FAKE') === '1'
 const BOOT_FAKE_ERROR = process.env.STARDUST_DESKTOP_BOOT_FAKE_ERROR || ''
 // Automated teardown (Playwright's app.close(), harness scripts) quits with
 // nobody to answer a modal, so the active-work confirmation would hang the
@@ -1879,6 +1880,14 @@ function rememberLog(chunk) {
 
   scheduleDesktopLogFlush()
 }
+
+// A packaged app has no console, so deprecation notices for renamed HERMES_DESKTOP_* variables must
+// reach desktop.log too. Notices from module-load reads are held until this sink is installed.
+setRenamedDesktopEnvWarningSink(message => {
+  console.warn(message)
+  rememberLog(message)
+})
+warnAboutDeprecatedDesktopEnv()
 
 installCrashForensics({ flush: flushDesktopLogBufferSync, log: rememberLog })
 
@@ -4857,7 +4866,7 @@ function resolveHermesCwd() {
   // real directory), then the home dir.
   const candidates = [
     readDefaultProjectDir(),
-    process.env.STARDUST_DESKTOP_CWD,
+    readRenamedDesktopEnv('STARDUST_DESKTOP_CWD'),
     IS_PACKAGED ? null : process.env.INIT_CWD,
     IS_PACKAGED ? null : process.cwd(),
     !IS_PACKAGED ? SOURCE_REPO_ROOT : null,
@@ -5055,7 +5064,7 @@ async function resolveHermesBackend(backendArgs) {
   //    do NOT write a bootstrap marker; the user did this themselves and we
   //    don't want to take ownership of an install we didn't perform.
   //    STARDUST_DESKTOP_IGNORE_EXISTING=1 forces the bootstrap path for testing.
-  if (process.env.STARDUST_DESKTOP_IGNORE_EXISTING !== '1') {
+  if (readRenamedDesktopEnv('STARDUST_DESKTOP_IGNORE_EXISTING') !== '1') {
     let hermesCommand = null
     const hermesOverride = process.env.STARDUST_DESKTOP_HERMES
 

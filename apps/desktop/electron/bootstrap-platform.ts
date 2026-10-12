@@ -1,5 +1,7 @@
 import fs from 'node:fs'
 
+import { readRenamedDesktopEnv } from './renamed-env'
+
 function isWslEnvironment(env = process.env, platform = process.platform, kernelRelease = null) {
   if (platform !== 'linux') {
     return false
@@ -64,7 +66,7 @@ function detectRemoteDisplay(options: { env?: NodeJS.ProcessEnv; platform?: Node
   const env = options.env ?? process.env
   const platform = options.platform ?? process.platform
 
-  const override = String(env.STARDUST_DESKTOP_DISABLE_GPU || '')
+  const override = String(readRenamedDesktopEnv('STARDUST_DESKTOP_DISABLE_GPU', env) || '')
     .trim()
     .toLowerCase()
 
@@ -128,7 +130,7 @@ function resolveLinuxPasswordStore(options: { env?: NodeJS.ProcessEnv; platform?
   const env = options.env ?? process.env
   const platform = options.platform ?? process.platform
 
-  const requested = String(env.STARDUST_DESKTOP_PASSWORD_STORE || '').trim()
+  const requested = String(readRenamedDesktopEnv('STARDUST_DESKTOP_PASSWORD_STORE', env) || '').trim()
 
   if (platform !== 'linux' || !requested) {
     return { store: null, warning: null }

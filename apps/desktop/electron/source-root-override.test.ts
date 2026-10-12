@@ -2,13 +2,14 @@ import path from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { resetSourceRootOverrideWarningForTests, resolveSourceRootOverride } from './source-root-override'
+import { resetRenamedDesktopEnvForTests } from './renamed-env'
+import { resolveSourceRootOverride } from './source-root-override'
 
 const CURRENT_NAME = 'STARDUST_DESKTOP_HERMES_ROOT'
 const LEGACY_NAME = 'HERMES_DESKTOP_HERMES_ROOT'
 
 beforeEach(() => {
-  resetSourceRootOverrideWarningForTests()
+  resetRenamedDesktopEnvForTests()
 })
 
 afterEach(() => {

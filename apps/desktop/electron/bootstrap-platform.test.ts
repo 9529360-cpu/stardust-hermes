@@ -86,6 +86,23 @@ test('detectRemoteDisplay honors the STARDUST_DESKTOP_DISABLE_GPU override both 
   )
 })
 
+test('detectRemoteDisplay still honors the legacy HERMES_DESKTOP_DISABLE_GPU name when the current one is unset', () => {
+  assert.match(
+    String(detectRemoteDisplay({ env: { HERMES_DESKTOP_DISABLE_GPU: '1', DISPLAY: ':0' }, platform: 'linux' })),
+    /override/
+  )
+})
+
+test('resolveLinuxPasswordStore still honors the legacy HERMES_DESKTOP_PASSWORD_STORE name', () => {
+  assert.deepEqual(
+    resolveLinuxPasswordStore({ env: { HERMES_DESKTOP_PASSWORD_STORE: 'kwallet6' }, platform: 'linux' }),
+    {
+      store: 'kwallet6',
+      warning: null
+    }
+  )
+})
+
 test('resolveLinuxPasswordStore applies known backends on linux', () => {
   for (const store of ['gnome-libsecret', 'kwallet', 'kwallet5', 'kwallet6', 'basic']) {
     assert.deepEqual(

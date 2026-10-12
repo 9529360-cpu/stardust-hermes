@@ -34,7 +34,7 @@ npm run dev
 
 ```bash
 ../scripts/dev-sandbox.sh npm run dev
-HERMES_DESKTOP_HERMES_ROOT=/path/to/stardust-hermes npm run dev
+STARDUST_DESKTOP_HERMES_ROOT=/path/to/stardust-hermes npm run dev
 HERMES_HOME=/tmp/stardust-dev npm run dev
 npm run dev:fake-boot
 ```
@@ -71,7 +71,7 @@ Stardust Desktop 仍沿用成熟的三层边界：
 
 Backend resolution 继续按验证后的候选链工作：
 
-1. `HERMES_DESKTOP_HERMES_ROOT`
+1. `STARDUST_DESKTOP_HERMES_ROOT`
 2. 当前开发 checkout
 3. 已完成的 Stardust managed install
 4. `STARDUST_DESKTOP_HERMES` 或 `hermes` on `PATH`
@@ -79,6 +79,8 @@ Backend resolution 继续按验证后的候选链工作：
 6. Stardust first-launch bootstrap installer
 
 候选只在通过真实 probe 后才可使用；文件存在本身不是有效运行时的证明。
+
+旧名称 `HERMES_DESKTOP_HERMES_ROOT` 仍作为兼容回退：只有在新名称未设置时才生效，每个进程只打印一次弃用警告，警告同时写入 `desktop.log`。改名后的其它变量（如 `STARDUST_DESKTOP_TERMINAL`、`STARDUST_DESKTOP_DISABLE_GPU`）使用同样的回退规则。
 
 ## Connections 与 Projects
 

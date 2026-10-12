@@ -263,7 +263,13 @@ function launchFresh() {
   env.STARDUST_HOME = hermesHome
   delete env.STARDUST_DESKTOP_HERMES
   delete env.STARDUST_DESKTOP_HERMES_ROOT
-  delete env.HERMES_DESKTOP_HERMES_ROOT
+  // Legacy HERMES_DESKTOP_* names still resolve as fallbacks (renamed-env.ts); keep a developer shell from
+  // leaking them into the fresh sandbox.
+  for (const key of Object.keys(env)) {
+    if (key.startsWith('HERMES_DESKTOP_')) {
+      delete env[key]
+    }
+  }
 
   const child = spawn(APP.binary, [], {
     cwd: os.homedir(),

@@ -12,6 +12,8 @@ import re
 from pathlib import Path
 from typing import Optional
 
+from renamed_env import read_renamed_env
+
 logger = logging.getLogger("hermes.security_audit")
 
 # The audit runs once per process even if both the CLI and gateway startup paths call it.
@@ -71,7 +73,7 @@ def _in_container() -> bool:
     """Best-effort container detection (Docker / Podman / generic OCI)."""
     if os.path.exists("/.dockerenv"):
         return True
-    if os.environ.get("STARDUST_DESKTOP_CHILD_PID"):
+    if read_renamed_env("STARDUST_DESKTOP_CHILD_PID"):
         return False  # desktop child, not a server container
     try:
         cgroup = Path("/proc/1/cgroup").read_text(encoding="utf-8", errors="replace")

@@ -246,6 +246,14 @@ function writeEmptyConfig(hermesHome: string): void {
 export function buildAppEnv(sandbox: Sandbox, extra: Record<string, string> = {}): Record<string, string> {
   const clean = stripCredentials(process.env)
 
+  // Legacy HERMES_DESKTOP_* names still resolve as fallbacks (renamed-env.ts). A developer shell that sets
+  // one must not leak it into an isolated run, so drop them all here.
+  for (const key of Object.keys(clean)) {
+    if (key.startsWith('HERMES_DESKTOP_')) {
+      delete clean[key]
+    }
+  }
+
   // XDG_RUNTIME_DIR is needed for Electron on Linux when running in a
   // headless/CI context — without it the zygote may fail to initialize.
   if (!clean.XDG_RUNTIME_DIR && process.env.XDG_RUNTIME_DIR) {
@@ -580,7 +588,6 @@ export async function setupPackagedApp(): Promise<PackagedAppFixture> {
   delete (env as Record<string, string | undefined>).STARDUST_DESKTOP_DEV_SERVER
   delete (env as Record<string, string | undefined>).STARDUST_DESKTOP_HERMES
   delete (env as Record<string, string | undefined>).STARDUST_DESKTOP_HERMES_ROOT
-  delete (env as Record<string, string | undefined>).HERMES_DESKTOP_HERMES_ROOT
 
   const app = await _electron.launch({
     executablePath: PACKAGED_BINARY_PATH,

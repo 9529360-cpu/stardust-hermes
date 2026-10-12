@@ -27,6 +27,7 @@ from agent.prompt_builder import (
 from agent import prompt_builder as _pb
 from agent.runtime_cwd import resolve_context_cwd
 from hermes_constants import get_default_hermes_root, get_hermes_home
+from renamed_env import read_renamed_env
 from utils import is_truthy_value
 
 logger = logging.getLogger(__name__)
@@ -99,7 +100,7 @@ _TUI_EMBEDDED_PANE_CLARIFIER = (
 def _tui_embedded_pane_clarifier(hint: str) -> str:
     """Append the desktop embedded-terminal clarifier when ``STARDUST_DESKTOP_TERMINAL``
     is set (only the desktop's TUI PTY, never the chat backend). Idempotent."""
-    if not hint or _TUI_EMBEDDED_PANE_CLARIFIER in hint or not is_truthy_value(os.getenv("STARDUST_DESKTOP_TERMINAL")):
+    if not hint or _TUI_EMBEDDED_PANE_CLARIFIER in hint or not is_truthy_value(read_renamed_env("STARDUST_DESKTOP_TERMINAL")):
         return hint
     return hint + _TUI_EMBEDDED_PANE_CLARIFIER
 
