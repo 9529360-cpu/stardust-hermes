@@ -11,16 +11,20 @@ from __future__ import annotations
 
 import contextlib
 import json
+import logging
 import os
 import shutil
 import subprocess
 import sys
 import time
+from dataclasses import dataclass, field
 from pathlib import Path
 
 # _early_recovery owns the recovery-lock lifecycle and uv lookup; importing it is free (stdlib).
 from hermes_cli import _early_recovery as _er
 from hermes_cli.venv_layout import resolve_venv_dir
+
+logger = logging.getLogger(__name__)
 
 
 def _is_windows() -> bool:
@@ -353,20 +357,48 @@ def _is_managed_shim(body: bytes) -> bool:
     return len(lines) > 1 and lines[1].rstrip(b"\r") == MANAGED_SHIM_MARKER.encode("ascii")
 
 
-def _retire_shadowing_exe(launcher: Path, stamp: str) -> None:
+@dataclass(frozen=True)
+class ShimRefresh:
+    """What one :func:`refresh_managed_shims` run did.
+
+    ``written`` lists the managed ``.cmd`` shims that now delegate to the venv. ``failed`` lists the managed-bin files
+    that could not be moved aside or written, so the shim they shadow or replace did not take effect. ``ok`` is True
+    when nothing failed. A run with nothing to do (not Windows, a development checkout, a venv without ``stardust.exe``)
+    is ``ok`` and writes nothing.
+    """
+
+    written: list[str] = field(default_factory=list)
+    failed: list[str] = field(default_factory=list)
+
+    @property
+    def ok(self) -> bool:
+        return not self.failed
+
+
+def _retire_shadowing_exe(launcher: Path, stamp: str) -> bool:
     """Move a managed-bin ``<name>.exe`` aside so the ``.cmd`` shim beside it takes effect.
 
     PowerShell and cmd resolve ``.EXE`` before ``.CMD``. install.ps1 copies a launcher into the bin for a
     non-relocatable venv, and that leftover kept winning, so the refreshed ``.cmd`` never ran. The move keeps the bytes
-    as ``<name>.exe.bak-<stamp>``. A launcher that cannot be moved (in use) stays where it is, with no copy left behind.
+    as ``<name>.exe.bak-<stamp>``. A launcher that cannot be moved (in use) stays where it is, with no copy left behind,
+    and the failure is logged. Returns False in that case.
     """
     if not launcher.is_file():
-        return
-    with contextlib.suppress(OSError):
+        return True
+    try:
         os.replace(launcher, launcher.with_name(f"{launcher.name}.bak-{stamp}"))
+    except OSError as exc:
+        logger.warning(
+            "Could not move %s aside (%s). PowerShell and cmd run it before the .cmd shim, "
+            "so the refreshed shim has not taken effect.",
+            launcher,
+            exc,
+        )
+        return False
+    return True
 
 
-def refresh_managed_shims(root, *, windows: bool | None = None, install_authority: bool = False) -> list[str]:
+def refresh_managed_shims(root, *, windows: bool | None = None, install_authority: bool = False) -> ShimRefresh:
     r"""Point the managed ``stardust.cmd`` and ``hermes.cmd`` at *root*'s venv console script.
 
     The managed bin (:func:`hermes_constants.get_default_hermes_root` ``\bin``) is shared by every checkout,
@@ -376,58 +408,69 @@ def refresh_managed_shims(root, *, windows: bool | None = None, install_authorit
     exists, so a shim is never repointed at a missing script. A shim that already matches is left alone. A file
     with one of these names that is not ours (no marker line) is copied to ``<name>.bak-<UTC timestamp>`` first,
     and kept if that copy fails. A managed ``<name>.exe`` beside them is moved aside the same way, because PowerShell
-    and cmd run ``.EXE`` before ``.CMD``. Never raises; returns the paths written.
+    and cmd run ``.EXE`` before ``.CMD``. Never raises. Returns a :class:`ShimRefresh`: the shims written, and the files
+    that could not be moved aside or written (each of those is also logged as a warning).
     """
     if windows is None:
         windows = _is_windows()
     if not windows:
-        return []
+        return ShimRefresh()
     home = _default_hermes_root()
     if home is None:
-        return []
+        return ShimRefresh()
     if not install_authority and _normalize_windows_path(Path(root).parent) != _normalize_windows_path(home):
-        return []
+        return ShimRefresh()
     from hermes_constants import venv_bin_dir
 
     exe = venv_bin_dir(resolve_venv_dir(Path(root), windows=True), windows=True) / "stardust.exe"
     if not exe.is_file():
-        return []
+        return ShimRefresh()
     bin_dir = home / "bin"
     body = _managed_shim_bytes(exe)
     stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    result = ShimRefresh()
     try:
         bin_dir.mkdir(parents=True, exist_ok=True)
-    except OSError:
-        return []
+    except OSError as exc:
+        logger.warning("Could not create the managed bin %s (%s). The launcher shims were not refreshed.", bin_dir, exc)
+        result.failed.append(str(bin_dir))
+        return result
     for name in MANAGED_SHIM_NAMES:
-        _retire_shadowing_exe(bin_dir / f"{name}.exe", stamp)
-    written: list[str] = []
+        launcher = bin_dir / f"{name}.exe"
+        if not _retire_shadowing_exe(launcher, stamp):
+            result.failed.append(str(launcher))
     for name in MANAGED_SHIM_NAMES:
         final = bin_dir / f"{name}.cmd"
         try:
             current = final.read_bytes() if final.is_file() else None
-        except OSError:
+        except OSError as exc:
+            logger.warning("Could not read %s (%s). The shim was left as it is.", final, exc)
+            result.failed.append(str(final))
             continue
         if current == body:
             continue
         if current is not None and not _is_managed_shim(current):
             try:
                 shutil.copy2(final, final.with_name(f"{final.name}.bak-{stamp}"))
-            except OSError:
+            except OSError as exc:
+                logger.warning("Could not back up %s (%s). The shim was left as it is.", final, exc)
+                result.failed.append(str(final))
                 continue
         staging = final.with_name(f"{final.name}.heal.{os.getpid()}")
         try:
             staging.write_bytes(body)
             os.replace(staging, final)
-        except OSError:
+        except OSError as exc:
+            logger.warning("Could not write %s (%s).", final, exc)
+            result.failed.append(str(final))
             with contextlib.suppress(OSError):
                 staging.unlink()
             continue
-        written.append(str(final))
-    if written:
+        result.written.append(str(final))
+    if result.written:
         with contextlib.suppress(OSError, ValueError):
-            print("  ✓ Refreshed Stardust launcher shim(s): " + ", ".join(written), file=sys.stderr)
-    return written
+            print("  ✓ Refreshed Stardust launcher shim(s): " + ", ".join(result.written), file=sys.stderr)
+    return result
 
 
 def _main(argv: list[str]) -> int:
@@ -436,8 +479,8 @@ def _main(argv: list[str]) -> int:
         print("usage: python -m hermes_cli._install_repair --refresh-managed-shims <install-root>",
               file=sys.stderr)
         return 2
-    refresh_managed_shims(Path(argv[1]), install_authority=True)
-    return 0
+    result = refresh_managed_shims(Path(argv[1]), install_authority=True)
+    return 0 if result.ok else 1
 
 
 def _load_console_script_names(root: Path) -> list[str]:

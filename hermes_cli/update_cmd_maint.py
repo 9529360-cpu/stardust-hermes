@@ -968,7 +968,9 @@ def _print_post_update_notices_and_self_heals() -> None:
     def _refresh_managed_shims() -> None:
         # The managed stardust/hermes .cmd shims must delegate to THIS checkout's venv console script.
         from hermes_cli._install_repair import refresh_managed_shims
-        refresh_managed_shims(_m().PROJECT_ROOT)
+        result = refresh_managed_shims(_m().PROJECT_ROOT)
+        if not result.ok:
+            logger.warning("Managed launcher shims were not all refreshed: %s", ", ".join(result.failed))
 
     for message, step in (
         # v23 FTS layout is opt-in (existing indexes untouched); surface the command here.
