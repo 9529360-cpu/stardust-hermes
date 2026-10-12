@@ -811,17 +811,28 @@ export function appendLiveSessionProjection(messages: ChatMessage[], projection:
   // assistant reply ends the turn.
   const latestUserIndex = messages.map(message => message.role).lastIndexOf('user')
   const latestUserRun: ChatMessage[] = []
+  const inflightCorrectionTexts = new Set(inflightCorrections.map(correction => textWithoutReferenceLines(correction)))
+  let persistedCorrectionSeen = false
 
   for (let index = latestUserIndex; index >= 0; index -= 1) {
     const candidate = messages[index]
 
     if (candidate.role === 'user') {
       latestUserRun.unshift(candidate)
+      persistedCorrectionSeen ||= inflightCorrectionTexts.has(textWithoutReferenceLines(chatMessageText(candidate)))
 
       continue
     }
 
-    if (candidate.role === 'assistant' && isLiveTailRow(candidate)) {
+    // A stored correction can follow a sealed tool/reasoning row while the
+    // backend still reports the original prompt as the live turn's user. Keep
+    // walking across that structured progress only after seeing one of this
+    // turn's persisted corrections; otherwise an older repeated prompt could
+    // be mistaken for the current one.
+    if (
+      candidate.role === 'assistant' &&
+      (isLiveTailRow(candidate) || (persistedCorrectionSeen && hasStructuralParts(candidate)))
+    ) {
       continue
     }
 

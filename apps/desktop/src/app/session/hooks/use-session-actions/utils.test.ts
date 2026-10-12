@@ -1368,6 +1368,33 @@ describe('appendLiveSessionProjection', () => {
     ])
   })
 
+  it('does not duplicate a persisted inflight prompt when correction follows assistant progress', () => {
+    const stored = [
+      msg('stored-user', 'user', 'current running prompt'),
+      msg('stored-progress', 'assistant', 'Checking the long-running task before I continue.', {
+        parts: [
+          { type: 'text', text: 'Checking the long-running task before I continue.' },
+          { type: 'tool-call', toolCallId: 'cmd-1', toolName: 'terminal', args: { command: 'sleep 5' } }
+        ]
+      }),
+      msg('stored-correction', 'user', 'correction while running')
+    ]
+
+    const restored = appendLiveSessionProjection(stored, {
+      session_id: 'runtime-1',
+      inflight: {
+        user: 'current running prompt',
+        corrections: ['correction while running'],
+        assistant: 'The corrected task finished.',
+        streaming: true
+      }
+    })
+
+    expect(restored.filter(message => message.role === 'user').map(message => message.parts.map(part =>
+      'text' in part ? part.text : ''
+    ).join(''))).toEqual(['current running prompt', 'correction while running'])
+  })
+
   it('does not duplicate the inflight user when the persisted turn carries @image refs', () => {
     // By the time a stored transcript reaches appendLiveSessionProjection it
     // has already been run through toChatMessages, so the @image directive has
