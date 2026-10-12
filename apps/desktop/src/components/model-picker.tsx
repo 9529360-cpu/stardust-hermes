@@ -499,10 +499,15 @@ function LoadingResults() {
 
 function catalogModelName(provider: ModelOptionProvider, model: string): string {
   const names = provider.model_names
+
   if (names && typeof names === 'object' && !Array.isArray(names)) {
     const name = (names as Record<string, unknown>)[model]
-    if (typeof name === 'string' && name) return name
+
+    if (typeof name === 'string' && name) {
+      return name
+    }
   }
+
   return model
 }
 
