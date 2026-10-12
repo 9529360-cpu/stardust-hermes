@@ -571,10 +571,12 @@ def run_host(stdin: Any = None, stdout: Any = None) -> None:
     with contextlib.suppress(Exception):
         signal.signal(signal.SIGTERM, _signal_handler)
         signal.signal(signal.SIGINT, _signal_handler)
+    from hermes_constants import configured_home_text
+
     host.emit({
         "type": "hello", "host_pid": os.getpid(), "boot_id": host._boot_id,
         "build_sha": _build_sha(), "cwd": os.getcwd(),
-        "hermes_home": os.environ.get("STARDUST_HOME", "")})
+        "hermes_home": configured_home_text()})
 
     def _reader() -> None:
         for raw in _iter_control_lines(stdin):

@@ -33,7 +33,7 @@ def _state_dir() -> Path:
     if override:
         return Path(override)
     # Default: $STARDUST_HOME/watcher-state/, falling back to ~/.stardust/watcher-state/.
-    hermes_home = os.environ.get("STARDUST_HOME") or str(Path.home() / ".stardust")
+    hermes_home = os.environ.get("STARDUST_HOME") or os.environ.get("HERMES_HOME") or str(Path.home() / ".stardust")
     return Path(hermes_home) / "watcher-state"
 
 

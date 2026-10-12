@@ -97,7 +97,7 @@ def current_secret_scope() -> Optional[Mapping[str, str]]:
 # value is a profile secret. Membership is exact name OR prefix.
 _GLOBAL_ENV_EXACT = frozenset({
     # Hermes runtime / deployment
-    "STARDUST_HOME", "STARDUST_PROFILE", "STARDUST_GATEWAY_LOCK_DIR",
+    "STARDUST_HOME", "HERMES_HOME", "STARDUST_PROFILE", "STARDUST_GATEWAY_LOCK_DIR",
     "STARDUST_MAX_ITERATIONS", "STARDUST_API_TIMEOUT",
     "STARDUST_REDACT_SECRETS", "HERMES_NOUS_TIMEOUT_SECONDS",
     "_HERMES_GATEWAY",

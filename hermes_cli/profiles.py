@@ -17,7 +17,12 @@ from typing import Dict, List, Optional, Tuple
 
 from agent.skill_utils import is_excluded_skill_path
 from hermes_cli.archive_safe import archive_root_dirs, make_targz, normalize_archive_parts, safe_extract_targz
-from hermes_constants import clear_named_profile_deleted, mark_named_profile_deleted, named_profile_is_deleted
+from hermes_constants import (
+    clear_named_profile_deleted,
+    configured_home_text,
+    mark_named_profile_deleted,
+    named_profile_is_deleted,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1172,7 +1177,7 @@ def _profile_bound_backend_pids(canon: str, profile_dir: Path) -> list[int]:
             bound = any(normalize_profile_name(sel) == canon for sel in _argv_profile_selectors(argv))
             if not bound:
                 with contextlib.suppress(Exception):  # environ() can raise AccessDenied even same-user
-                    env_home = (proc.environ() or {}).get("STARDUST_HOME", "")
+                    env_home = configured_home_text(proc.environ() or {})
                     bound = bool(env_home) and Path(env_home).resolve() == resolved_dir
             if bound:
                 pids.append(pid)
@@ -1878,7 +1883,7 @@ def resolve_profile_env(profile_name: str) -> str:
     (junction-transparent); only the spelling is preserved.
     """
     canon = _canon_valid(profile_name)
-    env_home = os.environ.get("STARDUST_HOME", "").strip()
+    env_home = configured_home_text()
     if env_home:
         env_path = Path(env_home)
         # A profile-shaped env value means the root is the grandparent (mirrors

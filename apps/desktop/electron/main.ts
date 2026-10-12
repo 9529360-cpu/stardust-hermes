@@ -225,6 +225,7 @@ import {
   tightenSecretFileMode,
   writeSecretFileAtomic
 } from './hardening'
+import { configuredHomeFromEnv, HOME_ENV_NAMES } from './home-env'
 import { requestHudClose } from './hud-close'
 import { cursorPointInWindow } from './hud-cursor'
 import { startHudGameOverlayWatch } from './hud-game-overlay'
@@ -784,8 +785,12 @@ if (INSTALL_STAMP) {
 // STARDUST_HOME beneath the throwaway userData dir so a fresh-install run never
 // touches the user's real ~/.stardust / %LOCALAPPDATA%\hermes.
 function resolveHermesHome() {
-  if (process.env.STARDUST_HOME) {
-    return normalizeHermesHomeRoot(process.env.STARDUST_HOME)
+  // STARDUST_HOME, then the legacy HERMES_HOME (see home-env.ts). This value is handed to the backend as
+  // its STARDUST_HOME, so resolving only the new name would point the backend at the default home.
+  const fromEnv = configuredHomeFromEnv(process.env)
+
+  if (fromEnv) {
+    return normalizeHermesHomeRoot(fromEnv)
   }
 
   if (USER_DATA_OVERRIDE) {
@@ -798,11 +803,13 @@ function resolveHermesHome() {
     // process.env even though the CLI (a fresh shell) sees it. Without this the
     // backend silently falls back to %LOCALAPPDATA%\stardust and reports "No
     // inference provider configured" despite a valid configured home (#45471).
-    // Consult the live User-scoped registry value before the default below.
-    const fromRegistry = readWindowsUserEnvVar('STARDUST_HOME')
+    // Consult the live User-scoped registry values before the default below, in the same order.
+    for (const name of HOME_ENV_NAMES) {
+      const fromRegistry = readWindowsUserEnvVar(name)
 
-    if (fromRegistry) {
-      return normalizeHermesHomeRoot(fromRegistry)
+      if (fromRegistry) {
+        return normalizeHermesHomeRoot(fromRegistry)
+      }
     }
   }
 

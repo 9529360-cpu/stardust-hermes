@@ -33,7 +33,8 @@ _SECRET_SUBSTRINGS = ("KEY", "TOKEN", "SECRET", "PASSWORD", "CREDENTIAL", "PASSW
 # imports may read at import time. STARDUST_DELEGATED_CHILD_CONTEXT must ride
 # along so a child that imports Hermes code retains delegated-child identity.
 _HERMES_CHILD_ALLOWED = frozenset({
-    "STARDUST_HOME", "STARDUST_PROFILE", "STARDUST_CONFIG", "STARDUST_ENV", "STARDUST_DELEGATED_CHILD_CONTEXT",
+    "STARDUST_HOME", "HERMES_HOME", "STARDUST_PROFILE", "STARDUST_CONFIG", "STARDUST_ENV",
+    "STARDUST_DELEGATED_CHILD_CONTEXT",
 })
 
 # Windows-only: without these the CRT itself fails — socket.socket() raises

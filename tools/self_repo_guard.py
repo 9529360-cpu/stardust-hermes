@@ -454,7 +454,9 @@ def detect_self_repo_git_mutation(
 
 
 def _block_message(operation: str, root: Path) -> str:
-    hermes_home = os.environ.get("STARDUST_HOME", "").strip()
+    from hermes_constants import configured_home_text
+
+    hermes_home = configured_home_text()
     scratch = (Path(hermes_home).expanduser() if hermes_home else Path.home() / ".stardust") / "scratch"
     return (
         f"Blocked: `{operation}` would rewrite Hermes's live source checkout "

@@ -356,7 +356,9 @@ def _build_hermes_tools_mcp_entry() -> dict:
     # profile. The pytest-tempdir guard below catches the issue #26250 Bug C scenario: a sibling test's
     # monkeypatch.setenv("STARDUST_HOME", tmp_path) would otherwise leak a transient pytest tempdir into the
     # user's real ~/.codex/config.toml and silently brick codex once the tempdir is GC'd.
-    hermes_home = os.environ.get("STARDUST_HOME") or ""
+    from hermes_constants import configured_home_text
+
+    hermes_home = configured_home_text()
     if hermes_home and not _looks_like_test_tempdir(hermes_home):
         env["STARDUST_HOME"] = hermes_home
     if os.environ.get("PYTHONPATH"):

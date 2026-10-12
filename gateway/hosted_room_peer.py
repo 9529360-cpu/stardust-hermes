@@ -89,10 +89,10 @@ def gateway_room_grant_secret(root: Path | str | None = None) -> bytes:
     or capability RPCs, and is shared only by this installation's gateway processes.
     """
     if root is None:
-        from hermes_constants import get_hermes_home
-        # Profile routing uses a context-local STARDUST_HOME override; the process environment
+        from hermes_constants import configured_home_text, get_hermes_home
+        # Profile routing uses a context-local home override; the process environment
         # retains the installation root and is the authority here.
-        root = os.environ.get("STARDUST_HOME") or get_hermes_home()
+        root = configured_home_text() or get_hermes_home()
     return _gateway_room_grant_secret_for_home(str(Path(root).expanduser().resolve()))
 
 

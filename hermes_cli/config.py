@@ -147,8 +147,8 @@ _ENV_VAR_NAME_DENYLIST: frozenset[str] = frozenset({
     # General / git
     "PATH", "SHELL", "BROWSER", "EDITOR", "VISUAL", "PAGER",
     "GIT_SSH_COMMAND", "GIT_EXEC_PATH", "GIT_SHELL",
-    # Hermes runtime location
-    "STARDUST_HOME", "STARDUST_PROFILE", "STARDUST_CONFIG", "STARDUST_ENV",
+    # Hermes runtime location (HERMES_HOME is the pre-rename home name, still read as a fallback)
+    "STARDUST_HOME", "HERMES_HOME", "STARDUST_PROFILE", "STARDUST_CONFIG", "STARDUST_ENV",
     "STARDUST_CONFIG_PATH", "STARDUST_ENV_PATH",
     # MCP catalog trust root; package-manager wrappers may still set it in the process env.
     "STARDUST_OPTIONAL_MCPS",

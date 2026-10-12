@@ -30,8 +30,8 @@ param(
     # existing tree pass -ForceCommit.
     [switch]$ForceCommit,
     [string]$Tag = "",
-    [string]$HermesHome = $(if ($env:STARDUST_HOME) { $env:STARDUST_HOME } else { "$env:LOCALAPPDATA\stardust" }),
-    [string]$InstallDir = $(if ($env:STARDUST_HOME) { "$env:STARDUST_HOME\hermes-agent" } else { "$env:LOCALAPPDATA\stardust\hermes-agent" }),
+    [string]$HermesHome = $(if ($env:STARDUST_HOME) { $env:STARDUST_HOME } elseif ($env:HERMES_HOME) { $env:HERMES_HOME } else { "$env:LOCALAPPDATA\stardust" }),
+    [string]$InstallDir = $(if ($env:STARDUST_HOME) { "$env:STARDUST_HOME\hermes-agent" } elseif ($env:HERMES_HOME) { "$env:HERMES_HOME\hermes-agent" } else { "$env:LOCALAPPDATA\stardust\hermes-agent" }),
 
     # --- Stage protocol (additive; default invocation behaves as before) ----
     # See the "Stage protocol" section near the bottom of the file for the
@@ -345,14 +345,14 @@ if ($PSBoundParameters.ContainsKey('HermesHome')) {
     $HermesHome = ConvertTo-LongPath $HermesHome
 } else {
     $HermesHome = ConvertTo-LongPath $(
-        if ($env:STARDUST_HOME) { $env:STARDUST_HOME } else { "$env:LOCALAPPDATA\stardust" }
+        if ($env:STARDUST_HOME) { $env:STARDUST_HOME } elseif ($env:HERMES_HOME) { $env:HERMES_HOME } else { "$env:LOCALAPPDATA\stardust" }
     )
 }
 if ($PSBoundParameters.ContainsKey('InstallDir')) {
     $InstallDir = ConvertTo-LongPath $InstallDir
 } else {
     $InstallDir = ConvertTo-LongPath $(
-        if ($env:STARDUST_HOME) { "$env:STARDUST_HOME\hermes-agent" } else { "$env:LOCALAPPDATA\stardust\hermes-agent" }
+        if ($env:STARDUST_HOME) { "$env:STARDUST_HOME\hermes-agent" } elseif ($env:HERMES_HOME) { "$env:HERMES_HOME\hermes-agent" } else { "$env:LOCALAPPDATA\stardust\hermes-agent" }
     )
 }
 if ($script:NormalizedProfilePaths) {

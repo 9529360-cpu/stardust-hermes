@@ -226,8 +226,10 @@ def _config_default_interface_early() -> str:
     if _EARLY_INTERFACE_CACHE is not None:
         return _EARLY_INTERFACE_CACHE[0]
     value = "cli"
+    from hermes_constants import configured_home_text
+
     try:
-        home = os.environ.get("STARDUST_HOME")
+        home = configured_home_text()
         if home:
             cfg_path = os.path.join(home, "config.yaml")
         else:
@@ -551,7 +553,9 @@ def _apply_profile_override() -> None:
     # points at the hermes root (systemd hardcodes STARDUST_HOME=/root/.stardust)
     # we must still read active_profile — the user may have run
     # `stardust profile use` and the gateway should honour it (#22502).
-    hermes_home_env = os.environ.get("STARDUST_HOME", "")
+    from hermes_constants import configured_home_text
+
+    hermes_home_env = configured_home_text()
     if profile_name is None and hermes_home_env and Path(hermes_home_env).parent.name == "profiles":
         return
 

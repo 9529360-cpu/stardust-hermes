@@ -1103,18 +1103,22 @@ def _systemctl_show(properties: tuple[str, ...], *, system: bool) -> dict[str, s
 
 
 def _hermes_home_pinned_by_unit(unit_path: Path) -> str | None:
-    """``STARDUST_HOME`` pinned by the unit file at *unit_path*, or None when absent/unreadable."""
+    """Stardust home pinned by the unit file at *unit_path* (STARDUST_HOME, else legacy HERMES_HOME), or None."""
+    from hermes_constants import configured_home_text
+
     try:
         text = unit_path.read_text(encoding="utf-8")
     except OSError:
         return None
+    pinned: dict[str, str] = {}
     for line in text.splitlines():
         body = line.strip()
         if body.startswith("Environment="):
             body = body[len("Environment=") :].strip().strip('"')
-            if body.startswith("STARDUST_HOME="):
-                return body.split("=", 1)[1].strip().strip('"') or None
-    return None
+            name, sep, value = body.partition("=")
+            if sep and name in ("STARDUST_HOME", "HERMES_HOME"):
+                pinned.setdefault(name, value.strip().strip('"'))
+    return configured_home_text(pinned) or None
 
 
 def _hermes_home_from_systemd_unit_file(system: bool = False) -> str | None:
@@ -1127,12 +1131,14 @@ def _sync_hermes_home_from_systemd_unit(system: bool) -> None:
     get_hermes_home() would pick the wrong profile for runtime-status/PID reads."""
     if not system:
         return
+    from hermes_constants import configured_home_text
+
     # On-disk unit first; ``systemctl show`` for units that only exist in the manager.
     unit_home = (_hermes_home_from_systemd_unit_file(system=True) or "").strip()
     if not unit_home:
         env_line = _systemctl_show(("Environment",), system=True).get("Environment", "")
-        unit_home = _parse_kv_pairs(env_line.split()).get("STARDUST_HOME", "").strip()
-    if unit_home and os.environ.get("STARDUST_HOME", "").strip() != unit_home:
+        unit_home = configured_home_text(_parse_kv_pairs(env_line.split())).strip()
+    if unit_home and configured_home_text() != unit_home:
         os.environ["STARDUST_HOME"] = unit_home
 
 
@@ -2762,7 +2768,9 @@ def _remap_path_for_user(path: str, target_home_dir: str) -> str:
 def _hermes_home_for_target_user(target_home_dir: str) -> str:
     """Remap the current STARDUST_HOME (root's, under sudo) to the target user's equivalent:
     ``/root/.stardust[/profiles/x]`` → ``/home/alice/.stardust[/profiles/x]``; custom paths kept as-is."""
-    current_hermes_raw = os.environ.get("STARDUST_HOME", "").strip()
+    from hermes_constants import configured_home_text
+
+    current_hermes_raw = configured_home_text()
     current_hermes = Path(current_hermes_raw).expanduser() if current_hermes_raw else get_hermes_home()
     # Keep paths lexical: resolving a non-existent path can bake a different STARDUST_HOME into the unit.
     current_default = Path.home() / ".stardust"

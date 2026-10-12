@@ -57,3 +57,14 @@ class TestMultiplexedHermesHome:
         monkeypatch.setenv("STARDUST_HOME", "/machine/default/.stardust")
 
         assert _child_env()["STARDUST_HOME"] == "/machine/default/.stardust"
+
+
+class TestLegacyHomeName:
+    def test_legacy_home_survives_the_child_env_scrub(self, monkeypatch):
+        """An install that still exports only HERMES_HOME hands sandbox children that home."""
+        monkeypatch.delenv("STARDUST_HOME", raising=False)
+        monkeypatch.setenv("HERMES_HOME", "/owner/legacy-home")
+
+        child = _child_env()
+
+        assert (child.get("STARDUST_HOME") or child.get("HERMES_HOME")) == "/owner/legacy-home"

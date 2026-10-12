@@ -107,19 +107,23 @@ def _scan_dashboard_processes(*, exclude_pids: set[int] | None = None) -> list[t
 
 
 def _hermes_home_for_pid(pid: int) -> str | None:
-    """Best-effort ``STARDUST_HOME`` from *pid*'s environment (psutil, then /proc)."""
+    """Best-effort configured Stardust home from *pid*'s environment (psutil, then /proc)."""
+    from hermes_constants import configured_home_text
+
     with contextlib.suppress(Exception):
         import psutil
-        if home := psutil.Process(pid).environ().get("STARDUST_HOME"):
+        if home := configured_home_text(psutil.Process(pid).environ()):
             return home
     try:
         raw = Path(f"/proc/{pid}/environ").read_bytes()
     except OSError:
         return None
+    environ: dict[str, str] = {}
     for part in raw.split(b"\x00"):
-        if part.startswith(b"STARDUST_HOME="):
-            return part.split(b"=", 1)[1].decode("utf-8", errors="replace") or None
-    return None
+        key, sep, value = part.partition(b"=")
+        if sep:
+            environ.setdefault(key.decode("utf-8", errors="replace"), value.decode("utf-8", errors="replace"))
+    return configured_home_text(environ) or None
 
 
 def _dashboard_subcommand_index(argv: list[str]) -> int | None:

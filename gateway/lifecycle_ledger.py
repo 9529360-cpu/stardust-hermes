@@ -26,9 +26,9 @@ logger = logging.getLogger(__name__)
 
 def _process_hermes_home() -> Path:
     """STARDUST_HOME for process-level identity files (ignore task overrides)."""
-    from hermes_constants import get_hermes_home
+    from hermes_constants import configured_home_text, get_hermes_home
 
-    val = os.environ.get("STARDUST_HOME", "").strip()
+    val = configured_home_text()
     return Path(val) if val else get_hermes_home()
 
 

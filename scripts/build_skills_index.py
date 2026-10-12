@@ -30,7 +30,8 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO_ROOT)
 
 # Ensure STARDUST_HOME is set (needed by tools/skills_hub*.py imports)
-os.environ.setdefault("STARDUST_HOME", os.path.join(os.path.expanduser("~"), ".stardust"))
+if not (os.environ.get("STARDUST_HOME") or os.environ.get("HERMES_HOME")):
+    os.environ["STARDUST_HOME"] = os.path.join(os.path.expanduser("~"), ".stardust")
 
 from tools.skills_hub_clawhub import ClawHubSource
 from tools.skills_hub_github import GitHubAuth, GitHubSource
