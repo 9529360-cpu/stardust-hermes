@@ -244,21 +244,24 @@ def _(rid, params: dict) -> dict:
 
 def _readiness_check(rid, params, probe):
     """Shared shell of setup.status / setup.runtime_check. ``probe(profile, scoped)`` runs inside the
-    optional ``profile`` param's STARDUST_HOME + ``.env`` secret scope (ContextVars: concurrent checks
-    stay isolated); ``scoped`` is the ``{"profile": ...}`` payload stamp (``{}`` for the launch
-    profile). An unknown profile answers ``ok=False`` (never a JSON-RPC error, never a quiet answer
-    for the launch profile instead)."""
-    import contextlib
+    profile's runtime scope (ContextVars: concurrent checks stay isolated): a named profile's full scope,
+    or the launch profile's own secret scope once this process multiplexes, since an unscoped
+    provider-key read fails closed there. ``scoped`` is the ``{"profile": ...}`` payload stamp (``{}``
+    for the launch profile). An unknown profile answers ``ok=False`` (never a JSON-RPC error, never a
+    quiet answer for the launch profile instead)."""
     profile = str(params.get("profile") or "").strip() if isinstance(params, dict) else ""
-    scope = contextlib.nullcontext()
+    home = None
     if profile:
         from hermes_cli import profiles as profiles_mod
         if not profiles_mod.profile_exists(profile):
             return _ok(rid, {"ok": False, "profile": params.get("profile"),
                              "error": f"Profile '{profile}' does not exist on this backend."})
         home = _profile_home(profile)
-        if home is not None:
-            scope = _session_profile_runtime_scope({"profile_home": str(home)})
+    if home is not None:
+        scope = _session_profile_runtime_scope({"profile_home": str(home)})
+    else:
+        from tui_gateway.launch_profile_policy import multiplexed_launch_secret_scope
+        scope = multiplexed_launch_secret_scope(_hermes_home)
     with scope:
         payload = probe(profile, {"profile": profile} if profile else {})
     return _ok(rid, payload)
