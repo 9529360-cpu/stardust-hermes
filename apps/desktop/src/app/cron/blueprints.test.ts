@@ -37,6 +37,8 @@ describe('blueprint display copy', () => {
 
     expect(blueprintDisplayTitle(official, c)).toBe('晨间简报')
     expect(blueprintDisplayDescription(official, c)).toContain('全球股市')
+    expect(blueprintDisplayDescription(official, c)).toContain('只读')
+    expect(blueprintDisplayDescription(official, c)).toContain('连接后')
     expect(blueprintDisplayFieldLabel(official.key, official.fields[0], c)).toBe('时间')
     expect(blueprintDisplayOption('sunday', c)).toBe('周日')
   })

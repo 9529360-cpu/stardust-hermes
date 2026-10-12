@@ -3190,7 +3190,7 @@ export const zh = defineLocale({
         },
         'morning-brief': {
           title: '晨间简报',
-          description: '每天的简报：全球股市（PDF）、家庭状态检查，以及从任务和日历读到的今日安排。'
+          description: '每天的简报：全球股市（PDF）、只读家庭状态检查，以及连接后从任务和日历读到的今日安排。'
         },
         'important-mail': {
           title: '重要邮件监控',
