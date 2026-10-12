@@ -658,6 +658,26 @@ def test_venv_launcher_ancestors_returns_venv_side_parent(_winp, monkeypatch):
 
 
 @patch.object(cli_main, "_is_windows", return_value=True)
+def test_venv_launcher_ancestors_use_the_windows_layout_on_every_host(_winp, monkeypatch, tmp_path):
+    """The guard resolves the venv with the Windows layout, even where a POSIX ``.venv`` also exists.
+
+    A ``uv sync`` on Linux (the CI shard) writes ``.venv/bin/python``. Resolving without ``windows=True`` then
+    picked ``.venv`` while the Windows layout (``Scripts\\python.exe``) picked ``venv``, so the pause and the
+    guard named different folders.
+    """
+    (tmp_path / ".venv" / "bin").mkdir(parents=True)
+    (tmp_path / ".venv" / "bin" / "python").write_text("", encoding="utf-8")
+    monkeypatch.setattr(cli_main, "PROJECT_ROOT", tmp_path)
+    venv_exe = str(resolve_venv_dir(tmp_path, windows=True) / "Scripts" / "python.exe")
+    worker_exe = r"C:\Users\x\AppData\Roaming\uv\python\cpython-3.11\python.exe"
+
+    fake = _fake_psutil_tree({200: 100}, venv_exe, worker_exe)
+    monkeypatch.setitem(sys.modules, "psutil", fake)
+
+    assert cli_main._venv_launcher_ancestors([200]) == [100]
+
+
+@patch.object(cli_main, "_is_windows", return_value=True)
 def test_venv_launcher_ancestors_ignores_non_venv_parents(_winp, monkeypatch):
     """A Scheduled Task's cmd.exe / an operator shell is not a venv holder."""
     venv_exe = str(resolve_venv_dir(cli_main.PROJECT_ROOT, windows=True) / "Scripts" / "python.exe")
