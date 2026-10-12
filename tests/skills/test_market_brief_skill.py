@@ -1,66 +1,44 @@
-"""Tests for the market-brief skill: SKILL.md contract and scripts/make_brief_pdf.py."""
+"""Tests for the market-brief skill: the SKILL.md contract and the stocks fields it reads.
 
-import datetime as dt
+Index levels come from the stocks skill and the PDF from the pdf skill's pdf_markdown.py, so these
+tests check what SKILL.md tells the agent to run, that those paths resolve in an installed skills
+folder, and the stocks output the brief relies on. No test calls Yahoo Finance.
+"""
+
 import importlib.util
+import json
+import os
 import re
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 import yaml
 
-pytest.importorskip("reportlab")
-import reportlab  # noqa: E402
+from agent.skill_preprocessing import substitute_template_vars
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SKILL_DIR = REPO_ROOT / "skills" / "productivity" / "market-brief"
 SKILL_PATH = SKILL_DIR / "SKILL.md"
-SCRIPT_PATH = SKILL_DIR / "scripts" / "make_brief_pdf.py"
-
-SAMPLE_BRIEF = """# 全球股市日报 · 2026-10-11
-
-数据截至 18:00（北京时间）。状态：收盘 / 盘中。
-
-## 主要指数
-
-| 地区 | 指数 | 最新 | 涨跌幅 | 状态 | 来源 |
-|---|---|---|---|---|---|
-| 美国 | 标普500 (S&P 500) | 未取到 | 未取到 | 前一交易日收盘 | [Example](https://example.com/a?x=1&y=2) |
-| 亚洲 | 日经225 | 41,000 | -0.8% | 收盘 | [Example](https://example.com/b) |
-
-## 主要异动
-
-- **宁德时代 (A股)**: +3.2%，超预期。来源：[财经网](https://example.com/news)
-
----
-
-## 资料来源
-
-1. [Example](https://example.com/a)
-"""
+STOCKS_CLIENT = REPO_ROOT / "optional-skills" / "finance" / "stocks" / "scripts" / "stocks_client.py"
 
 
-@pytest.fixture
-def brief_pdf():
-    """Load the script as a fresh module so monkeypatched module constants take effect."""
-    name = "market_brief_make_brief_pdf_under_test"
-    spec = importlib.util.spec_from_file_location(name, SCRIPT_PATH)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    try:
-        spec.loader.exec_module(module)
-        yield module
-    finally:
-        sys.modules.pop(name, None)
-
-
-def _frontmatter_and_body():
-    content = SKILL_PATH.read_text(encoding="utf-8")
+def _frontmatter_and_body(text=None):
+    content = SKILL_PATH.read_text(encoding="utf-8") if text is None else text
     assert content.startswith("---")
     match = re.search(r"\n---\s*\n", content[3:])
     assert match, "frontmatter must close with ---"
     frontmatter = yaml.safe_load(content[3 : match.start() + 3])
     return frontmatter, content[match.end() + 3 :]
+
+
+def _command_path(text, script_name):
+    """The quoted path that the text gives for one script in a `python "..."` command."""
+    match = re.search(r'python "([^"]*' + re.escape(script_name) + r')"', text)
+    assert match, f"no `python \"...{script_name}\"` command in the text"
+    return match.group(1)
 
 
 class TestSkillContract:
@@ -80,9 +58,12 @@ class TestSkillContract:
     def test_related_skills_resolve_in_repo(self):
         fm, _ = _frontmatter_and_body()
         for name in fm["metadata"]["hermes"]["related_skills"]:
-            hits = list(REPO_ROOT.glob(f"skills/*/{name}/SKILL.md")) + list(
-                REPO_ROOT.glob(f"skills/*/*/{name}/SKILL.md")
-            )
+            hits = [
+                path
+                for tree in ("skills", "optional-skills")
+                for path in (REPO_ROOT / tree).rglob("SKILL.md")
+                if path.parent.name == name
+            ]
             assert hits, f"related_skills entry does not resolve in-repo: {name}"
 
     def test_sections_follow_the_modern_order(self):
@@ -100,121 +81,143 @@ class TestSkillContract:
         positions = [body.index(section) for section in sections]
         assert positions == sorted(positions), "sections are out of order"
 
-    def test_skill_runs_the_bundled_script(self):
-        _, body = _frontmatter_and_body()
-        assert "SKILL_DIR/scripts/make_brief_pdf.py" in body
-        assert SCRIPT_PATH.is_file()
-
-    def test_skill_never_invents_numbers_and_requires_sources(self):
-        _, body = _frontmatter_and_body()
-        assert "未取到" in body
-        assert "`web_search`" in body and "`web_extract`" in body
-        assert "at least three" in body.lower() or "three or more" in body.lower()
-
     def test_outline_headings_are_in_fixed_order(self):
         _, body = _frontmatter_and_body()
         outline = ["# 全球股市日报", "## 主要指数", "## 主要异动", "## 宏观要闻", "## 资料来源"]
         positions = [body.index(heading) for heading in outline]
         assert positions == sorted(positions)
 
+    def test_trigger_wording_and_file_naming_are_kept(self):
+        _, body = _frontmatter_and_body()
+        for phrase in ('"今天全球股市怎么样"', '"股市日报"', '"global market brief"', "`global-market-brief`"):
+            assert phrase in body, f"trigger wording missing: {phrase}"
+        assert "YYYY-MM-DD-market-brief.md" in body
+        assert "YYYY-MM-DD-market-brief.pdf" in body
+        assert "workspace/reports" in body
 
-class TestRenderPdf:
-    def test_chinese_markdown_renders_to_a_pdf_file(self, tmp_path, brief_pdf):
-        out = tmp_path / "brief.pdf"
-        result = brief_pdf.render_pdf(SAMPLE_BRIEF, out)
-        data = out.read_bytes()
-        assert result.output == out
-        assert data.startswith(b"%PDF")
-        assert len(data) > 1000
+    def test_unknown_figures_rule_and_three_publisher_rule_are_kept(self):
+        _, body = _frontmatter_and_body()
+        assert "未取到" in body
+        assert "Never invent a number" in body
+        assert "`web_search`" in body and "`web_extract`" in body
+        assert "at least three different publishers" in body.lower()
+        assert "no buy or sell advice and no trades" in body
 
-    def test_truetype_font_is_embedded_when_one_is_available(self, tmp_path, brief_pdf):
-        # reportlab ships Vera.ttf, so this exercises the embedding path on every host.
-        vera = Path(reportlab.__file__).parent / "fonts" / "Vera.ttf"
-        out = tmp_path / "vera.pdf"
-        result = brief_pdf.render_pdf(SAMPLE_BRIEF, out, candidates=[(str(vera), 0)])
-        assert result.cjk_font == vera
-        assert result.font.startswith(brief_pdf.CJK_FONT_NAME)
-        assert b"FontFile2" in out.read_bytes()
-
-    @pytest.mark.windows_only
-    def test_windows_cjk_font_is_embedded(self, tmp_path, brief_pdf):
-        msyh = Path(brief_pdf.CJK_FONT_CANDIDATES[0][0])
-        if not msyh.is_file():
-            pytest.skip("Microsoft YaHei is not installed on this machine")
-        out = tmp_path / "msyh.pdf"
-        result = brief_pdf.render_pdf(SAMPLE_BRIEF, out)
-        assert result.cjk_font == msyh
-        assert b"FontFile2" in out.read_bytes()
+    def test_skill_ships_no_code_and_never_mentions_reportlab(self):
+        _, body = _frontmatter_and_body()
+        assert "reportlab" not in body.lower()
+        assert not (SKILL_DIR / "scripts" / "make_brief_pdf.py").exists()
+        assert not list(SKILL_DIR.rglob("*.py"))
 
 
-class TestFallback:
-    def test_missing_cjk_font_falls_back_to_helvetica(self, tmp_path, brief_pdf, capsys):
-        out = tmp_path / "fallback.pdf"
-        result = brief_pdf.render_pdf(SAMPLE_BRIEF, out, candidates=[(str(tmp_path / "none.ttc"), 0)])
-        assert result.font == "Helvetica"
-        assert result.cjk_font is None
-        assert out.read_bytes().startswith(b"%PDF")
-        assert "warning" in capsys.readouterr().err
+class TestSiblingCommands:
+    def test_index_levels_come_from_the_stocks_quote_command(self):
+        _, body = _frontmatter_and_body()
+        assert re.search(r'python "\$\{STARDUST_SKILL_DIR\}/[^"]*stocks_client\.py" quote ', body)
+        assert "Yahoo Finance (stocks skill)" in body
+        assert _command_path(body, "stocks_client.py").endswith("finance/stocks/scripts/stocks_client.py")
+        assert STOCKS_CLIENT.is_file()
 
-    def test_unreadable_font_file_is_skipped_with_a_warning(self, tmp_path, brief_pdf, capsys):
-        broken = tmp_path / "broken.ttc"
-        broken.write_bytes(b"not a font file")
-        out = tmp_path / "broken.pdf"
-        result = brief_pdf.render_pdf(SAMPLE_BRIEF, out, candidates=[(str(broken), 0)])
-        assert result.cjk_font is None
-        assert out.read_bytes().startswith(b"%PDF")
-        err = capsys.readouterr().err
-        assert "warning" in err and "broken.ttc" in err
+    def test_pdf_is_rendered_by_the_pdf_skill_with_the_contract_flags(self):
+        _, body = _frontmatter_and_body()
+        command = next(
+            line for line in body.splitlines()
+            if "pdf_markdown.py" in line and line.lstrip().startswith("python")
+        )
+        assert command.index("--input") < command.index("--output")
+        assert _command_path(body, "pdf_markdown.py").endswith("pdf/scripts/pdf_markdown.py")
 
-    def test_cli_still_writes_pdf_without_a_cjk_font(self, tmp_path, brief_pdf, monkeypatch, capsys):
-        monkeypatch.setattr(brief_pdf, "CJK_FONT_CANDIDATES", ((str(tmp_path / "none.ttc"), 0),))
-        brief = tmp_path / "brief.md"
-        brief.write_text(SAMPLE_BRIEF, encoding="utf-8")
-        out = tmp_path / "out" / "brief.pdf"
-        assert brief_pdf.main([str(brief), str(out)]) == 0
-        captured = capsys.readouterr()
-        assert captured.out.strip().splitlines()[-1] == str(out.resolve())
-        assert out.read_bytes().startswith(b"%PDF")
-        assert "warning" in captured.err
+    def test_paths_use_the_runtime_token_only(self):
+        _, body = _frontmatter_and_body()
+        assert "${STARDUST_SKILL_DIR}" in body
+        assert not re.search(r"(?<!STARDUST_)SKILL_DIR", body)
 
-
-class TestCommandLine:
-    def test_reports_dir_is_created_under_the_stardust_home(self, tmp_path, brief_pdf, monkeypatch, capsys):
+    def test_reports_folder_command_creates_the_folder_under_the_stardust_home(self, tmp_path):
+        _, body = _frontmatter_and_body()
+        match = re.search(r'^python -c "(.+)"$', body, re.M)
+        assert match, "How to Run must give the reports-folder command"
         home = tmp_path / "home"
-        monkeypatch.setenv("STARDUST_HOME", str(home))
-        assert brief_pdf.main(["--reports-dir"]) == 0
-        printed = capsys.readouterr().out.strip().splitlines()[-1]
-        assert Path(printed) == home / "workspace" / "reports"
-        assert (home / "workspace" / "reports").is_dir()
-
-    def test_default_pdf_name_is_dated_inside_reports(self, tmp_path, brief_pdf, monkeypatch):
-        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "home"))
-        path = brief_pdf.default_output(dt.date(2026, 10, 11))
-        assert path == tmp_path / "home" / "workspace" / "reports" / "2026-10-11-market-brief.pdf"
-        assert path.parent.is_dir()
-
-    def test_missing_brief_is_an_error(self, tmp_path, brief_pdf, capsys):
-        assert brief_pdf.main([str(tmp_path / "missing.md")]) == 1
-        assert "brief not found" in capsys.readouterr().err
+        env = {key: value for key, value in os.environ.items() if key != "HERMES_HOME"}
+        env["STARDUST_HOME"] = str(home)
+        done = subprocess.run(
+            [sys.executable, "-c", match.group(1)],
+            cwd=REPO_ROOT, env=env, capture_output=True, text=True, timeout=120,
+        )
+        assert done.returncode == 0, done.stderr
+        printed = Path(done.stdout.strip().splitlines()[-1])
+        assert printed == home / "workspace" / "reports"
+        assert printed.is_dir()
 
 
-class TestMarkdownParsing:
-    def test_blocks_keep_document_order(self, brief_pdf):
-        kinds = [block[0] for block in brief_pdf.parse_markdown(SAMPLE_BRIEF)]
-        assert kinds == [
-            "heading", "paragraph", "heading", "table", "heading", "bullet", "rule", "heading", "paragraph",
-        ]
+class TestInstalledLayout:
+    def test_documented_paths_resolve_after_expansion(self, tmp_path):
+        skills = tmp_path / "skills"
+        brief = skills / "productivity" / "market-brief"
+        brief.mkdir(parents=True)
+        shutil.copy(SKILL_PATH, brief / "SKILL.md")
+        stocks_dir = skills / "finance" / "stocks" / "scripts"
+        stocks_dir.mkdir(parents=True)
+        shutil.copy(STOCKS_CLIENT, stocks_dir / "stocks_client.py")
+        (skills / "productivity" / "pdf" / "scripts").mkdir(parents=True)
 
-    def test_table_rows_are_padded_to_the_header_width(self, brief_pdf):
-        text = "| a | b | c |\n|---|---|---|\n| 1 | 2 |\n| 1 | 2 | 3 | 4 |\n"
-        (block,) = brief_pdf.parse_markdown(text)
-        _, header, rows = block
-        assert header == ["a", "b", "c"]
-        assert rows == [["1", "2", ""], ["1", "2", "3"]]
+        expanded = substitute_template_vars(SKILL_PATH.read_text(encoding="utf-8"), brief, "test-session")
+        assert "${STARDUST_SKILL_DIR}" not in expanded
 
-    def test_inline_escapes_markup_and_links_only_http(self, brief_pdf):
-        markup = brief_pdf._inline("a <b> & [x](https://e.com/?p=1&q=2) [y](javascript:alert(1)) **bold**")
-        assert "&lt;b&gt;" in markup and "&amp;" in markup
-        assert '<a href="https://e.com/?p=1&amp;q=2">' in markup
-        assert "javascript:" in markup and 'href="javascript' not in markup
-        assert "<b>bold</b>" in markup
+        stocks_cmd = Path(_command_path(expanded, "stocks_client.py"))
+        assert stocks_cmd.resolve() == (stocks_dir / "stocks_client.py").resolve()
+        help_run = subprocess.run(
+            [sys.executable, str(stocks_cmd), "--help"], capture_output=True, text=True, timeout=60,
+        )
+        assert help_run.returncode == 0, help_run.stderr
+
+        # pdf_markdown.py is added by the pdf skill; this checks where the path points only.
+        pdf_cmd = Path(_command_path(expanded, "pdf_markdown.py"))
+        assert pdf_cmd.resolve() == (skills / "productivity" / "pdf" / "scripts" / "pdf_markdown.py").resolve()
+
+
+@pytest.fixture
+def stocks_client():
+    """Load the stocks client as a module, without any network access at import time."""
+    name = "market_brief_stocks_client_under_test"
+    spec = importlib.util.spec_from_file_location(name, STOCKS_CLIENT)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    try:
+        spec.loader.exec_module(module)
+        yield module
+    finally:
+        sys.modules.pop(name, None)
+
+
+class TestStocksQuoteFields:
+    def test_level_and_day_change_come_back_as_printed_strings(self, stocks_client):
+        chart = {"chart": {"result": [{"meta": {
+            "regularMarketPrice": 5000.0, "previousClose": 4950.0, "chartPreviousClose": 4950.0,
+            "currency": "USD", "shortName": "S&P 500",
+        }}]}}
+        quote = stocks_client.extract_quote_from_chart("^GSPC", chart)
+        assert quote["symbol"] == "^GSPC"
+        assert quote["price"] == "5000.00"
+        assert quote["change_pct"] == "1.01%"
+        assert not quote["change_pct"].startswith("+"), "the brief writes the plus sign itself"
+
+    def test_symbol_without_chart_data_has_no_level(self, stocks_client):
+        quote = stocks_client.extract_quote_from_chart("^NOPE", {})
+        assert quote["price"] is None
+        assert quote["change_pct"] is None
+
+    def test_quote_lists_one_row_per_symbol_and_no_price_when_yahoo_is_silent(
+        self, stocks_client, monkeypatch, capsys,
+    ):
+        monkeypatch.delenv("ALPHA_VANTAGE_KEY", raising=False)
+        monkeypatch.setattr(stocks_client, "yf_chart", lambda *args, **kwargs: None)
+        monkeypatch.setattr(stocks_client, "yf_quote_summary", lambda *args, **kwargs: None)
+
+        stocks_client.cmd_quote(["^GSPC", "^IXIC"])
+        rows = json.loads(capsys.readouterr().out)
+        assert [row["symbol"] for row in rows] == ["^GSPC", "^IXIC"]
+        assert all("price" not in row for row in rows)
+
+        stocks_client.cmd_quote(["^GSPC"])
+        single = json.loads(capsys.readouterr().out)
+        assert isinstance(single, dict) and single["symbol"] == "^GSPC"

@@ -33,7 +33,7 @@ description: "在 Excel 中构建杠杆收购模型——资金来源与用途�
 
 本 skill 假设使用**无界面 openpyxl**——你在磁盘上生成 .xlsx 文件。
 遵循 `excel-author` skill 关于单元格着色、公式、命名区域和敏感性表格的约定。
-交付前重新计算：`python /path/to/excel-author/scripts/recalc.py ./out/model.xlsx`。
+交付前重新计算：`python /path/to/xlsx/scripts/xlsx_recalc.py ./out/model.xlsx`，然后检查 JSON 输出是否为 `"recalculated": true`。
 
 ---
 
@@ -52,7 +52,7 @@ description: "在 Excel 中构建杠杆收购模型——资金来源与用途�
 
 ## 关键指令——请先阅读
 
-使用 Python/openpyxl。写入公式字符串（`ws["D20"] = "=B5*B6"`），然后在交付前运行 `excel-author` skill 的 `recalc.py` 辅助脚本。
+使用 Python/openpyxl。写入公式字符串（`ws["D20"] = "=B5*B6"`），然后在交付前运行 `xlsx` skill 的 `xlsx_recalc.py` 辅助脚本。
 
 ### 核心原则
 * **每个计算都必须是 Excel 公式**——绝不在 Python 中计算值后将结果硬编码到单元格。使用 openpyxl 时，写 `cell.value = "=B5*B6"`（公式字符串），而非 `cell.value = 1250`（计算结果）。模型必须是动态的，在输入变化时能自动更新。
@@ -181,9 +181,9 @@ description: "在 Excel 中构建杠杆收购模型——资金来源与用途�
 
 ### 运行公式验证
 ```bash
-python /path/to/excel-author/scripts/recalc.py model.xlsx
+python /path/to/xlsx/scripts/xlsx_recalc.py model.xlsx
 ```
-必须返回成功且零错误。
+必须输出 `"recalculated": true`，且重新计算后的公式没有错误值。
 
 ### 节平衡
 - [ ] 必须平衡的节（资金来源/用途、资产/负债）完全平衡

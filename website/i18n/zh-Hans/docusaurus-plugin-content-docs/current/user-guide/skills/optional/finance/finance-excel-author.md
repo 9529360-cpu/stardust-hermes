@@ -227,7 +227,7 @@ openpyxl 写入公式字符串但不计算结果。Excel 打开时会重新计�
 libreoffice --headless --calc --convert-to xlsx ./out/model.xlsx --outdir ./out/
 ```
 
-或使用 Python 重新计算辅助工具（参见本 skill 中的 `scripts/recalc.py`）。
+或使用 Python 重新计算辅助工具（参见 `xlsx` skill 中的 `scripts/xlsx_recalc.py`）。
 
 ## 模型布局规划
 

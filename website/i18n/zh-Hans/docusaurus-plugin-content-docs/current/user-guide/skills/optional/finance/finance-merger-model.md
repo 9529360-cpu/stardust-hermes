@@ -33,7 +33,7 @@ description: "在 Excel 中构建增厚/摊薄（并购）模型 — 备考损�
 
 本 skill 假定使用**无界面 openpyxl** — 即在磁盘上生成 .xlsx 文件。
 遵循 `excel-author` skill 关于单元格着色、公式、命名区域和敏感性表格的约定。
-交付前重新计算：`python /path/to/excel-author/scripts/recalc.py ./out/model.xlsx`。
+交付前重新计算：`python /path/to/xlsx/scripts/xlsx_recalc.py ./out/model.xlsx`，然后检查 JSON 输出是否为 `"recalculated": true`。
 
 # Merger Model
 
