@@ -1,16 +1,15 @@
-"""Deletes that can reach the venv alias handle it explicitly on Windows (a directory junction).
+"""Deletes that reach the venv alias, on Windows where the alias is a directory junction.
 
-The Stardust venv alias ``<install>\\venv`` is a directory junction to ``<install>\\.venv``. Three things can reach it:
+The Stardust venv alias ``<install>\\venv`` is a junction to ``<install>\\.venv``. Every test builds that layout for
+real with ``mklink /J`` (no elevation) and checks one of three things:
 
-* ``Path.resolve()`` follows the junction. The dashboard file browser resolved a selected ``venv`` to ``.venv``,
-  so deleting the alias deleted the real venv. The route now keeps a selected link as itself and unlinks it.
-* A recursive delete of an install root (the uninstaller's checkout and home removal, a failed worktree) first
-  unlinks the alias with ``os.rmdir``, then removes the real ``.venv`` as an ordinary folder.
-* A real ``venv`` folder is never unlinked: only link entries are removed.
+* the Files page lists the alias as itself, and deleting it removes only the link, so the real ``.venv`` survives;
+* a dangling alias (its ``.venv`` is gone) is listed and removed, instead of failing the listing or answering 404;
+* a recursive delete of an install root (the uninstaller's checkout and home removal, a failed worktree) removes the
+  alias and the real ``.venv``, and never reaches a folder outside the tree that a junction points to.
 
-These tests build the layout for real (``mklink /J``, no elevation). Each changed delete path runs against it, and
-the assertions check that the ``.venv`` files survive when only the alias should go, and that a link target outside
-the deleted tree survives.
+``shutil.rmtree`` removes a junction entry without descending into it, so the recursive deletes need no unlink step
+first. The guard tests below fail if that stops being true.
 """
 
 from __future__ import annotations
@@ -25,7 +24,7 @@ from starlette.testclient import TestClient
 
 from hermes_cli import web_server, worktree_ops
 from hermes_cli.uninstall import _rmtree_step
-from hermes_cli.venv_layout import is_link_entry, unlink_link_entry, unlink_venv_aliases
+from hermes_cli.venv_layout import is_link_entry, unlink_link_entry
 
 pytestmark = pytest.mark.windows_only
 
@@ -78,6 +77,15 @@ def test_junction_is_a_link_entry_and_a_real_folder_is_not(checkout):
     assert is_link_entry(root / "missing") is False
 
 
+def test_a_plain_folder_named_venv_is_not_a_link(tmp_path):
+    root = tmp_path / "hermes-agent"
+    (root / "venv" / "Lib").mkdir(parents=True)
+    (root / "venv" / "Lib" / "keep.txt").write_text("real folder", encoding="utf-8")
+
+    assert is_link_entry(root / "venv") is False
+    assert (root / "venv" / "Lib" / "keep.txt").read_text(encoding="utf-8") == "real folder"
+
+
 def test_unlinking_the_alias_keeps_the_venv_files(checkout):
     root, venv = checkout
 
@@ -88,32 +96,12 @@ def test_unlinking_the_alias_keeps_the_venv_files(checkout):
     assert (venv / "Scripts" / "python.exe").read_bytes() == b"interpreter"
 
 
-def test_unlink_venv_aliases_removes_only_the_link_and_reports_it(checkout):
+def test_checkout_removal_removes_the_alias_and_the_real_venv(checkout):
     root, venv = checkout
 
-    removed = unlink_venv_aliases(root)
-
-    assert removed == [root / "venv"]
-    assert not os.path.lexists(root / "venv")
-    assert (venv / "Lib" / "keep.txt").read_text(encoding="utf-8") == "venv file"
-
-
-def test_unlink_venv_aliases_never_touches_a_real_venv_folder(tmp_path):
-    root = tmp_path / "hermes-agent"
-    (root / "venv" / "Lib").mkdir(parents=True)
-    (root / "venv" / "Lib" / "keep.txt").write_text("real venv", encoding="utf-8")
-
-    assert unlink_venv_aliases(root) == []
-    assert (root / "venv" / "Lib" / "keep.txt").read_text(encoding="utf-8") == "real venv"
-
-
-def test_checkout_removal_after_the_alias_is_unlinked_removes_the_real_venv(checkout):
-    root, venv = checkout
-
-    unlink_venv_aliases(root)
     shutil.rmtree(root)
 
-    assert not root.exists()
+    assert not os.path.lexists(root)
     assert not venv.exists()
 
 
@@ -123,16 +111,15 @@ def test_checkout_removal_never_reaches_a_link_target_outside_it(tmp_path):
     outside = _build_outside_venv(tmp_path)
     _make_junction(root / "venv", outside)
     try:
-        unlink_venv_aliases(root)
         shutil.rmtree(root)
 
-        assert not root.exists()
+        assert not os.path.lexists(root)
         assert (outside / "keep.txt").read_text(encoding="utf-8") == "outside"
     finally:
         _release_junction(root / "venv")
 
 
-def test_uninstall_checkout_removal_unlinks_the_alias_before_the_delete(tmp_path):
+def test_uninstall_checkout_removal_never_reaches_outside(tmp_path):
     root = tmp_path / "hermes-agent"
     root.mkdir()
     outside = _build_outside_venv(tmp_path)
@@ -142,13 +129,13 @@ def test_uninstall_checkout_removal_unlinks_the_alias_before_the_delete(tmp_path
     try:
         _rmtree_step(root)
 
-        assert not root.exists()
+        assert not os.path.lexists(root)
         assert (outside / "keep.txt").read_text(encoding="utf-8") == "outside"
     finally:
         _release_junction(root / "venv")
 
 
-def test_uninstall_home_removal_unlinks_the_managed_checkout_alias(tmp_path):
+def test_uninstall_home_removal_removes_the_managed_checkout_alias(tmp_path):
     home = tmp_path / "home"
     checkout_venv = _build_checkout(home / "hermes-agent")
     outside = _build_outside_venv(tmp_path)
@@ -189,40 +176,99 @@ def dashboard_client(monkeypatch, tmp_path):
             web_server.app.state.bound_host = prev_host
 
 
-def test_dashboard_delete_of_the_alias_keeps_the_venv(dashboard_client):
+def _listed(client, folder: Path, name: str) -> dict:
+    """The Files page's listing of *folder*, filtered to the entry called *name*."""
+    response = client.get("/api/files", params={"path": str(folder)})
+    assert response.status_code == 200, response.text
+    return next(entry for entry in response.json()["entries"] if entry["name"] == name)
+
+
+def test_dashboard_lists_the_alias_as_a_link_under_its_own_path(dashboard_client):
     client, managed = dashboard_client
-    venv = _build_checkout(managed / "hermes-agent")
+    checkout = managed / "hermes-agent"
+    _build_checkout(checkout)
     try:
+        entry = _listed(client, checkout, "venv")
+
+        assert entry["is_link"] is True
+        assert entry["broken"] is False
+        assert entry["path"] == str(checkout / "venv")
+    finally:
+        _release_junction(checkout / "venv")
+
+
+def test_dashboard_lists_a_link_to_outside_without_following_it(dashboard_client, tmp_path):
+    client, managed = dashboard_client
+    checkout = managed / "hermes-agent"
+    checkout.mkdir(parents=True)
+    outside = _build_outside_venv(tmp_path)
+    _make_junction(checkout / "outside-link", outside)
+    try:
+        entry = _listed(client, checkout, "outside-link")
+
+        assert entry["is_link"] is True
+        assert entry["path"] == str(checkout / "outside-link")
+    finally:
+        _release_junction(checkout / "outside-link")
+
+
+def test_dashboard_listing_then_delete_of_the_alias_keeps_the_venv(dashboard_client):
+    client, managed = dashboard_client
+    checkout = managed / "hermes-agent"
+    venv = _build_checkout(checkout)
+    try:
+        # The Files page sends back the listed path, with recursive set for a folder entry.
+        entry = _listed(client, checkout, "venv")
         response = client.request(
-            "DELETE", "/api/files", json={"path": str(managed / "hermes-agent" / "venv"), "recursive": True}
+            "DELETE", "/api/files", json={"path": entry["path"], "recursive": entry["is_directory"]}
         )
 
         assert response.status_code == 200, response.text
-        assert not os.path.lexists(managed / "hermes-agent" / "venv")
-        assert (venv / "Lib" / "keep.txt").read_text(encoding="utf-8") == "venv file"
+        assert (venv / "Lib" / "keep.txt").is_file(), "the real .venv was deleted through the listed path"
+        assert (venv / "Scripts" / "python.exe").read_bytes() == b"interpreter"
+        assert not os.path.lexists(checkout / "venv")
     finally:
-        _release_junction(managed / "hermes-agent" / "venv")
+        _release_junction(checkout / "venv")
+
+
+def test_dashboard_lists_and_deletes_a_dangling_alias(dashboard_client):
+    client, managed = dashboard_client
+    checkout = managed / "hermes-agent"
+    _build_checkout(checkout)
+    shutil.rmtree(checkout / ".venv")  # the alias now dangles
+    try:
+        entry = _listed(client, checkout, "venv")
+
+        assert entry["is_link"] is True
+        assert entry["broken"] is True
+        assert entry["is_directory"] is False
+
+        response = client.request("DELETE", "/api/files", json={"path": entry["path"], "recursive": False})
+
+        assert response.status_code == 200, response.text
+        assert not os.path.lexists(checkout / "venv")
+    finally:
+        _release_junction(checkout / "venv")
 
 
 def test_dashboard_recursive_delete_of_the_checkout_never_reaches_outside(dashboard_client, tmp_path):
     client, managed = dashboard_client
-    _build_checkout(managed / "hermes-agent")
+    checkout = managed / "hermes-agent"
+    _build_checkout(checkout)
     outside = _build_outside_venv(tmp_path)
-    _make_junction(managed / "hermes-agent" / "outside-link", outside)
+    _make_junction(checkout / "outside-link", outside)
     try:
-        response = client.request(
-            "DELETE", "/api/files", json={"path": str(managed / "hermes-agent"), "recursive": True}
-        )
+        response = client.request("DELETE", "/api/files", json={"path": str(checkout), "recursive": True})
 
         assert response.status_code == 200, response.text
-        assert not (managed / "hermes-agent").exists()
+        assert not os.path.lexists(checkout)
         assert (outside / "keep.txt").read_text(encoding="utf-8") == "outside"
     finally:
-        _release_junction(managed / "hermes-agent" / "outside-link")
-        _release_junction(managed / "hermes-agent" / "venv")
+        _release_junction(checkout / "outside-link")
+        _release_junction(checkout / "venv")
 
 
-def test_failed_worktree_fallback_unlinks_the_alias_and_keeps_the_target(tmp_path, monkeypatch):
+def test_failed_worktree_fallback_removes_the_alias_and_keeps_the_target(tmp_path, monkeypatch):
     wt_path = tmp_path / "worktree"
     venv = _build_checkout(wt_path)
     outside = _build_outside_venv(tmp_path)
@@ -232,9 +278,9 @@ def test_failed_worktree_fallback_unlinks_the_alias_and_keeps_the_target(tmp_pat
     try:
         worktree_ops._cleanup_failed_worktree_add(str(tmp_path), wt_path, "feature")
 
-        assert not wt_path.exists()
-        assert (outside / "keep.txt").read_text(encoding="utf-8") == "outside"
+        assert not os.path.lexists(wt_path)
         assert not venv.exists()
+        assert (outside / "keep.txt").read_text(encoding="utf-8") == "outside"
     finally:
         _release_junction(wt_path / "venv")
         _release_junction(wt_path / "outside-link")

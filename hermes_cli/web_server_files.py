@@ -173,7 +173,33 @@ def _managed_response_meta(policy: ManagedFilesPolicy) -> Dict[str, Any]:
     return {"root": locked_root, "locked_root": locked_root, "can_change_path": policy.can_change_path}
 
 
+def _managed_link_entry(target: Path) -> Dict[str, Any]:
+    """A symlink or junction is listed as itself: its own path, never resolved (see ``is_link_entry``).
+
+    Resolving the venv alias produced the real ``.venv`` path, so picking the alias in the Files page deleted the
+    real venv. A dangling link (its target is gone) is listed with ``broken`` instead of failing the listing.
+    """
+    try:
+        st = os.lstat(target)
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"Could not stat path: {exc}")
+    broken = not os.path.exists(target)
+    is_dir = not broken and os.path.isdir(target)
+    return {
+        "name": target.name,
+        "path": str(target),
+        "is_directory": is_dir,
+        "is_link": True,
+        "broken": broken,
+        "size": None,
+        "mtime": st.st_mtime,
+        "mime_type": None if is_dir else (mimetypes.guess_type(target.name)[0] or "application/octet-stream"),
+    }
+
+
 def _managed_file_entry(policy: ManagedFilesPolicy, target: Path) -> Dict[str, Any]:
+    if is_link_entry(target):
+        return _managed_link_entry(target)
     try:
         resolved = target.resolve()
     except (OSError, RuntimeError):

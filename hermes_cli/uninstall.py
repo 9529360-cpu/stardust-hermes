@@ -9,7 +9,6 @@ from pathlib import Path
 from hermes_constants import get_hermes_home
 
 from hermes_cli.colors import Colors, color
-from hermes_cli.venv_layout import unlink_venv_aliases
 
 def _logger(mark: str, col: str):
     return lambda msg: print(f"{color(mark, col)} {msg}")
@@ -599,13 +598,12 @@ def _remove_step(label: str, remove, success_fmt: str, none_msg: str) -> None:
 def _rmtree_step(path: Path, *, indent: str = "", fully: bool = True) -> None:
     """Best-effort ``rmtree`` with the shared success/warning lines.
 
-    The checkout and the home can hold the venv alias (a junction to ``.venv``). The alias is unlinked first
-    (:func:`hermes_cli.venv_layout.unlink_venv_aliases`, ``os.rmdir`` on the junction only), so the real ``.venv``
-    is removed as an ordinary folder and the delete never runs through the link.
+    The checkout and the home can hold the venv alias (a junction to ``.venv``). ``shutil.rmtree`` removes a junction
+    entry itself and never descends into it (probed on Python 3.11 and 3.12), so the real ``.venv`` goes as an
+    ordinary folder and nothing outside the tree is touched.
     """
     try:
         if path.exists():
-            unlink_venv_aliases(path)
             shutil.rmtree(path)
             log_success(f"{indent}Removed {path}")
     except Exception as e:

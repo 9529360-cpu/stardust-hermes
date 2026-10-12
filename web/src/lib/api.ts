@@ -2117,6 +2117,10 @@ export interface ManagedFileEntry {
   name: string;
   path: string;
   is_directory: boolean;
+  /** A symlink or junction (the venv alias), listed under its own path and never followed. */
+  is_link?: boolean;
+  /** A link whose target is missing. */
+  broken?: boolean;
   size: number | null;
   mtime: number;
   mime_type: string | null;

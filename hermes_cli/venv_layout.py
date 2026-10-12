@@ -73,18 +73,24 @@ def ensure_venv_alias(root, *, windows: bool | None = None) -> str:
 
 
 _FILE_ATTRIBUTE_DIRECTORY = 0x10
-_FILE_ATTRIBUTE_REPARSE_POINT = 0x400
+# Reparse tags of the two link kinds Stardust creates: a directory junction (mount point) and a symlink.
+_IO_REPARSE_TAG_MOUNT_POINT = 0xA0000003
+_IO_REPARSE_TAG_SYMLINK = 0xA000000C
 
 
 def is_link_entry(path) -> bool:
-    """True for a symlink or a Windows reparse point (a directory junction). Never follows *path*."""
+    """True for a symlink or a directory junction (the venv alias). Never follows *path*; a dangling link counts.
+
+    Other reparse points (a OneDrive placeholder, a dedup file) are ordinary entries: removing a folder of that
+    kind must stay a recursive delete, not an unlink.
+    """
     try:
         st = os.lstat(path)
     except OSError:
         return False
     if stat.S_ISLNK(st.st_mode):
         return True
-    return bool(getattr(st, "st_file_attributes", 0) & _FILE_ATTRIBUTE_REPARSE_POINT)
+    return getattr(st, "st_reparse_tag", 0) in (_IO_REPARSE_TAG_MOUNT_POINT, _IO_REPARSE_TAG_SYMLINK)
 
 
 def unlink_link_entry(path) -> None:
@@ -94,23 +100,3 @@ def unlink_link_entry(path) -> None:
         os.rmdir(path)
     else:
         os.unlink(path)
-
-
-def unlink_venv_aliases(tree) -> list[Path]:
-    """Remove the venv alias of *tree* and of each direct child folder (where install roots live). Only link
-    entries go, with ``os.rmdir`` (junction) or ``os.unlink`` (symlink); a real venv folder is never touched, so a
-    recursive delete of *tree* that runs next finds the real ``.venv`` as an ordinary folder. Returns what it removed.
-    """
-    base = Path(tree)
-    candidates = [base / DEFAULT_VENV_NAME]
-    try:
-        children = [child for child in base.iterdir() if child.is_dir() and not is_link_entry(child)]
-    except OSError:
-        children = []
-    candidates.extend(child / DEFAULT_VENV_NAME for child in children)
-    removed: list[Path] = []
-    for alias in candidates:
-        if is_link_entry(alias):
-            unlink_link_entry(alias)
-            removed.append(alias)
-    return removed

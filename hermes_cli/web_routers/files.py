@@ -25,7 +25,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 
 from hermes_cli._subprocess_compat import windows_hide_flags
-from hermes_cli.venv_layout import is_link_entry, unlink_link_entry, unlink_venv_aliases
+from hermes_cli.venv_layout import is_link_entry, unlink_link_entry
 from hermes_cli.web_deps import late
 from hermes_cli.web_server_files import (
     _fs_path, _managed_file_entry, _managed_response_meta, _resolve_managed_path,
@@ -584,17 +584,18 @@ async def delete_managed_file(payload: ManagedFileDelete, request: Request):
         raise HTTPException(status_code=400, detail="Cannot delete the managed files root")
     if target.parent == target:
         raise HTTPException(status_code=400, detail="Cannot delete the filesystem root")
-    if not target.exists():
+    link = is_link_entry(target)
+    # A dangling link fails exists() although its entry is still there, so links skip the missing-path check.
+    if not link and not target.exists():
         raise HTTPException(status_code=404, detail="Path not found")
 
     try:
-        if is_link_entry(target):
-            # A selected link (the venv alias is a junction) is removed as itself; what it points to is left alone.
+        if link:
+            # A link (the venv alias is a junction) is removed as itself; what it points to is left alone.
             unlink_link_entry(target)
         elif target.is_dir():
             if payload.recursive:
-                # A managed folder can hold a Stardust install: unlink its venv alias before the recursive delete.
-                unlink_venv_aliases(target)
+                # shutil.rmtree removes a junction entry without descending into it (probed on Python 3.11 and 3.12).
                 shutil.rmtree(target)
             else:
                 target.rmdir()

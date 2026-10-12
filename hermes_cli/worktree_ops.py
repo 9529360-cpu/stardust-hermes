@@ -19,7 +19,6 @@ from pathlib import Path
 from typing import Dict, Optional
 
 from hermes_constants import get_hermes_home
-from hermes_cli.venv_layout import unlink_venv_aliases
 from utils import atomic_json_write
 
 logger = logging.getLogger("cli")
@@ -90,8 +89,6 @@ def _cleanup_failed_worktree_add(repo_root: str, wt_path: Path, branch_name: str
         _git_quiet(["worktree", "unlock", str(wt_path)], repo_root, timeout=15)
         _git_quiet(["worktree", "remove", "--force", str(wt_path)], repo_root, timeout=15)
         if wt_path.exists():
-            # A worktree that ran `stardust update` can hold the venv alias: unlink it before the tree delete.
-            unlink_venv_aliases(wt_path)
             shutil.rmtree(wt_path, ignore_errors=True)
         # `remove` needs the dir; `prune` drops the admin entry when it is already gone.
         _git_quiet(["worktree", "prune"], repo_root, timeout=15)
