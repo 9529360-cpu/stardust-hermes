@@ -88,6 +88,32 @@ beforeEach(() => {
   $localModelsEnabled.set(true)
 })
 
+it('lets users manually select every GPT官方 account model', async () => {
+  const onSelect = vi.fn()
+  vi.mocked(requestModelOptions).mockResolvedValue({
+    ...OPTIONS,
+    providers: [{ slug: 'gpt-official', name: 'GPT官方',
+      models: ['gpt-5.6-luna', 'gpt-5.6-sol', 'account-only'], authenticated: true }]
+  })
+  renderPicker({ onSelect })
+  expect(await screen.findByText('GPT官方')).toBeTruthy()
+  expect(screen.getByText('gpt-5.6-luna')).toBeTruthy()
+  expect(screen.getByText('gpt-5.6-sol')).toBeTruthy()
+  fireEvent.click(screen.getByText('account-only'))
+  expect(onSelect).toHaveBeenCalledWith({ provider: 'gpt-official', model: 'account-only' })
+})
+
+it('shows GPT官方 login errors even without selectable models', async () => {
+  vi.mocked(requestModelOptions).mockResolvedValue({
+    ...OPTIONS,
+    providers: [{ slug: 'gpt-official', name: 'GPT官方', models: [], authenticated: false,
+      warning: '请在原 ChatGPT/Codex 客户端重新登录' }]
+  })
+  renderPicker()
+  expect(await screen.findByText('GPT官方')).toBeTruthy()
+  expect(await screen.findByText('请在原 ChatGPT/Codex 客户端重新登录')).toBeTruthy()
+})
+
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()

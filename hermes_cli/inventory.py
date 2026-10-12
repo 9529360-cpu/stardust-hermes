@@ -479,7 +479,7 @@ def _filter_explicit_provider_rows(rows: list[dict], ctx: ConfigContext) -> list
         # machine-scoped dir); there is deliberately no config credential, so without the source clause
         # the row would only survive on the profile where Use was last clicked.
         if (row.get("is_user_defined") or (current_slug and slug == current_slug)
-                or row.get("source") == "local-runtime"):
+                or row.get("source") in {"local-runtime", "external-access-readonly"}):
             return True
         if slug == "moa":
             # Virtual routing mode, not a configured provider: hide unless current (above) or the user

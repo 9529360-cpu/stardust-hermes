@@ -344,6 +344,22 @@ def _resolve_nous_branch(req: _ResolveRequest) -> _ResolveResult:
     return _route_client(req, client, final_model)
 
 
+def _resolve_gpt_official_branch(req: _ResolveRequest) -> _ResolveResult:
+    """Direct external-account route, never SIWC, a pool, or a fallback."""
+    from hermes_cli.gpt_official import read_credentials, request_headers, DEFAULT_MODEL
+    from agent.codex_headers import CODEX_AUX_BASE_URL
+    from hermes_cli.auth import AuthError
+    if req.explicit_api_key or (req.explicit_base_url and req.explicit_base_url.rstrip("/") != CODEX_AUX_BASE_URL):
+        raise AuthError("GPT官方只允许原客户端凭据及官方直连接口。")
+    creds = read_credentials()
+    model = req.model or DEFAULT_MODEL
+    client = _aux._create_openai_client(api_key=creds["access_token"], base_url=CODEX_AUX_BASE_URL,
+                                      default_headers=request_headers(creds))
+    if not req.raw_codex:
+        client = _aux.CodexAuxiliaryClient(client, model)
+    return _route_client(req, client, model)
+
+
 def _resolve_openai_codex_branch(req: _ResolveRequest) -> _ResolveResult:
     """OpenAI Codex (OAuth → Responses API)."""
     model = req.model
@@ -676,6 +692,7 @@ _EXPLICIT_PROVIDER_BRANCHES: Dict[str, Callable[[_ResolveRequest], _ResolveResul
     "auto": _resolve_auto_branch,
     "openrouter": _resolve_openrouter_branch,
     "nous": _resolve_nous_branch,
+    "gpt-official": _resolve_gpt_official_branch,
     "openai-codex": _resolve_openai_codex_branch,
     "xai-oauth": _resolve_xai_oauth_branch,
     "custom": _resolve_custom_branch,
@@ -715,6 +732,9 @@ def resolve_provider_client(
     # lists drift) → configured main model (MoA → aggregator), keeping OAuth aux tasks off the Step-2 fallback.
     # Excluded: ``auto`` (a stale main slug could pair with any picked provider) and Nous + vision (the
     # Portal's tier-aware vision recommendation must win over a text-only model).
+    if not model and provider == "gpt-official":
+        from hermes_cli.gpt_official import DEFAULT_MODEL
+        model = DEFAULT_MODEL
     if not model and provider != "auto" and not (provider == "nous" and is_vision):
         # ``auto`` is intentionally excluded: `_resolve_auto_route(main_runtime=...)` returns the model paired
         # with the provider it actually selected. Pre-filling an auto call from `_read_main_model()` can

@@ -541,6 +541,13 @@ def validate_requested_model(
     if normalized == "copilot":
         lookup = _m.normalize_copilot_model_id(requested, api_key=api_key) or requested
 
+    if normalized == "gpt-official":
+        from hermes_cli.gpt_official import model_ids
+        from hermes_cli.auth import AuthError
+        try:
+            return _accept() if requested in model_ids() else _reject("该模型不在 GPT官方当前账户目录中；未替换模型。")
+        except AuthError as exc:
+            return _reject(str(exc))
     if not requested:
         return _reject("Model name cannot be empty.")
     req = _Request(requested, lookup, provider, normalized, api_key, base_url, api_mode, headers)

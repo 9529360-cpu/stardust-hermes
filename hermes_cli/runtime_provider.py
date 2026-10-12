@@ -860,6 +860,14 @@ def resolve_runtime_provider(*, requested: Optional[str] = None, explicit_api_ke
     OpenCode Zen/Go where different models route through different API surfaces)."""
     requested_provider = resolve_requested_provider(requested)
     _raise_if_provider_disabled(requested_provider)
+    if requested_provider == "gpt-official":
+        from hermes_cli.gpt_official import read_credentials
+        from agent.codex_headers import CODEX_AUX_BASE_URL
+        if explicit_api_key or (explicit_base_url and explicit_base_url.rstrip("/") != CODEX_AUX_BASE_URL):
+            raise AuthError("GPT官方只允许原客户端凭据及官方直连接口。")
+        creds = read_credentials()
+        return _runtime("gpt-official", "codex_responses", CODEX_AUX_BASE_URL, creds["access_token"],
+                        source="external-access-readonly", requested_provider=requested_provider)
     return next(r for r in _ladder_rungs(requested_provider, explicit_api_key, explicit_base_url, target_model) if r)
 
 

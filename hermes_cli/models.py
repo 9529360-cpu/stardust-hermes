@@ -475,6 +475,9 @@ def recommended_nous_default_model() -> dict[str, Any]:
 def get_default_model_for_provider(provider: str) -> str:
     """Cost-safe default model for a provider, or "" — the NON-INTERACTIVE fallback when a provider
     is configured but no model was ever selected."""
+    if provider == "gpt-official":
+        from hermes_cli.gpt_official import DEFAULT_MODEL
+        return DEFAULT_MODEL
     models = _PROVIDER_MODELS.get(provider, [])
     if provider in _SILENT_DEFAULT_PROVIDERS:
         preferred = get_preferred_silent_default_model(provider)
@@ -1473,6 +1476,9 @@ def provider_model_ids(provider: Optional[str], *, force_refresh: bool = False) 
         return _ollama_local_catalog(force_refresh)
 
     normalized = normalize_provider(provider)
+    if normalized == "gpt-official":
+        from hermes_cli.gpt_official import model_ids
+        return model_ids()
     fetcher = _PROVIDER_CATALOG_FETCHERS.get(normalized)
     if fetcher is not None:
         models = fetcher(normalized, force_refresh)

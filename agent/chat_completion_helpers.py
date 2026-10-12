@@ -1872,6 +1872,8 @@ def try_activate_fallback(agent, reason: "FailoverReason | None" = None) -> bool
     """Switch to the next fallback model/provider in the chain; False when exhausted. Swaps client,
     model slug and provider in place so the retry loop continues on the new backend; client
     construction goes through resolve_provider_client (no duplicated provider→key mappings)."""
+    if getattr(agent, "provider", "") == "gpt-official":
+        return False  # Explicit account route: never silently spend on another model/provider.
     from agent.fallback_cooldown import _arm_rate_limit_cooldown
     # Credential rotation is attempted before this function. Reaching provider fallback means the
     # active route itself could not recover, so persist its circuit state for every future agent and

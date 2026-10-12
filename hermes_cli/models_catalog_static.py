@@ -320,6 +320,7 @@ CANONICAL_PROVIDERS: list[ProviderEntry] = [ProviderEntry(*row) for row in (
     ("lmstudio", "LM Studio", "LM Studio (Local desktop app with built-in model server)"),
     ("anthropic", "Anthropic", "Anthropic (Claude models via API key or Claude Code)"),
     ("openai-codex", "ChatGPT or Codex Subscription", "ChatGPT or Codex Subscription (Sign in with your ChatGPT account, uses Codex models)"),
+    ("gpt-official", "GPT官方", "GPT官方（只读本机 ChatGPT/Codex 登录，直接 Responses API；不是 SIWC）"),
     ("openai-api", "OpenAI API", "OpenAI API (api.openai.com, API key)"),
     ("alibaba", "Qwen Cloud", "Qwen Cloud / DashScope (Qwen + multi-provider)"),
     ("xai-oauth", "xAI Grok OAuth (SuperGrok / Premium+)", "xAI Grok OAuth (SuperGrok / Premium+ subscription)"),

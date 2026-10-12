@@ -281,7 +281,7 @@ function ModelResults({
   const localModelsShown = $localModelsEnabled.get()
 
   const configured = providers.filter(
-    p => (p.models ?? []).length > 0 && (localModelsShown || p.slug !== LOCAL_PROVIDER_SLUG)
+    p => ((p.models ?? []).length > 0 || (p.slug === 'gpt-official' && !!p.warning)) && (localModelsShown || p.slug !== LOCAL_PROVIDER_SLUG)
   )
 
   // In-flight local downloads render as disabled progress rows: inside the
@@ -297,7 +297,7 @@ function ModelResults({
         const models = rankModels(provider, provider.models ?? [])
         const groupDownloads = provider.slug === LOCAL_PROVIDER_SLUG ? visibleDownloads : []
 
-        if (models.length === 0 && groupDownloads.length === 0) {
+        if (models.length === 0 && groupDownloads.length === 0 && !provider.warning) {
           return null
         }
 
