@@ -56,10 +56,18 @@ backgroundReleasePath?: string
 autoShowScripts?: Record<string, ScriptedTurn[]>
 }
 
+export interface CorrectionSwitchRequestTrace {
+  ordinal: number
+  scriptTurn: number
+  lastUserText: string
+  messageTail: Array<{ role: string; content: string }>
+}
+
 export interface MockServer {
   port: number
   url: string
   receivedPrompts: string[]
+  correctionSwitchRequestTrace: () => readonly CorrectionSwitchRequestTrace[]
   waitForHeldStream: () => Promise<void>
   waitForHeldCompletion: () => Promise<void>
   releaseHeldStream: () => void
@@ -543,6 +551,7 @@ function autoShowTurnFor(messages: any[], scripts: Record<string, ScriptedTurn[]
 export function startMockServer(options: MockServerOptions = {}): Promise<MockServer> {
   return new Promise((resolve, reject) => {
     const receivedPrompts: string[] = []
+    const correctionSwitchRequestTrace: CorrectionSwitchRequestTrace[] = []
     let resolveHeldStreamStarted: (() => void) | null = null
     let releaseHeldStream: (() => void) | null = null
     let heldCompletionCount = 0
@@ -787,6 +796,16 @@ export function startMockServer(options: MockServerOptions = {}): Promise<MockSe
           }
 
           if (isCorrectionSwitchTrigger) {
+            const scriptTurn = _correctionSwitchIndex
+            correctionSwitchRequestTrace.push({
+              ordinal: correctionSwitchRequestTrace.length + 1,
+              scriptTurn,
+              lastUserText: userText,
+              messageTail: messages.slice(-8).map(message => ({
+                role: typeof message?.role === 'string' ? message.role : 'unknown',
+                content: typeof message?.content === 'string' ? message.content : '',
+              })),
+            })
             const turn = CORRECTION_SWITCH_SCRIPT[_correctionSwitchIndex] ?? CORRECTION_SWITCH_SCRIPT[CORRECTION_SWITCH_SCRIPT.length - 1]
             _correctionSwitchIndex++
 
@@ -926,6 +945,7 @@ export function startMockServer(options: MockServerOptions = {}): Promise<MockSe
         port,
         url,
         receivedPrompts,
+        correctionSwitchRequestTrace: () => correctionSwitchRequestTrace,
         waitForHeldStream: () => heldStreamStarted,
         waitForHeldCompletion: () => heldStreamStarted,
         releaseHeldStream: () => releaseHeldStream?.(),

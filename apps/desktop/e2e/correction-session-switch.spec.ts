@@ -187,7 +187,7 @@ test.describe('correction session switch', () => {
   })
 
   test('keeps a live correction in place and does not duplicate its original prompt after switching sessions', async ({}, testInfo: TestInfo) => {
-    const { page } = fixture!
+    const { mock, page } = fixture!
 
     // A blank draft does not exercise session hydration. Seed a real second
     // session first, matching the observed switch between two saved chats.
@@ -241,6 +241,12 @@ test.describe('correction session switch', () => {
     expect(correctionMessagesAfterResume[0].id).toBeTruthy()
 
     await waitForTranscriptText(page, CORRECTED_REPLY)
+    const primary = activeSurface(page).locator('[data-slot="composer-root"] button[type="submit"]')
+    await expect(primary).toHaveAttribute('aria-label', /^(Send|发送)$/, { timeout: 30_000 })
+    await testInfo.attach('correction-switch-model-requests.json', {
+      body: JSON.stringify(mock.correctionSwitchRequestTrace(), null, 2),
+      contentType: 'application/json',
+    })
     // The post-turn stored-history reconcile can momentarily repaint from a
     // snapshot in which the steer's user row hasn't been folded back in yet —
     // poll to the converged order instead of sampling one frame.
