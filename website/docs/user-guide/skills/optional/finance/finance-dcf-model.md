@@ -33,7 +33,7 @@ The following is the complete skill definition that Hermes loads when this skill
 
 This skill assumes **headless openpyxl** — you are producing an .xlsx file on disk.
 Follow the `excel-author` skill's conventions for cell coloring, formulas, named ranges, and sensitivity tables.
-Recalculate before delivery: `python /path/to/excel-author/scripts/recalc.py ./out/model.xlsx`.
+Recalculate before delivery: `python /path/to/xlsx/scripts/xlsx_recalc.py ./out/model.xlsx`, then check that its JSON reports `"recalculated": true`.
 
 # DCF Model Builder
 
@@ -86,9 +86,9 @@ These constraints apply throughout all DCF model building. Review before startin
 - Test formulas immediately after creation
 
 **Formula Recalculation:**
-- Run `python recalc.py model.xlsx 30` before delivery
-- Fix ALL errors until status is "success"
-- Zero formula errors required (#REF!, #DIV/0!, #VALUE!, etc.)
+- Run `python xlsx_recalc.py model.xlsx --timeout 30` before delivery (the xlsx skill's helper; check that its JSON reports `"recalculated": true`)
+- Fix ALL errors until `"recalculated"` is true and no error values remain
+- Zero formula errors required (#REF!, #DIV/0!, #VALUE!, etc.). `xlsx_recalc.py` does not scan for error values, so check the cached results with `xlsx_read.py --formulas`
 
 **Scenario Blocks:**
 - Create separate blocks for Bear/Base/Bull cases
@@ -768,8 +768,8 @@ In addition, be aware of these errors:
 **This skill uses the `xlsx` skill for all spreadsheet operations.** The xlsx skill provides:
 - Standardized formula construction rules
 - Number formatting conventions
-- Automated formula recalculation via `recalc.py` script
-- Comprehensive error checking and validation
+- Formula recalculation via the `xlsx_recalc.py` script
+- Structure validation via `xlsx_verify.py` (what Excel would refuse)
 
 All Excel files created by this skill must follow xlsx skill requirements, including zero formula errors and proper recalculation.
 
@@ -807,48 +807,32 @@ Create **two sheets**:
 
 ### Formula Recalculation (MANDATORY)
 
-After creating or modifying the Excel model, **recalculate all formulas** using the `recalc.py` script from the `excel-author` skill:
+After creating or modifying the Excel model, **recalculate all formulas** using the `xlsx_recalc.py` script from the `xlsx` skill's `scripts/` directory:
 
 ```bash
-python recalc.py [path_to_excel_file] [timeout_seconds]
+python xlsx_recalc.py [path_to_excel_file] --timeout 30
 ```
 
 Example:
 ```bash
-python recalc.py AAPL_DCF_Model_2025-10-12.xlsx 30
+python xlsx_recalc.py AAPL_DCF_Model_2025-10-12.xlsx --timeout 30
 ```
 
 The script will:
-- Recalculate all formulas in all sheets using LibreOffice
-- Scan ALL cells for Excel errors (#REF!, #DIV/0!, #VALUE!, #NAME?, #NULL!, #NUM!, #N/A)
-- Return detailed JSON with error locations and counts
+- Recalculate all formulas in all sheets using LibreOffice, and save the result in place (or to `--out PATH`)
+- Print JSON. On success it contains `"ok": true` and `"recalculated": true`, plus `formula_cells` and `with_cached_values` counts
+- Exit 0 without recalculating when LibreOffice is not on PATH. It then prints `"recalculated": false`, so check the JSON, not only the exit code
 
-**Expected output format:**
-```json
-{
-  "status": "success",           // or "errors_found"
-  "total_errors": 0,              // Total error count
-  "total_formulas": 42,           // Number of formulas in file
-  "error_summary": {}             // Only present if errors found
-}
+**It does not scan for error values.** After a successful recalc, read each sheet's formulas with their cached results and check them:
+
+```bash
+python xlsx_read.py AAPL_DCF_Model_2025-10-12.xlsx --formulas --sheet DCF
+python xlsx_read.py AAPL_DCF_Model_2025-10-12.xlsx --formulas --sheet WACC
 ```
 
-**If errors are found**, the output will include details:
-```json
-{
-  "status": "errors_found",
-  "total_errors": 2,
-  "total_formulas": 42,
-  "error_summary": {
-    "#REF!": {
-      "count": 2,
-      "locations": ["DCF!B25", "DCF!C25"]
-    }
-  }
-}
-```
+Look for `#REF!`, `#DIV/0!`, `#VALUE!`, `#NAME?`, `#NULL!`, `#NUM!`, and `#N/A` in the `cached` values, and list their cells.
 
-**Fix all errors** and re-run recalc.py until status is "success" before delivering the model.
+**Fix all errors** and re-run `xlsx_recalc.py` until `"recalculated": true` and no error values remain before delivering the model.
 
 ### Formatting Standards
 
@@ -1230,13 +1214,14 @@ This approach centralizes scenario logic, making the model easier to audit and m
    - Cell comments on ALL hardcoded inputs
    - Professional borders around major sections
 
-2. **Recalculate formulas**: Run `python recalc.py model.xlsx 30`
+2. **Recalculate formulas**: Run `python xlsx_recalc.py model.xlsx --timeout 30`
 
 3. **Check output**:
-   - If `status` is `"success"` → Continue to step 4
-   - If `status` is `"errors_found"` → Check `error_summary` and read [TROUBLESHOOTING.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/finance\dcf-model/TROUBLESHOOTING.md) for debugging guidance
+   - If the JSON reports `"recalculated": true` → Continue to step 4
+   - If it reports `"recalculated": false` (LibreOffice missing) → install LibreOffice or recalculate in Excel, then run again
+   - Then check the formulas for error values (see Formula Recalculation). If you find any, read [TROUBLESHOOTING.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/finance\dcf-model/TROUBLESHOOTING.md) for debugging guidance
 
-4. **Fix errors and re-run recalc.py** until status is "success"
+4. **Fix errors and re-run xlsx_recalc.py** until `"recalculated": true` and no error values remain
 
 5. **Spot-check formulas**:
    - Test one FCF formula - does it reference the correct assumption rows?
@@ -1257,7 +1242,7 @@ This approach centralizes scenario logic, making the model easier to audit and m
 Before delivering DCF model:
 
 **Required:**
-- Run `python recalc.py model.xlsx 30` until status is "success" (zero formula errors)
+- Run `python xlsx_recalc.py model.xlsx --timeout 30` until `"recalculated": true`, with zero formula errors (checked with `xlsx_read.py --formulas`)
 - Two sheets: DCF (with sensitivity at bottom), WACC
 - Font colors: Blue=inputs, Black=formulas, Green=sheet links
 - Cell comments on ALL hardcoded inputs

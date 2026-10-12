@@ -39,6 +39,7 @@ Turn documents into cited facts and proposed actions. Extraction is not legal ad
 - "Turn this report into tasks."
 - "Read these scanned forms and structure the data."
 - "Find risks, owners, and follow-ups in these attachments."
+- Meeting notes or a transcript (decisions, owners, follow-ups): read `references/meeting-mode.md`.
 
 Don't use for: plain text extraction with no downstream structuring (load `pdf` directly).
 

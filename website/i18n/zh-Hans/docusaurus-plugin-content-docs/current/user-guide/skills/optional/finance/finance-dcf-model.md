@@ -33,7 +33,7 @@ description: "在 Excel 中构建机构级 DCF 估值模型——收入预测、
 
 本 skill 假定使用**无头 openpyxl**——你在磁盘上生成 .xlsx 文件。
 遵循 `excel-author` skill 关于单元格着色、公式、命名区域和敏感性表格的约定。
-交付前重新计算：`python /path/to/excel-author/scripts/recalc.py ./out/model.xlsx`。
+交付前重新计算：`python /path/to/xlsx/scripts/xlsx_recalc.py ./out/model.xlsx`，然后检查 JSON 输出是否为 `"recalculated": true`。
 
 # DCF 模型构建器
 
@@ -86,8 +86,8 @@ description: "在 Excel 中构建机构级 DCF 估值模型——收入预测、
 - 创建后立即测试公式
 
 **公式重新计算：**
-- 交付前运行 `python recalc.py model.xlsx 30`
-- 修复所有错误直到状态为"success"
+- 交付前运行 `python xlsx_recalc.py model.xlsx --timeout 30`
+- 修复所有错误，直到 `"recalculated": true` 且没有错误值
 - 要求零公式错误（#REF!、#DIV/0!、#VALUE! 等）
 
 **情景块：**
@@ -768,8 +768,8 @@ Revenue Growth FY2,9%,12%,15%
 **本 skill 使用 `xlsx` skill 进行所有电子表格操作。** xlsx skill 提供：
 - 标准化公式构建规则
 - 数字格式约定
-- 通过 `recalc.py` 脚本自动重新计算公式
-- 全面的错误检查和验证
+- 通过 `xlsx_recalc.py` 脚本重新计算公式
+- 通过 `xlsx_verify.py` 进行结构验证（Excel 会拒绝的结构）
 
 本 skill 创建的所有 Excel 文件必须遵循 xlsx skill 要求，包括零公式错误和正确的重新计算。
 
@@ -807,48 +807,30 @@ Revenue Growth FY2,9%,12%,15%
 
 ### 公式重新计算（必须执行）
 
-创建或修改 Excel 模型后，使用 `excel-author` skill 中的 `recalc.py` 脚本**重新计算所有公式**：
+创建或修改 Excel 模型后，使用 `xlsx` skill 的 `scripts/` 目录中的 `xlsx_recalc.py` 脚本**重新计算所有公式**：
 
 ```bash
-python recalc.py [path_to_excel_file] [timeout_seconds]
+python xlsx_recalc.py [path_to_excel_file] --timeout 30
 ```
 
 示例：
 ```bash
-python recalc.py AAPL_DCF_Model_2025-10-12.xlsx 30
+python xlsx_recalc.py AAPL_DCF_Model_2025-10-12.xlsx --timeout 30
 ```
 
 该脚本将：
-- 使用 LibreOffice 重新计算所有工作表中的所有公式
-- 扫描所有单元格中的 Excel 错误（#REF!、#DIV/0!、#VALUE!、#NAME?、#NULL!、#NUM!、#N/A）
-- 返回包含错误位置和计数的详细 JSON
+- 使用 LibreOffice 重新计算所有工作表中的所有公式，并原地保存结果（或用 `--out PATH` 指定输出路径）
+- 输出 JSON。成功时包含 `"ok": true` 和 `"recalculated": true`，以及 `formula_cells`、`with_cached_values` 计数
+- 若 PATH 中找不到 LibreOffice，则不重新计算，输出 `"recalculated": false` 并以退出码 0 结束。因此应检查 JSON，而不只看退出码
 
-**预期输出格式：**
-```json
-{
-  "status": "success",           // or "errors_found"
-  "total_errors": 0,              // Total error count
-  "total_formulas": 42,           // Number of formulas in file
-  "error_summary": {}             // Only present if errors found
-}
+**该脚本不扫描错误值。** 重新计算成功后，读取每个工作表的公式及其缓存结果并逐一检查：
+```bash
+python xlsx_read.py AAPL_DCF_Model_2025-10-12.xlsx --formulas --sheet DCF
+python xlsx_read.py AAPL_DCF_Model_2025-10-12.xlsx --formulas --sheet WACC
 ```
+在 `cached` 值中查找 `#REF!`、`#DIV/0!`、`#VALUE!`、`#NAME?`、`#NULL!`、`#NUM!` 和 `#N/A`，并列出其单元格。
 
-**如果发现错误**，输出将包含详细信息：
-```json
-{
-  "status": "errors_found",
-  "total_errors": 2,
-  "total_formulas": 42,
-  "error_summary": {
-    "#REF!": {
-      "count": 2,
-      "locations": ["DCF!B25", "DCF!C25"]
-    }
-  }
-}
-```
-
-**修复所有错误**并重新运行 recalc.py，直到状态为"success"，然后再交付模型。
+**修复所有错误**，并重新运行 `xlsx_recalc.py`，直到 `"recalculated": true` 且不再有错误值，然后再交付模型。
 
 ### 格式标准
 
@@ -1230,13 +1212,14 @@ WACC = (Cost of Equity × Equity Weight) + (After-tax Cost of Debt × Debt Weigh
    - 所有硬编码输入的单元格注释
    - 主要节周围的专业边框
 
-2. **重新计算公式**：运行 `python recalc.py model.xlsx 30`
+2. **重新计算公式**：运行 `python xlsx_recalc.py model.xlsx --timeout 30`
 
 3. **检查输出**：
-   - 如果 `status` 为 `"success"` → 继续第 4 步
-   - 如果 `status` 为 `"errors_found"` → 检查 `error_summary` 并阅读 [TROUBLESHOOTING.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/finance/dcf-model/TROUBLESHOOTING.md) 获取调试指导
+   - 如果 JSON 中 `"recalculated": true` → 继续第 4 步
+   - 如果为 `"recalculated": false`（缺少 LibreOffice）→ 安装 LibreOffice，或在 Excel 中重新计算，然后再次运行
+   - 然后检查公式中是否有错误值（见上文"公式重新计算"）。如果有，阅读 [TROUBLESHOOTING.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/finance/dcf-model/TROUBLESHOOTING.md) 获取调试指导
 
-4. **修复错误并重新运行 recalc.py**，直到状态为"success"
+4. **修复错误并重新运行 xlsx_recalc.py**，直到 `"recalculated": true` 且不再有错误值
 
 5. **抽查公式**：
    - 测试一个 FCF 公式——它是否引用了正确的假设行？
@@ -1257,7 +1240,7 @@ WACC = (Cost of Equity × Equity Weight) + (After-tax Cost of Debt × Debt Weigh
 交付 DCF 模型前：
 
 **必要项：**
-- 运行 `python recalc.py model.xlsx 30` 直到状态为"success"（零公式错误）
+- 运行 `python xlsx_recalc.py model.xlsx --timeout 30` 直到 `"recalculated": true`（零公式错误，用 `xlsx_read.py --formulas` 检查）
 - 两个工作表：DCF（底部含敏感性分析）、WACC
 - 字体颜色：蓝色=输入，黑色=公式，绿色=工作表链接
 - 所有硬编码输入的单元格注释

@@ -52,26 +52,26 @@ const PRODUCT_NAV_COPY = {
     agentSpace: 'مساحة الوكلاء',
     newChat: 'محادثة جديدة',
     project: 'المشروع',
-    tasks: 'المهام',
+    tasks: 'الأتمتة',
     tools: 'الأدوات'
   },
-  en: { agentSpace: 'Agent space', newChat: 'New chat', project: 'Project', tasks: 'Tasks', tools: 'Tools' },
+  en: { agentSpace: 'Agent space', newChat: 'New chat', project: 'Project', tasks: 'Automations', tools: 'Tools' },
   ja: {
     agentSpace: 'エージェント空間',
     newChat: '新しいチャット',
     project: 'プロジェクト',
-    tasks: 'タスク',
+    tasks: 'オートメーション',
     tools: 'ツール'
   },
   ru: {
     agentSpace: 'Пространство агентов',
     newChat: 'Новый чат',
     project: 'Проект',
-    tasks: 'Задачи',
+    tasks: 'Автоматизация',
     tools: 'Инструменты'
   },
-  zh: { agentSpace: '智能体空间', newChat: '新建对话', project: '项目', tasks: '任务', tools: '工具' },
-  'zh-hant': { agentSpace: '智能體空間', newChat: '新增對話', project: '專案', tasks: '任務', tools: '工具' }
+  zh: { agentSpace: '智能体空间', newChat: '新建对话', project: '项目', tasks: '自动化', tools: '工具' },
+  'zh-hant': { agentSpace: '智能體空間', newChat: '新增對話', project: '專案', tasks: '自動化', tools: '工具' }
 } as const
 
 const NULL_ICON: SidebarNavItem['icon'] = () => null
