@@ -312,6 +312,16 @@ class TestStore:
         assert _add(store, key="b") is None
 
 
+# The starter keys of the first release, the blueprint each one resolves to now, and the schedule each
+# starter has always created. The keys are stored in suggestions.json, so they must keep working.
+LEGACY_STARTERS = [
+    ("catalog:daily-briefing", "morning-brief", "0 8 * * *"),
+    ("catalog:important-mail-monitor", "important-mail", "every 30m"),
+    ("catalog:weekly-review", "weekly-review", "0 18 * * 0"),
+    ("catalog:standup-reminder", "workday-start", "0 9 * * 1-5"),
+]
+
+
 class TestCatalog:
     def test_seed_registers_all_entries(self, store):
         from cron.suggestion_catalog import CATALOG, seed_catalog_suggestions
@@ -332,6 +342,116 @@ class TestCatalog:
         assert "cron.scripts.classify_items" in monitor.job_spec["prompt"]
         assert classify_items_script_path() not in monitor.job_spec["prompt"]
         assert Path(classify_items_script_path()).name == "classify_items.py"
+
+    @pytest.mark.parametrize("key, blueprint_key, _schedule", LEGACY_STARTERS)
+    def test_legacy_starter_key_resolves_to_its_blueprint(self, key, blueprint_key, _schedule):
+        from cron.blueprint_catalog import get_blueprint
+        from cron.suggestion_catalog import blueprint_key_for_starter
+
+        assert blueprint_key_for_starter(key) == blueprint_key
+        assert get_blueprint(blueprint_key) is not None
+
+    @pytest.mark.parametrize("key, blueprint_key, _schedule", LEGACY_STARTERS)
+    def test_starter_prompt_is_its_blueprint_prompt(self, store, key, blueprint_key, _schedule):
+
+        from cron.blueprint_catalog import fill_blueprint, get_blueprint
+        from cron.suggestion_catalog import CATALOG, seed_catalog_suggestions
+
+        seeded = seed_catalog_suggestions(add_fn=store.add_suggestion, keys=[key])
+        assert len(seeded) == 1
+        blueprint_prompt = fill_blueprint(get_blueprint(blueprint_key), {})["prompt"]
+        declared = next(entry for entry in CATALOG if entry.key == key).prompt_suffix
+        # A starter adds only the suffix it declares to its blueprint prompt, nothing else.
+        expected = f"{blueprint_prompt} {declared}" if declared else blueprint_prompt
+        assert seeded[0]["job_spec"]["prompt"] == expected
+
+    @pytest.mark.parametrize("key, _blueprint_key, schedule", LEGACY_STARTERS)
+    def test_starter_job_keeps_the_schedule_it_always_had(self, store, key, _blueprint_key, schedule):
+        from cron.suggestion_catalog import seed_catalog_suggestions
+
+        seed_catalog_suggestions(add_fn=store.add_suggestion, keys=[key])
+        created = {}
+
+        def fake_create_job(**kwargs):
+            created.update(kwargs)
+            return {"id": "starter-job", **kwargs}
+
+        with patch("cron.jobs.create_job", fake_create_job):
+            assert store.accept_suggestion(store.list_pending()[0]["id"]) is not None
+
+        assert created["schedule"] == schedule
+
+    @pytest.mark.parametrize("key, _blueprint_key, schedule", LEGACY_STARTERS)
+    def test_suggestion_saved_under_legacy_key_still_accepts_with_its_schedule(
+        self, store, key, _blueprint_key, schedule,
+    ):
+        rec = _add(store, key=key, title="Saved starter", schedule=schedule)
+        assert rec is not None
+        created = {}
+
+        def fake_create_job(**kwargs):
+            created.update(kwargs)
+            return {"id": "saved-job", **kwargs}
+
+        with patch("cron.jobs.create_job", fake_create_job):
+            assert store.accept_suggestion(rec["id"]) is not None
+
+        assert created["schedule"] == schedule
+        assert created["source_suggestion_id"] == rec["id"]
+
+    @pytest.mark.parametrize("key, _blueprint_key, _schedule", LEGACY_STARTERS)
+    def test_dismissed_legacy_starter_is_not_reoffered(self, store, key, _blueprint_key, _schedule):
+        from cron.suggestion_catalog import seed_catalog_suggestions
+
+        seeded = seed_catalog_suggestions(add_fn=store.add_suggestion, keys=[key])
+        assert store.dismiss_suggestion(seeded[0]["id"]) is True
+        assert seed_catalog_suggestions(add_fn=store.add_suggestion, keys=[key]) == []
+
+    def test_important_mail_starter_keeps_the_never_newsletters_promise(self, store):
+        """The monitor tells the owner it never surfaces newsletters. The description and the scoring
+        prompt must both keep that exclusion, or the promise lapses without anyone noticing."""
+        from cron.suggestion_catalog import seed_catalog_suggestions
+
+        seeded = seed_catalog_suggestions(add_fn=store.add_suggestion, keys=["catalog:important-mail-monitor"])
+        assert len(seeded) == 1
+        assert "never the newsletters" in seeded[0]["description"]
+        assert "never the newsletters" in seeded[0]["job_spec"]["prompt"]
+
+    def test_morning_brief_starter_never_attaches_google_workspace(self, store):
+        """An unattended morning briefing cannot answer google-workspace's OAuth setup, and preflight
+        refuses the job while its credential files are missing. The starter keeps market-brief and
+        house-check instead."""
+        from cron.suggestion_catalog import seed_catalog_suggestions
+
+        seeded = seed_catalog_suggestions(add_fn=store.add_suggestion, keys=["catalog:daily-briefing"])
+        assert len(seeded) == 1
+        skills = seeded[0]["job_spec"].get("skills") or []
+        assert "google-workspace" not in skills
+        assert {"market-brief", "house-check"} <= set(skills)
+
+    def test_unattended_starters_end_with_the_no_sign_in_rule(self, store):
+        """Morning briefing, weekly review and important mail run with nobody to answer a question.
+        Each prompt must end with the shared rule: no sign-in or OAuth step, and skip a source that
+        is not set up."""
+        from cron.suggestion_catalog import UNATTENDED_RULE, seed_catalog_suggestions
+
+        keys = ["catalog:daily-briefing", "catalog:weekly-review", "catalog:important-mail-monitor"]
+        seeded = {rec["dedup_key"]: rec for rec in seed_catalog_suggestions(add_fn=store.add_suggestion, keys=keys)}
+        assert set(seeded) == set(keys)
+        for key in keys:
+            prompt = seeded[key]["job_spec"]["prompt"]
+            assert prompt.endswith(UNATTENDED_RULE), key
+            assert "unattended run" in prompt, key
+            assert "Do not start any sign-in, OAuth setup or new credential step." in prompt, key
+            assert "skip it and say so in one line" in prompt, key
+
+    def test_starter_declares_no_content_fields_of_its_own(self):
+        import dataclasses
+
+        from cron.suggestion_catalog import CatalogEntry
+
+        names = {field.name for field in dataclasses.fields(CatalogEntry)}
+        assert not names & {"prompt", "job_spec", "title", "description"}
 
 
 class TestIntegrationSuggestions:
@@ -357,14 +477,14 @@ class TestIntegrationSuggestions:
 
         created = seed_integration_suggestions(["googlecalendar"], add_fn=store.add_suggestion)
 
-        assert [item["title"] for item in created] == ["Daily briefing"]
+        assert [item["title"] for item in created] == ["Morning briefing"]
         assert created[0]["source"] == "integration"
         assert created[0]["dedup_key"] == "catalog:daily-briefing"
         assert created[0]["job_spec"].get("skills") in (None, [])
         assert "connectors__googlecalendar__" in created[0]["job_spec"]["prompt"]
         assert "Do NOT run local Google Workspace OAuth" in created[0]["job_spec"]["prompt"]
         assert created[0]["job_spec"]["schedule"] == "0 8 * * *"
-        assert created[0]["job_spec"]["name"] == "Daily briefing"
+        assert created[0]["job_spec"]["name"] == "Morning briefing"
 
     def test_managed_calendar_suggestion_never_requires_local_google_credentials(self, store):
         from cron.suggestion_catalog import seed_integration_suggestions
