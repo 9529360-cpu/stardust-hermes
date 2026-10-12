@@ -7,14 +7,18 @@ cron: ``schedule_template`` fixes the recurrence; only human parts (time, weekda
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
+
+from cron.triggers import normalize_trigger
 
 __all__ = [
     "BlueprintSlot",
     "AutomationBlueprint",
     "CATALOG",
+    "default_downloads_dir",
     "get_blueprint",
     "blueprint_form_schema",
     "blueprint_slash_command",
@@ -30,8 +34,9 @@ class BlueprintFillError(ValueError):
     """Raised when supplied slot values fail validation."""
 
 
-# Slot types the renderers understand.
-_SLOT_TYPES = frozenset({"time", "enum", "text", "weekdays"})
+# Slot types the renderers understand. "folder" is a folder path on this computer; it is checked
+# by cron.triggers when the job is created, so a missing or system folder is a field error.
+_SLOT_TYPES = frozenset({"time", "enum", "text", "weekdays", "folder"})
 
 # Named weekday recurrences -> cron day-of-week field.
 WEEKDAY_PRESETS: Dict[str, str] = {
@@ -56,6 +61,9 @@ class BlueprintSlot:
     # the deliver slot, where the real set of valid platforms depends on the user's configured
     # gateways and is validated downstream by the cron scheduler).
     strict: bool = True
+    # A computed default, resolved each time a form is shown or a job is created (for example the
+    # owner's Downloads folder). It takes precedence over ``default``.
+    resolve_default: Optional[Callable[[], Any]] = None
 
     def __post_init__(self) -> None:
         if self.type not in _SLOT_TYPES:
@@ -80,6 +88,20 @@ class AutomationBlueprint:
     deliver_default: str = "origin"
     skills: tuple = ()        # skills the job loads before running
     tags: tuple = ()
+    # Event templates run on a trigger instead of a clock, and their schedule_template is "".
+    # Example: {"type": "startup"} or {"type": "folder", "watch_dir": "{folder}", "pattern": "*.pdf"}.
+    # String values may hold {slot} placeholders; the result is checked by cron.triggers.
+    trigger: Optional[Dict[str, Any]] = None
+
+
+def default_downloads_dir() -> str:
+    """The owner's Downloads folder. Resolved on each call, so it follows the current user and is
+    never stored as a fixed path."""
+    return os.path.join(os.path.expanduser("~"), "Downloads")
+
+
+def _default_value(slot: BlueprintSlot) -> Any:
+    return slot.resolve_default() if slot.resolve_default is not None else slot.default
 
 
 # ---------------------------------------------------------------------------
@@ -544,6 +566,70 @@ CATALOG: List[AutomationBlueprint] = [
         ],
         tags=("daily", "curiosity"),
     ),
+    # --- Event templates: the job runs on a trigger, not on a clock ---------------------------
+    AutomationBlueprint(
+        key="startup-briefing",
+        title="Startup briefing",
+        description="Each time Stardust starts, a short summary of today's tasks and unread messages.",
+        category="daily",
+        schedule_template="",
+        trigger={"type": "startup"},
+        prompt_template=(
+            "Give the user a short briefing for today: their open tasks and any unread messages. "
+            "Use only the task and messaging tools that are connected. Do not open, read or list any "
+            "files. If no task or message source is connected, say so in one line and stop."
+        ),
+        slots=[_DELIVER],
+        tags=("startup", "briefing"),
+    ),
+    AutomationBlueprint(
+        key="new-pdf-summary",
+        title="New PDF summary",
+        description="When a new PDF appears in a folder you choose, a short summary of its first page, "
+        "written from the file name and details only.",
+        category="files",
+        schedule_template="",
+        trigger={"type": "folder", "watch_dir": "{folder}", "pattern": "*.pdf"},
+        prompt_template=(
+            "A new PDF appeared in a folder you asked me to watch. The trigger block below gives its "
+            "name, size, modified time and path. Do not open or read the PDF. From the file name and "
+            "these details only, write a short summary of what its first page probably covers, and say "
+            "that it is based on the name and details, not the contents. Then save the summary as a "
+            "Markdown file in your workspace's reports folder and reply with the file's path."
+        ),
+        slots=[
+            BlueprintSlot(
+                name="folder", type="folder", label="Which folder?",
+                help="A folder on this computer. A new PDF in it starts the summary.",
+            ),
+            _DELIVER,
+        ],
+        tags=("files", "pdf"),
+    ),
+    AutomationBlueprint(
+        key="downloads-report",
+        title="New download report",
+        description="When a file arrives in your Downloads folder (or one you choose), a short report of "
+        "what arrived. Read-only: nothing is moved, renamed or deleted.",
+        category="files",
+        schedule_template="",
+        trigger={"type": "folder", "watch_dir": "{folder}", "pattern": "*"},
+        prompt_template=(
+            "A new file arrived in a folder you asked me to watch. The trigger block below gives its "
+            "name, size, modified time and path. Report what arrived in one short message. This is "
+            "read-only: do not open, move, rename, copy or delete the file, and do not change any other "
+            "file."
+        ),
+        slots=[
+            BlueprintSlot(
+                name="folder", type="folder", label="Which folder?",
+                resolve_default=default_downloads_dir,
+                help="Defaults to your Downloads folder.",
+            ),
+            _DELIVER,
+        ],
+        tags=("files", "downloads"),
+    ),
     AutomationBlueprint(
         key="global-market-brief",
         title="全球股市日报",
@@ -580,7 +666,7 @@ def _slot(
 
 def _slot_default(blueprint: AutomationBlueprint, *names: str) -> Any:
     slot = _slot(blueprint, *names)
-    return slot.default if slot else None
+    return _default_value(slot) if slot else None
 
 
 # --- Renderers --------------------------------------------------------------------------------
@@ -598,7 +684,7 @@ def blueprint_form_schema(blueprint: AutomationBlueprint) -> Dict[str, Any]:
                 "name": s.name,
                 "type": s.type,
                 "label": s.label,
-                "default": s.default,
+                "default": _default_value(s),
                 "options": list(s.options),
                 "optional": s.optional,
                 "strict": s.strict,
@@ -615,7 +701,7 @@ def blueprint_slash_command(blueprint: AutomationBlueprint, values: Optional[Dic
     values = values or {}
     parts = [f"/blueprint {blueprint.key}"]
     for s in blueprint.slots:
-        val = values.get(s.name, s.default)
+        val = values.get(s.name, _default_value(s))
         if val is None or val == "":
             if s.optional:
                 continue
@@ -633,16 +719,24 @@ def blueprint_deeplink(blueprint: AutomationBlueprint, values: Optional[Dict[str
 
     values = values or {}
     query = {
-        s.name: str(values.get(s.name, s.default))
+        s.name: str(values.get(s.name, _default_value(s)))
         for s in blueprint.slots
-        if values.get(s.name, s.default) not in (None, "")
+        if values.get(s.name, _default_value(s)) not in (None, "")
     }
     qs = ("?" + urlencode(query)) if query else ""
     return f"hermes://blueprint/{quote(blueprint.key)}{qs}"
 
 
+_TRIGGER_HUMAN = {
+    "startup": "on Stardust start",
+    "folder": "when a new file appears in the folder",
+}
+
+
 def _humanize_schedule(blueprint: AutomationBlueprint) -> str:
     """A short human-readable description of when a blueprint runs (defaults)."""
+    if blueprint.trigger is not None:
+        return _TRIGGER_HUMAN[blueprint.trigger["type"]]
     sched = blueprint.schedule_template
     if sched.startswith("*/"):
         every = _slot_default(blueprint, "interval_min") or sched.split("/")[1].split()[0]
@@ -669,6 +763,7 @@ def blueprint_catalog_entry(blueprint: AutomationBlueprint) -> Dict[str, Any]:
     return {
         **blueprint_form_schema(blueprint),
         "schedule": blueprint.schedule_template,
+        "trigger_type": blueprint.trigger["type"] if blueprint.trigger is not None else "schedule",
         "scheduleHuman": _humanize_schedule(blueprint),
         "command": blueprint_slash_command(blueprint),
         "appUrl": blueprint_deeplink(blueprint),
@@ -738,6 +833,22 @@ def _resolve_schedule(blueprint: AutomationBlueprint, values: Dict[str, Any]) ->
         raise BlueprintFillError(f"schedule template missing value for {e}") from e
 
 
+def _resolve_trigger(blueprint: AutomationBlueprint, values: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """The validated trigger for an event template, or None for a clock template. A folder that
+    cron.triggers refuses (missing, not a folder, or a system folder) is a field error, so the form
+    shows the reason next to the field instead of a server failure."""
+    if blueprint.trigger is None:
+        return None
+    filled = {
+        key: value.format(**values) if isinstance(value, str) else value
+        for key, value in blueprint.trigger.items()
+    }
+    try:
+        return normalize_trigger(filled)
+    except ValueError as exc:
+        raise BlueprintFillError(str(exc)) from exc
+
+
 def fill_blueprint(
     blueprint: AutomationBlueprint, values: Dict[str, Any], *,
     origin: Optional[Dict[str, Any]] = None,
@@ -757,7 +868,7 @@ def fill_blueprint(
         )
     resolved: Dict[str, Any] = {}
     for s in blueprint.slots:
-        raw = values.get(s.name, s.default)
+        raw = values.get(s.name, _default_value(s))
         if raw in (None, ""):
             if s.optional:
                 continue
@@ -768,7 +879,8 @@ def fill_blueprint(
             )
         resolved[s.name] = raw
 
-    schedule = _resolve_schedule(blueprint, resolved)
+    trigger = _resolve_trigger(blueprint, resolved)
+    schedule = None if trigger is not None else _resolve_schedule(blueprint, resolved)
 
     try:
         prompt = blueprint.prompt_template.format(**resolved)
@@ -777,10 +889,13 @@ def fill_blueprint(
 
     spec: Dict[str, Any] = {
         "prompt": prompt,
-        "schedule": schedule,
         "name": blueprint.title,
         "deliver": resolved.get("deliver", blueprint.deliver_default),
     }
+    if trigger is not None:
+        spec["trigger"] = trigger  # an event job runs on its trigger and takes no schedule
+    else:
+        spec["schedule"] = schedule
     if blueprint.skills:
         spec["skills"] = list(blueprint.skills)
     if origin is not None:

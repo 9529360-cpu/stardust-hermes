@@ -358,12 +358,21 @@ const PILL_TONE: Record<PanelPillTone, string> = {
   warn: 'bg-amber-500/10 text-amber-600 dark:text-amber-300'
 }
 
-export function PanelPill({ children, tone = 'muted' }: { children: ReactNode; tone?: PanelPillTone }) {
+export function PanelPill({
+  children,
+  className,
+  tone = 'muted'
+}: {
+  children: ReactNode
+  className?: string
+  tone?: PanelPillTone
+}) {
   return (
     <span
       className={cn(
         'inline-flex items-center rounded-full px-1.5 py-0.5 text-[0.62rem] font-medium capitalize',
-        PILL_TONE[tone]
+        PILL_TONE[tone],
+        className
       )}
     >
       {children}

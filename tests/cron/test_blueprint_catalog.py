@@ -35,7 +35,7 @@ class TestCatalog:
     def test_every_slot_has_known_type(self):
         for r in CATALOG:
             for s in r.slots:
-                assert s.type in {"time", "enum", "text", "weekdays"}
+                assert s.type in {"time", "enum", "text", "weekdays", "folder"}
 
     def test_bad_slot_type_rejected(self):
         with pytest.raises(ValueError):

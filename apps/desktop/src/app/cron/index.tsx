@@ -109,6 +109,17 @@ import {
   toggleCronDeliveryTarget,
   validateCronEditor
 } from './cron-job-model'
+import { CronTriggerFolderFields, CronWhenChoice } from './cron-trigger-fields'
+import {
+  cronCreateRunPayload,
+  cronJobTriggerType,
+  cronLastTriggeredAt,
+  cronTriggerBadge,
+  cronTriggerFormFromJob,
+  type CronTriggerFormValues,
+  DEFAULT_CRON_TRIGGER_FORM,
+  validateCronTriggerForm
+} from './cron-trigger-model'
 import { jobState, jobTitle, STATE_DOT } from './job-state'
 import { RecentRunDetail } from './recent-run-detail'
 import { jobLookupKey, RUN_DOT, runJob, runKey, runStatus, runTimeLabel, runTitle } from './recent-runs'
@@ -742,9 +753,9 @@ export function CronView({
       } = await mutateAndRefreshCronJobs(profile, () =>
         createCronJob({
           prompt: values.prompt,
-          schedule: values.schedule,
           name: values.name || undefined,
           deliver: values.deliver || DEFAULT_DELIVER,
+          ...cronCreateRunPayload(values.trigger, values.schedule),
           ...(values.model.trim() ? { model: values.model.trim(), provider: values.provider.trim() || undefined } : {})
         })
       )
@@ -772,7 +783,11 @@ export function CronView({
         refreshError,
         stale
       } = await mutateAndRefreshCronJobs(profile, () =>
-        updateCronJob(editor.job.id, cronEditorUpdates(values, { scriptOnlyJob }), jobOwner(editor.job)!)
+        updateCronJob(
+          editor.job.id,
+          cronEditorUpdates(values, { scriptOnlyJob, triggerType: cronJobTriggerType(editor.job) }),
+          jobOwner(editor.job)!
+        )
       )
 
       if (stale || !updated) {
@@ -974,6 +989,7 @@ export function CronView({
                     { icon: 'trash', label: t.common.delete, onSelect: () => setPendingDelete(job), tone: 'danger' }
                   ] : undefined}
                   menuLabel={c.manage}
+                  meta={cronJobTriggerType(job) === 'schedule' ? undefined : cronTriggerBadge(job, c.trigger)}
                   onSelect={() => {
                     setSelectedSuggestionId(null)
                     setSelectedRunKey(null)
@@ -1183,6 +1199,7 @@ function CronJobListRow({
   job,
   menuItems,
   menuLabel,
+  meta,
   onSelect,
   rowKey
 }: {
@@ -1190,6 +1207,8 @@ function CronJobListRow({
   job: CronJob
   menuItems?: PanelMenuItem[]
   menuLabel?: string
+  /** Trailing trigger badge for startup and folder jobs; clock jobs show none. */
+  meta?: string
   onSelect: () => void
   rowKey: string
 }) {
@@ -1201,6 +1220,7 @@ function CronJobListRow({
       dotClassName={STATE_DOT[state] ?? 'bg-muted-foreground'}
       menuItems={menuItems}
       menuLabel={menuLabel}
+      meta={meta}
       onSelect={onSelect}
       rowKey={rowKey}
       title={jobTitle(job)}
@@ -1227,6 +1247,11 @@ function CronJobDetail({ allowMutation, busy, c, job, ownerProfile, runsScope, o
   const deliver = jobDeliver(job)
   const prompt = jobPrompt(job)
   const modelOverride = jobModel(job)
+  const triggerType = cronJobTriggerType(job)
+  const isClockJob = triggerType === 'schedule'
+  const lastTriggered = cronLastTriggeredAt(job)
+  // A startup or folder job that is enabled has no clock: "scheduled" would read as a time, so say it waits.
+  const stateLabel = !isClockJob && state === 'scheduled' ? c.trigger.waiting : (c.states[state] ?? state)
 
   return (
     <PanelDetail>
@@ -1234,7 +1259,11 @@ function CronJobDetail({ allowMutation, busy, c, job, ownerProfile, runsScope, o
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <h3 className="text-[0.95rem] font-semibold tracking-tight text-foreground">{jobTitle(job)}</h3>
-            <PanelPill tone={STATE_TONE[state] ?? 'muted'}>{c.states[state] ?? state}</PanelPill>
+            <PanelPill tone={STATE_TONE[state] ?? 'muted'}>{stateLabel}</PanelPill>
+            {/* Folder names keep their own case; the shared pill would otherwise capitalise them. */}
+            <PanelPill className="normal-case" tone="muted">
+              {cronTriggerBadge(job, c.trigger)}
+            </PanelPill>
           </div>
           <div className="flex shrink-0 items-center gap-0.5">
             <PanelAction disabled={busy || !allowMutation} icon={isPaused ? 'play' : 'debug-pause'} onClick={onPauseResume}>
@@ -1248,9 +1277,14 @@ function CronJobDetail({ allowMutation, busy, c, job, ownerProfile, runsScope, o
 
         <PanelMeta
           rows={[
-            { label: c.frequencyLabel, value: jobScheduleDisplay(job) },
+            isClockJob
+              ? { label: c.frequencyLabel, value: jobScheduleDisplay(job) }
+              : { label: c.trigger.whenLabel, value: triggerType === 'folder' ? c.trigger.whenFolder : c.trigger.whenStartup },
+            ...(triggerType === 'folder' ? [{ label: c.trigger.folderLabel, value: job.trigger?.watch_dir ?? '' }] : []),
             { label: c.last.replace(/:$/, ''), value: formatTime(job.last_run_at) },
-            { label: c.next.replace(/:$/, ''), value: formatTime(job.next_run_at) },
+            isClockJob
+              ? { label: c.next.replace(/:$/, ''), value: formatTime(job.next_run_at) }
+              : { label: c.trigger.lastTriggeredLabel, value: lastTriggered ? formatTime(lastTriggered) : c.trigger.neverTriggered },
             { label: c.deliverLabel, value: c.deliveryLabels[deliver] ?? deliver },
             ...(modelOverride ? [{ label: c.modelLabel, value: modelOverride }] : [])
           ]}
@@ -1491,6 +1525,9 @@ function CronEditorDialog({
   // Per-job model override, encoded as `${providerSlug}:${model}` (split on the
   // first ':' when saving). MODEL_DEFAULT_VALUE = follow the global default.
   const [modelChoice, setModelChoice] = useState(MODEL_DEFAULT_VALUE)
+  // "When to run": the clock (schedule fields below), every start, or a new file in a folder.
+  // In edit mode the run type is fixed to the job's own type; only folder fields can change.
+  const [trigger, setTrigger] = useState<CronTriggerFormValues>(DEFAULT_CRON_TRIGGER_FORM)
   // Blueprint fills typed slots (time/enum/weekdays/text) instead of the raw
   // cron fields; the backend renders the prompt + schedule from them.
   const [slotValues, setSlotValues] = useState<Record<string, string>>({})
@@ -1545,6 +1582,7 @@ function CronEditorDialog({
     setSchedulePreset(initial ? scheduleOptionForExpr(jobScheduleExpr(initial)).value : 'daily')
     setDeliver(initial ? jobDeliver(initial) : DEFAULT_DELIVER)
     setModelChoice(initial && jobModel(initial) ? `${jobProvider(initial)}:${jobModel(initial)}` : MODEL_DEFAULT_VALUE)
+    setTrigger(initial ? cronTriggerFormFromJob(initial) : DEFAULT_CRON_TRIGGER_FORM)
     setSlotValues({})
     setTemplateChoice(editor.mode === 'create' ? (editor.blueprintKey ?? CUSTOM_TEMPLATE) : CUSTOM_TEMPLATE)
     setError(null)
@@ -1595,7 +1633,8 @@ function CronEditorDialog({
     const validationError = validateCronEditor({
       prompt,
       schedule,
-      scriptOnlyJob
+      scriptOnlyJob,
+      triggerType: trigger.when
     })
 
     if (validationError) {
@@ -1606,6 +1645,14 @@ function CronEditorDialog({
             ? c.promptRequired
             : c.promptScheduleRequired
       )
+
+      return
+    }
+
+    const triggerError = validateCronTriggerForm(trigger)
+
+    if (triggerError) {
+      setError(c.trigger[triggerError])
 
       return
     }
@@ -1626,7 +1673,8 @@ function CronEditorDialog({
         name: name.trim(),
         prompt: prompt.trim(),
         provider: overrideProvider,
-        schedule: schedule.trim()
+        schedule: schedule.trim(),
+        trigger
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : c.failedSave)
@@ -1642,6 +1690,20 @@ function CronEditorDialog({
       return
     }
 
+    // Check the folder here, so an empty or relative folder gets this field's own wording instead of
+    // the backend's English slot message. The backend still checks it again when the job is created.
+    const folderField = blueprint.fields.find(field => field.type === 'folder')
+
+    const folderError = folderField
+      ? validateCronTriggerForm({ when: 'folder', watchDir: slotValues[folderField.name] ?? '', pattern: '*' })
+      : null
+
+    if (folderError) {
+      setError(c.trigger[folderError])
+
+      return
+    }
+
     setSaving(true)
     setError(null)
 
@@ -1654,6 +1716,23 @@ function CronEditorDialog({
       setSaving(false)
     }
   }
+
+  const runType = trigger.when
+  const clockRun = runType === 'schedule'
+  // Only a folder job has a folder to check. It is marked after a failed submit, not while the user types.
+  const folderInvalid = Boolean(error) && validateCronTriggerForm(trigger) !== null
+
+  const deliverField = (
+    <Field htmlFor="cron-deliver" label={c.deliverLabel}>
+      <DeliverCheckboxes
+        c={c}
+        id="cron-deliver"
+        onChange={setDeliver}
+        targets={deliveryTargets.data ?? []}
+        value={deliver}
+      />
+    </Field>
+  )
 
   return (
     <Dialog onOpenChange={value => !value && !saving && onClose()} open={open}>
@@ -1762,32 +1841,63 @@ function CronEditorDialog({
               />
             </Field>
 
-            <div className="grid items-start gap-4 sm:grid-cols-2">
-              <Field htmlFor="cron-frequency" label={c.frequencyLabel}>
-                <Select onValueChange={handleSchedulePresetChange} value={schedulePreset}>
-                  <SelectTrigger className="h-9 rounded-md" id="cron-frequency">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SCHEDULE_OPTIONS.map(option => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {c.scheduleLabels[option.value]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-
-              <Field htmlFor="cron-deliver" label={c.deliverLabel}>
-                <DeliverCheckboxes
+            {isEdit ? (
+              !clockRun && (
+                <Field htmlFor="cron-when" label={c.trigger.whenLabel}>
+                  <p className="text-sm text-foreground">
+                    {runType === 'folder' ? c.trigger.whenFolder : c.trigger.whenStartup}
+                  </p>
+                  <FieldHint>{c.trigger.whenFixedHint}</FieldHint>
+                </Field>
+              )
+            ) : (
+              <Field htmlFor="cron-when" label={c.trigger.whenLabel}>
+                <CronWhenChoice
                   c={c}
-                  id="cron-deliver"
-                  onChange={setDeliver}
-                  targets={deliveryTargets.data ?? []}
-                  value={deliver}
+                  onChange={when => {
+                    setTrigger(prev => ({ ...prev, when }))
+                    setError(null)
+                  }}
+                  value={runType}
                 />
               </Field>
-            </div>
+            )}
+
+            {clockRun ? (
+              <div className="grid items-start gap-4 sm:grid-cols-2">
+                <Field htmlFor="cron-frequency" label={c.frequencyLabel}>
+                  <Select onValueChange={handleSchedulePresetChange} value={schedulePreset}>
+                    <SelectTrigger className="h-9 rounded-md" id="cron-frequency">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SCHEDULE_OPTIONS.map(option => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {c.scheduleLabels[option.value]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+
+                {deliverField}
+              </div>
+            ) : (
+              <>
+                {runType === 'folder' ? (
+                  <CronTriggerFolderFields
+                    c={c}
+                    folderInvalid={folderInvalid}
+                    onChange={setTrigger}
+                    values={trigger}
+                  />
+                ) : (
+                  <FieldHint>{c.trigger.startupHint}</FieldHint>
+                )}
+
+                {deliverField}
+              </>
+            )}
 
             {!scriptOnlyJob && (
               <Field htmlFor="cron-model" label={c.modelLabel} optional optionalLabel={c.optional}>
@@ -1821,7 +1931,7 @@ function CronEditorDialog({
               </Field>
             )}
 
-            {schedulePreset === 'custom' ? (
+            {clockRun && schedulePreset === 'custom' && (
               <Field htmlFor="cron-schedule" label={c.customScheduleLabel}>
                 <Input
                   className="font-mono"
@@ -1832,7 +1942,9 @@ function CronEditorDialog({
                 />
                 <FieldHint>{c.customHint}</FieldHint>
               </Field>
-            ) : (
+            )}
+
+            {clockRun && schedulePreset !== 'custom' && (
               <div className="rounded-md bg-(--ui-bg-quinary) px-3 py-2">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                   <span className="font-medium text-foreground">{scheduleHint}</span>
@@ -1879,6 +1991,8 @@ interface EditorValues {
   /** Provider slug for the model override ('' = none). */
   provider: string
   schedule: string
+  /** "When to run" and its folder fields. */
+  trigger: CronTriggerFormValues
 }
 
 interface ScheduleOption {

@@ -2472,11 +2472,54 @@ export const ru = defineLocale({
     scriptOnlyEditHint: 'Задача только со скриптом (без AI-промпта). ID задачи:',
     saveChanges: 'Сохранить изменения',
     createAction: 'Создать cron',
+    trigger: {
+      whenLabel: 'Когда запускать',
+      whenSchedule: 'По расписанию',
+      whenStartup: 'При каждом запуске Stardust',
+      whenFolder: 'Когда в папке появляется новый файл',
+      whenFixedHint: 'Способ запуска нельзя изменить после создания.',
+      waiting: 'Ждёт срабатывания',
+      badgeSchedule: 'По расписанию',
+      badgeStartup: 'При запуске',
+      badgeFolder: name => `Папка: ${name}`,
+      lastTriggeredLabel: 'Последнее срабатывание',
+      neverTriggered: 'Никогда',
+      startupHint: 'Запускается один раз при каждом старте Stardust.',
+      folderLabel: 'Папка',
+      folderPlaceholder: 'Например D:\\Downloads',
+      folderChoose: 'Выбрать папку…',
+      folderPickerTitle: 'Выберите папку для наблюдения',
+      folderRequired: 'Выберите папку для наблюдения.',
+      folderNotAbsolute: 'Введите полный путь, например D:\\Downloads.',
+      folderRestriction: 'Системные папки (Windows, Program Files, ProgramData, /usr, /etc) и корни дисков нельзя наблюдать.',
+      folderHint: 'Stardust читает только имя и сведения о каждом новом файле и не открывает его.',
+      patternLabel: 'Шаблон имени файла',
+      patternPlaceholder: '* или *.pdf',
+      patternHint: '* подходит для всех файлов, *.pdf — только для PDF.',
+      patternInvalid: 'Шаблон имени файла не может содержать косую черту.',
+      pickFailed: 'Не удалось открыть выбор папки.'
+    },
     tabs: {
       jobs: 'Задачи',
       blueprints: 'Шаблоны'
     },
     blueprints: {
+      catalog: {
+        'startup-briefing': {
+          title: 'Сводка при запуске',
+          description: 'При каждом запуске Stardust — короткая сводка по задачам на сегодня и непрочитанным сообщениям.'
+        },
+        'new-pdf-summary': {
+          title: 'Сводка нового PDF',
+          description: 'Когда в выбранной папке появляется новый PDF, краткое описание первой страницы — только по имени файла и сведениям о нём.',
+          fields: { folder: { label: 'Какую папку наблюдать?', help: 'Папка на этом компьютере. Новый PDF в ней запускает сводку.' } }
+        },
+        'downloads-report': {
+          title: 'Отчёт о новых загрузках',
+          description: 'Когда в папке загрузок (или выбранной вами) появляется файл, короткий отчёт о том, что пришло. Только чтение: ничего не перемещается, не переименовывается и не удаляется.',
+          fields: { folder: { label: 'Какую папку наблюдать?', help: 'По умолчанию — папка загрузок.' } }
+        }
+      },
       tab: 'Шаблоны',
       startFrom: 'Начать с',
       custom: 'Свой',

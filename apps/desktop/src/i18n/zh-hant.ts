@@ -2538,11 +2538,51 @@ export const zhHant = defineLocale({
     scriptOnlyEditHint: '僅腳本任務（無 AI 提示詞）。任務 ID：',
     saveChanges: '儲存變更',
     createAction: '建立排程工作',
+    trigger: {
+      whenLabel: '何時執行',
+      whenSchedule: '定時',
+      whenStartup: '每次啟動時',
+      whenFolder: '資料夾裡出現新檔案時',
+      whenFixedHint: '建立後不能更改執行方式。',
+      waiting: '等待觸發',
+      badgeSchedule: '定時',
+      badgeStartup: '每次啟動時',
+      badgeFolder: name => `資料夾: ${name}`,
+      lastTriggeredLabel: '上次觸發',
+      neverTriggered: '從未',
+      startupHint: '每次 Stardust 啟動後執行一次。',
+      folderLabel: '資料夾',
+      folderPlaceholder: '例如 D:\\Downloads',
+      folderChoose: '選擇資料夾…',
+      folderPickerTitle: '選擇要監看的資料夾',
+      folderRequired: '請選擇要監看的資料夾。',
+      folderNotAbsolute: '請輸入完整路徑，例如 D:\\Downloads。',
+      folderRestriction: '系統資料夾（Windows、Program Files、ProgramData、/usr、/etc）和磁碟根目錄不能被監看。',
+      folderHint: '只讀取每個新檔案的名稱和資訊，不會開啟檔案內容。',
+      patternLabel: '檔名比對',
+      patternPlaceholder: '* 或 *.pdf',
+      patternHint: '* 比對所有檔案，*.pdf 只比對 PDF 檔案。',
+      patternInvalid: '檔名比對不能包含斜線。',
+      pickFailed: '無法開啟資料夾選擇器。'
+    },
     tabs: {
       jobs: '工作',
       blueprints: '藍圖'
     },
     blueprints: {
+      catalog: {
+        'startup-briefing': { title: '啟動簡報', description: '每次啟動 Stardust 時，簡要說明今天的任務和未讀訊息。' },
+        'new-pdf-summary': {
+          title: '新 PDF 摘要',
+          description: '資料夾裡出現新 PDF 時，只根據檔名和檔案資訊，寫一段第一頁的摘要。',
+          fields: { folder: { label: '監看哪個資料夾？', help: '選擇一個本機資料夾，裡面出現新 PDF 時開始摘要。' } }
+        },
+        'downloads-report': {
+          title: '新下載檔案報告',
+          description: '下載資料夾（或你選擇的資料夾）裡出現新檔案時，簡要回報來了什麼。唯讀：不移動、不改名、不刪除。',
+          fields: { folder: { label: '監看哪個資料夾？', help: '預設是你的下載資料夾。' } }
+        }
+      },
       tab: '藍圖',
       startFrom: '從此開始',
       custom: '自訂',

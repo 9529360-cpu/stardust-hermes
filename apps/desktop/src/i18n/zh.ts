@@ -3073,6 +3073,33 @@ export const zh = defineLocale({
     scriptOnlyEditHint: '仅脚本任务（无 AI 提示词）。任务 ID：',
     saveChanges: '保存更改',
     createAction: '创建定时任务',
+    trigger: {
+      whenLabel: '何时运行',
+      whenSchedule: '定时',
+      whenStartup: '每次启动时',
+      whenFolder: '文件夹里出现新文件时',
+      whenFixedHint: '创建后不能更改运行方式。',
+      waiting: '等待触发',
+      badgeSchedule: '定时',
+      badgeStartup: '每次启动时',
+      badgeFolder: name => `文件夹: ${name}`,
+      lastTriggeredLabel: '上次触发',
+      neverTriggered: '从未',
+      startupHint: '每次 Stardust 启动后运行一次。',
+      folderLabel: '文件夹',
+      folderPlaceholder: '例如 D:\\Downloads',
+      folderChoose: '选择文件夹…',
+      folderPickerTitle: '选择要监视的文件夹',
+      folderRequired: '请选择要监视的文件夹。',
+      folderNotAbsolute: '请输入完整路径，例如 D:\\Downloads。',
+      folderRestriction: '系统文件夹（Windows、Program Files、ProgramData、/usr、/etc）和磁盘根目录不能被监视。',
+      folderHint: '只读取每个新文件的名称和信息，不会打开文件内容。',
+      patternLabel: '文件名匹配',
+      patternPlaceholder: '* 或 *.pdf',
+      patternHint: '* 匹配所有文件，*.pdf 只匹配 PDF 文件。',
+      patternInvalid: '文件名匹配不能包含斜杠。',
+      pickFailed: '无法打开文件夹选择器。'
+    },
     tabs: {
       jobs: '任务',
       blueprints: '蓝图'
@@ -3150,6 +3177,17 @@ export const zh = defineLocale({
         'quote of the day': '每日一句'
       },
       catalog: {
+        'startup-briefing': { title: '启动简报', description: '每次启动 Stardust 时，简要说明今天的任务和未读消息。' },
+        'new-pdf-summary': {
+          title: '新 PDF 摘要',
+          description: '文件夹里出现新 PDF 时，只根据文件名和文件信息，写一段第一页的摘要。',
+          fields: { folder: { label: '监视哪个文件夹？', help: '选择一个本机文件夹，里面出现新 PDF 时开始摘要。' } }
+        },
+        'downloads-report': {
+          title: '新下载文件报告',
+          description: '下载文件夹（或你选择的文件夹）里出现新文件时，简要报告来了什么。只读：不移动、不改名、不删除。',
+          fields: { folder: { label: '监视哪个文件夹？', help: '默认是你的下载文件夹。' } }
+        },
         'morning-brief': {
           title: '晨间简报',
           description: '每天的简短概览：今日日程、天气和需要尽快处理的事项。'

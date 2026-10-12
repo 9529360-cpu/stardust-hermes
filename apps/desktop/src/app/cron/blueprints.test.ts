@@ -135,3 +135,31 @@ describe('initialBlueprintValues', () => {
     expect(values).toEqual({ deliver: 'telegram' })
   })
 })
+
+describe('folder slot', () => {
+  it('starts empty when the catalog has no default folder', () => {
+    const values = initialBlueprintValues(
+      blueprint([{ name: 'folder', type: 'folder', label: 'Which folder?', default: null, options: [], optional: false, help: '' }])
+    )
+
+    expect(values).toEqual({ folder: '' })
+  })
+
+  it('starts from the default folder the backend resolved for the form', () => {
+    const values = initialBlueprintValues(
+      blueprint([
+        {
+          name: 'folder',
+          type: 'folder',
+          label: 'Which folder?',
+          default: 'C:\\Users\\me\\Downloads',
+          options: [],
+          optional: false,
+          help: ''
+        }
+      ])
+    )
+
+    expect(values).toEqual({ folder: 'C:\\Users\\me\\Downloads' })
+  })
+})
