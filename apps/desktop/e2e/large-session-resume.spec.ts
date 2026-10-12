@@ -26,6 +26,8 @@ const EXPECTED_TEXT = 'E2E persisted user message 52'
 // oldest row means the baseline reflects the fully-mounted transcript.
 const OLDEST_SEEDED_TEXT = 'E2E persisted user message 0: audit the compatibility matrix'
 const BACKGROUND_PROMPT = 'E2E background inference must remain attached across resume'
+// Distinguish this completion from the repeated MOCK_REPLY rows in seeded history.
+const BACKGROUND_REPLY = 'E2E background resume completed reply marker 4c935fa8'
 const HISTORY_TURNS = Array.from(
   { length: 27 },
   (_, index) => `E2E persisted user message ${index * 2}: audit the compatibility matrix`,
@@ -212,7 +214,10 @@ test.describe('large session resume', () => {
 
   for (const resumeKind of ['fast', 'cold'] as const) {
     test(`${resumeKind} resume keeps background inference attached without duplicate messages`, async ({}, testInfo) => {
-      fixture = await setupSeededDesktop({ holdFirstStreamForPrompt: BACKGROUND_PROMPT })
+      fixture = await setupSeededDesktop({
+        holdFirstStreamForPrompt: BACKGROUND_PROMPT,
+        replyForPrompt: prompt => (prompt === BACKGROUND_PROMPT ? BACKGROUND_REPLY : MOCK_REPLY),
+      })
       await waitForAppReady(fixture, 120_000)
 
       await openSeededSession(fixture.page)
@@ -239,17 +244,20 @@ test.describe('large session resume', () => {
       fixture.mock.releaseHeldStream()
       await fixture.page.waitForFunction(
         expected => (document.querySelector('[data-slot="aui_thread-viewport"]')?.textContent ?? '').includes(expected),
-        MOCK_REPLY,
+        BACKGROUND_REPLY,
         { timeout: 60_000 },
       )
-      await fixture.page.waitForTimeout(300)
       await fixture.page.screenshot({ path: testInfo.outputPath(`${resumeKind}-background-inference-resume.png`), fullPage: false })
 
       expect(await textNodeOccurrences(fixture.page, BACKGROUND_PROMPT), 'the running user prompt should appear once').toBe(1)
       expect(
         await textNodeOccurrences(fixture.page, MOCK_REPLY),
-        'the completed assistant reply should add exactly one transcript row',
-      ).toBe(initialMockReplyCount + 1)
+        'the historical seeded replies should remain unchanged',
+      ).toBe(initialMockReplyCount)
+      expect(
+        await textNodeOccurrences(fixture.page, BACKGROUND_REPLY),
+        'the new completed assistant reply should appear exactly once',
+      ).toBe(1)
     })
   }
 })

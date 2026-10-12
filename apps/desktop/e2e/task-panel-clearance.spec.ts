@@ -107,7 +107,11 @@ test.describe('working-session task-panel clearance', () => {
 
     const staleState = await activeSurface(page)
       .locator('[data-slot="aui_thread-viewport"]')
-      .evaluate(viewport => {
+      .evaluate(async viewport => {
+        // Chromium's scroll anchoring otherwise advances scrollTop by the
+        // spacer height and hides the stale geometry this fixture needs.
+        viewport.style.overflowAnchor = 'none'
+
         // Grow scrollHeight before the observed thread-content node. This
         // shifts the transcript behind the dock without resizing the observed
         // node or synthesizing a user scroll (which must escape the lock).
@@ -116,12 +120,15 @@ test.describe('working-session task-panel clearance', () => {
         staleClearance.setAttribute('aria-hidden', 'true')
         viewport.prepend(staleClearance)
 
+        // Read only after Chromium has committed the resulting layout.
+        await new Promise<void>(resolve => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+        })
+
         const distance = viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop
         const surface = viewport.closest<HTMLElement>('[data-composer-target]')!
         const latest = Array.from(surface.querySelectorAll<HTMLElement>('[data-role="assistant"]')).at(-1)!
         const status = surface.querySelector<HTMLElement>('[data-slot="composer-status-stack"]')!
-
-        window.dispatchEvent(new Event('focus'))
 
         return {
           distance,
@@ -132,10 +139,14 @@ test.describe('working-session task-panel clearance', () => {
         }
       })
 
+    // Do not send the focus event until the synthetic scroll-height change
+    // has actually produced the stale geometry required by this regression.
     expect(staleState.visibility, JSON.stringify(staleState)).toBe('visible')
+    expect(staleState.distance, JSON.stringify(staleState)).toBeGreaterThan(100)
     expect(staleState.following, JSON.stringify(staleState)).toBe('true')
-    expect(staleState.distance).toBeGreaterThan(100)
     expect(staleState.latestMessageBottom, JSON.stringify(staleState)).toBeGreaterThan(staleState.statusPanelTop)
+
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')))
     await page.waitForTimeout(1_000)
     const metrics = await clearanceMetrics(page)
     await page.screenshot({ path: testInfo.outputPath('task-panel-after-resume.png') })

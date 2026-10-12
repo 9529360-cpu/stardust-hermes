@@ -237,10 +237,10 @@ test.describe('fleet profile rail — two registered gateways', () => {
 
     ;({ app, page } = await launchDesktop(buildAppEnv(sandbox)))
     await waitForAppReady({ app, page } as MockBackendFixture, 120_000)
-    // Let boot settle fully (the gateway health item reports "ready" once the
-    // primary socket is open) so the boot-time launch-mode restore has run
+    // Let boot settle fully (the gateway health item reports a localized ready
+    // state once the primary socket is open) so the boot-time launch-mode restore has run
     // before any click — the rail must then hold whatever the user picks.
-    await expect(page.locator('[data-slot="statusbar"]').getByText('ready', { exact: true })).toBeVisible({ timeout: 120_000 })
+    await expect(page.locator('[data-slot="statusbar"]')).toContainText(/ready|就绪/i, { timeout: 120_000 })
     await page.waitForTimeout(2_000)
   })
 
