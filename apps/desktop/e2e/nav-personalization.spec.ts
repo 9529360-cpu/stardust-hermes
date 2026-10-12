@@ -226,7 +226,7 @@ test('the open page nav row carries aria-current="page"', async () => {
   await setWindowSize(WIDE)
   await revealNav(page)
 
-  const tasks = nav.getByRole('button', { name: '任务', exact: true })
+  const tasks = nav.getByRole('button', { name: '自动化', exact: true })
   const tools = nav.getByRole('button', { name: '工具', exact: true })
 
   await tasks.click()

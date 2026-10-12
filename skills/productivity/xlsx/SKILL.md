@@ -33,6 +33,7 @@ scripts are argparse CLIs that print JSON and use explicit UTF-8 I/O.
 - Recalculating formulas headlessly via LibreOffice
   (`xlsx_recalc.py`).
 - CSV interop with type inference and non-UTF-8 encodings.
+- Banker-style financial models (blue/black/green inputs, named ranges, a Checks tab, sensitivity tables): read `references/excel-author-conventions.md`.
 - Not for the legacy .xls binary format (use LibreOffice to convert
   first: `soffice --headless --convert-to xlsx old.xls`).
 

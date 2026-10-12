@@ -50,7 +50,7 @@ test.afterAll(async () => {
 
 test('pending automation is localized, consent-gated, and dismissible from Scheduled jobs', async () => {
   const page = fixture!.page
-  const tasksButton = page.locator('[data-personal-product-nav]').getByRole('button', { name: '任务' })
+  const tasksButton = page.locator('[data-personal-product-nav]').getByRole('button', { name: '自动化' })
 
   await tasksButton.click()
 

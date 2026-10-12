@@ -89,7 +89,7 @@ test('Tools and Plugins share the Tasks title row, and the Projects list names t
   const nav = page.getByRole('navigation', { name: 'Product navigation' })
 
   // Tasks is the reference: its title row sits at the top of the page body.
-  await nav.getByRole('button', { name: '任务', exact: true }).click()
+  await nav.getByRole('button', { name: '自动化', exact: true }).click()
   const tasksTitle = page.getByRole('heading', { name: '定时任务', exact: true })
   await expect(tasksTitle).toBeVisible({ timeout: 20_000 })
   const tasksBox = await tasksTitle.boundingBox()
