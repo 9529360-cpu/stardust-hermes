@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Union
 
 from hermes_state_common import _BOUNDARY_END_REASONS
-from tools.memory_tombstones import forgotten_index
+from tools.memory_tombstones import RECALL_SUSPENDED, recall_index
 
 # Hidden from browsing/searching — integrations (STARDUST_SESSION_SOURCE=tool), delegate
 # subagent runs, kanban workers are not the user's history.
@@ -311,10 +311,13 @@ def _discover_payload(db, query: str, detail: str, results: list, **extra) -> st
     return _ok(mode="discover", query=query, detail=detail, results=results, count=len(results), **extra, **rebuild)
 
 
-def _drop_forgotten(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Drop results whose text contains a phrase the owner forgot. Transcripts are untouched; this filters
-    what recall shows (see tools/memory_tombstones.py)."""
-    index = forgotten_index()
+def _drop_forgotten(results: List[Dict[str, Any]]) -> Optional[List[Dict[str, Any]]]:
+    """Drop results whose text contains a phrase the owner forgot. Transcripts are untouched; this filters what recall
+    shows (see tools/memory_tombstones.py). Returns None when forgotten.json cannot be read: recall is then suspended,
+    because results could not be filtered."""
+    index = recall_index()
+    if index is None:
+        return None
     if not index:
         return results
     kept = []
@@ -428,6 +431,8 @@ def _discover(db, query: str, role_filter: Optional[List[str]], limit: int, sort
         if entry is not None:
             results.append(entry)
     results = _drop_forgotten(results)
+    if results is None:
+        return tool_error(RECALL_SUSPENDED, success=False)
     for entry in results:
         entry["link"] = _session_link(entry["session_id"], link_profile)
     return _discover_payload(db, query, detail, results, sessions_searched=len(seen_sessions), link_hint=(
@@ -499,7 +504,9 @@ def _list_recent_sessions(db, limit: int, current_session_id: str = None, link_p
         sessions = bounded_list(
             limit=limit + 15,  # extra so we can skip current / compression roots
             exclude_sources=list(_HIDDEN_SESSION_SOURCES), timeout_seconds=3.0)
-        forgotten = forgotten_index()
+        forgotten = recall_index()
+        if forgotten is None:
+            return tool_error(RECALL_SUSPENDED, success=False)
         sessions = [s for s in sessions if not forgotten.mentions(f"{s.get('title') or ''}\n{s.get('preview') or ''}")]
         current_root, has_compression_hop = (
             _resolve_to_parent(db, current_session_id) if current_session_id else (None, False))

@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from utils import atomic_write_bytes, atomic_write_text, fsync_directory, path_signature
 from tools.memory_tombstones import (
-    automatic_write_refusal, clear_forgotten_within, fold_text, forgotten_store_error, record_forgotten,
+    clear_forgotten_for, fold_text, forgotten_store_error, record_forgotten, write_refusal,
 )
 from tools.threat_patterns import first_threat_message as _first_threat_message
 
@@ -71,30 +71,34 @@ def _find_unique_match(entries: List[str], old_text: str) -> Tuple[Optional[int]
     return (matches[0] if matches else None), False
 
 
-def _with_forget_record(result: Dict[str, Any], removed_texts: List[str], target: str) -> Dict[str, Any]:
-    """Record removed texts as forgotten after a successful write. A failed record is reported
-    on the result; the removal itself has already happened."""
-    if result.get("success") and removed_texts:
-        warning = record_forgotten(removed_texts, source=target)
-        if warning:
-            result["forget_record_warning"] = warning
-    return result
+def _record_or_error(texts: List[str], *, source: str, scope: str, topic_key: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """Record removed texts as forgotten, before the removal is written. A failure returns an error, so the
+    caller writes nothing: a removal that cannot be recorded does not happen."""
+    try:
+        record_forgotten(texts, source=source, scope=scope, topic_key=topic_key)
+    except (OSError, RuntimeError) as exc:
+        return _error(f"Nothing was removed: the forgotten record could not be written ({exc}).")
+    return None
 
 
 def _refused(reason: str) -> Dict[str, Any]:
-    """Result for an automatic write that was not stored. The reason is logged and returned."""
-    logger.info("Skipped an automatic memory write: %s", reason)
+    """Result for a memory write that was not stored. The reason is logged and returned."""
+    logger.info("Skipped a memory write: %s", reason)
     return {"success": False, "skipped": True, "reason": reason}
 
 
-def _with_forgotten_cleared(result: Dict[str, Any], text: str, owner_initiated: bool) -> Dict[str, Any]:
-    """After an owner's own add or replace succeeds, drop the forgotten records that the new text contains."""
+def _with_forgotten_cleared(result: Dict[str, Any], text: str, owner_initiated: bool,
+                            topic_key: Optional[str] = None) -> Dict[str, Any]:
+    """After an owner's own write succeeds, drop the forgotten records the new text contains (and, for a topic, its
+    whole-topic record). If that cannot be written, the write is reported as saved but not cleared."""
     if owner_initiated and result.get("success"):
-        cleared, warning = clear_forgotten_within(text)
+        try:
+            cleared = clear_forgotten_for(text, topic_key=topic_key)
+        except (OSError, RuntimeError) as exc:
+            return {**result, "success": False, "saved": True,
+                    "error": f"The entry was saved, but its forgotten record could not be cleared ({exc})."}
         if cleared:
             result["forgotten_cleared"] = cleared
-        if warning:
-            result["forget_record_warning"] = warning
     return result
 
 
@@ -366,6 +370,16 @@ class MemoryStore:
                     if existed:
                         raw, read_ok = cls._read_raw_checked(path)
                         erased = cls._parse_entries(raw) if read_ok else []
+                        if erased:
+                            # The erased entries become forgotten records before anything is erased, so old chats
+                            # cannot resurface them. If they cannot be recorded, nothing is erased.
+                            try:
+                                record_forgotten(erased, source=target, scope="entry")
+                            except (OSError, RuntimeError) as exc:
+                                raise RuntimeError(
+                                    f"Reset of {path.name} stopped before erasing: the forgotten record could not be "
+                                    f"written ({exc}). Nothing was erased; retry the reset."
+                                ) from exc
                         atomic_write_text(
                             path,
                             "",
@@ -386,10 +400,6 @@ class MemoryStore:
                     f"complete. Stale sessions are fenced, but old bytes may still be "
                     f"present; retry the reset. Cause: {exc}"
                 ) from exc
-        if erased:
-            # The erased entries become forgotten records so old chats cannot resurface them.
-            if warning := record_forgotten(erased, source=target):
-                logger.warning("%s", warning)
         return existed
 
     def _entries_for(self, target: str) -> List[str]:
@@ -453,7 +463,7 @@ class MemoryStore:
             return _error("Content cannot be empty.")
         if scan_error := _scan_memory_content(content):
             return _error(scan_error)
-        if not owner_initiated and (refusal := automatic_write_refusal(content)):
+        if refusal := write_refusal(content, owner_initiated=owner_initiated):
             return _refused(refusal)
 
         def _add(entries, limit):
@@ -480,7 +490,7 @@ class MemoryStore:
             return _error("new_content cannot be empty. Use 'remove' to delete entries.")
         if scan_error := _scan_memory_content(new_content):
             return _error(scan_error)
-        if not owner_initiated and (refusal := automatic_write_refusal(new_content)):
+        if refusal := write_refusal(new_content, owner_initiated=owner_initiated):
             return _refused(refusal)
         return _with_forgotten_cleared(self._edit(target, old_text.strip(), new_content), new_content, owner_initiated)
 
@@ -512,7 +522,7 @@ class MemoryStore:
             return _error("new_content cannot be empty. Use 'remove' to delete entries.")
         if scan_error := _scan_memory_content(content):
             return _error(scan_error)
-        if not owner_initiated and (refusal := automatic_write_refusal(content)):
+        if refusal := write_refusal(content, owner_initiated=owner_initiated):
             return _refused(refusal)
         result = self._rewrite_exact_entry(target, expected_text, expected_index=index, new_content=content)
         return _with_forgotten_cleared(result, content, owner_initiated)
@@ -569,6 +579,8 @@ class MemoryStore:
                 return _error("Memory entries are duplicated on disk; resolve duplicates before deleting one.")
             index = matches[0]
             if new_content is None:
+                if err := _record_or_error([entry], source=target, scope="entry"):
+                    return err
                 remaining = entries[:index] + entries[index + 1:]
                 remaining_bytes = raw_entry_bytes[:index] + raw_entry_bytes[index + 1:]
                 message = "Entry removed."
@@ -591,8 +603,6 @@ class MemoryStore:
                 atomic_write_bytes(path, payload, tmp_prefix=".mem_")
             except OSError as exc:
                 raise RuntimeError(f"Failed to write memory file {path}: {exc}") from exc
-        if new_content is None:
-            return _with_forget_record(self._success_response(target, message), [entry], target)
         return self._success_response(target, message)
 
     def disk_entries(self, target: str) -> Optional[List[str]]:
@@ -602,30 +612,35 @@ class MemoryStore:
         return list(dict.fromkeys(self._parse_entries(raw))) if read_ok else None
 
     def forget_matching(self, target: str, phrase: str) -> Dict[str, Any]:
-        """Remove every entry containing *phrase* (case-insensitive) in one locked write.
+        """Remove the single entry containing *phrase* (case-insensitive) in one locked write.
 
-        Cross-store forget: the caller found hits in this store. The removed count is returned as
-        ``removed_count``; the removed texts are recorded as forgotten (hashes only)."""
+        Cross-store forget: the caller found one hit in this store. The count is checked again under the lock, so a
+        second matching entry written since the scan is refused rather than removed with the first. The matched entry is
+        recorded as forgotten (hash only) inside the lock, before the write; if that fails nothing is removed."""
         needle = fold_text(phrase)
         if not needle:
             return _error("old_text cannot be empty.")
         if forget_error := forgotten_store_error():
             return _error(forget_error)
-        removed: List[str] = []
+        removed: List[int] = []
 
         def _apply(entries, limit):
             hits = [entry for entry in entries if needle in fold_text(entry)]
             if not hits:
                 return _error(f"No entry matched '{phrase}'.")
-            removed.extend(hits)
+            if len(hits) > 1:
+                return _error(f"'{phrase}' matches more than one entry. Nothing was changed. Retry with a longer phrase "
+                              "that identifies one entry.", matches=[entry[:80] for entry in hits])
+            if err := _record_or_error(hits, source=target, scope="entry"):
+                return err
             keep = [entry for entry in entries if needle not in fold_text(entry)]
-            return keep, f"Removed {len(hits)} matching entr{'y' if len(hits) == 1 else 'ies'}."
+            removed.append(len(hits))
+            return keep, "Entry removed."
 
         result = self._mutate(target, _apply)
-        if not result.get("success"):
-            return result
-        result["removed_count"] = len(removed)
-        return _with_forget_record(result, removed, target)
+        if result.get("success"):
+            result["removed_count"] = removed[0]
+        return result
 
     def replace_matching(self, target: str, phrase: str, new_content: str, *,
                          owner_initiated: bool = False) -> Dict[str, Any]:
@@ -639,7 +654,7 @@ class MemoryStore:
             return _error("new_content cannot be empty. Use 'remove' to delete entries.")
         if scan_error := _scan_memory_content(content):
             return _error(scan_error)
-        if not owner_initiated and (refusal := automatic_write_refusal(content)):
+        if refusal := write_refusal(content, owner_initiated=owner_initiated):
             return _refused(refusal)
 
         def _apply(entries, limit):
@@ -671,7 +686,6 @@ class MemoryStore:
     def _edit(self, target: str, old_text: str, new_content: Optional[str]) -> Dict[str, Any]:
         """Locked replace (``new_content`` set) or remove (None) of the entry matching *old_text*.
         Only a removal is forgotten; a replacement supersedes the old text and records nothing."""
-        removed: List[str] = []
         if new_content is None and (forget_error := forgotten_store_error()):
             return _error(forget_error)
 
@@ -686,7 +700,8 @@ class MemoryStore:
                     f"of the entry you want to {'replace' if new_content else 'remove'}.", current_entries=entries))
             replaced = entries[:idx] + ([] if new_content is None else [new_content]) + entries[idx + 1:]
             if new_content is None:
-                removed.append(entries[idx])
+                if err := _record_or_error([entries[idx]], source=target, scope="entry"):
+                    return err
                 return replaced, "Entry removed."
             new_total = len(ENTRY_DELIMITER.join(replaced))
             if new_total > limit:
@@ -695,7 +710,7 @@ class MemoryStore:
                     f"or 'remove' other stale or less important entries to make room (see current_entries "
                     f"below), then retry — all in this turn."))
             return replaced, "Entry replaced."
-        return _with_forget_record(self._mutate(target, _apply), removed, target)
+        return self._mutate(target, _apply)
 
     @staticmethod
     def _apply_batch_op(working: List[str], act: str, content: str, old_text: str, pos: str,
@@ -740,7 +755,7 @@ class MemoryStore:
         # A batch is an automatic write: one add or replace that repeats forgotten text rejects the whole batch.
         for i, op in enumerate(ops):
             if op.get("action") in {"add", "replace"} and (
-                    refusal := automatic_write_refusal(op.get("content") or op.get("new_text") or "")):
+                    refusal := write_refusal(op.get("content") or op.get("new_text") or "", owner_initiated=False)):
                 return _refused(f"Operation {i + 1}: {refusal} Nothing was applied (batch is all-or-nothing).")
         if any(op.get("action") == "remove" for op in ops) and (forget_error := forgotten_store_error()):
             return _error(forget_error)
@@ -772,8 +787,12 @@ class MemoryStore:
                     f"After applying all {len(operations)} operations, memory would be at "
                     f"{new_total:,}/{limit:,} chars -- over the limit. Remove or shorten more "
                     f"entries in the same batch (see current_entries below), then retry."))
+            if forgotten:
+                # The removed entries are recorded before the batch is written; if that fails, nothing is written.
+                if err := _record_or_error(forgotten, source=target, scope="entry"):
+                    return err
             return working, f"Applied {len(operations)} operation(s)."
-        return _with_forget_record(self._mutate(target, _apply), forgotten, target)
+        return self._mutate(target, _apply)
 
     def format_for_system_prompt(self, target: str) -> Optional[str]:
         """Frozen load-time snapshot (NOT live state — mid-session writes don't touch

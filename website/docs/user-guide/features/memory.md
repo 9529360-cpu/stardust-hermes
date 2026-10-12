@@ -100,36 +100,44 @@ There is no `read` action — memory content is automatically injected into the 
 
 ### Substring Matching
 
-The `replace` and `remove` actions use short unique substring matching — you don't need the full entry text. The `old_text` parameter just needs to be a unique substring that identifies exactly one entry:
+The `replace` and `remove` actions match a phrase, not the whole entry. The `old_text` parameter must be at least 8 characters (after Unicode and whitespace normalization) and must identify exactly one entry:
 
 ```python
 # If memory contains "User prefers dark mode in all editors"
 memory(action="replace", target="memory",
-       old_text="dark mode",
+       old_text="dark mode in all editors",
        content="User prefers light mode in VS Code, dark mode in terminal")
 ```
 
-If the substring matches multiple entries, an error is returned asking for a more specific match.
+A shorter phrase is refused. So is a phrase that matches more than one entry: the result lists the candidates and nothing changes. A short word such as `tea` cannot remove `Team meeting on Monday`, and `Berlin` cannot remove `Visited berlin in 2019`.
 
 ### Forgetting Across Stores
 
-A forget removes the text from every store that holds it: the requested store's exact match, then `MEMORY.md`, `USER.md`, and topic summaries (title, keywords, and summary text, case-insensitively). The result's `removed_from` lists each store that changed. A topic summary loses only the matching sentence or keyword, unless the phrase is its title. `replace` changes a single match in whichever store holds it, and refuses to guess between several. A phrase with no match anywhere changes nothing, and the result lists candidate entries from every store so the agent can retry with an exact phrase. Batch operations stay inside the requested store.
+A forget removes the text from every store that holds it: the requested store, `MEMORY.md`, `USER.md`, and topic summaries (title, keywords, and summary text, matched case-insensitively). Every store is scanned before anything is written. The forget goes ahead only when each store holds at most one match. Otherwise it changes nothing and lists the candidates. The result's `removed_from` lists each store that changed. A topic summary loses only the matching sentence or keyword, unless the phrase is its title. `replace` changes a single match in whichever store holds it, and refuses to guess between several. A phrase with no match anywhere changes nothing, and the result lists candidate entries from every store so the agent can retry with an exact phrase.
 
-The same forget applies when you delete an entry from the memory page or a journey card: the entry goes, and the same text is removed from the other stores.
+A batch stays inside one store and applies all or nothing. Before anything is written, a batch `remove` is refused if its phrase is also held by another store, and the refusal names that store. Send that remove on its own so every store that holds it loses it.
+
+The same forget applies when you delete an entry from the memory page or a journey card: the entry goes, and the same text is removed from the other stores. The sweep follows the same 8-character and single-match rules. A shorter or ambiguous text removes only the entry you picked.
 
 ### Forgotten Text Stays Forgotten
 
-Forgetting records a SHA-256 hash of the normalized text in `memories/forgotten.json` beside `MEMORY.md`, together with its length, the time, the store, and the topic key for topic text. The text itself is not stored there. Tool results are kept in the transcript, so a forget response never repeats the removed text.
+Forgetting records only SHA-256 hashes, in `memories/forgotten.json` beside `MEMORY.md`. Each hash is of the normalized text: Unicode NFKC, then case folded, then runs of whitespace collapsed to one space. A record also keeps the text's normalized length, the time, the store, and the scope (entry, sentence, keyword, or topic). For a topic, it keeps the SHA-256 of the topic key, not the key. Neither the text nor the topic key is stored there. A forget also rewrites any plaintext rows from an earlier build as hashes. Tool results are kept in the transcript, so a forget response never repeats the removed text.
 
-- **Recall.** `session_search` and topic recall drop any result whose text contains a recorded phrase. Transcripts are never edited or deleted.
-- **Automatic writes.** Background review, staged approvals, agent imports, and the agent's own adds and replacements skip text that repeats something you forgot. They log the reason and return it.
+A removal is recorded inside the same lock as the removal, before anything is written. If the record cannot be written, nothing is removed.
+
+Removing a whole topic records its title and summary. Its keywords are not recorded, because a single keyword is often a common word that would then be refused everywhere. A keyword forgotten on its own is recorded.
+
+- **Recall.** `session_search` and topic recall drop any result whose text contains a recorded phrase. If `forgotten.json` cannot be read, recall is suspended rather than run unfiltered. Transcripts are never edited or deleted.
+- **Automatic writes.** Background review, staged approvals, agent imports, and the agent's own adds and replacements skip text that repeats something you forgot, and a topic whose whole-topic record matches is not recreated automatically. A staged proposal that would add forgotten text is refused before it is saved to the pending list. Each refusal logs its reason and returns it.
 - **Your own adds.** Adding the text yourself from the memory page, or entering it during onboarding, puts it back and clears the matching records.
+- **Unreadable records.** If `forgotten.json` cannot be read, every memory write is refused, the owner's included, and forgetting and resetting refuse too, until the file is repaired. Nothing is written that could bring forgotten text back.
+- **Migration.** The OpenClaw migration skips entries that repeat forgotten text. It takes the same lock as Hermes when it writes `MEMORY.md` or `USER.md`, and keeps forgotten text out of its overflow file and report. If `forgotten.json` cannot be read, it writes neither file.
 
 Limits:
 
-- Matching is verbatim after case and whitespace folding. A paraphrase in an old chat is not filtered.
+- Matching is verbatim after normalization. A paraphrase in an old chat is not filtered.
 - `session_search` by `session_id`, and the scroll mode, still show a transcript as it was. Recall filtering covers search results only.
-- Phrases shorter than four characters are recorded but never used for filtering.
+- A phrase of fewer than four characters is recorded but never used for filtering. A remove or replace phrase must be at least 8 characters.
 
 ## Two Targets Explained
 
@@ -365,6 +373,8 @@ Review staged writes from the CLI or any messaging platform:
 This is the answer to "the agent saved a wrong assumption about me": set
 `write_approval: true`, and every save — especially the unprompted background
 ones — waits for your yes/no before it ever enters your profile.
+
+A proposed save that would add text you forgot is refused before it is written to the pending list, so it never appears in `/memory pending`. In the interactive CLI the inline approval prompt comes first; if you approve such a save, it is refused the same way. See [Forgotten Text Stays Forgotten](#forgotten-text-stays-forgotten).
 
 ## Background review notifications (`display.memory_notifications`)
 

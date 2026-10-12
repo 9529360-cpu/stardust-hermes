@@ -45,6 +45,7 @@ from tools.memory_tool_store import (  # noqa: E402,F401  (re-exports)
     ENTRY_DELIMITER, MEMORY_BLOCK_HEADERS, MemoryStore, _scan_memory_content)
 from tools.memory_forget import (  # noqa: E402
     batch_cross_store_hint, remove_entry, remove_topic, replace_entry)
+from tools.memory_tombstones import ForgottenProposalRefused  # noqa: E402
 
 
 def load_on_disk_store() -> "MemoryStore":
@@ -82,7 +83,11 @@ def _gate_or_stage(
         return None
     if decision.blocked:
         return tool_error(decision.message, success=False)
-    record = wa.stage_write(wa.MEMORY, payload, summary=f"{summary}: {detail[:120]}", origin=wa.current_origin())
+    try:
+        record = wa.stage_write(wa.MEMORY, payload, summary=f"{summary}: {detail[:120]}", origin=wa.current_origin())
+    except ForgottenProposalRefused as exc:
+        # Refused before anything reached the pending store: the forgotten text is not written to disk.
+        return json.dumps({"success": False, "skipped": True, "reason": str(exc)}, ensure_ascii=False)
     return json.dumps({"success": True, "staged": True, "pending_id": record["id"], "message": decision.message},
                       ensure_ascii=False)
 
@@ -205,6 +210,8 @@ def _background_delete_gate(
                         f"{'batch' if operations is not None else action} was staged for your approval — "
                         "review it with /memory pending (approve to apply, discard to drop)."),
         }, ensure_ascii=False)
+    except ForgottenProposalRefused as exc:
+        return json.dumps({"success": False, "skipped": True, "reason": str(exc)}, ensure_ascii=False)
     except Exception:
         logger.warning("Failed to stage background-review consolidation; denying", exc_info=True)
         return tool_error(
@@ -486,7 +493,7 @@ MEMORY_SCHEMA = {
             },
             "old_text": {
                 "type": "string",
-                "description": "REQUIRED for 'replace' and 'remove' (single-op shape): a short unique substring identifying the existing entry to modify. Omit only for 'add'."
+                "description": "REQUIRED for 'replace' and 'remove' (single-op shape): a unique substring of at least 8 characters identifying the existing entry to modify. Shorter text is refused, and a phrase found in more than one entry is refused with the candidates. Omit only for 'add'."
             },
             "new_text": {
                 "type": "string",
@@ -505,7 +512,7 @@ MEMORY_SCHEMA = {
                         "action": {"type": "string", "enum": ["add", "replace", "remove"]},
                         "content": {"type": "string", "description": "Entry content for add/replace. Alias: 'new_text'."},
                         "new_text": {"type": "string", "description": "Alias for 'content' in a batch op."},
-                        "old_text": {"type": "string", "description": "Substring identifying the entry for replace/remove."},
+                        "old_text": {"type": "string", "description": "Substring of at least 8 characters identifying the entry for replace/remove."},
                     },
                     "required": ["action"],
                 },

@@ -669,13 +669,13 @@ class TestMemoryToolDispatcher:
     def test_new_text_alias_for_content_on_replace(self, store):
         # A caller mirroring old_text with new_text (the patch tool's shape)
         # must succeed instead of erroring 'content is required'.
-        store.add("memory", "fact A")
+        store.add("memory", "fact A is set")
         result = json.loads(
-            memory_tool(action="replace", old_text="fact A", new_text="fact A refined", store=store)
+            memory_tool(action="replace", old_text="fact A is set", new_text="fact A is refined", store=store)
         )
         assert result["success"] is True
-        assert "fact A refined" in store.memory_entries
-        assert "fact A" not in [e for e in store.memory_entries if e == "fact A"]
+        assert "fact A is refined" in store.memory_entries
+        assert "fact A is set" not in store.memory_entries
 
     def test_new_text_alias_for_content_on_add(self, store):
         result = json.loads(memory_tool(action="add", new_text="added via new_text", store=store))

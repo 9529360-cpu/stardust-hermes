@@ -379,7 +379,13 @@ class AgentImporter:
                 failed = True
                 self.record(kind, md_file, destination, "error", f"Could not read file: {exc}")
         # Text the owner forgot must not come back through an import: it is skipped and counted.
-        forgotten = forgotten_index(destination.parent)
+        try:
+            forgotten = forgotten_index(destination.parent, strict=True)
+        except (OSError, RuntimeError) as exc:
+            # Fail closed: without the records the import cannot tell what the owner forgot, so it writes nothing.
+            self.record(kind, source, destination, "error",
+                        f"Memory not written: forgotten.json cannot be read ({exc}). Repair it and re-run the import.")
+            return
         kept = [entry for entry in incoming if not forgotten.mentions(entry)]
         forgotten_skipped = len(incoming) - len(kept)
         incoming = kept

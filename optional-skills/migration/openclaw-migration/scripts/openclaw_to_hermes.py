@@ -16,15 +16,27 @@ import os
 import re
 import shutil
 import tempfile
+import unicodedata
+from contextlib import contextmanager, nullcontext
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 
 try:
     import yaml
 except Exception:  # pragma: no cover - handled at runtime
     yaml = None
+
+# The same store-lock primitives tools/memory_tool.py uses: flock on POSIX, msvcrt on Windows.
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - Windows
+    fcntl = None
+try:
+    import msvcrt
+except ImportError:  # pragma: no cover - POSIX
+    msvcrt = None
 
 
 ENTRY_DELIMITER = "\n§\n"
@@ -673,6 +685,119 @@ def merge_entries(
     return merged, stats, overflowed
 
 
+# ───────────────────────────────────────────────────────────────────────
+# Forgotten text and the memory-file lock. The owner's forgotten records sit
+# beside the memory files (memories/forgotten.json). This script is stdlib-only,
+# so it repeats the matching rules of tools/memory_tombstones.py; a parity test
+# keeps the two in step.
+# ───────────────────────────────────────────────────────────────────────
+
+FORGOTTEN_FILENAME = "forgotten.json"
+FORGOTTEN_MIN_PHRASE_CHARS = 4  # tools.memory_tombstones.MIN_PHRASE_CHARS
+_FORGOTTEN_DIGEST = re.compile(r"[0-9a-f]{64}")
+
+
+class ForgottenUnreadable(RuntimeError):
+    """forgotten.json exists but cannot be read. Nothing may be written to a memory file, because the write could
+    bring back text the owner forgot."""
+
+
+def fold_forgotten_text(value: Any) -> str:
+    """The comparison form used for every forgotten-text match: NFKC, casefold, collapsed whitespace."""
+    return " ".join(unicodedata.normalize("NFKC", str(value or "")).casefold().split())
+
+
+def _forgotten_digest(folded: str) -> str:
+    return hashlib.sha256(folded.encode("utf-8")).hexdigest()
+
+
+def _forgotten_row(row: Any) -> Tuple[Optional[str], int]:
+    """(digest, folded length) of one record. A legacy row that holds plaintext ``text`` is hashed here, as the Hermes
+    reader does. (None, 0) when the row cannot be used."""
+    if not isinstance(row, dict):
+        return None, 0
+    digest, length = row.get("sha256"), row.get("length")
+    if isinstance(digest, str) and _FORGOTTEN_DIGEST.fullmatch(digest) and isinstance(length, int) and length >= 0:
+        return digest, length
+    folded = fold_forgotten_text(row["text"]) if isinstance(row.get("text"), str) else ""
+    return (_forgotten_digest(folded), len(folded)) if folded else (None, 0)
+
+
+class ForgottenIndex:
+    """Digests of the forgotten texts, grouped by length. A passage mentions one when a window of its folded form, of
+    that length and starting and ending on a non-space character, has the same digest."""
+
+    def __init__(self, by_length: Dict[int, set]) -> None:
+        self._by_length = by_length
+
+    def mentions(self, text: Any) -> bool:
+        folded = fold_forgotten_text(text)
+        size = len(folded)
+        for length in sorted(self._by_length):
+            if length > size:
+                break
+            wanted = self._by_length[length]
+            for start in range(size - length + 1):
+                if folded[start] == " " or folded[start + length - 1] == " ":
+                    continue
+                if _forgotten_digest(folded[start:start + length]) in wanted:
+                    return True
+        return False
+
+
+def load_forgotten_index(memories_dir: Path) -> ForgottenIndex:
+    """Strict read of memories/forgotten.json. A missing file is an empty index. Anything unreadable raises
+    ForgottenUnreadable, so the migration never writes what it cannot check. Error messages never include record text."""
+    path = memories_dir / FORGOTTEN_FILENAME
+    try:
+        raw = path.read_bytes()
+    except FileNotFoundError:
+        return ForgottenIndex({})
+    except OSError as exc:
+        raise ForgottenUnreadable(f"{FORGOTTEN_FILENAME} cannot be read ({exc.strerror or type(exc).__name__})") from None
+    try:
+        data = json.loads(raw.decode("utf-8"))
+    except ValueError:  # includes UnicodeDecodeError
+        raise ForgottenUnreadable(f"{FORGOTTEN_FILENAME} is not valid JSON") from None
+    rows = data.get("forgotten") if isinstance(data, dict) else None
+    if not isinstance(rows, list):
+        raise ForgottenUnreadable(f"{FORGOTTEN_FILENAME} has an invalid forgotten payload")
+    by_length: Dict[int, set] = {}
+    for row in rows:
+        digest, length = _forgotten_row(row)
+        if digest is None:
+            raise ForgottenUnreadable(f"{FORGOTTEN_FILENAME} has a record that cannot be read")
+        if length >= FORGOTTEN_MIN_PHRASE_CHARS:
+            by_length.setdefault(length, set()).add(digest)
+    return ForgottenIndex(by_length)
+
+
+@contextmanager
+def memory_file_lock(path: Path) -> Iterator[None]:
+    """Hold the lock MemoryStore takes for *path*: an exclusive lock on ``<path>.lock``, the same file and primitive.
+    A migration and a running Hermes therefore never write one memory file at the same time."""
+    lock_path = path.with_suffix(path.suffix + ".lock")
+    ensure_parent(lock_path)
+    flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+    with os.fdopen(os.open(str(lock_path), flags, 0o600), "r+") as handle:
+        if fcntl is None and msvcrt is None:
+            yield
+            return
+        if fcntl is not None:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        else:
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+        try:
+            yield
+        finally:
+            if fcntl is not None:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            else:
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+
+
 def relative_label(path: Path, root: Path) -> str:
     try:
         return str(path.relative_to(root))
@@ -1300,22 +1425,46 @@ class Migrator:
             self.record(kind, source, destination, "skipped", "No importable entries found")
             return
         incoming = [rebrand_text(entry) for entry in incoming]
+        self.merge_memory_entries(
+            kind, source, destination, incoming, limit,
+            extra_details={}, dry_run_reason="Would merge entries",
+        )
 
-        existing = parse_existing_memory_entries(destination)
-        merged, stats, overflowed = merge_entries(existing, incoming, limit)
-        details = {
-            "existing_entries": stats["existing"],
-            "added_entries": stats["added"],
-            "duplicate_entries": stats["duplicates"],
-            "overflowed_entries": stats["overflowed"],
-            "char_limit": limit,
-            "final_char_count": len(ENTRY_DELIMITER.join(merged)) if merged else 0,
-        }
-        overflow_file = self.write_overflow_entries(kind, overflowed)
-        if overflow_file is not None:
-            details["overflow_file"] = str(overflow_file)
+    def merge_memory_entries(self, kind: str, source: Path, destination: Path, incoming: Sequence[str], limit: int,
+                             *, extra_details: Dict[str, Any], dry_run_reason: str) -> None:
+        """Merge *incoming* entries into a Hermes memory file (MEMORY.md or USER.md).
 
-        if self.execute:
+        Entries that repeat text the owner forgot are dropped before the merge, so the memory file, the overflow file and
+        the report never carry them. The check and the write run under the file's lock. An unreadable forgotten.json
+        records an error and writes nothing. A dry run only reads."""
+        with memory_file_lock(destination) if self.execute else nullcontext():
+            try:
+                forgotten = load_forgotten_index(destination.parent)
+            except ForgottenUnreadable as exc:
+                self.record(kind, source, destination, "error",
+                            f"Not migrated: {exc}. Repair it, then run the migration again.")
+                return
+            kept = [entry for entry in incoming if not forgotten.mentions(entry)]
+            existing = parse_existing_memory_entries(destination)
+            merged, stats, overflowed = merge_entries(existing, kept, limit)  # overflow only ever holds kept entries
+            details = {
+                "existing_entries": stats["existing"],
+                "added_entries": stats["added"],
+                "duplicate_entries": stats["duplicates"],
+                "overflowed_entries": stats["overflowed"],
+                "forgotten_entries_skipped": len(incoming) - len(kept),
+                "char_limit": limit,
+                "final_char_count": len(ENTRY_DELIMITER.join(merged)) if merged else 0,
+                **extra_details,
+            }
+            overflow_file = self.write_overflow_entries(kind, overflowed)
+            if overflow_file is not None:
+                details["overflow_file"] = str(overflow_file)
+
+            if not self.execute:
+                self.record(kind, source, destination, "migrated", dry_run_reason,
+                            overflow_preview=overflowed[:5], **details)
+                return
             if stats["added"] == 0 and not overflowed:
                 self.record(kind, source, destination, "skipped", "No new entries to import", **details)
                 return
@@ -1331,8 +1480,6 @@ class Migrator:
                 overflow_preview=overflowed[:5],
                 **details,
             )
-        else:
-            self.record(kind, source, destination, "migrated", "Would merge entries", overflow_preview=overflowed[:5], **details)
 
     def migrate_command_allowlist(self) -> None:
         source = self.source_root / "exec-approvals.json"
@@ -2057,40 +2204,10 @@ class Migrator:
             self.record("daily-memory", source_dir, destination, "skipped", "No importable entries found in daily memory files")
             return
         all_incoming = [rebrand_text(entry) for entry in all_incoming]
-
-        existing = parse_existing_memory_entries(destination)
-        merged, stats, overflowed = merge_entries(existing, all_incoming, self.memory_limit)
-        details = {
-            "source_files": len(md_files),
-            "existing_entries": stats["existing"],
-            "added_entries": stats["added"],
-            "duplicate_entries": stats["duplicates"],
-            "overflowed_entries": stats["overflowed"],
-            "char_limit": self.memory_limit,
-            "final_char_count": len(ENTRY_DELIMITER.join(merged)) if merged else 0,
-        }
-        overflow_file = self.write_overflow_entries("daily-memory", overflowed)
-        if overflow_file is not None:
-            details["overflow_file"] = str(overflow_file)
-
-        if self.execute:
-            if stats["added"] == 0 and not overflowed:
-                self.record("daily-memory", source_dir, destination, "skipped", "No new entries to import", **details)
-                return
-            backup_path = self.maybe_backup(destination)
-            ensure_parent(destination)
-            destination.write_text(ENTRY_DELIMITER.join(merged) + ("\n" if merged else ""), encoding="utf-8")
-            self.record(
-                "daily-memory",
-                source_dir,
-                destination,
-                "migrated",
-                backup=str(backup_path) if backup_path else "",
-                overflow_preview=overflowed[:5],
-                **details,
-            )
-        else:
-            self.record("daily-memory", source_dir, destination, "migrated", "Would merge daily memory entries", overflow_preview=overflowed[:5], **details)
+        self.merge_memory_entries(
+            "daily-memory", source_dir, destination, all_incoming, self.memory_limit,
+            extra_details={"source_files": len(md_files)}, dry_run_reason="Would merge daily memory entries",
+        )
 
     def migrate_skills(self) -> None:
         source_root = self.source_candidate("workspace/skills")

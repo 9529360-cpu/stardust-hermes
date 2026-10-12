@@ -5,6 +5,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 
 SCRIPT_PATH = (
     Path(__file__).resolve().parents[2]
@@ -744,6 +746,159 @@ def test_messaging_settings_handles_invalid_utf8_in_telegram_allowlist(tmp_path:
     assert items and items[0]["status"] == "migrated"
     env_text = (target / ".env").read_text(encoding="utf-8")
     assert "123456789" in env_text
+
+
+# ── forgotten text and the memory-file lock ─────────────────────────────────
+
+def _record_forgotten_text(text: str, memories: Path) -> None:
+    """Record *text* with the Hermes writer, so the migrator is checked against what Hermes really writes."""
+    from tools.memory_tombstones import record_forgotten
+
+    record_forgotten([text], source="memory", scope="entry", memories_dir=memories)
+
+
+def _migrator(mod, source: Path, target: Path, selected: str, output_dir: Path | None = None):
+    return mod.Migrator(
+        source_root=source, target_root=target, execute=True,
+        workspace_target=None, overwrite=False, migrate_secrets=False, output_dir=output_dir,
+        selected_options={selected},
+    )
+
+
+@pytest.mark.parametrize(
+    ("option", "source_name", "dest_name"),
+    [("memory", "MEMORY.md", "MEMORY.md"), ("user-profile", "USER.md", "USER.md")],
+)
+def test_migrated_entry_repeating_forgotten_text_is_skipped(tmp_path: Path, option, source_name, dest_name):
+    mod = load_module()
+    source, target = tmp_path / ".openclaw", tmp_path / ".stardust"
+    (source / "workspace").mkdir(parents=True)
+    (source / "workspace" / source_name).write_text(
+        "- Prefers tea in the morning, always\n- Works on the migration project\n", encoding="utf-8")
+    memories = target / "memories"
+    _record_forgotten_text("Prefers tea in the morning, always", memories)
+
+    report = _migrator(mod, source, target, option).migrate()
+
+    content = (memories / dest_name).read_text(encoding="utf-8")
+    assert "migration project" in content
+    assert "tea in the morning" not in content
+    item = next(i for i in report["items"] if i["kind"] == option)
+    assert item["status"] == "migrated"
+    assert item["details"]["forgotten_entries_skipped"] == 1
+
+
+def test_daily_memory_entry_repeating_forgotten_text_is_skipped(tmp_path: Path):
+    mod = load_module()
+    source, target = tmp_path / ".openclaw", tmp_path / ".stardust"
+    daily = source / "workspace" / "memory"
+    daily.mkdir(parents=True)
+    (daily / "2026-03-01.md").write_text(
+        "- Prefers tea in the morning, always\n- Works on the migration project\n", encoding="utf-8")
+    memories = target / "memories"
+    _record_forgotten_text("Prefers tea in the morning, always", memories)
+
+    report = _migrator(mod, source, target, "daily-memory").migrate()
+
+    content = (memories / "MEMORY.md").read_text(encoding="utf-8")
+    assert "migration project" in content and "tea in the morning" not in content
+    item = next(i for i in report["items"] if i["kind"] == "daily-memory")
+    assert item["details"]["forgotten_entries_skipped"] == 1
+
+
+def test_forgotten_text_stays_out_of_the_overflow_file_and_the_report(tmp_path: Path):
+    mod = load_module()
+    source, target, output = tmp_path / ".openclaw", tmp_path / ".stardust", tmp_path / "out"
+    (source / "workspace").mkdir(parents=True)
+    (source / "workspace" / "MEMORY.md").write_text(
+        "- Prefers tea in the morning, always\n- Works on the migration project\n"
+        "- Keeps a long running note about the desktop release plan\n", encoding="utf-8")
+    _record_forgotten_text("Prefers tea in the morning, always", target / "memories")
+
+    migrator = _migrator(mod, source, target, "memory", output_dir=output)
+    migrator.memory_limit = 80  # the desktop note does not fit and overflows
+    migrator.migrate()
+
+    overflow = output / "overflow" / "memory_overflow.txt"
+    assert "desktop release plan" in overflow.read_text(encoding="utf-8")
+    for path in (overflow, output / "report.json", output / "summary.md"):
+        assert "tea in the morning" not in path.read_text(encoding="utf-8")
+
+
+def test_unreadable_forgotten_file_blocks_the_memory_write(tmp_path: Path):
+    mod = load_module()
+    source, target = tmp_path / ".openclaw", tmp_path / ".stardust"
+    (source / "workspace").mkdir(parents=True)
+    (source / "workspace" / "MEMORY.md").write_text("- Works on the migration project\n", encoding="utf-8")
+    memories = target / "memories"
+    memories.mkdir(parents=True)
+    (memories / "MEMORY.md").write_text("Existing owner note", encoding="utf-8")
+    (memories / "forgotten.json").write_bytes(b"{broken")
+
+    report = _migrator(mod, source, target, "memory").migrate()
+
+    assert (memories / "MEMORY.md").read_text(encoding="utf-8") == "Existing owner note"
+    assert (memories / "forgotten.json").read_bytes() == b"{broken"
+    item = next(i for i in report["items"] if i["kind"] == "memory")
+    assert item["status"] == "error"
+    assert "forgotten.json" in item["reason"]
+
+
+def test_memory_write_holds_the_same_lock_hermes_takes(tmp_path: Path, monkeypatch):
+    from contextlib import contextmanager
+
+    mod = load_module()
+    source, target = tmp_path / ".openclaw", tmp_path / ".stardust"
+    (source / "workspace").mkdir(parents=True)
+    (source / "workspace" / "MEMORY.md").write_text("- Works on the migration project\n", encoding="utf-8")
+    memories = target / "memories"
+    locked: list[Path] = []
+    real_lock = mod.memory_file_lock
+
+    @contextmanager
+    def spy(path):
+        locked.append(Path(path))
+        with real_lock(path):
+            yield
+
+    monkeypatch.setattr(mod, "memory_file_lock", spy)
+    _migrator(mod, source, target, "memory").migrate()
+
+    assert locked == [memories / "MEMORY.md"]
+    assert (memories / "MEMORY.md.lock").exists()  # the file MemoryStore._file_lock uses
+    assert "migration project" in (memories / "MEMORY.md").read_text(encoding="utf-8")
+
+
+def test_forgotten_matching_agrees_with_the_hermes_reader(tmp_path: Path):
+    """The script repeats the matching rules of tools/memory_tombstones.py. The two must agree on what counts as
+    forgotten text: case, width and whitespace folding, containment at word edges, and legacy plaintext rows."""
+    from tools import memory_tombstones as hermes
+
+    mod = load_module()
+    memories = tmp_path / "memories"
+    memories.mkdir()
+    hermes.record_forgotten(["Prefers tea in the morning, always", "Ｃａｆé　ａｔ　ｎｏｏｎ"],
+                            source="memory", scope="entry", memories_dir=memories)
+    path = memories / "forgotten.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["forgotten"].append({"text": "Legacy plaintext note here", "source": "memory"})
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+    for sample in ["Café  at\tNOON", "ＣＡＦＥ ａｔ noon", "x y"]:
+        assert mod.fold_forgotten_text(sample) == hermes.fold_text(sample)
+
+    ours = mod.load_forgotten_index(memories)
+    theirs = hermes.forgotten_index(memories, strict=True)
+    passages = {
+        "Reminder: prefers TEA in the morning,  always, keep it": True,
+        "Prefers tea in the evening, always": False,
+        "The café at noon": True,
+        "legacy PLAINTEXT note here, ok": True,
+        "unrelated text": False,
+    }
+    for passage, expected in passages.items():
+        assert theirs.mentions(passage) is expected, passage
+        assert ours.mentions(passage) == theirs.mentions(passage), passage
 
 
 

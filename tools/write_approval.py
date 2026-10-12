@@ -74,7 +74,15 @@ def stage_write(subsystem: str, payload: Dict[str, Any], *, summary: str, origin
     """Persist a pending write and return its record (``id`` + metadata). ``payload`` is the exact
     kwargs to replay the write on approval; ``origin`` is ``foreground`` or ``background_review``.
     Best-effort: on disk failure it logs and still returns a record — the write is lost, which is
-    the safe failure for an approval gate (nothing silently committed)."""
+    the safe failure for an approval gate (nothing silently committed).
+
+    A memory proposal that would add text the owner forgot is refused here, before anything is written to
+    the pending store, so the forgotten text never reaches disk (ForgottenProposalRefused)."""
+    if subsystem == MEMORY:
+        from tools.memory_tombstones import ForgottenProposalRefused, proposal_refusal
+
+        if reason := proposal_refusal(payload):
+            raise ForgottenProposalRefused(reason)
     pid = uuid.uuid4().hex[:8]
     record = {
         "id": pid, "subsystem": subsystem, "action": payload.get("action", ""),

@@ -479,7 +479,7 @@ class TestImportRespectsForgetting:
     def test_import_skips_entries_that_repeat_forgotten_text(self, claude_tree, hermes_home):
         from tools.memory_tombstones import record_forgotten
 
-        assert record_forgotten(["Always use type hints"], source="memory") is None
+        assert record_forgotten(["Always use type hints"], source="memory", scope="entry") is None
 
         report = run_import("claude-code", claude_tree, hermes_home, execute=True)
 
@@ -496,7 +496,7 @@ class TestImportRespectsForgetting:
         root = profile_env / ".claude"
         root.mkdir()
         (root / "CLAUDE.md").write_text("- Always use type hints\n", encoding="utf-8")
-        assert record_forgotten(["Always use type hints"], source="memory") is None
+        assert record_forgotten(["Always use type hints"], source="memory", scope="entry") is None
 
         report = run_import("claude-code", root, hermes_home, execute=True)
 

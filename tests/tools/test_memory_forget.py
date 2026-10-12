@@ -18,10 +18,11 @@ from agent import learning_mutations as lm
 from hermes_state import SessionDB
 from tools.memory_forget import forget_owner_entry
 from tools.memory_tool import MemoryStore, apply_memory_pending, memory_tool
-from tools.memory_tombstones import fold_text, forgotten_index, forgotten_path, record_forgotten
+from tools.memory_tombstones import fold_text, forgotten_index, forgotten_path, record_forgotten, topic_digest
 from tools.session_search_tool import session_search
 from tools.skill_provenance import reset_current_write_origin, set_current_write_origin
 from tools.topic_memory_store import (
+    forget_topic_text,
     get_topic_summary,
     recall_topic_summaries,
     remove_topic_summary,
@@ -127,7 +128,7 @@ def test_forget_response_never_carries_the_forgotten_text(store, home):
 def test_memory_target_forget_reaches_a_topic_summary(store, home):
     upsert_topic_summary("atlas", "Atlas is the codename for the owner's project.", title="Atlas", keywords=["Atlas"])
 
-    result = _run(store, action="remove", target="memory", old_text="Atlas")
+    result = _run(store, action="remove", target="memory", old_text="Atlas is the codename")
 
     assert result["success"] is True
     assert result["removed_from"] == ["topic"]
@@ -137,7 +138,7 @@ def test_memory_target_forget_reaches_a_topic_summary(store, home):
 def test_user_profile_entry_is_found_when_memory_was_requested(store, home):
     store.add("user", "Name: Alice")
 
-    result = _run(store, action="remove", target="memory", old_text="alice")
+    result = _run(store, action="remove", target="memory", old_text="Name: Alice")
 
     assert result["success"] is True
     assert result["removed_from"] == ["user"]
@@ -158,9 +159,9 @@ def test_topic_forget_removes_only_the_matching_sentence(store, home):
 
 
 def test_keyword_only_match_removes_the_keyword_and_keeps_the_topic(store, home):
-    upsert_topic_summary("project", "Ship date is March.", title="Project", keywords=["Atlas", "release"])
+    upsert_topic_summary("project", "Ship date is March.", title="Project", keywords=["Atlas launch", "release"])
 
-    result = _run(store, action="remove", target="memory", old_text="atlas")
+    result = _run(store, action="remove", target="memory", old_text="atlas launch")
 
     assert result["removed_from"] == ["topic"]
     topic = get_topic_summary("project")
@@ -168,11 +169,11 @@ def test_keyword_only_match_removes_the_keyword_and_keeps_the_topic(store, home)
     assert topic["keywords"] == ["release"]
 
 
-def test_several_matches_across_stores_are_all_removed_and_listed(store, home):
-    store.add("memory", "Atlas launch is in March")
+def test_one_match_per_store_is_removed_from_each_store(store, home):
+    store.add("memory", "Atlas budget launch is in March")
     upsert_topic_summary("budget", "Atlas budget is set. Office is in Berlin.", title="Budget")
 
-    result = _run(store, action="remove", target="memory", old_text="atlas")
+    result = _run(store, action="remove", target="memory", old_text="Atlas budget")
 
     assert result["success"] is True
     assert result["removed_from"] == ["memory", "topic"]
@@ -196,7 +197,7 @@ def test_not_found_lists_candidates_from_every_store(store, home):
 def test_replace_finds_the_entry_in_another_store(store, home):
     store.add("user", "Name: Alice")
 
-    result = _run(store, action="replace", target="memory", old_text="alice", content="Name: Alicia")
+    result = _run(store, action="replace", target="memory", old_text="Name: Alice", content="Name: Alicia")
 
     assert result["success"] is True
     assert result["replaced_in"] == "user"
@@ -204,11 +205,11 @@ def test_replace_finds_the_entry_in_another_store(store, home):
 
 
 def test_replace_refuses_to_guess_between_several_matches(store, home):
-    store.add("user", "Likes Atlas coffee")
+    store.add("user", "Likes Atlas budget coffee")
     upsert_topic_summary("budget", "Atlas budget is set.", title="Budget")
     before = _file(home, "USER.md").read_bytes()
 
-    result = _run(store, action="replace", target="memory", old_text="atlas", content="Atlas is closed")
+    result = _run(store, action="replace", target="memory", old_text="Atlas budget", content="Atlas budget is closed")
 
     assert result["success"] is False
     assert "Multiple entries matched" in result["error"]
@@ -229,9 +230,9 @@ def test_topic_replace_rewrites_only_the_matching_sentence(store, home):
 
 
 def test_replace_refuses_a_match_that_is_only_in_a_topic_title_or_keywords(store, home):
-    upsert_topic_summary("project", "Ship date is March.", title="Project", keywords=["Atlas"])
+    upsert_topic_summary("project", "Ship date is March.", title="Project", keywords=["Atlas launch"])
 
-    result = _run(store, action="replace", target="memory", old_text="atlas", content="Atlas is closed")
+    result = _run(store, action="replace", target="memory", old_text="atlas launch", content="Atlas launch is closed")
 
     assert result["success"] is False
     assert "title or keywords" in result["error"]
@@ -370,15 +371,17 @@ def test_forgotten_file_stores_a_hash_and_never_the_text(store, home):
     assert forgotten_path() == _file(home, "forgotten.json")
 
 
-def test_topic_forget_records_the_topic_key_with_the_hash(store, home):
+def test_topic_forget_records_the_topic_key_only_as_a_hash(store, home):
     upsert_topic_summary("project", "Ship date is March. Codename is Atlas.", title="Project")
 
     _run(store, action="remove", target="topic", topic="project", old_text="codename is Atlas")
 
-    records = _records(home)
-    assert records[0]["topic"] == "project"
-    assert records[0]["sha256"] == _digest("Codename is Atlas.")
-    assert "Codename" not in _file(home, "forgotten.json").read_text(encoding="utf-8")
+    raw = _file(home, "forgotten.json").read_text(encoding="utf-8")
+    record = _records(home)[0]
+    assert record["sha256"] == _digest("Codename is Atlas.")
+    assert record["scope"] == "sentence" and record["source"] == "topic"
+    assert record["topic_sha256"] == topic_digest("project")
+    assert "project" not in raw and "Codename" not in raw
 
 
 def test_legacy_plaintext_records_still_filter_and_are_dropped_on_the_next_write(store, home):
@@ -396,7 +399,7 @@ def test_legacy_plaintext_records_still_filter_and_are_dropped_on_the_next_write
 
 
 def test_short_phrase_is_recorded_but_never_filters(home):
-    assert record_forgotten(["ok"], source="memory") is None
+    assert record_forgotten(["ok"], source="memory", scope="entry") is None
 
     assert _records(home)[0]["length"] == 2
     assert not forgotten_index().mentions("ok then, thanks")
@@ -424,7 +427,7 @@ def test_topic_reset_records_the_erased_summaries_as_hashes(home):
 def test_replacing_an_entry_does_not_forget_the_old_text(store, home):
     store.add("memory", "The owner lives in Berlin")
 
-    _run(store, action="replace", target="memory", old_text="Berlin", content="The owner lives in Munich")
+    _run(store, action="replace", target="memory", old_text="lives in Berlin", content="The owner lives in Munich")
 
     assert not _file(home, "forgotten.json").exists()
 
@@ -518,11 +521,11 @@ def test_replace_with_forgotten_text_is_refused_for_automatic_writers_and_accept
     memory_tool(action="remove", target="memory", old_text="green tea", store=store)
     store.add("memory", "The owner drinks coffee")
 
-    refused = _run(store, action="replace", target="memory", old_text="coffee", content=phrase)
+    refused = _run(store, action="replace", target="memory", old_text="drinks coffee", content=phrase)
     assert refused["skipped"] is True
     assert store._entries_for("memory") == ["The owner drinks coffee"]
 
-    accepted = store.replace("memory", "coffee", phrase, owner_initiated=True)
+    accepted = store.replace("memory", "drinks coffee", phrase, owner_initiated=True)
     assert accepted["success"] is True
     assert store._entries_for("memory") == [phrase]
 
@@ -530,7 +533,7 @@ def test_replace_with_forgotten_text_is_refused_for_automatic_writers_and_accept
 def test_topic_upsert_refuses_automatic_writers_and_accepts_the_owner(home):
     phrase = "The owner's favourite editor is Vim"
     upsert_topic_summary("editor-notes", f"Editor setup notes. {phrase}.", title="Editor notes")
-    assert record_forgotten([phrase], source="memory") is None
+    assert record_forgotten([phrase], source="memory", scope="entry") is None
 
     refused = upsert_topic_summary("editor-notes", f"Updated notes. {phrase}.", title="Editor notes")
     assert refused["skipped"] is True
@@ -590,7 +593,7 @@ def test_session_search_by_session_id_still_shows_the_transcript(store, home, tm
 
 def test_forgotten_text_in_a_topic_file_is_dropped_from_topic_recall(home):
     phrase = "The owner's favourite editor is Vim"
-    assert record_forgotten([phrase], source="memory") is None
+    assert record_forgotten([phrase], source="memory", scope="entry") is None
     topic_memory_path().parent.mkdir(parents=True, exist_ok=True)
     topic_memory_path().write_text(json.dumps({"version": 1, "topics": [{
         "key": "editor-notes", "title": "Editor notes", "summary": f"Editor setup notes. {phrase}.",
@@ -598,3 +601,218 @@ def test_forgotten_text_in_a_topic_file_is_dropped_from_topic_recall(home):
     }]}), encoding="utf-8")
 
     assert recall_topic_summaries("Vim editor notes") == []
+
+
+# ── sweep limits: a short or ambiguous phrase changes nothing ───────────────
+
+@pytest.mark.parametrize("phrase", ["tea", "Berlin"])
+def test_a_phrase_under_eight_characters_never_removes_or_replaces_unrelated_text(store, home, phrase):
+    store.add("memory", "Team meeting on Monday")
+    store.add("memory", "Visited berlin in 2019")
+    before = _file(home, "MEMORY.md").read_bytes()
+
+    removed = _run(store, action="remove", target="memory", old_text=phrase)
+    replaced = _run(store, action="replace", target="memory", old_text=phrase, content="Something else entirely")
+
+    for result in (removed, replaced):
+        assert result["success"] is False
+        assert "shorter than 8 characters" in result["error"]
+    assert _file(home, "MEMORY.md").read_bytes() == before
+    assert not _file(home, "forgotten.json").exists()
+
+
+def test_a_phrase_matching_two_entries_is_refused_with_candidates_and_nothing_changes(store, home):
+    store.add("memory", "Team meeting on Monday")
+    store.add("memory", "Team meeting on Friday")
+    before = _file(home, "MEMORY.md").read_bytes()
+
+    result = _run(store, action="remove", target="memory", old_text="Team meeting")
+
+    assert result["success"] is False
+    assert "matches more than one entry in MEMORY.md" in result["error"]
+    assert {match["preview"] for match in result["matches"]} == {"Team meeting on Monday", "Team meeting on Friday"}
+    assert _file(home, "MEMORY.md").read_bytes() == before
+    assert not _file(home, "forgotten.json").exists()
+
+
+def test_a_phrase_matching_twice_in_one_topic_is_refused_across_all_stores(store, home):
+    store.add("memory", "Atlas budget launch is in March")
+    upsert_topic_summary("budget", "Atlas budget is set. Atlas budget review is in May.", title="Budget")
+    memory_before = _file(home, "MEMORY.md").read_bytes()
+    topics_before = topic_memory_path().read_bytes()
+
+    result = _run(store, action="remove", target="memory", old_text="Atlas budget")
+
+    assert result["success"] is False
+    assert "topic summaries" in result["error"]
+    assert _file(home, "MEMORY.md").read_bytes() == memory_before
+    assert topic_memory_path().read_bytes() == topics_before
+
+
+def test_store_level_forget_refuses_a_second_match_written_after_the_scan(store, home):
+    store.add("memory", "The owner drinks green tea")
+    store.add("memory", "The owner drinks green tea at noon")
+    before = _file(home, "MEMORY.md").read_bytes()
+
+    result = store.forget_matching("memory", "green tea")
+
+    assert result["success"] is False
+    assert "matches more than one entry" in result["error"]
+    assert _file(home, "MEMORY.md").read_bytes() == before
+    assert not _file(home, "forgotten.json").exists()
+
+
+def test_topic_level_forget_refuses_a_second_match_written_after_the_scan(home):
+    upsert_topic_summary("budget", "Atlas budget is set. Atlas budget review is in May.", title="Budget")
+    before = topic_memory_path().read_bytes()
+
+    result = forget_topic_text("Atlas budget")
+
+    assert result["success"] is False
+    assert "matches more than one topic item" in result["error"]
+    assert topic_memory_path().read_bytes() == before
+
+
+def test_batch_remove_of_a_phrase_also_held_in_user_names_that_store_and_writes_nothing(store, home):
+    store.add("memory", "Atlas budget is set for March")
+    store.add("user", "Atlas budget owner is Alice")
+    memory_before = _file(home, "MEMORY.md").read_bytes()
+    user_before = _file(home, "USER.md").read_bytes()
+
+    result = _run(store, operations=[{"action": "remove", "old_text": "Atlas budget"}], target="memory")
+
+    assert result["success"] is False
+    assert "USER.md" in result["error"]
+    assert _file(home, "MEMORY.md").read_bytes() == memory_before
+    assert _file(home, "USER.md").read_bytes() == user_before
+
+
+def test_a_legacy_plaintext_row_found_alone_is_removed_from_the_file(store, home):
+    phrase = "Old plaintext fact about tea"
+    _file(home, "forgotten.json").write_text(json.dumps({"version": 1, "forgotten": [
+        {"text": phrase, "forgotten_at": "2026-10-01T00:00:00+00:00", "source": "memory"}]}), encoding="utf-8")
+
+    result = _run(store, action="remove", target="memory", old_text="plaintext fact about tea")
+
+    assert result["success"] is True and result["already_forgotten"] is True
+    raw = _file(home, "forgotten.json").read_text(encoding="utf-8")
+    assert "plaintext fact" not in raw and '"text"' not in raw
+    assert _digest(phrase) in {row["sha256"] for row in _records(home)}
+
+
+# ── keywords, topic keys, fail-closed reads, failed records, proposals ──────
+
+def test_a_forgotten_keyword_is_recorded_and_blocks_an_automatic_readd(store, home):
+    upsert_topic_summary("project", "Ship date is March.", title="Project", keywords=["Atlas launch", "release"])
+
+    _run(store, action="remove", target="topic", topic="project", old_text="atlas launch")
+
+    assert next(row for row in _records(home) if row["sha256"] == _digest("Atlas launch"))["scope"] == "keyword"
+    refused = _background(lambda: _run(store, action="add", target="memory", content="Atlas launch is on Friday"))
+    assert refused["skipped"] is True
+    assert store._entries_for("memory") == []
+
+
+def test_a_forgotten_topic_is_recorded_under_its_key_hash_and_blocks_a_recreated_topic(home):
+    upsert_topic_summary("editor-notes", "Editor setup notes.", title="Editor notes")
+    assert remove_topic_summary("editor-notes")["success"] is True
+
+    raw = _file(home, "forgotten.json").read_text(encoding="utf-8")
+    assert "editor-notes" not in raw and "Editor setup notes" not in raw
+    assert {row["topic_sha256"] for row in _records(home) if "topic_sha256" in row} == {topic_digest("editor-notes")}
+
+    refused = upsert_topic_summary("editor-notes", "A different summary.", title="Editor notes")
+    assert refused["skipped"] is True
+    assert "forgotten as a whole" in refused["reason"]
+    assert get_topic_summary("editor-notes") is None
+
+
+def test_an_unreadable_forgotten_file_refuses_every_memory_write_even_the_owners(store, home):
+    store.add("memory", "The owner wakes late")
+    _file(home, "forgotten.json").write_bytes(b"{broken")
+    before = _file(home, "MEMORY.md").read_bytes()
+
+    automatic = _run(store, action="add", target="memory", content="The owner drinks green tea")
+    owner = _run(store, action="add", target="memory", content="The owner drinks green tea", owner_initiated=True)
+
+    for result in (automatic, owner):
+        assert result["skipped"] is True
+        assert "cannot be read" in result["reason"]
+    assert _file(home, "MEMORY.md").read_bytes() == before
+    assert _file(home, "forgotten.json").read_bytes() == b"{broken"
+
+
+def test_a_removal_whose_forgotten_record_cannot_be_written_does_not_happen(store, home, monkeypatch):
+    store.add("memory", "The owner drinks green tea")
+    upsert_topic_summary("tea-notes", "Morning routine. The owner drinks green tea.", title="Tea notes")
+    memory_before = _file(home, "MEMORY.md").read_bytes()
+    topics_before = topic_memory_path().read_bytes()
+
+    def disk_full(*args, **kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr("tools.memory_tool_store.record_forgotten", disk_full)
+    monkeypatch.setattr("tools.topic_memory_store.record_forgotten", disk_full)
+
+    memory_removal = _run(store, action="remove", target="memory", old_text="The owner drinks green tea")
+    topic_removal = _run(store, action="remove", target="topic", topic="tea-notes", old_text="Morning routine.")
+
+    for result in (memory_removal, topic_removal):
+        assert result["success"] is False
+        assert "Nothing was removed" in result["error"]
+    assert _file(home, "MEMORY.md").read_bytes() == memory_before
+    assert topic_memory_path().read_bytes() == topics_before
+
+
+def test_a_staged_proposal_that_would_add_forgotten_text_is_refused_before_anything_is_staged(store, home, monkeypatch):
+    from tools import write_approval as wa
+
+    phrase = "The owner drinks green tea"
+    store.add("memory", phrase)
+    memory_tool(action="remove", target="memory", old_text="green tea", store=store)
+    monkeypatch.setattr(wa, "evaluate_gate", lambda subsystem, **kwargs: wa.GateDecision(stage=True, message="staged"))
+    pending = home / "pending" / "memory"
+
+    memory_proposal = _run(store, action="add", target="memory", content=phrase)
+    topic_proposal = _run(store, action="add", target="topic", topic="editor-notes", content=f"Notes. {phrase}.")
+
+    for result in (memory_proposal, topic_proposal):
+        assert result["success"] is False and result["skipped"] is True
+    assert not pending.exists() or not any(pending.glob("*.json"))
+
+    staged = _run(store, action="add", target="memory", content="The owner likes trains")
+    assert staged["staged"] is True
+    assert len(list(pending.glob("*.json"))) == 1
+
+
+def test_reset_erases_nothing_when_the_forgotten_record_cannot_be_written(store, home, monkeypatch):
+    store.add("memory", "The owner drinks green tea")
+
+    def disk_full(*args, **kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr("tools.memory_tool_store.record_forgotten", disk_full)
+
+    with pytest.raises(RuntimeError, match="stopped before erasing"):
+        MemoryStore.reset_target("memory")
+    assert _file(home, "MEMORY.md").read_text(encoding="utf-8") == "The owner drinks green tea"
+
+
+def test_session_search_is_suspended_while_forgotten_records_are_unreadable(home, tmp_path):
+    db = SessionDB(tmp_path / "state.db")
+    db.create_session("s_any", source="cli")
+    db.append_message("s_any", role="user", content="Atlas the rocket launch is scheduled for Friday.")
+    _file(home, "forgotten.json").write_bytes(b"{broken")
+
+    result = json.loads(session_search(query="Atlas", db=db))
+
+    assert result["success"] is False
+    assert "Recall is suspended" in result["error"]
+
+
+def test_topic_recall_is_suspended_while_forgotten_records_are_unreadable(home):
+    upsert_topic_summary("project", "Ship date is March. Codename is Atlas.", title="Project", keywords=["release"])
+    assert recall_topic_summaries("Project release ship date")
+    _file(home, "forgotten.json").write_bytes(b"{broken")
+
+    assert recall_topic_summaries("Project release ship date") == []
