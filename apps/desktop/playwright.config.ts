@@ -32,9 +32,11 @@ export default defineConfig({
    * app) and is owned by the vitest `electron` project. Without this the
    * default testMatch would claim those files too and run them twice. */
   testIgnore: '**/*.unit.test.ts',
-  /* The desktop app can take a while to bootstrap on cold CI runners — 90 s
-   * per test gives us headroom without masking real hangs. */
-  timeout: 90_000,
+  /* A cold desktop boot takes 25-60 s, and specs that seed bot or session
+   * profiles first start a gateway per profile before the app is ready. Hooks
+   * share this budget, and their readiness waits run to 120 s, so the old 90 s
+   * could not hold a boot plus its wait. */
+  timeout: 240_000,
   retries: process.env.CI ? 1 : 0,
   /* Each test gets its own worker so the Electron process is fully isolated. */
   fullyParallel: false,
