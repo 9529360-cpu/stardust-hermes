@@ -71,21 +71,16 @@ async function waitForTranscriptText(page: Page, text: string): Promise<void> {
   )
 }
 
-async function textNodeOccurrences(page: Page, text: string): Promise<number> {
+async function userMessagesContaining(page: Page, text: string): Promise<Array<{ id: string | null; text: string }>> {
   return page.evaluate(
     ([expected, surfaceSelector]: [string, string]) => {
       const surfaces = document.querySelectorAll(surfaceSelector)
       const viewport = surfaces[surfaces.length - 1]?.querySelector('[data-slot="aui_thread-viewport"]')
-      if (!viewport) return 0
+      if (!viewport) return []
 
-      const walker = document.createTreeWalker(viewport, NodeFilter.SHOW_TEXT)
-      let count = 0
-      while (walker.nextNode()) {
-        if (walker.currentNode.textContent?.includes(expected)) {
-          count += 1
-        }
-      }
-      return count
+      return Array.from(viewport.querySelectorAll<HTMLElement>('[data-role="user"]'))
+        .filter(message => (message.textContent ?? '').includes(expected))
+        .map(message => ({ id: message.getAttribute('data-message-id'), text: message.textContent?.trim() ?? '' }))
     },
     [text, SURFACE] as [string, string],
   )
@@ -211,8 +206,12 @@ test.describe('correction session switch', () => {
 
     const orderBeforeSwitch = relevantOrder(await transcriptTextOrder(page))
     expect(orderBeforeSwitch).toEqual([ORIGINAL_PROMPT, CORRECTION])
-    expect(await textNodeOccurrences(page, ORIGINAL_PROMPT)).toBe(1)
-    expect(await textNodeOccurrences(page, CORRECTION)).toBe(1)
+    const originalMessages = await userMessagesContaining(page, ORIGINAL_PROMPT)
+    const correctionMessages = await userMessagesContaining(page, CORRECTION)
+    expect(originalMessages).toHaveLength(1)
+    expect(originalMessages[0].id).toBeTruthy()
+    expect(correctionMessages).toHaveLength(1)
+    expect(correctionMessages[0].id).toBeTruthy()
     await page.screenshot({ path: testInfo.outputPath('correction-before-session-switch.png') })
 
     // Reproduce the observed race: switch to another persisted session while
@@ -234,8 +233,12 @@ test.describe('correction session switch', () => {
       .toEqual(orderBeforeSwitch)
     await page.screenshot({ path: testInfo.outputPath('correction-after-warm-resume.png') })
 
-    expect(await textNodeOccurrences(page, ORIGINAL_PROMPT)).toBe(1)
-    expect(await textNodeOccurrences(page, CORRECTION)).toBe(1)
+    const originalMessagesAfterResume = await userMessagesContaining(page, ORIGINAL_PROMPT)
+    const correctionMessagesAfterResume = await userMessagesContaining(page, CORRECTION)
+    expect(originalMessagesAfterResume).toHaveLength(1)
+    expect(originalMessagesAfterResume[0].id).toBeTruthy()
+    expect(correctionMessagesAfterResume).toHaveLength(1)
+    expect(correctionMessagesAfterResume[0].id).toBeTruthy()
 
     await waitForTranscriptText(page, CORRECTED_REPLY)
     // The post-turn stored-history reconcile can momentarily repaint from a
@@ -266,8 +269,16 @@ test.describe('correction session switch', () => {
     await openSidebarSession(page, OTHER_SESSION_LABEL, OTHER_SESSION_PROMPT)
     await reopenInferenceSession(page)
 
-    expect(await textNodeOccurrences(page, INFERENCE_PROMPT)).toBe(1)
-    expect(await textNodeOccurrences(page, INFERENCE_CORRECTION)).toBe(1)
+    const originalMessages = await userMessagesContaining(page, INFERENCE_PROMPT)
+    const correctionMessages = await userMessagesContaining(page, INFERENCE_CORRECTION)
+    expect(originalMessages).toHaveLength(1)
+    expect(originalMessages[0].id).toBeTruthy()
+    expect(correctionMessages).toHaveLength(1)
+    expect(correctionMessages[0].id).toBeTruthy()
+    const userMessageOrder = (await transcriptMessageOrder(page)).filter(message =>
+      message.includes(INFERENCE_PROMPT) || message.includes(INFERENCE_CORRECTION),
+    )
+    expect(userMessageOrder).toEqual([INFERENCE_PROMPT, INFERENCE_CORRECTION])
     await page.screenshot({ path: testInfo.outputPath('inference-correction-after-warm-resume.png') })
 
     mock.releaseHeldStream()
