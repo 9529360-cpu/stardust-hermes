@@ -247,6 +247,13 @@ test.describe('large session resume', () => {
         BACKGROUND_REPLY,
         { timeout: 60_000 },
       )
+      const activeSubmit = fixture.page
+        .locator('[data-composer-target]:not([data-pane-hidden] [data-composer-target]) [data-slot="composer-root"] button[type="submit"]')
+        .last()
+      await expect(activeSubmit).toHaveAttribute('aria-label', /^(Send|发送)$/, { timeout: 60_000 })
+      // The completion label proves the stop chunk was consumed; leave the
+      // existing brief settle for the subsequent persisted-history reconcile.
+      await fixture.page.waitForTimeout(300)
       await fixture.page.screenshot({ path: testInfo.outputPath(`${resumeKind}-background-inference-resume.png`), fullPage: false })
 
       expect(await textNodeOccurrences(fixture.page, BACKGROUND_PROMPT), 'the running user prompt should appear once').toBe(1)
