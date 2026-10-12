@@ -35,6 +35,7 @@ Create PDFs from structured specs, build and fill AcroForm forms (with layout li
   `python -m pip install pypdf reportlab pdfplumber`
 - Optional, for page rasterization (`pdf_page_image.py`, overlay rendering): `python -m pip install pypdfium2`, or poppler's `pdftoppm` on PATH. Scripts fall back pypdfium2 → pdftoppm and report `{"rendered": false, "missing": [...]}` (exit 0) when neither exists.
 - Each helper script checks imports lazily and prints an install hint if a dependency is missing.
+- `pdf_markdown.py` embeds the first CJK TrueType font it finds (Microsoft YaHei on Windows, Noto Sans CJK or WenQuanYi Zen Hei on Linux, PingFang or Hiragino on macOS); pass `--font PATH` to choose one. Without one, the PDF still renders in Helvetica and the JSON result carries a warning.
 
 ## How to Run
 
@@ -42,6 +43,7 @@ All helpers live in `scripts/` and are argparse CLIs — run them with the `term
 
 ```bash
 python scripts/pdf_create.py spec.json -o out.pdf         # build PDF from JSON spec
+python scripts/pdf_markdown.py --input report.md --output report.pdf  # Markdown report to PDF, Chinese text
 python scripts/pdf_make_form.py formspec.json -o form.pdf # build fillable AcroForm from JSON spec
 python scripts/pdf_form_layout.py formspec.json           # lint form layout BEFORE building
 python scripts/pdf_form_layout.py formspec.json --render-overlay boxes.png [--pdf form.pdf]
@@ -69,6 +71,7 @@ python scripts/pdf_meta.py doc.pdf --list-attachments | --extract-attachments di
 | Task | Tool | Command / API |
 |---|---|---|
 | Create doc (headings, tables, images) | reportlab platypus | `pdf_create.py spec.json -o out.pdf` |
+| Markdown report with Chinese text | reportlab platypus | `pdf_markdown.py --input r.md --output r.pdf` |
 | Build fillable form | reportlab acroForm | `pdf_make_form.py formspec.json -o form.pdf` |
 | Lint form layout / overlay image | pure python + PIL | `pdf_form_layout.py formspec.json [--render-overlay o.png]` |
 | Per-page text | pdfplumber | `pdf_read.py f.pdf --text` |
