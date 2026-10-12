@@ -101,6 +101,8 @@ _PY_RELEVANT_CONTRACT_FILES = {
     "apps/shared/src/gateway-contract.openrpc.json",
     # tests/hermes_cli/test_desktop_slash_registry.py
     "apps/desktop/src/lib/desktop-slash-registry.json",
+    # tests/hermes_cli/test_venv_layout.py (the Electron updater's venv names must match venv_layout)
+    "apps/desktop/electron/venv-layout.ts",
 }
 
 # CI-sensitive files: eslint config, workflow files, composite actions.

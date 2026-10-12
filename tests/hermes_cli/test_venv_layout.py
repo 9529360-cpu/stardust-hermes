@@ -2,18 +2,20 @@
 
 These are the behaviour contracts behind every update-path lookup: the rule (``venv`` with an
 interpreter, else ``.venv`` with one, else ``venv``), the alias that exposes a ``.venv``-only install
-under ``venv``, and the unchanged answer of ``project_venv_dir`` for half-repaired folders.
+under ``venv``, the unchanged answer of ``project_venv_dir`` for half-repaired folders, and the names every
+updater, installer and repair path repeats agreeing with ``venv_layout``.
 """
 
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 import pytest
 
 import hermes_constants
-from hermes_cli import venv_layout
+from hermes_cli import managed_uv, venv_layout
 from hermes_cli.venv_layout import ensure_venv_alias, resolve_venv_dir, venv_dirs_to_guard
 
 
@@ -183,3 +185,69 @@ def test_alias_failure_is_reported_and_never_raised(tmp_path, monkeypatch):
     assert ensure_venv_alias(tmp_path, windows=False) == "failed"
     assert not os.path.lexists(tmp_path / "venv")
     assert (tmp_path / ".venv").is_dir()  # the failed alias leaves .venv untouched
+
+
+# ── one definition of the venv names, read back from every place that repeats them ──
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _source(relative: str) -> str:
+    return (_REPO_ROOT / relative).read_text(encoding="utf-8").replace("\r\n", "\n")
+
+
+def _installer_pin_names() -> tuple[str, ...]:
+    """Distinct venv folder names that scripts/install.ps1 pins UV_PROJECT_ENVIRONMENT to."""
+    pins = [line for line in _source("scripts/install.ps1").splitlines() if re.search(r"UV_PROJECT_ENVIRONMENT\s*=", line)]
+    assert pins, "scripts/install.ps1 no longer pins UV_PROJECT_ENVIRONMENT"
+    names = []
+    for line in pins:
+        found = re.findall(r"(?<!\w)(\.?venv)(?!\w)", line.split("=", 1)[1])
+        assert len(found) == 1, f"expected one venv folder in the pin: {line.strip()}"
+        names.append(found[0])
+    return tuple(dict.fromkeys(names))
+
+
+def _electron_updater_names() -> tuple[str, str]:
+    """(DEFAULT_VENV_NAME, UV_VENV_NAME) as apps/desktop/electron/venv-layout.ts declares them."""
+    consts = dict(re.findall(r"export const (\w+) = ['\"]([^'\"]+)['\"]", _source("apps/desktop/electron/venv-layout.ts")))
+    return consts["DEFAULT_VENV_NAME"], consts["UV_VENV_NAME"]
+
+
+def _windows_resolver_names() -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """(candidate folders in order, fresh-install default) of Resolve-VenvDir in scripts/desktop-update/windows.ps1."""
+    text = _source("scripts/desktop-update/windows.ps1")
+    function = re.search(r"^function Resolve-VenvDir\(\[string\]\$Root\) \{\n(.*?)^\}", text, re.M | re.S)
+    assert function, "Resolve-VenvDir not found in scripts/desktop-update/windows.ps1"
+    body = function.group(1)
+    candidates = re.search(r"foreach \(\$name in @\(([^)]*)\)\)", body)
+    assert candidates, "Resolve-VenvDir no longer iterates a literal list of venv folder names"
+    return (
+        tuple(re.findall(r'"([^"]+)"', candidates.group(1))),
+        tuple(re.findall(r'Join-Path \$Root "([^"]+)"', body)),
+    )
+
+
+def test_venv_names_agree_across_installer_updater_and_repair():
+    """One rule names the venv folders: ``venv`` first, then ``.venv`` as the uv fallback.
+
+    venv_layout holds the definition. The installer's UV_PROJECT_ENVIRONMENT pin, the Electron updater, the Windows
+    hand-off resolver and the runtime repair list each repeat it. Changing any one of them alone fails this test.
+    """
+    candidates, fresh_install_default = _windows_resolver_names()
+    observed = {
+        "hermes_cli/venv_layout.py": (venv_layout.DEFAULT_VENV_NAME, venv_layout.UV_VENV_NAME),
+        "hermes_cli/managed_uv.py": (managed_uv._VENV_NAME, managed_uv._ALT_VENV_NAME),
+        "apps/desktop/electron/venv-layout.ts": _electron_updater_names(),
+        "scripts/desktop-update/windows.ps1 candidates": candidates,
+        "scripts/desktop-update/windows.ps1 fresh-install default": fresh_install_default,
+        "scripts/install.ps1 UV_PROJECT_ENVIRONMENT pins": _installer_pin_names(),
+    }
+    assert observed == {
+        "hermes_cli/venv_layout.py": ("venv", ".venv"),
+        "hermes_cli/managed_uv.py": ("venv", ".venv"),
+        "apps/desktop/electron/venv-layout.ts": ("venv", ".venv"),
+        "scripts/desktop-update/windows.ps1 candidates": ("venv", ".venv"),
+        "scripts/desktop-update/windows.ps1 fresh-install default": ("venv",),
+        "scripts/install.ps1 UV_PROJECT_ENVIRONMENT pins": ("venv",),
+    }
