@@ -67,7 +67,10 @@ async function checkChangedStates(
 
   const setupCard = page.getByRole('button', { name: '为我设置' })
   const runtimeHeading = page.getByText('本地运行时', { exact: true })
-  await expect(setupCard.or(runtimeHeading).first()).toBeVisible({ timeout: 30_000 })
+  // The runtime card renders only after the local-model catalog request resolves,
+  // and that request runs the hardware probes (hermes_cli/local_runtime/hardware.py,
+  // 5-30 s subprocess timeouts). A 30 s budget is too short on a cold CI runner.
+  await expect(setupCard.or(runtimeHeading).first()).toBeVisible({ timeout: 90_000 })
   await expect.soft(setupCard).toHaveCount(0)
   await expect.soft(runtimeHeading).toBeVisible()
   await capture(page, size, 'settings-models')
