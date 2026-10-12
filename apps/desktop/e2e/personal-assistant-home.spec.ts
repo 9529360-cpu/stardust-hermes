@@ -36,7 +36,7 @@ test('personal assistant workspace keeps conversation primary and navigation unc
   const rightContextToggle = page.locator('[data-tour="right-pane-toggle"]')
 
   await expect(intro).toBeVisible()
-  await expect(page.getByTestId('assistant-quick-actions')).toHaveCount(0)
+  await expect(intro.getByTestId('assistant-quick-actions')).toBeVisible()
   await expect(productNav).toBeVisible()
   await expect(page.getByRole('tab', { name: '对话' })).toHaveCount(0)
   await expect(page.getByRole('tab', { name: '智能体' })).toHaveCount(0)
@@ -48,7 +48,8 @@ test('personal assistant workspace keeps conversation primary and navigation unc
   await expect(productNav.getByRole('button', { name: '工具' })).toBeVisible()
   await expect(productNav.getByRole('button', { name: '消息平台' })).toBeVisible()
   await expect(productNav.getByRole('button', { name: '项目' })).toBeVisible()
-  await expect(productNav.getByRole('button', { name: '对话' })).toHaveCount(0)
+  // Exact name: a substring match would also catch the nav's "新建对话" row.
+  await expect(productNav.getByRole('button', { name: '对话', exact: true })).toHaveCount(0)
   await expect(productNav.getByRole('button', { name: '知识库' })).toHaveCount(0)
   await expect(productNav.getByRole('button', { name: '设置' })).toHaveCount(0)
   await expect(overview).not.toBeVisible()
@@ -56,7 +57,7 @@ test('personal assistant workspace keeps conversation primary and navigation unc
   // Projects are a sidebar/context mode around the same conversation, not a
   // competing center page or an immediate native folder-picker action.
   await projectButton.click()
-  await expect(projectButton).toHaveAttribute('aria-current', 'page')
+  await expect(projectButton).toHaveAttribute('aria-expanded', 'true')
   await expect(composer).toBeVisible()
   await expect(overview).not.toBeVisible()
 
@@ -80,9 +81,9 @@ test('personal assistant workspace keeps conversation primary and navigation unc
 
   const viewport = await page.evaluate(() => ({ height: innerHeight, width: innerWidth }))
 
+  // The workspace overview this toggle used to open is retired (pane-shell
+  // store), so only the draft survival is asserted for the toggle itself.
   await rightContextToggle.click()
-  await expect(overview).toBeVisible()
-  await expect(overview).toHaveAttribute('aria-label', '上下文')
   await expect(composer).toBeVisible()
   await expect.poll(async () => composer.evaluate(element => element.textContent ?? '')).toBe('保留这段未发送草稿')
 

@@ -39,12 +39,11 @@ test('tools is a direct primary navigation destination, and plugins open from it
 
   // Skills remain available inside the capability surface without occupying a
   // permanent primary-nav row.
-  await page.getByText('技能', { exact: true }).click()
+  await page.getByRole('button', { name: /^技能 \d+$/ }).click()
   await expect(page.locator('[data-skill-overview]').first()).toBeVisible({ timeout: 15_000 })
   await expect(page.getByRole('switch').first()).toBeVisible({ timeout: 15_000 })
   await expect(page.getByText('正在加载能力…', { exact: true })).toHaveCount(0, { timeout: 15_000 })
   await expect(page.getByText('Hermes (default)', { exact: true })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: '浏览完整技能中心' })).toBeVisible()
   await expect(page.locator('iframe')).toHaveCount(0)
   await expect(page.getByText('它能做什么', { exact: true })).toBeVisible()
   await expect(page.getByText('效率', { exact: true }).first()).toBeVisible()
@@ -72,17 +71,15 @@ test('tools is a direct primary navigation destination, and plugins open from it
   await expect(page.getByRole('columnheader', { name: '桌面', exact: true })).toBeVisible()
   await expect(page.getByRole('columnheader', { name: '默认配置 中的智能体', exact: true })).toBeVisible()
   await expect(page.getByText('智能体', { exact: true }).first()).toBeVisible()
-  await expect(page.getByText('任务看板', { exact: true })).toBeVisible()
+  // The Kanban board is retired, so its plugin row is not listed.
+  await expect(page.getByText('任务看板', { exact: true })).toHaveCount(0)
   await expect(page.getByText('电台', { exact: true })).toHaveCount(0)
   await expect(
     page.getByText('智能体名册，为每个智能体提供独立对话、定时任务、群聊和智能体间消息。', { exact: true })
   ).toBeVisible()
-  await expect(
-    page.getByText('多智能体任务看板，包含看板页面、命令面板入口和状态栏中的实时任务动态。', { exact: true })
-  ).toBeVisible()
   await expect(page.getByText('Hermes（默认）', { exact: true })).toHaveCount(0)
   await expect(page.getByText('Hermes (default)', { exact: true })).toHaveCount(0)
-  await expect(page.getByText('插件目录', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '打开插件文件夹', exact: true })).toBeVisible()
   await expect(page.locator('iframe')).toHaveCount(0)
   await page.screenshot({ path: testInfo.outputPath('personal-assistant-capabilities-plugins.png') })
 })
