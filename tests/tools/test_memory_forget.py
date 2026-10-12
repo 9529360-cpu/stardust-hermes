@@ -1079,7 +1079,9 @@ def test_a_proposal_naming_a_topic_with_forgotten_text_is_refused_before_anythin
     record_forgotten(["Coffee"], source="memory", scope="entry")
     monkeypatch.setattr(wa, "evaluate_gate", lambda subsystem, **kwargs: wa.GateDecision(stage=True, message="staged"))
 
-    result = _run(store, action="add", target="topic", topic="coffee notes", content="Trains are on time.")
+    # The title is "Trains", so the forgotten word appears only in the topic's name: the name rule alone refuses this.
+    result = _run(store, action="add", target="topic", topic="coffee notes", title="Trains",
+                  content="Trains are on time.")
 
     assert result["success"] is False and result["skipped"] is True
     pending = home / "pending" / "memory"
