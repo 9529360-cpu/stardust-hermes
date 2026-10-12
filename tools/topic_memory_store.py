@@ -53,6 +53,11 @@ def _topic_key(value: Any) -> str:
     return text[:80]
 
 
+def _key_forms(key: str) -> list[str]:
+    """A topic key as a person may type it: the key itself, and the key with its hyphens read as spaces."""
+    return [key, key.replace("-", " ")]
+
+
 def _keywords(values: Any) -> list[str]:
     if isinstance(values, str):
         values = [piece.strip() for piece in re.split(r"[,，;；\n]+", values)]
@@ -336,8 +341,7 @@ def topic_forget_units(row: dict[str, Any], needle: str) -> list[tuple[str, str]
     agree."""
     title = str(row.get("title") or "")
     key = _topic_key(row.get("key") or row.get("title"))
-    key_forms = (fold_text(key), fold_text(key.replace("-", " ")))  # "morning-coffee" is also named "morning coffee"
-    if needle in fold_text(title) or any(needle in form for form in key_forms):
+    if needle in fold_text(title) or any(needle in fold_text(form) for form in _key_forms(key)):
         return [("topic", title)]
     units = [("sentence", s.strip()) for s in _sentences(str(row.get("summary") or "")) if needle in fold_text(s)]
     units += [("keyword", str(k)) for k in row.get("keywords") or [] if needle in fold_text(k)]
@@ -347,7 +351,7 @@ def topic_forget_units(row: dict[str, Any], needle: str) -> list[tuple[str, str]
 def forget_topic_text(phrase: str, *, topic_key: str | None = None) -> dict[str, Any]:
     """Forget *phrase* across topic summaries (or only topic *topic_key*) in one locked write.
 
-    A title match removes the whole topic: the phrase names it. Otherwise only the summary sentences and keywords
+    A title or key match removes the whole topic: the phrase names it. Otherwise only the summary sentences and keywords
     that contain the phrase go; the rest of the topic stays, and a topic left with an empty summary is removed.
     Every removed item is recorded as forgotten inside the lock, before the write. If that fails, nothing is removed.
     """
@@ -374,8 +378,9 @@ def forget_topic_text(phrase: str, *, topic_key: str | None = None) -> dict[str,
                 continue
             if units[0][0] == "topic":
                 removed.append({"key": key, "what": "topic"})
+                # The key forms are recorded too: a phrase that named the topic by its key must not stay recallable.
                 groups.setdefault((key, "topic"), []).extend(
-                    [str(row.get("title") or ""), str(row.get("summary") or "")])
+                    [str(row.get("title") or ""), str(row.get("summary") or ""), *_key_forms(key)])
                 continue
             sentences = _sentences(str(row.get("summary") or ""))
             gone = [s for s in sentences if needle in fold_text(s)]

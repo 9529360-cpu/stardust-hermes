@@ -331,7 +331,7 @@ def _replace_everywhere(store, target: str, needle: str, new_content: Optional[s
     hit = hits[0]
     if hit["store"] == "topic":
         if hit["what"] != "sentence":
-            return _error(f"'{needle}' is in the title or keywords of topic '{hit['preview']}', not in a summary "
+            return _error(f"'{needle}' is in the title, name or keywords of topic '{hit['preview']}', not in a summary "
                           "sentence. Rewrite that topic with target='topic' and topic=<its key> instead.")
         result = replace_topic_sentence(hit["topic"], needle, content, owner_initiated=owner_initiated)
         return {**result, "done": True, "target": target, "replaced_in": "topic", "note": _NOTE} \

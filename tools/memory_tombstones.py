@@ -505,7 +505,8 @@ def proposal_refusal(payload: Dict[str, Any], memories_dir: Optional[Path] = Non
 
         key, candidate = topic_candidate(payload.get("topic") or payload.get("title") or "", payload.get("content") or "",
                                          title=payload.get("title"), keywords=payload.get("keywords"))
-        phrases += [payload.get("topic") or "", key, payload.get("title") or "", *_as_strings(payload.get("keywords"))]
+        phrases += [*_as_strings(payload.get("topic")), key, *_as_strings(payload.get("title")),
+                    *_as_strings(payload.get("keywords"))]
     for phrase in phrases:
         if reason := _phrase_refusal(phrase, memories_dir):
             return reason

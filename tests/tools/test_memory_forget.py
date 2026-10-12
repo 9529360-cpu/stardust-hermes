@@ -237,7 +237,7 @@ def test_replace_refuses_a_match_that_is_only_in_a_topic_title_or_keywords(store
     result = _run(store, action="replace", target="memory", old_text="atlas launch", content="Atlas launch is closed")
 
     assert result["success"] is False
-    assert "title or keywords" in result["error"]
+    assert "title, name or keywords" in result["error"]
     assert get_topic_summary("project")["summary"] == "Ship date is March."
 
 
@@ -1104,6 +1104,22 @@ def test_a_phrase_naming_a_topic_by_its_key_removes_the_whole_topic(store, home)
     assert result["success"] is True
     assert result["removed_from"] == ["topic"]
     assert get_topic_summary("morning-coffee-routine") is None
+
+
+def test_a_key_phrase_forget_also_hides_that_phrase_from_recall(store, home, tmp_path):
+    # The title "Shipping" does not occur in either transcript, so only the recorded key phrase can hide the first one.
+    upsert_topic_summary("morning-coffee-routine", "Ship date is March.", title="Shipping")
+    db = SessionDB(tmp_path / "state.db")
+    db.create_session("s_routine", source="cli")
+    db.append_message("s_routine", role="user", content="The morning coffee routine starts at six.")
+    db.create_session("s_beans", source="cli")
+    db.append_message("s_beans", role="user", content="Coffee beans were restocked today.")
+
+    result = _run(store, action="remove", target="memory", old_text="morning coffee routine")
+    recalled = json.loads(session_search(query="coffee", db=db))
+
+    assert result["success"] is True and get_topic_summary("morning-coffee-routine") is None
+    assert {r["session_id"] for r in recalled["results"]} == {"s_beans"}
 
 
 def test_a_staged_remove_matching_two_entries_is_refused_at_approval(store, home):
