@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 from starlette.testclient import TestClient
 
-from hermes_cli import web_server
+from hermes_cli import web_server, web_server_files
 import hermes_cli.web_routers.files as _rt_files
 
 
@@ -93,13 +93,17 @@ def _seed_file(client, root, name="out/hello.txt"):
 
 
 @pytest.mark.linux_only
-def test_mutations_do_not_reach_a_venv_through_a_symlink(forced_files_client):
-    """POSIX counterpart of the Windows venv-alias tests: a symlink to .venv is never followed by a mutation."""
+def test_mutations_do_not_reach_a_venv_through_a_symlink(forced_files_client, monkeypatch):
+    """POSIX counterpart of the Windows venv-alias tests: a symlink into the venv area is never followed."""
     client, root = forced_files_client
-    venv = root / "hermes-agent" / ".venv"
+    checkout = root / "hermes-agent"
+    monkeypatch.setattr(web_server_files, "_install_root", lambda: checkout)
+    venv = checkout / ".venv"
+    (venv / "bin").mkdir(parents=True)
+    (venv / "bin" / "python").write_text("", encoding="utf-8")
     (venv / "lib").mkdir(parents=True)
     (venv / "lib" / "keep.txt").write_text("venv file", encoding="utf-8")
-    alias = root / "hermes-agent" / "venv"
+    alias = checkout / "venv"
     alias.symlink_to(venv, target_is_directory=True)
 
     refused = client.request("DELETE", "/api/files", json={"path": str(alias / "lib"), "recursive": True})

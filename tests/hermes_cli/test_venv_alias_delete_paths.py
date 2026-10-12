@@ -7,6 +7,8 @@ real with ``mklink /J`` (no elevation) and checks one of three things:
 * a dangling alias (its ``.venv`` is gone) is listed and removed, instead of failing the listing or answering 404;
 * a recursive delete of an install root (the uninstaller's checkout and home removal, a failed worktree) removes the
   alias and the real ``.venv``, and never reaches a folder outside the tree that a junction points to.
+* a mutation that reaches a venv folder through a link is refused, while a link to any other folder keeps working for
+  writes and deletes.
 
 ``shutil.rmtree`` removes a junction entry without descending into it, so the recursive deletes need no unlink step
 first. The guard tests below fail if that stops being true.
@@ -22,7 +24,7 @@ from pathlib import Path
 import pytest
 from starlette.testclient import TestClient
 
-from hermes_cli import web_server, worktree_ops
+from hermes_cli import web_server, web_server_files, worktree_ops
 from hermes_cli.uninstall import _rmtree_step
 from hermes_cli.venv_layout import is_link_entry, unlink_link_entry
 
@@ -155,6 +157,8 @@ def test_uninstall_home_removal_removes_the_managed_checkout_alias(tmp_path):
 def dashboard_client(monkeypatch, tmp_path):
     managed = tmp_path / "data"
     monkeypatch.setenv("STARDUST_DASHBOARD_FILES_ROOT", str(managed))
+    # The dashboard runs from this checkout, so its venv folders are the managed venv area.
+    monkeypatch.setattr(web_server_files, "_install_root", lambda: managed / "hermes-agent")
     prev_auth = getattr(web_server.app.state, "auth_required", None)
     prev_host = getattr(web_server.app.state, "bound_host", None)
     web_server.app.state.auth_required = False
@@ -367,6 +371,43 @@ def test_mutating_calls_through_the_alias_are_refused(dashboard_client):
         assert (venv / "Scripts" / "python.exe").read_bytes() == b"interpreter"
     finally:
         _release_junction(alias)
+
+
+def test_an_ordinary_link_to_a_folder_outside_the_venv_area_still_writes_and_deletes(dashboard_client):
+    client, managed = dashboard_client
+    _build_checkout(managed / "hermes-agent")
+    project = managed / "elsewhere" / "project"
+    project.mkdir(parents=True)
+    (project / "keep.txt").write_text("project file", encoding="utf-8")
+    work = managed / "work"
+    work.mkdir()
+    _make_junction(work / "ordinary", project)
+    try:
+        written = client.post(
+            "/api/files/upload",
+            json={"path": str(work / "ordinary" / "new.txt"), "data_url": "data:text/plain;base64,eA=="},
+        )
+        assert written.status_code == 200, written.text
+        assert (project / "new.txt").read_text(encoding="utf-8") == "x"
+
+        edited = client.post(
+            "/api/fs/write-text", json={"path": str(work / "ordinary" / "keep.txt"), "content": "changed"}
+        )
+        assert edited.status_code == 200, edited.text
+        assert (project / "keep.txt").read_text(encoding="utf-8") == "changed"
+
+        deleted = client.request(
+            "DELETE", "/api/files", json={"path": str(work / "ordinary" / "new.txt"), "recursive": False}
+        )
+        assert deleted.status_code == 200, deleted.text
+        assert not (project / "new.txt").exists()
+
+        unlinked = client.request("DELETE", "/api/files", json={"path": str(work / "ordinary"), "recursive": True})
+        assert unlinked.status_code == 200, unlinked.text
+        assert not os.path.lexists(work / "ordinary")
+        assert (project / "keep.txt").read_text(encoding="utf-8") == "changed"
+    finally:
+        _release_junction(work / "ordinary")
 
 
 def test_failed_worktree_fallback_removes_the_alias_and_keeps_the_target(tmp_path, monkeypatch):

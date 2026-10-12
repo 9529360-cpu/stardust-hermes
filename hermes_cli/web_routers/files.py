@@ -28,7 +28,7 @@ from hermes_cli._subprocess_compat import windows_hide_flags
 from hermes_cli.venv_layout import is_link_entry, unlink_link_entry
 from hermes_cli.web_deps import late
 from hermes_cli.web_server_files import (
-    _fs_lexical_path, _fs_path, _managed_file_entry, _managed_files_policy, _managed_response_meta,
+    _fs_lexical_path, _fs_path, _managed_file_entry, _managed_response_meta,
     _refuse_link_chain, _resolve_managed_path,
 )
 from hermes_cli.web_models import (
@@ -656,7 +656,7 @@ async def fs_read_text(path: str):
 
 
 @router.post("/api/fs/write-text")
-async def fs_write_text(payload: FsWriteText, request: Request):
+async def fs_write_text(payload: FsWriteText):
     """Overwrite (or create) a UTF-8 text file for the in-app spot editor.
 
     Mirrors the Electron ``stardust:fs:writeText`` hardening: path validated by
@@ -665,8 +665,7 @@ async def fs_write_text(payload: FsWriteText, request: Request):
     temp file and ``os.replace``-d so a crash can't truncate the original.
     Stale-on-disk detection is the client's job (re-read before save).
     """
-    policy = _managed_files_policy(request, create_root=False)
-    _refuse_link_chain(policy, _fs_lexical_path(payload.path), leaf_link_ok=False)
+    _refuse_link_chain(_fs_lexical_path(payload.path), leaf_link_ok=False)
     target = _fs_path(payload.path)
     text = payload.content or ""
     if len(text.encode("utf-8")) > _FS_TEXT_WRITE_MAX_BYTES:

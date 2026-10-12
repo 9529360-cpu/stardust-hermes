@@ -9,7 +9,8 @@ from fastapi import HTTPException, Request
 from pathlib import Path
 from typing import Any, Dict
 
-from hermes_cli.venv_layout import is_link_entry
+from hermes_cli.venv_layout import is_link_entry, venv_dirs_to_guard
+from hermes_constants import venv_python_path
 
 
 _MANAGED_FILES_ROOT_ENV = "STARDUST_DASHBOARD_FILES_ROOT"
@@ -85,33 +86,55 @@ def _path_is_under(root: Path, target: Path) -> bool:
     return target == root or root in target.parents
 
 
-def _link_target_is_inside(link: Path, base: Path) -> bool:
-    """True when the link's target lies inside *base*; a target that cannot be resolved counts as inside (fail closed)."""
+def _install_root() -> Path:
+    """The checkout this dashboard runs from: the root the update and the holder guard manage (``PROJECT_ROOT``)."""
+    from hermes_cli import main as _main  # late: hermes_cli.main imports the web server, not the other way round
+
+    return Path(_main.PROJECT_ROOT)
+
+
+def _managed_venv_area() -> list[Path]:
+    """Resolved venv folders this install's update and holder guard manage: the ones that hold an interpreter.
+
+    A link is refused for a mutation only when its target lies inside one of these. An install with no venv has no area.
+    """
+    return [
+        folder.resolve(strict=False)
+        for folder in venv_dirs_to_guard(_install_root())
+        if venv_python_path(folder).is_file()
+    ]
+
+
+def _link_points_into_venv_area(link: Path, area: list[Path]) -> bool:
+    """True when *link* resolves to a folder inside the venv area. A link that cannot be resolved counts as inside."""
     try:
         target = link.resolve(strict=False)
     except (OSError, RuntimeError):
         return True
-    return _path_is_under(base, target)
+    return any(target == folder or folder in target.parents for folder in area)
 
 
-def _refuse_link_chain(policy: ManagedFilesPolicy, candidate: Path, *, leaf_link_ok: bool) -> None:
-    """403 when a mutation would reach the managed tree through a link (the venv alias is a junction to ``.venv``).
+def _refuse_link_chain(candidate: Path, *, leaf_link_ok: bool) -> None:
+    """403 when a mutation would reach a venv folder through a link (the venv alias is a junction to ``.venv``).
 
-    Walks the lexical path of *candidate* from its anchor before anything is resolved, because resolving would follow
-    the link and hide it. A link below the managed base is refused, and so is a link anywhere whose target lies inside
-    the base, which catches a path that enters the tree from outside. The final component may be a link only when
-    *leaf_link_ok*: a delete then unlinks that link as itself. Only symlinks and junctions count as links.
+    Walks the lexical path of *candidate* from its anchor, before anything is resolved, because resolving would follow
+    the link and hide it. A link on the ancestry, or the final link, is refused only when its target lies inside the
+    managed venv area. Links to any other folder keep working for writes and deletes, as before. *leaf_link_ok* lets a
+    delete unlink a final link as itself, whatever it points to.
     """
-    base = policy.locked_root if policy.locked_root is not None else policy.default_path
-    parts = candidate.parts
+    area = _managed_venv_area()
+    if not area:
+        return
+    parts = candidate.parts[1:]
     current = Path(candidate.anchor)
-    for index, part in enumerate(parts[1:]):
+    for index, part in enumerate(parts):
         current = current / part
-        is_last = index == len(parts) - 2
-        if not is_link_entry(current) or (leaf_link_ok and is_last):
+        if not is_link_entry(current):
             continue
-        if _path_is_under(base, current) or _link_target_is_inside(current, base):
-            raise HTTPException(status_code=403, detail="Path goes through a link")
+        if leaf_link_ok and index == len(parts) - 1:
+            continue
+        if _link_points_into_venv_area(current, area):
+            raise HTTPException(status_code=403, detail="Path goes through a link to a venv folder")
 
 
 def _path_text(raw_path: str | None) -> str:
@@ -197,7 +220,7 @@ def _resolve_managed_path(
         raise HTTPException(status_code=400, detail="Path cannot contain '..'")
 
     if mutating:
-        _refuse_link_chain(policy, candidate, leaf_link_ok=keep_link_leaf)
+        _refuse_link_chain(candidate, leaf_link_ok=keep_link_leaf)
 
     if for_write and not candidate.exists():
         parent = _canonical_path(candidate.parent)
