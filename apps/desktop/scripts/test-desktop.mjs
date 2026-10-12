@@ -263,6 +263,7 @@ function launchFresh() {
   env.STARDUST_HOME = hermesHome
   delete env.STARDUST_DESKTOP_HERMES
   delete env.STARDUST_DESKTOP_HERMES_ROOT
+  delete env.HERMES_DESKTOP_HERMES_ROOT
 
   const child = spawn(APP.binary, [], {
     cwd: os.homedir(),

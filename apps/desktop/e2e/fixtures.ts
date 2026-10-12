@@ -580,6 +580,7 @@ export async function setupPackagedApp(): Promise<PackagedAppFixture> {
   delete (env as Record<string, string | undefined>).STARDUST_DESKTOP_DEV_SERVER
   delete (env as Record<string, string | undefined>).STARDUST_DESKTOP_HERMES
   delete (env as Record<string, string | undefined>).STARDUST_DESKTOP_HERMES_ROOT
+  delete (env as Record<string, string | undefined>).HERMES_DESKTOP_HERMES_ROOT
 
   const app = await _electron.launch({
     executablePath: PACKAGED_BINARY_PATH,

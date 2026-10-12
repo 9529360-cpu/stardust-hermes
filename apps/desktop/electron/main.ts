@@ -367,6 +367,7 @@ import {
   SESSION_WINDOW_MIN_WIDTH
 } from './session-windows'
 import { ensureLoginShellPath } from './shell-path'
+import { resolveSourceRootOverride } from './source-root-override'
 import { createBootstrapCoordinator, sshConfigFingerprint } from './ssh-bootstrap-coordinator'
 import { collectSshConfigHosts, parseSshGOutput } from './ssh-config'
 import { createSshProbeConnection, pickLocalPort, redactSecrets, SshConnection } from './ssh-connection'
@@ -3062,7 +3063,7 @@ function writeZoomState(zoomLevel) {
 // STARDUST_DESKTOP_HERMES_ROOT always wins so devs can pin a worktree.
 function resolveUpdateRoot() {
   const candidates = [
-    process.env.STARDUST_DESKTOP_HERMES_ROOT && path.resolve(process.env.STARDUST_DESKTOP_HERMES_ROOT),
+    resolveSourceRootOverride(),
     !IS_PACKAGED && isHermesSourceRoot(SOURCE_REPO_ROOT) ? SOURCE_REPO_ROOT : null,
     isHermesSourceRoot(ACTIVE_HERMES_ROOT) ? ACTIVE_HERMES_ROOT : null
   ].filter(Boolean)
@@ -5003,7 +5004,7 @@ async function createActiveBackend(backendArgs) {
 async function resolveHermesBackend(backendArgs) {
   // 1. Explicit override -- STARDUST_DESKTOP_HERMES_ROOT points at a developer
   //    checkout. Honour it as-is (no bootstrap; the user is driving).
-  const overrideRoot = process.env.STARDUST_DESKTOP_HERMES_ROOT && path.resolve(process.env.STARDUST_DESKTOP_HERMES_ROOT)
+  const overrideRoot = resolveSourceRootOverride()
 
   if (overrideRoot && isHermesSourceRoot(overrideRoot)) {
     const backend = await createPythonBackend(overrideRoot, `Stardust source at ${overrideRoot}`, backendArgs)

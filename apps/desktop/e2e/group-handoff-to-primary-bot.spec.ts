@@ -78,7 +78,8 @@ test.afterEach(async ({}, info) => {
       await fixture.app.evaluate(() => ({
         cwd: process.cwd(),
         argv: process.argv,
-        root: process.env.STARDUST_DESKTOP_HERMES_ROOT,
+        // Mirrors resolveSourceRootOverride; this callback runs inside Electron, so it cannot import it.
+        root: process.env.STARDUST_DESKTOP_HERMES_ROOT || process.env.HERMES_DESKTOP_HERMES_ROOT,
         home: process.env.STARDUST_HOME
       })),
       null,
