@@ -603,6 +603,9 @@ export const ja = defineLocale({
       reactionsTitle: 'メッセージリアクション',
       reactionsDesc:
         'iMessage風の絵文字タップバック — メッセージにリアクションでき、Stardustもあなたのメッセージにリアクションします。',
+      autoShowFilesTitle: '生成されたファイルを自動で表示',
+      autoShowFilesDesc:
+        '現在のワークスペースでアシスタントが PDF、Webページ、画像、Markdown ファイルを書き出すと、会話の横のプレビューで自動的に開きます。ワークスペース外のファイル、プログラム、スクリプト、圧縮ファイルは自動では開きません。',
       tipsTitle: 'アプリ内ヒント',
       tipsDesc:
         'アプリや Stardust からのヒントをときどき表示します。各ヒントは一度だけ表示されます。利用開始から30日後に自動でオフになりますが、再びオンにできます。',

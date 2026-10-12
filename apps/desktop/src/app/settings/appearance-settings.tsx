@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils'
 import { $backdrop, $backdropImagePath, BACKDROP_IMAGE_EXTENSIONS, setBackdrop, setBackdropImagePath } from '@/store/backdrop'
 import { $composerPopoutGesturesEnabled, setComposerPopoutGesturesEnabled } from '@/store/composer-popout'
 import { $embedAllowed, $embedMode, clearEmbedAllowed, type EmbedMode, setEmbedMode } from '@/store/embed-consent'
+import { $autoShowGeneratedFiles, setAutoShowGeneratedFiles } from '@/store/generated-files-auto-show'
 import { $introSplash, setIntroSplash } from '@/store/intro-splash'
 import { notifyError } from '@/store/notifications'
 import { $activeGatewayProfile, $profiles, normalizeProfileKey } from '@/store/profile'
@@ -416,6 +417,7 @@ export function AppearanceSettings() {
   const glassMode = translucency.mode === 'glass' && GLASS_SUPPORTED
   const userBubbleTransparency = useStore($userBubbleTransparency)
   const reactionsEnabled = useStore($reactionsEnabled)
+  const autoShowGeneratedFiles = useStore($autoShowGeneratedFiles)
   const tipsEnabled = useStore($tipsEnabled)
   const toursEnabled = useStore($toursEnabled)
   const spentTips = useStore($spentTipCount)
@@ -895,6 +897,24 @@ export function AppearanceSettings() {
           />
 
           <ResumeLastSessionSetting />
+
+          <ListRow
+            action={
+              <SegmentedControl
+                onChange={id => {
+                  triggerHaptic('selection')
+                  setAutoShowGeneratedFiles(id === 'on')
+                }}
+                options={[
+                  { id: 'off', label: t.common.off },
+                  { id: 'on', label: t.common.on }
+                ]}
+                value={autoShowGeneratedFiles ? 'on' : 'off'}
+              />
+            }
+            description={a.autoShowFilesDesc}
+            title={a.autoShowFilesTitle}
+          />
 
           <ListRow
             action={

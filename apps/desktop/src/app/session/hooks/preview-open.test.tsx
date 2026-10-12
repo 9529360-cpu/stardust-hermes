@@ -4,13 +4,16 @@ import { useEffect } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { assistantTextPart, type ChatMessage } from '@/lib/chat-messages'
+import { $autoShowGeneratedFiles, setAutoShowGeneratedFiles } from '@/store/generated-files-auto-show'
 import { $previewTabs, $previewTarget, closeRightRail, openPreview, type PreviewTarget } from '@/store/preview'
 import { $rightContextOpen, setRightContextOpen } from '@/store/right-context'
 import { $activeSessionId, $currentCwd, $messages, $selectedStoredSessionId } from '@/store/session'
+import { $sessionStates, $sessionTiles } from '@/store/session-states'
 
 import { usePreviewRouting } from './use-preview-routing'
 
 const RUNTIME_SESSION_ID = '20260727_140707_edec2d'
+const WORKSPACE = '/work'
 
 function assistantMessage(id: string, text: string): ChatMessage {
   return { id, parts: [assistantTextPart(text)], role: 'assistant' }
@@ -25,7 +28,7 @@ let handleEvent: (event: GatewayEvent) => void = () => undefined
 function Harness() {
   const routing = usePreviewRouting({
     baseHandleGatewayEvent: vi.fn(),
-    currentCwd: '/work',
+    currentCwd: WORKSPACE,
     requestGateway: vi.fn()
   })
 
@@ -36,7 +39,7 @@ function Harness() {
   return null
 }
 
-async function emitPreviewOpen(url = '/tmp/artifact-test.html', sessionId = RUNTIME_SESSION_ID) {
+async function emitPreviewOpen(url = `${WORKSPACE}/artifact-test.html`, sessionId = RUNTIME_SESSION_ID) {
   await act(async () => {
     handleEvent({
       payload: { label: 'hi bestie', url },
@@ -56,6 +59,27 @@ async function emitToolStart(name: string, args: Record<string, unknown> = {}, s
   })
 }
 
+async function emitToolComplete(
+  name: string,
+  result: unknown,
+  args: Record<string, unknown> = {},
+  sessionId = RUNTIME_SESSION_ID
+) {
+  await act(async () => {
+    handleEvent({
+      payload: { args, name, result, tool_id: 'call-write' },
+      session_id: sessionId,
+      type: 'tool.complete'
+    } as unknown as GatewayEvent)
+  })
+}
+
+async function emitTurn(type: 'message.complete' | 'message.start', sessionId = RUNTIME_SESSION_ID) {
+  await act(async () => {
+    handleEvent({ payload: {}, session_id: sessionId, type } as unknown as GatewayEvent)
+  })
+}
+
 async function emitPreviewClose(url?: string, sessionId = RUNTIME_SESSION_ID) {
   await act(async () => {
     handleEvent({
@@ -66,14 +90,23 @@ async function emitPreviewClose(url?: string, sessionId = RUNTIME_SESSION_ID) {
   })
 }
 
+/** Let any async rail resolution finish, so a "never opens" assertion means something. */
+async function settle() {
+  await act(async () => {
+    await new Promise(resolve => setTimeout(resolve, 10))
+  })
+}
+
 describe('preview routing', () => {
   beforeEach(() => {
     // A live session always has a runtime id; only the STORED id lags.
     $activeSessionId.set(RUNTIME_SESSION_ID)
-    $currentCwd.set('/work')
+    $currentCwd.set(WORKSPACE)
     $messages.set([])
+    $sessionStates.set({ [RUNTIME_SESSION_ID]: { cwd: WORKSPACE } as never })
     closeRightRail()
     setRightContextOpen(false)
+    setAutoShowGeneratedFiles(true)
     window.localStorage.clear()
 
     Object.defineProperty(window, 'stardustDesktop', {
@@ -85,8 +118,10 @@ describe('preview routing', () => {
   afterEach(() => {
     cleanup()
     $messages.set([])
+    $sessionStates.set({})
     closeRightRail()
     setRightContextOpen(false)
+    setAutoShowGeneratedFiles(true)
     $activeSessionId.set(null)
     $selectedStoredSessionId.set(null)
     window.localStorage.clear()
@@ -104,7 +139,7 @@ describe('preview routing', () => {
 
       await emitPreviewOpen()
 
-      await waitFor(() => expect($previewTarget.get()?.path).toBe('/tmp/artifact-test.html'))
+      await waitFor(() => expect($previewTarget.get()?.path).toBe(`${WORKSPACE}/artifact-test.html`))
       expect($previewTabs.get()).toHaveLength(1)
     })
 
@@ -113,13 +148,13 @@ describe('preview routing', () => {
       render(<Harness />)
 
       await emitPreviewOpen()
-      await waitFor(() => expect($previewTarget.get()?.path).toBe('/tmp/artifact-test.html'))
+      await waitFor(() => expect($previewTarget.get()?.path).toBe(`${WORKSPACE}/artifact-test.html`))
 
       await act(async () => {
         $selectedStoredSessionId.set('stored-1')
       })
 
-      expect($previewTarget.get()?.path).toBe('/tmp/artifact-test.html')
+      expect($previewTarget.get()?.path).toBe(`${WORKSPACE}/artifact-test.html`)
     })
 
     it('ignores an open from a session that is not the one on screen', async () => {
@@ -127,7 +162,7 @@ describe('preview routing', () => {
 
       await act(async () => {
         handleEvent({
-          payload: { url: '/tmp/other.html' },
+          payload: { url: `${WORKSPACE}/other.html` },
           session_id: 'some-other-session',
           type: 'preview.open'
         } as unknown as GatewayEvent)
@@ -140,16 +175,16 @@ describe('preview routing', () => {
     // sits on main (the user asked, then clicked elsewhere). On-screen is the
     // bar — gating on focus made an explicit "open reddit" silently vanish.
     it('honors an open from an open tile session even when main holds focus', async () => {
-      const { $sessionTiles } = await import('@/store/session-states')
       const tiles = $sessionTiles.get()
 
       $sessionTiles.set([{ dir: 'right', runtimeId: 'tile-runtime', storedSessionId: 'stored-tile' }])
+      $sessionStates.set({ 'tile-runtime': { cwd: WORKSPACE } as never })
       render(<Harness />)
 
       try {
-        await emitPreviewOpen('/tmp/from-tile.html', 'tile-runtime')
+        await emitPreviewOpen(`${WORKSPACE}/from-tile.html`, 'tile-runtime')
 
-        await waitFor(() => expect($previewTarget.get()?.path).toBe('/tmp/from-tile.html'))
+        await waitFor(() => expect($previewTarget.get()?.path).toBe(`${WORKSPACE}/from-tile.html`))
       } finally {
         $sessionTiles.set(tiles)
       }
@@ -158,20 +193,20 @@ describe('preview routing', () => {
     it('opens a second target as its own tab rather than replacing the first', async () => {
       render(<Harness />)
 
-      await emitPreviewOpen('/tmp/one.html')
+      await emitPreviewOpen(`${WORKSPACE}/one.html`)
       await waitFor(() => expect($previewTabs.get()).toHaveLength(1))
 
-      await emitPreviewOpen('/tmp/two.html')
+      await emitPreviewOpen(`${WORKSPACE}/two.html`)
       await waitFor(() => expect($previewTabs.get()).toHaveLength(2))
 
-      expect($previewTarget.get()?.path).toBe('/tmp/two.html')
+      expect($previewTarget.get()?.path).toBe(`${WORKSPACE}/two.html`)
     })
 
     it('re-fronts the existing tab when the same target opens twice', async () => {
       render(<Harness />)
 
-      await emitPreviewOpen('/tmp/one.html')
-      await emitPreviewOpen('/tmp/one.html')
+      await emitPreviewOpen(`${WORKSPACE}/one.html`)
+      await emitPreviewOpen(`${WORKSPACE}/one.html`)
 
       await waitFor(() => expect($previewTabs.get()).toHaveLength(1))
     })
@@ -182,6 +217,25 @@ describe('preview routing', () => {
       await emitPreviewOpen()
 
       await waitFor(() => expect($previewTarget.get()?.renderMode).toBe('preview'))
+    })
+
+    it('refuses an explicit open of a file outside the session workspace', async () => {
+      render(<Harness />)
+
+      await emitPreviewOpen('/tmp/artifact-test.html')
+      await settle()
+
+      expect($previewTabs.get()).toHaveLength(0)
+      expect($rightContextOpen.get()).toBe(false)
+    })
+
+    it('never opens a program or script by explicit request', async () => {
+      render(<Harness />)
+
+      await emitPreviewOpen(`${WORKSPACE}/installer.exe`)
+      await settle()
+
+      expect($previewTabs.get()).toHaveLength(0)
     })
 
     // Offer, don't hijack: only an explicit open_preview call opens the rail.
@@ -226,7 +280,7 @@ describe('preview routing', () => {
       expect($rightContextOpen.get()).toBe(true)
       expect($previewTabs.get()).toHaveLength(0)
 
-      await emitPreviewOpen('/tmp/browser-page.html')
+      await emitPreviewOpen(`${WORKSPACE}/browser-page.html`)
       await waitFor(() => expect($previewTabs.get()).toHaveLength(1))
       const liveTabs = $previewTabs.get()
       setRightContextOpen(false)
@@ -251,7 +305,6 @@ describe('preview routing', () => {
       expect($rightContextOpen.get()).toBe(false)
       expect($previewTabs.get()).toHaveLength(0)
     })
-
 
     it('reveals the existing in-app browser when foreground interaction begins, without another tab', async () => {
       render(<Harness />)
@@ -279,7 +332,7 @@ describe('preview routing', () => {
 
     it('does not re-open the viewer after the user hides it during a browser task', async () => {
       render(<Harness />)
-      await emitToolStart('desktop_preview', { action: 'open', url: '/tmp/one.html' })
+      await emitToolStart('desktop_preview', { action: 'open', url: `${WORKSPACE}/one.html` })
       expect($rightContextOpen.get()).toBe(true)
 
       setRightContextOpen(false)
@@ -287,10 +340,10 @@ describe('preview routing', () => {
       await act(async () => {
         handleEvent({ session_id: RUNTIME_SESSION_ID, type: 'message.start', payload: {} } as GatewayEvent)
       })
-      await emitToolStart('desktop_preview', { action: 'open', url: '/tmp/two.html' })
-      await emitPreviewOpen('/tmp/two.html')
+      await emitToolStart('desktop_preview', { action: 'open', url: `${WORKSPACE}/two.html` })
+      await emitPreviewOpen(`${WORKSPACE}/two.html`)
 
-      await waitFor(() => expect($previewTarget.get()?.path).toBe('/tmp/two.html'))
+      await waitFor(() => expect($previewTarget.get()?.path).toBe(`${WORKSPACE}/two.html`))
       expect($rightContextOpen.get()).toBe(false)
       expect($previewTabs.get()).toHaveLength(1)
 
@@ -313,12 +366,158 @@ describe('preview routing', () => {
     })
   })
 
+  describe('generated files (auto-show)', () => {
+    it('opens a file the assistant writes during a live turn, and reveals the rail', async () => {
+      render(<Harness />)
+
+      await emitTurn('message.start')
+      await emitToolComplete(
+        'write_file',
+        { bytes_written: 42, resolved_path: `${WORKSPACE}/report.html` },
+        { path: `${WORKSPACE}/report.html` }
+      )
+
+      await waitFor(() => expect($previewTarget.get()?.path).toBe(`${WORKSPACE}/report.html`))
+      expect($previewTabs.get()).toHaveLength(1)
+      expect($rightContextOpen.get()).toBe(true)
+    })
+
+    it('opens a written file whose path is relative to the session workspace', async () => {
+      render(<Harness />)
+
+      await emitTurn('message.start')
+      await emitToolComplete('write_file', { bytes_written: 9 }, { path: 'notes/summary.md' })
+
+      await waitFor(() => expect($previewTarget.get()?.path).toBe(`${WORKSPACE}/notes/summary.md`))
+    })
+
+    it('does not open a file completed outside a live turn, so a replayed completion stays quiet', async () => {
+      render(<Harness />)
+
+      await emitToolComplete('write_file', { bytes_written: 42, resolved_path: `${WORKSPACE}/old.html` })
+      await settle()
+
+      expect($previewTabs.get()).toHaveLength(0)
+    })
+
+    it('opens a file once per turn, and not again after the user closes it in that turn', async () => {
+      render(<Harness />)
+      const write = { bytes_written: 1, resolved_path: `${WORKSPACE}/page.html` }
+
+      await emitTurn('message.start')
+      await emitToolComplete('write_file', write)
+      await waitFor(() => expect($previewTabs.get()).toHaveLength(1))
+
+      closeRightRail()
+      await emitToolComplete('patch', { ...write, files_modified: [`${WORKSPACE}/page.html`], success: true })
+      await settle()
+      expect($previewTabs.get()).toHaveLength(0)
+
+      await emitTurn('message.complete')
+      await emitTurn('message.start')
+      await emitToolComplete('write_file', write)
+      await waitFor(() => expect($previewTabs.get()).toHaveLength(1))
+    })
+
+    it('does nothing when the Settings switch is off', async () => {
+      setAutoShowGeneratedFiles(false)
+      expect($autoShowGeneratedFiles.get()).toBe(false)
+      render(<Harness />)
+
+      await emitTurn('message.start')
+      await emitToolComplete('write_file', { bytes_written: 1, resolved_path: `${WORKSPACE}/page.html` })
+      await settle()
+
+      expect($previewTabs.get()).toHaveLength(0)
+    })
+
+    it('never opens a file the assistant only read', async () => {
+      render(<Harness />)
+
+      await emitTurn('message.start')
+      await emitToolComplete('read_file', { content: '<html></html>' }, { path: `${WORKSPACE}/page.html` })
+      await settle()
+
+      expect($previewTabs.get()).toHaveLength(0)
+    })
+
+    it('does not open a write whose tool call failed', async () => {
+      render(<Harness />)
+
+      await emitTurn('message.start')
+      await emitToolComplete('write_file', { error: 'Permission denied' }, { path: `${WORKSPACE}/page.html` })
+      await settle()
+
+      expect($previewTabs.get()).toHaveLength(0)
+    })
+
+    it('keeps a write outside the session workspace closed', async () => {
+      render(<Harness />)
+
+      await emitTurn('message.start')
+      await emitToolComplete('write_file', { bytes_written: 1, resolved_path: '/tmp/page.html' })
+      await settle()
+
+      expect($previewTabs.get()).toHaveLength(0)
+    })
+
+    it('never opens for a background session, even mid-turn', async () => {
+      $sessionStates.set({ 'background-session': { cwd: WORKSPACE } as never })
+      render(<Harness />)
+
+      await emitTurn('message.start', 'background-session')
+      await emitToolComplete(
+        'write_file',
+        { bytes_written: 1, resolved_path: `${WORKSPACE}/bg.html` },
+        {},
+        'background-session'
+      )
+      await settle()
+
+      expect($previewTabs.get()).toHaveLength(0)
+      expect($rightContextOpen.get()).toBe(false)
+    })
+
+    it('does not move focus off the composer while the file opens', async () => {
+      const composer = window.document.createElement('textarea')
+
+      window.document.body.append(composer)
+      composer.focus()
+
+      try {
+        render(<Harness />)
+
+        await emitTurn('message.start')
+        await emitToolComplete('write_file', { bytes_written: 1, resolved_path: `${WORKSPACE}/report.pdf` })
+        await waitFor(() => expect($previewTabs.get()).toHaveLength(1))
+
+        expect(window.document.activeElement).toBe(composer)
+      } finally {
+        composer.remove()
+      }
+    })
+
+    it('adds the tab but leaves the rail closed when the user already hid it this turn', async () => {
+      render(<Harness />)
+
+      await emitTurn('message.start')
+      await emitToolComplete('write_file', { bytes_written: 1, resolved_path: `${WORKSPACE}/first.html` })
+      await waitFor(() => expect($rightContextOpen.get()).toBe(true))
+
+      setRightContextOpen(false)
+      await emitToolComplete('write_file', { bytes_written: 1, resolved_path: `${WORKSPACE}/second.html` })
+
+      await waitFor(() => expect($previewTabs.get()).toHaveLength(2))
+      expect($rightContextOpen.get()).toBe(false)
+    })
+  })
+
   describe('close_preview', () => {
     it('closes the whole pane when no url is given', async () => {
       render(<Harness />)
 
-      await emitPreviewOpen('/tmp/one.html')
-      await emitPreviewOpen('/tmp/two.html')
+      await emitPreviewOpen(`${WORKSPACE}/one.html`)
+      await emitPreviewOpen(`${WORKSPACE}/two.html`)
       await waitFor(() => expect($previewTabs.get()).toHaveLength(2))
 
       await emitPreviewClose('')
@@ -330,39 +529,39 @@ describe('preview routing', () => {
     it('closes only the matching tab when a url is given', async () => {
       render(<Harness />)
 
-      await emitPreviewOpen('/tmp/keep.html')
-      await emitPreviewOpen('/tmp/drop.html')
+      await emitPreviewOpen(`${WORKSPACE}/keep.html`)
+      await emitPreviewOpen(`${WORKSPACE}/drop.html`)
       await waitFor(() => expect($previewTabs.get()).toHaveLength(2))
 
-      await emitPreviewClose('/tmp/drop.html')
+      await emitPreviewClose(`${WORKSPACE}/drop.html`)
 
       await waitFor(() => expect($previewTabs.get()).toHaveLength(1))
-      expect($previewTarget.get()?.path).toBe('/tmp/keep.html')
+      expect($previewTarget.get()?.path).toBe(`${WORKSPACE}/keep.html`)
     })
 
     it('ignores a close from a session that is not the one on screen', async () => {
       render(<Harness />)
 
-      await emitPreviewOpen('/tmp/stay.html')
+      await emitPreviewOpen(`${WORKSPACE}/stay.html`)
       await waitFor(() => expect($previewTabs.get()).toHaveLength(1))
 
-      await emitPreviewClose('/tmp/stay.html', 'some-other-session')
+      await emitPreviewClose(`${WORKSPACE}/stay.html`, 'some-other-session')
 
       expect($previewTabs.get()).toHaveLength(1)
     })
 
     it('honors a close from an open tile session even when main holds focus', async () => {
-      const { $sessionTiles } = await import('@/store/session-states')
       const tiles = $sessionTiles.get()
 
       $sessionTiles.set([{ dir: 'right', runtimeId: 'tile-runtime', storedSessionId: 'stored-tile' }])
+      $sessionStates.set({ 'tile-runtime': { cwd: WORKSPACE } as never })
       render(<Harness />)
 
       try {
-        await emitPreviewOpen('/tmp/from-tile.html', 'tile-runtime')
+        await emitPreviewOpen(`${WORKSPACE}/from-tile.html`, 'tile-runtime')
         await waitFor(() => expect($previewTabs.get()).toHaveLength(1))
 
-        await emitPreviewClose('/tmp/from-tile.html', 'tile-runtime')
+        await emitPreviewClose(`${WORKSPACE}/from-tile.html`, 'tile-runtime')
 
         await waitFor(() => expect($previewTabs.get()).toHaveLength(0))
       } finally {

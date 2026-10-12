@@ -659,6 +659,9 @@ export const ru = defineLocale({
       introSplashDesc: 'Логотип и подсказка, показываемые на пустом чате.',
       reactionsTitle: 'Реакции на сообщения',
       reactionsDesc: 'Эмодзи-тапбеки в стиле iMessage — реагируйте на сообщения, и Stardust сможет реагировать на ваши.',
+      autoShowFilesTitle: 'Show generated files automatically',
+      autoShowFilesDesc:
+        'When the assistant writes a PDF, web page, image, or Markdown file in this workspace, it opens in the preview beside the chat. Files outside the workspace, programs, scripts, and archives never open by themselves.',
       composerPopoutTitle: 'Плавающий композер',
       composerPopoutDesc: 'Позволяет вытягивать композер из его док-зоны. Отключите, чтобы он был закреплён снизу.',
       embedsTitle: 'Встроенные превью',

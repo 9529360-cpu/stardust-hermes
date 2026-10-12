@@ -17,16 +17,6 @@ export function isPreviewableTarget(target: string): boolean {
   )
 }
 
-/**
- * Targets worth surfacing unprompted (auto-opening the rail), not just as a
- * click-to-open status link. Scoped to visual/document output the user asked
- * for by name (web pages, PDFs) — never plain source/code files, which stay
- * link-only so an ordinary edit turn doesn't yank the rail open.
- */
-export function isAutoOpenTarget(target: string): boolean {
-  return isPreviewableTarget(target)
-}
-
 export function stableHash(value: string): string {
   let hash = 0
 
