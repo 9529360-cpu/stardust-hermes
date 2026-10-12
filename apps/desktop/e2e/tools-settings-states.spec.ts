@@ -75,7 +75,7 @@ async function checkChangedStates(
 
 test('the changed states hold at the default window size', async () => {
   test.setTimeout(300_000)
-  const fixture = await setupMockBackend()
+  const fixture = await setupMockBackend({ extraDisplayConfig: "  language: zh", localModels: true })
 
   try {
     await waitForAppReady(fixture, 120_000)
@@ -87,7 +87,7 @@ test('the changed states hold at the default window size', async () => {
 
 test('the changed states hold at a narrow width', async () => {
   test.setTimeout(300_000)
-  const fixture = await setupMockBackend()
+  const fixture = await setupMockBackend({ extraDisplayConfig: "  language: zh", localModels: true })
 
   try {
     await waitForAppReady(fixture, 120_000)
