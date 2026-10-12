@@ -9,8 +9,7 @@ from fastapi import HTTPException, Request
 from pathlib import Path
 from typing import Any, Dict
 
-from hermes_cli.venv_layout import is_link_entry, venv_dirs_to_guard
-from hermes_constants import venv_python_path
+from hermes_cli.venv_layout import is_link_entry
 
 
 _MANAGED_FILES_ROOT_ENV = "STARDUST_DASHBOARD_FILES_ROOT"
@@ -93,48 +92,59 @@ def _install_root() -> Path:
     return Path(_main.PROJECT_ROOT)
 
 
-def _managed_venv_area() -> list[Path]:
-    """Resolved venv folders this install's update and holder guard manage: the ones that hold an interpreter.
+_VENV_FOLDER_NAMES = frozenset({"venv", ".venv"})
 
-    A link is refused for a mutation only when its target lies inside one of these. An install with no venv has no area.
+
+def _inside_venv_folder(path: Path, root: Path, anchors: list[Path]) -> bool:
+    """True when *path* is a venv folder under the install root, or lies inside one.
+
+    A venv folder is recognised by name, ``venv`` or ``.venv``, with or without an interpreter. *anchors* are the
+    resolved venv folders of the install, so a path that reaches one through a link is caught as well.
     """
-    return [
-        folder.resolve(strict=False)
-        for folder in venv_dirs_to_guard(_install_root())
-        if venv_python_path(folder).is_file()
-    ]
-
-
-def _link_points_into_venv_area(link: Path, area: list[Path]) -> bool:
-    """True when *link* resolves to a folder inside the venv area. A link that cannot be resolved counts as inside."""
-    try:
-        target = link.resolve(strict=False)
-    except (OSError, RuntimeError):
+    if any(path == anchor or anchor in path.parents for anchor in anchors):
         return True
-    return any(target == folder or folder in target.parents for folder in area)
+    try:
+        relative = path.relative_to(root)
+    except ValueError:
+        return False
+    return any(part in _VENV_FOLDER_NAMES for part in relative.parts)
 
 
-def _refuse_link_chain(candidate: Path, *, leaf_link_ok: bool) -> None:
-    """403 when a mutation would reach a venv folder through a link (the venv alias is a junction to ``.venv``).
+def _subtree_has_venv_folder(folder: Path) -> bool:
+    """True when a venv folder name appears below *folder*. Links are not followed; a walk error counts as found."""
+    errors: list[OSError] = []
+    for _dirpath, dirnames, _filenames in os.walk(folder, onerror=errors.append):
+        if any(name in _VENV_FOLDER_NAMES for name in dirnames):
+            return True
+    return bool(errors)
 
-    Walks the lexical path of *candidate* from its anchor, before anything is resolved, because resolving would follow
-    the link and hide it. A link on the ancestry, or the final link, is refused only when its target lies inside the
-    managed venv area. Links to any other folder keep working for writes and deletes, as before. *leaf_link_ok* lets a
-    delete unlink a final link as itself, whatever it points to.
+
+def _refuse_venv_mutation(candidate: Path, *, mutation: str, recursive: bool = False) -> None:
+    """403 when a file mutation would touch a venv folder of the install, by name, with or without links.
+
+    The dashboard never mutates anything inside a venv or ``.venv`` folder under the install root. *candidate* is the
+    path as addressed. The check covers the path as addressed, the entry with its ancestors resolved, and the fully
+    resolved target. One exception: deleting the alias itself, a final link named ``venv`` directly in the install
+    root. That link is unlinked and its target is left alone. A recursive delete is also refused when the folder
+    contains the install root, or holds a venv folder.
     """
-    area = _managed_venv_area()
-    if not area:
-        return
-    parts = candidate.parts[1:]
-    current = Path(candidate.anchor)
-    for index, part in enumerate(parts):
-        current = current / part
-        if not is_link_entry(current):
-            continue
-        if leaf_link_ok and index == len(parts) - 1:
-            continue
-        if _link_points_into_venv_area(current, area):
-            raise HTTPException(status_code=403, detail="Path goes through a link to a venv folder")
+    root = _install_root().resolve(strict=False)
+    anchors = [(root / name).resolve(strict=False) for name in ("venv", ".venv")]
+    try:
+        entry = candidate.parent.resolve(strict=False) / candidate.name
+        if mutation == "delete" and entry == root / "venv" and is_link_entry(entry):
+            return
+        target = entry.resolve(strict=False)
+    except (OSError, RuntimeError):
+        raise HTTPException(status_code=403, detail="Path cannot be resolved")
+    for location in (candidate, entry, target):
+        if _inside_venv_folder(location, root, anchors):
+            raise HTTPException(status_code=403, detail="Path is inside a venv folder")
+    if mutation == "delete" and recursive and not is_link_entry(entry) and os.path.isdir(entry):
+        if entry == root or entry in root.parents:
+            raise HTTPException(status_code=403, detail="Path contains the install root")
+        if root in entry.parents and _subtree_has_venv_folder(entry):
+            raise HTTPException(status_code=403, detail="Path contains a venv folder")
 
 
 def _path_text(raw_path: str | None) -> str:
@@ -197,7 +207,8 @@ def _resolve_managed_path(
     *,
     for_write: bool = False,
     keep_link_leaf: bool = False,
-    mutating: bool = False,
+    mutation: str | None = None,
+    recursive: bool = False,
 ) -> tuple[ManagedFilesPolicy, Path, str]:
     policy = _managed_files_policy(request)
     text = _path_text(raw_path)
@@ -219,8 +230,8 @@ def _resolve_managed_path(
     if ".." in candidate.parts:
         raise HTTPException(status_code=400, detail="Path cannot contain '..'")
 
-    if mutating:
-        _refuse_link_chain(candidate, leaf_link_ok=keep_link_leaf)
+    if mutation is not None:
+        _refuse_venv_mutation(candidate, mutation=mutation, recursive=recursive)
 
     if for_write and not candidate.exists():
         parent = _canonical_path(candidate.parent)

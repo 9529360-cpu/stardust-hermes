@@ -7,8 +7,8 @@ real with ``mklink /J`` (no elevation) and checks one of three things:
 * a dangling alias (its ``.venv`` is gone) is listed and removed, instead of failing the listing or answering 404;
 * a recursive delete of an install root (the uninstaller's checkout and home removal, a failed worktree) removes the
   alias and the real ``.venv``, and never reaches a folder outside the tree that a junction points to.
-* a mutation that reaches a venv folder through a link is refused, while a link to any other folder keeps working for
-  writes and deletes.
+* a mutation that touches a venv or .venv folder under the install root is refused, by name and whether or not links are
+  involved. Only the alias itself can be unlinked.
 
 ``shutil.rmtree`` removes a junction entry without descending into it, so the recursive deletes need no unlink step
 first. The guard tests below fail if that stops being true.
@@ -255,21 +255,171 @@ def test_dashboard_lists_and_deletes_a_dangling_alias(dashboard_client):
         _release_junction(checkout / "venv")
 
 
-def test_dashboard_recursive_delete_of_the_checkout_never_reaches_outside(dashboard_client, tmp_path):
+def test_recursive_delete_of_a_folder_with_an_outside_link_never_reaches_outside(dashboard_client, tmp_path):
     client, managed = dashboard_client
     checkout = managed / "hermes-agent"
-    _build_checkout(checkout)
+    venv = _build_checkout(checkout)
+    work = checkout / "work"
+    work.mkdir()
     outside = _build_outside_venv(tmp_path)
-    _make_junction(checkout / "outside-link", outside)
+    _make_junction(work / "outside-link", outside)
     try:
-        response = client.request("DELETE", "/api/files", json={"path": str(checkout), "recursive": True})
+        whole = client.request("DELETE", "/api/files", json={"path": str(checkout), "recursive": True})
+
+        assert whole.status_code == 403, whole.text
+        assert checkout.exists()
+
+        response = client.request("DELETE", "/api/files", json={"path": str(work), "recursive": True})
 
         assert response.status_code == 200, response.text
-        assert not os.path.lexists(checkout)
+        assert not os.path.lexists(work)
         assert (outside / "keep.txt").read_text(encoding="utf-8") == "outside"
+        assert (venv / "Lib" / "keep.txt").read_text(encoding="utf-8") == "venv file"
     finally:
-        _release_junction(checkout / "outside-link")
+        _release_junction(work / "outside-link")
         _release_junction(checkout / "venv")
+
+
+def test_direct_delete_inside_dot_venv_is_refused(dashboard_client):
+    client, managed = dashboard_client
+    checkout = managed / "hermes-agent"
+    venv = _build_checkout(checkout)
+    try:
+        response = client.request("DELETE", "/api/files", json={"path": str(venv / "Lib"), "recursive": True})
+
+        assert response.status_code == 403, response.text
+        assert (venv / "Lib" / "keep.txt").read_text(encoding="utf-8") == "venv file"
+        assert (venv / "Scripts" / "python.exe").read_bytes() == b"interpreter"
+    finally:
+        _release_junction(checkout / "venv")
+
+
+def test_a_link_to_the_install_root_followed_by_a_delete_below_it_is_refused(dashboard_client):
+    client, managed = dashboard_client
+    checkout = managed / "hermes-agent"
+    venv = _build_checkout(checkout)
+    work = managed / "work"
+    work.mkdir()
+    _make_junction(work / "rootlink", checkout)
+    try:
+        response = client.request(
+            "DELETE", "/api/files", json={"path": str(work / "rootlink" / ".venv" / "Lib"), "recursive": True}
+        )
+
+        assert response.status_code == 403, response.text
+        assert (venv / "Lib" / "keep.txt").read_text(encoding="utf-8") == "venv file"
+    finally:
+        _release_junction(work / "rootlink")
+        _release_junction(checkout / "venv")
+
+
+def test_a_two_link_chain_into_dot_venv_is_refused(dashboard_client):
+    client, managed = dashboard_client
+    checkout = managed / "hermes-agent"
+    venv = _build_checkout(checkout)
+    work = managed / "work"
+    work.mkdir()
+    _make_junction(work / "b", venv)
+    _make_junction(work / "a", work / "b")
+    try:
+        response = client.request("DELETE", "/api/files", json={"path": str(work / "a" / "Lib"), "recursive": True})
+
+        assert response.status_code == 403, response.text
+        assert (venv / "Lib" / "keep.txt").read_text(encoding="utf-8") == "venv file"
+    finally:
+        _release_junction(work / "a")
+        _release_junction(work / "b")
+        _release_junction(checkout / "venv")
+
+
+def test_a_link_inside_dot_venv_pointing_back_to_the_root_is_refused(dashboard_client):
+    client, managed = dashboard_client
+    checkout = managed / "hermes-agent"
+    venv = _build_checkout(checkout)
+    _make_junction(venv / "back", checkout)
+    try:
+        link = client.request("DELETE", "/api/files", json={"path": str(venv / "back"), "recursive": True})
+        below = client.request("DELETE", "/api/files", json={"path": str(venv / "back" / "Lib"), "recursive": True})
+
+        assert link.status_code == 403, link.text
+        assert below.status_code == 403, below.text
+        assert os.path.lexists(venv / "back")
+        assert (venv / "Lib" / "keep.txt").read_text(encoding="utf-8") == "venv file"
+    finally:
+        _release_junction(venv / "back")
+        _release_junction(checkout / "venv")
+
+
+def test_the_listing_path_of_dot_venv_is_refused_while_the_alias_unlinks_alone(dashboard_client):
+    client, managed = dashboard_client
+    checkout = managed / "hermes-agent"
+    venv = _build_checkout(checkout)
+    try:
+        real = _listed(client, checkout, ".venv")
+        alias = _listed(client, checkout, "venv")
+
+        refused = client.request("DELETE", "/api/files", json={"path": real["path"], "recursive": real["is_directory"]})
+        child = client.request("DELETE", "/api/files", json={"path": str(checkout / "venv" / "Lib"), "recursive": True})
+        unlinked = client.request(
+            "DELETE", "/api/files", json={"path": alias["path"], "recursive": alias["is_directory"]}
+        )
+
+        assert refused.status_code == 403, refused.text
+        assert child.status_code == 403, child.text
+        assert unlinked.status_code == 200, unlinked.text
+        assert not os.path.lexists(checkout / "venv")
+        assert (venv / "Lib" / "keep.txt").read_text(encoding="utf-8") == "venv file"
+    finally:
+        _release_junction(checkout / "venv")
+
+
+def test_a_final_link_into_dot_venv_is_refused_because_only_the_alias_may_be_unlinked(dashboard_client):
+    client, managed = dashboard_client
+    checkout = managed / "hermes-agent"
+    venv = _build_checkout(checkout)
+    work = managed / "work"
+    work.mkdir()
+    _make_junction(work / "toVenv", venv)
+    try:
+        response = client.request("DELETE", "/api/files", json={"path": str(work / "toVenv"), "recursive": True})
+
+        assert response.status_code == 403, response.text
+        assert os.path.lexists(work / "toVenv")
+        assert (venv / "Lib" / "keep.txt").read_text(encoding="utf-8") == "venv file"
+    finally:
+        _release_junction(work / "toVenv")
+        _release_junction(checkout / "venv")
+
+
+def test_a_recursive_delete_of_a_folder_holding_a_venv_under_the_root_is_refused(dashboard_client):
+    client, managed = dashboard_client
+    checkout = managed / "hermes-agent"
+    venv = _build_checkout(checkout)
+    tools = checkout / "tools"
+    nested = tools / "helper" / ".venv"
+    (nested / "Lib").mkdir(parents=True)
+    (nested / "Lib" / "keep.txt").write_text("nested venv", encoding="utf-8")
+    try:
+        response = client.request("DELETE", "/api/files", json={"path": str(tools), "recursive": True})
+
+        assert response.status_code == 403, response.text
+        assert (nested / "Lib" / "keep.txt").read_text(encoding="utf-8") == "nested venv"
+        assert (venv / "Lib" / "keep.txt").read_text(encoding="utf-8") == "venv file"
+    finally:
+        _release_junction(checkout / "venv")
+
+
+def test_a_dot_venv_folder_without_an_interpreter_is_protected_by_name(dashboard_client):
+    client, managed = dashboard_client
+    checkout = managed / "hermes-agent"
+    venv = checkout / ".venv"
+    (venv / "lib").mkdir(parents=True)
+    (venv / "lib" / "keep.txt").write_text("venv file", encoding="utf-8")
+
+    response = client.request("DELETE", "/api/files", json={"path": str(venv / "lib"), "recursive": True})
+
+    assert response.status_code == 403, response.text
+    assert (venv / "lib" / "keep.txt").read_text(encoding="utf-8") == "venv file"
 
 
 def test_dashboard_recursive_delete_through_the_alias_folder_is_refused(dashboard_client):
