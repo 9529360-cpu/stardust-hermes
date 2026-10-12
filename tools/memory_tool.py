@@ -89,11 +89,14 @@ def _gate_or_stage(
 
 # action -> (store call, gate (summary, detail) text) for the live tool path and staged replay.
 _STORE_ACTIONS = {
-    "add": (lambda store, target, content, old_text: store.add(target, content),
+    "add": (lambda store, target, content, old_text, *, owner_initiated=False:
+            store.add(target, content, owner_initiated=owner_initiated),
             lambda label, content, old_text: (f"add to {label}", content or "")),
-    "replace": (lambda store, target, content, old_text: replace_entry(store, target, old_text, content),
+    "replace": (lambda store, target, content, old_text, *, owner_initiated=False:
+                replace_entry(store, target, old_text, content, owner_initiated=owner_initiated),
                 lambda label, content, old_text: (f"replace in {label}", f"old: {old_text}\nnew: {content}")),
-    "remove": (lambda store, target, content, old_text: remove_entry(store, target, old_text),
+    "remove": (lambda store, target, content, old_text, *, owner_initiated=False:
+               remove_entry(store, target, old_text),
                lambda label, content, old_text: (f"remove from {label}", old_text or ""))}
 
 
@@ -212,8 +215,12 @@ def _background_delete_gate(
 def memory_tool(action: str = None, target: str = "memory", content: str = None, old_text: str = None,
                 new_text: str = None, operations: Optional[List[Dict[str, Any]]] = None,
                 topic: str = None, title: str = None, keywords: Any = None,
-                store: Optional[MemoryStore] = None) -> str:
-    """Tool entry point for core/user memory and topic summaries."""
+                store: Optional[MemoryStore] = None, *, owner_initiated: bool = False) -> str:
+    """Tool entry point for core/user memory and topic summaries.
+
+    ``owner_initiated`` is set only by surfaces the owner operates directly (the memory page, onboarding). It is
+    not in the tool schema, so a model call cannot set it. Without it, an add or replace that repeats text the
+    owner forgot is refused."""
     if content is None and new_text is not None:
         content = new_text
     # Strict providers send JSON null for optional fields; treat as omitted.
@@ -236,7 +243,8 @@ def memory_tool(action: str = None, target: str = "memory", content: str = None,
             if gate_result is not None:
                 return gate_result
             return json.dumps(
-                upsert_topic_summary(topic_key, content, title=title, keywords=keywords),
+                upsert_topic_summary(topic_key, content, title=title, keywords=keywords,
+                                     owner_initiated=owner_initiated),
                 ensure_ascii=False,
             )
         if action == "remove":
@@ -275,7 +283,8 @@ def memory_tool(action: str = None, target: str = "memory", content: str = None,
                or _apply_write_gate(action, target, content, old_text, store))
     if invalid is not None:
         return invalid
-    return json.dumps(_STORE_ACTIONS[action][0](store, target, content, old_text), ensure_ascii=False)
+    return json.dumps(_STORE_ACTIONS[action][0](store, target, content, old_text, owner_initiated=owner_initiated),
+                      ensure_ascii=False)
 
 
 def get_builtin_memory_config(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:

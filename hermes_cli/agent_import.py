@@ -19,7 +19,8 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 import yaml
 
-from tools.memory_tombstones import forgotten_phrases, mentions_forgotten
+from tools.memory_tombstones import forgotten_index
+from tools.memory_tool_store import MemoryStore
 from utils import atomic_write_text, atomic_yaml_write
 
 logger = logging.getLogger(__name__)
@@ -378,8 +379,8 @@ class AgentImporter:
                 failed = True
                 self.record(kind, md_file, destination, "error", f"Could not read file: {exc}")
         # Text the owner forgot must not come back through an import: it is skipped and counted.
-        forgotten = forgotten_phrases(destination.parent)
-        kept = [entry for entry in incoming if not mentions_forgotten(entry, forgotten)]
+        forgotten = forgotten_index(destination.parent)
+        kept = [entry for entry in incoming if not forgotten.mentions(entry)]
         forgotten_skipped = len(incoming) - len(kept)
         incoming = kept
         if not incoming:
@@ -401,17 +402,31 @@ class AgentImporter:
 
         def write() -> Optional[str]:
             destination.parent.mkdir(parents=True, exist_ok=True)
-            # Snapshot first (``<name>.bak.<unix_ts>``, as MemoryStore does); never rewrite the
-            # store when the safety net failed.
-            step = "back up existing"
+            step = "lock the memory store"
             try:
-                if destination.exists():
-                    backup = destination.with_suffix(f"{destination.suffix}.bak.{int(time.time())}")
-                    shutil.copy2(destination, backup)
-                    details["backup"] = str(backup)
-                step = "write merged"
-                # Canonical store bytes (no trailing newline), so the memory tool's byte-preserving paths accept it.
-                atomic_write_text(destination, ENTRY_DELIMITER.join(merged))
+                # The read, the merge and the write all happen under the memory store's lock, so an agent or
+                # another import writing the same file cannot be overwritten by this one. The preview above was
+                # computed without the lock and is replaced here by the figures from the locked read.
+                with MemoryStore._file_lock(destination):
+                    step = "read the existing store"
+                    current = parse_existing_memory_entries(destination)
+                    locked_merged, locked_stats = merge_entries(current, incoming, MEMORY_CHAR_LIMIT)
+                    details.update(existing_entries=locked_stats["existing"], added_entries=locked_stats["added"],
+                                   duplicate_entries=locked_stats["duplicates"],
+                                   overflowed_entries=locked_stats["overflowed"])
+                    if locked_stats["added"] == 0:
+                        details["no_change"] = True  # a concurrent writer already holds these entries
+                        return None
+                    # Snapshot first (``<name>.bak.<unix_ts>``, as MemoryStore does); never rewrite the
+                    # store when the safety net failed.
+                    step = "back up existing"
+                    if destination.exists():
+                        backup = destination.with_suffix(f"{destination.suffix}.bak.{int(time.time())}")
+                        shutil.copy2(destination, backup)
+                        details["backup"] = str(backup)
+                    step = "write merged"
+                    # Canonical store bytes (no trailing newline), so the memory tool's byte-preserving paths accept it.
+                    atomic_write_text(destination, ENTRY_DELIMITER.join(locked_merged))
             except OSError as exc:
                 return f"Could not {step} memory file: {exc}"
             return None

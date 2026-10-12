@@ -33,7 +33,9 @@ def remember_onboarding(answers: dict) -> dict:
     # backend or under a custom Hermes home.
     token = set_hermes_home_override(get_profile_dir('default'))
     try:
-        result = json.loads(memory_tool(action='add', target='user', content=content, store=load_on_disk_store()))
+        # The owner typed these facts during onboarding, so the add is owner-initiated.
+        result = json.loads(memory_tool(action='add', target='user', content=content, store=load_on_disk_store(),
+                                        owner_initiated=True))
         if not result.get('success') or result.get('staged'):
             raise ValueError(result.get('error') or result.get('message') or 'Memory was not saved')
         # memory_tool can report success without the entry reaching disk, so read it back from a fresh store.

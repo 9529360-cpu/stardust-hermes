@@ -169,3 +169,18 @@ def test_list_disabled_targets_do_not_expose_disk_entries(rpc, tmp_path, flag, d
         selected = {"memory", "user"} if selection == "both" else {selection}
         assert result["targets"] == {name: "disabled" if name in disabled else "enabled" for name in selected}
         assert {entry["target"] for entry in result["entries"]} == selected - disabled
+
+
+def test_owner_remember_may_put_back_text_the_owner_forgot(rpc):
+    """The memory page is an owner surface: after a forget, the owner can add the same text again."""
+    from tools.memory_tombstones import forgotten_index
+
+    text = "Prefers green tea in the morning"
+    assert rpc("memory.remember", target="memory", content=text)["result"] == {"success": True}
+    assert rpc("memory.forget", target="memory", text=text)["result"] == {"success": True}
+    assert forgotten_index().mentions(text)
+
+    assert rpc("memory.remember", target="memory", content=text)["result"] == {"success": True}
+    assert rpc("memory.list", target="memory")["result"]["entries"] == [
+        {"target": "memory", "index": 0, "text": text}]
+    assert not forgotten_index().mentions(text)

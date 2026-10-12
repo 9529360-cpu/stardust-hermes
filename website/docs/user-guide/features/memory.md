@@ -113,9 +113,23 @@ If the substring matches multiple entries, an error is returned asking for a mor
 
 ### Forgetting Across Stores
 
-When the requested target has no exact match, `remove` and `replace` also search the other stores: `MEMORY.md`, `USER.md`, and topic summaries (title, keywords, and summary text, case-insensitively). A single match is acted on and the result names the store (`removed_from` or `replaced_in`). A `remove` that matches several places removes each one and lists it; a `replace` refuses to guess between several. A topic summary loses only the matching sentence or keyword, unless the phrase is its title. A phrase with no match anywhere changes nothing, and the result lists candidate entries from every store so the agent can retry with an exact phrase. An exact match in the requested target keeps its previous behavior and does not search the other stores.
+A forget removes the text from every store that holds it: the requested store's exact match, then `MEMORY.md`, `USER.md`, and topic summaries (title, keywords, and summary text, case-insensitively). The result's `removed_from` lists each store that changed. A topic summary loses only the matching sentence or keyword, unless the phrase is its title. `replace` changes a single match in whichever store holds it, and refuses to guess between several. A phrase with no match anywhere changes nothing, and the result lists candidate entries from every store so the agent can retry with an exact phrase. Batch operations stay inside the requested store.
 
-Each forgotten text is also recorded in `memories/forgotten.json` beside `MEMORY.md`. `session_search` and topic recall then drop results that contain a recorded phrase, so an old chat cannot bring the text back. Transcripts are never edited or deleted. Matching is verbatim, so a paraphrase inside an old chat is not filtered, and phrases shorter than four characters are not used for filtering.
+The same forget applies when you delete an entry from the memory page or a journey card: the entry goes, and the same text is removed from the other stores.
+
+### Forgotten Text Stays Forgotten
+
+Forgetting records a SHA-256 hash of the normalized text in `memories/forgotten.json` beside `MEMORY.md`, together with its length, the time, the store, and the topic key for topic text. The text itself is not stored there. Tool results are kept in the transcript, so a forget response never repeats the removed text.
+
+- **Recall.** `session_search` and topic recall drop any result whose text contains a recorded phrase. Transcripts are never edited or deleted.
+- **Automatic writes.** Background review, staged approvals, agent imports, and the agent's own adds and replacements skip text that repeats something you forgot. They log the reason and return it.
+- **Your own adds.** Adding the text yourself from the memory page, or entering it during onboarding, puts it back and clears the matching records.
+
+Limits:
+
+- Matching is verbatim after case and whitespace folding. A paraphrase in an old chat is not filtered.
+- `session_search` by `session_id`, and the scroll mode, still show a transcript as it was. Recall filtering covers search results only.
+- Phrases shorter than four characters are recorded but never used for filtering.
 
 ## Two Targets Explained
 

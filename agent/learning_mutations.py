@@ -129,9 +129,11 @@ def _delete_skill(name: str) -> dict[str, Any]:
 
 
 def _delete_memory(node_id: str) -> dict[str, Any]:
+    from tools.memory_forget import forget_owner_entry
+
     source, _ = _parse_memory_id(node_id)
     path, chunks, local = _locate_memory(node_id)
-    result = _disk_store().remove_index(_STORE_TARGETS[source], local, chunks[local])
+    result = forget_owner_entry(_disk_store(), _STORE_TARGETS[source], chunks[local], index=local)
     if not result.get("success"):
         return {"ok": False, "message": result.get("error", "delete failed")}
     return {"ok": True, "message": f"deleted memory from {path.name}"}
@@ -158,7 +160,8 @@ def _edit_memory(node_id: str, content: str) -> dict[str, Any]:
     if not body:
         return {"ok": False, "message": "empty memory — use delete to remove it"}
     path, chunks, local = _locate_memory(node_id)
-    result = _disk_store().replace_index(_STORE_TARGETS[source], local, chunks[local], body)
+    # Editing a card in the journey is an owner action, so it may put back text the owner forgot.
+    result = _disk_store().replace_index(_STORE_TARGETS[source], local, chunks[local], body, owner_initiated=True)
     if not result.get("success"):
         return {"ok": False, "message": result.get("error", "edit failed")}
     return {"ok": True, "message": f"updated memory in {path.name}"}

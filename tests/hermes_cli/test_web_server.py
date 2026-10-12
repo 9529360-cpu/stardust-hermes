@@ -3914,11 +3914,13 @@ class TestStatusMemoryBlock:
 
 class TestMemoryEntriesApi:
     @pytest.fixture(autouse=True)
-    def _setup_test_client(self, monkeypatch, _hermetic_environment):
+    def _setup_test_client(self, monkeypatch, tmp_path):
         from starlette.testclient import TestClient
         from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
-        monkeypatch.setenv("STARDUST_HOME", str(_hermetic_environment))
+        # tmp_path, not the _hermetic_environment fixture: that fixture returns None, so str() of it made the
+        # home the relative path "None" and the first bootstrap created a None/ folder in the working directory.
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "stardust-home"))
         self.client = TestClient(app)
         self.client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
 
@@ -3946,6 +3948,7 @@ class TestMemoryEntriesApi:
         assert response.status_code == 200
         assert path.read_text(encoding="utf-8") == "Likes tea daily\n§\nLives in Berlin"
         assert response.json()["active_session_behavior"] == "refresh_on_next_turn"
+        assert response.json()["removed_from"] == ["memory"]
 
     def test_rejects_stale_entry_without_mutating_memory(self, tmp_path, monkeypatch):
         from tools.memory_tool import MemoryStore

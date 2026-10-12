@@ -62,7 +62,8 @@ def _(rid, params):
     store = _memory_rpc_store()
     target = params["target"]
     error = _memory_target_error(store, target)
-    return _memory_rpc_result(rid, error or store.add(target, params["content"]))
+    # Added by the owner from the memory page, so this add may put back text the owner forgot.
+    return _memory_rpc_result(rid, error or store.add(target, params["content"], owner_initiated=True))
 
 
 @method("memory.forget")
@@ -82,8 +83,9 @@ def _(rid, params):
     error = _memory_target_error(store, target)
     if error:
         return _memory_rpc_result(rid, error)
-    result = (store.remove_index(target, index, expected_text) if index is not None
-              else store.remove_exact(target, text))
+    from tools.memory_forget import forget_owner_entry
+
+    result = forget_owner_entry(store, target, expected_text if index is not None else text, index=index)
     return _memory_rpc_result(rid, result)
 
 

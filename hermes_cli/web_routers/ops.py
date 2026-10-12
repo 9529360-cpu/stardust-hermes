@@ -502,10 +502,13 @@ async def delete_memory_entry(target: str, body: Dict[str, str], profile: Option
         store = load_on_disk_store()
         if not store.target_enabled(target):
             raise HTTPException(status_code=409, detail="Built-in memory is disabled for this target")
-        result = store.remove_exact(target, entry)
+        from tools.memory_forget import forget_owner_entry
+
+        result = forget_owner_entry(store, target, entry)
         if not result.get("success"):
             raise HTTPException(status_code=409, detail="Memory entry changed; reload the list and retry")
-        return {"ok": True, "active_session_behavior": "refresh_on_next_turn"}
+        return {"ok": True, "active_session_behavior": "refresh_on_next_turn",
+                "removed_from": result["removed_from"]}
 
     return await scoped_to_thread(profile, _remove)
 

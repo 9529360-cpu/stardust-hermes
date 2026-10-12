@@ -14,7 +14,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from utils import atomic_write_bytes, atomic_write_text, fsync_directory, path_signature
-from tools.memory_tombstones import fold_text, forgotten_store_error, record_forgotten
+from tools.memory_tombstones import (
+    automatic_write_refusal, clear_forgotten_within, fold_text, forgotten_store_error, record_forgotten,
+)
 from tools.threat_patterns import first_threat_message as _first_threat_message
 
 logger = logging.getLogger("tools.memory_tool")
@@ -74,6 +76,23 @@ def _with_forget_record(result: Dict[str, Any], removed_texts: List[str], target
     on the result; the removal itself has already happened."""
     if result.get("success") and removed_texts:
         warning = record_forgotten(removed_texts, source=target)
+        if warning:
+            result["forget_record_warning"] = warning
+    return result
+
+
+def _refused(reason: str) -> Dict[str, Any]:
+    """Result for an automatic write that was not stored. The reason is logged and returned."""
+    logger.info("Skipped an automatic memory write: %s", reason)
+    return {"success": False, "skipped": True, "reason": reason}
+
+
+def _with_forgotten_cleared(result: Dict[str, Any], text: str, owner_initiated: bool) -> Dict[str, Any]:
+    """After an owner's own add or replace succeeds, drop the forgotten records that the new text contains."""
+    if owner_initiated and result.get("success"):
+        cleared, warning = clear_forgotten_within(text)
+        if cleared:
+            result["forgotten_cleared"] = cleared
         if warning:
             result["forget_record_warning"] = warning
     return result
@@ -424,13 +443,18 @@ class MemoryStore:
             self._write_file(path, result[0])
             return self._success_response(target, result[1])
 
-    def add(self, target: str, content: str) -> Dict[str, Any]:
-        """Append a new entry. Returns error if it would exceed the char limit."""
+    def add(self, target: str, content: str, *, owner_initiated: bool = False) -> Dict[str, Any]:
+        """Append a new entry. Returns error if it would exceed the char limit.
+
+        Only an owner-initiated add may store text the owner forgot, and it clears that record. Any other
+        writer is refused (skipped, with the reason)."""
         content = content.strip()
         if not content:
             return _error("Content cannot be empty.")
         if scan_error := _scan_memory_content(content):
             return _error(scan_error)
+        if not owner_initiated and (refusal := automatic_write_refusal(content)):
+            return _refused(refusal)
 
         def _add(entries, limit):
             if content in entries:
@@ -444,10 +468,11 @@ class MemoryStore:
             return entries + [content], "Entry added."
         # Append-only: skip the drift guard (appending never clobbers foreign
         # content) but still refuse a failed read — add rewrites the WHOLE file.
-        return self._mutate(target, _add, skip_drift=True)
+        return _with_forgotten_cleared(self._mutate(target, _add, skip_drift=True), content, owner_initiated)
 
-    def replace(self, target: str, old_text: str, new_content: str) -> Dict[str, Any]:
-        """Find entry containing old_text substring, replace it with new_content."""
+    def replace(self, target: str, old_text: str, new_content: str, *, owner_initiated: bool = False) -> Dict[str, Any]:
+        """Find entry containing old_text substring, replace it with new_content. The new text follows the same
+        forgotten-text rule as add."""
         new_content = new_content.strip()
         if not old_text.strip():
             return _error("old_text cannot be empty.")
@@ -455,7 +480,9 @@ class MemoryStore:
             return _error("new_content cannot be empty. Use 'remove' to delete entries.")
         if scan_error := _scan_memory_content(new_content):
             return _error(scan_error)
-        return self._edit(target, old_text.strip(), new_content)
+        if not owner_initiated and (refusal := automatic_write_refusal(new_content)):
+            return _refused(refusal)
+        return _with_forgotten_cleared(self._edit(target, old_text.strip(), new_content), new_content, owner_initiated)
 
     def remove(self, target: str, old_text: str) -> Dict[str, Any]:
         """Remove the entry containing old_text substring."""
@@ -471,7 +498,8 @@ class MemoryStore:
             return _error(forget_error)
         return self._rewrite_exact_entry(target, entry, expected_index=expected_index, new_content=None)
 
-    def replace_index(self, target: str, index: int, expected_text: str, new_content: str) -> Dict[str, Any]:
+    def replace_index(self, target: str, index: int, expected_text: str, new_content: str, *,
+                      owner_initiated: bool = False) -> Dict[str, Any]:
         """Replace the entry at *index* under the byte-preserving lock, verified against *expected_text*."""
         if target not in {"memory", "user"}:
             return _error("target must be memory or user")
@@ -484,7 +512,10 @@ class MemoryStore:
             return _error("new_content cannot be empty. Use 'remove' to delete entries.")
         if scan_error := _scan_memory_content(content):
             return _error(scan_error)
-        return self._rewrite_exact_entry(target, expected_text, expected_index=index, new_content=content)
+        if not owner_initiated and (refusal := automatic_write_refusal(content)):
+            return _refused(refusal)
+        result = self._rewrite_exact_entry(target, expected_text, expected_index=index, new_content=content)
+        return _with_forgotten_cleared(result, content, owner_initiated)
 
     def _rewrite_exact_entry(
         self, target: str, entry: str, *, expected_index: int | None, new_content: str | None,
@@ -573,8 +604,8 @@ class MemoryStore:
     def forget_matching(self, target: str, phrase: str) -> Dict[str, Any]:
         """Remove every entry containing *phrase* (case-insensitive) in one locked write.
 
-        Cross-store forget: the caller found hits in this store. The removed texts are returned as
-        ``removed_texts`` and recorded as forgotten."""
+        Cross-store forget: the caller found hits in this store. The removed count is returned as
+        ``removed_count``; the removed texts are recorded as forgotten (hashes only)."""
         needle = fold_text(phrase)
         if not needle:
             return _error("old_text cannot be empty.")
@@ -593,10 +624,11 @@ class MemoryStore:
         result = self._mutate(target, _apply)
         if not result.get("success"):
             return result
-        result["removed_texts"] = list(removed)
+        result["removed_count"] = len(removed)
         return _with_forget_record(result, removed, target)
 
-    def replace_matching(self, target: str, phrase: str, new_content: str) -> Dict[str, Any]:
+    def replace_matching(self, target: str, phrase: str, new_content: str, *,
+                         owner_initiated: bool = False) -> Dict[str, Any]:
         """Replace the single entry containing *phrase* (case-insensitive) in one locked write. Several hits
         are refused: a replacement must not guess which entry the owner meant."""
         needle = fold_text(phrase)
@@ -607,6 +639,8 @@ class MemoryStore:
             return _error("new_content cannot be empty. Use 'remove' to delete entries.")
         if scan_error := _scan_memory_content(content):
             return _error(scan_error)
+        if not owner_initiated and (refusal := automatic_write_refusal(content)):
+            return _refused(refusal)
 
         def _apply(entries, limit):
             hits = [i for i, entry in enumerate(entries) if needle in fold_text(entry)]
@@ -624,7 +658,7 @@ class MemoryStore:
                     f"below), then retry — all in this turn."))
             return replaced, "Entry replaced."
 
-        return self._mutate(target, _apply)
+        return _with_forgotten_cleared(self._mutate(target, _apply), content, owner_initiated)
 
     def remove_index(self, target: str, index: int, expected_text: str) -> Dict[str, Any]:
         """Validate index AND exact selected text under the byte-preserving delete lock."""
@@ -703,6 +737,11 @@ class MemoryStore:
             if scan_error:
                 return _error(f"Operation {i + 1}: {scan_error}")
 
+        # A batch is an automatic write: one add or replace that repeats forgotten text rejects the whole batch.
+        for i, op in enumerate(ops):
+            if op.get("action") in {"add", "replace"} and (
+                    refusal := automatic_write_refusal(op.get("content") or op.get("new_text") or "")):
+                return _refused(f"Operation {i + 1}: {refusal} Nothing was applied (batch is all-or-nothing).")
         if any(op.get("action") == "remove" for op in ops) and (forget_error := forgotten_store_error()):
             return _error(forget_error)
         forgotten: List[str] = []

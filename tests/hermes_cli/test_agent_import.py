@@ -506,6 +506,42 @@ class TestImportRespectsForgetting:
         assert item["forgotten_skipped"] == 1
 
 
+class TestImportTakesTheStoreLock:
+    """The import reads, merges and writes MEMORY.md while holding the memory store's lock, so it cannot
+    overwrite an entry that an agent or another import wrote in the meantime."""
+
+    def test_the_memory_write_happens_inside_the_store_lock(self, claude_tree, hermes_home, monkeypatch):
+        from contextlib import contextmanager
+
+        import hermes_cli.agent_import as agent_import
+        from tools.memory_tool_store import MemoryStore
+
+        events: list[str] = []
+        real_lock = MemoryStore._file_lock
+
+        @contextmanager
+        def traced_lock(path):
+            events.append(f"lock {Path(path).name}")
+            with real_lock(path):
+                yield
+            events.append(f"unlock {Path(path).name}")
+
+        real_write = agent_import.atomic_write_text
+
+        def traced_write(path, content, **kwargs):
+            if Path(path).name == "MEMORY.md":
+                events.append("write MEMORY.md")
+            return real_write(path, content, **kwargs)
+
+        monkeypatch.setattr(MemoryStore, "_file_lock", staticmethod(traced_lock))
+        monkeypatch.setattr(agent_import, "atomic_write_text", traced_write)
+
+        report = run_import("claude-code", claude_tree, hermes_home, execute=True)
+
+        assert events.index("lock MEMORY.md") < events.index("write MEMORY.md") < events.index("unlock MEMORY.md")
+        assert any(i["kind"] == "claude-md" and i["status"] == "imported" for i in report["items"])
+
+
 # ---------------------------------------------------------------------------
 # config.yaml preservation (sibling of the MEMORY.md case above)
 # ---------------------------------------------------------------------------
