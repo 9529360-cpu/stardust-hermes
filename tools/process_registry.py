@@ -54,9 +54,12 @@ def _checkpoint_path() -> Path:
 MAX_OUTPUT_CHARS = 200_000      # rolling output buffer
 FINISHED_TTL_SECONDS = 1800     # keep finished processes 30 minutes
 MAX_PROCESSES = 64              # max tracked processes (LRU pruning)
-# Longest a reconciled exit waits for the reader to leave its pipe section. The reader holds that
-# section across its live-output sink, so a stuck sink must not hold up a listing.
+# Longest a reconciled exit's first attempt waits for the reader to leave its pipe section. The reader
+# holds that section across its live-output sink, so a stuck sink must not hold up a listing.
 _PIPE_HANDOFF_TIMEOUT_SECONDS = 1.0
+# Reconcile attempts for a session whose reader stays busy before the session is finished without
+# draining. Only the first attempt waits; the others try once and return at once.
+_PIPE_HANDOFF_MAX_ATTEMPTS = 4
 
 # Watch-pattern rate limiting, PER SESSION: one watch-match notification per
 # WATCH_MIN_INTERVAL_SECONDS; a match inside the cooldown is dropped and counts as one
@@ -496,16 +499,15 @@ class ProcessSession:
     _completion_event: threading.Event = field(default_factory=threading.Event, repr=False)
     _lock: threading.Lock = field(default_factory=threading.Lock)
     _reader_thread: Optional[threading.Thread] = field(default=None, repr=False)
-    # POSIX pipe reader/reconcile handoff. The reader holds this only across a
-    # ready, non-blocking read + buffer append; exit reconciliation holds it
-    # (acquired with a bounded wait) while draining the remaining bytes and
-    # publishing completion. This closes the race where the reader had consumed
-    # a chunk but had not appended it yet.
+    # Pipe handoff between the reader thread and a reconciled exit. The reader holds this across each
+    # read and its ingest, on every stream kind, so it never has bytes taken but not yet buffered. A
+    # reconciled exit takes it, with a bound, before draining a POSIX pipe.
     _pipe_read_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
     # Pipe state shared by the reader and a reconciled drain; both touch it only under _pipe_read_lock.
     _pipe_decoder: Any = field(default=None, repr=False)          # incremental UTF-8 decoder for stdout
     _shell_head_open: bool = field(default=True, repr=False)      # stdout may still start with shell noise
     _shell_head_pending: str = field(default="", repr=False)      # undecided first line, held back
+    _pipe_handoff_misses: int = field(default=0, repr=False)      # reconcile attempts that found the reader busy
     _pty: Any = field(default=None, repr=False)  # ptyprocess handle (use_pty=True)
 
     def __post_init__(self) -> None:
@@ -1182,16 +1184,11 @@ class ProcessRegistry(ProcessCheckpointMixin):
                         if idle_after_exit >= 3:
                             break
                         continue
-                if fd is not None:
-                    # A direct-child exit may be reconciled from list()/poll() while
-                    # this reader is active. Keep the actual pipe read and its buffer
-                    # append indivisible from reconciliation so completion notices
-                    # cannot snapshot between those two operations.
-                    with session._pipe_read_lock:
-                        chunk = _read_once()
-                        if chunk:
-                            _ingest(chunk)
-                else:
+                # A direct-child exit may be reconciled from list()/poll() while this reader is active.
+                # The read and its buffer append stay indivisible from reconciliation, so completion
+                # notices cannot snapshot between them. Every stream kind takes the lock. Windows never
+                # reconciles through it (no drain), so holding it across a blocking read there blocks nothing.
+                with session._pipe_read_lock:
                     chunk = _read_once()
                     if chunk:
                         _ingest(chunk)
@@ -1203,8 +1200,11 @@ class ProcessRegistry(ProcessCheckpointMixin):
         finally:
             # Flush the decoder's tail and any undecided first line under the pipe lock, so the flush
             # cannot interleave with a reconciled exit reading the same stream.
-            with session._pipe_read_lock, suppress(Exception):
-                self._ingest_pipe_bytes(session, b"", final=True)
+            with session._pipe_read_lock:
+                try:
+                    self._ingest_pipe_bytes(session, b"", final=True)
+                except Exception as e:
+                    logger.debug("Final pipe flush of %s failed: %s", session.id, e)
             self._finish_reader(
                 session, None, lambda text: self._ingest_pipe_text(session, text), "Process",
                 session.process.wait, lambda: session.process.returncode)
@@ -1397,10 +1397,11 @@ class ProcessRegistry(ProcessCheckpointMixin):
         session.mark_exited(exit_code)
         self._move_to_finished(session)
 
-    def _move_to_finished(self, session: ProcessSession):
+    def _move_to_finished(self, session: ProcessSession, *, keep_stdout: bool = False):
         """Move a session from running to finished.
         Idempotent: kill_process() and the reader thread can both call this; only
-        the FIRST move enqueues the completion notification, so no duplicates."""
+        the FIRST move enqueues the completion notification, so no duplicates.
+        ``keep_stdout`` leaves the pipe to the reader thread, which closes it when it finishes."""
         with self._lock:
             was_running = session.id in self._running
             if was_running:
@@ -1418,7 +1419,7 @@ class ProcessRegistry(ProcessCheckpointMixin):
         # and the loop exits, dropping at most the unread tail of a process
         # that was just killed. poll()/wait()/read_log() serve from the
         # buffered ``output_buffer``, never from the pipe.
-        self._release_finished_handles(session)
+        self._release_finished_handles(session, keep_stdout=keep_stdout)
         if session.owner_home and session.owner_home != hermes_home_key():
             from hermes_constants import reset_hermes_home_override, set_hermes_home_override
             token = set_hermes_home_override(session.owner_home)
@@ -1456,7 +1457,7 @@ class ProcessRegistry(ProcessCheckpointMixin):
             "termination_source": session.termination_source,
         }
 
-    def _release_finished_handles(self, session: ProcessSession):
+    def _release_finished_handles(self, session: ProcessSession, *, keep_stdout: bool = False):
         """Close a finished session's OS handles (Popen pipes / PTY master).
 
         Best-effort and idempotent: the session may have no local Popen (env
@@ -1464,6 +1465,7 @@ class ProcessRegistry(ProcessCheckpointMixin):
         the reader loop / kill path. Closing a Popen's stream objects does not
         kill anything — the child has already exited — it only releases the
         parent's pipe FDs, which is exactly the retained-resource leak.
+        ``keep_stdout`` leaves stdout open for the reader thread, which closes it at its own end.
         """
         proc = session.process
         if proc is not None:
@@ -1475,7 +1477,7 @@ class ProcessRegistry(ProcessCheckpointMixin):
             reader_busy = (_IS_WINDOWS and reader is not None and reader.is_alive()
                            and reader is not threading.current_thread())
             for stream in (proc.stdout, proc.stderr, proc.stdin):
-                if stream is None or (reader_busy and stream is proc.stdout):
+                if stream is None or (stream is proc.stdout and (keep_stdout or reader_busy)):
                     continue
                 with suppress(OSError, ValueError):  # a stdin flush can hit EPIPE
                     stream.close()
@@ -1753,11 +1755,21 @@ class ProcessRegistry(ProcessCheckpointMixin):
         if stdout is None or _IS_WINDOWS:
             self._finalize_reconciled_exit(session, rc)
             return
-        # Drain what the pipe already holds before the exit is published. The reader holds this lock
-        # across each read and its ingest, so wait for it, but only up to the bound: a reader stuck in
-        # its output sink leaves the session running for the next refresh instead of blocking the listing.
-        if not session._pipe_read_lock.acquire(timeout=_PIPE_HANDOFF_TIMEOUT_SECONDS):
-            logger.debug("Reconcile of %s deferred: reader is still inside its pipe section", session.id)
+        # Drain what the pipe already holds before the exit is published. The first attempt waits, up to
+        # the bound, for the reader to leave its pipe section. Once it has missed, later attempts only try,
+        # so a reader stuck in its output sink costs each listing nothing. After
+        # _PIPE_HANDOFF_MAX_ATTEMPTS misses the session is finished without draining. The reader still owns
+        # the pipe and closes it when it finishes, so output it has not yet read reaches output_buffer later.
+        wait = 0.0 if session._pipe_handoff_misses else _PIPE_HANDOFF_TIMEOUT_SECONDS
+        if not session._pipe_read_lock.acquire(timeout=wait):
+            session._pipe_handoff_misses += 1
+            if session._pipe_handoff_misses < _PIPE_HANDOFF_MAX_ATTEMPTS:
+                logger.debug("Reconcile of %s deferred: reader is still inside its pipe section", session.id)
+                return
+            logger.warning(
+                "Process %s: reader still busy after %d reconcile attempts; finishing without draining it",
+                session.id, session._pipe_handoff_misses)
+            self._finalize_reconciled_exit(session, rc, keep_stdout=True)
             return
         try:
             self._drain_pipe_available(session, stdout)
@@ -1785,14 +1797,14 @@ class ProcessRegistry(ProcessCheckpointMixin):
             logger.debug("Non-blocking drain failed for %s: %s", session.id, e)
         self._ingest_pipe_bytes(session, raw if isinstance(raw, bytes) else b"", final=True)
 
-    def _finalize_reconciled_exit(self, session: ProcessSession, rc: int) -> None:
+    def _finalize_reconciled_exit(self, session: ProcessSession, rc: int, *, keep_stdout: bool = False) -> None:
         with session._lock:
             session.mark_exited(rc)
         logger.info(
             "Reconciled session %s: direct child exited with code %s but reader "
             "was still blocked (orphaned pipe). Flipped to exited.",
             session.id, rc)
-        self._move_to_finished(session)
+        self._move_to_finished(session, keep_stdout=keep_stdout)
 
     @staticmethod
     def _status_head(session: ProcessSession) -> dict:

@@ -45,8 +45,9 @@ def _probe(root):
             session.notify_on_complete = True
         owner, sibling = sessions
         deadline = time.monotonic() + 5
-        while not all(s.output_buffer for s in sessions):
-            assert time.monotonic() < deadline, "writers did not become ready"
+        # Each writer's own marker: other output, such as shell start-up warnings, says nothing about it.
+        while not ("owner-output" in owner.output_buffer and "sibling-output" in sibling.output_buffer):
+            assert time.monotonic() < deadline, "writers did not print their markers"
             time.sleep(0.01)
         assert all(s.process.poll() is None for s in sessions)
         (root / "owner-exit").touch()

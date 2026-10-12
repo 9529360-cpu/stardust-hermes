@@ -1,8 +1,8 @@
 """Pipe handoff between a local process's reader thread and a reconciled exit.
 
 Shell start-up noise is removed from the head of the output however the kernel splits it, and a
-reconciled exit drains the pipe through that same path. The filter cases are pure and run everywhere;
-the pipe cases use real POSIX pipes and gate files instead of timing sleeps.
+reconciled exit drains the pipe through that same path. The filter cases are pure. The pipe cases use
+real POSIX pipes and are skipped on Windows; ordering uses gate files rather than sleeps.
 """
 
 import os
@@ -16,7 +16,12 @@ import time
 
 import pytest
 
-from tools.process_registry import ProcessRegistry, ProcessSession
+from tools.process_registry import (
+    _PIPE_HANDOFF_MAX_ATTEMPTS,
+    _PIPE_HANDOFF_TIMEOUT_SECONDS,
+    ProcessRegistry,
+    ProcessSession,
+)
 from tools.process_registry_shell_noise import filter_shell_noise_head
 
 NOISE_CPGROUP = "bash: cannot set terminal process group (-1): Inappropriate ioctl for device"
@@ -114,6 +119,41 @@ def _reap(proc: subprocess.Popen, *readers) -> None:
         reader.join(timeout=10)
 
 
+def _timed_listing(registry: ProcessRegistry, timeout: float = 10.0):
+    """One list_sessions call in a daemon thread, so a blocked listing fails the test instead of hanging it.
+    Returns (seconds, rows)."""
+    done = {}
+
+    def run():
+        start = time.monotonic()
+        done["rows"] = registry.list_sessions(session_key="k")
+        done["seconds"] = time.monotonic() - start
+
+    worker = threading.Thread(target=run, daemon=True)
+    worker.start()
+    worker.join(timeout)
+    assert not worker.is_alive(), "listing did not return"
+    return done["seconds"], done["rows"]
+
+
+def _start_stuck_sink(registry: ProcessRegistry, sid: str):
+    """A reader whose live-output sink stays stuck after the first chunk. The direct child prints and
+    exits; a background descendant keeps the pipe open. Returns (session, proc, release)."""
+    entered, release = threading.Event(), threading.Event()
+
+    def stuck_sink(_session, _chunk):
+        entered.set()
+        release.wait(30)
+
+    registry.on_output = stuck_sink
+    proc = _spawn("printf '%s\\n' owner-output; (sleep 30) &")
+    session = _local_session(proc, sid)
+    registry._track_started(session, registry._reader_loop, f"{sid}-reader")
+    assert entered.wait(10), "reader never reached the output sink"
+    proc.wait(timeout=10)
+    return session, proc, release
+
+
 @posix_only
 def test_warning_split_across_reads_stays_out_of_output(tmp_path):
     first, gate = tmp_path / "first", tmp_path / "gate"
@@ -160,31 +200,84 @@ def test_reconciled_exit_drains_pipe_through_the_same_filter():
 
 
 @posix_only
+def test_normal_drain_still_drops_warnings_split_from_the_reader(tmp_path):
+    first, gate = tmp_path / "first", tmp_path / "gate"
+    script = (
+        f"printf '%s\\n' {shlex.quote(NOISE_CPGROUP)}; touch {shlex.quote(str(first))}; "
+        f"while [ ! -e {shlex.quote(str(gate))} ]; do sleep 0.01; done; "
+        f"printf '%s\\n' {shlex.quote(NOISE_JOBCONTROL)} owner-output"
+    )
+    registry = ProcessRegistry()
+    live = []
+    registry.on_output = lambda _session, chunk: live.append(chunk)
+    proc = _spawn(script)
+    session = _local_session(proc, "proc_normal_drain")
+    registry._running[session.id] = session  # No reader thread: this test plays the reader's first read.
+    try:
+        assert _wait_until(lambda: first.exists() and _pipe_has_data(proc.stdout))
+        # The reader's first read: only the first warning is in the pipe so far.
+        registry._ingest_pipe_bytes(session, os.read(proc.stdout.fileno(), 4096))
+        gate.touch()
+        proc.wait(timeout=10)
+        registry._reconcile_local_exit(session)  # Normal drain: the lock is free.
+        assert _completion_for(registry, session.id)["output"] == "owner-output\n"
+        assert live == ["owner-output\n"]
+    finally:
+        _reap(proc)
+
+
+@posix_only
 def test_stuck_output_sink_cannot_block_a_listing():
     registry = ProcessRegistry()
-    entered, release = threading.Event(), threading.Event()
-
-    def stuck_sink(_session, _chunk):
-        entered.set()
-        release.wait(30)
-
-    registry.on_output = stuck_sink
-    # The direct child prints and exits; a background descendant keeps the pipe open.
-    proc = _spawn("printf '%s\\n' owner-output; (sleep 30) &")
-    session = _local_session(proc, "proc_sink")
-    registry._track_started(session, registry._reader_loop, "sink-reader")
+    session, proc, release = _start_stuck_sink(registry, "proc_sink")
     try:
-        assert entered.wait(10), "reader never reached the output sink"
-        proc.wait(timeout=10)
-        worker = threading.Thread(target=registry.list_sessions, kwargs={"session_key": "k"}, daemon=True)
-        worker.start()
-        worker.join(timeout=5)
-        assert not worker.is_alive(), "listing waited behind a reader stuck in its output sink"
+        seconds, _ = _timed_listing(registry)
+        assert seconds < _PIPE_HANDOFF_TIMEOUT_SECONDS + 3, f"listing took {seconds:.2f}s behind the stuck sink"
         release.set()
         # Wait for the completion itself: `exited` is set a moment before it is published.
         event = registry.completion_queue.get(timeout=10)
         assert event["session_id"] == session.id
         assert event["output"] == "owner-output\n"
+    finally:
+        release.set()
+        _reap(proc, session._reader_thread)
+
+
+@posix_only
+def test_stuck_output_sink_does_not_slow_repeated_listings():
+    registry = ProcessRegistry()
+    session, proc, release = _start_stuck_sink(registry, "proc_repeat")
+    try:
+        # The first listing may pay the bound once. Every later listing, before the session is given up,
+        # must return at once.
+        first, _ = _timed_listing(registry)
+        later = [_timed_listing(registry)[0] for _ in range(_PIPE_HANDOFF_MAX_ATTEMPTS - 2)]
+        assert first < _PIPE_HANDOFF_TIMEOUT_SECONDS + 3, f"first listing took {first:.2f}s"
+        assert max(later) < 0.5, f"repeated listings were slowed by the stuck sink: {later}"
+    finally:
+        release.set()
+        _reap(proc, session._reader_thread)
+
+
+@posix_only
+def test_stuck_output_sink_does_not_keep_session_running_forever():
+    registry = ProcessRegistry()
+    session, proc, release = _start_stuck_sink(registry, "proc_forever")
+    try:
+        rows = []
+        for _ in range(_PIPE_HANDOFF_MAX_ATTEMPTS + 2):
+            rows = _timed_listing(registry)[1]
+            if rows[0]["status"] == "exited":
+                break
+        assert rows[0]["status"] == "exited", "session stayed running while its sink stayed stuck"
+        # Finished without the unread output; the output the reader had already buffered is in the event.
+        event = registry.completion_queue.get(timeout=5)
+        assert event["session_id"] == session.id
+        assert event["output"] == "owner-output\n"
+        release.set()
+        session._reader_thread.join(timeout=10)
+        assert not session._reader_thread.is_alive(), "reader did not finish once its sink was released"
+        assert registry.completion_queue.empty(), "the released reader published a second completion"
     finally:
         release.set()
         _reap(proc, session._reader_thread)
