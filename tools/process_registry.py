@@ -35,6 +35,7 @@ from hermes_constants import hermes_home_key
 from tools.process_registry_notifications import format_process_notification
 from tools.process_registry_checkpoint import ProcessCheckpointMixin
 from tools.process_registry_results import load_completed_results, save_completed_result
+from tools.process_registry_shell_noise import filter_shell_noise_head
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,9 @@ def _checkpoint_path() -> Path:
 MAX_OUTPUT_CHARS = 200_000      # rolling output buffer
 FINISHED_TTL_SECONDS = 1800     # keep finished processes 30 minutes
 MAX_PROCESSES = 64              # max tracked processes (LRU pruning)
+# Longest a reconciled exit waits for the reader to leave its pipe section. The reader holds that
+# section across its live-output sink, so a stuck sink must not hold up a listing.
+_PIPE_HANDOFF_TIMEOUT_SECONDS = 1.0
 
 # Watch-pattern rate limiting, PER SESSION: one watch-match notification per
 # WATCH_MIN_INTERVAL_SECONDS; a match inside the cooldown is dropped and counts as one
@@ -494,9 +498,14 @@ class ProcessSession:
     _reader_thread: Optional[threading.Thread] = field(default=None, repr=False)
     # POSIX pipe reader/reconcile handoff. The reader holds this only across a
     # ready, non-blocking read + buffer append; exit reconciliation holds it
-    # while draining the remaining bytes and publishing completion. This closes
-    # the race where the reader had consumed a chunk but had not appended it yet.
+    # (acquired with a bounded wait) while draining the remaining bytes and
+    # publishing completion. This closes the race where the reader had consumed
+    # a chunk but had not appended it yet.
     _pipe_read_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+    # Pipe state shared by the reader and a reconciled drain; both touch it only under _pipe_read_lock.
+    _pipe_decoder: Any = field(default=None, repr=False)          # incremental UTF-8 decoder for stdout
+    _shell_head_open: bool = field(default=True, repr=False)      # stdout may still start with shell noise
+    _shell_head_pending: str = field(default="", repr=False)      # undecided first line, held back
     _pty: Any = field(default=None, repr=False)  # ptyprocess handle (use_pty=True)
 
     def __post_init__(self) -> None:
@@ -544,10 +553,6 @@ class ProcessRegistry(ProcessCheckpointMixin):
     Thread-safe: accessed from executor threads (terminal_tool, process handlers),
     the gateway asyncio loop (watchers, reset checks) and the cleanup thread."""
 
-    _SHELL_NOISE_SUBSTRINGS = (
-        "no job control in this shell", "cannot set terminal process group",
-        "tcsetattr: Inappropriate ioctl for device")
-
     def __init__(self):
         self._running: Dict[str, ProcessSession] = {}
         self._finished: Dict[str, ProcessSession] = {}
@@ -589,14 +594,6 @@ class ProcessRegistry(ProcessCheckpointMixin):
         with self._lock:
             watchers, self.pending_watchers = self.pending_watchers, []
         return watchers
-
-    @staticmethod
-    def _clean_shell_noise(text: str) -> str:
-        """Strip shell startup warnings from the beginning of output."""
-        lines = text.split("\n")
-        while lines and any(noise in lines[0] for noise in ProcessRegistry._SHELL_NOISE_SUBSTRINGS):
-            lines.pop(0)
-        return "\n".join(lines)
 
     def _emit_output(self, session: ProcessSession, chunk: str) -> None:
         """Forward a chunk to the live-output sink; called from reader threads, never raises."""
@@ -1137,25 +1134,9 @@ class ProcessRegistry(ProcessCheckpointMixin):
         Windows pipes don't support select(); the blocking path is kept there and the lazy reconcile in
         poll()/wait() remains the safety net. See #68915, #8340.
         """
-        first_chunk = True
-        # A split multibyte UTF-8 char would become U+FFFD with stateless decoding; the
-        # incremental decoder holds the partial sequence until the rest arrives (and on
-        # Windows decodes console-code-page lines, e.g. PowerShell's GBK, as such).
-        from tools.environments.base_output import console_output_decoder
-
-        decoder = console_output_decoder()
-
-        # Incremental decoder: raw pipe reads can split a multibyte UTF-8 character across two read1()
-        # chunks. A stateless per-chunk ``bytes.decode(errors="replace")`` turns both halves into U+FFFD
-        # mojibake. The incremental decoder holds the partial sequence until the continuation bytes arrive —
-        # same treatment the foreground path already has in
-        # ``tools/environments/base.py::_wait_for_process``. (Ported from openclaw/openclaw#112325.)
-        def _append_chunk(chunk: str):
-            nonlocal first_chunk
-            if first_chunk:
-                chunk = self._clean_shell_noise(chunk)
-                first_chunk = False
-            self._ingest_output(session, chunk)
+        # Bytes go through the session's incremental decoder (see _ingest_pipe_bytes): a UTF-8 character
+        # split across reads, or across this reader and a reconciled exit, decodes whole.
+        # (Ported from openclaw/openclaw#112325.)
         try:
             proc = session.process
             if proc is None or proc.stdout is None:
@@ -1164,11 +1145,16 @@ class ProcessRegistry(ProcessCheckpointMixin):
             raw_read = getattr(getattr(stdout, "buffer", None), "read1", None)
 
             def _read_once():
-                """One 4 KiB read: decoded text ('' for a partial multibyte tail), None at EOF."""
+                """One 4 KiB read: bytes from a pipe, text from a text-only stream, None at EOF."""
                 if raw_read is None:  # mocked/alternate streams without a raw buffer: less "live"
                     return stdout.read(4096) or None
-                raw = raw_read(4096)
-                return decoder.decode(raw) if raw else None
+                return raw_read(4096) or None
+
+            def _ingest(chunk):
+                if isinstance(chunk, bytes):
+                    self._ingest_pipe_bytes(session, chunk)
+                else:
+                    self._ingest_pipe_text(session, chunk)
             # select() needs a real OS fd; mocked streams (tests, adapters) may lack
             # fileno() and use the blocking read instead.
             try:
@@ -1203,20 +1189,24 @@ class ProcessRegistry(ProcessCheckpointMixin):
                     # cannot snapshot between those two operations.
                     with session._pipe_read_lock:
                         chunk = _read_once()
-                        if chunk is not None and chunk:
-                            _append_chunk(chunk)
+                        if chunk:
+                            _ingest(chunk)
                 else:
                     chunk = _read_once()
-                    if chunk is not None and chunk:
-                        _append_chunk(chunk)
+                    if chunk:
+                        _ingest(chunk)
                 if chunk is None:
                     break  # true EOF — all writers closed
                 idle_after_exit = 0
         except Exception as e:
             logger.debug("Process stdout reader ended: %s", e)
         finally:
+            # Flush the decoder's tail and any undecided first line under the pipe lock, so the flush
+            # cannot interleave with a reconciled exit reading the same stream.
+            with session._pipe_read_lock, suppress(Exception):
+                self._ingest_pipe_bytes(session, b"", final=True)
             self._finish_reader(
-                session, decoder, _append_chunk, "Process",
+                session, None, lambda text: self._ingest_pipe_text(session, text), "Process",
                 session.process.wait, lambda: session.process.returncode)
 
     def _finish_reader(self, session, decoder, append, label, wait, exit_code) -> None:
@@ -1227,10 +1217,11 @@ class ProcessRegistry(ProcessCheckpointMixin):
         daemon thread, so it must keep waiting rather than publish a false completion
         and discard the only ``Popen`` handle that can reap the child.
         """
-        with suppress(Exception):
-            tail = decoder.decode(b"", final=True)
-            if tail:
-                append(tail)
+        if decoder is not None:  # the pipe reader flushes its own stream before it gets here
+            with suppress(Exception):
+                tail = decoder.decode(b"", final=True)
+                if tail:
+                    append(tail)
         try:
             wait()
         except Exception as e:
@@ -1383,6 +1374,23 @@ class ProcessRegistry(ProcessCheckpointMixin):
         session.append_output(text)
         self._check_watch_patterns(session, text)
         self._emit_output(session, text)
+
+    def _ingest_pipe_bytes(self, session: ProcessSession, raw: bytes, *, final: bool = False) -> None:
+        """Decode bytes read from a local pipe, then ingest them. Caller holds ``session._pipe_read_lock``."""
+        if session._pipe_decoder is None:
+            from tools.environments.base_output import console_output_decoder
+
+            session._pipe_decoder = console_output_decoder()
+        self._ingest_pipe_text(session, session._pipe_decoder.decode(raw, final=final), final=final)
+
+    def _ingest_pipe_text(self, session: ProcessSession, text: str, *, final: bool = False) -> None:
+        """The one path from a local pipe into ``output_buffer``, for the reader thread and a reconciled
+        exit alike: shell start-up noise is removed from the head of the stream, then the text is buffered,
+        watched and streamed live. Caller holds ``session._pipe_read_lock``."""
+        emit, session._shell_head_pending, session._shell_head_open = filter_shell_noise_head(
+            session._shell_head_open, session._shell_head_pending, text, final=final)
+        if emit:
+            self._ingest_output(session, emit)
 
     def _finish_exited(self, session: ProcessSession, exit_code) -> None:
         """Mark a reader-observed exit (a raced kill keeps its own code/reason) and finish."""
@@ -1741,37 +1749,50 @@ class ProcessRegistry(ProcessCheckpointMixin):
             return
         if rc is None:
             return  # Direct child still running — reader block is legitimate.
-        # Best-effort non-blocking drain of whatever the reader hasn't consumed.
-        # Coordinate with the POSIX reader so it cannot have already removed bytes
-        # from the pipe while still waiting to append them to output_buffer.
         stdout = getattr(proc, "stdout", None)
-        pipe_guard = session._pipe_read_lock if stdout is not None and not _IS_WINDOWS else suppress()
-        with pipe_guard:
-            if stdout is not None and not _IS_WINDOWS:
-                try:
-                    import fcntl
-                    fd = stdout.fileno()
-                    flags = fcntl.fcntl(fd, fcntl.F_GETFL)
-                    fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
-                    try:
-                        with suppress(BlockingIOError, OSError, ValueError):
-                            chunk = stdout.read()
-                            if chunk:
-                                session.append_output(
-                                    chunk if isinstance(chunk, str)
-                                    else chunk.decode("utf-8", errors="replace"))
-                    finally:
-                        with suppress(Exception):
-                            fcntl.fcntl(fd, fcntl.F_SETFL, flags)
-                except Exception as e:
-                    logger.debug("Non-blocking drain failed for %s: %s", session.id, e)
-            with session._lock:
-                session.mark_exited(rc)
-            logger.info(
-                "Reconciled session %s: direct child exited with code %s but reader "
-                "was still blocked (orphaned pipe). Flipped to exited.",
-                session.id, rc)
-            self._move_to_finished(session)
+        if stdout is None or _IS_WINDOWS:
+            self._finalize_reconciled_exit(session, rc)
+            return
+        # Drain what the pipe already holds before the exit is published. The reader holds this lock
+        # across each read and its ingest, so wait for it, but only up to the bound: a reader stuck in
+        # its output sink leaves the session running for the next refresh instead of blocking the listing.
+        if not session._pipe_read_lock.acquire(timeout=_PIPE_HANDOFF_TIMEOUT_SECONDS):
+            logger.debug("Reconcile of %s deferred: reader is still inside its pipe section", session.id)
+            return
+        try:
+            self._drain_pipe_available(session, stdout)
+            self._finalize_reconciled_exit(session, rc)
+        finally:
+            session._pipe_read_lock.release()
+
+    def _drain_pipe_available(self, session: ProcessSession, stdout) -> None:
+        """Ingest the bytes already in a local pipe without waiting for more. Caller holds
+        ``session._pipe_read_lock``. A reconciled exit closes the stream right after this, so the decoder
+        and any undecided first line are flushed here as well."""
+        raw = None
+        try:
+            import fcntl
+
+            stream = getattr(stdout, "buffer", stdout)  # the binary side of a text pipe
+            fd = stream.fileno()
+            flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+            fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+            try:
+                raw = stream.read()  # None when nothing is available right now
+            finally:
+                fcntl.fcntl(fd, fcntl.F_SETFL, flags)
+        except Exception as e:
+            logger.debug("Non-blocking drain failed for %s: %s", session.id, e)
+        self._ingest_pipe_bytes(session, raw if isinstance(raw, bytes) else b"", final=True)
+
+    def _finalize_reconciled_exit(self, session: ProcessSession, rc: int) -> None:
+        with session._lock:
+            session.mark_exited(rc)
+        logger.info(
+            "Reconciled session %s: direct child exited with code %s but reader "
+            "was still blocked (orphaned pipe). Flipped to exited.",
+            session.id, rc)
+        self._move_to_finished(session)
 
     @staticmethod
     def _status_head(session: ProcessSession) -> dict:
