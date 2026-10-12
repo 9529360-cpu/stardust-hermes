@@ -19,6 +19,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -576,6 +577,48 @@ def test_failed_worktree_fallback_removes_the_alias_and_keeps_the_target(tmp_pat
     finally:
         _release_junction(wt_path / "venv")
         _release_junction(wt_path / "outside-link")
+
+
+def test_a_junction_to_a_venv_outside_the_tree_is_not_a_false_refusal(dashboard_client, tmp_path):
+    client, managed = dashboard_client
+    checkout = managed / "hermes-agent"
+    checkout.mkdir(parents=True)
+    outside = tmp_path / "elsewhere" / "project"
+    (outside / ".venv" / "Lib").mkdir(parents=True)
+    (outside / ".venv" / "Lib" / "keep.txt").write_text("outside venv", encoding="utf-8")
+    tools = checkout / "tools"
+    tools.mkdir()
+    _make_junction(tools / "outside-link", outside)
+    try:
+        response = client.request("DELETE", "/api/files", json={"path": str(tools), "recursive": True})
+
+        assert response.status_code == 200, response.text
+        assert not os.path.lexists(tools)
+        assert (outside / ".venv" / "Lib" / "keep.txt").read_text(encoding="utf-8") == "outside venv"
+    finally:
+        _release_junction(tools / "outside-link")
+
+
+def test_junction_loops_under_a_folder_do_not_stall_its_recursive_delete(dashboard_client):
+    client, managed = dashboard_client
+    checkout = managed / "hermes-agent"
+    checkout.mkdir(parents=True)
+    tools = checkout / "tools"
+    (tools / "sub").mkdir(parents=True)
+    (tools / "sub" / "keep.txt").write_text("keep", encoding="utf-8")
+    _make_junction(tools / "loop-a", tools)  # a junction back to its own folder
+    _make_junction(tools / "sub" / "loop-b", tools)  # and another one, deeper down
+    try:
+        started = time.monotonic()
+        response = client.request("DELETE", "/api/files", json={"path": str(tools), "recursive": True})
+        elapsed = time.monotonic() - started
+
+        assert response.status_code == 200, response.text
+        assert elapsed < 5, f"the recursive delete took {elapsed:.1f}s"
+        assert not os.path.lexists(tools)
+    finally:
+        _release_junction(tools / "loop-a")
+        _release_junction(tools / "sub" / "loop-b")
 
 
 def _mixed_case_venv(checkout: Path) -> Path:

@@ -135,15 +135,18 @@ def _inside_venv_folder(path: Path, root: Path, anchors: list[Path]) -> bool:
 
 
 def _subtree_has_venv_folder(folder: Path) -> bool:
-    """True when a venv folder name appears below *folder*. Links are not followed.
+    """True when a venv folder name appears in *folder*'s own tree. Links are checked by name but never entered.
 
-    Raises OSError when a folder below *folder* cannot be read and no venv folder was found, so an unverified tree can
-    be told apart from one that holds a venv.
+    A junction or symlink below *folder* is pruned from the walk after its name is checked. The walk therefore never
+    follows a link: a venv reached through a junction is neither found nor refused, and a junction loop cannot be walked
+    without end. Raises OSError when a folder in the tree cannot be read and no venv folder was found, so an unverified
+    tree can be told apart from one that holds a venv.
     """
     unreadable: list[OSError] = []
-    for _dirpath, dirnames, _filenames in os.walk(folder, onerror=unreadable.append):
+    for dirpath, dirnames, _filenames in os.walk(folder, onerror=unreadable.append):
         if any(_name_key(name) in _VENV_FOLDER_KEYS for name in dirnames):
             return True
+        dirnames[:] = [name for name in dirnames if not is_link_entry(os.path.join(dirpath, name))]
     if unreadable:
         raise unreadable[0]
     return False
@@ -156,8 +159,9 @@ def _refuse_venv_mutation(candidate: Path, *, mutation: str, recursive: bool = F
     path as addressed. The check covers the path as addressed, the entry with its ancestors resolved, and the fully
     resolved target. One exception: deleting the alias itself, a final link named ``venv`` directly in the install
     root. That link is unlinked and its target is left alone. A recursive delete is also refused when the folder
-    contains the install root, or holds a venv folder. Names compare case-insensitively on Windows. A folder that
-    cannot be read to check it is a 500 with a message, not a refusal, and nothing is deleted.
+    contains the install root, or holds a venv folder in its own tree. Links are not entered. Names compare
+    case-insensitively on Windows. A folder that cannot be read to check it is a 500 with a message, not a refusal, and
+    nothing is deleted. A path that cannot be resolved is a 400.
     """
     root = _install_root().resolve(strict=False)
     anchors = [(root / name).resolve(strict=False) for name in _VENV_FOLDER_NAMES]
@@ -166,8 +170,11 @@ def _refuse_venv_mutation(candidate: Path, *, mutation: str, recursive: bool = F
         if mutation == "delete" and _is_same_path(entry, root / DEFAULT_VENV_NAME) and is_link_entry(entry):
             return
         target = entry.resolve(strict=False)
-    except (OSError, RuntimeError):
-        raise HTTPException(status_code=403, detail="Path cannot be resolved")
+    except (OSError, RuntimeError) as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="Path cannot be resolved: it is invalid or loops through links. Nothing was changed.",
+        ) from exc
     for location in (candidate, entry, target):
         if _inside_venv_folder(location, root, anchors):
             raise HTTPException(status_code=403, detail="Path is inside a venv folder")

@@ -579,6 +579,12 @@ async def create_managed_directory(payload: ManagedDirectoryCreate, request: Req
 
 @router.delete("/api/files")
 async def delete_managed_file(payload: ManagedFileDelete, request: Request):
+    # The venv guard walks a folder's tree and the removal can take long on a large one, so the whole delete runs in a
+    # worker thread. The event loop keeps serving other requests meanwhile.
+    return await asyncio.to_thread(_delete_managed_entry, payload, request)
+
+
+def _delete_managed_entry(payload: ManagedFileDelete, request: Request) -> dict:
     # keep_link_leaf: a selected venv alias is unlinked as itself; resolving it would delete the real .venv.
     policy, target, display_path = _resolve_managed_path(
         payload.path, request, keep_link_leaf=True, mutation="delete", recursive=payload.recursive

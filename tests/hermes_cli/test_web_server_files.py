@@ -1,9 +1,12 @@
 """Tests for the dashboard-managed file browser API."""
 
+import asyncio
 import base64
 import os
+import time
 from types import SimpleNamespace
 
+import httpx
 import pytest
 from starlette.testclient import TestClient
 
@@ -120,6 +123,66 @@ def test_mutations_do_not_reach_a_venv_through_a_symlink(forced_files_client, mo
     assert removed.status_code == 200, removed.text
     assert not alias.is_symlink()
     assert (venv / "lib" / "keep.txt").read_text(encoding="utf-8") == "venv file"
+
+
+def test_a_recursive_delete_does_not_block_the_event_loop(forced_files_client, monkeypatch):
+    client, root = forced_files_client
+    checkout = root / "hermes-agent"
+    monkeypatch.setattr(web_server_files, "_install_root", lambda: checkout)
+    tools = checkout / "tools"
+    (tools / "sub").mkdir(parents=True)
+    (tools / "sub" / "keep.txt").write_text("keep", encoding="utf-8")
+
+    def slow_tree_check(folder):
+        time.sleep(0.6)  # a walk over a large tree; the event loop must keep running meanwhile
+        return False
+
+    monkeypatch.setattr(web_server_files, "_subtree_has_venv_folder", slow_tree_check)
+
+    async def delete_while_ticking():
+        gaps: list[float] = []
+        stop = asyncio.Event()
+
+        async def tick():
+            last = time.monotonic()
+            while not stop.is_set():
+                await asyncio.sleep(0.01)
+                now = time.monotonic()
+                gaps.append(now - last)
+                last = now
+
+        ticker = asyncio.create_task(tick())
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=web_server.app),
+            base_url="http://testserver",
+            headers=client.headers,
+        ) as api:
+            response = await api.request("DELETE", "/api/files", json={"path": str(tools), "recursive": True})
+        stop.set()
+        await ticker
+        return response, max(gaps, default=0.0)
+
+    response, worst_gap = asyncio.run(delete_while_ticking())
+
+    assert response.status_code == 200, response.text
+    assert not tools.exists()
+    assert worst_gap < 0.3, f"the event loop went {worst_gap:.2f}s without running"
+
+
+@pytest.mark.linux_only
+def test_a_path_that_loops_through_links_is_refused_as_a_bad_request(forced_files_client, monkeypatch):
+    client, root = forced_files_client
+    checkout = root / "hermes-agent"
+    checkout.mkdir(parents=True)
+    monkeypatch.setattr(web_server_files, "_install_root", lambda: checkout)
+    (checkout / "loop-a").symlink_to(checkout / "loop-b")
+    (checkout / "loop-b").symlink_to(checkout / "loop-a")
+
+    response = client.request("DELETE", "/api/files", json={"path": str(checkout / "loop-a" / "x"), "recursive": False})
+
+    assert response.status_code == 400, response.text
+    assert "cannot be resolved" in response.text
+    assert (checkout / "loop-a").is_symlink()
 
 
 def test_upload_stream_into_dot_venv_is_refused(forced_files_client, monkeypatch):
