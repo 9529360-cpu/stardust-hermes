@@ -39,6 +39,22 @@ def resolve_venv_dir(root, *, windows: bool | None = None) -> Path:
     return root / DEFAULT_VENV_NAME
 
 
+def venv_dirs_to_guard(root, *, windows: bool | None = None) -> list[Path]:
+    """Every venv folder of *root* that holds an interpreter, which a holder guard must watch.
+
+    The backend launches from ``.venv`` first (``findPythonForRoot`` in the desktop app), while
+    :func:`resolve_venv_dir` prefers ``venv``. When both folders hold an interpreter, both are guarded, so the one the
+    backend runs is covered too. A folder without an interpreter cannot hold a running venv process. With none present,
+    the resolver's pick (the fresh-install folder) is returned.
+    """
+    present = [
+        root / name
+        for name in (DEFAULT_VENV_NAME, UV_VENV_NAME)
+        if venv_python_path(root / name, windows=windows).is_file()
+    ]
+    return present or [resolve_venv_dir(root, windows=windows)]
+
+
 def ensure_venv_alias(root, *, windows: bool | None = None) -> str:
     """Expose a ``.venv``-only install under ``venv`` too (junction on Windows, symlink on POSIX).
 

@@ -21,6 +21,7 @@ from hermes_cli import main as cli_main
 from hermes_cli import dashboard_procs
 from hermes_cli import main_install_repair
 from hermes_cli import update_cmd
+from hermes_cli import update_cmd_windows
 from hermes_cli.venv_layout import resolve_venv_dir
 
 
@@ -672,6 +673,46 @@ def test_venv_launcher_ancestors_use_the_windows_layout_on_every_host(_winp, mon
     worker_exe = r"C:\Users\x\AppData\Roaming\uv\python\cpython-3.11\python.exe"
 
     fake = _fake_psutil_tree({200: 100}, venv_exe, worker_exe)
+    monkeypatch.setitem(sys.modules, "psutil", fake)
+
+    assert cli_main._venv_launcher_ancestors([200]) == [100]
+
+
+def _dual_venv_root(tmp_path, monkeypatch) -> Path:
+    """A project root whose ``venv`` and ``.venv`` are both real folders with an interpreter; returns the .venv one."""
+    for folder in ("venv", ".venv"):
+        scripts = tmp_path / folder / "Scripts"
+        scripts.mkdir(parents=True)
+        (scripts / "python.exe").write_text("", encoding="utf-8")
+    monkeypatch.setattr(cli_main, "PROJECT_ROOT", tmp_path)
+    return tmp_path / ".venv" / "Scripts" / "python.exe"
+
+
+@patch.object(cli_main, "_is_windows", return_value=True)
+def test_holder_guard_watches_dot_venv_when_venv_also_exists(_winp, monkeypatch, tmp_path):
+    """Both folders are real and the backend launches from .venv first, so the guard must still see that interpreter."""
+    dot_venv_exe = _dual_venv_root(tmp_path, monkeypatch)
+
+    class _Proc:
+        info = {"pid": 4242, "exe": str(dot_venv_exe), "name": "python.exe"}
+
+        def cmdline(self):
+            # No path and no hermes_cli.main: only the venv folder prefix can make this process a holder.
+            return ["python.exe", "-m", "uvicorn", "app"]
+
+    fake = types.SimpleNamespace(process_iter=lambda attrs: [_Proc()])
+    monkeypatch.setattr(update_cmd_windows, "_psutil", lambda: fake)
+
+    assert [pid for pid, _name, _cmd in update_cmd_windows._detect_venv_python_processes()] == [4242]
+
+
+@patch.object(cli_main, "_is_windows", return_value=True)
+def test_gateway_pause_stops_the_launcher_under_dot_venv_too(_winp, monkeypatch, tmp_path):
+    """The pause snapshots launchers under the same folders the guard watches, so a .venv launcher is stopped too."""
+    dot_venv_exe = _dual_venv_root(tmp_path, monkeypatch)
+    worker_exe = r"C:\Users\x\AppData\Roaming\uv\python\cpython-3.11\python.exe"
+
+    fake = _fake_psutil_tree({200: 100}, str(dot_venv_exe), worker_exe)
     monkeypatch.setitem(sys.modules, "psutil", fake)
 
     assert cli_main._venv_launcher_ancestors([200]) == [100]

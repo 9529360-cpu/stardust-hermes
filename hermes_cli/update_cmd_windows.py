@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from hermes_cli.update_cmd_common import _best_effort
-from hermes_cli.venv_layout import resolve_venv_dir
+from hermes_cli.venv_layout import venv_dirs_to_guard
 
 logger = logging.getLogger("hermes_cli.update_cmd")  # log-record parity with the origin module
 
@@ -134,6 +134,16 @@ def _parent_is_live(proc) -> bool:
     return parent is not None and parent.is_running() and parent.create_time() <= proc.create_time()
 
 
+def _venv_guard_prefixes() -> list[str]:
+    """Lower-cased folder prefixes of every venv the holder guard and the gateway pause watch.
+
+    Both sides read this one list, so the pause stops the launchers the guard would abort on (see
+    ``venv_dirs_to_guard``).
+    """
+    from hermes_cli.update_cmd import _m
+    return sorted({_lower_dir_prefix(folder) for folder in venv_dirs_to_guard(_m().PROJECT_ROOT, windows=True)})
+
+
 def _detect_venv_python_processes(*, exclude_pids: set[int] | None = None) -> list[tuple[int, str, str]]:
     """Live processes running from the project venv's interpreter as ``(pid, name, cmdline)``; never raises.
 
@@ -147,9 +157,7 @@ def _detect_venv_python_processes(*, exclude_pids: set[int] | None = None) -> li
     psutil = _psutil()
     if not _m()._is_windows() or psutil is None:
         return []
-    # Windows layout on every host: a POSIX ``.venv/bin/python`` (uv sync on Linux CI) must not change the venv
-    # the pause and the guard agree on.
-    venv_prefix = _lower_dir_prefix(resolve_venv_dir(_m().PROJECT_ROOT, windows=True))
+    venv_prefixes = _venv_guard_prefixes()
     root_prefix = _lower_dir_prefix(_m().PROJECT_ROOT)
     skip = set(exclude_pids or set()) | _self_and_non_gateway_ancestor_pids(psutil)
     matches: list[tuple[int, str, str]] = []
@@ -170,7 +178,7 @@ def _detect_venv_python_processes(*, exclude_pids: set[int] | None = None) -> li
         except (OSError, ValueError):
             exe_norm = str(exe).lower()
         # Primary match: exe lives under this venv (desktop backend / gateway case).
-        in_venv = exe_norm.startswith(venv_prefix)
+        in_venv = any(exe_norm.startswith(prefix) for prefix in venv_prefixes)
         name = str(info.get("name") or Path(exe).name)
         name_low = name.lower()
         if not (in_venv or name_low.startswith(("python", "pypy")) or name_low in {"uv.exe", "uvx.exe", "stardust.exe"}):
@@ -179,7 +187,7 @@ def _detect_venv_python_processes(*, exclude_pids: set[int] | None = None) -> li
         cmdline_low = cmdline_raw.lower()
         # Fallback: uv/base-interpreter trampolines have an exe OUTSIDE the venv yet hold
         # its .pyd files — match cmdline (venv path, or `-m hermes_cli.main` + root/cwd).
-        if in_venv or venv_prefix in cmdline_low or (
+        if in_venv or any(prefix in cmdline_low for prefix in venv_prefixes) or (
             "hermes_cli.main" in cmdline_low and (root_prefix in cmdline_low or _cwd_prefix(proc).startswith(root_prefix))
         ):
             matches.append((int(pid), name, cmdline_raw))
@@ -301,9 +309,7 @@ def _venv_launcher_ancestors(pids: list[int]) -> list[int]:
     psutil = _psutil()
     if not _m()._is_windows() or not pids or psutil is None:
         return []
-    # Windows layout on every host: a POSIX ``.venv/bin/python`` (uv sync on Linux CI) must not change the venv
-    # the pause and the guard agree on.
-    venv_prefix = _lower_dir_prefix(resolve_venv_dir(_m().PROJECT_ROOT, windows=True))
+    venv_prefixes = _venv_guard_prefixes()
     skip = _self_and_non_gateway_ancestor_pids(psutil) | set(pids)
     found: list[int] = []
     for pid in pids:
@@ -312,7 +318,8 @@ def _venv_launcher_ancestors(pids: list[int]) -> list[int]:
             if parent is None:
                 continue
             ppid = int(parent.pid)
-            if ppid not in skip and ppid not in found and (parent.exe() or "").lower().startswith(venv_prefix):
+            exe_low = (parent.exe() or "").lower()
+            if ppid not in skip and ppid not in found and any(exe_low.startswith(prefix) for prefix in venv_prefixes):
                 found.append(ppid)
     return found
 

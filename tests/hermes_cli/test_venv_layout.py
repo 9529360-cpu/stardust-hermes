@@ -14,7 +14,7 @@ import pytest
 
 import hermes_constants
 from hermes_cli import venv_layout
-from hermes_cli.venv_layout import ensure_venv_alias, resolve_venv_dir
+from hermes_cli.venv_layout import ensure_venv_alias, resolve_venv_dir, venv_dirs_to_guard
 
 
 def _interpreter(venv_dir: Path, *, windows: bool) -> Path:
@@ -26,6 +26,29 @@ def _interpreter(venv_dir: Path, *, windows: bool) -> Path:
 
 
 # ── resolve_venv_dir ───────────────────────────────────────────────────────
+
+
+def _write_windows_interpreter(folder: Path) -> None:
+    (folder / "Scripts").mkdir(parents=True)
+    (folder / "Scripts" / "python.exe").write_text("", encoding="utf-8")
+
+
+def test_guard_folders_cover_both_layouts_when_both_hold_an_interpreter(tmp_path):
+    _write_windows_interpreter(tmp_path / "venv")
+    _write_windows_interpreter(tmp_path / ".venv")
+
+    assert venv_dirs_to_guard(tmp_path, windows=True) == [tmp_path / "venv", tmp_path / ".venv"]
+
+
+def test_guard_folders_skip_a_folder_without_an_interpreter(tmp_path):
+    _write_windows_interpreter(tmp_path / ".venv")
+    (tmp_path / "venv").mkdir()
+
+    assert venv_dirs_to_guard(tmp_path, windows=True) == [tmp_path / ".venv"]
+
+
+def test_guard_folders_fall_back_to_the_fresh_install_folder(tmp_path):
+    assert venv_dirs_to_guard(tmp_path, windows=True) == [tmp_path / "venv"]
 
 
 def test_resolver_picks_venv_when_it_holds_the_interpreter(tmp_path):
