@@ -23,7 +23,8 @@ class ManagedFilesPolicy:
     can_change_path: bool
 
 
-def _fs_path(raw_path: str, *, cwd: str | None = None) -> Path:
+def _fs_lexical_path(raw_path: str, *, cwd: str | None = None) -> Path:
+    """The absolute path *raw_path* names, not resolved, so a link in it stays visible (see ``_fs_path``)."""
     raw = str(raw_path or "").strip()
     if not raw:
         raise HTTPException(status_code=400, detail="Path is required")
@@ -44,6 +45,14 @@ def _fs_path(raw_path: str, *, cwd: str | None = None) -> Path:
             if not base.is_absolute():
                 raise HTTPException(status_code=400, detail="Session working directory is unavailable")
             candidate = base / candidate
+        return candidate
+    except (OSError, RuntimeError, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid path")
+
+
+def _fs_path(raw_path: str, *, cwd: str | None = None) -> Path:
+    candidate = _fs_lexical_path(raw_path, cwd=cwd)
+    try:
         return candidate.resolve(strict=False)
     except (OSError, RuntimeError, ValueError):
         raise HTTPException(status_code=400, detail="Invalid path")
@@ -74,6 +83,35 @@ def _ensure_managed_root(raw_path: str | Path) -> Path:
 
 def _path_is_under(root: Path, target: Path) -> bool:
     return target == root or root in target.parents
+
+
+def _link_target_is_inside(link: Path, base: Path) -> bool:
+    """True when the link's target lies inside *base*; a target that cannot be resolved counts as inside (fail closed)."""
+    try:
+        target = link.resolve(strict=False)
+    except (OSError, RuntimeError):
+        return True
+    return _path_is_under(base, target)
+
+
+def _refuse_link_chain(policy: ManagedFilesPolicy, candidate: Path, *, leaf_link_ok: bool) -> None:
+    """403 when a mutation would reach the managed tree through a link (the venv alias is a junction to ``.venv``).
+
+    Walks the lexical path of *candidate* from its anchor before anything is resolved, because resolving would follow
+    the link and hide it. A link below the managed base is refused, and so is a link anywhere whose target lies inside
+    the base, which catches a path that enters the tree from outside. The final component may be a link only when
+    *leaf_link_ok*: a delete then unlinks that link as itself. Only symlinks and junctions count as links.
+    """
+    base = policy.locked_root if policy.locked_root is not None else policy.default_path
+    parts = candidate.parts
+    current = Path(candidate.anchor)
+    for index, part in enumerate(parts[1:]):
+        current = current / part
+        is_last = index == len(parts) - 2
+        if not is_link_entry(current) or (leaf_link_ok and is_last):
+            continue
+        if _path_is_under(base, current) or _link_target_is_inside(current, base):
+            raise HTTPException(status_code=403, detail="Path goes through a link")
 
 
 def _path_text(raw_path: str | None) -> str:
@@ -131,7 +169,12 @@ def _managed_files_policy(request: Request, *, create_root: bool = True) -> Mana
 
 
 def _resolve_managed_path(
-    raw_path: str | None, request: Request, *, for_write: bool = False, keep_link_leaf: bool = False
+    raw_path: str | None,
+    request: Request,
+    *,
+    for_write: bool = False,
+    keep_link_leaf: bool = False,
+    mutating: bool = False,
 ) -> tuple[ManagedFilesPolicy, Path, str]:
     policy = _managed_files_policy(request)
     text = _path_text(raw_path)
@@ -152,6 +195,9 @@ def _resolve_managed_path(
 
     if ".." in candidate.parts:
         raise HTTPException(status_code=400, detail="Path cannot contain '..'")
+
+    if mutating:
+        _refuse_link_chain(policy, candidate, leaf_link_ok=keep_link_leaf)
 
     if for_write and not candidate.exists():
         parent = _canonical_path(candidate.parent)

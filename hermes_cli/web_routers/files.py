@@ -28,7 +28,8 @@ from hermes_cli._subprocess_compat import windows_hide_flags
 from hermes_cli.venv_layout import is_link_entry, unlink_link_entry
 from hermes_cli.web_deps import late
 from hermes_cli.web_server_files import (
-    _fs_path, _managed_file_entry, _managed_response_meta, _resolve_managed_path,
+    _fs_lexical_path, _fs_path, _managed_file_entry, _managed_files_policy, _managed_response_meta,
+    _refuse_link_chain, _resolve_managed_path,
 )
 from hermes_cli.web_models import (
     ChatImageUpload, FsWriteText, ManagedDirectoryCreate, ManagedFileDelete, ManagedFileUpload,
@@ -474,7 +475,7 @@ async def stream_managed_file(request: Request, path: str):
 
 
 def _managed_write_target(path: str, request: Request, overwrite: bool):
-    policy, target, display_path = _resolve_managed_path(path, request, for_write=True)
+    policy, target, display_path = _resolve_managed_path(path, request, for_write=True, mutating=True)
     if target.exists() and target.is_dir():
         raise HTTPException(status_code=409, detail="A directory already exists at that path")
     if target.exists() and not overwrite:
@@ -568,7 +569,7 @@ async def upload_managed_file_stream(
 
 @router.post("/api/files/mkdir")
 async def create_managed_directory(payload: ManagedDirectoryCreate, request: Request):
-    policy, target, display_path = _resolve_managed_path(payload.path, request, for_write=True)
+    policy, target, display_path = _resolve_managed_path(payload.path, request, for_write=True, mutating=True)
     if target.exists() and not target.is_dir():
         raise HTTPException(status_code=409, detail="A file already exists at that path")
     with _io_errors("Directory is not writable", "Could not create directory"):
@@ -579,7 +580,7 @@ async def create_managed_directory(payload: ManagedDirectoryCreate, request: Req
 @router.delete("/api/files")
 async def delete_managed_file(payload: ManagedFileDelete, request: Request):
     # keep_link_leaf: a selected venv alias is unlinked as itself; resolving it would delete the real .venv.
-    policy, target, display_path = _resolve_managed_path(payload.path, request, keep_link_leaf=True)
+    policy, target, display_path = _resolve_managed_path(payload.path, request, keep_link_leaf=True, mutating=True)
     if policy.locked_root is not None and target == policy.locked_root:
         raise HTTPException(status_code=400, detail="Cannot delete the managed files root")
     if target.parent == target:
@@ -655,7 +656,7 @@ async def fs_read_text(path: str):
 
 
 @router.post("/api/fs/write-text")
-async def fs_write_text(payload: FsWriteText):
+async def fs_write_text(payload: FsWriteText, request: Request):
     """Overwrite (or create) a UTF-8 text file for the in-app spot editor.
 
     Mirrors the Electron ``stardust:fs:writeText`` hardening: path validated by
@@ -664,6 +665,8 @@ async def fs_write_text(payload: FsWriteText):
     temp file and ``os.replace``-d so a crash can't truncate the original.
     Stale-on-disk detection is the client's job (re-read before save).
     """
+    policy = _managed_files_policy(request, create_root=False)
+    _refuse_link_chain(policy, _fs_lexical_path(payload.path), leaf_link_ok=False)
     target = _fs_path(payload.path)
     text = payload.content or ""
     if len(text.encode("utf-8")) > _FS_TEXT_WRITE_MAX_BYTES:

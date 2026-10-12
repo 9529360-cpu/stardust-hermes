@@ -92,6 +92,31 @@ def _seed_file(client, root, name="out/hello.txt"):
 
 
 
+@pytest.mark.linux_only
+def test_mutations_do_not_reach_a_venv_through_a_symlink(forced_files_client):
+    """POSIX counterpart of the Windows venv-alias tests: a symlink to .venv is never followed by a mutation."""
+    client, root = forced_files_client
+    venv = root / "hermes-agent" / ".venv"
+    (venv / "lib").mkdir(parents=True)
+    (venv / "lib" / "keep.txt").write_text("venv file", encoding="utf-8")
+    alias = root / "hermes-agent" / "venv"
+    alias.symlink_to(venv, target_is_directory=True)
+
+    refused = client.request("DELETE", "/api/files", json={"path": str(alias / "lib"), "recursive": True})
+    mkdir = client.post("/api/files/mkdir", json={"path": str(alias / "lib" / "newdir")})
+
+    assert refused.status_code == 403, refused.text
+    assert mkdir.status_code == 403, mkdir.text
+    assert not (venv / "lib" / "newdir").exists()
+    assert (venv / "lib" / "keep.txt").read_text(encoding="utf-8") == "venv file"
+
+    removed = client.request("DELETE", "/api/files", json={"path": str(alias), "recursive": True})
+
+    assert removed.status_code == 200, removed.text
+    assert not alias.is_symlink()
+    assert (venv / "lib" / "keep.txt").read_text(encoding="utf-8") == "venv file"
+
+
 def test_download_authenticates_via_query_token(forced_files_client):
     client, root = forced_files_client
     file_path = _seed_file(client, root, name="out/demo.mp4")

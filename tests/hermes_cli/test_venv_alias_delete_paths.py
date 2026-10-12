@@ -268,6 +268,107 @@ def test_dashboard_recursive_delete_of_the_checkout_never_reaches_outside(dashbo
         _release_junction(checkout / "venv")
 
 
+def test_dashboard_recursive_delete_through_the_alias_folder_is_refused(dashboard_client):
+    client, managed = dashboard_client
+    checkout = managed / "hermes-agent"
+    venv = _build_checkout(checkout)
+    try:
+        response = client.request(
+            "DELETE", "/api/files", json={"path": str(checkout / "venv" / "Lib"), "recursive": True}
+        )
+
+        assert response.status_code == 403, response.text
+        assert (venv / "Lib" / "keep.txt").read_text(encoding="utf-8") == "venv file"
+        assert (venv / "Scripts" / "python.exe").read_bytes() == b"interpreter"
+    finally:
+        _release_junction(checkout / "venv")
+
+
+def test_dashboard_delete_of_a_file_through_the_alias_is_refused(dashboard_client):
+    client, managed = dashboard_client
+    checkout = managed / "hermes-agent"
+    venv = _build_checkout(checkout)
+    try:
+        response = client.request(
+            "DELETE", "/api/files", json={"path": str(checkout / "venv" / "Lib" / "keep.txt"), "recursive": False}
+        )
+
+        assert response.status_code == 403, response.text
+        assert (venv / "Lib" / "keep.txt").read_text(encoding="utf-8") == "venv file"
+    finally:
+        _release_junction(checkout / "venv")
+
+
+def test_a_link_inside_a_real_folder_is_refused_and_deleting_the_folder_keeps_the_venv(dashboard_client):
+    client, managed = dashboard_client
+    checkout = managed / "hermes-agent"
+    venv = _build_checkout(checkout)
+    work = checkout / "work"
+    work.mkdir()
+    _make_junction(work / "link", venv)
+    try:
+        refused = client.request("DELETE", "/api/files", json={"path": str(work / "link" / "Lib"), "recursive": True})
+
+        assert refused.status_code == 403, refused.text
+        assert (venv / "Lib" / "keep.txt").read_text(encoding="utf-8") == "venv file"
+
+        removed = client.request("DELETE", "/api/files", json={"path": str(work), "recursive": True})
+
+        assert removed.status_code == 200, removed.text
+        assert not os.path.lexists(work)
+        assert (venv / "Lib" / "keep.txt").read_text(encoding="utf-8") == "venv file"
+        assert (venv / "Scripts" / "python.exe").read_bytes() == b"interpreter"
+    finally:
+        _release_junction(work / "link")
+        _release_junction(checkout / "venv")
+
+
+def test_a_link_from_outside_the_root_into_the_venv_is_refused(dashboard_client, tmp_path):
+    client, managed = dashboard_client
+    checkout = managed / "hermes-agent"
+    venv = _build_checkout(checkout)
+    outside = tmp_path / "elsewhere" / "alias"
+    outside.parent.mkdir()
+    _make_junction(outside, venv)
+    try:
+        response = client.request("DELETE", "/api/files", json={"path": str(outside / "Lib"), "recursive": True})
+
+        assert response.status_code == 403, response.text
+        assert (venv / "Lib" / "keep.txt").read_text(encoding="utf-8") == "venv file"
+    finally:
+        _release_junction(outside)
+        _release_junction(checkout / "venv")
+
+
+def test_mutating_calls_through_the_alias_are_refused(dashboard_client):
+    client, managed = dashboard_client
+    checkout = managed / "hermes-agent"
+    venv = _build_checkout(checkout)
+    alias = checkout / "venv"
+    data_url = "data:text/plain;base64,eA=="
+    try:
+        mkdir = client.post("/api/files/mkdir", json={"path": str(alias / "Lib" / "newdir")})
+        upload = client.post(
+            "/api/files/upload",
+            json={"path": str(alias / "Lib" / "new.txt"), "data_url": data_url, "overwrite": True},
+        )
+        write = client.post(
+            "/api/fs/write-text", json={"path": str(alias / "Lib" / "keep.txt"), "content": "changed"}
+        )
+        onto_alias = client.post("/api/files/upload", json={"path": str(alias), "data_url": data_url, "overwrite": True})
+
+        assert mkdir.status_code == 403, mkdir.text
+        assert upload.status_code == 403, upload.text
+        assert write.status_code == 403, write.text
+        assert onto_alias.status_code == 403, onto_alias.text
+        assert not os.path.lexists(venv / "Lib" / "newdir")
+        assert not os.path.lexists(venv / "Lib" / "new.txt")
+        assert (venv / "Lib" / "keep.txt").read_text(encoding="utf-8") == "venv file"
+        assert (venv / "Scripts" / "python.exe").read_bytes() == b"interpreter"
+    finally:
+        _release_junction(alias)
+
+
 def test_failed_worktree_fallback_removes_the_alias_and_keeps_the_target(tmp_path, monkeypatch):
     wt_path = tmp_path / "worktree"
     venv = _build_checkout(wt_path)
