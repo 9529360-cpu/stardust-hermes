@@ -63,7 +63,7 @@ async function createRoom(page: MockBackendFixture['page']) {
 }
 
 test.beforeEach(async () => {
-  fixture = await setupMockBackend({ mockServer: {
+  fixture = await setupMockBackend({ extraDisplayConfig: '  language: en', mockServer: {
     holdFirstCompletionContaining: 'LANE_A_FIRST',
     replyForPrompt: prompt => prompt.includes('LANE_A_FOLLOWUP') ? FOLLOWUP_REPLY : prompt.includes('LANE_A_FIRST') ? FIRST_REPLY : MOCK_REPLY
   } })

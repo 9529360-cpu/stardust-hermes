@@ -80,7 +80,7 @@ test.describe('sidebar states — background process and subagent', () => {
 
   test.beforeAll(async () => {
     restartMockServer()
-    fixture = await setupMockBackend({ extraConfig: DISABLE_AUTO_TITLE })
+    fixture = await setupMockBackend({ extraDisplayConfig: '  language: en', extraConfig: DISABLE_AUTO_TITLE })
     await waitForAppReady(fixture, 120_000)
   })
 
@@ -144,6 +144,7 @@ test.describe('sidebar states — subagent and background dot coexist', () => {
   test.beforeAll(async () => {
     restartMockServer()
     fixture = await setupMockBackend({
+      extraDisplayConfig: '  language: en',
       extraConfig: DISABLE_AUTO_TITLE,
       mockServer: { backgroundReleasePath: bgRelease.path },
     })
@@ -230,6 +231,7 @@ test.describe('sidebar states — cross-session dot transition', () => {
   test.beforeAll(async () => {
     restartMockServer()
     fixture = await setupMockBackend({
+      extraDisplayConfig: '  language: en',
       extraConfig: DISABLE_AUTO_TITLE,
       mockServer: { backgroundReleasePath: bgRelease.path },
     })

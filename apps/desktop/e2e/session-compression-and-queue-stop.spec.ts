@@ -36,7 +36,7 @@ test.describe('session compression', () => {
 
   test.beforeAll(async () => {
     restartMockServer()
-    fixture = await setupMockBackend()
+    fixture = await setupMockBackend({ extraDisplayConfig: '  language: en' })
     await waitForAppReady(fixture, 120_000)
   })
 
@@ -100,6 +100,7 @@ test.describe('session compression in progress', () => {
 
   test.beforeAll(async () => {
     fixture = await setupMockBackend({
+      extraDisplayConfig: '  language: en',
       modelContextLength: 64_000,
       extraConfig: `compression:
   threshold_tokens: 22000
