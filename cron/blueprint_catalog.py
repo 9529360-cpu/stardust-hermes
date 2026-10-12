@@ -126,22 +126,32 @@ CATALOG: List[AutomationBlueprint] = [
     AutomationBlueprint(
         key="morning-brief",
         title="Morning briefing",
-        description="A short daily briefing: today's calendar, weather, and "
-        "anything urgent waiting on you.",
+        description="A daily briefing: the global market brief (PDF), a read-only house status "
+        "check, and today's plan from your tasks and calendar when they can be read.",
         category="daily",
         schedule_template="{minute} {hour} * * *",
         prompt_template=(
-            "Produce a concise morning briefing for the user: today's calendar "
-            "events, the local weather, and any urgent items. When Gmail/Google "
-            "Calendar are connected, follow the google-workspace skill's "
-            "references/daily-brief.md procedure (exact day window, conflict "
-            "detection, meeting prep, mail-to-meeting links). Keep it short and "
-            "scannable. If no data sources are connected, give a brief "
-            "good-morning with the date and offer to connect calendar/email."
+            "Produce the owner's morning briefing as one short reply with three parts, in this order. "
+            "1. Global markets: load the market-brief skill and produce today's global market brief as "
+            "that skill describes. Give the main index moves for the US, Europe and Asia and the top macro "
+            "news in a few lines. Never invent a figure; mark a missing one the way the skill says. Its "
+            "Markdown brief and PDF are saved in the reports folder. "
+            "2. House status: load the house-check skill and run its read-only check. In two short lines, "
+            "give the free space on each drive, then any cache or data-home warning, or say there is none. "
+            "Never run a cleanup or delete command; the check only reports. "
+            "3. Today's plan: if a tasks or calendar list is available to you in this run, list today's "
+            "items as short bullets, most urgent first. When Gmail or Google Calendar is connected, follow "
+            "the google-workspace skill's references/daily-brief.md procedure. If no such list is available, "
+            "say so plainly in one line and do not invent items. "
+            "This runs unattended, so do not start a sign-in or setup flow. "
+            "The owner's language is the reply language: write the whole reply in it. "
+            "End the reply with a list of file paths: the market Markdown brief and its PDF, or the Markdown "
+            "alone if the PDF step failed. Apart from those report files, do not create, move, rename, edit "
+            "or delete any file, and do not send a message to anyone."
         ),
         slots=[_TIME("08:00"), _DELIVER],
-        skills=("google-workspace",),
-        tags=("daily", "briefing"),
+        skills=("google-workspace", "market-brief", "house-check"),
+        tags=("daily", "briefing", "morning", "report"),
     ),
     AutomationBlueprint(
         key="important-mail",
