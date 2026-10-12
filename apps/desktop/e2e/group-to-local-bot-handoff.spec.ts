@@ -57,6 +57,8 @@ test('local bot replaces an open group main workspace', async () => {
   await expect(groupTab).toHaveAttribute('aria-selected', 'true')
   await expect(groupComposer).toBeVisible()
 
+  // Creating the group leaves the Agent space, so the roster row is reached again from it.
+  await openBots(page)
   const programmer = page.getByRole('button', { name: /^Programmer\b/ }).filter({ visible: true }).first()
   await programmer.click()
 
@@ -67,7 +69,7 @@ test('local bot replaces an open group main workspace', async () => {
   // (here a fresh one: its empty-state splash asks for a first message)
   // taking the main workspace. The first open also spawns the bot's own
   // backend, so give the "Loading session" phase a real chance to clear.
-  await expect(page.getByText('Say something to get started.').filter({ visible: true })).toBeVisible({
+  await expect(page.getByText('What can I help you with?').filter({ visible: true })).toBeVisible({
     timeout: 120_000
   })
   await expect(groupTab).toHaveCount(0)
