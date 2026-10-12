@@ -331,7 +331,7 @@ def _check_native(request: NativeDialogClick, approvals: tuple[OwnerApproval, ..
     if (gap := _identity_gap(request)) is not None:
         return gap
     if request.origin != NATIVE_UI_ORIGIN:
-        return _deny("dialog is rendered by page content; page content cannot grant a permission")
+        return _deny("dialog is not native browser UI: page content or an unknown window cannot grant a permission")
     if request.attribution != LAUNCH_RECORD_ATTRIBUTION:
         return _deny("dialog is not attributed to the launch record of an approved connection")
     if not request.permission:

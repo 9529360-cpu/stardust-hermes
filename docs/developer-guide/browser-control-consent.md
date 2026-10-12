@@ -1,6 +1,6 @@
 # Browser-control consent policy (slice 1)
 
-Status: a pure policy module with unit tests. It is not wired into any tool, the browser router, the Desktop UI or an approval store. Nothing here installs an extension, clicks a dialog or touches a real browser.
+Status: a pure policy module with unit tests, plus a Windows verifier (`tools/browser_window_origin.py`) that decides the `origin` of a native dialog from OS window data. Neither is wired into any tool, the browser router, the Desktop UI or an approval store. Nothing here installs an extension, clicks a dialog or touches a real browser. The probe below ran a throwaway browser and clicked nothing.
 
 ## Location and why
 
@@ -9,6 +9,7 @@ Status: a pure policy module with unit tests. It is not wired into any tool, the
 - `tools/browser_preview_approval.py` classifies browser risk for `unified_browser_tool._host_action`.
 - `tools/browser_extension_router.py` routes page actions to the bound controller.
 - `tools/computer_use/tool.py` gates desktop actions in `_reject_unsafe` and `_request_approval`.
+- `tools/browser_window_origin.py` (Windows only) decides the `origin` of a native dialog from OS window data, which `NativeDialogClick` trusts.
 
 The install and native-dialog steps come from the computer-control tool, and page actions come from the browser router. Both need the same answer, so the policy sits in `tools/` rather than inside one tool. It is not in `tools/approval.py`: that module is the interactive prompt transport, and a standing, revocable, per-connection owner grant is a different authority. It is not in `gateway/browser_control_broker.py`: the broker is transport-neutral, and the policy must not depend on a transport. The module imports the broker's capability allowlist lazily, because importing `gateway` loads its config, session and delivery modules.
 
@@ -38,13 +39,41 @@ Across all steps:
 - Mutation check: removing the origin guard, the record-source guard, the pairing guard, the argv credential guard or the isolated-root guard each fails its own tests. The module was restored byte-identical afterwards.
 - The pin equals the version locked in `experiments/playwright-mcp-host-bridge/package-lock.json`. A test asserts this.
 - `ruff check` passes on both new files. The neighbouring browser tests (`test_browser_extension_router.py`, `test_browser_preview_approval.py`) and the repo-wide source-scan guards still pass.
+- `tests/tools/test_browser_window_origin.py`: 33 cases pass under `scripts/run_tests.sh`. 29 use fake window records, and 4 are `windows_only` and create real windows in-process.
+- Mutation check: removing the renderer-descendant rule fails 5 cases. Removing the instance binding fails 3. The module was restored byte-identical.
+- `ruff check` passes on the changed files. The repo does not enforce `ruff format`, and untouched modules fail it too.
+- The packaging, source-scan and neighbouring browser tests pass: 243 tests across 9 files.
+
+## Window origin: verifier and probe (Windows)
+
+`tools/browser_window_origin.py` gives the `origin` for `NativeDialogClick` from OS window data. A window is `native_ui` only when all of these hold:
+
+- it is visible, and it is a top-level window or a window owned by one;
+- its process image is the pinned executable the caller passes in, compared the way Windows compares paths, and its process belongs to the launched browser instance;
+- its class is `Chrome_WidgetWin_1`, and its owner, if it has one, is a top-level Chromium window of that instance;
+- no `Chrome_RenderWidgetHostHWND` is its ancestor or a descendant.
+
+A window that is, or sits inside, a renderer surface, or that hosts one, is `web_page`. Anything else is `unknown`, and the policy denies both.
+
+Three checks go beyond the brief. Visibility is required because a dialog must be on screen to be clicked. The renderer-descendant rule is needed because the browser's own frame and any page-created popup otherwise pass as top-level Chromium windows. The instance binding is needed because a second Chrome on the same machine has the same executable. The pure function takes snapshots, so the fake-record tests run on any host. The policy seam test shows that only a `native_ui` verdict lets the policy click.
+
+Probe, read-only, 2026-10-12, Windows 11. Chrome 154.0.8037.98 and Edge 155.0.4283.45, one fresh temporary profile per run. A 127.0.0.1 page requested geolocation. Nothing was clicked and no keystroke was sent.
+
+| Window | Chrome | Edge |
+|---|---|---|
+| Location permission prompt | `native_ui`. Top-level `Chrome_WidgetWin_1`, owned by the frame, no renderer. First seen 0.16 s after the request. A capture shows the prompt. | `web_page`. Same class and owner, but it hosts a `Chrome_RenderWidgetHostHWND`, so Edge draws this prompt as web content and the verifier denies it. The literal rules would say native. |
+| HTML fake dialog, hit test at its centre | `web_page` (the page renderer) | `web_page` |
+| Browser frame | `web_page`. The four literal rules would say native. | `web_page`. The literal rules say native. |
+| Edge translate prompt | not sampled | `native_ui` |
+
+Four earlier Chrome runs released the request at once, without activating the window, and none showed a prompt window. The run that released the request only after activating the window showed one. The cause is not established. Edge's translate prompt is `native_ui`, so `native_ui` means browser UI, not a permission prompt. The policy's permission and attribution checks still decide what may be clicked. One run found 22 windows of the same executable belonging to other processes, which is why the instance binding is required.
 
 ## Not verified and not built
 
 - **Approval store and Desktop endpoint.** The policy trusts only the records passed in. The store must write owner records from the app's own approval action and nowhere else.
 - **Wiring.** No tool, router or Desktop code calls the policy yet. The install and dialog actions do not exist in the tools. Wiring the approval requirement into `_host_action` now would deny every existing host action, because no records exist. The next slice wires it behind `browser.extension_control.enabled`.
 - **Caller-asserted facts.** `origin`, `attribution`, `channel`, `controller_live` and `pairing_grant_consumed` come from the caller. Wiring must derive each one from the code path or the broker, never from request content.
-- **Native versus page origin.** `native_ui` must come from OS window ownership, the browser's own top-level window. It must never come from screenshot pixels, because a page can paint a fake dialog inside its viewport. This is the hardest open risk, and this slice does not solve it.
+- **Native versus page origin.** The verifier decides `origin` from OS window data, not pixels, and the probe above confirms it for Chrome 154 and Edge 155. Still open: Edge draws its permission prompt as web content, so it is denied (fail closed), and certifying it needs a signal beyond window ownership that tells browser UI from page content. The click path must recheck the window under the click with `window_at_point`, which is not wired. Other OS dialogs, such as file pickers, are `unknown` and were not probed.
 - **Extension identity.** The policy pins the npm package, not the extension's store ID or signature. Checking the installed extension against its official listing is not done.
 - **One-shot install.** The policy cannot track consumption, so the store should expire an install record after one use.
-- **Live checks.** Real Chrome, a real extension install, real native dialogs, the Desktop stop control and the visible step UI were not exercised.
+- **Live checks.** The probe observed real Chrome and Edge permission prompts, but only to classify them. A real extension install, a real click, the Desktop stop control and the visible step UI were not exercised.
