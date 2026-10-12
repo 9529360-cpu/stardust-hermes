@@ -19,8 +19,11 @@ A window is ``native_ui`` only when all of these hold:
 Anything inside or hosting a renderer surface is ``web_page``. Anything else is ``unknown``. The
 consent policy denies both.
 
-``classify_window`` is pure and works on snapshots, so tests use fake window records. Only
-``snapshot_windows`` and ``window_at_point`` call Win32. Design note:
+``classify_window`` is pure and works on snapshots, so tests use fake window records. Just before a
+click, ``decide_click`` checks again that the window at the target point is the one that passed the
+check: the same hwnd, pid and class, and no renderer surface is it, its ancestor or its descendant.
+``decide_click_at_point`` is the thin Windows wrapper around it. Only ``snapshot_windows``,
+``window_at_point`` and that wrapper call Win32. Design note:
 docs/developer-guide/browser-control-consent.md.
 """
 
@@ -28,6 +31,7 @@ from __future__ import annotations
 
 import ctypes
 import functools
+import logging
 import ntpath
 import sys
 from collections import defaultdict
@@ -36,6 +40,8 @@ from types import SimpleNamespace
 from typing import Callable, Iterator, Mapping
 
 from tools.browser_control_consent import NATIVE_UI_ORIGIN
+
+logger = logging.getLogger(__name__)
 
 WEB_PAGE_ORIGIN = "web_page"
 UNKNOWN_ORIGIN = "unknown"
@@ -82,6 +88,16 @@ class WindowVerdict:
     reason: str
 
 
+@dataclass(frozen=True)
+class ClickDecision:
+    """Whether one click may be sent. ``reason`` is what gets logged when the click is denied."""
+
+    allowed: bool
+    reason: str
+    approved_hwnd: int
+    hit_hwnd: int  # what window_at_point returned at the target point; 0 when there was no window
+
+
 def classify_window(hwnd: int, windows: Mapping[int, WindowRecord], instance: BrowserInstance) -> WindowVerdict:
     """Decide one window's origin from a snapshot. Pure: no Win32 calls and no I/O."""
     record = windows.get(hwnd)
@@ -106,12 +122,56 @@ def classify_window(hwnd: int, windows: Mapping[int, WindowRecord], instance: Br
     return _verdict(hwnd, NATIVE_UI_ORIGIN, "visible Chromium top-level window of the pinned browser; no renderer surface")
 
 
+def decide_click(verdict: WindowVerdict, approved: WindowRecord, hit_hwnd: int,
+                 windows: Mapping[int, WindowRecord]) -> ClickDecision:
+    """Decide one click just before it is sent. Pure: no Win32 calls and no I/O.
+
+    ``verdict`` and ``approved`` are the native_ui verdict and the window record captured when the window
+    passed the check. ``hit_hwnd`` is what ``window_at_point`` returned at the target point, and ``windows`` is
+    a snapshot taken just before the click. The click may proceed only when the window at the point is the
+    approved window, with the same hwnd, pid and class, and no renderer surface is that window, one of its
+    ancestors or one of its descendants. Anything else is denied, including a window that never passed the
+    native_ui check.
+    """
+    if verdict.origin != NATIVE_UI_ORIGIN or verdict.hwnd != approved.hwnd:
+        return _click(False, "the window did not pass the native_ui check", approved, hit_hwnd)
+    if not hit_hwnd:
+        return _click(False, "no window at the target point", approved, hit_hwnd)
+    hit = windows.get(hit_hwnd)
+    if hit is None:
+        return _click(False, "the window at the target point is not in the snapshot", approved, hit_hwnd)
+    if _touches_renderer(hit, windows):
+        return _click(False, "the target point lands on a renderer surface or inside one: page content",
+                      approved, hit_hwnd)
+    if hit_hwnd != approved.hwnd:
+        return _click(False, "a different window is at the target point", approved, hit_hwnd)
+    if hit.pid != approved.pid:
+        return _click(False, "the window at the target point belongs to another process", approved, hit_hwnd)
+    if hit.class_name != approved.class_name:
+        return _click(False, "the window at the target point has another class", approved, hit_hwnd)
+    return _click(True, "the window at the target point is the window that passed the native_ui check",
+                  approved, hit_hwnd)
+
+
 def _verdict(hwnd: int, origin: str, reason: str) -> WindowVerdict:
     return WindowVerdict(hwnd=hwnd, origin=origin, reason=reason)
 
 
+def _click(allowed: bool, reason: str, approved: WindowRecord, hit_hwnd: int) -> ClickDecision:
+    return ClickDecision(allowed=allowed, reason=reason, approved_hwnd=approved.hwnd, hit_hwnd=hit_hwnd)
+
+
 def _is_renderer(record: WindowRecord) -> bool:
     return record.class_name in RENDERER_SURFACE_CLASSES
+
+
+def _touches_renderer(record: WindowRecord, windows: Mapping[int, WindowRecord]) -> bool:
+    """True when a renderer surface is the window, one of its ancestors or one of its descendants.
+
+    This is the renderer rule ``classify_window`` applies, so the click-time check asks the same question.
+    """
+    return (any(_is_renderer(node) for node in _self_and_ancestors(record, windows))
+            or any(_is_renderer(node) for node in _descendants(record.hwnd, windows)))
 
 
 def _is_absolute(path: str) -> bool:
@@ -211,6 +271,21 @@ def window_at_point(x: int, y: int) -> int:
     """The window, child windows included, that the OS would deliver a click to at this screen point. Read-only."""
     api = _api()
     return int(api.user32.WindowFromPoint(api.wintypes.POINT(x, y)) or 0)
+
+
+def decide_click_at_point(verdict: WindowVerdict, approved: WindowRecord, x: int, y: int) -> ClickDecision:
+    """Windows only. Run just before a click at screen point (x, y).
+
+    It looks up the window at the point first, then takes a fresh snapshot, decides with ``decide_click``
+    and logs the reason when the click is denied. It does not click: the caller clicks only when the
+    decision is allowed.
+    """
+    hit_hwnd = window_at_point(x, y)
+    decision = decide_click(verdict, approved, hit_hwnd, snapshot_windows())
+    if not decision.allowed:
+        logger.warning("browser click at (%d, %d) denied: %s; approved hwnd %#x, window at point %#x",
+                       x, y, decision.reason, decision.approved_hwnd, decision.hit_hwnd)
+    return decision
 
 
 def _collect(api: SimpleNamespace, enumerate_fn: Callable, *args: object) -> list[int]:

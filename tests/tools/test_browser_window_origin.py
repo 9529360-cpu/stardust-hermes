@@ -8,6 +8,7 @@ OS calls. Nothing here starts a browser, clicks, or reads a profile.
 from __future__ import annotations
 
 import ctypes
+import logging
 import os
 from types import SimpleNamespace
 
@@ -31,7 +32,10 @@ from tools.browser_window_origin import (
     WEB_PAGE_ORIGIN,
     BrowserInstance,
     WindowRecord,
+    WindowVerdict,
     classify_window,
+    decide_click,
+    decide_click_at_point,
     snapshot_windows,
 )
 
@@ -42,6 +46,8 @@ EDGE = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 LOOKALIKE = r"C:\Users\reviewer\Downloads\chrome.exe"
 INSTANCE = BrowserInstance(pinned_exe=CHROME, pids=frozenset({4100, 4101}))
 MAIN, BUBBLE, POPUP, RENDERER, FAKE, TOOLBAR, HOST, FOREIGN = 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80
+OTHER_DIALOG = 0x90
+FOREIGN_CLASS = "Notepad"
 OTHER_INSTANCE_PID = 5555
 FOREIGN_PID = 9999
 NOW = 1_000.0
@@ -230,6 +236,9 @@ def test_only_a_native_verdict_lets_the_policy_click(records, target, allowed):
 WS_POPUP = 0x80000000
 WS_CHILD = 0x40000000
 WS_VISIBLE = 0x10000000
+SWP_NOSIZE = 0x0001
+SWP_NOMOVE = 0x0002
+SWP_NOACTIVATE = 0x0010
 
 
 class _RealWindows:
@@ -291,6 +300,13 @@ class _RealWindows:
         self._windows.append(hwnd)
         return hwnd
 
+    def topmost(self, hwnd: int) -> None:
+        """Keep the window above the others, so the point at its centre is not covered by a window on top."""
+        self.user32.SetWindowPos.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int, ctypes.c_int,
+                                             ctypes.c_int, ctypes.c_int, ctypes.c_uint]
+        self.user32.SetWindowPos.restype = ctypes.c_bool
+        self.user32.SetWindowPos(hwnd, ctypes.c_void_p(-1), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
+
     def close(self) -> None:
         for hwnd in reversed(self._windows):
             self.user32.DestroyWindow(hwnd)
@@ -299,8 +315,15 @@ class _RealWindows:
 
 
 @pytest.fixture
-def own_windows():
-    """An unowned Chromium window and a popup it owns, both in this process and both visible."""
+def own_windows(tmp_path, monkeypatch):
+    """An unowned Chromium window and a popup it owns, both in this process and both visible.
+
+    The working directory moves into the test's temp directory first. Creating windows loads the Windows
+    input method into this process, and under the test runner's cleared environment that method writes its
+    cache under a literal ``%SystemDrive%`` path relative to the working directory. That must not land in
+    the repository.
+    """
+    monkeypatch.chdir(tmp_path)
     windows = _RealWindows()
     try:
         owner = windows.create(CHROMIUM, WS_POPUP | WS_VISIBLE, 0, 40, 40, 300, 200)
@@ -346,3 +369,125 @@ def test_real_window_is_unknown_when_its_process_is_outside_the_instance(own_win
     records = snapshot_windows()
     instance = BrowserInstance(pinned_exe=records[own_windows.owner].image_path, pids=frozenset())
     assert origin_of(own_windows.popup, records, instance) == UNKNOWN_ORIGIN
+
+
+# -- Click-time recheck ----------------------------------------------------------------------
+
+def recheck(hit_hwnd, *, at_check, at_click=None, target=BUBBLE):
+    """Recheck a click on ``target``. The verdict and the approved record come from the snapshot taken when the
+    window passed the check. The window at the point is judged on the snapshot taken at click time."""
+    verdict = classify_window(target, at_check, INSTANCE)
+    return decide_click(verdict, at_check[target], hit_hwnd, at_check if at_click is None else at_click)
+
+
+def test_the_same_window_at_the_point_passes():
+    decision = recheck(BUBBLE, at_check=snapshot(top(MAIN), top(BUBBLE, owner=MAIN)))
+    assert decision.allowed
+    assert decision.approved_hwnd == BUBBLE and decision.hit_hwnd == BUBBLE
+
+
+def test_a_different_hwnd_at_the_point_is_denied():
+    records = snapshot(top(MAIN), top(BUBBLE, owner=MAIN), top(OTHER_DIALOG, owner=MAIN))
+    decision = recheck(OTHER_DIALOG, at_check=records)
+    assert not decision.allowed
+    assert "different window" in decision.reason
+
+
+def test_a_different_pid_for_the_same_hwnd_is_denied():
+    """A window handle can be reused: the same hwnd, now created by another process."""
+    at_check = snapshot(top(MAIN), top(BUBBLE, owner=MAIN))
+    at_click = snapshot(top(MAIN), top(BUBBLE, owner=MAIN, pid=FOREIGN_PID, image=LOOKALIKE))
+    decision = recheck(BUBBLE, at_check=at_check, at_click=at_click)
+    assert not decision.allowed
+    assert "another process" in decision.reason
+
+
+def test_a_different_class_for_the_same_hwnd_is_denied():
+    at_check = snapshot(top(MAIN), top(BUBBLE, owner=MAIN))
+    at_click = snapshot(top(MAIN), top(BUBBLE, owner=MAIN, cls=FOREIGN_CLASS))
+    decision = recheck(BUBBLE, at_check=at_check, at_click=at_click)
+    assert not decision.allowed
+    assert "another class" in decision.reason
+
+
+def test_a_page_drawn_window_at_the_point_is_denied():
+    """A page paints a window inside its renderer. Under the point it is page content, whatever it claims to be."""
+    at_click = snapshot(top(MAIN), child(RENDERER, MAIN, cls=RENDERER_CLASS), child(FAKE, RENDERER, cls=CHROMIUM))
+    decision = recheck(FAKE, at_check=snapshot(top(MAIN), top(BUBBLE, owner=MAIN)), at_click=at_click)
+    assert not decision.allowed
+    assert "page content" in decision.reason
+
+
+def test_the_approved_hwnd_now_drawn_inside_a_renderer_is_denied():
+    """The same hwnd, pid and class, but a renderer surface is now its ancestor."""
+    at_click = snapshot(top(MAIN), child(RENDERER, MAIN, cls=RENDERER_CLASS), child(BUBBLE, RENDERER, cls=CHROMIUM))
+    decision = recheck(BUBBLE, at_check=snapshot(top(MAIN), top(BUBBLE, owner=MAIN)), at_click=at_click)
+    assert not decision.allowed
+    assert "page content" in decision.reason
+
+
+def test_a_window_that_starts_hosting_a_renderer_after_the_check_is_denied():
+    at_click = snapshot(top(MAIN), top(BUBBLE, owner=MAIN), child(RENDERER, BUBBLE, cls=RENDERER_CLASS))
+    decision = recheck(BUBBLE, at_check=snapshot(top(MAIN), top(BUBBLE, owner=MAIN)), at_click=at_click)
+    assert not decision.allowed
+    assert "page content" in decision.reason
+
+
+def test_a_renderer_surface_at_the_point_is_denied():
+    at_click = snapshot(top(MAIN), child(RENDERER, MAIN, cls=RENDERER_CLASS), top(BUBBLE, owner=MAIN))
+    decision = recheck(RENDERER, at_check=snapshot(top(MAIN), top(BUBBLE, owner=MAIN)), at_click=at_click)
+    assert not decision.allowed
+    assert "renderer surface" in decision.reason
+
+
+def test_no_window_at_the_point_is_denied():
+    decision = recheck(0, at_check=snapshot(top(MAIN), top(BUBBLE, owner=MAIN)))
+    assert not decision.allowed
+    assert decision.reason == "no window at the target point"
+
+
+def test_a_window_at_the_point_that_left_the_snapshot_is_denied():
+    decision = recheck(0x999, at_check=snapshot(top(MAIN), top(BUBBLE, owner=MAIN)))
+    assert not decision.allowed
+    assert "not in the snapshot" in decision.reason
+
+
+@pytest.mark.parametrize("origin", [WEB_PAGE_ORIGIN, UNKNOWN_ORIGIN])
+def test_a_window_that_did_not_pass_native_ui_is_never_clickable(origin):
+    records = snapshot(top(MAIN), top(BUBBLE, owner=MAIN))
+    decision = decide_click(WindowVerdict(BUBBLE, origin, "not native"), records[BUBBLE], BUBBLE, records)
+    assert not decision.allowed
+    assert "native_ui" in decision.reason
+
+
+def test_a_verdict_for_another_window_does_not_approve_this_one():
+    records = snapshot(top(MAIN), top(BUBBLE, owner=MAIN))
+    verdict_for_main = classify_window(MAIN, records, INSTANCE)
+    decision = decide_click(verdict_for_main, records[BUBBLE], BUBBLE, records)
+    assert not decision.allowed
+    assert "native_ui" in decision.reason
+
+
+@pytest.mark.windows_only
+def test_real_recheck_allows_the_approved_window_at_its_centre(own_windows):
+    own_windows.windows.topmost(own_windows.popup)
+    records = snapshot_windows()
+    popup = records[own_windows.popup]
+    instance = BrowserInstance(pinned_exe=records[own_windows.owner].image_path, pids=frozenset({os.getpid()}))
+    verdict = classify_window(own_windows.popup, records, instance)
+    x, y = (popup.rect[0] + popup.rect[2]) // 2, (popup.rect[1] + popup.rect[3]) // 2
+    decision = decide_click_at_point(verdict, popup, x, y)
+    assert decision.allowed, decision.reason
+    assert decision.hit_hwnd == own_windows.popup
+
+
+@pytest.mark.windows_only
+def test_real_recheck_denies_a_point_with_no_window_and_logs_the_reason(own_windows, caplog):
+    records = snapshot_windows()
+    popup = records[own_windows.popup]
+    instance = BrowserInstance(pinned_exe=records[own_windows.owner].image_path, pids=frozenset({os.getpid()}))
+    verdict = classify_window(own_windows.popup, records, instance)
+    with caplog.at_level(logging.WARNING, logger="tools.browser_window_origin"):
+        decision = decide_click_at_point(verdict, popup, -1_000_000, -1_000_000)
+    assert not decision.allowed and decision.hit_hwnd == 0
+    assert "no window at the target point" in caplog.text
