@@ -241,3 +241,14 @@ class TestGlobalMarketBriefBlueprint:
     def test_time_slot_still_sets_the_schedule(self):
         spec = fill_blueprint(get_blueprint("global-market-brief"), {"time": "07:30"})
         assert spec["schedule"] == "30 7 * * *"
+
+
+class TestMorningBriefBlueprint:
+    def test_loads_market_and_house_skills_and_replies_with_paths(self):
+        spec = fill_blueprint(get_blueprint("morning-brief"), {})
+        # Both skills load with the job, and the prompt names them and asks for the file paths.
+        assert "market-brief" in spec["skills"]
+        assert "house-check" in spec["skills"]
+        assert "market-brief" in spec["prompt"]
+        assert "house-check" in spec["prompt"]
+        assert "file paths" in spec["prompt"]
