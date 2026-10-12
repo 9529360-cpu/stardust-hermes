@@ -431,6 +431,12 @@ def forget_topic_text(phrase: str, *, topic_key: str | None = None) -> dict[str,
     }
 
 
+def _topic_label(row: dict[str, Any], key: str) -> str:
+    """How an error names a topic without its key: its title, or 'that topic' when the title would repeat the key."""
+    title = str(row.get("title") or "").strip()
+    return f"'{title}'" if title and _topic_key(title) != key else "that topic"
+
+
 def replace_topic_sentence(topic: str, phrase: str, content: str, *, owner_initiated: bool = False) -> dict[str, Any]:
     """Rewrite the single summary sentence of *topic* that contains *phrase*. Refused when no sentence or
     several sentences match: a replacement must not guess, and must not discard the rest of the summary."""
@@ -452,14 +458,15 @@ def replace_topic_sentence(topic: str, phrase: str, content: str, *, owner_initi
         topics = list(payload["topics"])
         idx = next((i for i, row in enumerate(topics) if _topic_key(row.get("key") or row.get("title")) == key), None)
         if idx is None:
-            return {"success": False, "error": f"Topic '{topic}' was not found"}
+            return {"success": False, "error": "That topic was not found."}
         row = topics[idx]
+        label = _topic_label(row, key)
         sentences = _sentences(str(row.get("summary") or ""))
         hits = [i for i, s in enumerate(sentences) if needle in fold_text(s)]
         if not hits:
-            return {"success": False, "error": f"No sentence in topic '{topic}' contains '{phrase}'."}
+            return {"success": False, "error": f"No sentence in {label} contains '{phrase}'."}
         if len(hits) > 1:
-            return {"success": False, "error": f"{len(hits)} sentences in topic '{topic}' contain '{phrase}'. Be more specific."}
+            return {"success": False, "error": f"{len(hits)} sentences in {label} contain '{phrase}'. Be more specific."}
         old = sentences[hits[0]]
         sentences[hits[0]] = clean + old[len(old.rstrip()):]
         summary = "".join(sentences).strip()

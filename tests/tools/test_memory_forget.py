@@ -937,12 +937,12 @@ def test_an_unrelated_owner_add_does_not_clear_the_forgotten_coffee_record(store
 
 
 def test_an_ascii_phrase_matches_whole_words_and_a_cjk_phrase_matches_inside_a_run():
-    index = ForgottenIndex([{"sha256": _digest("Coffee"), "length": len("coffee")},
-                            {"sha256": _digest("咖啡很好喝"), "length": len("咖啡很好喝")}])
+    index = ForgottenIndex([{"sha256": _digest("coffee maker"), "length": len("coffee maker")},
+                            {"sha256": _digest("咖啡很好喝呢真的"), "length": len("咖啡很好喝呢真的")}])
 
     assert not index.mentions("Buy a coffeemaker next week")
     assert index.mentions("Buy a coffee maker next week")
-    assert index.mentions("我觉得咖啡很好喝呢")
+    assert index.mentions("我觉得咖啡很好喝呢真的")
 
 
 @pytest.mark.parametrize("query", ["Atlas", "codename"])
@@ -996,7 +996,7 @@ def test_a_passage_over_the_scan_budget_fails_closed_and_a_long_english_passage_
 
 def test_records_written_before_fingerprints_still_match(home):
     memories = home / "memories"
-    record_forgotten(["Coffee", "咖啡很好喝"], source="memory", scope="entry", memories_dir=memories)
+    record_forgotten(["coffee maker", "咖啡很好喝呢真的"], source="memory", scope="entry", memories_dir=memories)
     path = forgotten_path(memories)
     data = json.loads(path.read_text(encoding="utf-8"))
     for row in data["forgotten"]:
@@ -1006,7 +1006,7 @@ def test_records_written_before_fingerprints_still_match(home):
 
     assert index.mentions("Buy a coffee maker next week")
     assert not index.mentions("Buy a coffeemaker next week")
-    assert index.mentions("我觉得咖啡很好喝呢")
+    assert index.mentions("我觉得咖啡很好喝呢真的")
 
 
 # ── review round 3: tool calls, profiles, topic names, the single-match rule, sweeps, echoes ──
@@ -1063,7 +1063,7 @@ def test_profile_results_are_filtered_with_that_profiles_own_forgotten_records(h
 
 
 def test_an_automatic_write_of_a_topic_name_that_repeats_forgotten_text_is_refused(home):
-    record_forgotten(["Coffee"], source="memory", scope="entry")
+    record_forgotten(["coffee notes"], source="memory", scope="entry")
 
     refused = upsert_topic_summary("coffee notes", "Trains are on time.", title="Trains")
 
@@ -1076,7 +1076,7 @@ def test_an_automatic_write_of_a_topic_name_that_repeats_forgotten_text_is_refus
 def test_a_proposal_naming_a_topic_with_forgotten_text_is_refused_before_anything_is_staged(store, home, monkeypatch):
     from tools import write_approval as wa
 
-    record_forgotten(["Coffee"], source="memory", scope="entry")
+    record_forgotten(["coffee notes"], source="memory", scope="entry")
     monkeypatch.setattr(wa, "evaluate_gate", lambda subsystem, **kwargs: wa.GateDecision(stage=True, message="staged"))
 
     # The title is "Trains", so the forgotten word appears only in the topic's name: the name rule alone refuses this.
@@ -1090,7 +1090,7 @@ def test_a_proposal_naming_a_topic_with_forgotten_text_is_refused_before_anythin
 
 def test_a_forget_naming_a_topic_with_forgotten_text_is_refused_and_the_topic_stays(store, home):
     upsert_topic_summary("coffee notes", "Trains are on time.", title="Trains")
-    record_forgotten(["Coffee"], source="memory", scope="entry")
+    record_forgotten(["coffee notes"], source="memory", scope="entry")
 
     result = _run(store, action="remove", target="topic", topic="coffee notes")
 
@@ -1354,3 +1354,105 @@ def test_a_phrase_based_replace_omits_a_title_that_equals_its_key(store, home):
 
     assert replaced["success"] is True
     assert "title" not in replaced and "coffee-notes" not in json.dumps(replaced)
+
+
+def test_a_short_forgotten_entry_does_not_block_an_automatic_add_of_a_sentence_containing_it(store, home):
+    record_forgotten(["Vegan"], source="memory", scope="entry")
+
+    added = _run(store, action="add", target="memory", content="I am vegan")
+
+    assert added["success"] is True
+
+
+def test_a_short_forgotten_entry_still_blocks_an_automatic_add_of_the_whole_entry(store, home):
+    record_forgotten(["Vegan"], source="memory", scope="entry")
+
+    refused = _run(store, action="add", target="memory", content="Vegan")
+
+    assert refused["success"] is False
+
+
+def test_a_short_forgotten_entry_does_not_block_recall_of_a_sentence_containing_it(home, tmp_path):
+    record_forgotten(["Vegan"], source="memory", scope="entry", memories_dir=home / "memories")
+    db = SessionDB(tmp_path / "state.db")
+    db.create_session("s_sentence", source="cli")
+    db.append_message("s_sentence", role="user", content="I am vegan and I cook at home.")
+    db.create_session("s_entry", source="cli")
+    db.append_message("s_entry", role="user", content="Vegan")
+
+    recalled = json.loads(session_search(query="vegan", db=db))
+
+    assert {r["session_id"] for r in recalled["results"]} == {"s_sentence"}
+
+
+def test_a_short_forgotten_word_does_not_block_a_topic_write_about_it(home):
+    record_forgotten(["Berlin"], source="memory", scope="entry")
+
+    written = upsert_topic_summary("trips", "Visited Berlin in 2019.", title="Trips")
+
+    assert written["success"] is True
+    assert get_topic_summary("trips") is not None
+
+
+def test_a_short_topic_name_is_not_tombstoned_so_it_can_be_written_again(store, home):
+    upsert_topic_summary("berlin", "Visited Berlin in 2019.", title="Berlin")
+    _run(store, action="remove", target="topic", topic="Berlin")
+
+    written = upsert_topic_summary("berlin", "Trains are on time.", title="Berlin")
+
+    assert written["success"] is True
+
+
+def test_a_forget_removes_pending_proposals_that_hold_the_forgotten_text(store, home):
+    from tools import write_approval as wa
+
+    store.add("memory", "Atlas budget is set for Q3")
+    wa.stage_write(wa.MEMORY, {"action": "add", "target": "memory", "content": "Atlas budget is set for Q3 and Q4",
+                               "old_text": None}, summary="add budget", origin="foreground")
+    assert wa.list_pending(wa.MEMORY)
+
+    result = _run(store, action="remove", target="memory", old_text="Atlas budget is set for Q3")
+
+    assert result["success"] is True
+    held = [path.read_text(encoding="utf-8") for path in (home / "pending" / "memory").glob("*.json")]
+    assert not any("Atlas budget is set for Q3" in text for text in held)
+
+
+def test_a_topic_remove_with_a_phrase_succeeds_without_a_built_in_store(home):
+    upsert_topic_summary("coffee-notes", "Trains are on time. Ship date is March.", title="Notes")
+
+    removed = json.loads(memory_tool(action="remove", target="topic", topic="coffee-notes",
+                                     old_text="Trains are on time", store=None))
+
+    assert removed["success"] is True
+    assert "Trains are on time" not in topic_memory_path().read_text(encoding="utf-8")
+
+
+def test_a_phrase_based_replace_refusal_does_not_echo_the_topic_key(home):
+    from tools.topic_memory_store import replace_topic_sentence
+
+    upsert_topic_summary("coffee-notes", "Coffee is in the drawer. Coffee is in the cup.", title="Notes")
+
+    refused = replace_topic_sentence("coffee-notes", "Coffee is in the", "Coffee is in the kitchen.")
+
+    assert refused["success"] is False
+    assert "coffee-notes" not in refused["error"]
+
+
+def test_a_phrase_that_names_a_topic_title_equal_to_its_key_does_not_echo_the_key(store, home):
+    upsert_topic_summary("coffee-notes", "Trains are on time.", title="coffee-notes")
+
+    refused = _run(store, action="replace", target="memory", old_text="coffee notes", content="Coffee notes are here")
+
+    assert refused["success"] is False
+    assert "coffee-notes" not in json.dumps(refused)
+
+
+def test_an_ambiguous_replace_lists_its_matches_without_a_topic_key(store, home):
+    store.add("memory", "Remember the coffee notes folder")
+    upsert_topic_summary("coffee-notes", "Trains are on time.", title="coffee-notes")
+
+    refused = _run(store, action="replace", target="memory", old_text="coffee notes", content="Coffee notes are here")
+
+    assert refused["success"] is False
+    assert "coffee-notes" not in json.dumps(refused)

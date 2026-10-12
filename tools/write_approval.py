@@ -130,6 +130,46 @@ def discard_pending(subsystem: str, pending_id: str) -> bool:
     return False
 
 
+def discard_forgotten_pending(memories_dir: Optional[Path] = None) -> int:
+    """Delete each pending memory proposal that holds forgotten text, so a forget leaves none of it on disk. A proposal is
+    checked as the strings it holds (its payload and summary); a file that cannot be parsed is checked as its raw text.
+    Returns how many were deleted. A file that cannot be read or removed is logged, and the others are still checked."""
+    from tools.memory_tombstones import forgotten_index  # lazy: memory_tombstones calls this after it records a forget
+
+    try:
+        index = forgotten_index(memories_dir, strict=True)
+    except (OSError, RuntimeError) as exc:
+        logger.error("Could not check pending memory proposals for forgotten text: %s", exc)
+        return 0
+    if not index:
+        return 0
+    removed = 0
+    for path in _pending_files(MEMORY):
+        try:
+            raw = path.read_text(encoding="utf-8", errors="replace")
+            try:
+                text = "\n".join(_strings(json.loads(raw)))
+            except ValueError:
+                text = raw
+            if index.mentions(text):
+                path.unlink()
+                removed += 1
+        except OSError as exc:
+            logger.error("Could not check or remove pending memory proposal %s: %s", path.name, exc)
+    return removed
+
+
+def _strings(value: Any) -> List[str]:
+    """Every string a parsed pending record holds, at any depth."""
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        return [text for item in value.values() for text in _strings(item)]
+    if isinstance(value, list):
+        return [text for item in value for text in _strings(item)]
+    return []
+
+
 def pending_count(subsystem: str) -> int:
     """Cheap count of pending records (for notification badges)."""
     d = _pending_path(subsystem, "").parent

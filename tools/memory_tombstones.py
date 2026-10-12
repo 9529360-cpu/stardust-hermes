@@ -43,6 +43,8 @@ logger = logging.getLogger(__name__)
 FORGOTTEN_FILENAME = "forgotten.json"
 MIN_PHRASE_CHARS = 4  # recall and re-add checks; phrases shorter than this are recorded but never matched
 MIN_NAME_CHARS = 8  # a topic name, title or key shorter than this is not recorded, so it cannot block ordinary words
+MIN_SUBSTRING_CHARS = 8  # a recorded text shorter than this matches only a whole entry, never a word inside a sentence
+_ENTRY_BOUNDARY = re.compile(r"[\n\x00]")  # what separates the entries of a passage: a line, or a NUL-separated field
 SCOPES = ("entry", "sentence", "keyword", "topic")
 REFUSAL_TEXT = (
     "The text repeats something the owner forgot. Automatic writes cannot put it back; "
@@ -247,6 +249,14 @@ def record_forgotten(texts: Iterable[str], *, source: str, scope: str, topic_key
             added += 1
         if added:
             _write(path, records)
+    _discard_forgotten_proposals(memories_dir)
+
+
+def _discard_forgotten_proposals(memories_dir: Optional[Path]) -> None:
+    """A forget also removes the pending memory proposals that hold the forgotten text, so none of it stays on disk."""
+    from tools import write_approval  # lazy: write_approval imports this module to stage a proposal
+
+    write_approval.discard_forgotten_pending(memories_dir)
 
 
 def _fingerprint(folded: str) -> int:
@@ -322,15 +332,19 @@ class ForgottenIndex:
     def __init__(self, records: List[Dict[str, Any]]) -> None:
         self._fp_tables: Dict[int, Dict[int, Set[bytes]]] = {}  # length -> fingerprint -> digests
         self._digest_only: Dict[int, Set[bytes]] = {}  # length -> digests of records without a fingerprint
+        self._whole_entries: Set[str] = set()  # sha256 (hex) of short texts: each matches only a whole entry
         self._topic_blocks: Set[str] = set()
         entries: List[Tuple[str, int, int]] = []
         for record in records:
             if record["length"] >= MIN_PHRASE_CHARS:
-                digest = bytes.fromhex(record["sha256"])
-                if "fp" in record:
-                    self._fp_tables.setdefault(record["length"], {}).setdefault(record["fp"], set()).add(digest)
+                if record["length"] < MIN_SUBSTRING_CHARS:
+                    self._whole_entries.add(record["sha256"])
                 else:
-                    self._digest_only.setdefault(record["length"], set()).add(digest)
+                    digest = bytes.fromhex(record["sha256"])
+                    if "fp" in record:
+                        self._fp_tables.setdefault(record["length"], {}).setdefault(record["fp"], set()).add(digest)
+                    else:
+                        self._digest_only.setdefault(record["length"], set()).add(digest)
                 entries.append((record["sha256"], record["length"], record.get("fp", -1)))
             if record.get("scope") == "topic" and record.get("topic_sha256"):
                 self._topic_blocks.add(record["topic_sha256"])
@@ -338,7 +352,7 @@ class ForgottenIndex:
             json.dumps([sorted(entries), sorted(self._topic_blocks)]).encode("utf-8")).hexdigest()
 
     def __bool__(self) -> bool:
-        return bool(self._fp_tables) or bool(self._digest_only) or bool(self._topic_blocks)
+        return bool(self._fp_tables) or bool(self._digest_only) or bool(self._whole_entries) or bool(self._topic_blocks)
 
     def blocks_topic(self, key: Any) -> bool:
         """Whether a whole-topic record matches this topic key (compared by hash)."""
@@ -383,9 +397,18 @@ class ForgottenIndex:
                             return found
         return found
 
+    def _whole_entry_in(self, text: Any) -> bool:
+        """Whether one whole entry of *text* is exactly a short recorded text. The entries are the lines and the NUL-separated
+        fields of the text, so a short text never matches a word inside a sentence."""
+        if not self._whole_entries:
+            return False
+        return any(_sha(fold_text(entry)) in self._whole_entries for entry in _ENTRY_BOUNDARY.split(str(text or "")))
+
     def mentions(self, text: Any) -> bool:
-        """Whether *text* contains a recorded text at the boundaries described above. A passage too large to check
-        counts as mentioning one."""
+        """Whether *text* contains a recorded text at the boundaries described above, or has a whole entry that is exactly a
+        short recorded text. A passage too large to check counts as mentioning one."""
+        if self._whole_entry_in(text):
+            return True
         if not (self._fp_tables or self._digest_only):
             return False
         folded = fold_text(text)

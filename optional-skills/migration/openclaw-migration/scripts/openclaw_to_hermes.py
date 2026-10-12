@@ -337,6 +337,16 @@ def ensure_parent(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
 
 
+def write_canonical_memory(path: Path, entries: Sequence[str]) -> None:
+    """Write a memory file as MemoryStore and agent import write it: entries joined by ENTRY_DELIMITER, with no trailing
+    newline. A trailing newline is drift to the store, which then refuses owner deletes. The bytes go to a temporary file
+    that replaces the target, so a crash never leaves a half-written file. Callers hold memory_file_lock(path)."""
+    ensure_parent(path)
+    temp = path.with_name(path.name + ".migrating")
+    temp.write_bytes(ENTRY_DELIMITER.join(entries).encode("utf-8"))
+    os.replace(temp, path)
+
+
 def resolve_secret_input(value: Any, env: Optional[Dict[str, str]] = None) -> Optional[str]:
     """Resolve an OpenClaw SecretInput value to a plain string.
 
@@ -694,6 +704,8 @@ def merge_entries(
 
 FORGOTTEN_FILENAME = "forgotten.json"
 FORGOTTEN_MIN_PHRASE_CHARS = 4  # tools.memory_tombstones.MIN_PHRASE_CHARS
+FORGOTTEN_MIN_SUBSTRING_CHARS = 8  # tools.memory_tombstones.MIN_SUBSTRING_CHARS
+_FORGOTTEN_ENTRY_BOUNDARY = re.compile(r"[\n\x00]")  # tools.memory_tombstones._ENTRY_BOUNDARY
 _FORGOTTEN_DIGEST = re.compile(r"[0-9a-f]{64}")
 
 
@@ -789,11 +801,21 @@ class ForgottenIndex:
     candidate window. The candidates follow the word-boundary rule. A passage over FORGOTTEN_MATCH_BUDGET counts as
     mentioning a forgotten text (fail closed)."""
 
-    def __init__(self, fp_tables: Dict[int, Dict[int, set]], digest_only: Dict[int, set]) -> None:
+    def __init__(self, fp_tables: Dict[int, Dict[int, set]], digest_only: Dict[int, set], whole_entries: set) -> None:
         self._fp_tables = fp_tables
         self._digest_only = digest_only
+        self._whole_entries = whole_entries  # digests of short texts: each matches only a whole entry
+
+    def _whole_entry_in(self, text: Any) -> bool:
+        """Whether one whole entry of *text* is exactly a short recorded text (tools.memory_tombstones._whole_entry_in)."""
+        if not self._whole_entries:
+            return False
+        return any(_forgotten_digest(fold_forgotten_text(entry)) in self._whole_entries
+                   for entry in _FORGOTTEN_ENTRY_BOUNDARY.split(str(text or "")))
 
     def mentions(self, text: Any) -> bool:
+        if self._whole_entry_in(text):
+            return True
         folded = fold_forgotten_text(text)
         size = len(folded)
         lengths = sorted(length for length in set(self._fp_tables) | set(self._digest_only) if length <= size)
@@ -831,7 +853,7 @@ def load_forgotten_index(memories_dir: Path) -> ForgottenIndex:
     try:
         raw = path.read_bytes()
     except FileNotFoundError:
-        return ForgottenIndex({}, {})
+        return ForgottenIndex({}, {}, set())
     except OSError as exc:
         raise ForgottenUnreadable(f"{FORGOTTEN_FILENAME} cannot be read ({exc.strerror or type(exc).__name__})") from None
     try:
@@ -843,16 +865,19 @@ def load_forgotten_index(memories_dir: Path) -> ForgottenIndex:
         raise ForgottenUnreadable(f"{FORGOTTEN_FILENAME} has an invalid forgotten payload")
     fp_tables: Dict[int, Dict[int, set]] = {}
     digest_only: Dict[int, set] = {}
+    whole_entries: set = set()
     for row in rows:
         digest, length, fp = _forgotten_row(row)
         if digest is None:
             raise ForgottenUnreadable(f"{FORGOTTEN_FILENAME} has a record that cannot be read")
         if length >= FORGOTTEN_MIN_PHRASE_CHARS:
-            if fp is None:
+            if length < FORGOTTEN_MIN_SUBSTRING_CHARS:
+                whole_entries.add(digest)
+            elif fp is None:
                 digest_only.setdefault(length, set()).add(digest)
             else:
                 fp_tables.setdefault(length, {}).setdefault(fp, set()).add(digest)
-    return ForgottenIndex(fp_tables, digest_only)
+    return ForgottenIndex(fp_tables, digest_only, whole_entries)
 
 
 @contextmanager
@@ -1553,7 +1578,7 @@ class Migrator:
                 return
             backup_path = self.maybe_backup(destination)
             ensure_parent(destination)
-            destination.write_text(ENTRY_DELIMITER.join(merged) + ("\n" if merged else ""), encoding="utf-8")
+            write_canonical_memory(destination, merged)
             self.record(
                 kind,
                 source,

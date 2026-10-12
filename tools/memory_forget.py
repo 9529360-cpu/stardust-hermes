@@ -71,16 +71,23 @@ def _enabled_labels(store) -> List[str]:
     return built_in + ["topic"]
 
 
-def _sweep_labels() -> List[str]:
+def _sweep_labels(store) -> List[str]:
     """Every store a forget sweeps. A disabled built-in store is swept too: its file can still hold the forgotten text,
-    and removing text from a file writes nothing new."""
-    return ["memory", "user", "topic"]
+    and removing text from a file writes nothing new. Without a built-in store (store is None) only topic summaries are
+    swept, so a topic-target forget succeeds there as it does on its own."""
+    return (["memory", "user"] if store is not None else []) + ["topic"]
 
 
 def _echo(units: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Units as a response may show them. A topic's key is left out: a name can repeat forgotten text, and a response is
-    kept in the transcript."""
-    return [{key: value for key, value in unit.items() if key != "topic"} for unit in units]
+    """Units as a response may show them. A topic's key is left out, and so is a preview that is the key itself (a title
+    equal to its key): a name can repeat forgotten text, and a response is kept in the transcript."""
+    shown = []
+    for unit in units:
+        clean = {field: value for field, value in unit.items() if field != "topic"}
+        if unit.get("topic") and topic_candidate(clean.get("preview", ""), "")[0] == unit["topic"]:
+            clean["preview"] = "the topic's title"
+        shown.append(clean)
+    return shown
 
 
 def _memories_dir(store) -> Optional[Path]:
@@ -91,7 +98,7 @@ def _scan(store, needle: str, *, sweep: bool = False) -> Tuple[_Scan, Optional[D
     """Every current match of the folded *needle*, per store: every store when *sweep* (a forget), else the enabled ones.
     Returns an error when a store cannot be read."""
     per_store: _Scan = {}
-    for label in _sweep_labels() if sweep else _enabled_labels(store):
+    for label in _sweep_labels(store) if sweep else _enabled_labels(store):
         if label == "topic":
             try:
                 rows = load_topics(strict=True)
@@ -172,7 +179,7 @@ def _apply_unique(store, needle: str, per_store: _Scan) -> Tuple[List[str], List
     """Remove the single match in each store that holds one. The caller has checked that no store holds more."""
     changed: List[str] = []
     removed: List[Dict[str, Any]] = []
-    for label in _sweep_labels():
+    for label in _sweep_labels(store):
         if not per_store.get(label):
             continue
         if label == "topic":
@@ -361,8 +368,8 @@ def _replace_everywhere(store, target: str, needle: str, new_content: Optional[s
     hit = hits[0]
     if hit["store"] == "topic":
         if hit["what"] != "sentence":
-            return _error(f"'{needle}' is in the title, name or keywords of topic '{hit['preview']}', not in a summary "
-                          "sentence. Rewrite that topic with target='topic' and topic=<its key> instead.")
+            return _error(f"'{needle}' is in the title, name or keywords of a topic, not in a summary sentence. Rewrite "
+                          "that topic with target='topic' and its name instead.")
         result = replace_topic_sentence(hit["topic"], needle, content, owner_initiated=owner_initiated)
         if not result.get("success"):
             return result

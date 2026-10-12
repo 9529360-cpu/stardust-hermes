@@ -816,6 +816,7 @@ def test_the_openclaw_migrator_index_matches_the_shared_index(tmp_path: Path):
     record_forgotten(["The owner drinks green tea"], source="memory", scope="entry", memories_dir=memories)
     record_forgotten(["Ship date is March."], source="topic", scope="topic", topic_key="shipping", memories_dir=memories)
     record_forgotten(["tea"], source="memory", scope="entry", memories_dir=memories)  # too short to be used
+    record_forgotten(["Vegan"], source="memory", scope="entry", memories_dir=memories)  # a short text matches only whole
     path = memories / "forgotten.json"
     data = json.loads(path.read_text(encoding="utf-8"))
     data["forgotten"].append({"text": "Visited Berlin in 2019", "source": "memory", "scope": "entry",
@@ -830,12 +831,34 @@ def test_the_openclaw_migrator_index_matches_the_shared_index(tmp_path: Path):
         "The owner drinks ＧＲＥＥＮ　ＴＥＡ today",
         "Ship date is March. Confirmed.",
         "tea time",
+        "I am vegan today",
+        "Vegan",
+        "Dinner plans\nVegan",
         "We visited Berlin in 2019 together",
         "Nothing forgotten here",
     ]
     expected = {probe: shared.mentions(probe) for probe in probes}
     assert any(expected.values()) and not all(expected.values())
     assert {probe: migrated.mentions(probe) for probe in probes} == expected
+
+
+def test_a_migrated_entry_can_be_deleted_from_the_memory_page(tmp_path: Path, monkeypatch):
+    from tools.memory_tool import MemoryStore
+
+    mod = load_module()
+    source, target = tmp_path / ".openclaw", tmp_path / ".stardust"
+    (source / "workspace").mkdir(parents=True)
+    (source / "workspace" / "MEMORY.md").write_text(
+        "- Prefers tea in the morning, always\n- Works on the migration project\n", encoding="utf-8")
+
+    _migrator(mod, source, target, "memory").migrate()
+
+    written = (target / "memories" / "MEMORY.md").read_bytes()
+    assert not written.endswith(b"\n")  # the canonical bytes MemoryStore writes: entries joined, no trailing newline
+    monkeypatch.setenv("STARDUST_HOME", str(target))
+    store = MemoryStore(memory_char_limit=2200, user_char_limit=1375)
+    store.load_from_disk()
+    assert store.remove_exact("memory", "Works on the migration project")["success"] is True
 
 
 def test_forgotten_text_stays_out_of_the_overflow_file_and_the_report(tmp_path: Path):
@@ -909,7 +932,7 @@ def test_forgotten_matching_agrees_with_the_hermes_reader(tmp_path: Path):
     mod = load_module()
     memories = tmp_path / "memories"
     memories.mkdir()
-    hermes.record_forgotten(["Prefers tea in the morning, always", "Ｃａｆé　ａｔ　ｎｏｏｎ", "Coffee", "咖啡很好喝"],
+    hermes.record_forgotten(["Prefers tea in the morning, always", "Ｃａｆé　ａｔ　ｎｏｏｎ", "coffee maker", "咖啡很好喝呢真的"],
                             source="memory", scope="entry", memories_dir=memories)
     path = memories / "forgotten.json"
     data = json.loads(path.read_text(encoding="utf-8"))
@@ -927,9 +950,9 @@ def test_forgotten_matching_agrees_with_the_hermes_reader(tmp_path: Path):
         "The café at noon": True,
         "legacy PLAINTEXT note here, ok": True,
         "unrelated text": False,
-        "Buy a coffeemaker next week": False,  # "Coffee" is a whole word only
+        "Buy a coffeemaker next week": False,  # "coffee maker" is a phrase: a word may not run into another
         "Buy a coffee maker next week": True,
-        "我觉得咖啡很好喝呢": True,  # CJK has no spaces, so it matches inside a run
+        "我觉得咖啡很好喝呢真的": True,  # CJK has no spaces, so it matches inside a run
     }
     for passage, expected in passages.items():
         assert theirs.mentions(passage) is expected, passage
