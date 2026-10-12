@@ -409,6 +409,16 @@ class TestCatalog:
         assert store.dismiss_suggestion(seeded[0]["id"]) is True
         assert seed_catalog_suggestions(add_fn=store.add_suggestion, keys=[key]) == []
 
+    def test_important_mail_starter_keeps_the_never_newsletters_promise(self, store):
+        """The monitor tells the owner it never surfaces newsletters. The description and the scoring
+        prompt must both keep that exclusion, or the promise lapses without anyone noticing."""
+        from cron.suggestion_catalog import seed_catalog_suggestions
+
+        seeded = seed_catalog_suggestions(add_fn=store.add_suggestion, keys=["catalog:important-mail-monitor"])
+        assert len(seeded) == 1
+        assert "never the newsletters" in seeded[0]["description"]
+        assert "never the newsletters" in seeded[0]["job_spec"]["prompt"]
+
     def test_starter_declares_no_content_fields_of_its_own(self):
         import dataclasses
 

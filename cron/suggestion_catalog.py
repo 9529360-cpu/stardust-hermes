@@ -45,6 +45,9 @@ class CatalogEntry:
     schedule: Optional[str] = None
     # Override: the one instruction the blueprint prompt does not give, appended after its prompt.
     prompt_suffix: str = ""
+    # Override: the description the blueprint does not give. The monitor's promise (never the
+    # newsletters) lives here, so the suggestion record and the integration suggestion both carry it.
+    description_override: str = ""
 
     @property
     def title(self) -> str:
@@ -52,7 +55,7 @@ class CatalogEntry:
 
     @property
     def description(self) -> str:
-        return _blueprint_of(self).description
+        return self.description_override or _blueprint_of(self).description
 
     @property
     def job_spec(self) -> Dict[str, Any]:
@@ -88,7 +91,12 @@ CATALOG: List[CatalogEntry] = [
         key="catalog:important-mail-monitor",
         blueprint="important-mail",
         schedule="every 30m",
+        description_override=(
+            "Check your inbox periodically and ping you ONLY about mail that actually needs attention "
+            "— never the newsletters."
+        ),
         prompt_suffix=(
+            "Candidates are mail that actually needs attention — never the newsletters. "
             "For the scoring step, run `python3 -m cron.scripts.classify_items --threshold 7 "
             "--criteria ...` from the Stardust install (resolve the script path at run time; do not "
             "assume a fixed location) and deliver ONLY what it returns."
