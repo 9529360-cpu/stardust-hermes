@@ -12,7 +12,7 @@ from pathlib import Path
 
 PROVIDER = "gpt-official"
 LABEL = "GPT官方"
-DEFAULT_MODEL = "gpt-5.6-luna"
+DEFAULT_MODEL = "gpt-6-luna"
 
 
 def _access_fields(obj: dict) -> dict:
@@ -53,33 +53,57 @@ def request_headers(creds: dict[str, str]) -> dict[str, str]:
     return headers
 
 
-def model_ids() -> list[str]:
-    """Authoritative account catalog only. No synthetic models, disk cache or fallback."""
+def model_catalog() -> dict:
+    """Read the original client's catalog, not the legacy 0.0.0 live directory.
+
+    Desktop visibility is not public-API support or proof of entitlement. The
+    opaque cache identity has no documented account mapping; never claim binding.
+    """
+    from datetime import datetime, timezone
     from hermes_cli.auth import AuthError
-    from agent.model_metadata import CODEX_MODELS_CATALOG_URL
-    import httpx
-    creds = read_credentials()
+    read_credentials()
+    home = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex").expanduser()
     try:
-        with _http_client() as client:
-            response = client.get(CODEX_MODELS_CATALOG_URL, headers={
-                **request_headers(creds), "Authorization": "Bearer " + creds["access_token"]})
-        if response.status_code in {401, 403}:
-            raise AuthError("GPT官方需在原 ChatGPT/Codex 客户端重新登录或确认账户权限；星尘不会刷新凭据。")
-        if response.status_code != 200:
-            raise AuthError("GPT官方账户模型目录暂不可用；未切换到其他模型或服务。")
-        data = response.json()
-        rows = data["models"]
-        if not isinstance(rows, list):
+        data = json.loads((home / "models_cache.json").read_text(encoding="utf-8"))
+        if not isinstance(data, dict) or not isinstance(data.get("models"), list):
             raise ValueError()
-        models = list(dict.fromkeys(row["slug"] for row in rows
-            if isinstance(row, dict) and isinstance(row.get("slug"), str) and row["slug"]
-            and row.get("visibility", "list") == "list" and row.get("supported_in_api", True)))
+        fetched_at = data["fetched_at"]
+        version = data["client_version"]
+        if not isinstance(fetched_at, str) or not isinstance(version, str) or not version:
+            raise ValueError()
+        fetched = datetime.fromisoformat(fetched_at.replace("Z", "+00:00"))
+        if fetched.tzinfo is None or fetched.timestamp() > time.time() + 300:
+            raise ValueError()
+        names = {}
+        for row in data["models"]:
+            if not isinstance(row, dict) or not isinstance(row.get("slug"), str) or not row["slug"].strip():
+                raise ValueError()
+            if row.get("visibility") not in {"list", "hide", "hidden"}:
+                raise ValueError()
+            if row["visibility"] != "list":
+                continue
+            name = row.get("display_name", row["slug"])
+            if not isinstance(name, str) or not name:
+                raise ValueError()
+            names.setdefault(row["slug"], name)
+        if not names:
+            raise ValueError()
+        models = list(names)
         if DEFAULT_MODEL in models:
             models.remove(DEFAULT_MODEL)
             models.insert(0, DEFAULT_MODEL)
-        return models
-    except (httpx.HTTPError, ValueError, KeyError, TypeError):
-        raise AuthError("GPT官方账户模型目录读取失败；未切换到其他模型或服务。") from None
+        age = (datetime.now(timezone.utc) - fetched).total_seconds()
+        return {"models": models, "model_names": names,
+                "source": "codex-models-cache-readonly", "fetched_at": fetched_at,
+                "client_version": version, "account_binding": "unverified",
+                "catalog_stale": age > 86400}
+    except (OSError, ValueError, KeyError, TypeError, OverflowError):
+        raise AuthError("GPT官方本地官方模型目录缺失或无效，请在原 ChatGPT/Codex 客户端更新目录；未使用静态列表或其他服务。") from None
+
+
+def model_ids() -> list[str]:
+    return model_catalog()["models"]
+
 
 
 def bind_readonly_client(client):

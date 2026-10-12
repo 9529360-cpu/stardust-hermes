@@ -750,28 +750,29 @@ class _PickerBuild:
 
 
 def _lap_gpt_official_row(b: _PickerBuild) -> None:
-    """Read-only external account row, uncapped and independent of SIWC/pools."""
-    from hermes_cli.gpt_official import PROVIDER, LABEL, model_ids
+    """Uncapped original-client catalog, independent of SIWC/pools."""
+    from hermes_cli.gpt_official import PROVIDER, LABEL, model_catalog
     from hermes_cli.auth import AuthError
     if _skip(b.seen_slugs, b.excluded, PROVIDER):
         return
-    # Reserve the identity so generic OAuth/pool discovery never imports credentials.
     b.seen_slugs.add(PROVIDER)
     try:
-        models = model_ids()
+        catalog = model_catalog()
     except AuthError as exc:
-        if b.current_provider != PROVIDER:
-            return
-        models = []
+        catalog = {"models": [], "source": "codex-models-cache-readonly"}
         error = str(exc)
     else:
         error = ""
-    b.results.append({"slug": PROVIDER, "name": LABEL,
+    models = catalog["models"]
+    provenance = (f"本地官方 models_cache.json · 更新时间 {catalog.get('fetched_at', '')} · "
+                  f"原客户端 {catalog.get('client_version', '')}。账户绑定未验证；候选模型权限以真实请求为准。")
+    if catalog.get("catalog_stale"):
+        provenance += "目录超过24小时，请在原客户端更新。"
+    b.results.append({**catalog, "slug": PROVIDER, "name": LABEL,
         "is_current": b.current_provider == PROVIDER, "is_user_defined": False,
-        "models": models, "total_models": len(models), "source": "external-access-readonly",
-        "auth_type": "external_access_readonly", "auth_error": error,
-        "warning": error or "账户 Codex API 模型目录，不等同 ChatGPT 网页全部模型；仅展示服务端 list 且 API 可用的常规模型。Luna 为旧代快速高效模型，并非最新型号。隐藏的 Reserve、Legacy、Auto Review 不作为普通聊天选项。",
-        "authenticated": not bool(error)})
+        "total_models": len(models), "auth_type": "external_access_readonly",
+        "auth_error": error, "warning": error or provenance, "authenticated": not bool(error)})
+
 
 
 def _lap_builtin_rows(b: _PickerBuild, data: dict, user_providers: dict) -> None:

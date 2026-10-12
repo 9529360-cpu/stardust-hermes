@@ -48,32 +48,29 @@ def test_external_access_is_readonly_and_reread(tmp_path, monkeypatch):
     assert path.read_bytes() == before
 
 
-def test_catalog_only_live_models_luna_first_and_safe_errors(tmp_path, monkeypatch):
-    import httpx
+def test_catalog_local_official_visible_models_and_provenance(tmp_path, monkeypatch):
     path = auth_file(tmp_path, monkeypatch)
     before = path.read_bytes()
     mod = module()
-    requests = []
-    def handle(request):
-        requests.append(request)
-        assert request.method == "GET"
-        assert request.headers["originator"] == "hermes-agent"
-        assert request.headers["User-Agent"].startswith("HermesAgent/")
-        assert request.headers["ChatGPT-Account-ID"] == "account-fixture"
-        return httpx.Response(200, json={"models": [{"slug": "gpt-6-astra"},
-            {"slug": "gpt-5.6-luna"}, {"slug": "account-only-hidden", "visibility": "hide"},
-            {"slug": "gpt-6-astra"}]})
-    transport = httpx.MockTransport(handle)
-    monkeypatch.setattr(mod, "_http_client", lambda: httpx.Client(transport=transport))
-    assert mod.model_ids() == ["gpt-5.6-luna", "gpt-6-astra"]
-    assert len(requests) == 1
+    slugs = ["gpt-6.1-sol", "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
+             "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"]
+    cache = {"fetched_at": "2026-10-12T06:21:55.249793500Z", "client_version": "0.162.0",
+             "identity": "opaque-client-identity", "models": [
+                 {"slug": slug, "display_name": slug.upper(), "visibility": "list",
+                  "supported_in_api": False} for slug in slugs] + [
+                 {"slug": "hidden", "visibility": "hide"}]}
+    (path.parent / "models_cache.json").write_text(json.dumps(cache))
+    monkeypatch.setattr(mod, "_http_client", lambda: pytest.fail("legacy live URL must not mask official cache"))
+    assert mod.model_ids() == ["gpt-6-luna"] + [s for s in slugs if s != "gpt-6-luna"]
+    catalog = mod.model_catalog()
+    assert catalog["source"] == "codex-models-cache-readonly"
+    assert catalog["fetched_at"] == cache["fetched_at"]
+    assert catalog["client_version"] == cache["client_version"]
+    assert catalog["model_names"]["gpt-6-luna"] == "GPT-6-LUNA"
+    assert catalog["account_binding"] == "unverified"
     assert path.read_bytes() == before
-    monkeypatch.setattr(mod, "_http_client", lambda: httpx.Client(transport=httpx.MockTransport(
-        lambda r: httpx.Response(401, text="DO_NOT_IMPORT_REFRESH"))))
-    from hermes_cli.auth import AuthError
-    with pytest.raises(AuthError) as caught:
-        mod.model_ids()
-    assert "原" in str(caught.value) and "DO_NOT_IMPORT" not in str(caught.value)
+    assert json.loads((path.parent / "models_cache.json").read_text()) == cache
+
 
 
 def test_expired_access_never_refreshes_or_leaks(tmp_path, monkeypatch):
@@ -89,7 +86,7 @@ def test_expired_access_never_refreshes_or_leaks(tmp_path, monkeypatch):
 def test_picker_and_runtime_are_separate_from_siwc_and_keep_all_models(tmp_path, monkeypatch):
     auth_file(tmp_path, monkeypatch)
     mod = module()
-    monkeypatch.setattr(mod, "model_ids", lambda: ["gpt-5.6-luna", "gpt-6-astra", "account-only"])
+    monkeypatch.setattr(mod, "model_catalog", lambda: {"models": ["gpt-6-luna", "gpt-6-astra", "account-only"], "model_names": {}, "source": "codex-models-cache-readonly", "fetched_at": "fixture", "client_version": "fixture", "account_binding": "unverified"})
     import agent.models_dev as md
     monkeypatch.setattr(md, "fetch_models_dev", lambda **kw: {})
     from hermes_cli.inventory import ConfigContext, build_models_payload
@@ -102,10 +99,10 @@ def test_picker_and_runtime_are_separate_from_siwc_and_keep_all_models(tmp_path,
     official = [r for r in result["providers"] if r["slug"] == "gpt-official"]
     assert len(official) == 1
     assert official[0]["name"] == "GPT官方"
-    assert official[0]["models"] == ["gpt-5.6-luna", "gpt-6-astra", "account-only"]
+    assert official[0]["models"] == ["gpt-6-luna", "gpt-6-astra", "account-only"]
     assert official[0]["total_models"] == 3
     from hermes_cli.runtime_provider import resolve_runtime_provider
-    rt = resolve_runtime_provider(requested="gpt-official", target_model="gpt-5.6-luna")
+    rt = resolve_runtime_provider(requested="gpt-official", target_model="gpt-6-luna")
     assert rt["provider"] == "gpt-official"
     assert rt["api_mode"] == "codex_responses"
     assert rt["base_url"] == "https://chatgpt.com/backend-api/codex"
@@ -113,7 +110,7 @@ def test_picker_and_runtime_are_separate_from_siwc_and_keep_all_models(tmp_path,
     assert not rt.get("credential_pool")
     assert "refresh_token" not in rt
     from hermes_cli.models import get_default_model_for_provider, provider_model_ids
-    assert get_default_model_for_provider("gpt-official") == "gpt-5.6-luna"
+    assert get_default_model_for_provider("gpt-official") == "gpt-6-luna"
     assert provider_model_ids("gpt-official") == official[0]["models"]
     from hermes_cli.providers import get_label, get_provider
     assert get_label("gpt-official") == "GPT官方"
@@ -121,11 +118,11 @@ def test_picker_and_runtime_are_separate_from_siwc_and_keep_all_models(tmp_path,
     from hermes_cli.auth import resolve_provider
     assert resolve_provider("gpt-official") == "gpt-official"
     from agent.auxiliary_client import resolve_provider_client
-    client, model = resolve_provider_client("gpt-official", model="gpt-5.6-luna", raw_codex=True)
-    assert client is not None and model == "gpt-5.6-luna"
+    client, model = resolve_provider_client("gpt-official", model="gpt-6-luna", raw_codex=True)
+    assert client is not None and model == "gpt-6-luna"
     client.close()
     client, model = resolve_provider_client("gpt-official", raw_codex=True)
-    assert model == "gpt-5.6-luna"
+    assert model == "gpt-6-luna"
     client.close()
 
 
@@ -133,12 +130,12 @@ def test_switch_manual_models_persists_without_credentials(tmp_path, monkeypatch
     import yaml
     auth_file(tmp_path, monkeypatch)
     mod = module()
-    monkeypatch.setattr(mod, "model_ids", lambda: ["gpt-5.6-luna", "gpt-5.6-sol", "account-only"])
+    monkeypatch.setattr(mod, "model_ids", lambda: ["gpt-6-luna", "gpt-5.6-sol", "account-only"])
     from hermes_cli.models_validate import validate_requested_model
     assert validate_requested_model("account-only", "gpt-official")["recognized"]
     assert not validate_requested_model("gpt-6-astra", "gpt-official")["accepted"]
     from hermes_cli.model_switch import switch_model, persist_model_selection
-    for model in ["gpt-5.6-sol", "gpt-5.6-luna", "account-only"]:
+    for model in ["gpt-5.6-sol", "gpt-6-luna", "account-only"]:
         result = switch_model(model, current_provider="custom", current_model="old",
                               explicit_provider="gpt-official", is_global=True)
         assert result.success, result
@@ -175,13 +172,13 @@ def test_runtime_fails_closed_no_override_no_fallback(tmp_path, monkeypatch):
 def test_transport_tools_are_codex_compatible_and_identity_is_honest():
     from agent.transports.codex import ResponsesApiTransport
     transport = ResponsesApiTransport()
-    kwargs = transport.build_kwargs("gpt-5.6-luna", [{"role": "user", "content": "hi"}],
+    kwargs = transport.build_kwargs("gpt-6-luna", [{"role": "user", "content": "hi"}],
         tools=[{"type": "function", "function": {"name": "read_file", "description": "read",
                "parameters": {"type": "object", "properties": {"path": {"type": "string"}}}}}],
         instructions="Stardust", provider="gpt-official",
         base_url="https://chatgpt.com/backend-api/codex", is_codex_backend=True)
     kwargs = transport.preflight_kwargs(kwargs, allow_stream=True, sanitize_harmony_tokens=True)
-    assert kwargs["model"] == "gpt-5.6-luna" and kwargs["store"] is False
+    assert kwargs["model"] == "gpt-6-luna" and kwargs["store"] is False
     assert kwargs["tools"][0]["name"] == "read_file"
     from agent.codex_responses_adapter import classify_responses_route
     from types import SimpleNamespace
@@ -255,3 +252,15 @@ def test_request_boundary_rereads_external_access_without_refresh(tmp_path, monk
 
 
 
+
+@pytest.mark.parametrize("payload", [None, {}, {"models": []},
+    {"models": "bad", "fetched_at": "bad", "client_version": "0.162.0"}])
+def test_catalog_failure_is_explicit_no_fallback(tmp_path, monkeypatch, payload):
+    path = auth_file(tmp_path, monkeypatch)
+    before = path.read_bytes()
+    if payload is not None:
+        (path.parent / "models_cache.json").write_text(json.dumps(payload))
+    from hermes_cli.auth import AuthError
+    with pytest.raises(AuthError, match="本地官方模型目录"):
+        module().model_ids()
+    assert path.read_bytes() == before

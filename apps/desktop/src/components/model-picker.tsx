@@ -270,7 +270,7 @@ function ModelResults({
       return [...models]
     }
 
-    return fuzzyRank(models, q, modelSearchText).map(r => r.item)
+    return fuzzyRank(models, q, model => `${modelSearchText(model)} ${catalogModelName(provider, model)}`).map(r => r.item)
   }
 
   // Only configured providers (those with curated models) are selectable
@@ -339,7 +339,7 @@ function ModelResults({
                   value={`${provider.slug}:${model}`}
                 >
                   <span className="min-w-0 flex-1 truncate">
-                    <HighlightMatches foldSeparators query={search} text={model} />
+                    <HighlightMatches foldSeparators query={search} text={catalogModelName(provider, model)} />
                   </span>
                   {loadProgress && (
                     <span className="flex shrink-0 items-center gap-1.5" title={copy.loadingIntoMemory}>
@@ -495,6 +495,15 @@ function LoadingResults() {
       ))}
     </CommandGroup>
   )
+}
+
+function catalogModelName(provider: ModelOptionProvider, model: string): string {
+  const names = provider.model_names
+  if (names && typeof names === 'object' && !Array.isArray(names)) {
+    const name = (names as Record<string, unknown>)[model]
+    if (typeof name === 'string' && name) return name
+  }
+  return model
 }
 
 function ProviderHeading({ provider }: { provider: ModelOptionProvider }) {
