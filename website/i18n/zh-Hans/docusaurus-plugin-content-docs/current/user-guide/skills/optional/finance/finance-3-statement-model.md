@@ -33,7 +33,7 @@ description: "在 Excel 中构建完整集成的三表模型（利润表、资�
 
 本 skill 假设使用**无界面 openpyxl** — 即在磁盘上生成 .xlsx 文件。
 遵循 `excel-author` skill 关于单元格着色、公式、命名区域和敏感性分析表的规范。
-交付前重新计算：`python /path/to/excel-author/scripts/recalc.py ./out/model.xlsx`。
+交付前重新计算：`python /path/to/xlsx/scripts/xlsx_recalc.py ./out/model.xlsx`，然后检查 JSON 输出是否为 `"recalculated": true`。
 
 # 三表财务模型模板填写
 
