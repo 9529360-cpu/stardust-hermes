@@ -12,6 +12,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { promisify } from 'node:util'
 
+import { resolveVenvDir } from './venv-layout'
+
 const execFileAsync = promisify(execFile)
 
 // ---------------------------------------------------------------------------
@@ -264,7 +266,7 @@ export function resolveVenvPython(updateRoot: string): string | null {
   const isWindows = process.platform === 'win32'
   const pythonName = isWindows ? 'python.exe' : 'python3'
   const scriptsDir = isWindows ? 'Scripts' : 'bin'
-  const candidate = path.join(updateRoot, 'venv', scriptsDir, pythonName)
+  const candidate = path.join(resolveVenvDir(updateRoot), scriptsDir, pythonName)
 
   try {
     fs.accessSync(candidate)

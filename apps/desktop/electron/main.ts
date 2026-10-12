@@ -412,6 +412,7 @@ import {
   stopSafeVenvBlockers
 } from './venv-blocker-scan'
 import { isHermesOwnedVenvDaemon } from './venv-holder-select'
+import { ensureVenvAlias, managedShimRefreshCommand, resolveVenvDir } from './venv-layout'
 import { fetchMarketplaceThemes, searchMarketplaceThemes } from './vscode-marketplace'
 import { createWakeIndicatorWindowController } from './wake-indicator-window'
 import { enumerateWindowsFrontToBack, enumerationFailed, readWindowBelow } from './window-below'
@@ -841,8 +842,9 @@ function pathWithHermesManagedNode(...entries) {
 // install.ps1 / install.sh use, so a desktop-only user and a CLI-only user end
 // up with identical layouts and can share one install.
 const ACTIVE_HERMES_ROOT = path.join(STARDUST_HOME, 'hermes-agent')
-// VENV_ROOT — venv lives inside the repo, exactly like install.ps1 does it.
-const VENV_ROOT = path.join(ACTIVE_HERMES_ROOT, 'venv')
+// VENV_ROOT — venv lives inside the repo, exactly like install.ps1 does it. `.venv` (uv's default name) is
+// used when that is the folder that holds the interpreter; see venv-layout.ts.
+const VENV_ROOT = resolveVenvDir(ACTIVE_HERMES_ROOT)
 // BOOTSTRAP_COMPLETE_MARKER — written by the first-launch bootstrap runner
 // (Phase 1D) after install.ps1 has completed all stages and the user has
 // finished initial configuration. Presence of this marker means the install
@@ -2587,6 +2589,38 @@ function isCommandScript(command) {
   return IS_WINDOWS && /\.(cmd|bat)$/i.test(command || '')
 }
 
+// Point the managed `stardust` / `hermes` shims at this install's venv before PATH resolution: a shim left
+// over from an older layout would be picked up and fail its probe. The Python writer
+// (hermes_cli/_install_repair.py) is the only shim writer; this only starts it. Best effort and bounded.
+// Packaged builds only: a development run (npm run dev) must never retarget the machine-wide `stardust`.
+function refreshManagedShimsAtBoot() {
+  if (!IS_PACKAGED) {
+    return
+  }
+
+  const refresh = managedShimRefreshCommand(resolveUpdateRoot())
+
+  if (!refresh) {
+    return
+  }
+
+  try {
+    execFileSync(
+      refresh.command,
+      refresh.args,
+      hiddenWindowsChildOptions({
+        cwd: refresh.cwd,
+        encoding: 'utf8',
+        env: { ...process.env, STARDUST_HOME },
+        stdio: ['ignore', 'ignore', 'pipe'],
+        timeout: 20_000
+      })
+    )
+  } catch (error) {
+    rememberLog(`[boot] managed shim refresh skipped: ${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
 async function unwrapWindowsVenvHermesCommand(command, backendArgs) {
   return resolveVenvHermesCommand(command, backendArgs, {
     isWindows: IS_WINDOWS,
@@ -3443,9 +3477,7 @@ function repairMacUpdaterHelper(updater) {
 // fresh entry points. On Windows this is the file the running backend
 // `stardust.exe` holds open; on POSIX it's never mandatory-locked.
 function venvHermesShimPath(updateRoot) {
-  return IS_WINDOWS
-    ? path.join(updateRoot, 'venv', 'Scripts', 'stardust.exe')
-    : path.join(updateRoot, 'venv', 'bin', 'stardust')
+  return path.join(resolveVenvDir(updateRoot), IS_WINDOWS ? 'Scripts' : 'bin', IS_WINDOWS ? 'stardust.exe' : 'stardust')
 }
 
 // Best-effort lock probe mirroring the Rust updater's is_locked(): a running
@@ -3491,7 +3523,7 @@ function killHermesOwnedVenvDaemons(updateRoot) {
     return
   }
 
-  const scriptsDir = path.join(updateRoot, 'venv', 'Scripts')
+  const scriptsDir = path.join(resolveVenvDir(updateRoot), 'Scripts')
 
   let holders = []
 
@@ -4064,7 +4096,9 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
       updaterArgs.push('--target-app', targetApp)
     }
 
-    const venvBin = path.join(updateRoot, 'venv', IS_WINDOWS ? 'Scripts' : 'bin')
+    // Expose a `.venv`-only install as `venv` before the prerequisite check and the hand-off. Idempotent.
+    rememberLog(`[updates] venv alias: ${ensureVenvAlias(updateRoot, { log: rememberLog })}`)
+    const venvBin = path.join(resolveVenvDir(updateRoot), IS_WINDOWS ? 'Scripts' : 'bin')
 
     // ── Pre-flight state.db integrity guard (#68474) ─────────────────
     // Emergency backup and header verification before the update touches
@@ -4356,7 +4390,8 @@ async function handOffWindowsBootstrapRecovery(reason) {
     ? await resolveHealedBranch(updateRoot, configuredBranch || DEFAULT_UPDATE_BRANCH)
     : configuredBranch || DEFAULT_UPDATE_BRANCH
 
-  const venvBin = path.join(updateRoot, 'venv', IS_WINDOWS ? 'Scripts' : 'bin')
+  rememberLog(`[bootstrap] venv alias: ${ensureVenvAlias(updateRoot, { log: rememberLog })}`)
+  const venvBin = path.join(resolveVenvDir(updateRoot), IS_WINDOWS ? 'Scripts' : 'bin')
   const venvHermes = path.join(venvBin, IS_WINDOWS ? 'stardust.exe' : 'stardust')
   const venvPython = path.join(venvBin, IS_WINDOWS ? 'python.exe' : 'python')
 
@@ -4551,6 +4586,9 @@ async function applyUpdatesPosixHandoff(opts: any) {
     return { ok: true, manual: true, command: 'stardust update', hermesRoot: updateRoot }
   }
 
+  // The POSIX hand-off still uses `venv/bin` paths; the alias keeps them valid for a `.venv` install.
+  rememberLog(`[updates] venv alias: ${ensureVenvAlias(updateRoot, { log: rememberLog })}`)
+
   const handoffConflict = updateHandoffConflict(STARDUST_HOME)
 
   if (handoffConflict) {
@@ -4615,7 +4653,7 @@ async function applyUpdatesPosixHandoff(opts: any) {
       ...process.env,
       STARDUST_HOME,
       STARDUST_UPDATE_STARTED_AT: String(updateStartedAt),
-      PATH: pathWithHermesManagedNode(path.join(updateRoot, 'venv', 'bin'))
+      PATH: pathWithHermesManagedNode(path.join(resolveVenvDir(updateRoot), 'bin'))
     },
     detached: true,
     stdio: 'ignore'
@@ -4956,7 +4994,7 @@ async function createPythonBackend(root, label, backendArgs, options: any = {}) 
   // `venv`, and mixing the two crashes the backend on its first native
   // import (see venvRootForPython). Fall back to root/venv only for a
   // system python, where the historical layout is the best guess.
-  const venvRoot = venvRootForPython(python, root) ?? path.join(root, 'venv')
+  const venvRoot = venvRootForPython(python, root) ?? resolveVenvDir(root)
   const venvPython = getVenvPython(venvRoot)
   const command = IS_WINDOWS && fileExists(venvPython) ? venvPython : python
 
@@ -5069,6 +5107,7 @@ async function resolveHermesBackend(backendArgs) {
         rememberLog(`Ignoring Windows Stardust override under WSL: ${hermesOverride}`)
       }
     } else {
+      refreshManagedShimsAtBoot()
       hermesCommand = findOnPath('stardust')
     }
 

@@ -2,12 +2,14 @@ import { spawn, type SpawnOptions } from 'node:child_process'
 import { existsSync, statSync } from 'node:fs'
 import path from 'node:path'
 
+import { resolveVenvDir } from './venv-layout'
 import { hiddenWindowsChildOptions } from './windows-child-options'
 
 /** File prerequisites only: dependency recovery must remain reachable through update. */
 export function windowsUpdatePrerequisiteError(updateRoot: string): string | null {
   const maintainedDir = path.join(updateRoot, 'scripts', 'desktop-update')
-  const required = [path.join(updateRoot, 'venv', 'Scripts', 'python.exe')]
+  // `venv` or `.venv`, whichever holds the interpreter (the alias step makes `venv` appear for `.venv` installs).
+  const required = [path.join(resolveVenvDir(updateRoot, { isWindows: true }), 'Scripts', 'python.exe')]
 
   // Pre-reorg flat scripts remain supported; damaged modern trees do not.
   if (existsSync(maintainedDir)) {
