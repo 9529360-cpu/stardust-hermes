@@ -192,3 +192,65 @@ def test_browser_registry_handler_cannot_bypass_agent_bound_gui_callbacks():
     assert "target" in definition[0]["function"]["parameters"]["required"]
     result = registry.dispatch("browser", {"action": "open", "target": "in_app", "url": "https://example.com"})
     assert "error" in json.loads(result)
+
+
+# ── connect: the agent pairs the user's Chrome itself (owner field case 2026-10-12) ──────────────────────
+
+
+def _connect_seams(monkeypatch, *, attached=False, approved=True, desktop=True):
+    seen = {"approvals": [], "emitted": []}
+    monkeypatch.setattr("tools.browser_extension_router.extension_controller_available", lambda *_: attached)
+
+    def approve(tool, reason, **kw):
+        seen["approvals"].append((tool, reason, kw.get("rule_key")))
+        return {"approved": approved, "message": None if approved else "User declined."}
+
+    monkeypatch.setattr("tools.approval.request_tool_approval", approve)
+    monkeypatch.setattr(
+        "tools.desktop_ui.emit", lambda name, payload: desktop and (seen["emitted"].append((name, payload)) or True),
+    )
+    return seen
+
+
+def test_connect_asks_once_then_has_the_desktop_pair_chrome_and_keeps_the_setup_with_the_agent(monkeypatch):
+    seen = _connect_seams(monkeypatch)
+
+    result = run(agent(), action="connect", target="host", chrome_profile="Profile 2")
+
+    assert result["requested"] is True
+    assert seen["approvals"] == [("browser", seen["approvals"][0][1], "browser_host_connect")]
+    assert seen["emitted"] == [("browser.host.connect", {"chrome_profile_dir": "Profile 2"})]
+    # The agent is told to install and approve the extension itself, not to hand the setup back.
+    assert "computer_use" in result["next"] and ub.PLAYWRIGHT_EXTENSION_URL in result["next"]
+    assert "status" in result["next"]
+
+
+def test_declined_connect_never_reaches_the_desktop(monkeypatch):
+    seen = _connect_seams(monkeypatch, approved=False)
+
+    result = run(agent(), action="connect", target="host")
+
+    assert "declined" in result["error"]
+    assert seen["emitted"] == []
+
+
+def test_connect_on_an_attached_controller_reports_connected_without_asking(monkeypatch):
+    seen = _connect_seams(monkeypatch, attached=True)
+
+    assert run(agent(), action="connect", target="host") == {"success": True, "connected": True}
+    assert seen["approvals"] == [] and seen["emitted"] == []
+
+
+def test_connect_needs_the_desktop_app_and_the_host_target(monkeypatch):
+    _connect_seams(monkeypatch, desktop=False)
+
+    assert "desktop app" in run(agent(), action="connect", target="host")["error"]
+    assert "target=host" in run(agent(turn="turn-2"), action="connect", target="in_app")["error"]
+
+
+def test_a_missing_controller_points_the_agent_at_connect(monkeypatch):
+    monkeypatch.setattr("tools.browser_extension_router.extension_controller_available", lambda *_: False)
+
+    failed = run(agent(), action="open", target="host", url="https://example.com")
+
+    assert "browser(action='connect', target='host')" in failed["error"]

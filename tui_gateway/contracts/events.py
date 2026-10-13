@@ -535,6 +535,16 @@ event("preview.open", PreviewOpenPayload, doc="Open a URL / file in the desktop 
 event("preview.close", PreviewClosePayload, doc="Close the preview pane or one tab.")
 
 
+class BrowserHostConnectPayload(Payload):
+    """``tools/unified_browser_tool.py`` ``connect``: pair the user's own Chrome to this chat."""
+
+    chrome_profile_dir: str = ""
+
+
+event("browser.host.connect", BrowserHostConnectPayload,
+      doc="Start the existing-Chrome bridge for this chat, as the Tools page's Connect Chrome does.")
+
+
 class LayoutApplyPayload(OpenPayload):
     """``tools/apply_layout_tool.py``."""
 

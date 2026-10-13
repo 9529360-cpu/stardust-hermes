@@ -138,6 +138,8 @@ export type GatewayEventPayload = {
   kind?: string
   // pane.reveal (agent focusing a desktop pane via the focus_pane tool)
   pane?: string
+  // browser.host.connect (agent pairing the user's own Chrome via the browser tool's connect action)
+  chrome_profile_dir?: string
   // layout.apply (agent applying a layout preset via the apply_layout tool)
   preset?: string
   // tour.request (tour tool — agent-guided driver.js walkthrough). `action`

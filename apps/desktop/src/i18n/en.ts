@@ -1814,6 +1814,9 @@ export const en: Translations = {
         working: 'Working…',
         connectedTitle: 'Chrome connected',
         connectedMessage: 'This chat can now use the paired Chrome profile after each action is approved.',
+        agentConnectingTitle: 'Connecting your Chrome',
+        agentConnectingMessage:
+          'This chat is connecting to the Chrome you have open, including the sites you are signed in to.',
         connectFailed: 'Could not connect to Chrome',
         disconnectFailed: 'Could not disconnect from Chrome',
         noSession: 'Open or select a Desktop chat first.',

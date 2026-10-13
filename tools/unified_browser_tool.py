@@ -15,7 +15,7 @@ from tools.registry import registry, tool_error
 
 ACTIONS = (
     "open", "elements", "read", "click", "hover", "type", "scroll",
-    "press", "back", "forward", "reload", "status",
+    "press", "back", "forward", "reload", "status", "connect",
 )
 TARGETS = ("in_app", "host")
 HOST_ACTIONS = {
@@ -40,6 +40,48 @@ def _success(raw: str) -> bool:
     )
 
 
+# Official "Playwright MCP Bridge" extension the host controller pairs through.
+PLAYWRIGHT_EXTENSION_URL = "https://chromewebstore.google.com/detail/mmlmfjhmonkocbjadbfplnigmagldckm"
+
+# What the agent does itself after asking Stardust to connect, instead of handing the setup back to the
+# user (owner field case 2026-10-12: an hour of "please install / pair / approve" in chat).
+HOST_CONNECT_NEXT_STEPS = (
+    "Stardust is starting the Chrome bridge for this chat. Check browser(action='status', target='host') every "
+    "few seconds for up to a minute. Chrome then shows a Playwright extension page asking which tab to share or "
+    "whether to allow the connection: approve it with computer_use. If that Chrome has no 'Playwright MCP "
+    f"Bridge' extension, open {PLAYWRIGHT_EXTENSION_URL} in that Chrome with computer_use, add the extension, "
+    "then call connect again. Ask the user only for a Chrome sign-in or a system prompt you cannot reach."
+)
+
+
+def _connect_host(args: dict) -> str:
+    """Pair the user's own Chrome to this chat: one approval, then the desktop starts the bridge."""
+    from tools.browser_extension_router import extension_controller_available
+
+    if extension_controller_available("browser_snapshot"):
+        return json.dumps({"success": True, "connected": True}, ensure_ascii=False)
+
+    from tools.approval import request_tool_approval
+
+    # Pairing hands this chat the user's signed-in Chrome, so it goes through the approval gate once.
+    decision = request_tool_approval(
+        "browser", "Connect this chat to the user's own Chrome, including the sites they are signed in to",
+        rule_key="browser_host_connect",
+    )
+    if not decision.get("approved"):
+        return tool_error(decision.get("message") or "Connecting the user's Chrome was declined.")
+
+    from tools import desktop_ui
+
+    profile_dir = str(args.get("chrome_profile") or "").strip()
+    return desktop_ui.emit_or_error(
+        "browser.host.connect", {"chrome_profile_dir": profile_dir},
+        "Could not ask Stardust to connect Chrome: ",
+        "Connecting the user's Chrome needs the Stardust desktop app.",
+        {"success": True, "requested": True, "next": HOST_CONNECT_NEXT_STEPS},
+    )
+
+
 def _host_action(action: str, args: dict, *, task_id: str, session_id: str, tool_call_id: str) -> str:
     command = HOST_ACTIONS.get(action)
     if command is None:
@@ -55,8 +97,8 @@ def _host_action(action: str, args: dict, *, task_id: str, session_id: str, tool
     if not extension_controller_available(command):
         return tool_error(
             "No authorized host browser controller is attached to this session "
-            f"with permission for {command}. Connect and approve a compatible "
-            "browser extension before using target=host."
+            f"with permission for {command}. Connect it yourself with "
+            "browser(action='connect', target='host') instead of asking the user to set it up, then retry."
         )
     if action in ("click", "type", "press"):
         from tools.approval import request_tool_approval
@@ -161,6 +203,12 @@ def run_unified_browser(agent: Any, args: dict, *, drive_callback, read_callback
             "available": available,
         }, ensure_ascii=False)
 
+    if action == "connect":
+        if target != "host":
+            return tool_error("connect pairs the user's own Chrome; use target=host.")
+        state["target"] = target
+        return _connect_host(args)
+
     if action == "open":
         raw_url = str(args.get("url") or "").strip()
         from urllib.parse import urlsplit
@@ -224,7 +272,9 @@ UNIFIED_BROWSER_SCHEMA = {
         "text; ask the user to enter them in the exact active browser, or "
         "use a secure vault ONLY when verified to address that same session. "
         "Start with open and then elements. Host control currently supports "
-        "only open, elements/read, click, type, scroll, back and press."
+        "only open, elements/read, click, type, scroll, back and press. When the "
+        "user asks you to use their Chrome and status says it is not available, "
+        "call connect (target=host) yourself rather than sending them to settings."
     ),
     "parameters": {
         "type": "object",
@@ -244,6 +294,10 @@ UNIFIED_BROWSER_SCHEMA = {
             "amount": {"type": "integer", "description": "scroll pixels for in_app (signed)."},
             "max": {"type": "integer", "description": "Maximum elements or text length."},
             "full": {"type": "boolean", "description": "Return all interactive elements, not just changes."},
+            "chrome_profile": {
+                "type": "string",
+                "description": "connect: Chrome profile directory to pair, e.g. Default or Profile 2 (chrome://version shows it).",
+            },
         },
         "required": ["action", "target"],
     },

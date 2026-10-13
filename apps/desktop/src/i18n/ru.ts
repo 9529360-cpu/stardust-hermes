@@ -1468,6 +1468,10 @@ export const ru = defineLocale({
       clearDirFailed: 'Не удалось очистить папку по умолчанию'
     },
     toolsets: {
+      browserHostControl: {
+        agentConnectingTitle: 'Подключаем ваш Chrome',
+        agentConnectingMessage: 'Этот чат подключается к открытому Chrome, включая сайты, где вы вошли в аккаунт.'
+      },
       loadingConfig: 'Загрузка конфигурации',
       savedTitle: 'Учётные данные сохранены',
       savedMessage: key => `${key} обновлён.`,

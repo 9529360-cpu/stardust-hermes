@@ -1489,6 +1489,9 @@ export const ja = defineLocale({
         working: '処理中…',
         connectedTitle: 'Chrome に接続しました',
         connectedMessage: '各操作の承認後、このチャットでペアリングした Chrome プロファイルを使用できます。',
+        agentConnectingTitle: 'Chrome に接続しています',
+        agentConnectingMessage:
+          'この会話は開いている Chrome に接続し、ログイン済みのサイトを使います。',
         connectFailed: 'Chrome に接続できませんでした',
         disconnectFailed: 'Chrome を切断できませんでした',
         noSession: '先に Desktop チャットを開くか選択してください。',

@@ -1592,6 +1592,9 @@ export const zhHant = defineLocale({
         working: '處理中…',
         connectedTitle: 'Chrome 已連接',
         connectedMessage: '每個操作獲得核准後，此對話即可使用已配對的 Chrome 設定檔。',
+        agentConnectingTitle: '正在連接你的 Chrome',
+        agentConnectingMessage:
+          '這個對話正在接入你已開啟的 Chrome，會用到你已登入的網站。',
         connectFailed: '無法連接 Chrome',
         disconnectFailed: '無法中斷 Chrome 連接',
         noSession: '請先開啟或選取 Desktop 對話。',

@@ -1622,6 +1622,8 @@ export interface Translations {
         working: string
         connectedTitle: string
         connectedMessage: string
+        agentConnectingTitle: string
+        agentConnectingMessage: string
         connectFailed: string
         disconnectFailed: string
         noSession: string
