@@ -10,6 +10,7 @@ from typing import Any, Dict, List
 
 from agent.memory_manager import sanitize_context
 from agent.message_content import flatten_message_text
+from agent.progress_pulse import mark_user_updated
 from agent.redact import redact_sensitive_text
 from agent.reasoning_timing import answer_event_stamp, event_stamped, reasoning_event_stamp
 
@@ -170,6 +171,7 @@ class StreamDeliveryMixin:
             cb(visible, already_streamed=already_streamed)
             for part in record:
                 self._record_delivered_interim_text(part)
+            mark_user_updated(self)
         except Exception:
             logger.debug("interim_assistant_callback error", exc_info=True)
 

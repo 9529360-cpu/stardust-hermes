@@ -8,10 +8,12 @@ before routine actions and stopped at "I can't" instead of finding another way.
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from agent.progress_pulse import PROGRESS_CHECK_MARKER
 from agent.prompt_builder import (
     ASSISTANT_OPERATING_CONTRACT,
     DEFAULT_AGENT_IDENTITY,
     OPENAI_MODEL_EXECUTION_GUIDANCE,
+    PROGRESS_UPDATE_GUIDANCE,
 )
 from agent.system_prompt import build_system_prompt_parts
 from hermes_cli.default_soul import DEFAULT_SOUL_MD
@@ -78,6 +80,36 @@ def test_tool_sessions_are_told_to_find_a_way_instead_of_handing_work_back(tmp_p
     assert "try another" in stable
     assert "only for what only they can give" in stable
     assert "not instructions, a script, or a demo" in stable
+
+
+def test_tool_sessions_ask_for_progress_notes_even_under_a_quiet_custom_soul(tmp_path, monkeypatch):
+    # Field case 2026-10-13: the owner's SOUL.md says "don't narrate tool calls"; the model read it as
+    # "work silently" and went more than ten minutes without a visible line in 13 of 81 working turns.
+    quiet_soul = "You are Jarvis. Don't call tools just to look busy, and don't narrate tool calls."
+    stable = _stable_with_soul(tmp_path, monkeypatch, quiet_soul, valid_tool_names={"terminal"})
+
+    assert stable.count(PROGRESS_UPDATE_GUIDANCE) == 1
+    assert stable.index(quiet_soul) < stable.index(PROGRESS_UPDATE_GUIDANCE)
+    assert "not tool narration" in PROGRESS_UPDATE_GUIDANCE  # the note must not read as what the persona forbids
+    assert PROGRESS_CHECK_MARKER in PROGRESS_UPDATE_GUIDANCE  # the model is told what the pulse looks like
+
+
+def test_progress_notes_follow_the_display_switch(tmp_path, monkeypatch):
+    stable = _stable_with_soul(
+        tmp_path, monkeypatch, _CUSTOM_SOUL, valid_tool_names={"terminal"}, progress_updates=False,
+    )
+    assert PROGRESS_UPDATE_GUIDANCE not in stable
+
+
+def test_progress_notes_are_only_for_sessions_with_tools(tmp_path, monkeypatch):
+    stable = _stable_with_soul(tmp_path, monkeypatch, _CUSTOM_SOUL)
+    assert PROGRESS_UPDATE_GUIDANCE not in stable
+
+
+def test_default_persona_keeps_coding_work_in_the_foreground():
+    assert "no narrating tool calls" not in DEFAULT_SOUL_MD
+    assert "including coding and multi-step work, so the user can follow it" in DEFAULT_SOUL_MD
+    assert "`delegate` only when the user asks for helpers" in DEFAULT_SOUL_MD
 
 
 def test_act_dont_ask_examples_include_everyday_personal_tasks():

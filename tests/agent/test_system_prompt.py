@@ -17,6 +17,7 @@ def _make_agent(**overrides):
         skip_context_files=False,
         valid_tool_names=[],
         _task_completion_guidance=False,
+        progress_updates=False,
         _tool_use_enforcement=False,
         _environment_probe=False,
         _kanban_worker_guidance="",

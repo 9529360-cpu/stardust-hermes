@@ -20,7 +20,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from agent.prompt_builder import (
     ASSISTANT_OPERATING_CONTRACT, DEFAULT_AGENT_IDENTITY, EXECUTION_GUIDANCE_MODELS, GOOGLE_MODEL_OPERATIONAL_GUIDANCE,
     STARDUST_AGENT_HELP_GUIDANCE, STARDUST_AGENT_HELP_GUIDANCE_NO_SKILLS,
-    PARALLEL_TOOL_CALL_GUIDANCE, PLATFORM_HINTS, SESSION_SEARCH_GUIDANCE, SKILLS_GUIDANCE,
+    PARALLEL_TOOL_CALL_GUIDANCE, PLATFORM_HINTS, PROGRESS_UPDATE_GUIDANCE, SESSION_SEARCH_GUIDANCE, SKILLS_GUIDANCE,
     SOUL_OPERATING_DEFAULTS, STEER_CHANNEL_NOTE, TASK_COMPLETION_GUIDANCE, TELEGRAM_RICH_MESSAGES_HINT,
     TOOL_USE_ENFORCEMENT_GUIDANCE, TOOL_USE_ENFORCEMENT_MODELS, drain_truncation_warnings,
 )
@@ -699,6 +699,7 @@ def _guidance_parts(agent: Any) -> List[str]:
         parts += [
             text for flag, text in (
                 ("_task_completion_guidance", TASK_COMPLETION_GUIDANCE),
+                ("progress_updates", PROGRESS_UPDATE_GUIDANCE),
                 ("_parallel_tool_call_guidance", PARALLEL_TOOL_CALL_GUIDANCE),
             ) if getattr(agent, flag, True)
         ]

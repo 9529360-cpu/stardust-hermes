@@ -2013,6 +2013,7 @@ display:
   platforms: {}           # Per-platform display overrides (see below)
   interim_assistant_messages: true  # Gateway: send natural mid-turn assistant updates as separate messages
   show_commentary: true   # Codex models: deliver commentary-channel progress narration as visible mid-turn updates
+  progress_updates: true  # Ask for a one-line progress note at each step of tool work; nudge a turn that stays quiet for a minute
   skin: default           # Built-in or custom CLI skin (see user-guide/features/skins)
   personality: ""         # Legacy cosmetic field still surfaced in some summaries
   compact: false          # Compact output mode (less whitespace)
@@ -2219,6 +2220,8 @@ Signal is listed as a valid platform key because the setting can be saved per pl
 `interim_assistant_messages` is gateway-only. When enabled, Hermes sends completed mid-turn assistant updates as separate chat messages. This is independent from `tool_progress` and does not require gateway streaming.
 
 `show_commentary` (default `true`) controls Codex Responses models' commentary channel — the polished progress narration these models produce alongside their private reasoning. When enabled, each completed commentary message is delivered as a visible mid-turn update (on the gateway this also requires `interim_assistant_messages`). Set it to `false` if the extra narration annoys you: commentary then falls back to the reasoning channel and is only shown when `show_reasoning` is enabled.
+
+`progress_updates` (default `true`) keeps you posted while the agent works with tools. The system prompt asks for one short plain-language line at each new step (what it found, what it does next), and when a turn shows you nothing for about a minute, Stardust appends a `[Progress check]` line to the next tool result so the model's following response opens with an update. The check is only sent while a desktop or gateway client is receiving mid-turn messages. Set it to `false` to have the agent work quietly until it finishes.
 
 ## Privacy
 

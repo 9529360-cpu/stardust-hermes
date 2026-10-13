@@ -30,6 +30,7 @@ from agent.display import (
     _detect_tool_failure,
 )
 from agent.message_sanitization import coalesce_tool_call_id
+from agent.progress_pulse import nudge_for_tool_result
 from agent.reasoning_timing import event_stamped, tool_event_stamp
 from agent.tool_result_classification import tool_may_have_side_effect
 from agent.inline_tool_executors import (
@@ -1088,13 +1089,14 @@ def _commit_tool_result(
         )
     _record_persisted_path_for_stub(agent, tool_call_id, persisted_result)
 
-    subdir_hints = agent._subdirectory_hints.check_tool_call(function_name, function_args)
-    if subdir_hints:
+    # Subdirectory hints, then the progress check when the turn has gone quiet (agent/progress_pulse.py).
+    notes = (agent._subdirectory_hints.check_tool_call(function_name, function_args) or "") + nudge_for_tool_result(agent)
+    if notes:
         if _is_multimodal_tool_result(persisted_result):
-            # Hint goes on the text summary part so the model still sees it; image blocks untouched.
-            _append_subdir_hint_to_multimodal(persisted_result, subdir_hints)
+            # Notes go on the text summary part so the model still sees them; image blocks untouched.
+            _append_subdir_hint_to_multimodal(persisted_result, notes)
         else:
-            persisted_result += subdir_hints
+            persisted_result += notes
 
     # Multimodal dicts become an OpenAI-style content list; text-only servers get a
     # string-safe fallback so a rejected image result never poisons history.

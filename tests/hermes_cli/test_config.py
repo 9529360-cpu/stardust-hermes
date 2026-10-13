@@ -128,6 +128,29 @@ class TestEnsureHermesHome:
             ensure_hermes_home()
             assert soul_path.read_text(encoding="utf-8") == DEFAULT_SOUL_MD
 
+    def test_upgrades_previous_default_that_forbade_narrating_tool_calls(self, tmp_path):
+        from hermes_cli.default_soul import DEFAULT_SOUL_MD, _PRE_PROGRESS_UPDATE_DEFAULT_SOUL
+
+        assert "no narrating tool calls" in _PRE_PROGRESS_UPDATE_DEFAULT_SOUL
+        assert "no narrating tool calls" not in DEFAULT_SOUL_MD
+
+        with patch.dict(os.environ, {"STARDUST_HOME": str(tmp_path)}):
+            soul_path = tmp_path / "SOUL.md"
+            soul_path.write_text(_PRE_PROGRESS_UPDATE_DEFAULT_SOUL, encoding="utf-8")
+            ensure_hermes_home()
+            assert soul_path.read_text(encoding="utf-8") == DEFAULT_SOUL_MD
+
+    def test_does_not_upgrade_customized_previous_default_that_forbade_narration(self, tmp_path):
+        from hermes_cli.default_soul import _PRE_PROGRESS_UPDATE_DEFAULT_SOUL
+
+        customized = _PRE_PROGRESS_UPDATE_DEFAULT_SOUL + " Always call me Captain."
+
+        with patch.dict(os.environ, {"STARDUST_HOME": str(tmp_path)}):
+            soul_path = tmp_path / "SOUL.md"
+            soul_path.write_text(customized, encoding="utf-8")
+            ensure_hermes_home()
+            assert soul_path.read_text(encoding="utf-8") == customized
+
     def test_does_not_upgrade_customized_previous_durable_task_free_default(self, tmp_path):
         from hermes_cli.default_soul import DEFAULT_SOUL_MD, _PRE_DURABLE_TASK_DEFAULT_SOUL
 
