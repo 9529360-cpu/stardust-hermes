@@ -15,7 +15,6 @@ import sys
 import time as _time
 from pathlib import Path
 from typing import Optional
-from hermes_constants import venv_python_path
 
 from hermes_cli.update_cmd_common import _best_effort
 
@@ -406,13 +405,14 @@ def _update_complete_message(pre_version: str | None) -> str:
 
 
 def _post_update_sqlite_runtime_status():
-    """Return whether the interpreter used after update has safe SQLite."""
+    """Probe SQLite safety in the interpreter selected by the active project runtime."""
     from hermes_cli.update_cmd import _m
-    from hermes_constants import project_venv_dir
+    from hermes_constants import resolve_current_project_venv
     from hermes_cli.sqlite_runtime import probe_sqlite_runtime
-    venv_dir = project_venv_dir(_m().PROJECT_ROOT)
-    python = (venv_python_path(venv_dir, windows=_m()._is_windows()) if venv_dir is not None else Path(sys.executable))
-    info = probe_sqlite_runtime(python)
+    resolution = resolve_current_project_venv(_m().PROJECT_ROOT, windows=_m()._is_windows())
+    if resolution.error or not resolution.python:
+        return False, None
+    info = probe_sqlite_runtime(resolution.python)
     return info is not None and not info.wal_reset_vulnerable, info
 
 
@@ -449,7 +449,10 @@ def _clear_stale_sqlite_sidecars(db_path: Path) -> None:
         db_path.with_name(db_path.name + suffix).unlink(missing_ok=True)
 
 
-def _print_update_summary(*, node_failures: list, desktop_build_ok: bool, pre_update_version: str | None) -> bool:
+def _print_update_summary(
+    *, node_failures: list, desktop_build_ok: bool, pre_update_version: str | None,
+    python_deps_ok: bool = True,
+) -> bool:
     """Final banner. A failed Desktop rebuild is non-fatal but must not print ``✓ Update complete!``.
 
     See #88251.
@@ -460,12 +463,14 @@ def _print_update_summary(*, node_failures: list, desktop_build_ok: bool, pre_up
         # Grace path: only a POSITIVE vulnerable probe demotes success to partial.
         sqlite_runtime_ok = True
     print()
-    if node_failures or not desktop_build_ok or not sqlite_runtime_ok:
+    if node_failures or not desktop_build_ok or not sqlite_runtime_ok or not python_deps_ok:
         parts = []
         if node_failures:
             parts.append(f"Node.js dependencies for {', '.join(node_failures)} did not refresh")
         if not desktop_build_ok:
             parts.append("the desktop app was not rebuilt and is still on the previous build")
+        if not python_deps_ok:
+            parts.append("Python dependency/import health could not be verified")
         if parts:
             print("⚠ Update partially complete — " + "; ".join(parts) + ".")
         if node_failures:
@@ -473,12 +478,14 @@ def _print_update_summary(*, node_failures: list, desktop_build_ok: bool, pre_up
             print("  be in a mixed state until the Node deps are rebuilt.")
         if not desktop_build_ok:
             print("  Run `stardust desktop` to retry the desktop rebuild.")
+        if not python_deps_ok:
+            print("  Check the selected Python environment, repair its dependencies, then rerun `stardust update`.")
         if not sqlite_runtime_ok:
             for line in _sqlite_partial_completion_lines(sqlite_info.sqlite_version_string):
                 print(line)
     else:
         _print_update_completion(_update_complete_message(pre_update_version))
-    return desktop_build_ok and sqlite_runtime_ok
+    return desktop_build_ok and sqlite_runtime_ok and python_deps_ok
 
 
 def _restore_state_db_from_snapshot(state_path: Path, snap_state: Path) -> bool:
@@ -988,8 +995,8 @@ def _migrate_relay_exporter_env() -> None:
 
 
 def _run_post_update_maintenance(
-    *, assume_yes, gateway_mode, pre_update_snapshot_id, had_desktop_app_before_update, node_failures, desktop_build_ok,
-    pre_update_version,
+    *, assume_yes, gateway_mode, pre_update_snapshot_id, had_desktop_app_before_update, node_failures,
+    desktop_build_ok, pre_update_version, python_deps_ok: bool = True,
 ) -> bool:
     """Post-pull housekeeping: state.db restore, catalog/skills/profile syncs, config migration,
     the update summary (verdict returned), and best-effort notices/self-heals. Every step is
@@ -1042,6 +1049,7 @@ def _run_post_update_maintenance(
 
     update_complete = _print_update_summary(
         node_failures=node_failures, desktop_build_ok=desktop_build_ok, pre_update_version=pre_update_version,
+        python_deps_ok=python_deps_ok,
     )
 
     _print_post_update_notices_and_self_heals()

@@ -12,7 +12,7 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Optional
-from hermes_constants import venv_python_path
+from hermes_constants import probe_project_venv, resolve_current_project_venv
 from hermes_cli._subprocess_compat import bounded_probe_run
 
 # Log-record parity with the origin module.
@@ -82,20 +82,20 @@ def _critical_module_import_failures(
         "sys.stdout.write('\\n%s' + json.dumps(failures))\n"
         % (_UPDATE_CRITICAL_MODULES, tuple(sorted(FIRST_PARTY_MODULE_ROOTS)), report_runtime_errors,
            report_runtime_errors, marker))
+    resolution = resolve_current_project_venv(root, windows=_m()._is_windows())
+    if resolution.error or not resolution.python:
+        return _probe_failure(
+            "EnvironmentResolution",
+            resolution.error or "could not determine the active project interpreter",
+        )
+    interpreter = str(resolution.python)
     try:
-        interpreter = sys.executable
-        with suppress(Exception):
-            venv_python = venv_python_path(Path(root) / "venv", windows=_m()._is_windows())
-            if venv_python.exists():
-                interpreter = str(venv_python)
         result = bounded_probe_run(
             [interpreter, "-c", probe], timeout=120, cwd=str(root), raise_on_spawn_failure=True,
         )
-    except (OSError, subprocess.SubprocessError):
-        # Keep this guard advisory: a probe we could not even spawn (unreadable venv
-        # interpreter, fork failure) says nothing about the checkout, so it must not
-        # fail an otherwise successful update. A spawned child that hangs does.
-        return {}
+    except (OSError, subprocess.SubprocessError) as exc:
+        return _probe_failure(
+            "SpawnFailure", f"could not spawn selected project interpreter ({type(exc).__name__})")
     if result is None:
         return _probe_failure("TimeoutExpired", "timed out before reporting import health")
     output = result.stdout or ""
@@ -634,46 +634,17 @@ def _update_node_dependencies() -> list[str]:
 
 
 def _venv_core_imports_healthy() -> tuple[bool, str]:
-    """Probe the venv (in ITS interpreter — the updater may run under another Python) for core
-    imports, catching a half-updated venv that "Already up to date!" would otherwise never re-sync.
-    Returns ``(healthy, detail)``; never raises, unknown states report healthy."""
+    """Probe required imports in the active project venv; unresolved or failing targets are unhealthy."""
     from hermes_cli.update_cmd import _m
-    venv_dir = _m().PROJECT_ROOT / "venv"
-    venv_python = venv_python_path(venv_dir, windows=_m()._is_windows())
-    if not venv_python.exists():
-        # No venv: normal for a dev checkout (healthy), but on a MANAGED install (bootstrap
-        # stamp or `.update-incomplete`) the venv IS the install — absence means an interrupted repair.
-        managed_markers = (_m().PROJECT_ROOT / ".hermes-bootstrap-complete", _m()._update_marker_path())
-        if any(m.exists() for m in managed_markers):
-            return False, f"venv python missing ({venv_python})"
-        return True, ""
 
-    # Import (not just metadata): dist-info can be intact with modules missing after an
-    # interrupted uninstall/install.
-    check = (
-        "import importlib\n"
-        "mods = ['fastapi', 'uvicorn', 'pydantic', 'openai', 'yaml']\n"
-        "missing = []\n"
-        "for m in mods:\n"
-        "    try: importlib.import_module(m)\n"
-        "    except Exception as e: missing.append(f'{m}: {e}')\n"
-        "print('\\n'.join(missing))\n")
-    try:
-        result = subprocess.run(
-            [str(venv_python), "-c", check], capture_output=True, text=True, encoding="utf-8",
-            errors="replace", timeout=60, cwd=_m().PROJECT_ROOT)
-    except Exception as exc:
-        logger.debug("venv health probe failed to run: %s", exc)
-        return True, ""
-
-    missing = [line.strip() for line in (result.stdout or "").splitlines() if line.strip()]
-    if result.returncode != 0 and not missing:
-        # Interpreter itself is broken — that IS unhealthy.
-        detail = (result.stderr or "").strip().splitlines()
-        return False, detail[0] if detail else "venv python failed to run"
-    if missing:
-        return False, "; ".join(missing[:4])
-    return True, ""
+    resolution = resolve_current_project_venv(_m().PROJECT_ROOT, windows=_m()._is_windows())
+    if resolution.error or resolution.venv_dir is None or resolution.python is None:
+        return False, resolution.error or "the active project environment could not be resolved"
+    return probe_project_venv(
+        resolution,
+        required_modules=("fastapi", "uvicorn", "pydantic", "openai", "yaml"),
+        timeout=60,
+    )
 
 
 # Native extensions that pin venv files once imported: if the updater holds one, Windows blocks
@@ -825,6 +796,13 @@ def _rebuild_desktop_after_update(
     See #88251.
     """
     from hermes_cli.update_cmd import _m
+    from hermes_constants import resolve_current_project_venv
+
+    resolution = resolve_current_project_venv(_m().PROJECT_ROOT)
+    if resolution.error or not resolution.python:
+        print(f"  ⚠ Desktop build stopped: project Python target could not be resolved: {resolution.error}")
+        return False
+
     # The release tree is git-ignored and can vanish mid-update; pre-update presence suffices.
     # Never make people who never used Desktop pay for an Electron build.
     has_desktop_app = had_desktop_app_before_update or _desktop_app_present(desktop_dir)
@@ -845,7 +823,7 @@ def _rebuild_desktop_after_update(
         print("  ✓ Desktop app up to date")
         return True
 
-    desktop_build_cmd = [sys.executable, "-m", "hermes_cli.main", "desktop", "--build-only"]
+    desktop_build_cmd = [str(resolution.python), "-m", "hermes_cli.main", "desktop", "--build-only"]
     # Capture the loud build output into update.log; retry once on failure (still-settling
     # rebuild window), then surface the tail. Put Hermes-managed Node on PATH: the desktop
     # updater chain loses shell PATH customizations, so a bare-PATH child hits `node: not found`.
@@ -950,7 +928,14 @@ def _refuse_update_if_venv_foreign_owned(project_root) -> None:
 
     See #83529.
     """
-    foreign = _venv_foreign_owned_paths(Path(project_root) / "venv")
+    from hermes_cli.update_cmd import _m
+    resolution = resolve_current_project_venv(project_root, windows=_m()._is_windows())
+    if resolution.error or not resolution.venv_dir:
+        print("\n✗ Update stopped: cannot safely resolve the active project environment.")
+        print(f"  {resolution.error or 'No project environment was identified.'}")
+        print("  No files were changed; activate the intended environment and retry.")
+        sys.exit(1)
+    foreign = _venv_foreign_owned_paths(resolution.venv_dir)
     if not foreign:
         return
     print("\n✗ Update stopped: this install's venv contains files owned by another user.")
@@ -993,11 +978,15 @@ def _sync_python_dependencies_after_pull(
     # `uv self update` if we already have a managed uv.
     update_managed_uv()
     uv_bin = ensure_uv()
-    pip_cmd = [sys.executable, "-m", "pip"]
+    resolution = resolve_current_project_venv(_m().PROJECT_ROOT, windows=_m()._is_windows())
+    if resolution.error or not resolution.python:
+        print(f"  ✗ Cannot resolve the update Python target: {resolution.error}")
+        sys.exit(1)
+    pip_cmd = [str(resolution.python), "-m", "pip"]
     if not uv_bin:
         uv_bin = _ensure_uv_for_termux(pip_cmd)
     if not uv_bin:
-        _ensure_venv_pip(pip_cmd, sys.executable)
+        _ensure_venv_pip(pip_cmd, str(resolution.python))
     install_prefix, lazy_env = _pip_install_prefix(uv_bin)
     install_group = "all"
     is_termux = _m()._is_termux_env(lazy_env)
@@ -1057,3 +1046,4 @@ def _sync_python_dependencies_after_pull(
         print(f"      {import_error}")
         print("    Run `stardust update` again — if it persists, reinstall:")
         print("    https://hermes-agent.nousresearch.com")
+    return import_ok

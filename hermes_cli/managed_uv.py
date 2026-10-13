@@ -712,6 +712,15 @@ def _windows_runtime_holders() -> tuple[bool, str]:
     if platform.system() != "Windows":
         return False, ""
     main_module = sys.modules.get("hermes_cli.main")
+    if main_module is None:
+        return True, "cannot verify Windows venv holders from this update context"
+    try:
+        from hermes_constants import resolve_current_project_venv
+        resolution = resolve_current_project_venv(main_module.PROJECT_ROOT, windows=True)
+    except Exception as exc:
+        return True, f"could not resolve the active Windows project environment: {exc}"
+    if resolution.error or resolution.venv_dir is None:
+        return True, f"could not resolve the active Windows project environment: {resolution.error}"
     detector = getattr(main_module, "_detect_venv_python_processes", None)
     if detector is None:
         return True, "cannot verify Windows venv holders from this update context"

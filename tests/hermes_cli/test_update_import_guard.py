@@ -17,6 +17,7 @@ and the syntax guard reported the update as successful.
 from __future__ import annotations
 
 import sys
+import venv
 from pathlib import Path
 
 import pytest
@@ -25,6 +26,13 @@ from hermes_cli import main as hermes_main
 from hermes_cli import update_cmd
 import hermes_cli.update_cmd_deps as update_cmd_deps
 from hermes_constants import partial_update_hint
+
+
+@pytest.fixture(autouse=True)
+def _active_project_venv(monkeypatch, tmp_path):
+    venv_root = tmp_path / ".venv"
+    venv.EnvBuilder(with_pip=False).create(venv_root)
+    monkeypatch.setenv("VIRTUAL_ENV", str(venv_root))
 
 
 def _write_skewed_tree(root: Path, *, skewed: bool) -> None:
@@ -251,14 +259,19 @@ def test_import_guard_reports_bounded_probe_failure(monkeypatch, tmp_path):
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX exec-bit PermissionError")
-def test_import_guard_is_non_fatal_when_probe_cannot_run(tmp_path):
-    """A venv interpreter that exists but cannot be executed must not read as a hung probe:
-    spawn failure stays advisory (real ``bounded_probe_run``, real ``Popen``)."""
+def test_import_guard_fails_closed_when_probe_cannot_run(monkeypatch, tmp_path):
+    """An unstartable target interpreter cannot validate an update."""
     venv_python = tmp_path / "venv" / "bin" / "python"
     venv_python.parent.mkdir(parents=True)
     venv_python.write_text("#!/bin/sh\nexit 0\n")
-    venv_python.chmod(0o644)  # present, not executable -> Popen raises PermissionError
-    assert update_cmd._validate_critical_modules_import(tmp_path) == (True, None, None)
+    venv_python.chmod(0o644)
+    monkeypatch.setenv("VIRTUAL_ENV", str(tmp_path / "venv"))
+
+    ok, module, error = update_cmd._validate_critical_modules_import(tmp_path)
+
+    assert not ok
+    assert module == "critical-module probe"
+    assert error and "spawn" in error.lower()
 
 
 # ---------------------------------------------------------------------------
@@ -304,6 +317,7 @@ def test_import_guard_prefers_the_project_venv_interpreter(monkeypatch, tmp_path
     venv_python = tmp_path / "venv" / bin_dir / name
     venv_python.parent.mkdir(parents=True)
     venv_python.write_text("")
+    monkeypatch.setenv("VIRTUAL_ENV", str(tmp_path / "venv"))
 
     seen: dict = {}
 
@@ -370,7 +384,7 @@ def test_hint_fires_for_each_first_party_root(modname):
     assert partial_update_hint(exc), f"expected guidance for {modname}"
 
 
-def test_probe_and_hint_share_one_first_party_definition():
+def test_probe_and_hint_share_one_first_party_definition(tmp_path):
     """The guard that BLOCKS and the hint that EXPLAINS must never disagree.
 
     These started as two hand-maintained lists and immediately diverged:
@@ -396,7 +410,7 @@ def test_probe_and_hint_share_one_first_party_definition():
     real_run = update_cmd_deps.bounded_probe_run
     update_cmd_deps.bounded_probe_run = capture
     try:
-        update_cmd._validate_critical_modules_import("/tmp")
+        update_cmd._validate_critical_modules_import(tmp_path)
     finally:
         update_cmd_deps.bounded_probe_run = real_run
 

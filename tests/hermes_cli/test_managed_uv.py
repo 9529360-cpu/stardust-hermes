@@ -1542,3 +1542,20 @@ class TestWindowsRuntimeSelfLock:
 
         assert locked
         assert "999" in detail
+
+
+def test_windows_runtime_holder_lock_fails_closed_without_a_resolved_environment(monkeypatch, tmp_path):
+    from hermes_cli import managed_uv
+    from hermes_cli import main as cli_main
+
+    monkeypatch.setattr(managed_uv.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(cli_main, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(cli_main, "_detect_venv_python_processes", lambda: [])
+    monkeypatch.setattr(sys, "executable", str(tmp_path / "outer-python.exe"))
+    monkeypatch.setattr(sys, "prefix", sys.base_prefix)
+    monkeypatch.delenv("VIRTUAL_ENV", raising=False)
+
+    blocked, detail = managed_uv._windows_runtime_holders()
+
+    assert blocked
+    assert "environment" in detail.lower() or "venv" in detail.lower()

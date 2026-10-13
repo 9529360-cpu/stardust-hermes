@@ -392,9 +392,11 @@ import { branchTipApiUrl, cacheIsFresh, compareApiUrl, githubRepoSlug, parseComp
 import { waitForUpdateClearance } from './update-gate'
 import { readLiveUpdateMarker, updateHandoffConflict, writeUpdateMarker } from './update-marker'
 import { isOfficialSshRemote, OFFICIAL_REPO_HTTPS_URL } from './update-remote'
+import { probeUpdateVenv, resolveUpdateVenv } from './update-venv'
 import {
   collectRelaunchArgs,
   describeUpdaterHandoffFailure,
+  developmentWorkspaceManualUpdateMessage,
   observeUpdaterHandoff,
   resolvePosixScriptHandoff,
   resolveStagedUpdaterBinary,
@@ -408,6 +410,7 @@ import {
 import {
   formatBlockerMessage,
   formatProbeFailedMessage,
+  resolveVenvPython,
   scanVenvBlockers,
   stopSafeVenvBlockers
 } from './venv-blocker-scan'
@@ -3442,10 +3445,10 @@ function repairMacUpdaterHelper(updater) {
 // Path to the venv shim whose lock decides whether `stardust update` can write
 // fresh entry points. On Windows this is the file the running backend
 // `stardust.exe` holds open; on POSIX it's never mandatory-locked.
-function venvHermesShimPath(updateRoot) {
+function venvHermesShimPath(updateRoot, venvRoot = path.join(updateRoot, 'venv')) {
   return IS_WINDOWS
-    ? path.join(updateRoot, 'venv', 'Scripts', 'stardust.exe')
-    : path.join(updateRoot, 'venv', 'bin', 'stardust')
+    ? path.join(venvRoot, 'Scripts', 'stardust.exe')
+    : path.join(venvRoot, 'bin', 'stardust')
 }
 
 // Best-effort lock probe mirroring the Rust updater's is_locked(): a running
@@ -3486,12 +3489,12 @@ function isShimLocked(shimPath) {
 // hand-off aborts, per existing design. Selection lives in the pure
 // venv-holder-select module (ordinal path-prefix, no PowerShell -like
 // wildcard hazards) so it's testable without Electron.
-function killHermesOwnedVenvDaemons(updateRoot) {
+function killHermesOwnedVenvDaemons(updateRoot, venvRoot = path.join(updateRoot, 'venv')) {
   if (!IS_WINDOWS) {
     return
   }
 
-  const scriptsDir = path.join(updateRoot, 'venv', 'Scripts')
+  const scriptsDir = path.join(venvRoot, 'Scripts')
 
   let holders = []
 
@@ -3841,8 +3844,8 @@ function reapOrphanedBackendsOnce() {
 // SIGTERM + app.quit() teardown already works (the macOS path is flawless), and
 // aggressively SIGKILL-ing the backend here would be an untested behavior change
 // for no benefit. So we no-op off Windows and leave that path exactly as it was.
-async function releaseBackendLockForUpdate(updateRoot) {
-  return releaseBackendLock(updateRoot, 'updates')
+async function releaseBackendLockForUpdate(updateRoot, venvRoot = path.join(updateRoot, 'venv')) {
+  return releaseBackendLock(updateRoot, 'updates', venvRoot)
 }
 
 // Shared backend teardown + venv-shim unlock wait. Used by BOTH the self-update
@@ -3855,7 +3858,7 @@ async function releaseBackendLockForUpdate(updateRoot) {
 //
 // `tag` only flavors the log lines. No-op off Windows (POSIX has no mandatory
 // locks — the before-quit SIGTERM + the cleanup script's own PID-wait suffice).
-async function releaseBackendLock(updateRoot, tag) {
+async function releaseBackendLock(updateRoot, tag, venvRoot = path.join(updateRoot, 'venv')) {
   if (!IS_WINDOWS) {
     return { unlocked: true }
   }
@@ -3897,16 +3900,16 @@ async function releaseBackendLock(updateRoot, tag) {
   // taskkill /T from the worker never reaches its parent), drains in-flight
   // agents, and force-kills survivors. Best-effort; abort paths restore via
   // startGatewaysAfterUpdateAbort. No-op off Windows.
-  stopGatewayBeforeUpdate(venvHermesShimPath(updateRoot), STARDUST_HOME)
+  stopGatewayBeforeUpdate(venvHermesShimPath(updateRoot, venvRoot), STARDUST_HOME)
 
   // Reap Hermes-OWNED venv daemons the tree-kill above cannot reach: the
   // memory plugin's hindsight daemon is spawned DETACHED (it outlives the
   // backend) yet runs off venv\Scripts\pythonw.exe, keeping venv files
   // mapped past the backend teardown (#75477/#75478). Narrowly scoped
   // (venv-holder-select) — external holders are never killed here.
-  killHermesOwnedVenvDaemons(updateRoot)
+  killHermesOwnedVenvDaemons(updateRoot, venvRoot)
 
-  const shim = venvHermesShimPath(updateRoot)
+  const shim = venvHermesShimPath(updateRoot, venvRoot)
 
   const gate = await waitForBackendRelease(
     initialPids,
@@ -3969,6 +3972,14 @@ async function releaseBackendLock(updateRoot, tag) {
 async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
   if (updateInFlight) {
     throw new Error('An update is already in progress.')
+  }
+
+  const manualUpdate = developmentWorkspaceManualUpdateMessage(IS_PACKAGED)
+  if (manualUpdate) {
+    const updateRoot = resolveUpdateRoot()
+    rememberLog(`[updates] refusing automatic update in development workspace at ${updateRoot}`)
+    emitUpdateProgress({ stage: 'manual', message: manualUpdate.message, percent: null })
+    return { ok: true, manual: true, command: manualUpdate.command, message: manualUpdate.message, hermesRoot: updateRoot }
   }
 
   updateInFlight = true
@@ -4064,15 +4075,34 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
       updaterArgs.push('--target-app', targetApp)
     }
 
-    const venvBin = path.join(updateRoot, 'venv', IS_WINDOWS ? 'Scripts' : 'bin')
+    const activeBackendProcess = backendConnectionState.getProcess()
+    const runningPython = typeof activeBackendProcess?.spawnfile === 'string' ? activeBackendProcess.spawnfile : null
+
+    const updateRuntimePython = runningPython ?? (IS_PACKAGED
+      ? path.join(updateRoot, 'venv', IS_WINDOWS ? 'Scripts' : 'bin', IS_WINDOWS ? 'python.exe' : 'python')
+      : await findPythonForRoot(updateRoot))
+
+    const updateVenv = resolveUpdateVenv(updateRoot, {
+      runtimePython: updateRuntimePython,
+      virtualEnv: process.env.VIRTUAL_ENV,
+      installationSource: IS_PACKAGED ? 'managed' : 'development',
+      runtimeMode: IS_PACKAGED ? 'managed' : 'development'
+    })
+
+    const updateVenvRoot = updateVenv.root ?? path.join(updateRoot, 'venv')
+    const updatePythonPath = updateVenv.python ?? path.join(updateVenvRoot, 'Scripts', 'python.exe')
+    const venvBin = path.join(updateVenvRoot, IS_WINDOWS ? 'Scripts' : 'bin')
 
     // ── Pre-flight state.db integrity guard (#68474) ─────────────────
     // Emergency backup and header verification before the update touches
     // anything.  Runs while the backend is still alive.
     preflightStateDb(STARDUST_HOME, rememberLog)
 
-    if (IS_WINDOWS && resolveUpdateScriptHandoff(updateRoot)) {
-      const message = windowsUpdatePrerequisiteError(updateRoot)
+    if (IS_WINDOWS) {
+      const message =
+        updateVenv.error ??
+        probeUpdateVenv(updateRoot, updateVenv) ??
+        windowsUpdatePrerequisiteError(updateRoot, updateVenv.python)
 
       if (message) {
         emitUpdateProgress({ stage: 'error', message, percent: null })
@@ -4085,7 +4115,7 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
     // spawn the updater. Without this the updater races a still-locked
     // stardust.exe (held by the backend child / its grandchildren) and the update
     // bricks. See releaseBackendLockForUpdate for the full failure analysis.
-    const lock = await releaseBackendLockForUpdate(updateRoot)
+    const lock = await releaseBackendLockForUpdate(updateRoot, updateVenvRoot)
 
     if (!lock.unlocked) {
       // Something OUTSIDE this app holds the venv (a second window, a user
@@ -4103,7 +4133,7 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
       if (IS_WINDOWS) {
         // The pre-gate `gateway stop --all` (#70337) took every profile's
         // gateway down for an update that never happened — bring them back.
-        startGatewaysAfterUpdateAbort(venvHermesShimPath(updateRoot))
+        startGatewaysAfterUpdateAbort(venvHermesShimPath(updateRoot, updateVenvRoot))
       }
 
       return { ok: false, error: message }
@@ -4119,17 +4149,23 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
     // malformed output, missing psutil) abort the handoff — never proceed
     // to the detached updater when the venv state is unknown.
     if (IS_WINDOWS) {
-      let scanOutcome = await scanVenvBlockers(updateRoot)
+      let scanOutcome = await scanVenvBlockers(updateRoot, undefined, root => resolveVenvPython(root, updateVenv.python))
 
       if (scanOutcome.kind === 'blocked' && opts.stopSafeBlockers) {
-        const stopResult = await stopSafeVenvBlockers(updateRoot, scanOutcome.result)
+        const stopResult = await stopSafeVenvBlockers(
+          updateRoot,
+          scanOutcome.result,
+          undefined,
+          root => resolveVenvPython(root, updateVenv.python)
+        )
+
         rememberLog(
           `[updates] user-approved blocker cleanup: stopped=${stopResult.stopped.join(',') || 'none'} failed=${stopResult.failed.join(',') || 'none'}`
         )
         // Let verified process-tree termination finish unwinding wrapper shells,
         // then make the scanner — not the stale renderer payload — authoritative.
         await new Promise(resolve => setTimeout(resolve, 300))
-        scanOutcome = await scanVenvBlockers(updateRoot)
+        scanOutcome = await scanVenvBlockers(updateRoot, undefined, root => resolveVenvPython(root, updateVenv.python))
       }
 
       // Re-scan before aborting on 'blocked' (#74805). Process-table teardown
@@ -4146,7 +4182,7 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
           `[updates] venv-blocker scan reported ${scanOutcome.result.processes.length} holder(s); re-scanning after settle (attempt ${attempt + 2}/3)`
         )
         await new Promise(resolve => setTimeout(resolve, 1500))
-        scanOutcome = await scanVenvBlockers(updateRoot)
+        scanOutcome = await scanVenvBlockers(updateRoot, undefined, root => resolveVenvPython(root, updateVenv.python))
       }
 
       if (scanOutcome.kind === 'blocked') {
@@ -4157,7 +4193,7 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
         startHermes().catch(() => {})
         // Restore the gateways the pre-gate stop took down (#70337 drain
         // semantics): the update aborted, so nothing else will relaunch them.
-        startGatewaysAfterUpdateAbort(venvHermesShimPath(updateRoot))
+        startGatewaysAfterUpdateAbort(venvHermesShimPath(updateRoot, updateVenvRoot))
 
         return { ok: false, error: 'venv-blocked', message, blockers: scanOutcome.result.processes }
       }
@@ -4169,7 +4205,7 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
         emitUpdateProgress({ stage: 'error', message, percent: null })
         startHermes().catch(() => {})
         // Same drain-semantics restore as the venv-blocked abort above.
-        startGatewaysAfterUpdateAbort(venvHermesShimPath(updateRoot))
+        startGatewaysAfterUpdateAbort(venvHermesShimPath(updateRoot, updateVenvRoot))
 
         return { ok: false, error: 'venv-probe-failed', message }
       }
@@ -4202,6 +4238,10 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
       const wrapped = wrapHandoffForDetachedConsole(scriptHandoff, [
         '-InstallRoot',
         updateRoot,
+        '-VenvRoot',
+        updateVenvRoot,
+        '-PythonPath',
+        updatePythonPath,
         '-Branch',
         branch,
         '-DesktopPid',
@@ -4300,7 +4340,7 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
 
       if (IS_WINDOWS) {
         // Same drain-semantics restore as the earlier abort paths (#70337).
-        startGatewaysAfterUpdateAbort(venvHermesShimPath(updateRoot))
+        startGatewaysAfterUpdateAbort(venvHermesShimPath(updateRoot, updateVenvRoot))
       }
 
       return { ok: false, error: 'updater-spawn-failed', message }
@@ -4562,6 +4602,25 @@ async function applyUpdatesPosixHandoff(opts: any) {
     return { ok: false, error: 'update-already-running', message: handoffConflict.message }
   }
 
+  const activeBackendProcess = backendConnectionState.getProcess()
+  const runningPython = typeof activeBackendProcess?.spawnfile === 'string' ? activeBackendProcess.spawnfile : null
+  const updateRuntimePython = runningPython ?? await findPythonForRoot(updateRoot)
+  const updateVenv = resolveUpdateVenv(updateRoot, {
+    runtimePython: updateRuntimePython,
+    virtualEnv: process.env.VIRTUAL_ENV,
+    installationSource: 'managed',
+    runtimeMode: 'managed'
+  })
+  const environmentError = updateVenv.error ?? probeUpdateVenv(updateRoot, updateVenv)
+  if (environmentError || !updateVenv.root || !updateVenv.python) {
+    const message = `Update aborted before hand-off: ${environmentError ?? 'project Python target is incomplete'}`
+    rememberLog(`[updates] ${message}`)
+    emitUpdateProgress({ stage: 'error', message, percent: null })
+    return { ok: false, error: 'invalid-update-environment', message }
+  }
+  const updateVenvRoot = updateVenv.root
+  const updatePythonPath = updateVenv.python
+
   // ── Pre-flight state.db integrity guard (#68474) ──
   preflightStateDb(STARDUST_HOME, rememberLog)
 
@@ -4580,7 +4639,19 @@ async function applyUpdatesPosixHandoff(opts: any) {
     // best effort
   }
 
-  const args = [...handoff.args, '--install-root', updateRoot, '--branch', branch, '--desktop-pid', String(process.pid)]
+  const args = [
+    ...handoff.args,
+    '--install-root',
+    updateRoot,
+    '--venv-root',
+    updateVenvRoot,
+    '--python-path',
+    updatePythonPath,
+    '--branch',
+    branch,
+    '--desktop-pid',
+    String(process.pid)
+  ]
   const updateStartedAt = Math.floor(Date.now() / 1000)
 
   // Relaunch target: the running .app bundle on mac (script swaps the
@@ -4614,8 +4685,9 @@ async function applyUpdatesPosixHandoff(opts: any) {
     env: {
       ...process.env,
       STARDUST_HOME,
+      VIRTUAL_ENV: updateVenvRoot,
       STARDUST_UPDATE_STARTED_AT: String(updateStartedAt),
-      PATH: pathWithHermesManagedNode(path.join(updateRoot, 'venv', 'bin'))
+      PATH: pathWithHermesManagedNode(path.join(updateVenvRoot, 'bin'))
     },
     detached: true,
     stdio: 'ignore'

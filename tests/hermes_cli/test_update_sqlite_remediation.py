@@ -9,7 +9,12 @@ import hermes_cli.update_cmd_deps as update_cmd_deps
 
 
 def test_runtime_status_probes_running_venv_outside_checkout(tmp_path, monkeypatch):
-    running_python = tmp_path / "venv312" / "bin" / "python"
+    bin_dir = "Scripts" if update_cmd._m()._is_windows() else "bin"
+    python_name = "python.exe" if update_cmd._m()._is_windows() else "python"
+    running_python = tmp_path / "venv312" / bin_dir / python_name
+    running_python.parent.mkdir(parents=True)
+    running_python.write_bytes(b"fixture")
+    monkeypatch.setenv("VIRTUAL_ENV", str(running_python.parent.parent))
     observed = []
     vulnerable = SimpleNamespace(wal_reset_vulnerable=True)
     monkeypatch.setattr("hermes_constants.project_venv_dir", lambda _root: None)
@@ -68,6 +73,33 @@ def test_summary_withholds_success_when_sqlite_remediation_failed(capsys, monkey
     assert "venv" not in out
     assert "install-stardust.sh | bash" in out
     assert "stardust doctor" in out
+
+
+def test_summary_withholds_success_when_python_health_probe_failed(capsys, monkeypatch):
+    monkeypatch.setattr(
+        update_cmd,
+        "_post_update_sqlite_runtime_status",
+        lambda: (True, SimpleNamespace(wal_reset_vulnerable=False)),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        update_cmd_maint,
+        "_post_update_sqlite_runtime_status",
+        lambda: (True, SimpleNamespace(wal_reset_vulnerable=False)),
+        raising=False,
+    )
+
+    complete = update_cmd._print_update_summary(
+        node_failures=[],
+        desktop_build_ok=True,
+        pre_update_version=None,
+        python_deps_ok=False,
+    )
+
+    out = capsys.readouterr().out
+    assert not complete
+    assert "Update complete" not in out
+    assert "Python" in out
 
 
 def test_sqlite_partial_message_is_shared_and_names_windows_installer(capsys, monkeypatch):

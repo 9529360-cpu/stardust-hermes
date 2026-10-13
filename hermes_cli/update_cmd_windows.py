@@ -118,6 +118,17 @@ def _lower_dir_prefix(path: Path) -> str:
     return raw.lower().rstrip(os.sep) + os.sep
 
 
+def _active_project_venv_resolution():
+    """The one interpreter/environment target shared by Windows holder scans and lock gates."""
+    from hermes_cli.update_cmd import _m
+    from hermes_constants import resolve_current_project_venv
+
+    try:
+        return resolve_current_project_venv(_m().PROJECT_ROOT, windows=True)
+    except Exception:
+        return None
+
+
 def _psutil():
     """The ``psutil`` module, or ``None`` when it can't be imported (callers degrade, never raise)."""
     try:
@@ -146,7 +157,10 @@ def _detect_venv_python_processes(*, exclude_pids: set[int] | None = None) -> li
     psutil = _psutil()
     if not _m()._is_windows() or psutil is None:
         return []
-    venv_prefix = _lower_dir_prefix(_m().PROJECT_ROOT / "venv")
+    resolution = _active_project_venv_resolution()
+    if resolution is None or resolution.error or resolution.venv_dir is None:
+        return []
+    venv_prefix = _lower_dir_prefix(resolution.venv_dir)
     root_prefix = _lower_dir_prefix(_m().PROJECT_ROOT)
     skip = set(exclude_pids or set()) | _self_and_non_gateway_ancestor_pids(psutil)
     matches: list[tuple[int, str, str]] = []
@@ -298,7 +312,10 @@ def _venv_launcher_ancestors(pids: list[int]) -> list[int]:
     psutil = _psutil()
     if not _m()._is_windows() or not pids or psutil is None:
         return []
-    venv_prefix = _lower_dir_prefix(_m().PROJECT_ROOT / "venv")
+    resolution = _active_project_venv_resolution()
+    if resolution is None or resolution.error or resolution.venv_dir is None:
+        return []
+    venv_prefix = _lower_dir_prefix(resolution.venv_dir)
     skip = _self_and_non_gateway_ancestor_pids(psutil) | set(pids)
     found: list[int] = []
     for pid in pids:
@@ -1319,6 +1336,14 @@ def _clear_windows_venv_holders_or_exit(args, gateway_mode: bool, _windows_gatew
     def _resume_and_exit():
         _m()._resume_windows_gateways_after_update(_windows_gateway_resume)
         sys.exit(2)
+
+    resolution = _active_project_venv_resolution()
+    if resolution is None or resolution.error or resolution.venv_dir is None:
+        detail = resolution.error if resolution is not None else "active environment identity could not be read"
+        print("✗ Update stopped: cannot safely resolve the active Windows project environment.")
+        print(f"  {detail}")
+        print("  No environment was changed; activate the intended environment and retry.")
+        _resume_and_exit()
 
     holders = _m()._detect_venv_python_processes()
     # Gateways the pause machinery owns (respawned in the pause->guard window or unmapped

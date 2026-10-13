@@ -38,6 +38,8 @@ def _make_managed(tmp_path, monkeypatch, *, relocatable: bool = False):
     root = home / "hermes-agent"
     scripts = root / "venv" / "Scripts"
     scripts.mkdir(parents=True)
+    (scripts / "python.exe").write_bytes(b"MZ Python")
+    monkeypatch.setenv("VIRTUAL_ENV", str(root / "venv"))
     for name in _WINDOWS_BIN_LAUNCHERS:
         (scripts / f"{name}.exe").write_bytes(b"MZ console script: " + name.encode())
     cfg = "home = X\nversion_info = 3.11.15\n"
@@ -158,6 +160,8 @@ def test_profile_session_still_heals_the_shared_bin(tmp_path, monkeypatch):
     root = home / "hermes-agent"
     scripts = root / "venv" / "Scripts"
     scripts.mkdir(parents=True)
+    (scripts / "python.exe").write_bytes(b"MZ Python")
+    monkeypatch.setenv("VIRTUAL_ENV", str(root / "venv"))
     for name in _WINDOWS_BIN_LAUNCHERS:
         (scripts / f"{name}.exe").write_bytes(b"MZ")
     (root / "venv" / "pyvenv.cfg").write_text("home = X\n", encoding="utf-8")

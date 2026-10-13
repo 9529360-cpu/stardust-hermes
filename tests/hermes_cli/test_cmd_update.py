@@ -1142,8 +1142,12 @@ class TestNodeRuntimeNpmResolution:
             )
 
         assert packaged.call_count == 2
+        scripts_name, python_name = (
+            ("Scripts", "python.exe") if hm._is_windows() else ("bin", "python")
+        )
+        expected_python = PROJECT_ROOT / ".venv" / scripts_name / python_name
         desktop_build.assert_called_once_with(
-            [hm.sys.executable, "-m", "hermes_cli.main", "desktop", "--build-only"],
+            [str(expected_python), "-m", "hermes_cli.main", "desktop", "--build-only"],
             cwd=PROJECT_ROOT,
             env=ANY,
         )
@@ -1160,11 +1164,22 @@ class TestNodeRuntimeNpmResolution:
         """
         import zipfile
 
+        import hermes_constants
         from hermes_cli import main as hm
         from hermes_cli import update_cmd
 
+        # Keep every platform consumer in this Windows scenario aligned on POSIX CI.
+        monkeypatch.setattr(hm, "_is_windows", lambda: True)
+        monkeypatch.setattr(hermes_constants.sys, "platform", "win32")
+
         project_root = tmp_path / "hermes-agent"
         (project_root / ".git").mkdir(parents=True)
+        venv_root = project_root / ".venv"
+        # This test simulates the Windows ZIP updater even on a POSIX host.
+        venv_python = venv_root / "Scripts" / "python.exe"
+        venv_python.parent.mkdir(parents=True)
+        venv_python.touch()
+        monkeypatch.setenv("VIRTUAL_ENV", str(venv_root))
         desktop_dir = project_root / "apps" / "desktop"
         packaged_exe = desktop_dir / "release" / "win-unpacked" / "Stardust.exe"
         packaged_exe.parent.mkdir(parents=True)
@@ -1186,7 +1201,6 @@ class TestNodeRuntimeNpmResolution:
             return subprocess.CompletedProcess([], 0, stdout="", stderr="")
 
         monkeypatch.setattr(hm, "PROJECT_ROOT", project_root)
-        monkeypatch.setattr(hm, "_is_windows", lambda: True)
         monkeypatch.setattr(hm, "_run_pre_update_backup", lambda _args: None)
         monkeypatch.setattr(hm, "_pause_windows_gateways_for_update", lambda: None)
         monkeypatch.setattr(hm, "_get_origin_url", lambda *_args: "")

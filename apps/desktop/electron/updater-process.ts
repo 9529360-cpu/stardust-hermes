@@ -4,10 +4,28 @@ import path from 'node:path'
 
 import { hiddenWindowsChildOptions } from './windows-child-options'
 
+export interface DevelopmentWorkspaceManualUpdate {
+  command: string
+  message: string
+}
+
+/** Keep source checkouts out of automatic branch/environment-changing updates. */
+export function developmentWorkspaceManualUpdateMessage(isPackaged: boolean): DevelopmentWorkspaceManualUpdate | null {
+  if (isPackaged) {
+    return null
+  }
+
+  return {
+    command: 'stardust update',
+    message:
+      'Automatic updates are disabled for development workspaces. Run `stardust update` manually from the intended branch and virtual environment; the desktop button will not switch branches, stash changes, or create another environment.'
+  }
+}
+
 /** File prerequisites only: dependency recovery must remain reachable through update. */
-export function windowsUpdatePrerequisiteError(updateRoot: string): string | null {
+export function windowsUpdatePrerequisiteError(updateRoot: string, pythonPath?: string | null): string | null {
   const maintainedDir = path.join(updateRoot, 'scripts', 'desktop-update')
-  const required = [path.join(updateRoot, 'venv', 'Scripts', 'python.exe')]
+  const required = [pythonPath ?? path.join(updateRoot, 'venv', 'Scripts', 'python.exe')]
 
   // Pre-reorg flat scripts remain supported; damaged modern trees do not.
   if (existsSync(maintainedDir)) {

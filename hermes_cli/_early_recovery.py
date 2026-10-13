@@ -144,10 +144,10 @@ def _read_marker_attempts(marker_path: Path) -> int:
         return 0
 
 
-def _run_ensurepip(root: Path) -> None:
-    """Best-effort pip bootstrap — a killed install can leave the venv with no pip module at all."""
+def _run_ensurepip(root: Path, python_exe: str | None = None) -> None:
+    """Best-effort pip bootstrap in the selected interpreter."""
     try:
-        subprocess.run([sys.executable, "-m", "ensurepip", "--upgrade", "--default-pip"],
+        subprocess.run([python_exe or sys.executable, "-m", "ensurepip", "--upgrade", "--default-pip"],
                        cwd=root, capture_output=True)
     except Exception:
         pass
@@ -325,24 +325,28 @@ def _run_installer(tool: str, cmd: list[str], root: Path, env: dict | None = Non
 
 
 def _run_repair_install(specs: list[str], project_root: Path) -> bool:
-    """``uv pip`` (or stdlib ``pip``) force-reinstall of the given specs. Never raises.
+    """Force-reinstall dependencies only in the explicitly resolved active project environment."""
+    from hermes_constants import resolve_current_project_venv
 
-    Streams nothing to stdout (``stardust acp`` speaks JSON-RPC on stdout). uv is preferred when the
-    base interpreter is externally managed; without uv, pip runs with the PEP 668 override.
-    """
+    resolution = resolve_current_project_venv(project_root, windows=sys.platform == "win32")
+    if resolution.error or resolution.venv_dir is None or resolution.python is None:
+        detail = resolution.error or "the active project interpreter could not be resolved"
+        print(f"  ✗ Early venv repair stopped: {detail}. No environment was modified.", file=sys.stderr)
+        return False
+    python_exe = str(resolution.python)
     externally_managed = _base_interpreter_is_externally_managed()
     if externally_managed:
         uv = _find_uv_binary()
         if uv:
-            env = {**os.environ, "VIRTUAL_ENV": str(project_root / "venv")}
+            env = {**os.environ, "VIRTUAL_ENV": str(resolution.venv_dir)}
             env.pop("PYTHONHOME", None)
             env.pop("PYTHONPATH", None)
             return _run_installer("uv", [uv, "pip", "install", "--force-reinstall", *specs],
                                   project_root, env)
         print("  ⚠ Base interpreter is externally managed and no uv binary was "
               "found; retrying repair via pip with PEP 668 override.", file=sys.stderr)
-    _run_ensurepip(project_root)
-    pip_cmd = [sys.executable, "-m", "pip", "install", "--force-reinstall"]
+    _run_ensurepip(project_root, python_exe)
+    pip_cmd = [python_exe, "-m", "pip", "install", "--force-reinstall"]
     if externally_managed:
         pip_cmd.append("--break-system-packages")
     return _run_installer("pip", pip_cmd + specs, project_root)
