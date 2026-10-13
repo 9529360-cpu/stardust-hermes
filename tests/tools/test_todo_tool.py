@@ -50,6 +50,20 @@ class TestWriteAndRead:
             {"id": "2", "content": "Verify freed space", "status": "pending"},
         ]
 
+    def test_multiple_active_items_keep_first_and_report_normalization(self):
+        store = TodoStore()
+        result = json.loads(todo_tool(todos=[
+            {"id": "1", "content": "Current task", "status": "in_progress"},
+            {"id": "2", "content": "Next task", "status": "in_progress"},
+        ], store=store))
+
+        assert [(item["id"], item["status"]) for item in result["todos"]] == [
+            ("1", "in_progress"),
+            ("2", "pending"),
+        ]
+        assert result["summary"]["in_progress"] == 1
+        assert result["warnings"] and "Only one todo" in result["warnings"][0]
+
 
 class TestHasItems:
     def test_empty_store(self):
@@ -128,6 +142,22 @@ class TestMergeMode:
             {"id": "2", "content": "Verify freed space", "status": "pending"},
         ]
 
+    def test_merge_does_not_activate_a_second_item(self):
+        store = TodoStore()
+        store.write([
+            {"id": "1", "content": "Current task", "status": "in_progress"},
+            {"id": "2", "content": "Next task", "status": "pending"},
+        ])
+
+        result = json.loads(todo_tool(
+            todos=[{"id": "2", "status": "in_progress"}], merge=True, store=store,
+        ))
+
+        by_id = {item["id"]: item for item in result["todos"]}
+        assert by_id["1"]["status"] == "in_progress"
+        assert by_id["2"]["status"] == "pending"
+        assert result["warnings"]
+
 
 class TestTodoToolFunction:
     def test_read_mode(self):
@@ -145,6 +175,16 @@ class TestTodoToolFunction:
 
 
 class TestTodoStoreSnapshots:
+    def test_restore_normalizes_multiple_active_items(self):
+        store = TodoStore()
+        items = store.restore([
+            {"id": "1", "content": "Current task", "status": "in_progress"},
+            {"id": "2", "content": "Next task", "status": "in_progress"},
+        ], revision=7)
+
+        assert [item["status"] for item in items] == ["in_progress", "pending"]
+        assert store.snapshot()["revision"] == 7
+
     def test_revision_only_advances_when_state_changes(self):
         store = TodoStore()
         items = [{"id": "1", "content": "Task", "status": "pending"}]
