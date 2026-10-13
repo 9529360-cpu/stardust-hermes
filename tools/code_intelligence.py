@@ -1,4 +1,4 @@
-"""Compact language-server navigation, code action previews, and symbol renaming."""
+"""Compact language-server navigation, code action previews, and safe refactoring."""
 from __future__ import annotations
 
 import difflib
@@ -11,10 +11,11 @@ from tools.registry import registry
 
 _ACTIONS = (
     "definition", "implementation", "type_definition", "references", "hover", "code_actions",
-    "document_symbols", "workspace_symbols", "rename",
+    "apply_code_action", "document_symbols", "workspace_symbols", "rename",
 )
 _POSITION_ACTIONS = {
-    "definition", "implementation", "type_definition", "references", "hover", "code_actions", "rename",
+    "definition", "implementation", "type_definition", "references", "hover", "code_actions",
+    "apply_code_action", "rename",
 }
 _SYMBOL_KINDS = {
     1: "file", 2: "module", 3: "namespace", 4: "package", 5: "class", 6: "method",
@@ -27,18 +28,20 @@ _SYMBOL_KINDS = {
 SCHEMA = {
     "name": "code_intelligence",
     "description": (
-        "Use the project's language server for precise code navigation, code action previews, and symbol rename before broad text search: "
+        "Use the project's language server for precise code navigation, code action previews, and safe refactoring before broad text search: "
         "find a symbol's definition, implementation, type definition, or references; inspect hover/type information; list file symbols; "
-        "search workspace symbols; preview bounded code action edits without applying them or executing server commands; "
-        "or rename a symbol across files. Rename applies through Stardust's "
-        "existing guarded patch tool by default; set apply=false to preview. Locations use 1-based lines and columns."
+        "search workspace symbols; preview bounded code action edits without executing server commands; "
+        "apply one selected text edit through Stardust's guarded patch path; "
+        "or rename a symbol across files. Rename applies through Stardust's existing guarded patch tool by default; "
+        "set apply=false to preview. Applying a code action requires the exact title from a current preview. "
+        "Locations use 1-based lines and columns."
     ),
     "parameters": {
         "type": "object",
         "properties": {
             "action": {
                 "type": "string", "enum": list(_ACTIONS),
-                "description": "Semantic query to run; code_actions previews workspace edits and never executes server commands.",
+                "description": "Semantic query to run; code_actions previews edits, apply_code_action uses action_index and action_title from that preview to apply one edit through the guarded patch path, and neither action executes server commands.",
             },
             "path": {
                 "type": "string",
@@ -49,12 +52,12 @@ SCHEMA = {
             },
             "line": {
                 "type": "integer", "minimum": 1,
-                "description": "1-based source line for definition, implementation, type_definition, references, hover, or code_actions.",
+                "description": "1-based source line for definition, implementation, type_definition, references, hover, code_actions, or apply_code_action.",
             },
             "character": {
                 "type": "integer", "minimum": 1, "default": 1,
                 "description": (
-                    "1-based character column for definition, implementation, type_definition, references, hover, or code_actions "
+                    "1-based character column for definition, implementation, type_definition, references, hover, code_actions, or apply_code_action "
                     "(defaults to the start of the line)."
                 ),
             },
@@ -69,6 +72,14 @@ SCHEMA = {
             },
             "new_name": {
                 "type": "string", "description": "Required new symbol name for rename; must be a valid identifier for the language."
+            },
+            "action_title": {
+                "type": "string",
+                "description": "Exact title from a recent code_actions preview; required by apply_code_action to guard against a changed action list.",
+            },
+            "action_index": {
+                "type": "integer", "minimum": 0, "maximum": 7,
+                "description": "Zero-based index from a recent code_actions preview; required with action_title to select one current action.",
             },
             "apply": {
                 "type": "boolean", "default": True,
@@ -333,7 +344,7 @@ def _code_action_previews(raw: Any, source_path: str, limit: int) -> Tuple[List[
         title = item.get("title")
         row: Dict[str, Any] = {
             "index": index,
-            "title": str(title)[:200] if title is not None else "Untitled code action",
+            "title": str(title)[:500] if title is not None else "Untitled code action",
         }
         kind = item.get("kind")
         if isinstance(kind, str):
@@ -384,6 +395,105 @@ def _code_action_previews(raw: Any, source_path: str, limit: int) -> Tuple[List[
     return previews, truncated
 
 
+def _workspace_patch_parts(
+    updates: Dict[str, str], originals: Dict[str, str]
+) -> Tuple[List[str], List[str], Optional[str]]:
+    """Build guarded-patch updates only while every LSP source file is unchanged."""
+    paths: List[str] = []
+    parts: List[str] = []
+    try:
+        for path, new_text in updates.items():
+            if Path(path).read_text(encoding="utf-8", errors="replace") != originals[path]:
+                raise ValueError(f"workspace edit target changed while preparing the edit: {path}")
+            patch = _v4a_update(path, originals[path], new_text)
+            if patch:
+                paths.append(path)
+                parts.append(patch)
+    except (OSError, RuntimeError, ValueError) as e:
+        return [], [], str(e)
+    return paths, parts, None
+
+
+def _apply_guarded_patch(
+    patch_parts: List[str], task_id: str, session_id: Optional[str]
+) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """Apply a language-server edit only through Stardust's existing guarded patch tool."""
+    if not patch_parts:
+        return {}, None
+    try:
+        from tools.file_tools import patch_tool
+
+        result_text = patch_tool(
+            mode="patch", patch="*** Begin Patch\n" + "\n".join(patch_parts) + "\n*** End Patch",
+            task_id=task_id, session_id=session_id,
+        )
+    except Exception as e:  # noqa: BLE001
+        return None, f"Could not apply the language-server edit through Stardust's patch tool: {e}"
+    try:
+        result = json.loads(result_text)
+    except (TypeError, json.JSONDecodeError):
+        return None, "Patch tool returned an unstructured result."
+    if not isinstance(result, dict):
+        return None, "Patch tool returned an unstructured result."
+    return result, None
+
+
+def _apply_code_action(
+    args: Dict[str, Any], source_path: str, raw: Any, task_id: str, session_id: Optional[str]
+) -> str:
+    """Apply the selected current LSP text edit through the existing write guards."""
+    from agent.lsp.workspace import resolve_workspace_for_file
+
+    workspace_root, gated = resolve_workspace_for_file(source_path)
+    if not gated or not workspace_root:
+        return _json({"available": False, "action": "apply_code_action", "error": "Applying a code action requires a file inside a Git worktree."})
+
+    title = args["action_title"]
+    index = args["action_index"]
+    values = raw if isinstance(raw, list) else ([raw] if isinstance(raw, dict) else [])
+    selected = values[index] if index < len(values) and isinstance(values[index], dict) else None
+    if selected is None or selected.get("title") != title:
+        return _json({"available": False, "action": "apply_code_action", "error": "That code action changed; preview code actions again and choose a current index and title."})
+    if selected.get("disabled") is not None:
+        reason = selected["disabled"].get("reason") if isinstance(selected["disabled"], dict) else None
+        detail = f": {str(reason)[:300]}" if reason else ""
+        return _json({"available": False, "action": "apply_code_action", "title": title, "error": f"The selected code action is disabled{detail}."})
+    if selected.get("command") is not None:
+        return _json({"available": False, "action": "apply_code_action", "title": title, "error": "The selected action requires a language-server command; commands are not executed."})
+    edit = selected.get("edit")
+    if not isinstance(edit, dict):
+        return _json({"available": False, "action": "apply_code_action", "title": title, "error": "The selected action has no workspace text edit to apply."})
+
+    updates, originals, error = _apply_workspace_edits(edit, workspace_root)
+    if error:
+        return _json({"available": False, "action": "apply_code_action", "title": title, "error": error})
+    if not updates:
+        return _json({"available": True, "action": "apply_code_action", "title": title, "applied": False,
+                      "files_changed": 0, "message": "The selected code action makes no text changes."})
+    paths, patch_parts, error = _workspace_patch_parts(updates, originals)
+    if error:
+        return _json({"available": False, "action": "apply_code_action", "title": title, "error": error})
+    if not patch_parts:
+        return _json({"available": True, "action": "apply_code_action", "title": title, "applied": False,
+                      "files_changed": 0, "message": "The selected code action makes no text changes."})
+
+    result, error = _apply_guarded_patch(patch_parts, task_id, session_id)
+    if error:
+        return _json({"available": False, "action": "apply_code_action", "title": title, "error": error})
+    if result is None:
+        return _json({"available": False, "action": "apply_code_action", "title": title, "error": "Patch tool returned an unstructured result."})
+    modified = result.get("files_modified") or []
+    if result.get("error"):
+        return _json({"available": False, "action": "apply_code_action", "title": title,
+                      "applied": bool(modified), "files_modified": modified, "error": result["error"]})
+    return _json({
+        "available": True, "action": "apply_code_action", "title": title, "action_index": index, "applied": True,
+        "files_changed": len(modified), "files_modified": modified,
+        "lint": result.get("lint"), "lsp_diagnostics": result.get("lsp_diagnostics"),
+        "warning": result.get("_warning"),
+    })
+
+
 def _rename(args: Dict[str, Any], source_path: str, raw: Any, task_id: str, session_id: Optional[str]) -> str:
     from agent.lsp.workspace import resolve_workspace_for_file
     workspace_root, gated = resolve_workspace_for_file(source_path)
@@ -396,26 +506,12 @@ def _rename(args: Dict[str, Any], source_path: str, raw: Any, task_id: str, sess
         return _json({"available": True, "action": "rename", "applied": False, "files_changed": 0, "edits": 0,
                       "message": "The language server found no changes for this symbol."})
     new_name = args["new_name"]
-    patch_paths: List[str] = []
-    patch_parts: List[str] = []
-    try:
-        for path, new_text in updates.items():
-            # Do not base a refactor on a file that changed after the LSP returned its edits.
-            current_text = Path(path).read_text(encoding="utf-8", errors="replace")
-            if current_text != originals[path]:
-                raise ValueError(f"rename target changed while preparing the edit: {path}")
-            # Absolute paths let a workspace-wide rename reach sibling files even when the Agent
-            # session starts in a subdirectory. patch_tool still resolves and guards each path.
-            patch = _v4a_update(path, originals[path], new_text)
-            if patch:
-                patch_paths.append(path)
-                patch_parts.append(patch)
-    except (OSError, RuntimeError, ValueError) as e:
-        return _json({"available": False, "action": "rename", "error": str(e)})
+    patch_paths, patch_parts, error = _workspace_patch_parts(updates, originals)
+    if error:
+        return _json({"available": False, "action": "rename", "error": error})
     if not patch_parts:
         return _json({"available": True, "action": "rename", "applied": False, "files_changed": 0,
                       "edits": 0, "message": "The proposed rename does not change the current files."})
-    patch_text = "*** Begin Patch\n" + "\n".join(patch_parts) + "\n*** End Patch"
     if args.get("apply", True) is not True:
         preview = "\n".join(patch_parts)
         return _json({
@@ -423,6 +519,7 @@ def _rename(args: Dict[str, Any], source_path: str, raw: Any, task_id: str, sess
             "files_changed": len(patch_paths), "edits": sum(len(v) for v in _workspace_edits(raw, workspace_root).values()),
             "diff_preview": preview[:12000], "truncated": len(preview) > 12000,
         })
+    patch_text = "*** Begin Patch\n" + "\n".join(patch_parts) + "\n*** End Patch"
     try:
         from tools.file_tools import patch_tool
         result_text = patch_tool(
@@ -433,6 +530,8 @@ def _rename(args: Dict[str, Any], source_path: str, raw: Any, task_id: str, sess
     try:
         result = json.loads(result_text)
     except (TypeError, json.JSONDecodeError):
+        return _json({"available": False, "action": "rename", "error": "Patch tool returned an unstructured result.", "details": str(result_text)[:4000]})
+    if not isinstance(result, dict):
         return _json({"available": False, "action": "rename", "error": "Patch tool returned an unstructured result.", "details": str(result_text)[:4000]})
     modified = result.get("files_modified") or []
     if result.get("error"):
@@ -479,6 +578,13 @@ def code_intelligence(args: Dict[str, Any], *, task_id: str = "default", session
         new_name = new_name.strip()
     if action == "rename" and not isinstance(args.get("apply", True), bool):
         return _json({"available": False, "error": "apply must be a boolean."})
+    action_title = args.get("action_title", "")
+    action_index = args.get("action_index")
+    if action == "apply_code_action":
+        if not isinstance(action_title, str) or not action_title or len(action_title) > 500:
+            return _json({"available": False, "error": "apply_code_action requires an exact action_title of 1 to 500 characters."})
+        if not isinstance(action_index, int) or isinstance(action_index, bool) or not 0 <= action_index < 8:
+            return _json({"available": False, "error": "apply_code_action requires an action_index from 0 to 7 in a recent preview."})
     limit = args.get("max_results", 20)
     if not isinstance(limit, int) or isinstance(limit, bool):
         limit = 20
@@ -490,8 +596,9 @@ def code_intelligence(args: Dict[str, Any], *, task_id: str = "default", session
         return _json({"available": False, "error": f"Could not initialize the LSP service: {e}"})
     if service is None or not service.is_active():
         return _json({"available": False, "error": "LSP is disabled or unavailable in the current profile."})
+    query_action = "code_actions" if action == "apply_code_action" else action
     response = service.semantic_query_sync(
-        path, action,
+        path, query_action,
         line=(line - 1 if isinstance(line, int) and not isinstance(line, bool) else None),
         character=(character - 1 if isinstance(character, int) and not isinstance(character, bool) else None),
         query=query,
@@ -509,6 +616,8 @@ def code_intelligence(args: Dict[str, Any], *, task_id: str = "default", session
     raw = response.get("result")
     if action == "rename":
         return _rename(args, path, raw, task_id, session_id)
+    if action == "apply_code_action":
+        return _apply_code_action(args, path, raw, task_id, session_id)
     payload: Dict[str, Any] = {"available": True, "action": action, "path": path}
     if action == "code_actions":
         rows, truncated = _code_action_previews(raw, path, limit)
