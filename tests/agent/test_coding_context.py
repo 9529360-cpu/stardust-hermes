@@ -186,14 +186,14 @@ class TestProjectFacts:
         assert facts.verify_commands == ["pnpm run test"]  # dev excluded
         assert facts.context_files == []
 
-    def test_repository_test_wrapper_replaces_bare_pytest_hint(self, tmp_path):
+    def test_repository_test_wrapper_is_listed_before_bare_pytest_hint(self, tmp_path):
         (tmp_path / "scripts").mkdir()
         (tmp_path / "scripts" / "run_tests.sh").write_text("#!/usr/bin/env bash\n")
         (tmp_path / "pyproject.toml").write_text("[tool.pytest.ini_options]\n")
 
         facts = cc.detect_project_facts(tmp_path)
 
-        assert facts.verify_commands == ["scripts/run_tests.sh"]
+        assert facts.verify_commands == ["scripts/run_tests.sh", "pytest"]
 
     def test_project_facts_for_matches_prompt_block(self, tmp_path):
         # Invariant: the structured facts the UI consumes must not drift from the

@@ -490,9 +490,7 @@ def detect_project_facts(root: Path) -> ProjectFacts:
             scripts = {}
         js_pm = next((pm for lock, pm in _JS_LOCKFILES if (root / lock).is_file()), "npm")
         verify.extend(f"{js_pm} run {name}" for name in _VERIFY_TARGETS if name in scripts)
-    if not has_test_wrapper and (
-        (root / "pytest.ini").is_file() or "[tool.pytest" in _read_small(root / "pyproject.toml")
-    ):
+    if (root / "pytest.ini").is_file() or "[tool.pytest" in _read_small(root / "pyproject.toml"):
         verify.append("pytest")
     makefile = _read_small(root / "Makefile")
     verify.extend(
