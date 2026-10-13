@@ -51,10 +51,9 @@ def verify_on_stop_enabled(config: dict[str, Any] | None = None) -> bool:
     """Return whether edit -> verify-before-finish behavior is enabled.
 
     Precedence: ``STARDUST_VERIFY_ON_STOP`` env var, then ``agent.verify_on_stop``
-    config; default OFF (opt-in). A bool forces the behavior; ``"auto"`` is the
-    legacy surface-aware mode: ON for interactive coding surfaces and
-    programmatic callers, OFF for messaging surfaces where the verification
-    narrative is chat noise. Missing/unrecognized values fall back to OFF.
+    config. ``DEFAULT_CONFIG`` uses ``"auto"``: ON for interactive coding
+    surfaces and programmatic callers, OFF for messaging surfaces. A bool forces
+    the behavior everywhere; missing or unrecognized values fail closed to OFF.
     """
     env = os.environ.get("STARDUST_VERIFY_ON_STOP")
     if env is not None:
