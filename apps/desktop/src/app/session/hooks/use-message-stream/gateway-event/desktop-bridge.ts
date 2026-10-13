@@ -1,5 +1,6 @@
 import { writeAgentTerminalChunk } from '@/app/right-sidebar/terminal/agent-terminal-stream'
 import { closeAgentTerminalByProc } from '@/app/right-sidebar/terminal/terminals'
+import { connectHostBrowserForAgent } from '@/app/settings/browser-host-connect-agent'
 import { applyDesktopLayoutPreset, revealDesktopPane } from '@/store/pane-focus'
 import { recordAgentReaction } from '@/store/reactions-local'
 import { setMessages } from '@/store/session'
@@ -11,7 +12,7 @@ import type { GatewayEventContext } from './types'
  *  reveal, layouts and message reactions. The read-back REQUESTS the agent
  *  blocks on (terminal/preview/window/tour) live in `server-requests.ts`. */
 export function handleDesktopBridgeEvent(ctx: GatewayEventContext): boolean {
-  const { event, payload, isActiveEvent } = ctx
+  const { event, payload, isActiveEvent, sessionId } = ctx
 
   if (event.type === 'agent.terminal.output') {
     // Live chunk from a background process → its read-only agent terminal tab.
@@ -49,6 +50,18 @@ export function handleDesktopBridgeEvent(ctx: GatewayEventContext): boolean {
         text,
         title: typeof payload?.title === 'string' ? payload.title : undefined
       })
+    }
+
+    return true
+  }
+
+  if (event.type === 'browser.host.connect') {
+    // The agent asked to pair the user's own Chrome (browser connect, after the backend's approval
+    // gate). Same path as the Tools page's Connect Chrome button. On-screen chat from the active
+    // source only: a background chat must not start a bridge the user is not looking at.
+    if (isActiveEvent && sessionId && ctx.fromActiveSource()) {
+      const profileDir = typeof payload?.chrome_profile_dir === 'string' ? payload.chrome_profile_dir : ''
+      void connectHostBrowserForAgent(sessionId, profileDir)
     }
 
     return true

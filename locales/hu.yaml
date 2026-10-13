@@ -18,6 +18,7 @@ approval:
   denied:          "      ✗ Elutasítva"
   cancelled:       "      ✗ Megszakítva"
   blocklist_message: "Ez a parancs a feltétel nélküli tiltólistán van, és nem hagyható jóvá."
+  browser_host_connect: "Csatlakoztassa ezt a csevegést a saját Chrome-hoz, beleértve azokat a webhelyeket is, amelyekre be van jelentkezve"
 
 gateway:
   approval_expired: "⚠️ A jóváhagyás lejárt (az ügynök már nem vár). Kérd meg az ügynököt, hogy próbálja újra."

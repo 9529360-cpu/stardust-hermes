@@ -1956,6 +1956,9 @@ export const zh = defineLocale({
         working: '处理中…',
         connectedTitle: 'Chrome 已连接',
         connectedMessage: '每个操作获得批准后，此对话即可使用已配对的 Chrome 配置文件。',
+        agentConnectingTitle: '正在连接你的 Chrome',
+        agentConnectingMessage:
+          '这个对话正在接入你已打开的 Chrome，会用到你已登录的网站。',
         connectFailed: '无法连接 Chrome',
         disconnectFailed: '无法断开 Chrome 连接',
         noSession: '请先打开或选择一个 Desktop 对话。',

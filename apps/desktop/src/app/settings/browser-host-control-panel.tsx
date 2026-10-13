@@ -3,39 +3,21 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { type ProfileScope, profileScopeKey, saveHermesConfigRecord } from '@/hermes'
+import { type ProfileScope, profileScopeKey } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { requestGatewayForProfile } from '@/store/gateway'
 import { notify, notifyError } from '@/store/notifications'
 import { $activeSessionId } from '@/store/session'
 
+import {
+  type BridgeStatus,
+  type BrowserBridgeStatus,
+  connectHostBrowser,
+  DEFAULT_CHROME_PROFILE_DIR,
+  isChromeProfileDir,
+  reconcileBridgeStatus
+} from './browser-host-connect'
 import { ListRow } from './primitives'
-
-const PLAYWRIGHT_MCP_PACKAGE = '@playwright/mcp@0.0.83'
-const DEFAULT_CHROME_PROFILE_DIR = 'Default'
-
-const BROWSER_CONTROL_CAPABILITIES = [
-  'browser_navigate',
-  'browser_snapshot',
-  'browser_click',
-  'browser_type',
-  'browser_scroll',
-  'browser_press',
-  'browser_back',
-  'browser_tabs'
-]
-
-type BridgeStatus = 'inactive' | 'starting' | 'connected' | 'stopping' | 'error'
-
-type BrowserBridgeStatus = {
-  state?: BridgeStatus | 'stopped'
-  status?: BridgeStatus
-  error?: string
-  session_id?: string
-  controller_id?: string
-  browser_profile_id?: string
-  capabilities?: string[]
-}
 
 interface BrowserHostControlPanelProps {
   profile?: ProfileScope
@@ -94,15 +76,17 @@ export function BrowserHostControlPanel({ profile }: BrowserHostControlPanelProp
     }
 
     try {
-      const result = await requestGatewayForProfile<BrowserBridgeStatus>(
-        profileKey,
-        'browser.controller.bridge_status',
-        { session_id: activeSessionId }
-      )
+      const [backend, local] = await Promise.all([
+        requestGatewayForProfile<BrowserBridgeStatus>(profileKey, 'browser.controller.bridge_status', {
+          session_id: activeSessionId
+        }),
+        window.stardustDesktop?.browserControl?.status?.().catch(() => null) ?? null
+      ])
 
-      setStatus(result || { state: 'inactive', status: 'inactive' })
+      const result = reconcileBridgeStatus(backend, local, activeSessionId)
+      setStatus(result)
 
-      if (result?.controller_id) {
+      if (result.controller_id) {
         setControllerId(result.controller_id)
       }
     } catch (error) {
@@ -161,7 +145,7 @@ export function BrowserHostControlPanel({ profile }: BrowserHostControlPanelProp
 
     const profileDir = chromeProfileDir.trim()
 
-    if (!/^[\w .-]{1,90}$/.test(profileDir)) {
+    if (!isChromeProfileDir(profileDir)) {
       notifyError(new Error(copy.invalidProfile), copy.connectFailed)
 
       return
@@ -170,27 +154,11 @@ export function BrowserHostControlPanel({ profile }: BrowserHostControlPanelProp
     setBusy(true)
 
     try {
-      const browserProfileId = `chrome-${btoa(profileDir).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '')}`
-      await saveHermesConfigRecord({ browser: { extension_control: { enabled: true } } }, profile)
-
-      const prepared = await requestGatewayForProfile<Record<string, unknown>>(
-        profileKey,
-        'browser.controller.bridge_prepare',
-        {
-          session_id: activeSessionId,
-          browser_profile_id: browserProfileId,
-          capabilities: BROWSER_CONTROL_CAPABILITIES,
-          protocol_version: 1
-        }
-      )
-
-      const launchContext = prepared?.launch_context || prepared
-
-      const started = await window.stardustDesktop.browserControl.start({
-        profile: profileKey,
-        launchContext,
+      const started = await connectHostBrowser({
         chromeProfileDir: profileDir,
-        packageSpec: PLAYWRIGHT_MCP_PACKAGE
+        profile,
+        profileKey,
+        sessionId: activeSessionId
       })
 
       setStatus(started)

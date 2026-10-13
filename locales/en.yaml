@@ -28,6 +28,7 @@ approval:
   denied:          "      ✗ Denied"
   cancelled:       "      ✗ Cancelled"
   blocklist_message: "This command is on the unconditional blocklist and cannot be approved."
+  browser_host_connect: "Connect this chat to your own Chrome, including the sites you are signed in to"
 
 gateway:
   # Messenger replies to slash commands and implicit state changes.

@@ -1,8 +1,13 @@
 import { EventEmitter } from 'node:events'
+import path from 'node:path'
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { BrowserControlBridgeSupervisor, validateBridgeLaunchContext } from './browser-control-bridge-supervisor'
+import {
+  BrowserControlBridgeSupervisor,
+  packagedBrowserBridgeEntry,
+  validateBridgeLaunchContext
+} from './browser-control-bridge-supervisor'
 
 const context = {
   grant: 'normal-grant',
@@ -145,5 +150,22 @@ describe('BrowserControlBridgeSupervisor', () => {
     next.emit('error', new Error('ENOENT'))
     expect(failing.status()).toMatchObject({ status: 'error', error: 'Error: ENOENT' })
     await failing.stop()
+  })
+})
+
+describe('packagedBrowserBridgeEntry', () => {
+  // Field case 2026-10-12: the packaged app carried the bridge .mjs files without @playwright/mcp, so
+  // Connect Chrome could not start. The staged bridge now lives beside its packages, outside the asar.
+  it('points at the asar-unpacked staged bridge', () => {
+    const appPath = path.join('C:', 'Stardust', 'resources', 'app.asar')
+    const expected = path.join('C:', 'Stardust', 'resources', 'app.asar.unpacked', 'dist', 'browser-bridge', 'src', 'main.mjs')
+    const seen: string[] = []
+
+    expect(packagedBrowserBridgeEntry(appPath, file => (seen.push(file), true))).toBe(expected)
+    expect(seen).toEqual([expected])
+  })
+
+  it('reports a missing staged bridge instead of guessing another path', () => {
+    expect(packagedBrowserBridgeEntry(path.join('C:', 'Stardust', 'resources', 'app.asar'), () => false)).toBeNull()
   })
 })

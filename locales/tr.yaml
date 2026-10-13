@@ -18,6 +18,7 @@ approval:
   denied:          "      ✗ Reddedildi"
   cancelled:       "      ✗ İptal edildi"
   blocklist_message: "Bu komut koşulsuz engelleme listesinde ve onaylanamaz."
+  browser_host_connect: "Bu sohbeti, oturum açtığınız siteler de dahil olmak üzere kendi Chrome’unuza bağlayın"
 
 gateway:
   approval_expired: "⚠️ Onay süresi doldu (ajan artık beklemiyor). Ajanın tekrar denemesini isteyin."

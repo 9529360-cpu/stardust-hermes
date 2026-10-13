@@ -1,7 +1,7 @@
 ---
 name: computer-use
 description: "Drive the desktop background-first; escalate on signal."
-version: 2.1.0
+version: 2.2.0
 author: Francesco Bonacci (f-trycua), Hermes Agent
 license: MIT
 platforms: [macos, windows, linux]
@@ -198,6 +198,16 @@ tools (or `browser_exec` when the Browser Use CLI backend is active); their
 own schemas document the current contract. Reserve `computer_use` for browser
 *chrome* (the address bar, permission prompts, extension popups, native
 dialogs) and anything else on screen that isn't page content.
+
+**Connecting the user's own Chrome is setup you do yourself.** When the user
+asked you to use their Chrome, call `browser(action="connect", target="host")`;
+Stardust asks them once. Until that connection exists the browser tools cannot
+reach Chrome, so the setup pages are yours to drive with `computer_use`: open the
+official Chrome Web Store page for the Playwright MCP Bridge extension in that
+Chrome and add it if it is missing, then approve the extension's connection or
+tab-picker page. Do not send the user to settings for any of this. Only a Chrome
+sign-in or a system prompt you cannot reach goes back to them, and never type a
+password for them.
 
 ### Key shortcuts vary per platform
 

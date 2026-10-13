@@ -459,6 +459,36 @@ function includesCronRoutineTrigger(value: unknown): boolean {
 }
 
 /**
+ * A marker that makes the mock call the real browser tool's `connect` action, so the backend's approval
+ * gate, the `browser.host.connect` event and the desktop's Chrome pairing path all run for real.
+ */
+export const CHROME_CONNECT_TRIGGER = 'E2E_CHROME_CONNECT_TRIGGER'
+export const CHROME_CONNECT_REPLY = '已请求连接你的 Chrome。'
+
+const CHROME_CONNECT_TURN: ScriptedTurn = {
+  text: '',
+  toolCalls: [{ name: 'browser', args: { action: 'connect', target: 'host' } }],
+}
+
+const CHROME_CONNECT_REPLY_TURN: ScriptedTurn = { text: CHROME_CONNECT_REPLY }
+
+function includesMarker(value: unknown, marker: string): boolean {
+  if (typeof value === 'string') {
+    return value.includes(marker)
+  }
+
+  if (Array.isArray(value)) {
+    return value.some(item => includesMarker(item, marker))
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.values(value).some(item => includesMarker(item, marker))
+  }
+
+  return false
+}
+
+/**
  * Per-speaker scripted line for Bot Mode group rooms. A room turn prompt opens
  * with `You are @<handle>` and quotes the user's message verbatim, so one user
  * send can script every member's reply:
@@ -709,6 +739,21 @@ export function startMockServer(options: MockServerOptions = {}): Promise<MockSe
               void heldStreamReleased.then(respond)
             } else {
               respond()
+            }
+
+            return
+          }
+
+          if (includesMarker(parsed.messages, CHROME_CONNECT_TRIGGER)) {
+            // First completion asks to connect; once the tool result is in the history, close the turn.
+            const hasToolResult = Array.isArray(parsed.messages)
+              && parsed.messages.some((message: { role?: string }) => message?.role === 'tool')
+            const turn = hasToolResult ? CHROME_CONNECT_REPLY_TURN : CHROME_CONNECT_TURN
+
+            if (stream) {
+              streamScriptedTurn(res, model, turn)
+            } else {
+              nonStreamingScriptedTurn(res, model, turn)
             }
 
             return

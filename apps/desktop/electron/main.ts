@@ -83,7 +83,7 @@ import {
 } from './bootstrap-platform'
 import { decideBootstrapRepair } from './bootstrap-repair-guard'
 import { runBootstrap } from './bootstrap-runner'
-import { BrowserControlBridgeSupervisor } from './browser-control-bridge-supervisor'
+import { BrowserControlBridgeSupervisor, packagedBrowserBridgeEntry } from './browser-control-bridge-supervisor'
 import {
   BROWSER_WINDOW_HEIGHT,
   BROWSER_WINDOW_MIN_HEIGHT,
@@ -14188,7 +14188,7 @@ function createWindow() {
 
 const browserControlBridgeSupervisor = new BrowserControlBridgeSupervisor({
   resourcesPath: app.getAppPath(),
-  packagedBridgeEntry: app.isPackaged ? appPath => path.join(appPath, 'experiments', 'playwright-mcp-host-bridge', 'src', 'main.mjs') : undefined
+  packagedBridgeEntry: app.isPackaged ? appPath => packagedBrowserBridgeEntry(appPath) : undefined
 })
 
 ipcMain.handle('stardust:browser-control:bridge:start', async (event, payload) => {

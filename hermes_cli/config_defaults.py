@@ -863,8 +863,9 @@ DEFAULT_CONFIG = {
         "focus_saved_tool_progress": "all",
         "skin": "default",
         # UI language for static messages (approval prompts, some gateway slash replies); not agent
-        # responses/logs/tool outputs. en, zh, ja, de, es, fr, tr, uk; unknown → en.
-        "language": "en",
+        # responses/logs/tool outputs. Empty follows the machine UI language (agent/i18n.py); any
+        # language code pins it; unknown codes fall back to English.
+        "language": "",
         # TUI busy indicator: kaomoji | emoji | unicode (braille) | ascii. `/indicator <style>`.
         "tui_status_indicator": "kaomoji",
         # Seconds between idle prompt_toolkit redraws in the classic CLI; keeps wall-clock
