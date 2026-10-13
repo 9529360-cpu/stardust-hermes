@@ -2950,6 +2950,7 @@ export interface Translations {
     goalWaiting: string
     subagents: (count: number) => string
     todos: (done: number, total: number) => string
+    blockedBy: (ids: string[]) => string
     running: string
     cronRun: string
     stop: string

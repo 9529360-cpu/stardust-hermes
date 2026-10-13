@@ -3389,6 +3389,7 @@ export const en: Translations = {
     goalWaiting: 'Goal waiting',
     subagents: count => `${count} Subagent${count === 1 ? '' : 's'}`,
     todos: (done, total) => `Tasks ${done}/${total}`,
+    blockedBy: ids => `Waiting for ${ids.join(', ')}`,
     running: 'Running',
     cronRun: 'Scheduled run',
     stop: 'Stop',

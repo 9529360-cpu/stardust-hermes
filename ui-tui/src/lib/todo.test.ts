@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { todoGlyph, todoTone, todoTree } from './todo.js'
+import { todoBlockers, todoGlyph, todoTone, todoTree } from './todo.js'
 
 describe('todoGlyph', () => {
   it('uses fixed-width ASCII markers so the active row does not render wide or emoji-like', () => {
@@ -68,5 +68,17 @@ describe('todoTree', () => {
       ['a', 0],
       ['b', 0]
     ])
+  })
+})
+
+describe('todoBlockers', () => {
+  it('returns dependencies that are missing or not completed', () => {
+    const todos = [
+      { content: 'Prepare', id: 'setup', status: 'completed' as const },
+      { content: 'Compile', dependsOn: ['setup', 'verify', 'missing'], id: 'build', status: 'pending' as const },
+      { content: 'Verify', id: 'verify', status: 'in_progress' as const }
+    ]
+
+    expect(todoBlockers(todos[1]!, todos)).toEqual(['verify', 'missing'])
   })
 })

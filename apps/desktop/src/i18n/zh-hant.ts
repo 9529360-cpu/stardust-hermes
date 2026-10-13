@@ -3015,6 +3015,7 @@ export const zhHant = defineLocale({
     goalWaiting: '目標等待中',
     subagents: count => `${count} 個子代理`,
     todos: (done, total) => `任務 ${done}/${total}`,
+    blockedBy: ids => `等待：${ids.join('、')}`,
     running: '執行中',
     cronRun: '排程任務',
     stop: '停止',

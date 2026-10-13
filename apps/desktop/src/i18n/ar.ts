@@ -2383,6 +2383,7 @@ export const ar = defineLocale({
     goalWaiting: 'الهدف قيد الانتظار',
     subagents: count => `${count} ${count === 1 ? 'وكيل فرعي' : 'وكيل فرعي'}`,
     todos: (done, total) => `المهام ${done}/${total}`,
+    blockedBy: ids => `بانتظار ${ids.join('، ')}`,
     running: 'قيد التشغيل',
     cronRun: 'تشغيل مجدول',
     stop: 'إيقاف',

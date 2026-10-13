@@ -99,6 +99,18 @@ class TestFormatForInjection:
         assert "Working" in text
         assert "context compression" in text.lower()
 
+    def test_blocked_task_keeps_its_prerequisite_after_compression(self):
+        store = TodoStore()
+        store.write([
+            {"id": "setup", "content": "Prepare fixture", "status": "pending"},
+            {"id": "verify", "content": "Run focused check", "status": "in_progress", "depends_on": ["setup"]},
+        ])
+
+        text = store.format_for_injection()
+
+        assert "verify" in text
+        assert "waiting for: setup" in text
+
 
 class TestMergeMode:
     def test_update_existing_by_id(self):
@@ -124,6 +136,48 @@ class TestMergeMode:
         )
         items = store.read()
         assert len(items) == 2
+
+    def test_merge_can_set_and_clear_dependencies(self):
+        store = TodoStore()
+        store.write([
+            {"id": "setup", "content": "Prepare", "status": "pending"},
+            {"id": "build", "content": "Build", "status": "pending"},
+        ])
+
+        items = store.write([{"id": "build", "depends_on": ["setup"]}], merge=True)
+        assert next(item for item in items if item["id"] == "build")["depends_on"] == ["setup"]
+
+        items = store.write([{"id": "build", "depends_on": []}], merge=True)
+        assert "depends_on" not in next(item for item in items if item["id"] == "build")
+
+
+class TestDependencyGating:
+    def test_incomplete_dependency_blocks_activation_and_reports_reason(self):
+        store = TodoStore()
+        result = json.loads(todo_tool(todos=[
+            {"id": "setup", "content": "Prepare fixture", "status": "pending"},
+            {"id": "verify", "content": "Run focused check", "status": "in_progress", "depends_on": ["setup"]},
+        ], store=store))
+
+        by_id = {item["id"]: item for item in result["todos"]}
+        assert by_id["verify"]["status"] == "pending"
+        assert result["warnings"] and "verify" in result["warnings"][0]
+        assert "setup" in result["warnings"][0]
+
+        result = json.loads(todo_tool(todos=[
+            {"id": "setup", "status": "completed"},
+            {"id": "verify", "status": "in_progress"},
+        ], merge=True, store=store))
+        assert {item["id"]: item["status"] for item in result["todos"]}["verify"] == "in_progress"
+
+    def test_missing_dependency_stays_blocked(self):
+        store = TodoStore()
+        result = json.loads(todo_tool(todos=[
+            {"id": "verify", "content": "Run focused check", "status": "in_progress", "depends_on": ["missing"]},
+        ], store=store))
+
+        assert result["todos"][0]["status"] == "pending"
+        assert "missing" in result["warnings"][0]
 
     def test_merge_reorders_active_item_ahead_of_earlier_pending_step(self):
         store = TodoStore()
@@ -185,6 +239,17 @@ class TestTodoStoreSnapshots:
         assert [item["status"] for item in items] == ["in_progress", "pending"]
         assert store.snapshot()["revision"] == 7
 
+    def test_restore_does_not_resume_a_task_with_unfinished_dependencies(self):
+        store = TodoStore()
+        items = store.restore([
+            {"id": "setup", "content": "Prepare fixture", "status": "pending"},
+            {"id": "verify", "content": "Run check", "status": "in_progress", "depends_on": ["setup"]},
+        ], revision=7)
+
+        assert items[1]["status"] == "pending"
+        assert items[1]["depends_on"] == ["setup"]
+        assert store.snapshot()["revision"] == 7
+
     def test_revision_only_advances_when_state_changes(self):
         store = TodoStore()
         items = [{"id": "1", "content": "Task", "status": "pending"}]
@@ -215,7 +280,7 @@ class TestTodoSessionStatePersistence:
         store = TodoStore()
         store.write([
             {"id": "1", "content": "Keep task alive", "status": "in_progress"},
-            {"id": "2", "content": "Verify result", "status": "pending"},
+            {"id": "2", "content": "Verify result", "status": "pending", "depends_on": ["1"]},
         ])
         with SessionDB(db_path=tmp_path / "state.db") as db:
             db.create_session("todo-session", source="test")
