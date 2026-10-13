@@ -54,7 +54,7 @@ hermes tools                            # curses UI to enable/disable per platfo
 |--------|------|------|
 | `browser` | `browser_back`, `browser_cdp`, `browser_click`, `browser_console`, `browser_dialog`, `browser_get_images`, `browser_navigate`, `browser_press`, `browser_scroll`, `browser_snapshot`, `browser_type`, `browser_vision`, `web_search` | 核心浏览器自动化。包含 `web_search` 作为快速查询的备用方案。`browser_cdp` 和 `browser_dialog` 在运行时受限——仅在会话启动时 CDP 端点可达（通过 `/browser connect`、`browser.cdp_url` 配置、Browserbase 或 Camofox）时才注册。`browser_dialog` 与 `browser_snapshot` 在附加 CDP supervisor 时添加的 `pending_dialogs` 和 `frame_tree` 字段配合使用。 |
 | `clarify` | `clarify` | 当 agent 需要澄清时向用户提问。 |
-| `code_intelligence` | `code_intelligence` | 通过语言服务器导航代码并跨文件重命名符号；包含在 `coding`、`debugging` 与 `hermes-acp` 中。 |
+| `code_intelligence` | `code_intelligence` | 通过语言服务器导航代码、预览代码操作并跨文件重命名符号；包含在 `coding`、`debugging` 与 `hermes-acp` 中。 |
 | `code_execution` | `execute_code` | 运行以编程方式调用 Hermes 工具的 Python 脚本。 |
 | `cronjob` | `cronjob` | 调度和管理周期性任务。 |
 | `debugging` | 复合（`file` + `terminal` + `web` + `code_intelligence`） | 调试套件——文件、进程/终端、语义导航、网页提取/搜索。 |

@@ -7,6 +7,71 @@ from agent.lsp.client import file_uri
 from tools.registry import registry
 
 
+def test_registry_dispatch_previews_code_actions_without_applying_or_leaving_workspace(tmp_path, monkeypatch):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "-C", str(repo), "init", "-q"], check=True)
+    source = repo / "sample.py"
+    original = "count = 1\n"
+    source.write_text(original)
+    outside = tmp_path / "outside.py"
+    outside.write_text("outside = 1\n")
+    monkeypatch.chdir(repo)
+
+    class FakeService:
+        def is_active(self):
+            return True
+
+        def semantic_query_sync(self, *args, **kwargs):
+            return {"available": True, "result": [
+                {
+                    "title": "Rename count to total",
+                    "kind": "refactor.rewrite",
+                    "isPreferred": True,
+                    "edit": {"changes": {file_uri(str(source)): [{
+                        "range": {
+                            "start": {"line": 0, "character": 0},
+                            "end": {"line": 0, "character": 5},
+                        },
+                        "newText": "total",
+                    }]}},
+                },
+                {
+                    "title": "Edit outside the workspace",
+                    "edit": {"changes": {file_uri(str(outside)): [{
+                        "range": {
+                            "start": {"line": 0, "character": 0},
+                            "end": {"line": 0, "character": 7},
+                        },
+                        "newText": "changed",
+                    }]}},
+                },
+                {
+                    "title": "Run server command",
+                    "command": {"title": "Run server command", "command": "test.execute"},
+                },
+            ]}
+
+    monkeypatch.setattr("agent.lsp.get_service", lambda: FakeService())
+    monkeypatch.setattr("tools.file_tools_paths._uses_container_paths", lambda task_id: False)
+    monkeypatch.setattr("tools.file_tools_paths._resolve_path_for_task", lambda path, task_id: repo / path)
+
+    result = json.loads(registry.dispatch("code_intelligence", {
+        "action": "code_actions", "path": "sample.py", "line": 1, "character": 1,
+    }, task_id="task-123"))
+
+    assert result["available"] is True
+    assert result["actions"][0]["preferred"] is True
+    assert result["actions"][0]["files_changed"] == 1
+    assert "*** Begin Patch" in result["actions"][0]["diff_preview"]
+    assert f"*** Update File: {source}" in result["actions"][0]["diff_preview"]
+    assert "-count = 1" in result["actions"][0]["diff_preview"]
+    assert "+total = 1" in result["actions"][0]["diff_preview"]
+    assert "outside the active Git workspace" in result["actions"][1]["preview_error"]
+    assert result["actions"][2]["command_not_run"] is True
+    assert source.read_text() == original
+
+
 @pytest.mark.parametrize("action", ["implementation", "type_definition"])
 def test_registry_dispatch_formats_navigation_locations(tmp_path, monkeypatch, action):
     repo = tmp_path / "repo"

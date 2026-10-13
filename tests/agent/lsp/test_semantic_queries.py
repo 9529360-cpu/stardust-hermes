@@ -25,6 +25,48 @@ async def test_initialize_advertises_navigation_link_support(tmp_path, monkeypat
     text_document = params["capabilities"]["textDocument"]
     assert text_document["implementation"]["linkSupport"] is True
     assert text_document["typeDefinition"]["linkSupport"] is True
+    assert text_document["codeAction"]["isPreferredSupport"] is True
+    assert text_document["codeAction"]["disabledSupport"] is True
+    assert "refactor" in text_document["codeAction"]["codeActionLiteralSupport"]["codeActionKind"]["valueSet"]
+
+
+@pytest.mark.asyncio
+async def test_code_actions_query_sends_range_and_fresh_diagnostics(tmp_path, monkeypatch):
+    source = tmp_path / "sample.py"
+    source.write_text("value = 1\n")
+    client = LSPClient(server_id="pyright", workspace_root=str(tmp_path), command=["unused"])
+    diagnostic = {"message": "unknown name", "severity": 1}
+    seen = {}
+
+    async def sync_file(path, *, language_id="plaintext"):
+        seen["sync"] = (path, language_id)
+
+    def diagnostics_for(path, *, fresh_only=False):
+        seen["diagnostics"] = (path, fresh_only)
+        return [diagnostic]
+
+    async def send_request(method, params, *, timeout):
+        seen["request"] = (method, params, timeout)
+        return []
+
+    monkeypatch.setattr(client, "sync_file_for_query", sync_file)
+    monkeypatch.setattr(client, "diagnostics_for", diagnostics_for)
+    monkeypatch.setattr(client, "_send_request_with_retry", send_request)
+
+    await client.semantic_query(
+        str(source), "code_actions", line=3, character=5, language_id="python",
+    )
+
+    assert seen["sync"] == (str(source), "python")
+    assert seen["diagnostics"] == (str(source), True)
+    method, params, timeout = seen["request"]
+    assert method == "textDocument/codeAction"
+    assert params == {
+        "textDocument": {"uri": file_uri(str(source))},
+        "range": {"start": {"line": 3, "character": 5}, "end": {"line": 3, "character": 5}},
+        "context": {"diagnostics": [diagnostic]},
+    }
+    assert timeout > 0
 
 
 @pytest.mark.parametrize(
