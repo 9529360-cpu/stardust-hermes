@@ -106,6 +106,42 @@ def test_session_mid_finish_is_still_waited_on(registry):
     assert result["completed"] == [s.id]
 
 
+def test_second_finish_cannot_signal_completion_before_the_notice_is_queued(registry, monkeypatch):
+    """Two observers can finish one session: the reader thread at EOF, and the linger's own
+    ``_reconcile_local_exit`` (or a kill). Only the first move queues the completion. When the second
+    move set the completion event while the first was still writing its checkpoint, the linger woke,
+    the quiet parent drained an empty queue and exited without the follow-up turn (the CI flake in
+    test_completed_process_results.py::test_headless_terminal_result_survives_cli_exit, 2026-10-13)."""
+    s = _make_session(exited=True)
+    with registry._lock:
+        registry._running[s.id] = s
+    first_publishing, release_first = threading.Event(), threading.Event()
+    write_checkpoint = registry._write_checkpoint
+
+    def _checkpoint_held_for_first_move():
+        if threading.current_thread() is first_move:
+            first_publishing.set()
+            release_first.wait(30)
+        write_checkpoint()
+
+    monkeypatch.setattr(registry, "_write_checkpoint", _checkpoint_held_for_first_move)
+    first_move = threading.Thread(target=registry._move_to_finished, args=(s,), daemon=True)
+    first_move.start()
+    try:
+        assert first_publishing.wait(30), "the first move never reached its checkpoint write"
+        registry._move_to_finished(s)  # the second observer returns while the first still publishes
+        # The first move finishes publishing only once the linger is polling for it.
+        monkeypatch.setattr(registry, "_reconcile_local_exit", lambda _session: release_first.set())
+        result = registry.wait_for_pending_completions(timeout=30, poll_interval=0.05)
+        drained = registry.drain_notifications()
+    finally:
+        release_first.set()
+        first_move.join(30)
+    assert result == {"waited": [s.id], "completed": [s.id], "timed_out": []}
+    assert [event["session_id"] for event, _text in drained] == [s.id]
+    assert registry.completion_queue.empty()  # one notice, never a late duplicate
+
+
 def test_wait_returns_when_process_completes(registry):
     s = _make_session()
     with registry._lock:
