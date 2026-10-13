@@ -175,6 +175,7 @@ class SubagentWorktreeTests(unittest.TestCase):
         # preserved never gets looked at. Assert the actionable invariants
         # (flag set; note names the worktree + branch), not the prose.
         self.assertTrue(payload["inspection_failed"])
+        self.assertIsNone(payload["dirty"])
         self.assertIn(info["path"], payload["note"])
         self.assertIn(info["branch"], payload["note"])
 
@@ -209,9 +210,9 @@ class SubagentWorktreeTests(unittest.TestCase):
         self.assertFalse(bad_payload["pruned"])
         self.assertTrue(os.path.isdir(bad_info["path"]))
         self.assertTrue((bad_wt / "WIP.txt").exists())
-        # ...the flag must. Tolerant of an always-present-but-False refactor.
-        self.assertFalse(ok_payload.get("inspection_failed", False))
+        # Contract: unknown measurements are None, not plausible zero/clean defaults.
         self.assertTrue(bad_payload["inspection_failed"])
+        self.assertIsNone(bad_payload["dirty"])
         self.assertNotEqual(
             bool(ok_payload.get("inspection_failed")),
             bool(bad_payload.get("inspection_failed")),
@@ -261,7 +262,7 @@ class SubagentWorktreeTests(unittest.TestCase):
         self.assertTrue(payload["dirty"])
         self.assertTrue(payload["inspection_failed"])
         self.assertFalse(payload["pruned"])
-        # The note names ONLY the unmeasured field.
+        self.assertIsNone(payload["commits"])
         self.assertIn("commits UNKNOWN", payload["note"])
         self.assertNotIn("dirty UNKNOWN", payload["note"])
         self.assertNotIn("commits/dirty", payload["note"])
@@ -286,10 +287,74 @@ class SubagentWorktreeTests(unittest.TestCase):
 
         self.assertFalse(payload["pruned"])
         self.assertTrue(payload["inspection_failed"])
+        self.assertIsNone(payload["commits"])
+        self.assertIsNone(payload["dirty"])
         self.assertTrue(os.path.isdir(info["path"]))
         self.assertTrue((wt / "CHILD.txt").exists())
         branches = _git(["branch", "--list", info["branch"]], repo).stdout
         self.assertNotEqual(branches.strip(), "")
+
+    def test_finalize_keeps_worktree_with_ignored_child_data(self):
+        """Force-pruning a clean tree must not erase ignored child outputs."""
+        repo = _make_repo(self.tmp)
+        info = sw.create_subagent_worktree(str(repo), "ignored")
+        assert info is not None
+        wt = Path(info["path"])
+        exclude = Path(_git(["rev-parse", "--git-path", "info/exclude"], wt).stdout.strip())
+        if not exclude.is_absolute():
+            exclude = wt / exclude
+        exclude.parent.mkdir(parents=True, exist_ok=True)
+        exclude.write_text("PRIVATE_CACHE.txt\n", encoding="utf-8")
+        secret = wt / "PRIVATE_CACHE.txt"
+        secret.write_text("child result\n", encoding="utf-8")
+
+        payload = sw.finalize_subagent_worktree(info)
+
+        self.assertFalse(payload["pruned"])
+        self.assertFalse(payload["dirty"])
+        self.assertNotIn("inspection_failed", payload)
+        self.assertIn("PRIVATE_CACHE.txt", payload["ignored_files"])
+        self.assertIn("ignored files", payload["note"])
+        self.assertTrue(secret.exists())
+        self.assertTrue(os.path.isdir(info["path"]))
+
+        from types import SimpleNamespace
+        from tools.delegate_tool_child_run import _ChildRun
+        run = _ChildRun(SimpleNamespace(), SimpleNamespace(), 0, "save child data", "child", None)
+        run.worktree_info = info
+        result = run.attach_worktree({"status": "completed"})
+        self.assertTrue(result["requires_parent_review"])
+        self.assertIn("ignored files", result["review_reason"])
+        self.assertIn(info["path"], result["review_note"])
+        self.assertIn(info["branch"], result["review_note"])
+
+    def test_cleanup_failure_is_reported_for_parent_review(self):
+        from types import SimpleNamespace
+        from tools.delegate_tool_child_run import _ChildRun
+
+        repo = _make_repo(self.tmp)
+        info = sw.create_subagent_worktree(str(repo), "cleanup-fails")
+        assert info is not None
+        real_run = sw._run_git
+
+        def fail_remove(args, cwd, timeout=sw._GIT_TIMEOUT):
+            if args[:2] == ["worktree", "remove"]:
+                return SimpleNamespace(returncode=1, stdout="", stderr="busy worktree")
+            return real_run(args, cwd=cwd, timeout=timeout)
+
+        run = _ChildRun(SimpleNamespace(), SimpleNamespace(), 0, "check clean worktree", "child", None)
+        run.worktree_info = info
+        with mock.patch.object(sw, "_run_git", side_effect=fail_remove):
+            result = run.attach_worktree({"status": "completed"})
+
+        self.assertFalse(result["worktree"]["pruned"])
+        self.assertTrue(result["worktree"]["cleanup_failed"])
+        self.assertNotIn("inspection_failed", result["worktree"])
+        self.assertTrue(result["requires_parent_review"])
+        self.assertIn("busy worktree", result["review_reason"])
+        self.assertIn(info["path"], result["review_note"])
+        self.assertIn(info["branch"], result["review_note"])
+        self.assertTrue(os.path.isdir(info["path"]))
 
     def test_finalize_missing_path_reports_pruned(self):
         payload = sw.finalize_subagent_worktree(
@@ -416,8 +481,8 @@ class WorktreePayloadSchemaTests(unittest.TestCase):
             },
         )
         self.assertFalse(payload["pruned"])
-        self.assertEqual(payload["commits"], 0)
-        self.assertFalse(payload["dirty"])
+        self.assertIsNone(payload["commits"])
+        self.assertIsNone(payload["dirty"])
 
 
 class DelegationConfigGateTests(unittest.TestCase):

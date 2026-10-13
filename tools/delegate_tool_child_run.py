@@ -667,12 +667,22 @@ class _ChildRun:
             # via the shared factory so the two producers never drift.
             logger.warning("worktree finalize failed: %s", e)
             entry_dict["worktree"] = subagent_worktree.unproven_worktree_payload(info, f"finalize raised: {e}")
-        if not entry_dict["worktree"].get("pruned"):
+        worktree = entry_dict["worktree"]
+        if not worktree.get("pruned"):
+            review_reason = worktree.get("note")
+            if not review_reason and worktree.get("commits"):
+                review_reason = f"contains {worktree['commits']} committed change(s)"
+            elif not review_reason and worktree.get("dirty"):
+                review_reason = "contains uncommitted or untracked changes"
+            elif not review_reason:
+                review_reason = "cleanup was not confirmed; inspect before retrying"
             entry_dict["requires_parent_review"] = True
+            entry_dict["review_reason"] = review_reason
             entry_dict["review_note"] = (
-                "The child's work remains isolated. The parent must inspect its branch "
-                "and working tree, review the diff, run relevant tests and explicitly "
-                "integrate the changes. A child self-report is not verification."
+                f"The child's work remains isolated at {worktree.get('path')} "
+                f"(branch {worktree.get('branch')}). The parent must inspect the branch "
+                f"and working tree, review the diff, run relevant tests and explicitly integrate the changes. Reason: {review_reason}. "
+                "A child self-report is not verification."
             )
         return entry_dict
 

@@ -121,6 +121,9 @@ def mark_worktree_payload_unproven(payload: Dict[str, Any], reason: str, *,
     """
     path, branch = payload.get("path", ""), payload.get("branch", "")
     payload["inspection_failed"] = True
+    for field in unmeasured.split("/"):
+        if field in {"commits", "dirty"}:
+            payload[field] = None
     payload["note"] = (f"git inspection failed ({reason}): {unmeasured} UNKNOWN — not proven "
                        f"zero/clean. The worktree and branch were preserved — inspect {path} "
                        f"(branch {branch}) before assuming no work.")
@@ -151,7 +154,7 @@ def finalize_subagent_worktree(info: Dict[str, str], *, prune: bool = True) -> D
     # See #88113.
     if not base_commit:
         return mark_worktree_payload_unproven(
-            payload, "no base_commit recorded — commit count unmeasurable", unmeasured="commits")
+            payload, "no base_commit recorded — commit count unmeasurable", unmeasured="commits/dirty")
     failed, unmeasured = [], []
     probes = (("commits", "rev-list", ["rev-list", "--count", f"{base_commit}..HEAD"],
                lambda s: int(s or 0)),
@@ -172,6 +175,22 @@ def finalize_subagent_worktree(info: Dict[str, str], *, prune: bool = True) -> D
         # Destructive cleanup requires affirmative proof; defaults prove nothing.
         return mark_worktree_payload_unproven(payload, "; ".join(failed), unmeasured="/".join(unmeasured))
     if prune and payload["commits"] == 0 and not payload["dirty"]:
+        try:
+            ignored = _run_git(["status", "--porcelain", "--ignored=matching"], cwd=path)
+            if ignored.returncode != 0:
+                return mark_worktree_payload_unproven(
+                    payload, f"ignored-file inspection exit {ignored.returncode}: {ignored.stderr.strip()[:200]}",
+                    unmeasured="ignored files")
+            ignored_paths = [line[3:] for line in ignored.stdout.splitlines() if line.startswith("!! ")]
+            if ignored_paths:
+                payload["ignored_files"] = ignored_paths
+                payload["note"] = (
+                    "ignored files present; worktree kept to avoid deleting untracked child data: "
+                    + ", ".join(ignored_paths[:5])
+                )
+                return payload
+        except Exception as exc:
+            return mark_worktree_payload_unproven(payload, f"ignored-file inspection raised: {exc}")
         cwd = info.get("repo_root", "") or path
         try:
             removed = _run_git(["worktree", "remove", "--force", path], cwd=cwd)
@@ -180,8 +199,18 @@ def finalize_subagent_worktree(info: Dict[str, str], *, prune: bool = True) -> D
                 payload["pruned"] = True
                 logger.info("subagent worktree pruned (no work): %s", path)
             else:
+                payload["cleanup_failed"] = True
+                payload["note"] = (
+                    f"git worktree remove failed ({removed.returncode}): {removed.stderr.strip()[:200]}; "
+                    f"worktree preserved for parent review at {path} (branch {branch})."
+                )
                 logger.debug("subagent worktree: prune failed: %s", removed.stderr.strip())
         except Exception as exc:
+            payload["cleanup_failed"] = True
+            payload["note"] = (
+                f"git worktree remove raised: {exc}; worktree preserved for parent review "
+                f"at {path} (branch {branch})."
+            )
             logger.debug("subagent worktree: prune failed: %s", exc)
     return payload
 
