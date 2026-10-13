@@ -57,6 +57,9 @@ def _workspace(tmp_path, *, scripts=None, manifest_recipe=None):
     """A marker-rooted workspace (package.json) with an optional saved recipe."""
     project = tmp_path / "project"
     project.mkdir()
+    # pytest's local temp path may sit under the repository; isolate project
+    # discovery from the checkout's own .git root.
+    (project / ".git").mkdir()
     (project / "package.json").write_text(
         json.dumps({"scripts": scripts} if scripts else {}), encoding="utf-8"
     )

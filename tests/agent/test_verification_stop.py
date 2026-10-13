@@ -16,6 +16,10 @@ from agent.verification_stop import (
 
 
 def _node_project(root: Path) -> None:
+    # project_facts_for stops at the nearest workspace root. A sentinel .git
+    # keeps tmp_path fixtures independent of the checkout containing pytest's
+    # temporary directory.
+    (root / ".git").mkdir(exist_ok=True)
     (root / "package.json").write_text(
         json.dumps({"scripts": {"test": "vitest", "lint": "eslint ."}}),
         encoding="utf-8",
@@ -98,29 +102,27 @@ def test_verify_on_stop_auto_on_for_interactive_surfaces(clear_verify_env, sourc
 
 def test_verify_on_stop_default_path_through_load_config(tmp_path, clear_verify_env):
     # E2E: the sole production caller passes no config, so verify_on_stop_enabled
-    # resolves through load_config() + DEFAULT_CONFIG. The default is now False
-    # (opt-in): fresh installs must not fire the nudge on any surface. This is
-    # the path the unit-level tests above cannot exercise.
+    # resolves through load_config() + DEFAULT_CONFIG. The default is surface-aware
+    # auto: enabled for interactive development, disabled for messaging surfaces.
     clear_verify_env.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
 
     from hermes_cli.config import load_config
 
     merged = load_config()
-    assert merged["agent"]["verify_on_stop"] is False
+    assert merged["agent"]["verify_on_stop"] == "auto"
 
-    # Interactive surface resolves OFF through the real loader (opt-in default).
+    # Interactive surface resolves ON through the real loader.
     clear_verify_env.setenv("STARDUST_SESSION_SOURCE", "cli")
-    assert verify_on_stop_enabled() is False
+    assert verify_on_stop_enabled() is True
 
-    # A messaging platform also resolves OFF.
+    # A messaging platform remains quiet by default.
     clear_verify_env.setenv("STARDUST_SESSION_PLATFORM", "telegram")
     assert verify_on_stop_enabled() is False
 
 
 def test_verify_on_stop_missing_value_defaults_off(clear_verify_env):
-    # A missing/unrecognized config value falls back OFF on every surface,
-    # matching the opt-in DEFAULT_CONFIG default — only an explicit "auto"
-    # opts into the legacy surface-aware behavior.
+    # A missing/unrecognized value passed directly to the resolver fails closed.
+    # Production callers load DEFAULT_CONFIG first, which supplies "auto".
     clear_verify_env.setenv("STARDUST_SESSION_SOURCE", "cli")
     assert verify_on_stop_enabled({"agent": {}}) is False
     assert verify_on_stop_enabled({"agent": {"verify_on_stop": "bogus"}}) is False
@@ -170,6 +172,7 @@ def test_no_suite_nudge_uses_canonical_temp_dir(tmp_path, monkeypatch):
     monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
     project = tmp_path / "project"
     project.mkdir()
+    (project / ".git").mkdir()
     (project / "package.json").write_text("{}", encoding="utf-8")
     real_temp = tmp_path / "real-temp"
     real_temp.mkdir()
@@ -191,6 +194,7 @@ def test_no_suite_nudge_uses_canonical_temp_dir(tmp_path, monkeypatch):
 
 def test_ad_hoc_pass_satisfies_no_suite_stop_loop(tmp_path, monkeypatch):
     monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+    (tmp_path / ".git").mkdir()
     (tmp_path / "package.json").write_text("{}", encoding="utf-8")
     changed = str(tmp_path / "src" / "app.ts")
     script = Path(tempfile.gettempdir()) / f"hermes-ad-hoc-stop-{tmp_path.name}.py"

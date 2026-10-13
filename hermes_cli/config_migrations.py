@@ -610,28 +610,26 @@ MIGRATIONS: Tuple[Tuple[int, Callable[[Dict[str, Any], bool], None]], ...] = (
         added="model_catalog.ttl_hours 24→1",
         message="  ✓ Lowered model_catalog.ttl_hours to 1 (hourly picker refresh)")),
     (29, _migrate_to_29),
-    # 30 → 31: verify_on_stop OFF (one-time). The "auto" sentinel was more noise than signal.
-    # Rewrite only when missing or still "auto" — an explicit user true/false is preserved.
+    # 30 → 31: use the surface-aware verification default for installs that have no explicit choice.
+    # An explicit user true/false is preserved.
     (31, functools.partial(
-        _rewrite_key, section="agent", key="verify_on_stop", new=False, create_section=True,
+        _rewrite_key, section="agent", key="verify_on_stop", new="auto", create_section=True,
         match=lambda cur: cur is None or _lower_is("auto")(cur),
-        added="agent.verify_on_stop=false",
+        added="agent.verify_on_stop=auto",
         message=(
-            "  ✓ Turned off verify-on-stop (agent.verify_on_stop: false). "
-            "Set it to true to re-enable, or \"auto\" for the legacy "
-            "surface-aware behavior."))),
-    # 31 → 32: flip the BAKED-IN literal true to OFF (one-time). v30 defaulted verify_on_stop to a
-    # literal True and migrate_config persisted defaults, so installs that updated through v30 have
-    # `verify_on_stop: true` written literally — never a user choice (no off-switch existed until
-    # v31). A true set AFTER v32 is never touched.
+            "  ✓ Enabled surface-aware verify-on-stop by default (agent.verify_on_stop: auto). "
+            "Set it to false to opt out or true to require it on messaging surfaces too."))),
+    # 31 → 32: replace the BAKED-IN literal true with the surface-aware default. v30 defaulted
+    # verify_on_stop to a literal True and migrate_config persisted defaults, so installs that
+    # updated through v30 have `verify_on_stop: true` written literally — never a user choice (no
+    # off-switch existed until v31). Explicit false remains an opt-out.
     (32, _rewrite_stale_default(
-        section="agent", key="verify_on_stop", old=True, new=False,
-        added="agent.verify_on_stop=false",
+        section="agent", key="verify_on_stop", old=True, new="auto",
+        added="agent.verify_on_stop=auto",
         message=(
-            "  ✓ Turned off verify-on-stop (agent.verify_on_stop: false) — "
-            "the old default was written into your config as a literal "
-            "true. Set it to true again to re-enable, or \"auto\" for the "
-            "legacy surface-aware behavior."),
+            "  ✓ Changed verify-on-stop from the old baked-in true to the "
+            "surface-aware default (agent.verify_on_stop: auto). Set it to "
+            "false to opt out or true to require it on messaging surfaces too."),
         extra_guard=lambda raw: raw.get("verify_on_stop") is True)),
     (33, _migrate_to_33),
     (34, _migrate_to_34),
