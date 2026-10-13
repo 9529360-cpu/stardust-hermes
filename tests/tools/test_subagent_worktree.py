@@ -360,6 +360,38 @@ class WorktreePayloadSchemaTests(unittest.TestCase):
         self.assertIn(info["path"], unproven["note"])
         self.assertIn(info["branch"], unproven["note"])
 
+    def test_dirty_child_worktree_requires_independent_parent_review(self):
+        from types import SimpleNamespace
+        from tools.delegate_tool_child_run import _ChildRun
+
+        repo = _make_repo(self.tmp)
+        info = sw.create_subagent_worktree(str(repo), "must-review")
+        assert info is not None
+        (Path(info["path"]) / "feature.py").write_text("changed\\n", encoding="utf-8")
+        run = _ChildRun(SimpleNamespace(), SimpleNamespace(), 0, "change feature", "child", None)
+        run.worktree_info = info
+
+        result = run.attach_worktree({"status": "completed", "summary": "self-reported done"})
+        self.assertTrue(result["requires_parent_review"])
+        self.assertIn("review the diff", result["review_note"])
+        self.assertEqual(result["worktree"]["branch"], info["branch"])
+        self.assertFalse(result["worktree"]["pruned"])
+        self.assertFalse((repo / "feature.py").exists())
+
+    def test_clean_child_worktree_does_not_need_parent_review(self):
+        from types import SimpleNamespace
+        from tools.delegate_tool_child_run import _ChildRun
+
+        repo = _make_repo(self.tmp)
+        info = sw.create_subagent_worktree(str(repo), "clean-review")
+        assert info is not None
+        run = _ChildRun(SimpleNamespace(), SimpleNamespace(), 0, "check feature", "child", None)
+        run.worktree_info = info
+
+        result = run.attach_worktree({"status": "completed", "summary": "no changes"})
+        self.assertTrue(result["worktree"]["pruned"])
+        self.assertNotIn("requires_parent_review", result)
+
     def test_delegate_tool_fallback_uses_the_shared_factory(self):
         """delegate_tool's fallback must emit the flagged schema, not the
         creation-side metadata dict it used to leak."""

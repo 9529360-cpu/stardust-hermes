@@ -1,9 +1,10 @@
 """Git worktree isolation for delegated subagents (``delegation.worktree_isolation``).
 
-Git-only (outside a repo children share the parent's cwd); local terminal backend only (on
-docker/ssh/modal the host worktree is invisible in the sandbox, so isolation is skipped). One
-worktree per child under ``<repo>/.worktrees/subagent-<id>``, branch ``hermes-subagent/<id>``;
-pruned only on proof (zero commits AND clean, both probes ok), else kept + ``inspection_failed``.
+Outside a Git repository, normal tasks retain the parent's cwd. The local Git
+launcher fails rather than sharing a detected repository if worktree setup fails;
+explicitly required worktrees fail even on unsupported backends. A worktree is
+created under ``<repo>/.worktrees/subagent-<id>``, on its own branch, and pruned
+only on proof that it has neither commits nor uncommitted changes.
 """
 
 from __future__ import annotations
