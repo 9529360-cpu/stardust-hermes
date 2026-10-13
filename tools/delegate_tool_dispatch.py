@@ -214,7 +214,12 @@ def _run_children_parallel(batch: _Batch, results: list, *, honor_parent_interru
                             from tools.delegation_live_log import update_manifest_statuses
                             update_manifest_statuses(batch.live_deleg_id, [late_entry])
 
-                future.add_done_callback(finalize_after_worker_exit)
+                callback_context = contextvars.copy_context()
+
+                def finalize_in_request_context(done_future, context=callback_context):
+                    context.run(finalize_after_worker_exit, done_future)
+
+                future.add_done_callback(finalize_in_request_context)
             break
     finally:
         # The completed path has no live workers. On cancellation, the others

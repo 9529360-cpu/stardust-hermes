@@ -330,19 +330,38 @@ def test_registry_cancel_of_parallel_batch_emits_one_unknown_completion_and_defe
                 child.hard_interrupt("test teardown")
 
 
-def test_async_cancel_returns_unknown_without_finalizing_live_worker(monkeypatch):
+def test_async_cancel_returns_unknown_without_finalizing_live_worker(monkeypatch, tmp_path):
     import tools.delegate_tool_dispatch as dispatcher
+    import tools.delegation_live_log as live_log
+    from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+
+    default_home = tmp_path / "default"
+    request_home = tmp_path / "request-profile"
+    monkeypatch.setenv("STARDUST_HOME", str(default_home))
+    delegation_id = "deleg_async_cancel"
+    tasks = [{"goal": "wait until cancelled 0"}]
+    live_log.create_live_transcripts(tasks, delegation_id=delegation_id)
+    profile_token = set_hermes_home_override(request_home)
+    try:
+        live_log.create_live_transcripts(tasks, delegation_id=delegation_id)
+    finally:
+        reset_hermes_home_override(profile_token)
 
     parent, child = _Parent(), _ControlledChild()
     batch = _batch(parent, child)
     batch.unit_id = "async-cancel-test"
-    batch.live_deleg_id = "deleg_async_cancel"
+    batch.live_deleg_id = delegation_id
     monkeypatch.setattr(dispatcher, "_SYNC_INTERRUPT_GRACE_SECONDS", 0.05)
     finalizations = []
     manifest_updates = []
-    import tools.delegation_live_log as live_log
     monkeypatch.setattr(dispatcher, "_finalize_child_results", lambda *_args: finalizations.append("finalized"))
-    monkeypatch.setattr(live_log, "update_manifest_statuses", lambda delegation_id, entries: manifest_updates.append((delegation_id, entries)))
+    update_manifest_statuses = live_log.update_manifest_statuses
+
+    def record_manifest_update(updated_id, entries):
+        update_manifest_statuses(updated_id, entries)
+        manifest_updates.append((updated_id, entries, live_log.live_transcript_root()))
+
+    monkeypatch.setattr(live_log, "update_manifest_statuses", record_manifest_update)
 
     def run_child(_index, _task, agent):
         agent.started.set()
@@ -356,10 +375,13 @@ def test_async_cancel_returns_unknown_without_finalizing_live_worker(monkeypatch
     outcome = Future()
 
     def execute_batch():
+        token = set_hermes_home_override(request_home)
         try:
             outcome.set_result(dispatcher._execute_and_aggregate(batch, honor_parent_interrupt=False))
         except BaseException as exc:
             outcome.set_exception(exc)
+        finally:
+            reset_hermes_home_override(token)
 
     worker = threading.Thread(target=execute_batch, daemon=True)
     worker.start()
@@ -380,12 +402,23 @@ def test_async_cancel_returns_unknown_without_finalizing_live_worker(monkeypatch
         assert child.closed.wait(5)
         assert child.finished.is_set()
         deadline = time.monotonic() + 5
-        while not finalizations and time.monotonic() < deadline:
+        while not manifest_updates and time.monotonic() < deadline:
             time.sleep(0.01)
         assert finalizations == ["finalized"]
         assert len(manifest_updates) == 1
-        assert manifest_updates[0][0] == "deleg_async_cancel"
+        assert manifest_updates[0][0] == delegation_id
         assert manifest_updates[0][1][0]["status"] == "interrupted"
+        assert manifest_updates[0][2] == request_home / "cache" / "delegation" / "live"
+        request_manifest = json.loads(
+            (request_home / "cache" / "delegation" / "live" / delegation_id / "manifest.json")
+            .read_text(encoding="utf-8")
+        )
+        default_manifest = json.loads(
+            (default_home / "cache" / "delegation" / "live" / delegation_id / "manifest.json")
+            .read_text(encoding="utf-8")
+        )
+        assert request_manifest["tasks"][0]["status"] == "interrupted"
+        assert default_manifest["tasks"][0]["status"] == "running"
         assert child.close_count == 1
         assert not child.closed_while_running
     finally:
