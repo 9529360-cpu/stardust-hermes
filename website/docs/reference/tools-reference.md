@@ -113,7 +113,7 @@ Scoped to the Feishu document-comment handler. Drives comment read/write operati
 
 | Tool | Description | Requires environment |
 |------|-------------|----------------------|
-| `code_intelligence` | Query the workspace language server for a definition, implementation, type definition, references, hover/type information, document symbols, or workspace symbols, or rename a symbol across files through the guarded patch path. Requires a supported language server and a Git worktree. | — |
+| `code_intelligence` | Query the workspace language server for navigation, hover, and document/workspace symbols; preview bounded code actions; or rename symbols through the guarded patch path. Code action previews do not edit files or execute server commands. Requires a supported language server and a Git worktree. | — |
 
 ## `file` toolset
 

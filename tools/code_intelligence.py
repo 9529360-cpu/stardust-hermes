@@ -1,4 +1,4 @@
-"""Compact semantic code navigation and symbol renaming through the workspace language server."""
+"""Compact language-server navigation, code action previews, and symbol renaming."""
 from __future__ import annotations
 
 import difflib
@@ -10,10 +10,12 @@ from typing import Any, Dict, List, Optional, Tuple
 from tools.registry import registry
 
 _ACTIONS = (
-    "definition", "implementation", "type_definition", "references", "hover",
+    "definition", "implementation", "type_definition", "references", "hover", "code_actions",
     "document_symbols", "workspace_symbols", "rename",
 )
-_POSITION_ACTIONS = {"definition", "implementation", "type_definition", "references", "hover", "rename"}
+_POSITION_ACTIONS = {
+    "definition", "implementation", "type_definition", "references", "hover", "code_actions", "rename",
+}
 _SYMBOL_KINDS = {
     1: "file", 2: "module", 3: "namespace", 4: "package", 5: "class", 6: "method",
     7: "property", 8: "field", 9: "constructor", 10: "enum", 11: "interface", 12: "function",
@@ -25,15 +27,19 @@ _SYMBOL_KINDS = {
 SCHEMA = {
     "name": "code_intelligence",
     "description": (
-        "Use the project's language server for precise code navigation and symbol rename before broad text search: "
+        "Use the project's language server for precise code navigation, code action previews, and symbol rename before broad text search: "
         "find a symbol's definition, implementation, type definition, or references; inspect hover/type information; list file symbols; "
-        "search workspace symbols, or rename a symbol across files. Rename applies through Stardust's "
+        "search workspace symbols; preview bounded code action edits without applying them or executing server commands; "
+        "or rename a symbol across files. Rename applies through Stardust's "
         "existing guarded patch tool by default; set apply=false to preview. Locations use 1-based lines and columns."
     ),
     "parameters": {
         "type": "object",
         "properties": {
-            "action": {"type": "string", "enum": list(_ACTIONS), "description": "Semantic query to run."},
+            "action": {
+                "type": "string", "enum": list(_ACTIONS),
+                "description": "Semantic query to run; code_actions previews workspace edits and never executes server commands.",
+            },
             "path": {
                 "type": "string",
                 "description": (
@@ -43,14 +49,18 @@ SCHEMA = {
             },
             "line": {
                 "type": "integer", "minimum": 1,
-                "description": "1-based source line for definition, implementation, type_definition, references, or hover.",
+                "description": "1-based source line for definition, implementation, type_definition, references, hover, or code_actions.",
             },
             "character": {
                 "type": "integer", "minimum": 1, "default": 1,
                 "description": (
-                    "1-based character column for definition, implementation, type_definition, references, or hover "
+                    "1-based character column for definition, implementation, type_definition, references, hover, or code_actions "
                     "(defaults to the start of the line)."
                 ),
+            },
+            "max_results": {
+                "type": "integer", "minimum": 1, "maximum": 50, "default": 20,
+                "description": "Maximum locations or symbols to return; code action previews are capped at 8.",
             },
             "query": {"type": "string", "description": "Required non-empty symbol text for workspace_symbols."},
             "include_declaration": {
@@ -63,10 +73,6 @@ SCHEMA = {
             "apply": {
                 "type": "boolean", "default": True,
                 "description": "Apply a rename using the existing guarded patch path (default true); false returns a bounded diff preview.",
-            },
-            "max_results": {
-                "type": "integer", "minimum": 1, "maximum": 50, "default": 20,
-                "description": "Maximum locations or symbols to return.",
             },
         },
         "required": ["action", "path"],
@@ -210,9 +216,9 @@ def _workspace_edits(raw: Any, workspace_root: str) -> Dict[str, List[Dict[str, 
     if raw is None:
         return {}
     if not isinstance(raw, dict):
-        raise ValueError("language server returned an invalid rename edit")
+        raise ValueError("language server returned an invalid workspace edit")
     if raw.get("changeAnnotations"):
-        raise ValueError("rename includes annotated changes that cannot be safely auto-applied")
+        raise ValueError("workspace edit includes change annotations that require confirmation")
     changes: Dict[str, List[Dict[str, Any]]] = {}
     change_map = raw.get("changes")
     if change_map is not None:
@@ -227,7 +233,7 @@ def _workspace_edits(raw: Any, workspace_root: str) -> Dict[str, List[Dict[str, 
             raise ValueError("language server returned both WorkspaceEdit formats; refusing ambiguous changes")
         for item in document_changes:
             if not isinstance(item, dict) or not isinstance(item.get("textDocument"), dict):
-                raise ValueError("rename includes a file create/delete/move operation; refusing to apply it")
+                raise ValueError("workspace edit includes a file create/delete/move operation; refusing to preview it")
             uri = item["textDocument"].get("uri")
             edits = item.get("edits")
             if not isinstance(uri, str) or not isinstance(edits, list):
@@ -239,17 +245,17 @@ def _workspace_edits(raw: Any, workspace_root: str) -> Dict[str, List[Dict[str, 
     from agent.lsp.client import uri_to_path
     for uri, edits in changes.items():
         if not isinstance(uri, str) or not uri.startswith("file://") or not isinstance(edits, list):
-            raise ValueError("rename returned a non-file document edit; refusing to apply it")
+            raise ValueError("workspace edit returned a non-file document edit; refusing to preview it")
         path = os.path.realpath(uri_to_path(uri))
         try:
             inside = os.path.normcase(os.path.commonpath([root, path])) == os.path.normcase(root)
         except ValueError:
             inside = False
         if not inside or not os.path.isfile(path):
-            raise ValueError(f"rename target is missing or outside the active Git workspace: {path}")
+            raise ValueError(f"workspace edit target is missing or outside the active Git workspace: {path}")
         edit_count += len(edits)
         if edit_count > 5000:
-            raise ValueError("rename returned more than 5,000 edits; narrow the operation before applying")
+            raise ValueError("workspace edit contains more than 5,000 edits; narrow the operation before previewing")
         normalized[path] = edits
     return normalized
 
@@ -259,7 +265,7 @@ def _apply_workspace_edits(raw: Any, workspace_root: str) -> Tuple[Dict[str, str
     try:
         edits_by_path = _workspace_edits(raw, workspace_root)
         if len(edits_by_path) > 200:
-            raise ValueError("rename spans more than 200 files; narrow the operation before applying")
+            raise ValueError("workspace edit spans more than 200 files; narrow the operation before previewing")
         updated: Dict[str, str] = {}
         originals: Dict[str, str] = {}
         for path, edits in edits_by_path.items():
@@ -270,12 +276,12 @@ def _apply_workspace_edits(raw: Any, workspace_root: str) -> Tuple[Dict[str, str
             indexed = []
             for edit in edits:
                 if not isinstance(edit, dict) or not isinstance(edit.get("newText"), str):
-                    raise ValueError("language server returned an invalid text edit")
+                    raise ValueError("language server returned an invalid workspace text edit")
                 if edit.get("annotationId") is not None:
-                    raise ValueError("rename includes annotated text that cannot be safely auto-applied")
+                    raise ValueError("workspace text edit includes an annotation that requires confirmation")
                 rng = edit.get("range")
                 if not isinstance(rng, dict) or not isinstance(rng.get("start"), dict) or not isinstance(rng.get("end"), dict):
-                    raise ValueError("language server returned a text edit without a range")
+                    raise ValueError("language server returned a workspace text edit without a range")
                 start = _position_offset(
                     text, _lsp_position_value(rng["start"].get("line")),
                     _lsp_position_value(rng["start"].get("character")),
@@ -290,7 +296,7 @@ def _apply_workspace_edits(raw: Any, workspace_root: str) -> Tuple[Dict[str, str
             indexed.sort(key=lambda item: (item[0], item[1]))
             for previous, current in zip(indexed, indexed[1:]):
                 if previous[1] > current[0] or previous[0] == current[0]:
-                    raise ValueError(f"language server returned overlapping edits for {path}")
+                    raise ValueError(f"language server returned overlapping workspace edits for {path}")
             for start, end, replacement in reversed(indexed):
                 text = text[:start] + replacement + text[end:]
             if text != original:
@@ -302,13 +308,80 @@ def _apply_workspace_edits(raw: Any, workspace_root: str) -> Tuple[Dict[str, str
 
 
 def _v4a_update(path: str, old: str, new: str) -> str:
-    """Serialize one exact rename diff into Stardust's existing multi-file patch format."""
+    """Serialize one exact file diff into Stardust's existing multi-file patch format."""
     diff = list(difflib.unified_diff(
         old.splitlines(), new.splitlines(), fromfile="", tofile="", n=3, lineterm=""))
     hunks = [line for line in diff[2:] if not line.startswith("\\ No newline at end of file")]
     if not hunks:
         return ""
     return "*** Update File: " + path + "\n" + "\n".join(hunks)
+
+
+def _code_action_previews(raw: Any, source_path: str, limit: int) -> Tuple[List[Dict[str, Any]], bool]:
+    """Return bounded LSP CodeAction metadata and guarded previews without applying edits."""
+    values = raw if isinstance(raw, list) else ([raw] if isinstance(raw, dict) else [])
+    limit = min(limit, 8)
+    truncated = len(values) > limit
+    from agent.lsp.workspace import resolve_workspace_for_file
+    workspace_root, gated = resolve_workspace_for_file(source_path)
+    preview_budget = 7000
+    previews: List[Dict[str, Any]] = []
+
+    for index, item in enumerate(values[:limit]):
+        if not isinstance(item, dict):
+            continue
+        title = item.get("title")
+        row: Dict[str, Any] = {
+            "index": index,
+            "title": str(title)[:200] if title is not None else "Untitled code action",
+        }
+        kind = item.get("kind")
+        if isinstance(kind, str):
+            row["kind"] = kind[:120]
+        if isinstance(item.get("isPreferred"), bool):
+            row["preferred"] = item["isPreferred"]
+        disabled = item.get("disabled")
+        if isinstance(disabled, dict) and isinstance(disabled.get("reason"), str):
+            row["disabled_reason"] = disabled["reason"][:300]
+
+        edit = item.get("edit")
+        command = item.get("command")
+        row["has_edit"] = isinstance(edit, dict)
+        row["has_command"] = bool(command)
+        if command:
+            row["command_not_run"] = True
+            if isinstance(command, dict) and isinstance(command.get("command"), str):
+                row["command_name"] = command["command"][:160]
+            elif isinstance(command, str):
+                row["command_name"] = command[:160]
+
+        if isinstance(edit, dict):
+            if not gated or not workspace_root:
+                row["preview_error"] = "Code action edit preview requires a Git workspace."
+            else:
+                updates, originals, error = _apply_workspace_edits(edit, workspace_root)
+                if error:
+                    row["preview_error"] = error[:500]
+                else:
+                    patch_parts = [
+                        patch for path in sorted(updates)
+                        if (patch := _v4a_update(path, originals[path], updates[path]))
+                    ]
+                    row["files_changed"] = len(patch_parts)
+                    if patch_parts:
+                        patch_preview = "*** Begin Patch\n" + "\n".join(patch_parts) + "\n*** End Patch"
+                        preview_chars = min(len(patch_preview), preview_budget, 1800)
+                        row["diff_preview"] = patch_preview[:preview_chars]
+                        row["preview_truncated"] = preview_chars < len(patch_preview)
+                        preview_budget -= preview_chars
+                    else:
+                        row["diff_preview"] = ""
+                        row["preview_truncated"] = False
+        elif not disabled:
+            row["preview_note"] = "This action has no workspace edit; its command, if any, was not run."
+
+        previews.append(row)
+    return previews, truncated
 
 
 def _rename(args: Dict[str, Any], source_path: str, raw: Any, task_id: str, session_id: Optional[str]) -> str:
@@ -437,7 +510,10 @@ def code_intelligence(args: Dict[str, Any], *, task_id: str = "default", session
     if action == "rename":
         return _rename(args, path, raw, task_id, session_id)
     payload: Dict[str, Any] = {"available": True, "action": action, "path": path}
-    if action == "hover":
+    if action == "code_actions":
+        rows, truncated = _code_action_previews(raw, path, limit)
+        payload.update({"actions": rows, "truncated": truncated})
+    elif action == "hover":
         hover = _hover_text(raw)
         payload.update({"found": bool(hover), "hover": hover[:8000]})
         if len(hover) > 8000:

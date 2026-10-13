@@ -63,6 +63,19 @@ _CLIENT_CAPABILITIES: Dict[str, Any] = {
         "implementation": {"linkSupport": True},
         "typeDefinition": {"linkSupport": True},
         "references": {},
+        "codeAction": {
+            "dynamicRegistration": False,
+            "isPreferredSupport": True,
+            "disabledSupport": True,
+            "codeActionLiteralSupport": {
+                "codeActionKind": {
+                    "valueSet": [
+                        "quickfix", "refactor", "refactor.extract", "refactor.inline",
+                        "refactor.rewrite", "source", "source.organizeImports", "source.fixAll",
+                    ],
+                },
+            },
+        },
         "documentSymbol": {"hierarchicalDocumentSymbolSupport": True},
         "rename": {"dynamicRegistration": False, "prepareSupport": True},
     },
@@ -571,6 +584,7 @@ class LSPClient:
             "definition": "textDocument/definition",
             "implementation": "textDocument/implementation",
             "type_definition": "textDocument/typeDefinition",
+            "code_actions": "textDocument/codeAction",
             "references": "textDocument/references",
             "hover": "textDocument/hover",
             "document_symbols": "textDocument/documentSymbol",
@@ -594,6 +608,15 @@ class LSPClient:
             params = {"query": query}
         elif action == "document_symbols":
             params = {"textDocument": {"uri": uri}}
+        elif action == "code_actions":
+            if line is None or character is None:
+                raise ValueError("code_actions requires a source position")
+            position = {"line": line, "character": character}
+            params = {
+                "textDocument": {"uri": uri},
+                "range": {"start": position, "end": position.copy()},
+                "context": {"diagnostics": self.diagnostics_for(path, fresh_only=True)},
+            }
         else:
             if line is None or character is None:
                 raise ValueError(f"{action} requires a source position")
