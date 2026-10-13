@@ -182,7 +182,8 @@ def _execute_and_aggregate(batch: _Batch, *, honor_parent_interrupt: bool = True
 
     combined: Dict[str, Any] = {"results": results, "total_duration_seconds": total_duration}
     from tools.async_delegation import _batch_outcome
-    combined["batch_outcome"] = _batch_outcome(combined)
+    combined["batch_outcome"] = _batch_outcome(
+        combined, expected_task_indexes=[i for i, _task, _child in batch.children])
     # Runtime truth about children's background processes, as prose the parent can't miss inside the JSON.
     from tools.process_registry_notifications import _process_accounting_lines
     process_notes = [line for entry in results for line in _process_accounting_lines(entry)]

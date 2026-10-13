@@ -13,10 +13,12 @@ import subprocess
 import sys
 import threading
 import time
+from types import SimpleNamespace
 
 import pytest
 
 from tools import async_delegation as ad
+from tools import delegate_tool_dispatch as dispatch
 from tools.process_registry import process_registry
 from tools.process_registry_notifications import format_process_notification
 
@@ -123,6 +125,32 @@ def test_group_batch_outcome_uses_non_contiguous_expected_indexes(children, expe
     assert ad._batch_status(combined, expected_task_indexes=[1, 3]) == (
         "completed" if expected == "completed" else "error"
     )
+
+
+def test_group_aggregate_reports_unknown_for_missing_expected_index(monkeypatch):
+    """The parent-facing outcome must use the indexes assigned to this group."""
+    batch = SimpleNamespace(
+        children=[(1, {"goal": "first"}, object()), (3, {"goal": "third"}, object())],
+        task_list=[{"goal": str(i)} for i in range(4)],
+        parent_agent=SimpleNamespace(),
+        overall_start=time.monotonic(),
+        live_writers=[None] * 4,
+        live_paths=[],
+        live_deleg_id=None,
+        group="review-group",
+    )
+
+    def return_one_child(_batch, results, **_kwargs):
+        results.append({"task_index": 1, "status": "completed"})
+
+    monkeypatch.setattr(dispatch, "_run_children_parallel", return_one_child)
+    monkeypatch.setattr(dispatch, "_finalize_child_results", lambda *_args: None)
+    monkeypatch.setattr("tools.delegation_live_log.update_manifest_statuses", lambda *_args: None)
+    monkeypatch.setattr("tools.process_registry_notifications._process_accounting_lines", lambda _entry: [])
+
+    result = dispatch._execute_and_aggregate(batch)
+
+    assert result["batch_outcome"] == "unknown"
 
 
 def test_group_completion_event_uses_recorded_indexes(tmp_path, monkeypatch):
