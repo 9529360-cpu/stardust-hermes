@@ -1,6 +1,6 @@
 import type { ModelOptionProvider, ModelPricing } from '@stardust/shared'
 import { fuzzyRank, modelSearchText } from '@stardust/shared'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 
 import { getLocalModelsStatus } from '@/hermes'
@@ -18,6 +18,7 @@ import { cn } from '../lib/utils'
 
 import { InlineNotice } from './notifications'
 import { Button } from './ui/button'
+import { Codicon } from './ui/codicon'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog'
 import { HighlightMatches } from './ui/highlight-matches'
@@ -58,6 +59,7 @@ export function ModelPickerDialog({
 }: ModelPickerDialogProps) {
   const { t } = useI18n()
   const copy = t.modelPicker
+  const queryClient = useQueryClient()
   // Own the search term so we can filter manually. cmdk's built-in
   // shouldFilter reorders items by its fuzzy-match score (≈alphabetical with
   // an empty query), which destroys the backend's curated order. We disable
@@ -70,6 +72,8 @@ export function ModelPickerDialog({
     queryFn: () => requestModelOptions({ gateway: gw, profile, request, sessionId }),
     enabled: open
   })
+
+  const [refreshing, setRefreshing] = useState(false)
 
   // Live load state for the managed local server: which model is loading
   // into memory right now, with a REAL percent (per-tensor callback relayed
@@ -166,6 +170,25 @@ export function ModelPickerDialog({
     onOpenChange(false)
   }
 
+  const refreshModels = async () => {
+    if (refreshing) {
+      return
+    }
+
+    setRefreshing(true)
+
+    try {
+      const next = await requestModelOptions({ gateway: gw, profile, refresh: true, request, sessionId })
+      queryClient.setQueryData(modelOptionsQueryKey(profile, sessionId, ownerConnectionId), next)
+    } catch {
+      // Keep the current list visible; a normal re-fetch is still useful if an
+      // explicit catalog refresh cannot reach the backend.
+      void modelOptions.refetch()
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
   // Provider account catalogs are no longer a Desktop setup surface. Adding a
   // service always lands on the direct endpoint editor (URL + key + model).
   const addProvider = () => {
@@ -185,6 +208,7 @@ export function ModelPickerDialog({
             {copy.current} {optionsModel || currentModel || copy.unknown}
             {optionsProvider || currentProvider ? ` · ${optionsProvider || currentProvider}` : ''}
           </DialogDescription>
+          <p className="text-xs leading-relaxed text-muted-foreground">{copy.scopeHint}</p>
         </DialogHeader>
 
         <Command className="rounded-none bg-card" shouldFilter={false}>
@@ -206,6 +230,10 @@ export function ModelPickerDialog({
         </Command>
 
         <DialogFooter className="flex-row items-center justify-end gap-2 bg-card p-3">
+          <Button disabled={refreshing} onClick={() => void refreshModels()} variant="ghost">
+            <Codicon className={cn(refreshing && 'animate-spin')} name="sync" size="0.8rem" />
+            {t.shell.modelMenu.refreshModels}
+          </Button>
           <Button onClick={addProvider} variant="ghost">
             {t.onboarding.setupRelay}
           </Button>

@@ -100,6 +100,41 @@ describe('CustomEndpointsSettings', () => {
     expect(await screen.findByRole('button', { name: 'Add model service' })).toBeTruthy()
     expect(screen.queryByPlaceholderText('My model service')).toBeNull()
   })
+  it('offers Magpie through the existing custom endpoint flow without switching the saved default', async () => {
+    getCustomEndpoints.mockResolvedValue({
+      current: { provider: 'nous', model: 'hermes-4' },
+      endpoints: [{
+        id: 'existing', name: 'Existing service', base_url: 'https://example.com/v1', model: 'model-a',
+        models: ['model-a'], discover_models: true, is_current: true, has_api_key: false, source: 'providers'
+      }]
+    })
+    vi.mocked(validateCustomEndpoint).mockResolvedValue({
+      ok: true,
+      reachable: true,
+      message: '',
+      models: ['magpie-model']
+    })
+    const { CustomEndpointsSettings } = await import('./custom-endpoints-settings')
+    render(<CustomEndpointsSettings />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Connect Magpie' }))
+
+    expect(screen.getByPlaceholderText('My model service')).toHaveProperty('value', 'Magpie')
+    expect(screen.getByPlaceholderText('http://127.0.0.1:8081/v1')).toHaveProperty(
+      'value',
+      'http://127.0.0.1:3425/v1'
+    )
+    expect(screen.getByText(/Magpie manages its own updates/)).toBeTruthy()
+    expect(screen.getByRole('checkbox', { name: 'Use for new chats' }).getAttribute('aria-checked')).toBe('false')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Test connection' }))
+    await waitFor(() => expect(validateCustomEndpoint).toHaveBeenCalledWith(
+      expect.objectContaining({ base_url: 'http://127.0.0.1:3425/v1' }),
+      undefined
+    ))
+    expect(await screen.findByRole('button', { name: 'magpie-model' })).toBeTruthy()
+  })
+
   it('discovers candidates from the unsaved form without silently choosing a default', async () => {
     vi.mocked(validateCustomEndpoint).mockResolvedValue({
       ok: true,
@@ -119,7 +154,7 @@ describe('CustomEndpointsSettings', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: '测试连接' }))
     await waitFor(() => expect(validateCustomEndpoint).toHaveBeenCalled())
-    await waitFor(() => expect(document.querySelector('datalist option[value="relay-model"]')).toBeTruthy())
+    await waitFor(() => expect(globalThis.document.querySelector('datalist option[value="relay-model"]')).toBeTruthy())
     expect(screen.getByPlaceholderText('gpt-5.4')).toHaveProperty('value', '')
     fireEvent.click(screen.getByRole('button', { name: 'relay-model' }))
     expect(screen.getByPlaceholderText('gpt-5.4')).toHaveProperty('value', 'relay-model')

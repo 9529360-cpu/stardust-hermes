@@ -1,6 +1,5 @@
-import { expect, test } from './test'
-
 import { type MockBackendFixture, setupMockBackend, waitForAppReady } from './fixtures'
+import { expect, test } from './test'
 
 let fixture: MockBackendFixture | null = null
 
@@ -14,7 +13,7 @@ test.afterAll(async () => {
   fixture = null
 })
 
-test('settings offers one model services page without reviving provider account pages', async ({}, testInfo) => {
+test('settings offers one model services page without reviving provider account pages', async (_, testInfo) => {
   const page = fixture!.page
 
   // Settings left the primary nav; the titlebar gear is its visible door.
@@ -41,6 +40,16 @@ test('settings offers one model services page without reviving provider account 
   await expect(page.getByRole('button', { name: '添加模型服务' })).toBeVisible()
   await expect(page.getByText('服务地址', { exact: true })).toHaveCount(0)
 
+  // Magpie is an optional local gateway exposed through the existing custom
+  // endpoint flow; the shortcut must not silently change the saved default.
+  await page.getByRole('button', { name: /Magpie/ }).click()
+  await expect(page.getByPlaceholder('My model service')).toHaveValue('Magpie')
+  await expect(page.getByPlaceholder('http://127.0.0.1:8081/v1')).toHaveValue('http://127.0.0.1:3425/v1')
+  await expect(page.getByText(/Magpie.*updates/i)).toBeVisible()
+  await expect(page.getByRole('checkbox')).not.toBeChecked()
+  await page.screenshot({ path: testInfo.outputPath('magpie-custom-endpoint.png') })
+  await page.getByRole('button', { name: '取消' }).click()
+
   // Inventory is the default state. Add explicitly enters a create-only editor,
   // and cancelling returns to the inventory instead of leaving an existing
   // service loaded into a reusable form.
@@ -55,6 +64,7 @@ test('settings offers one model services page without reviving provider account 
   const overlayTheme = await page.locator('[data-overlay-surface]').evaluate(element =>
     getComputedStyle(element).getPropertyValue('--ui-chat-surface-background').trim()
   )
+
   expect(overlayTheme).not.toBe('')
 
   await page.screenshot({ path: testInfo.outputPath('personal-assistant-settings.png') })

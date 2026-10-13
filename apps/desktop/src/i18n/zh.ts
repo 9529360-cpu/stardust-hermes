@@ -1168,6 +1168,10 @@ export const zh = defineLocale({
       backendIdleTimeoutDesc: '未使用的机器人后端在关闭前保持预热的时长。调高这个值，你每隔几分钟就会再访问的机器人就不必每次冷启动。'
     },
     customEndpoints: {
+      magpieSetup: '连接 Magpie',
+      magpieName: 'Magpie',
+      magpieHelp: 'Magpie 需要从 Stardust 后端可达。点击“测试连接”加载模型列表；Magpie 会自行更新。',
+      defaultScopeHint: '默认服务用于新对话。已打开的对话会继续使用聊天中显示的模型。',
       title: '自定义服务',
       addTitle: '添加模型服务',
       editTitle: '编辑模型服务',
@@ -4134,6 +4138,7 @@ export const zh = defineLocale({
   },
 
   modelPicker: {
+    scopeHint: '这里显示当前对话或草稿实际使用的模型。设置中的“模型服务”用于设置新对话默认值，不会切换已打开的对话。',
     title: '切换模型',
     current: '当前：',
     unknown: '(未知)',

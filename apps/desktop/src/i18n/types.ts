@@ -864,6 +864,10 @@ export interface Translations {
     customEndpoints: {
       title: string
       addTitle: string
+      magpieSetup: string
+      magpieName: string
+      magpieHelp: string
+      defaultScopeHint: string
       editTitle: string
       active: string
       use: string
@@ -3377,6 +3381,7 @@ export interface Translations {
   modelPicker: {
     title: string
     current: string
+    scopeHint: string
     unknown: string
     search: string
     noModels: string

@@ -38,7 +38,7 @@ test.afterAll(async () => {
   fixture = null
 })
 
-test('at 1220x800 the composer shows the model name in its pill', async () => {
+test('at 1220x800 the composer and full model picker show their model context', async (_, testInfo) => {
   test.setTimeout(180_000)
   const page = fixture!.page
   await waitForAppReady(fixture!, 120_000)
@@ -46,6 +46,13 @@ test('at 1220x800 the composer shows the model name in its pill', async () => {
   const pill = page.getByRole('button', { name: MODEL_PILL }).first()
   await expect(pill).toBeVisible()
   await expect(pill).toContainText(/Mock Model/i)
+  await pill.click()
+  const picker = page.getByRole('dialog')
+  await expect(picker).toBeVisible()
+  await expect(picker.getByRole('button', { name: /刷新模型|Refresh models/ })).toBeVisible()
+  await expect(picker.getByText(/设置.*模型服务|Settings.*Model services/)).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath('model-picker-dialog.png') })
+  await page.keyboard.press('Escape')
   await capture(page, '1220x800-composer')
 })
 

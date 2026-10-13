@@ -118,6 +118,24 @@ it('shows GPT官方 login errors even without selectable models', async () => {
   expect(await screen.findByText('请在原 ChatGPT/Codex 客户端重新登录')).toBeTruthy()
 })
 
+it('refreshes the catalog from the full picker and explains model scope', async () => {
+  renderPicker()
+
+  expect(await screen.findByText('Nous')).toBeTruthy()
+  expect(screen.getByText(/Settings → Model services sets the default for new chats/)).toBeTruthy()
+
+  const refreshedOptions: ModelOptionsResult = {
+    ...OPTIONS,
+    providers: [{ slug: 'new-provider', name: 'New provider', models: ['fresh-model'], authenticated: true }]
+  }
+
+  vi.mocked(requestModelOptions).mockResolvedValueOnce(refreshedOptions)
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh models' }))
+
+  expect(await screen.findByText('fresh-model')).toBeTruthy()
+  expect(requestModelOptions).toHaveBeenLastCalledWith(expect.objectContaining({ refresh: true }))
+})
+
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
