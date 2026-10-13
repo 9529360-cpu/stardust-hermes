@@ -13,10 +13,12 @@ import subprocess
 import sys
 import threading
 import time
+from types import SimpleNamespace
 
 import pytest
 
 from tools import async_delegation as ad
+from tools import delegate_tool_dispatch as dispatch
 from tools.process_registry import process_registry
 from tools.process_registry_notifications import format_process_notification
 
@@ -65,6 +67,121 @@ def _drain_for(delegation_id, timeout=5.0):
             continue
         time.sleep(0.02)
     return None
+
+
+@pytest.mark.parametrize(
+    ("children", "expected_outcome", "expected_status"),
+    [
+        ([{"status": "completed"}], "completed", "completed"),
+        ([{"status": "success"}, {"status": "completed"}], "completed", "completed"),
+        ([{"status": "completed"}, {"status": "failed"}], "partial_failure", "error"),
+        ([{"status": "interrupted"}, {"status": "completed"}], "partial_failure", "error"),
+        ([{"status": "error"}, {"status": "timeout"}], "failed", "error"),
+        ([{"status": "completed", "truncated": True}], "failed", "error"),
+        ([{"status": "completed", "exit_reason": "max_iterations"}], "failed", "error"),
+        ([{"status": "completed", "schema_valid": False}], "failed", "error"),
+        ([{"status": "completed"}, {"status": "completed", "schema_valid": False}], "partial_failure", "error"),
+        ([{"status": "unknown"}], "unknown", "error"),
+        ([{"status": "failed"}], "failed", "error"),
+        ([], "failed", "error"),
+        (None, "failed", "error"),
+    ],
+)
+def test_batch_status_requires_every_child_to_finish(children, expected_outcome, expected_status):
+    """A partially successful fan-out cannot wake its parent with completed."""
+    combined = {"results": children}
+    assert ad._batch_outcome(combined) == expected_outcome
+    assert ad._batch_status(combined) == expected_status
+
+
+def test_batch_outcome_requires_complete_unique_task_indexes():
+    """Missing or duplicated child results cannot masquerade as full batch success."""
+    missing = {"results": [{"task_index": 0, "status": "completed"}]}
+    duplicated = {"results": [
+        {"task_index": 0, "status": "completed"},
+        {"task_index": 0, "status": "completed"},
+    ]}
+    assert ad._batch_outcome(missing, expected_task_indexes=[0, 1]) == "unknown"
+    assert ad._batch_outcome(duplicated, expected_task_indexes=[0, 1]) == "unknown"
+
+
+@pytest.mark.parametrize(
+    ("children", "expected"),
+    [
+        ([{"task_index": 1, "status": "completed"}, {"task_index": 3, "status": "completed"}], "completed"),
+        ([{"task_index": 1, "status": "completed"}], "unknown"),
+        ([{"task_index": 1, "status": "completed"}, {"task_index": 1, "status": "completed"}], "unknown"),
+        ([{"task_index": 1, "status": "completed"}, {"task_index": 4, "status": "completed"}], "unknown"),
+        ([{"task_index": 1, "status": "completed"}, {"task_index": "3", "status": "completed"}], "unknown"),
+        ([{"task_index": 1, "status": "completed"}, {"task_index": 3, "status": "failed"}], "partial_failure"),
+        ([{"task_index": 1, "status": "failed"}, {"task_index": 3, "status": "error"}], "failed"),
+        ([{"task_index": 1, "status": "completed"}, {"task_index": 3, "status": "unknown"}], "unknown"),
+    ],
+)
+def test_group_batch_outcome_uses_non_contiguous_expected_indexes(children, expected):
+    """An independent-completion group is judged against its own indexes, e.g. [1, 3]."""
+    combined = {"results": children}
+    assert ad._batch_outcome(combined, expected_task_indexes=[1, 3]) == expected
+    assert ad._batch_status(combined, expected_task_indexes=[1, 3]) == (
+        "completed" if expected == "completed" else "error"
+    )
+
+
+def test_group_aggregate_reports_unknown_for_missing_expected_index(monkeypatch):
+    """The parent-facing outcome must use the indexes assigned to this group."""
+    batch = SimpleNamespace(
+        children=[(1, {"goal": "first"}, object()), (3, {"goal": "third"}, object())],
+        task_list=[{"goal": str(i)} for i in range(4)],
+        parent_agent=SimpleNamespace(),
+        overall_start=time.monotonic(),
+        live_writers=[None] * 4,
+        live_paths=[],
+        live_deleg_id=None,
+        group="review-group",
+    )
+
+    def return_one_child(_batch, results, **_kwargs):
+        results.append({"task_index": 1, "status": "completed"})
+
+    monkeypatch.setattr(dispatch, "_run_children_parallel", return_one_child)
+    monkeypatch.setattr(dispatch, "_finalize_child_results", lambda *_args: None)
+    monkeypatch.setattr("tools.delegation_live_log.update_manifest_statuses", lambda *_args: None)
+    monkeypatch.setattr("tools.process_registry_notifications._process_accounting_lines", lambda _entry: [])
+
+    result = dispatch._execute_and_aggregate(batch)
+
+    assert result["batch_outcome"] == "unknown"
+
+
+def test_group_completion_event_uses_recorded_indexes(tmp_path, monkeypatch):
+    recorded = []
+    monkeypatch.setattr(ad, "_persist_completion", lambda event, result: recorded.append(event))
+    record = {
+        "delegation_id": "group-1", "is_batch": True, "goals": ["a", "b", "c", "d"],
+        "task_indexes": [1, 3], "dispatched_at": time.time(),
+    }
+    result = {"results": [{"task_index": 1, "status": "completed"}]}
+    ad._push_completion_event(record, result, ad._batch_status(result, [1, 3]))
+    assert recorded[0]["status"] == "error"
+    assert recorded[0]["batch_outcome"] == "unknown"
+
+
+def test_batch_completion_event_includes_partial_outcome(tmp_path, monkeypatch):
+    """The durable, parent-facing completion names a partial failure."""
+    recorded = []
+    monkeypatch.setattr(ad, "_persist_completion", lambda event, result: recorded.append((event, result)))
+    record = {
+        "delegation_id": "batch-partial", "is_batch": True,
+        "goals": ["check A", "check B"], "dispatched_at": time.time(),
+    }
+    result = {"results": [{"task_index": 0, "status": "completed"},
+                          {"task_index": 1, "status": "failed", "error": "test failed"}]}
+    ad._push_completion_event(record, result, ad._batch_status(result))
+    event, persisted_result = recorded[0]
+    assert event["status"] == "error"
+    assert event["batch_outcome"] == "partial_failure"
+    assert event["results"] == result["results"]
+    assert persisted_result is result
 
 
 def test_dispatch_persistence_failure_releases_capacity(monkeypatch):
