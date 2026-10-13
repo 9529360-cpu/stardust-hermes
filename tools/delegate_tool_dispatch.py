@@ -216,8 +216,10 @@ def _run_children_parallel(batch: _Batch, results: list, *, honor_parent_interru
 
                 callback_context = contextvars.copy_context()
 
-                def finalize_in_request_context(done_future, context=callback_context):
-                    context.run(finalize_after_worker_exit, done_future)
+                def finalize_in_request_context(
+                    done_future, context=callback_context, finalizer=finalize_after_worker_exit,
+                ):
+                    context.run(finalizer, done_future)
 
                 future.add_done_callback(finalize_in_request_context)
             break
