@@ -1047,12 +1047,15 @@ export function dedupeInflightUserAgainstTranscript(
     if (
       persistedTail[cursor]?.role !== 'user' ||
       normalizedMessageText(persistedTail[cursor]) !== corrections[index].replace(/\s+/g, ' ').trim()
-    )
-      {return projection}
+    ) {
+      return projection
+    }
 
     cursor -= 1
 
-    while (cursor >= 0 && persistedTail[cursor].role === 'assistant') {cursor -= 1}
+    while (cursor >= 0 && persistedTail[cursor].role === 'assistant') {
+      cursor -= 1
+    }
     lastPersistedMessage = persistedTail[cursor]
   }
 
