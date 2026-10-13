@@ -1,6 +1,6 @@
 import { writeAgentTerminalChunk } from '@/app/right-sidebar/terminal/agent-terminal-stream'
 import { closeAgentTerminalByProc } from '@/app/right-sidebar/terminal/terminals'
-import { connectHostBrowserForAgent } from '@/app/settings/browser-host-connect'
+import { connectHostBrowserForAgent } from '@/app/settings/browser-host-connect-agent'
 import { applyDesktopLayoutPreset, revealDesktopPane } from '@/store/pane-focus'
 import { recordAgentReaction } from '@/store/reactions-local'
 import { setMessages } from '@/store/session'

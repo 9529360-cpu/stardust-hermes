@@ -8,7 +8,7 @@ import type { GatewayEventContext } from './types'
 
 const connectHostBrowserForAgent = vi.fn()
 
-vi.mock('@/app/settings/browser-host-connect', () => ({
+vi.mock('@/app/settings/browser-host-connect-agent', () => ({
   connectHostBrowserForAgent: (...args: unknown[]) => connectHostBrowserForAgent(...args)
 }))
 
