@@ -1168,6 +1168,8 @@ def _init_session_state(agent, session_id, session_db, parent_session_id, reason
 def _apply_display_config(agent, _agent_cfg, platform):
     # show_commentary: Codex phase=commentary → interim path (true) or reasoning channel.
     agent.show_commentary = bool(_cfg_dict(_agent_cfg, "display").get("show_commentary", True))
+    # progress_updates: PROGRESS_UPDATE_GUIDANCE in the prompt + the quiet-turn pulse (agent/progress_pulse.py).
+    agent.progress_updates = bool(_cfg_dict(_agent_cfg, "display").get("progress_updates", True))
 
     # Window (seconds) for the bounded /fast auto|cold modes (agent.fast_mode).
     agent.fast_auto_seconds = (_agent_cfg.get("agent") or {}).get("fast_auto_seconds", 60)
