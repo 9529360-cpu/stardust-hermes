@@ -75,6 +75,18 @@ class TestMergeParent:
 
 
 class TestNestedInjection:
+    def test_only_one_active_item_is_preserved_across_parent_and_child(self):
+        store = TodoStore()
+        items = store.write([
+            _item("parent", status="in_progress"),
+            _item("child", status="in_progress", parent="parent"),
+        ])
+
+        by_id = {item["id"]: item for item in items}
+        assert by_id["parent"]["status"] == "in_progress"
+        assert by_id["child"]["status"] == "pending"
+        assert store.format_for_injection().count("[>]") == 1
+
     def test_children_indented(self):
         store = TodoStore()
         store.write([

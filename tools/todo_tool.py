@@ -40,7 +40,8 @@ class TodoStore:
 
     def _fresh_items(self, todos: List[Dict[str, Any]]) -> List[Dict[str, str]]:
         """Validate, dedupe and order a whole new list (replace / restore)."""
-        return self._normalize_order([self._validate(t) for t in self._dedupe_by_id(todos)])
+        items = [self._validate(t) for t in self._dedupe_by_id(todos)]
+        return self._normalize_order(self._keep_single_active(items))
 
     def write(self, todos: List[Dict[str, Any]], merge: bool = False) -> List[Dict[str, str]]:
         """Replace the list (default) or merge by id; returns the full list after writing."""
@@ -51,6 +52,7 @@ class TodoStore:
             self._items = self._fresh_items(todos)
         del self._items[MAX_TODO_ITEMS:]  # keep the priority head; replays can't grow unbounded
         self._sanitize_parents(self._items)
+        self._items = self._keep_single_active(self._items)
         if self._items != before:
             self._revision += 1
         return self.read()
@@ -194,6 +196,19 @@ class TodoStore:
         normalized.insert(statuses.index("pending"), normalized.pop(active_index))
         return normalized
 
+    @staticmethod
+    def _keep_single_active(items: List[Dict[str, str]]) -> List[Dict[str, str]]:
+        """Keep the first active item by list priority; return conflicting items to pending."""
+        active_seen = False
+        for item in items:
+            if item["status"] != "in_progress":
+                continue
+            if active_seen:
+                item["status"] = "pending"
+            else:
+                active_seen = True
+        return items
+
 
 def load_todo_session_state(session_db: Any, session_id: str) -> Optional[Dict[str, Any]]:
     """Return the trusted session-scoped todo snapshot, or ``None`` when unavailable.
@@ -255,6 +270,7 @@ def todo_tool(todos: Optional[List[Dict[str, Any]]] = None, merge: bool = False,
     """Write ``todos`` (replace, or ``merge`` by id) or read when None -> list + summary JSON."""
     if store is None:
         return tool_error("TodoStore not initialized")
+    requested_active_ids: List[str] = []
     if todos is None:
         items = store.read()
     else:
@@ -265,12 +281,27 @@ def todo_tool(todos: Optional[List[Dict[str, Any]]] = None, merge: bool = False,
                 return tool_error("todos must be a list of objects, got unparseable string")
         if not isinstance(todos, list):
             return tool_error(f"todos must be a list, got {type(todos).__name__}")
+        requested_active_ids = [
+            str(item.get("id", "")).strip() or "?"
+            for item in todos
+            if isinstance(item, dict)
+            and str(item.get("status", "")).strip().lower() == "in_progress"
+        ]
         items = store.write(todos, merge)
     summary = {"total": len(items)}
     for status in ("pending", "in_progress", "completed", "cancelled"):
         summary[status] = sum(1 for i in items if i["status"] == status)
-    return json.dumps({"todos": items, "revision": store.snapshot()["revision"],
-                       "summary": summary}, ensure_ascii=False)
+    result: Dict[str, Any] = {
+        "todos": items, "revision": store.snapshot()["revision"], "summary": summary,
+    }
+    active_ids = {item["id"] for item in items if item["status"] == "in_progress"}
+    if any(item_id not in active_ids for item_id in requested_active_ids):
+        result["warnings"] = [
+            "Only one todo may be in_progress. The first active item by list priority remains active; "
+            "conflicting activation requests are pending. Complete or cancel the active item before "
+            "activating another."
+        ]
+    return json.dumps(result, ensure_ascii=False)
 
 
 def check_todo_requirements() -> bool:
