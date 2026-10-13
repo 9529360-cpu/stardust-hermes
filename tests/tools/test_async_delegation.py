@@ -67,6 +67,47 @@ def _drain_for(delegation_id, timeout=5.0):
     return None
 
 
+@pytest.mark.parametrize(
+    ("children", "expected_outcome", "expected_status"),
+    [
+        ([{"status": "completed"}], "completed", "completed"),
+        ([{"status": "success"}, {"status": "completed"}], "completed", "completed"),
+        ([{"status": "completed"}, {"status": "failed"}], "partial_failure", "error"),
+        ([{"status": "interrupted"}, {"status": "completed"}], "partial_failure", "error"),
+        ([{"status": "error"}, {"status": "timeout"}], "failed", "error"),
+        ([{"status": "completed", "truncated": True}], "failed", "error"),
+        ([{"status": "completed", "exit_reason": "max_iterations"}], "failed", "error"),
+        ([{"status": "completed", "schema_valid": False}], "failed", "error"),
+        ([{"status": "completed"}, {"status": "completed", "schema_valid": False}], "partial_failure", "error"),
+        ([], "failed", "error"),
+        (None, "failed", "error"),
+    ],
+)
+def test_batch_status_requires_every_child_to_finish(children, expected_outcome, expected_status):
+    """A partially successful fan-out cannot wake its parent with completed."""
+    combined = {"results": children}
+    assert ad._batch_outcome(combined) == expected_outcome
+    assert ad._batch_status(combined) == expected_status
+
+
+def test_batch_completion_event_includes_partial_outcome(tmp_path, monkeypatch):
+    """The durable, parent-facing completion names a partial failure."""
+    recorded = []
+    monkeypatch.setattr(ad, "_persist_completion", lambda event, result: recorded.append((event, result)))
+    record = {
+        "delegation_id": "batch-partial", "is_batch": True,
+        "goals": ["check A", "check B"], "dispatched_at": time.time(),
+    }
+    result = {"results": [{"task_index": 0, "status": "completed"},
+                          {"task_index": 1, "status": "failed", "error": "test failed"}]}
+    ad._push_completion_event(record, result, ad._batch_status(result))
+    event, persisted_result = recorded[0]
+    assert event["status"] == "error"
+    assert event["batch_outcome"] == "partial_failure"
+    assert event["results"] == result["results"]
+    assert persisted_result is result
+
+
 def test_dispatch_persistence_failure_releases_capacity(monkeypatch):
     """A rejected admission cannot remain visible as a running child."""
     def fail_persist(_record):

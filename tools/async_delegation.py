@@ -637,11 +637,32 @@ def _batch_crash(error: str, duration: float) -> Dict[str, Any]:
     return {"results": [], "error": error, "total_duration_seconds": duration}
 
 
+def _batch_outcome(combined: Dict[str, Any]) -> str:
+    """A batch succeeds only when EVERY child finished its assigned work.
+
+    Keep per-child results intact. A usable summary is not proof of completion:
+    iteration exhaustion (truncated) and a failed output schema are incomplete
+    even when the child's legacy status says "completed".
+    """
+    children = combined.get("results")
+    if not isinstance(children, list) or not children:
+        return "failed"
+    succeeded = sum(
+        isinstance(child, dict)
+        and child.get("status") in {"completed", "success"}
+        and child.get("exit_reason") != "max_iterations"
+        and child.get("truncated") is not True
+        and child.get("schema_valid") is not False
+        for child in children
+    )
+    if succeeded == len(children):
+        return "completed"
+    return "partial_failure" if succeeded else "failed"
+
+
 def _batch_status(combined: Dict[str, Any]) -> str:
-    """Batch status: completed unless every child errored/was interrupted."""
-    child_results = combined.get("results") or []
-    ok = ("completed", "success")
-    return "error" if child_results and all(r.get("status") not in ok for r in child_results) else "completed"
+    """The parent must not see a mixed or incomplete batch as successful."""
+    return "completed" if _batch_outcome(combined) == "completed" else "error"
 
 
 def _dispatch(
@@ -852,6 +873,7 @@ def _push_completion_event(record: Dict[str, Any], result: Dict[str, Any], statu
     if is_batch:
         payload = {
             "is_batch": True, "results": result.get("results") or [],
+            "batch_outcome": result.get("batch_outcome") or _batch_outcome(result),
             "live_transcripts": result.get("live_transcripts"), "error": result.get("error"),
             "total_duration_seconds": result.get("total_duration_seconds"),
             **({"group": result["group"]} if result.get("group") is not None else {})}
