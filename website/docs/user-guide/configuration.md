@@ -2108,7 +2108,7 @@ The `display.language` setting translates a small set of static user-facing mess
 
 Supported values: `en` (English), `zh` (Simplified Chinese), `zh-hant` (Traditional Chinese), `ja` (Japanese), `de` (German), `es` (Spanish), `fr` (French), `tr` (Turkish), `uk` (Ukrainian), `af` (Afrikaans), `ko` (Korean), `it` (Italian), `ga` (Irish), `pt` (Portuguese), `ru` (Russian), `hu` (Hungarian). When unset (the default), the machine's UI language is used; set any language code to pin it. Unknown values fall back to English.
 
-You can also set this per-session with the `HERMES_LANGUAGE` env var, which overrides the config value.
+You can also set this per-session with the `STARDUST_LANGUAGE` env var, which overrides the config value.
 
 ```yaml
 display:
