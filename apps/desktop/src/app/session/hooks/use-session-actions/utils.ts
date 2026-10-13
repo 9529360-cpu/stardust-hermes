@@ -1036,7 +1036,25 @@ export function dedupeInflightUserAgainstTranscript(
   }
 
   const persistedTail = persistedMessages.slice(suffixStart)
-  const lastPersistedMessage = persistedTail[persistedTail.length - 1]
+  let lastPersistedMessage = persistedTail[persistedTail.length - 1]
+  const corrections = projection.inflight?.corrections ?? []
+
+  // A persisted correction is the latest user, but still belongs to this turn.
+  // Walk only an exact correction suffix; do not dedupe completed repeat turns.
+  let cursor = persistedTail.length - 1
+
+  for (let index = corrections.length - 1; index >= 0; index -= 1) {
+    if (
+      persistedTail[cursor]?.role !== 'user' ||
+      normalizedMessageText(persistedTail[cursor]) !== corrections[index].replace(/\s+/g, ' ').trim()
+    )
+      {return projection}
+
+    cursor -= 1
+
+    while (cursor >= 0 && persistedTail[cursor].role === 'assistant') {cursor -= 1}
+    lastPersistedMessage = persistedTail[cursor]
+  }
 
   const persistedUserPresent =
     lastPersistedMessage?.role === 'user' && normalizedMessageText(lastPersistedMessage) === inflightUser
