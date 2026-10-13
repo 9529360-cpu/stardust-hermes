@@ -22,8 +22,8 @@ approval:
   denied:          "      ✗ Diúltaithe"
   cancelled:       "      ✗ Cealaithe"
   blocklist_message: "Tá an t-ordú seo ar an liosta cosc gan choinníoll agus ní féidir é a cheadú."
-
   browser_host_connect: "Ceangail an comhrá seo le do Chrome féin, lena n-áirítear na suíomhanna a bhfuil tú sínithe isteach iontu"
+
 gateway:
   approval_expired: "⚠️ Tá an cead imithe in éag (níl an gníomhaire ag fanacht níos mó). Iarr ar an ngníomhaire iarracht eile a dhéanamh."
   draining:         "⏳ Ag fanacht le {count} gníomhaire(í) gníomhach roimh atosú..."

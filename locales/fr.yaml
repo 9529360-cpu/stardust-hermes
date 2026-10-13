@@ -18,8 +18,8 @@ approval:
   denied:          "      ✗ Refusé"
   cancelled:       "      ✗ Annulé"
   blocklist_message: "Cette commande est sur la liste de blocage inconditionnel et ne peut pas être approuvée."
-
   browser_host_connect: "Connecter cette conversation à votre propre Chrome, y compris les sites auxquels vous êtes connecté"
+
 gateway:
   approval_expired: "⚠️ Approbation expirée (l'agent n'attend plus). Demandez à l'agent de réessayer."
   draining:         "⏳ Vidage de {count} agent(s) actif(s) avant redémarrage..."

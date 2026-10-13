@@ -455,6 +455,18 @@ _HERMES_BEHAVIORAL_VARS = frozenset({
 
 
 @pytest.fixture(autouse=True)
+def _hermetic_machine_language(monkeypatch):
+    """Keep host locale out of tests unless a test opts in explicitly."""
+    try:
+        from agent import i18n
+
+        monkeypatch.setattr(i18n, "_machine_language_probe", lambda: None)
+        i18n._machine_language.cache_clear()
+    except Exception:
+        pass
+
+
+@pytest.fixture(autouse=True)
 def _hermetic_environment(tmp_path, monkeypatch):
     """Blank out all credential/behavioral env vars so local and CI match.
 

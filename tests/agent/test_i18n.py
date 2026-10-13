@@ -84,6 +84,31 @@ def test_catalog_placeholders_match_english(lang: str):
 
 
 
+@pytest.mark.parametrize(("machine_lang", "expected"), [("zh_CN", "zh"), ("zh_TW", "zh-hant"), ("xx_YY", "en")])
+def test_machine_language_fallback(monkeypatch, machine_lang, expected):
+    monkeypatch.delenv("STARDUST_LANGUAGE", raising=False)
+    i18n.reset_language_cache()
+    monkeypatch.setattr(i18n, "_config_language", lambda: None)
+    monkeypatch.setattr(i18n, "_machine_language_probe", lambda: machine_lang)
+    assert i18n.get_language() == expected
+
+
+def test_display_language_wins_over_machine_language(monkeypatch):
+    monkeypatch.delenv("STARDUST_LANGUAGE", raising=False)
+    i18n.reset_language_cache()
+    monkeypatch.setattr(i18n, "_config_language", lambda: "fr")
+    monkeypatch.setattr(i18n, "_machine_language_probe", lambda: "zh_CN")
+    assert i18n.get_language() == "fr"
+
+
+def test_stardust_language_wins_over_machine_and_display(monkeypatch):
+    monkeypatch.setenv("STARDUST_LANGUAGE", "de")
+    i18n.reset_language_cache()
+    monkeypatch.setattr(i18n, "_config_language", lambda: "fr")
+    monkeypatch.setattr(i18n, "_machine_language_probe", lambda: "zh_CN")
+    assert i18n.get_language() == "de"
+
+
 def test_default_when_nothing_set(monkeypatch):
     """With no env var and no config override, falls back to English."""
     monkeypatch.delenv("STARDUST_LANGUAGE", raising=False)

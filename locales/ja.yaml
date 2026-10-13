@@ -18,8 +18,8 @@ approval:
   denied:          "      ✗ 拒否しました"
   cancelled:       "      ✗ キャンセルしました"
   blocklist_message: "このコマンドは無条件ブロックリストに含まれており、承認できません。"
-
   browser_host_connect: "この会話をあなたの Chrome に接続します（ログイン済みのサイトを含む）"
+
 gateway:
   approval_expired: "⚠️ 承認の有効期限が切れました（エージェントはもう待機していません）。エージェントに再試行を依頼してください。"
   draining:         "⏳ 再起動前に {count} 個のアクティブエージェントの終了を待っています..."
