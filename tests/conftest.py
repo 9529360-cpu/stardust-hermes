@@ -456,14 +456,11 @@ _HERMES_BEHAVIORAL_VARS = frozenset({
 
 @pytest.fixture(autouse=True)
 def _hermetic_machine_language(monkeypatch):
-    """Keep host locale out of tests unless a test opts in explicitly."""
-    try:
-        from agent import i18n
+    """Keep the host's UI language out of tests unless a test opts in (agent/i18n.py falls back to it)."""
+    from agent import i18n
 
-        monkeypatch.setattr(i18n, "_machine_language_probe", lambda: None)
-        i18n._machine_language.cache_clear()
-    except Exception:
-        pass
+    monkeypatch.setattr(i18n, "_machine_language_probe", lambda: None)
+    i18n._machine_language.cache_clear()
 
 
 @pytest.fixture(autouse=True)
