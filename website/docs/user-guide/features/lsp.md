@@ -123,7 +123,7 @@ use.
 
 ## Agent-triggered code navigation
 
-The `code_intelligence` tool lets the Agent ask the same language server for a definition, references, hover/type information, document symbols, or workspace symbols. Results are reduced to file locations and compact symbol data, so the Agent can inspect the relevant code directly instead of searching and rereading unrelated files. It can also rename a symbol across files; that edit goes through Stardust's existing guarded patch path. Set `apply: false` to inspect a bounded diff before applying. Navigation queries use 1-based line and column arguments.
+The `code_intelligence` tool lets the Agent ask the same language server for a definition, implementation, type definition, references, hover/type information, document symbols, or workspace symbols. Results are reduced to file locations and compact symbol data, so the Agent can inspect the relevant code directly instead of searching and rereading unrelated files. It can also rename a symbol across files; that edit goes through Stardust's existing guarded patch path. Set `apply: false` to inspect a bounded diff before applying. Navigation queries use 1-based line and column arguments.
 
 The tool is available in the `coding`, `debugging`, and `hermes-acp` toolsets, and can be enabled directly with `--toolsets code_intelligence`. It requires a supported language server and a source file inside a Git worktree. Relative paths use the Agent's current working directory; the file must be visible to the Agent host. The language server is reused by the existing LSP service, and an unchanged document is not resent for each query.
 

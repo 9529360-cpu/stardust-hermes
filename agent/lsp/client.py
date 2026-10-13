@@ -60,6 +60,8 @@ _CLIENT_CAPABILITIES: Dict[str, Any] = {
                                "versionSupport": True, "codeDescriptionSupport": True, "dataSupport": False},
         "hover": {"contentFormat": ["markdown", "plaintext"]},
         "definition": {"linkSupport": True},
+        "implementation": {"linkSupport": True},
+        "typeDefinition": {"linkSupport": True},
         "references": {},
         "documentSymbol": {"hierarchicalDocumentSymbolSupport": True},
         "rename": {"dynamicRegistration": False, "prepareSupport": True},
@@ -567,6 +569,8 @@ class LSPClient:
         """Run one semantic LSP request; line/character are zero-based LSP positions."""
         methods = {
             "definition": "textDocument/definition",
+            "implementation": "textDocument/implementation",
+            "type_definition": "textDocument/typeDefinition",
             "references": "textDocument/references",
             "hover": "textDocument/hover",
             "document_symbols": "textDocument/documentSymbol",

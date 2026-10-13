@@ -9,8 +9,11 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from tools.registry import registry
 
-_ACTIONS = ("definition", "references", "hover", "document_symbols", "workspace_symbols", "rename")
-_POSITION_ACTIONS = {"definition", "references", "hover", "rename"}
+_ACTIONS = (
+    "definition", "implementation", "type_definition", "references", "hover",
+    "document_symbols", "workspace_symbols", "rename",
+)
+_POSITION_ACTIONS = {"definition", "implementation", "type_definition", "references", "hover", "rename"}
 _SYMBOL_KINDS = {
     1: "file", 2: "module", 3: "namespace", 4: "package", 5: "class", 6: "method",
     7: "property", 8: "field", 9: "constructor", 10: "enum", 11: "interface", 12: "function",
@@ -23,7 +26,7 @@ SCHEMA = {
     "name": "code_intelligence",
     "description": (
         "Use the project's language server for precise code navigation and symbol rename before broad text search: "
-        "find a symbol's definition or references, inspect hover/type information, list file symbols, "
+        "find a symbol's definition, implementation, type definition, or references; inspect hover/type information; list file symbols; "
         "search workspace symbols, or rename a symbol across files. Rename applies through Stardust's "
         "existing guarded patch tool by default; set apply=false to preview. Locations use 1-based lines and columns."
     ),
@@ -40,12 +43,12 @@ SCHEMA = {
             },
             "line": {
                 "type": "integer", "minimum": 1,
-                "description": "1-based source line for definition, references, or hover.",
+                "description": "1-based source line for definition, implementation, type_definition, references, or hover.",
             },
             "character": {
                 "type": "integer", "minimum": 1, "default": 1,
                 "description": (
-                    "1-based character column for definition, references, or hover "
+                    "1-based character column for definition, implementation, type_definition, references, or hover "
                     "(defaults to the start of the line)."
                 ),
             },

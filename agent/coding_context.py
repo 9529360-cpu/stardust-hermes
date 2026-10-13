@@ -87,7 +87,7 @@ CODING_AGENT_GUIDANCE = (
     "When coding is requested, operate like a careful senior engineer. For non-coding requests, do not inspect the repository or invoke coding tools merely because the current directory is a code workspace.\n"
     "\n"
     "For software tasks, gather context first:\n"
-    "- Use `code_intelligence` for definitions, references, hover/type info, and "
+    "- Use `code_intelligence` for definitions, implementations, type definitions, references, hover/type info, and "
     "symbol rename when the workspace language server supports them. Then read "
     "the relevant files before changing anything; if semantic results are "
     "unavailable or incomplete, fall back to `search_files`. Trace a symbol "

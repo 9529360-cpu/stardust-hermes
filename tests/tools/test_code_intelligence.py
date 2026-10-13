@@ -1,9 +1,51 @@
 import json
 import subprocess
 
+import pytest
 import tools.code_intelligence  # noqa: F401 - registers the tool for real registry dispatch
 from agent.lsp.client import file_uri
 from tools.registry import registry
+
+
+@pytest.mark.parametrize("action", ["implementation", "type_definition"])
+def test_registry_dispatch_formats_navigation_locations(tmp_path, monkeypatch, action):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "-C", str(repo), "init", "-q"], check=True)
+    source = repo / "sample.py"
+    source.write_text("value = 1\n")
+    target = repo / "target.py"
+    target.write_text("class Value: pass\n")
+    monkeypatch.chdir(repo)
+
+    class FakeService:
+        def is_active(self):
+            return True
+
+        def semantic_query_sync(self, *args, **kwargs):
+            return {"available": True, "result": [{
+                "targetUri": file_uri(str(target)),
+                "targetSelectionRange": {
+                    "start": {"line": 0, "character": 6},
+                    "end": {"line": 0, "character": 11},
+                },
+            }]}
+
+    monkeypatch.setattr("agent.lsp.get_service", lambda: FakeService())
+    monkeypatch.setattr("tools.file_tools_paths._uses_container_paths", lambda task_id: False)
+    monkeypatch.setattr("tools.file_tools_paths._resolve_path_for_task", lambda path, task_id: repo / path)
+
+    result = json.loads(registry.dispatch("code_intelligence", {
+        "action": action, "path": "sample.py", "line": 1, "character": 1,
+    }, task_id="task-123"))
+
+    assert result == {
+        "available": True,
+        "action": action,
+        "path": str(source),
+        "locations": [{"path": str(target), "line": 1, "column": 7}],
+        "truncated": False,
+    }
 
 
 def test_registry_dispatch_previews_utf16_rename_and_rejects_outside_workspace(tmp_path, monkeypatch):
@@ -15,7 +57,7 @@ def test_registry_dispatch_previews_utf16_rename_and_rejects_outside_workspace(t
     source.write_text(prefix + "old_name = 1\n")
     outside = tmp_path / "outside.py"
     outside.write_text("old_name = 1\n")
-    monkeypatch.chdir(tmp_path)
+    monkeypatch.chdir(repo)
 
     class FakeService:
         result = None
