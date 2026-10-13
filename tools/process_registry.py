@@ -1391,8 +1391,10 @@ class ProcessRegistry(ProcessCheckpointMixin):
 
     def _move_to_finished(self, session: ProcessSession):
         """Move a session from running to finished.
-        Idempotent: kill_process() and the reader thread can both call this; only
-        the FIRST move enqueues the completion notification, so no duplicates."""
+        Idempotent: kill_process(), the reader thread and exit reconciliation can each
+        call this; only the FIRST move enqueues the completion notification (no
+        duplicates) and then sets ``_completion_event``, so the event never runs ahead
+        of the notification its waiters are about to drain."""
         with self._lock:
             was_running = session.id in self._running
             if was_running:
@@ -1438,7 +1440,11 @@ class ProcessRegistry(ProcessCheckpointMixin):
             }
             _redact_process_result(notification)
             self.completion_queue.put(notification)
-        session._completion_event.set()
+        if was_running:
+            # A later move (the linger's reconcile, a kill) can return while this one is
+            # still writing the checkpoint; had it set the event, a one-shot parent would
+            # wake, drain an empty queue and exit without the follow-up turn.
+            session._completion_event.set()
 
     @staticmethod
     def _exit_fields(session: ProcessSession) -> dict:
