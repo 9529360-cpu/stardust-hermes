@@ -84,6 +84,28 @@ def test_catalog_placeholders_match_english(lang: str):
 
 
 
+def test_real_config_language_and_machine_fallback(monkeypatch, tmp_path):
+    """Resolve through the real config loader without confusing defaults for user intent."""
+    from hermes_cli import config as cfg_mod
+
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
+    monkeypatch.delenv("STARDUST_LANGUAGE", raising=False)
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("", encoding="utf-8")
+    monkeypatch.setattr(i18n, "_machine_language_probe", lambda: "zh_CN")
+    cfg_mod._LOAD_CONFIG_CACHE.clear()
+    i18n.reset_language_cache()
+    try:
+        assert i18n.get_language() == "zh"
+        config_path.write_text("display:\n  language: en\n", encoding="utf-8")
+        cfg_mod._LOAD_CONFIG_CACHE.clear()
+        i18n.reset_language_cache()
+        assert i18n.get_language() == "en"
+    finally:
+        cfg_mod._LOAD_CONFIG_CACHE.clear()
+        i18n.reset_language_cache()
+
+
 @pytest.mark.parametrize(("machine_lang", "expected"), [("zh_CN", "zh"), ("zh_TW", "zh-hant"), ("xx_YY", "en")])
 def test_machine_language_fallback(monkeypatch, machine_lang, expected):
     monkeypatch.delenv("STARDUST_LANGUAGE", raising=False)
