@@ -225,6 +225,23 @@ def test_connect_asks_once_then_has_the_desktop_pair_chrome_and_keeps_the_setup_
     assert "status" in result["next"]
 
 
+def test_connect_approval_reason_uses_the_chinese_catalog(monkeypatch):
+    from agent import i18n
+
+    monkeypatch.setenv("STARDUST_LANGUAGE", "zh")
+    i18n.reset_language_cache()
+    try:
+        seen = _connect_seams(monkeypatch)
+
+        run(agent(), action="connect", target="host")
+
+        assert seen["approvals"] == [(
+            "browser", "让这个对话连接你自己的 Chrome，包括你已登录的网站", "browser_host_connect",
+        )]
+    finally:
+        i18n.reset_language_cache()
+
+
 def test_declined_connect_never_reaches_the_desktop(monkeypatch):
     seen = _connect_seams(monkeypatch, approved=False)
 

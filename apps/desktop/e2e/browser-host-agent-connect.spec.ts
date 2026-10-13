@@ -65,6 +65,7 @@ test('the assistant asks once, then the desktop pairs Chrome to the chat on scre
     BrowserWindow.getAllWindows()[0].setSize(width, 820)
   }, NARROW_WIDTH)
   await page.waitForTimeout(600)
+  await page.getByText('连接到已打开的 Chrome 配置文件', { exact: true }).scrollIntoViewIfNeeded()
   await page.screenshot({ path: testInfo.outputPath('chrome-connect-tools-panel-narrow.png') })
 
   await disconnect.click()

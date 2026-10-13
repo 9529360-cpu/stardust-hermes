@@ -61,11 +61,12 @@ def _connect_host(args: dict) -> str:
     if extension_controller_available("browser_snapshot"):
         return json.dumps({"success": True, "connected": True}, ensure_ascii=False)
 
+    from agent.i18n import t
     from tools.approval import request_tool_approval
 
     # Pairing hands this chat the user's signed-in Chrome, so it goes through the approval gate once.
     decision = request_tool_approval(
-        "browser", "Connect this chat to the user's own Chrome, including the sites they are signed in to",
+        "browser", t("approval.browser_host_connect"),
         rule_key="browser_host_connect",
     )
     if not decision.get("approved"):

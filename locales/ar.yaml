@@ -24,6 +24,7 @@ approval:
   cancelled:       "      ✗ أُلغي"
   blocklist_message: "هذا الأمر مدرج في قائمة الحظر غير المشروطة ولا يمكن الموافقة عليه."
 
+  browser_host_connect: "اربط هذه المحادثة بمتصفح Chrome الخاص بك، بما في ذلك المواقع التي سجلت الدخول إليها"
 gateway:
   context:
     header:                "🧠 **Context Window**"

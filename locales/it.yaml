@@ -19,6 +19,7 @@ approval:
   cancelled:       "      ✗ Annullato"
   blocklist_message: "Questo comando è nella lista di blocco incondizionata e non può essere approvato."
 
+  browser_host_connect: "Collega questa chat al tuo Chrome, inclusi i siti a cui hai effettuato l’accesso"
 gateway:
   approval_expired: "⚠️ Approvazione scaduta (l'agente non è più in attesa). Chiedi all'agente di riprovare."
   draining:         "⏳ Attendo il completamento di {count} agente/i attivo/i prima di riavviare..."
