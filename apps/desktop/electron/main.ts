@@ -3843,7 +3843,7 @@ function reapOrphanedBackendsOnce() {
 // SIGTERM + app.quit() teardown already works (the macOS path is flawless), and
 // aggressively SIGKILL-ing the backend here would be an untested behavior change
 // for no benefit. So we no-op off Windows and leave that path exactly as it was.
-async function releaseBackendLockForUpdate(updateRoot, venvRoot) {
+async function releaseBackendLockForUpdate(updateRoot, venvRoot = path.join(updateRoot, 'venv')) {
   return releaseBackendLock(updateRoot, 'updates', venvRoot)
 }
 
@@ -4081,6 +4081,8 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
     })
 
     const updateVenvRoot = updateVenv.root ?? path.join(updateRoot, 'venv')
+    const updatePythonPath = updateVenv.python ?? path.join(updateVenvRoot, 'Scripts', 'python.exe')
+    const venvBin = path.join(updateVenvRoot, IS_WINDOWS ? 'Scripts' : 'bin')
 
     // ── Pre-flight state.db integrity guard (#68474) ─────────────────
     // Emergency backup and header verification before the update touches
@@ -4227,6 +4229,10 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
       const wrapped = wrapHandoffForDetachedConsole(scriptHandoff, [
         '-InstallRoot',
         updateRoot,
+        '-VenvRoot',
+        updateVenvRoot,
+        '-PythonPath',
+        updatePythonPath,
         '-Branch',
         branch,
         '-DesktopPid',
