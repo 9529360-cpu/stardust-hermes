@@ -11,6 +11,8 @@
 # CONTRACT (keep in sync with apps/desktop/electron/main.ts):
 #   bash scripts/desktop-update/posix.sh
 #     --install-root <path>    repo checkout (STARDUST_HOME/hermes-agent)
+#     --venv-root <path>       selected project environment root (.venv or venv)
+#     --python-path <path>     Python executable selected from that environment
 #     --branch <ref>           branch to update against
 #     --desktop-pid <pid>      the Electron main process to wait out
 #     [--relaunch-target <p>]  mac: running .app to swap+reopen;
@@ -38,12 +40,15 @@ set -u
 ORIGINAL_ARGS=("$@")
 INSTALL_ROOT="" BRANCH="main" DESKTOP_PID=0 RELAUNCH_TARGET=""
 RELAUNCH_CWD="" SANDBOX_FALLBACK=0 RELAUNCH_ARGS=()
-NO_UI=0 NO_MARKER_CLEANUP=0 SELF_TEST_UI=0 SELF_TEST_GATE=0 SELF_TEST_MARKER=0
+VENV_ROOT="" PYTHON_PATH="" VENV_BIN="" STARDUST_BIN=""
+NO_UI=0 NO_MARKER_CLEANUP=0 SELF_TEST_UI=0 SELF_TEST_GATE=0 SELF_TEST_MARKER=0 SELF_TEST_VENV_PATHS=0
 SELF_TEST_TCC_HEAL=0
 HANDOFF_DAEMONIZED=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --install-root) INSTALL_ROOT="$2"; shift 2 ;;
+    --venv-root) VENV_ROOT="$2"; shift 2 ;;
+    --python-path) PYTHON_PATH="$2"; shift 2 ;;
     --branch) BRANCH="$2"; shift 2 ;;
     --desktop-pid) DESKTOP_PID="$2"; shift 2 ;;
     --relaunch-target) RELAUNCH_TARGET="$2"; shift 2 ;;
@@ -54,6 +59,7 @@ while [ $# -gt 0 ]; do
     --self-test-ui) SELF_TEST_UI=1; shift ;;
     --self-test-gate) SELF_TEST_GATE=1; shift ;;
     --self-test-tcc-heal) SELF_TEST_TCC_HEAL=1; shift ;;
+    --self-test-venv-paths) SELF_TEST_VENV_PATHS=1; NO_UI=1; shift ;;
     --daemonized) HANDOFF_DAEMONIZED=1; shift ;;
     --self-test-marker) SELF_TEST_MARKER=1; NO_UI=1; NO_MARKER_CLEANUP=1; shift ;;
     --) shift; RELAUNCH_ARGS=("$@"); shift $# ;;
@@ -77,6 +83,73 @@ FINAL_MSG="update did not complete"
 DONE_NOTE=""  # set when the update succeeded but the app will NOT reopen itself
 
 log() { echo "$(date +%Y-%m-%dT%H:%M:%S%z) $1" | tee -a "$LOG" 2>/dev/null; }
+
+resolve_venv_target() {
+  local has_dot=0 has_flat=0 python_dir candidate
+  if [ -z "$VENV_ROOT" ]; then
+    if [ -n "${VIRTUAL_ENV:-}" ]; then
+      VENV_ROOT="$VIRTUAL_ENV"
+    else
+      [ -d "$INSTALL_ROOT/.venv" ] && has_dot=1
+      [ -d "$INSTALL_ROOT/venv" ] && has_flat=1
+      if [ "$has_dot" -eq 1 ] && [ "$has_flat" -eq 1 ]; then
+        echo "ambiguous project environments; pass --venv-root/--python-path or set VIRTUAL_ENV" >&2
+        return 1
+      elif [ "$has_dot" -eq 1 ]; then
+        VENV_ROOT="$INSTALL_ROOT/.venv"
+      elif [ "$has_flat" -eq 1 ]; then
+        VENV_ROOT="$INSTALL_ROOT/venv"
+      else
+        echo "project environment is missing (.venv and venv are absent)" >&2
+        return 1
+      fi
+    fi
+  fi
+
+  if [ ! -d "$VENV_ROOT" ]; then
+    echo "selected environment root does not exist: $VENV_ROOT" >&2
+    return 1
+  fi
+  VENV_ROOT="$(cd "$VENV_ROOT" 2>/dev/null && pwd -P)" || {
+    echo "cannot resolve selected environment root" >&2
+    return 1
+  }
+  VENV_BIN="$VENV_ROOT/bin"
+
+  if [ -z "$PYTHON_PATH" ]; then
+    for candidate in "$VENV_BIN/python" "$VENV_BIN/python3"; do
+      if [ -x "$candidate" ]; then PYTHON_PATH="$candidate"; break; fi
+    done
+  elif [ "${PYTHON_PATH#/}" = "$PYTHON_PATH" ]; then
+    PYTHON_PATH="$INSTALL_ROOT/$PYTHON_PATH"
+  fi
+  if [ -z "$PYTHON_PATH" ] || [ ! -x "$PYTHON_PATH" ]; then
+    echo "selected Python is missing or not executable: ${PYTHON_PATH:-<unspecified>}" >&2
+    return 1
+  fi
+  python_dir="$(cd "$(dirname "$PYTHON_PATH")" 2>/dev/null && pwd -P)" || {
+    echo "cannot resolve selected Python directory: $PYTHON_PATH" >&2
+    return 1
+  }
+  if [ "$python_dir" != "$VENV_BIN" ]; then
+    echo "selected Python does not belong to selected environment: $PYTHON_PATH (root $VENV_ROOT)" >&2
+    return 1
+  fi
+
+  STARDUST_BIN="$VENV_BIN/stardust"
+  VIRTUAL_ENV="$VENV_ROOT"
+  export VIRTUAL_ENV
+  return 0
+}
+
+if [ "$SELF_TEST_VENV_PATHS" -eq 1 ]; then
+  if ! resolve_venv_target; then
+    echo "VENV TARGET SELF-TEST: FAIL" >&2
+    exit 3
+  fi
+  echo "VENV TARGET SELF-TEST: PASS root=$VENV_ROOT python=$PYTHON_PATH shim=$STARDUST_BIN"
+  exit 0
+fi
 
 # Keep a durable signal breadcrumb.  A detached hand-off used to leave only the
 # generic FINAL_MSG when it was terminated while the updater child was running,
@@ -236,7 +309,7 @@ for entry in data.get("LSHandlers", []):
 start_ui() {
   [ "$NO_UI" -eq 1 ] && return
   local html="$SCRIPT_DIR/ui.html" py browser port="" i
-  py="${INSTALL_ROOT:+$INSTALL_ROOT/venv/bin/python3}"
+  py="${PYTHON_PATH:-}"
   [ -x "${py:-/nonexistent}" ] || py="$(command -v python3 2>/dev/null)"
   browser="$(find_browser)"
   if [ -n "$browser" ] && [ -n "$py" ] && ! default_browser_is_chromium "$py"; then
@@ -628,11 +701,11 @@ tcc_pick_update_invoke() { # sets UPDATE_INVOKE; safety net past a failed heal
 
 # ── self-tests: no update, touch nothing ────────────────────────────────────
 if [ "$SELF_TEST_TCC_HEAL" -eq 1 ]; then
-  # Runs the REAL heal + invoke selection against --install-root and reports;
-  # tests/scripts/desktop_update/test_desktop_update_tcc_heal.py drives the state matrix through it.
+  # Runs the REAL heal + invoke selection against the resolved active environment.
   trap - EXIT
-  tcc_anchor_heal "$INSTALL_ROOT/venv/bin" || true
-  tcc_pick_update_invoke "$INSTALL_ROOT/venv/bin"
+  if ! resolve_venv_target; then echo "TCC self-test could not resolve its environment" >&2; exit 3; fi
+  tcc_anchor_heal "$VENV_BIN" || true
+  tcc_pick_update_invoke "$VENV_BIN"
   echo "state=$TCC_HEAL_STATE invoke=${UPDATE_INVOKE[*]}"
   exit 0
 fi
@@ -657,6 +730,13 @@ if [ "$SELF_TEST_UI" -eq 1 ]; then
 fi
 
 # ── the actual job ──────────────────────────────────────────────────────────
+if ! resolve_venv_target; then
+  FINAL_CODE=3
+  FINAL_MSG="Update aborted: the selected Python environment is missing, ambiguous, or inconsistent. No environment was changed."
+  log "$FINAL_MSG"
+  exit 3
+fi
+
 # Electron's macOS quit teardown sends SIGTERM to its still-parented updater
 # child on this machine. `detached + unref` gives the child a process group but
 # does not re-parent it before `before-quit` runs, so the hand-off consistently
@@ -730,14 +810,14 @@ fi
 sleep 1
 start_ui
 
-STARDUST_BIN="$INSTALL_ROOT/venv/bin/stardust"
+STARDUST_BIN="$VENV_BIN/stardust"
 [ -x "$STARDUST_BIN" ] || { FINAL_CODE=3 FINAL_MSG="Update aborted: $STARDUST_BIN is missing. The install needs repair (run the Hermes installer or stardust doctor)."; log "$FINAL_MSG"; exit 3; }
 
 # Heal a venv the reverted TCC anchor left bricked BEFORE invoking the CLI:
 # venv/bin/stardust execs venv/bin/python3, so a dead alias kills every attempt
 # and its retry identically (#95759). macOS-only artifact; probe is cheap.
 if [ "$(uname)" = "Darwin" ]; then
-  if tcc_anchor_heal "$INSTALL_ROOT/venv/bin"; then
+  if tcc_anchor_heal "$VENV_BIN"; then
     case "$TCC_HEAL_STATE" in
       healed-*) log "TCC anchor self-heal repaired the venv interpreter ($TCC_HEAL_STATE)" ;;
     esac
@@ -745,7 +825,7 @@ if [ "$(uname)" = "Darwin" ]; then
     log "TCC anchor self-heal could not repair the venv ($TCC_HEAL_STATE)"
   fi
 fi
-tcc_pick_update_invoke "$INSTALL_ROOT/venv/bin"
+tcc_pick_update_invoke "$VENV_BIN"
 if [ "${UPDATE_INVOKE[0]}" != "$STARDUST_BIN" ]; then
   log "venv/bin/python3 still unbootable; invoking the update via ${UPDATE_INVOKE[*]}"
 fi
@@ -819,9 +899,9 @@ else
   # The bricked-venv class is fixable and must not read as a generic exit 1:
   # a dead interpreter with a failed/impossible heal means retrying can never
   # succeed — tell the user what is actually wrong (#95759).
-  if ! tcc_probe_python "$INSTALL_ROOT/venv/bin/python3" \
-      && ! tcc_probe_python "$INSTALL_ROOT/venv/bin/python"; then
-    FINAL_MSG="Update failed: the Python interpreter inside $INSTALL_ROOT/venv cannot start (heal state: $TCC_HEAL_STATE). Reinstall the runtime with the Hermes installer, or run stardust doctor --fix from a terminal if any stardust command still works."
+  if ! tcc_probe_python "$VENV_BIN/python3" \
+      && ! tcc_probe_python "$VENV_BIN/python"; then
+    FINAL_MSG="Update failed: the Python interpreter inside $VENV_ROOT cannot start (heal state: $TCC_HEAL_STATE). Reinstall the runtime with the Hermes installer, or run stardust doctor --fix from a terminal if any stardust command still works."
   fi
 fi
 exit "$FINAL_CODE"

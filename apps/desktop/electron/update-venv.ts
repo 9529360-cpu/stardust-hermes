@@ -5,6 +5,8 @@ import path from 'node:path'
 export type UpdateInstallationSource = 'managed' | 'development' | 'unknown'
 export type UpdateRuntimeMode = 'managed' | 'development' | 'unknown'
 
+const UPDATE_REQUIRED_MODULES = ['fastapi', 'uvicorn', 'pydantic', 'openai', 'yaml', 'hermes_cli.main'] as const
+
 export interface UpdateVenvTarget {
   root: string | null
   python: string | null
@@ -98,14 +100,22 @@ export function resolveUpdateVenv(projectRoot: string, options: ResolveUpdateVen
 export function probeUpdateVenv(
   projectRoot: string,
   target: UpdateVenvTarget,
-  run: typeof execFileSync = execFileSync
+  run: typeof execFileSync = execFileSync,
+  requiredModules: readonly string[] = UPDATE_REQUIRED_MODULES
 ): string | null {
   if (target.error || !target.root || !target.python) {return target.error ?? 'No selected update Python is available.'}
 
   try {
-    const script = "import importlib, json, sys; importlib.import_module('hermes_cli.main'); print(json.dumps({'prefix': sys.prefix}))"
+    const script = [
+      'import importlib, json, sys',
+      'modules = json.loads(sys.argv[1])',
+      "sys.argv = ['stardust', 'update']",
+      'for name in modules:',
+      '    importlib.import_module(name)',
+      "print(json.dumps({'prefix': sys.prefix}))"
+    ].join('\n')
 
-    const output = String(run(target.python, ['-c', script], {
+    const output = String(run(target.python, ['-c', script, JSON.stringify(requiredModules)], {
       cwd: projectRoot,
       encoding: 'utf8',
       timeout: 15000,

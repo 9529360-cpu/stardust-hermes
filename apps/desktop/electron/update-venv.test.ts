@@ -108,7 +108,8 @@ test('Python probe accepts the selected environment prefix and imports the CLI',
 
     const error = probeUpdateVenv(root, target, ((_python: string, args: string[]) => {
       assert.equal(args[0], '-c')
-      assert.match(args[1], /hermes_cli\.main/)
+      assert.match(args[1], /sys\.argv = \['stardust', 'update'\]/)
+      assert.ok(JSON.parse(args[2]).includes('hermes_cli.main'))
 
       return JSON.stringify({ prefix: target.root })
     }) as any)
@@ -134,6 +135,34 @@ test('Python probe rejects a runnable interpreter from a different environment',
     const error = probeUpdateVenv(root, target, (() => JSON.stringify({ prefix: root })) as any)
 
     assert.match(error ?? '', /does not match/i)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('runtime health probe sets update argv before importing required modules', () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'update-venv-probe-argv-'))
+
+  try {
+    const python = fixture(root, '.venv')
+    const target = resolveUpdateVenv(root, {
+      runtimePython: python,
+      runtimeMode: 'development',
+      platform: 'win32'
+    })
+    let script = ''
+    const run = ((_python: string, args: string[]) => {
+      script = args[1]
+      return JSON.stringify({ prefix: target.root })
+    }) as any
+
+    const error = probeUpdateVenv(root, target, run, ['hermes_cli.main'])
+
+    assert.equal(error, null)
+    const argvSetup = script.indexOf("sys.argv = ['stardust', 'update']")
+    const importCall = script.indexOf('importlib.import_module(name)')
+    assert.ok(argvSetup >= 0)
+    assert.ok(importCall > argvSetup)
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

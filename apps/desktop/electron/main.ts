@@ -4602,6 +4602,25 @@ async function applyUpdatesPosixHandoff(opts: any) {
     return { ok: false, error: 'update-already-running', message: handoffConflict.message }
   }
 
+  const activeBackendProcess = backendConnectionState.getProcess()
+  const runningPython = typeof activeBackendProcess?.spawnfile === 'string' ? activeBackendProcess.spawnfile : null
+  const updateRuntimePython = runningPython ?? await findPythonForRoot(updateRoot)
+  const updateVenv = resolveUpdateVenv(updateRoot, {
+    runtimePython: updateRuntimePython,
+    virtualEnv: process.env.VIRTUAL_ENV,
+    installationSource: 'managed',
+    runtimeMode: 'managed'
+  })
+  const environmentError = updateVenv.error ?? probeUpdateVenv(updateRoot, updateVenv)
+  if (environmentError || !updateVenv.root || !updateVenv.python) {
+    const message = `Update aborted before hand-off: ${environmentError ?? 'project Python target is incomplete'}`
+    rememberLog(`[updates] ${message}`)
+    emitUpdateProgress({ stage: 'error', message, percent: null })
+    return { ok: false, error: 'invalid-update-environment', message }
+  }
+  const updateVenvRoot = updateVenv.root
+  const updatePythonPath = updateVenv.python
+
   // ── Pre-flight state.db integrity guard (#68474) ──
   preflightStateDb(STARDUST_HOME, rememberLog)
 
@@ -4620,7 +4639,19 @@ async function applyUpdatesPosixHandoff(opts: any) {
     // best effort
   }
 
-  const args = [...handoff.args, '--install-root', updateRoot, '--branch', branch, '--desktop-pid', String(process.pid)]
+  const args = [
+    ...handoff.args,
+    '--install-root',
+    updateRoot,
+    '--venv-root',
+    updateVenvRoot,
+    '--python-path',
+    updatePythonPath,
+    '--branch',
+    branch,
+    '--desktop-pid',
+    String(process.pid)
+  ]
   const updateStartedAt = Math.floor(Date.now() / 1000)
 
   // Relaunch target: the running .app bundle on mac (script swaps the
@@ -4654,8 +4685,9 @@ async function applyUpdatesPosixHandoff(opts: any) {
     env: {
       ...process.env,
       STARDUST_HOME,
+      VIRTUAL_ENV: updateVenvRoot,
       STARDUST_UPDATE_STARTED_AT: String(updateStartedAt),
-      PATH: pathWithHermesManagedNode(path.join(updateRoot, 'venv', 'bin'))
+      PATH: pathWithHermesManagedNode(path.join(updateVenvRoot, 'bin'))
     },
     detached: true,
     stdio: 'ignore'
