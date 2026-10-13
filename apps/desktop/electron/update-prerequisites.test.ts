@@ -39,7 +39,7 @@ test('explicit .venv interpreter satisfies update prerequisites without requirin
     writeFileSync(python, 'file-presence fixture')
     writeFileSync(script, 'script fixture')
 
-    assert.match(windowsUpdatePrerequisiteError(root)!, /venv\\Scripts\\python\.exe/i)
+    assert.ok(windowsUpdatePrerequisiteError(root)!.includes(python))
     assert.equal(windowsUpdatePrerequisiteError(root, python), null)
   } finally {
     rmSync(root, { recursive: true, force: true })

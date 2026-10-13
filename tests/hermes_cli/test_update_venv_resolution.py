@@ -12,12 +12,18 @@ import hermes_cli.main as cli_main
 from hermes_cli import main_install_repair, update_cmd, update_cmd_deps, update_cmd_maint
 
 
-def _make_dual_layout(root: Path) -> tuple[Path, Path]:
+def _make_dual_layout(
+    root: Path, *, windows: bool | None = None
+) -> tuple[Path, Path]:
+    use_windows_layout = sys.platform == "win32" if windows is None else windows
+    scripts_name, python_name = (
+        ("Scripts", "python.exe") if use_windows_layout else ("bin", "python")
+    )
     paths = []
     for name in (".venv", "venv"):
-        scripts = root / name / "Scripts"
+        scripts = root / name / scripts_name
         scripts.mkdir(parents=True)
-        python = scripts / "python.exe"
+        python = scripts / python_name
         python.write_bytes(b"fixture")
         paths.append(python)
     return paths[0], paths[1]
@@ -63,14 +69,15 @@ def test_early_repair_install_target_uses_running_dot_venv(tmp_path, monkeypatch
 
 
 def test_main_install_repair_quarantines_shims_in_the_running_dot_venv(tmp_path, monkeypatch):
-    dot_python, _ = _make_dual_layout(tmp_path)
+    dot_python, _ = _make_dual_layout(tmp_path, windows=True)
     _patch_active_dot_venv(monkeypatch, tmp_path, dot_python)
+    monkeypatch.setattr(main_install_repair, "_is_windows", lambda: True)
 
     assert main_install_repair._venv_scripts_dir() == tmp_path / ".venv" / "Scripts"
 
 
-def test_early_repair_install_target_uses_running_dot_venv(tmp_path, monkeypatch):
-    dot_python, _ = _make_dual_layout(tmp_path)
+def test_early_repair_scripts_dir_uses_running_dot_venv(tmp_path, monkeypatch):
+    dot_python, _ = _make_dual_layout(tmp_path, windows=True)
     _patch_active_dot_venv(monkeypatch, tmp_path, dot_python)
     monkeypatch.setattr(install_repair, "_is_windows", lambda: True)
 
@@ -144,7 +151,10 @@ def test_core_health_probe_runs_the_selected_interpreter(tmp_path, monkeypatch):
 
 def test_repair_does_not_create_a_second_venv_when_dot_venv_is_active(tmp_path, monkeypatch):
     dot_root = tmp_path / ".venv"
-    dot_python = dot_root / "Scripts" / "python.exe"
+    scripts_name, python_name = (
+        ("Scripts", "python.exe") if sys.platform == "win32" else ("bin", "python")
+    )
+    dot_python = dot_root / scripts_name / python_name
     dot_python.parent.mkdir(parents=True)
     dot_python.write_bytes(b"fixture")
     _patch_active_dot_venv(monkeypatch, tmp_path, dot_python)

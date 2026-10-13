@@ -1116,6 +1116,7 @@ def test_update_impl_refuses_before_terminating_gateway_ancestor(
     _winp, monkeypatch, capsys
 ):
     """#98814: the live holder path must gate the destructive call itself."""
+    _stub_active_venv_target(monkeypatch)
     import gateway.status as status_mod
     import hermes_cli.gateway as gateway_cli
 

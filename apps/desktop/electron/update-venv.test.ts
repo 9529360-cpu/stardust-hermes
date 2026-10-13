@@ -7,14 +7,14 @@ import { test } from 'vitest'
 
 import { probeUpdateVenv, resolveUpdateVenv } from './update-venv'
 
-function fixture(root: string, name: string) {
-  const scripts = process.platform === 'win32' ? 'Scripts' : 'bin'
-  const python = process.platform === 'win32' ? 'python.exe' : 'python'
+function fixture(root: string, name: string, platform: NodeJS.Platform = process.platform) {
+  const scripts = platform === 'win32' ? 'Scripts' : 'bin'
+  const python = platform === 'win32' ? 'python.exe' : 'python'
   const dir = path.join(root, name, scripts)
   mkdirSync(dir, { recursive: true })
   const pythonPath = path.join(dir, python)
   writeFileSync(pythonPath, 'fixture')
-  writeFileSync(path.join(dir, process.platform === 'win32' ? 'stardust.exe' : 'stardust'), 'fixture')
+  writeFileSync(path.join(dir, platform === 'win32' ? 'stardust.exe' : 'stardust'), 'fixture')
 
   return pythonPath
 }
@@ -144,9 +144,10 @@ test('runtime health probe sets update argv before importing required modules', 
   const root = mkdtempSync(path.join(tmpdir(), 'update-venv-probe-argv-'))
 
   try {
-    const python = fixture(root, '.venv')
+    const python = fixture(root, '.venv', 'win32')
     const target = resolveUpdateVenv(root, {
       runtimePython: python,
+      installationSource: 'unknown',
       runtimeMode: 'development',
       platform: 'win32'
     })
