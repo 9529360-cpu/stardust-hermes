@@ -1,4 +1,4 @@
-"""A rejected background batch retains synchronous cancellation ownership."""
+"""Background pool rejection and safe cancellation ownership."""
 
 from __future__ import annotations
 
@@ -110,7 +110,7 @@ def registry_state(tmp_path, monkeypatch):
     monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     monkeypatch.delenv("STARDUST_IGNORE_USER_CONFIG", raising=False)
     (tmp_path / "config.yaml").write_text(
-        "delegation:\n  max_concurrent_children: 1\n  worktree_isolation: false\n",
+        "delegation:\n  max_concurrent_children: 1\n  worktree_isolation: false\n  capacity_fallback_sync: true\n",
         encoding="utf-8",
     )
     async_delegation._reset_for_tests()
@@ -136,7 +136,7 @@ def test_rejected_background_child_stops_with_parent(
         # The model-facing batch width is legal under the configured limit.
         (tmp_path / "config.yaml").write_text(
             "delegation:\n  max_concurrent_children: 3\n  worktree_isolation: false\n"
-            "  independent_completions: true\n",
+            "  capacity_fallback_sync: true\n  independent_completions: true\n",
             encoding="utf-8",
         )
         background_child, pending_child = _ControlledChild(), _ControlledChild()
@@ -303,3 +303,71 @@ def test_accepted_background_child_keeps_registry_cancellation_ownership(registr
             child.hard_interrupt("test teardown")
         child.allow_finish.set()
         assert child.closed.wait(5)
+
+
+def test_capacity_rejection_does_not_run_children_in_foreground(registry_state, monkeypatch):
+    """Default policy preserves responsiveness and reclaims unstarted children."""
+    from tools import delegate_tool_dispatch as dispatch
+    parent, child = _Parent(), _ControlledChild()
+    batch = _batch(parent, child)
+    occupied, release = threading.Event(), threading.Event()
+
+    def blocker():
+        occupied.set()
+        assert release.wait(10)
+        return {"status": "completed", "summary": "released"}
+
+    handle = async_delegation.dispatch_async_delegation(
+        goal="occupy", context=None, toolsets=None, role="leaf", model="test",
+        session_key="other", runner=blocker, max_async_children=1,
+    )
+    assert handle["status"] == "dispatched"
+    assert occupied.wait(3)
+    monkeypatch.setattr(dispatch, "_resolve_async_wake_sid", lambda *_args: "")
+    monkeypatch.setattr(dispatch, "_capacity_fallback_sync", lambda: False)
+    try:
+        started = time.monotonic()
+        outcome = json.loads(_dispatch_background(batch))
+        assert time.monotonic() - started < 3
+        assert outcome["status"] == "rejected"
+        assert outcome["retryable"] is True
+        assert outcome["results"][0]["exit_reason"] == "not_started"
+        assert not child.started.is_set()
+        assert child.closed.is_set()
+        assert not parent._active_children
+    finally:
+        release.set()
+
+
+def test_parent_cancellation_never_waits_forever_for_child_cleanup(registry_state, monkeypatch):
+    """A stuck worker is UNKNOWN and finishes its own cleanup after release."""
+    from tools import delegate_tool_dispatch as dispatch
+    parent, child = _Parent(), _ControlledChild()
+    batch = _batch(parent, child)
+    monkeypatch.setattr(dispatch, "_SYNC_INTERRUPT_GRACE_SECONDS", 0.05)
+    result = []
+
+    worker = threading.Thread(
+        target=lambda: dispatch._run_children_parallel(batch, result, honor_parent_interrupt=True),
+        daemon=True,
+    )
+    worker.start()
+    try:
+        assert child.started.wait(5)
+        parent.hard_interrupt("stop stuck delegated job")
+        assert child.stop_received.wait(5)
+        assert child.unwinding.wait(5)
+        worker.join(3)
+        assert not worker.is_alive(), "cancelled batch must not block on unresponsive worker"
+        assert len(result) == 1
+        assert result[0]["status"] == "unknown"
+        assert result[0]["cancellation_pending"] is True
+        assert result[0]["exit_reason"] == "termination_unconfirmed"
+        assert not child.closed.is_set()
+    finally:
+        child.allow_finish.set()
+        worker.join(3)
+        assert child.finished.wait(5)
+        assert child.closed.wait(5)
+
+
