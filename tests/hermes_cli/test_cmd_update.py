@@ -1142,8 +1142,9 @@ class TestNodeRuntimeNpmResolution:
             )
 
         assert packaged.call_count == 2
+        expected_python = PROJECT_ROOT / ".venv" / "Scripts" / "python.exe"
         desktop_build.assert_called_once_with(
-            [hm.sys.executable, "-m", "hermes_cli.main", "desktop", "--build-only"],
+            [str(expected_python), "-m", "hermes_cli.main", "desktop", "--build-only"],
             cwd=PROJECT_ROOT,
             env=ANY,
         )
@@ -1165,6 +1166,11 @@ class TestNodeRuntimeNpmResolution:
 
         project_root = tmp_path / "hermes-agent"
         (project_root / ".git").mkdir(parents=True)
+        venv_root = project_root / ".venv"
+        venv_python = venv_root / "Scripts" / "python.exe"
+        venv_python.parent.mkdir(parents=True)
+        venv_python.touch()
+        monkeypatch.setenv("VIRTUAL_ENV", str(venv_root))
         desktop_dir = project_root / "apps" / "desktop"
         packaged_exe = desktop_dir / "release" / "win-unpacked" / "Stardust.exe"
         packaged_exe.parent.mkdir(parents=True)

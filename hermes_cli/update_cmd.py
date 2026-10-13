@@ -18,7 +18,7 @@ from pathlib import Path
 
 from hermes_cli.config import get_hermes_home  # noqa: F401  (re-exported; patched via update_cmd)
 from hermes_cli.update_cmd_common import _best_effort
-from hermes_constants import get_default_hermes_root, venv_python_path
+from hermes_constants import get_default_hermes_root, resolve_current_project_venv
 
 # Re-exports: every split-module name stays reachable (and monkeypatchable) as update_cmd.<name>.
 from hermes_cli.update_abort_recovery import (  # noqa: F401
@@ -622,16 +622,16 @@ def _repair_venv_on_current_checkout(
     # must rewrite, defer NOW — after the code swap, so only the dependency install is pending and the next
     # fresh launch completes it via the marker.
     _m()._abort_dependency_sync_if_self_locked(_windows_gateway_resume)
-    _write_update_incomplete_marker()
+    resolution = resolve_current_project_venv(_m().PROJECT_ROOT, windows=_m()._is_windows())
+    if resolution.error or resolution.venv_dir is None or resolution.python is None:
+        detail = resolution.error or "the active project environment could not be resolved"
+        print(f"⚠ Cannot safely repair Python dependencies: {detail}")
+        print("  No virtual environment was created or changed. Activate the intended project environment and rerun `stardust update`.")
+        return False
     from hermes_cli.managed_uv import ensure_uv
     repair_uv = ensure_uv()
-    # Venv gone entirely (repair interrupted after the old one was moved aside): recreate.
-    venv_python_missing = not (
-        venv_python_path(_m().PROJECT_ROOT / "venv", windows=_m()._is_windows())).exists()
-    if venv_python_missing and repair_uv:
-        print("→ Recreating virtual environment...")
-        subprocess.run([repair_uv, "venv", "venv"], cwd=_m().PROJECT_ROOT, check=False)
     repair_prefix, repair_env = _pip_install_prefix(repair_uv)
+    _write_update_incomplete_marker()
     _m()._install_python_dependencies_with_optional_fallback(repair_prefix, env=repair_env, group="all")
     _m()._refresh_active_lazy_features(repair_prefix, env=repair_env, features=active_lazy_features)
     _m()._restore_active_tool_dependencies(active_tool_dependencies, repair_prefix, env=repair_env)
@@ -659,18 +659,19 @@ def _repair_venv_on_current_checkout(
 
 
 def _pip_install_prefix(uv_bin) -> tuple[list[str], dict | None]:
-    """``(install prefix, env)``: ``uv pip`` isolated from third-party UV env vars (so a foreign
-    UV_PYTHON_INSTALL_DIR can't hijack it), else ``sys.executable -m pip`` (avoids PEP 668 errors)."""
+    """Return an installer prefix targeted at the environment of the running update process."""
+    resolution = resolve_current_project_venv(_m().PROJECT_ROOT, windows=_m()._is_windows())
+    if resolution.error or resolution.venv_dir is None or resolution.python is None:
+        detail = resolution.error or "the active project environment could not be resolved"
+        raise RuntimeError(f"Cannot safely install project dependencies: {detail}")
+
     if uv_bin:
-        # Same third-party UV-env isolation as the main update path (#83914): a user-level
-        # UV_PYTHON_INSTALL_DIR / UV_PYTHON from unrelated software must not steer which interpreter uv
-        # resolves here.
-        # See #83914.
         from hermes_cli.managed_uv import managed_python_env
+
         env = managed_python_env()
-        env["VIRTUAL_ENV"] = str(_m().PROJECT_ROOT / "venv")
+        env["VIRTUAL_ENV"] = str(resolution.venv_dir)
         return [uv_bin, "pip"], env
-    return [sys.executable, "-m", "pip"], None
+    return [str(resolution.python), "-m", "pip"], None
 
 
 def _repair_current_checkout(
@@ -1264,7 +1265,7 @@ def _apply_pulled_update(
 
     # .[all], falling back to base + extras individually so one broken extra doesn't strip
     # the rest; the ownership preflight refuses first on foreign-owned (sudo-pip) venv files.
-    _sync_python_dependencies_after_pull(
+    python_deps_ok = _sync_python_dependencies_after_pull(
         git_cmd, branch, pre_pull_sha, active_lazy_features=opts.active_lazy_features,
         active_tool_dependencies=opts.active_tool_dependencies,
         _windows_gateway_resume=_windows_gateway_resume)
@@ -1282,7 +1283,7 @@ def _apply_pulled_update(
         pre_update_snapshot_id=pre_update_snapshot_id,
         had_desktop_app_before_update=had_desktop_app_before_update,
         node_failures=node_failures, desktop_build_ok=desktop_build_ok,
-        pre_update_version=opts.pre_update_version)
+        pre_update_version=opts.pre_update_version, python_deps_ok=python_deps_ok)
 
     # Exit code *before* the restart: under --gateway this process lives in the gateway's
     # systemd cgroup and the systemctl-restart fallback SIGKILLs it (KillMode=mixed), so

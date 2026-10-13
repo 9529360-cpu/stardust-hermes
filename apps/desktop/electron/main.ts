@@ -396,6 +396,7 @@ import { probeUpdateVenv, resolveUpdateVenv } from './update-venv'
 import {
   collectRelaunchArgs,
   describeUpdaterHandoffFailure,
+  developmentWorkspaceManualUpdateMessage,
   observeUpdaterHandoff,
   resolvePosixScriptHandoff,
   resolveStagedUpdaterBinary,
@@ -3971,6 +3972,14 @@ async function releaseBackendLock(updateRoot, tag, venvRoot = path.join(updateRo
 async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
   if (updateInFlight) {
     throw new Error('An update is already in progress.')
+  }
+
+  const manualUpdate = developmentWorkspaceManualUpdateMessage(IS_PACKAGED)
+  if (manualUpdate) {
+    const updateRoot = resolveUpdateRoot()
+    rememberLog(`[updates] refusing automatic update in development workspace at ${updateRoot}`)
+    emitUpdateProgress({ stage: 'manual', message: manualUpdate.message, percent: null })
+    return { ok: true, manual: true, command: manualUpdate.command, message: manualUpdate.message, hermesRoot: updateRoot }
   }
 
   updateInFlight = true

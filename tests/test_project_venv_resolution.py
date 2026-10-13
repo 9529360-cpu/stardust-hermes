@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from hermes_constants import probe_project_venv, resolve_project_venv
+from hermes_constants import probe_project_venv, resolve_current_project_venv, resolve_project_venv
 
 
 def _make_env(root: Path, name: str, *, windows: bool) -> Path:
@@ -112,3 +112,17 @@ def test_probe_does_not_call_a_present_but_invalid_python_healthy(tmp_path):
 
     assert not healthy
     assert detail
+
+
+def test_current_runtime_venv_outside_project_is_selected_when_identity_matches(tmp_path, monkeypatch):
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    python = _make_env(tmp_path, "sharedenv", windows=True)
+    monkeypatch.setattr("sys.executable", str(python))
+    monkeypatch.setenv("VIRTUAL_ENV", str(python.parent.parent))
+
+    result = resolve_current_project_venv(project_root, windows=True)
+
+    assert result.venv_dir == python.parent.parent
+    assert result.python == python
+    assert result.error is None

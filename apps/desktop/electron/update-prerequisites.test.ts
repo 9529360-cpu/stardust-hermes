@@ -5,7 +5,7 @@ import path from 'node:path'
 
 import { test } from 'vitest'
 
-import { windowsUpdatePrerequisiteError } from './updater-process'
+import { developmentWorkspaceManualUpdateMessage, windowsUpdatePrerequisiteError } from './updater-process'
 
 test('handoff prerequisites fail closed without requiring dependencies, shim or browser UI', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'hermes-prerequisites-'))
@@ -44,4 +44,15 @@ test('explicit .venv interpreter satisfies update prerequisites without requirin
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
+})
+
+test('development workspace requires a manual update; packaged runtime may update automatically', () => {
+  assert.equal(developmentWorkspaceManualUpdateMessage(true), null)
+
+  const notice = developmentWorkspaceManualUpdateMessage(false)
+  assert.ok(notice)
+  assert.match(notice.message, /manual/i)
+  assert.match(notice.message, /branch/i)
+  assert.match(notice.message, /environment/i)
+  assert.equal(notice.command, 'stardust update')
 })
