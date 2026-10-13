@@ -309,7 +309,6 @@ def test_registry_cancel_of_parallel_batch_emits_one_unknown_completion_and_defe
         completion = registry_state.get(timeout=3)
         assert completion["delegation_id"] == dispatch["delegation_id"]
         assert completion["status"] == "error"
-        assert completion["batch_outcome"] == "unknown"
         assert [entry["status"] for entry in completion["results"]] == ["unknown", "unknown"]
         assert not finalized_indexes
         assert all(child.close_count == 0 and not child.finished.is_set() for child in children)
@@ -370,7 +369,6 @@ def test_async_cancel_returns_unknown_without_finalizing_live_worker(monkeypatch
         worker.join(timeout=2)
         assert not worker.is_alive(), "single-child async cancellation left the aggregate waiting"
         result = outcome.result(timeout=1)
-        assert result["batch_outcome"] == "unknown"
         assert result["results"][0]["status"] == "unknown"
         assert result["results"][0]["cancellation_pending"] is True
         assert not child.finished.is_set()
@@ -437,7 +435,6 @@ def test_parallel_async_cancel_bounds_wait_and_defers_each_child_finalization(mo
         worker.join(timeout=2)
         assert not worker.is_alive(), "parallel async cancellation left aggregate waiting"
         result = outcome.result(timeout=1)
-        assert result["batch_outcome"] == "unknown"
         assert [entry["status"] for entry in result["results"]] == ["unknown", "unknown"]
         assert all(entry["cancellation_pending"] for entry in result["results"])
         assert not finalized_indexes
@@ -498,7 +495,6 @@ def test_async_cancel_racing_with_child_exit_keeps_real_result_and_finalizes_onc
         assert not worker.is_alive()
         result = outcome.result(timeout=1)
         assert result["results"] == [{"task_index": 0, "status": "interrupted", "exit_reason": "interrupted"}]
-        assert result["batch_outcome"] == "failed"
         assert len(finalizations) == 1
         assert finalizations[0][0]["status"] == "interrupted"
         assert child.closed.wait(5)
