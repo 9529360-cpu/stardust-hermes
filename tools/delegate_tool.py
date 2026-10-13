@@ -435,6 +435,7 @@ def _build_children(
         if _writer is not None:
             child.tool_progress_callback = wrap_progress_callback(getattr(child, "tool_progress_callback", None), _writer)
             child._live_transcript_path = str(_writer.path)
+        child._delegate_worktree_required = t.get("requires_worktree", False) is True
         if live_deleg_id:
             setattr(child, "_delegation_id", live_deleg_id)
             _ident_ref = getattr(child, "_progress_identity_ref", None)
@@ -669,6 +670,12 @@ DELEGATE_TASK_SCHEMA = {
                             "and constraints, specific checks or edits, verification and expected evidence, output "
                             "language, and what to do if blocked. Repeat shared facts for every child that needs them; "
                             "children cannot see your conversation or sibling results.",
+                        ),
+                        "requires_worktree": _p(
+                            "boolean",
+                            "REQUIRED true for code or repository editing. Run inside a separate local Git worktree "
+                            "or fail before tool execution. The parent must inspect the diff and tests before merging. "
+                            "Local Git subagents also use worktrees by default when this field is omitted.",
                         ),
                         "model": _p("string", "Optional model for this member; overrides the delegation default."),
                         "provider": _p(

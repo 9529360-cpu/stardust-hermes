@@ -86,10 +86,11 @@ class SubagentWorktreeTests(unittest.TestCase):
         self.assertTrue(info["base_commit"])
         # Worktree carries the committed file
         self.assertTrue((Path(info["path"]) / "README.md").exists())
-        # .gitignore gained the .worktrees/ entry
-        self.assertIn(
-            ".worktrees/", (repo / ".gitignore").read_text(encoding="utf-8").splitlines()
-        )
+        # Isolation must not modify tracked source in the parent checkout.
+        self.assertFalse((repo / ".gitignore").exists())
+        exclude = repo / ".git" / "info" / "exclude"
+        self.assertIn(".worktrees/", exclude.read_text(encoding="utf-8").splitlines())
+        self.assertEqual(_git(["status", "--porcelain"], repo).stdout.strip(), "")
         # A write in the worktree does not touch the parent checkout
         (Path(info["path"]) / "child.txt").write_text("x", encoding="utf-8")
         self.assertFalse((repo / "child.txt").exists())
@@ -388,10 +389,16 @@ class WorktreePayloadSchemaTests(unittest.TestCase):
 
 
 class DelegationConfigGateTests(unittest.TestCase):
-    def test_worktree_isolation_default_off(self):
+    def test_worktree_isolation_default_on(self):
         from tools import delegate_tool
 
         with mock.patch.object(delegate_tool, "_load_config", return_value={}):
+            self.assertTrue(delegate_tool._get_worktree_isolation())
+
+    def test_explicit_legacy_opt_out(self):
+        from tools import delegate_tool
+
+        with mock.patch.object(delegate_tool, "_load_config", return_value={"worktree_isolation": False}):
             self.assertFalse(delegate_tool._get_worktree_isolation())
 
     def test_worktree_isolation_enabled(self):
@@ -402,6 +409,57 @@ class DelegationConfigGateTests(unittest.TestCase):
             return_value={"worktree_isolation": True},
         ):
             self.assertTrue(delegate_tool._get_worktree_isolation())
+
+
+class IsolationLaunchTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="stardust-isolation-"))
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+
+    def _try(self, cwd, *, required=False):
+        from tools.delegate_tool_child_run import _create_isolated_worktree
+        with mock.patch("tools.terminal_tool.get_session_cwd", return_value=str(cwd)):
+            with mock.patch("tools.subagent_worktree.local_backend_active", return_value=True):
+                with mock.patch("tools.delegate_tool._get_worktree_isolation", return_value=True):
+                    return _create_isolated_worktree(object(), "parent", "child", required=required)
+
+    def test_local_git_child_gets_separate_directory(self):
+        repo = _make_repo(self.tmp)
+        info = self._try(repo)
+        self.assertIsNotNone(info)
+        self.assertNotEqual(info["path"], str(repo))
+
+    def test_detected_git_repo_fails_when_worktree_setup_fails(self):
+        repo = _make_repo(self.tmp)
+        with mock.patch("tools.subagent_worktree.create_subagent_worktree", return_value=None):
+            with self.assertRaisesRegex(RuntimeError, "refusing to execute"):
+                self._try(repo)
+
+    def test_requires_worktree_refuses_a_plain_directory(self):
+        plain = self.tmp / "plain"
+        plain.mkdir()
+        with self.assertRaisesRegex(RuntimeError, "no local Git repository"):
+            self._try(plain, required=True)
+        self.assertIsNone(self._try(plain))
+
+    def test_requires_worktree_refuses_remote_backend(self):
+        from tools.delegate_tool_child_run import _create_isolated_worktree
+        with mock.patch("tools.subagent_worktree.local_backend_active", return_value=False):
+            with self.assertRaisesRegex(RuntimeError, "not local"):
+                _create_isolated_worktree(object(), None, "child", required=True)
+
+    def test_failed_cwd_seed_blocks_tool_execution(self):
+        from types import SimpleNamespace
+        from tools.delegate_tool_child_run import _ChildRun
+
+        child = SimpleNamespace(_delegate_worktree_required=True)
+        parent = SimpleNamespace(_current_task_id=None)
+        run = _ChildRun(child, parent, 0, "edit source", "child", None)
+        with mock.patch("tools.delegate_tool_child_run._create_isolated_worktree", return_value={"path": "/isolated", "branch": "b"}):
+            with mock.patch("tools.terminal_tool.record_session_cwd", side_effect=OSError("cannot seed cwd")):
+                with mock.patch("tools.terminal_tool.register_container_alias"):
+                    with self.assertRaisesRegex(OSError, "cannot seed cwd"):
+                        run.seed_workspace()
 
 
 if __name__ == "__main__":

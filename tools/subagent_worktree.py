@@ -1,4 +1,4 @@
-"""Opt-in git worktree isolation for delegated subagents (``delegation.worktree_isolation``).
+"""Git worktree isolation for delegated subagents (``delegation.worktree_isolation``).
 
 Git-only (outside a repo children share the parent's cwd); local terminal backend only (on
 docker/ssh/modal the host worktree is invisible in the sandbox, so isolation is skipped). One
@@ -60,17 +60,22 @@ def resolve_repo_root(path: Optional[str]) -> Optional[str]:
 
 
 def _ensure_gitignore_entry(repo_root: str) -> None:
-    """Best-effort: keep ``.worktrees/`` out of git status."""
-    gitignore = Path(repo_root) / ".gitignore"
+    """Keep worktrees out of status without touching tracked .gitignore."""
     try:
-        existing = gitignore.read_text(encoding="utf-8-sig", errors="replace") if gitignore.exists() else ""
+        location = _run_git(["rev-parse", "--git-path", "info/exclude"], cwd=repo_root)
+        if location.returncode != 0 or not location.stdout.strip():
+            return
+        exclude = Path(location.stdout.strip())
+        if not exclude.is_absolute():
+            exclude = Path(repo_root) / exclude
+        exclude.parent.mkdir(parents=True, exist_ok=True)
+        existing = exclude.read_text(encoding="utf-8-sig", errors="replace") if exclude.exists() else ""
         if ".worktrees/" not in existing.splitlines():
-            with open(gitignore, "a", encoding="utf-8") as f:
+            with open(exclude, "a", encoding="utf-8") as f:
                 sep = "\n" if existing and not existing.endswith("\n") else ""
                 f.write(f"{sep}.worktrees/\n")
     except Exception as exc:
-        logger.debug("subagent worktree: could not update .gitignore: %s", exc)
-
+        logger.debug("subagent worktree: could not update Git info/exclude: %s", exc)
 
 def create_subagent_worktree(parent_cwd: Optional[str], subagent_id: Optional[str] = None) -> Optional[Dict[str, str]]:
     """Create an isolated worktree for one child; None (silent downgrade) outside git/on failure."""

@@ -20,6 +20,22 @@ from unittest.mock import MagicMock, patch
 from tools.delegate_tool import delegate_task
 
 
+def test_model_facing_worktree_requirement_is_enforced():
+    from tools.delegate_tool import _build_dynamic_schema_overrides
+    from tools.delegate_tool_tasks import _normalize_task_list
+
+    spec = _build_dynamic_schema_overrides()["parameters"]["properties"]["tasks"]["items"]["properties"]
+    assert spec["requires_worktree"]["type"] == "boolean"
+    tasks, err = _normalize_task_list(
+        None, None, [{"goal": "Implement isolated code fix", "requires_worktree": True}], None, "leaf", 10,
+    )
+    assert err is None and tasks[0]["requires_worktree"] is True
+    _ignored, err = _normalize_task_list(
+        None, None, [{"goal": "Implement isolated code fix", "requires_worktree": "true"}], None, "leaf", 10,
+    )
+    assert "must be a boolean" in err
+
+
 def test_model_facing_task_brief_names_completion_evidence():
     from tools.delegate_tool import _build_dynamic_schema_overrides
 

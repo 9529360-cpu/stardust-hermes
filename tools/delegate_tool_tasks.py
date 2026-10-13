@@ -103,6 +103,8 @@ def _normalize_task_list(
         for key in ("model", "provider"):
             if key in task and (not isinstance(task[key], str) or not task[key].strip()):
                 return None, f"Task {i} '{key}' must be a non-empty string."
+        if "requires_worktree" in task and not isinstance(task["requires_worktree"], bool):
+            return None, f"Task {i} 'requires_worktree' must be a boolean."
     # The single-goal form is exempt from the batch gate (short goals are valid there).
     batch_error = _validate_batch_tasks(task_list) if isinstance(tasks, list) else None
     return (None, batch_error) if batch_error else (task_list, None)

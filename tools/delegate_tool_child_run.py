@@ -325,26 +325,38 @@ def _register_child(
     })
     return _subagent_id
 
-def _create_isolated_worktree(parent_agent: Any, parent_task_id: Any, subagent_id: Optional[str]):
-    """Opt-in worktree isolation: own git worktree off the parent's HEAD (the
-    child's terminal starts there). Git-only, local-backend-only; failures
-    degrade silently to the shared workspace. Returns the worktree info or None."""
+def _create_isolated_worktree(
+    parent_agent: Any, parent_task_id: Any, subagent_id: Optional[str], *, required: bool = False,
+):
+    """Fail closed in local Git repositories if isolation cannot be created.
+
+    A non-Git task may continue without a worktree unless it explicitly
+    requires one. A code-writing task should set requires_worktree=true.
+    """
     from tools.delegate_tool import _get_worktree_isolation, _resolve_workspace_hint
-    if not _get_worktree_isolation():
+    if not required and not _get_worktree_isolation():
         return None
-    with _quiet("worktree isolation setup failed: %s"):
-        from tools import subagent_worktree
-        if not subagent_worktree.local_backend_active():
-            logger.debug("worktree isolation skipped: non-local terminal backend")
-            return None
-        _parent_cwd = None
-        with _quiet(None):
-            from tools.terminal_tool import get_session_cwd as _gsc
-            _parent_cwd = _gsc(parent_task_id)
-        return subagent_worktree.create_subagent_worktree(
-            _parent_cwd or _resolve_workspace_hint(parent_agent), subagent_id=subagent_id,
+    from tools import subagent_worktree
+    if not subagent_worktree.local_backend_active():
+        if required:
+            raise RuntimeError("This code task requires an isolated Git worktree, but the terminal backend is not local.")
+        return None
+    parent_cwd = None
+    with _quiet(None):
+        from tools.terminal_tool import get_session_cwd
+        parent_cwd = get_session_cwd(parent_task_id)
+    workspace = parent_cwd or _resolve_workspace_hint(parent_agent)
+    if not subagent_worktree.resolve_repo_root(workspace):
+        if required:
+            raise RuntimeError("This code task requires an isolated Git worktree, but no local Git repository was found.")
+        return None
+    info = subagent_worktree.create_subagent_worktree(workspace, subagent_id=subagent_id)
+    if info is None:
+        raise RuntimeError(
+            "Could not create an isolated Git worktree; refusing to execute the child "
+            "in the shared checkout. Fix the Git error before retrying."
         )
-    return None
+    return info
 
 def _defer_close_after_timeout(child: Any, child_future: Any) -> None:
     """Hand ``child.close()`` to a Future done-callback and drain its transports.
@@ -655,6 +667,13 @@ class _ChildRun:
             # via the shared factory so the two producers never drift.
             logger.warning("worktree finalize failed: %s", e)
             entry_dict["worktree"] = subagent_worktree.unproven_worktree_payload(info, f"finalize raised: {e}")
+        if not entry_dict["worktree"].get("pruned"):
+            entry_dict["requires_parent_review"] = True
+            entry_dict["review_note"] = (
+                "The child's work remains isolated. The parent must inspect its branch "
+                "and working tree, review the diff, run relevant tests and explicitly "
+                "integrate the changes. A child self-report is not verification."
+            )
         return entry_dict
 
     def seed_workspace(self) -> None:
@@ -671,11 +690,14 @@ class _ChildRun:
             record_session_cwd(self.child_task_id, get_session_cwd(self.parent_task_id))
             register_container_alias(self.child_task_id, self.parent_task_id)
 
-        self.worktree_info = _create_isolated_worktree(self.parent_agent, self.parent_task_id, self.subagent_id)
+        self.worktree_info = _create_isolated_worktree(
+            self.parent_agent, self.parent_task_id, self.subagent_id,
+            required=getattr(self.child, "_delegate_worktree_required", False) is True,
+        )
         if self.worktree_info is not None:
-            with _quiet("worktree cwd seed failed: %s"):
-                from tools.terminal_tool import record_session_cwd as _rsc
-                _rsc(self.child_task_id, self.worktree_info["path"])
+            # A failed cwd seed invalidates isolation: do not run child tools.
+            from tools.terminal_tool import record_session_cwd
+            record_session_cwd(self.child_task_id, self.worktree_info["path"])
             # The child's context is already built; carry the isolation contract on
             # the goal message instead (same turn, no system-prompt mutation).
             from tools.subagent_worktree import build_worktree_context_note
