@@ -79,6 +79,8 @@ def _drain_for(delegation_id, timeout=5.0):
         ([{"status": "completed", "exit_reason": "max_iterations"}], "failed", "error"),
         ([{"status": "completed", "schema_valid": False}], "failed", "error"),
         ([{"status": "completed"}, {"status": "completed", "schema_valid": False}], "partial_failure", "error"),
+        ([{"status": "unknown"}], "unknown", "error"),
+        ([{"status": "failed"}], "failed", "error"),
         ([], "failed", "error"),
         (None, "failed", "error"),
     ],
@@ -88,6 +90,52 @@ def test_batch_status_requires_every_child_to_finish(children, expected_outcome,
     combined = {"results": children}
     assert ad._batch_outcome(combined) == expected_outcome
     assert ad._batch_status(combined) == expected_status
+
+
+def test_batch_outcome_requires_complete_unique_task_indexes():
+    """Missing or duplicated child results cannot masquerade as full batch success."""
+    missing = {"results": [{"task_index": 0, "status": "completed"}]}
+    duplicated = {"results": [
+        {"task_index": 0, "status": "completed"},
+        {"task_index": 0, "status": "completed"},
+    ]}
+    assert ad._batch_outcome(missing, expected_task_indexes=[0, 1]) == "unknown"
+    assert ad._batch_outcome(duplicated, expected_task_indexes=[0, 1]) == "unknown"
+
+
+@pytest.mark.parametrize(
+    ("children", "expected"),
+    [
+        ([{"task_index": 1, "status": "completed"}, {"task_index": 3, "status": "completed"}], "completed"),
+        ([{"task_index": 1, "status": "completed"}], "unknown"),
+        ([{"task_index": 1, "status": "completed"}, {"task_index": 1, "status": "completed"}], "unknown"),
+        ([{"task_index": 1, "status": "completed"}, {"task_index": 4, "status": "completed"}], "unknown"),
+        ([{"task_index": 1, "status": "completed"}, {"task_index": "3", "status": "completed"}], "unknown"),
+        ([{"task_index": 1, "status": "completed"}, {"task_index": 3, "status": "failed"}], "partial_failure"),
+        ([{"task_index": 1, "status": "failed"}, {"task_index": 3, "status": "error"}], "failed"),
+        ([{"task_index": 1, "status": "completed"}, {"task_index": 3, "status": "unknown"}], "unknown"),
+    ],
+)
+def test_group_batch_outcome_uses_non_contiguous_expected_indexes(children, expected):
+    """An independent-completion group is judged against its own indexes, e.g. [1, 3]."""
+    combined = {"results": children}
+    assert ad._batch_outcome(combined, expected_task_indexes=[1, 3]) == expected
+    assert ad._batch_status(combined, expected_task_indexes=[1, 3]) == (
+        "completed" if expected == "completed" else "error"
+    )
+
+
+def test_group_completion_event_uses_recorded_indexes(tmp_path, monkeypatch):
+    recorded = []
+    monkeypatch.setattr(ad, "_persist_completion", lambda event, result: recorded.append(event))
+    record = {
+        "delegation_id": "group-1", "is_batch": True, "goals": ["a", "b", "c", "d"],
+        "task_indexes": [1, 3], "dispatched_at": time.time(),
+    }
+    result = {"results": [{"task_index": 1, "status": "completed"}]}
+    ad._push_completion_event(record, result, ad._batch_status(result, [1, 3]))
+    assert recorded[0]["status"] == "error"
+    assert recorded[0]["batch_outcome"] == "unknown"
 
 
 def test_batch_completion_event_includes_partial_outcome(tmp_path, monkeypatch):

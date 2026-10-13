@@ -637,16 +637,46 @@ def _batch_crash(error: str, duration: float) -> Dict[str, Any]:
     return {"results": [], "error": error, "total_duration_seconds": duration}
 
 
-def _batch_outcome(combined: Dict[str, Any]) -> str:
-    """A batch succeeds only when EVERY child finished its assigned work.
+def _batch_outcome(combined: Dict[str, Any], expected_task_indexes: Optional[List[int]] = None) -> str:
+    """A batch succeeds only when EVERY assigned child returned exactly once.
 
     Keep per-child results intact. A usable summary is not proof of completion:
-    iteration exhaustion (truncated) and a failed output schema are incomplete
-    even when the child's legacy status says "completed".
+    iteration exhaustion (truncated), a failed output schema, missing indexes,
+    and duplicate indexes are incomplete even when every received child says success.
     """
     children = combined.get("results")
+    if expected_task_indexes is None:
+        candidate = combined.get("expected_task_indexes")
+        expected_task_indexes = candidate if isinstance(candidate, list) else None
     if not isinstance(children, list) or not children:
-        return "failed"
+        return "unknown" if expected_task_indexes else "failed"
+    if any(not isinstance(child, dict) for child in children):
+        return "unknown"
+    incomplete_indexes = False
+    if expected_task_indexes is not None:
+        expected_values = list(expected_task_indexes)
+        expected = set(expected_values) if all(type(index) is int and index >= 0 for index in expected_values) else set()
+        indexes = [child.get("task_index") for child in children]
+        incomplete_indexes = (
+            len(expected) != len(expected_values)
+            or len(indexes) != len(children)
+            or any(type(index) is not int or index < 0 for index in indexes)
+            or len(indexes) != len(set(indexes))
+            or set(indexes) != expected
+        )
+    else:
+        indexes = [child["task_index"] for child in children if "task_index" in child]
+        incomplete_indexes = (
+            any(type(index) is not int or index < 0 for index in indexes)
+            or len(indexes) != len(set(indexes))
+        )
+    if incomplete_indexes or any(
+        isinstance(child, dict)
+        and (child.get("status") == "unknown" or child.get("cancellation_pending") is True
+             or child.get("exit_reason") == "termination_unconfirmed")
+        for child in children
+    ):
+        return "unknown"
     succeeded = sum(
         isinstance(child, dict)
         and child.get("status") in {"completed", "success"}
@@ -660,9 +690,9 @@ def _batch_outcome(combined: Dict[str, Any]) -> str:
     return "partial_failure" if succeeded else "failed"
 
 
-def _batch_status(combined: Dict[str, Any]) -> str:
+def _batch_status(combined: Dict[str, Any], expected_task_indexes: Optional[List[int]] = None) -> str:
     """The parent must not see a mixed or incomplete batch as successful."""
-    return "completed" if _batch_outcome(combined) == "completed" else "error"
+    return "completed" if _batch_outcome(combined, expected_task_indexes) == "completed" else "error"
 
 
 def _dispatch(
@@ -680,8 +710,9 @@ def _dispatch(
     (default: its own id); the units of one delegate_task call share the first unit's id so
     splitting a call into per-group completions never consumes more capacity than the call did."""
     is_batch = goals is not None
+    expected_batch_indexes = task_indexes if task_indexes is not None else list(range(len(goals or [])))
     label = " batch" if is_batch else ""
-    classify = _batch_status if is_batch else (lambda r: r.get("status") or "completed")
+    classify = (lambda r: _batch_status(r, expected_batch_indexes)) if is_batch else (lambda r: r.get("status") or "completed")
     crash_result = _batch_crash if is_batch else _single_crash
     dispatched_at = time.time()
     record: Dict[str, Any] = {
@@ -873,7 +904,8 @@ def _push_completion_event(record: Dict[str, Any], result: Dict[str, Any], statu
     if is_batch:
         payload = {
             "is_batch": True, "results": result.get("results") or [],
-            "batch_outcome": result.get("batch_outcome") or _batch_outcome(result),
+            "batch_outcome": result.get("batch_outcome") or _batch_outcome(
+                result, record.get("task_indexes") or list(range(len(record.get("goals") or [])))),
             "live_transcripts": result.get("live_transcripts"), "error": result.get("error"),
             "total_duration_seconds": result.get("total_duration_seconds"),
             **({"group": result["group"]} if result.get("group") is not None else {})}
