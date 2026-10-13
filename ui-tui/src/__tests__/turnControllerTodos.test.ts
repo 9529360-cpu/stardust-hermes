@@ -6,7 +6,7 @@ import { getTurnState, resetTurnState } from '../app/turnStore.js'
 // turnController.recordTodos() parses the raw `todo` tool payload into
 // TodoItem[]. Nested subtasks (apps/desktop's `parent` field) must survive
 // this parse — the TUI todo panel renders hierarchy from it via todoTree().
-describe('turnController.recordTodos — preserves the parent field', () => {
+describe('turnController.recordTodos — preserves task relationships', () => {
   beforeEach(() => {
     resetTurnState()
     turnController.fullReset()
@@ -34,5 +34,14 @@ describe('turnController.recordTodos — preserves the parent field', () => {
     turnController.recordTodos([{ content: 'x', id: 'a', status: 'pending' }])
 
     expect(getTurnState().todos).toEqual([{ content: 'x', id: 'a', status: 'pending' }])
+  })
+
+  it('keeps prerequisite ids from the backend snapshot', () => {
+    turnController.recordTodos([
+      { content: 'Prepare fixture', id: 'setup', status: 'completed' },
+      { content: 'Run check', depends_on: ['setup'], id: 'verify', status: 'pending' }
+    ])
+
+    expect(getTurnState().todos[1]?.dependsOn).toEqual(['setup'])
   })
 })

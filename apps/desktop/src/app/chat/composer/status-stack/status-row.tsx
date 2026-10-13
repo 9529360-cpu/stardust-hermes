@@ -158,6 +158,11 @@ export const StatusItemRow = memo(function StatusItemRow({ item, onDismiss, onOp
         >
           {item.title}
         </span>
+        {item.type === 'todo' && item.blockedBy && item.blockedBy.length > 0 && (
+          <span className="shrink-0 truncate text-[0.62rem] leading-4 text-amber-600/80 dark:text-amber-400/80">
+            {s.blockedBy(item.blockedBy)}
+          </span>
+        )}
         {item.type === 'subagent' && item.currentTool && (
           <span className="shrink-0 truncate text-[0.62rem] leading-4 text-muted-foreground/70">
             {toolLabel(item.currentTool)}

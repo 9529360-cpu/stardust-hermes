@@ -71,11 +71,16 @@ const parseTodos = (value: unknown): null | TodoItem[] => {
       const id = String(row.id ?? '').trim()
       const parent = String(row.parent ?? '').trim()
 
+      const dependsOn = Array.isArray(row.depends_on)
+        ? [...new Set(row.depends_on.slice(0, 16).map(value => String(value ?? '').trim()).filter(Boolean))]
+        : []
+
       return {
         content: String(row.content ?? '').trim(),
         id,
         status,
-        ...(parent && parent !== id ? { parent } : {})
+        ...(parent && parent !== id ? { parent } : {}),
+        ...(dependsOn.length > 0 ? { dependsOn } : {})
       }
     })
     .filter((item): item is TodoItem => Boolean(item?.id && item.content))

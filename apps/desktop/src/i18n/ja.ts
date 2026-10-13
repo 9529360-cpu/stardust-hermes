@@ -2785,6 +2785,7 @@ export const ja = defineLocale({
     goalWaiting: '目標待機中',
     subagents: count => `サブエージェント ${count} 件`,
     todos: (done, total) => `タスク ${done}/${total}`,
+    blockedBy: ids => `待機中：${ids.join('、')}`,
     running: '実行中',
     cronRun: 'スケジュール実行',
     stop: '停止',

@@ -26,6 +26,8 @@ class TestTodoSchemaDiet(unittest.TestCase):
     def test_param_schema_is_the_single_structure_source(self):
         item = TODO_SCHEMA["parameters"]["properties"]["todos"]["items"]
         self.assertEqual(item["required"], ["id", "content", "status"])
+        self.assertEqual(item["properties"]["depends_on"]["type"], "array")
+        self.assertEqual(item["properties"]["depends_on"]["maxItems"], 16)
         self.assertEqual(
             item["properties"]["status"]["enum"],
             ["pending", "in_progress", "completed", "cancelled"],

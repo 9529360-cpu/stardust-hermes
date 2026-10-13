@@ -2,7 +2,7 @@ import { Box, Text } from '@hermes/ink'
 import { memo, useState } from 'react'
 
 import { countPendingTodos } from '../lib/liveProgress.js'
-import { todoGlyph, todoTone, todoTree } from '../lib/todo.js'
+import { todoBlockers, todoGlyph, todoTone, todoTree } from '../lib/todo.js'
 import type { Theme } from '../theme.js'
 import type { TodoItem } from '../types.js'
 
@@ -78,12 +78,14 @@ export const TodoPanel = memo(function TodoPanel({
           {todoTree(todos).map(([todo, depth]) => {
             const tone = todoTone(todo.status)
             const color = rowColor(t, todo.status)
+            const blockers = todoBlockers(todo, todos)
 
             return (
               <Box key={todo.id} marginLeft={Math.min(depth, 4) * 2}>
                 <Text color={color} dim={tone === 'dim'}>
                   <Text color={color}>{todoGlyph(todo.status)} </Text>
                   {todo.content}
+                  {blockers.length > 0 && <Text color={t.color.muted}> (blocked by: {blockers.join(', ')})</Text>}
                 </Text>
               </Box>
             )

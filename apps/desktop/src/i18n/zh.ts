@@ -3700,6 +3700,7 @@ export const zh = defineLocale({
     goalWaiting: '目标等待中',
     subagents: count => `${count} 个子代理`,
     todos: (done, total) => `任务 ${done}/${total}`,
+    blockedBy: ids => `等待：${ids.join('、')}`,
     running: '运行中',
     cronRun: '定时任务',
     stop: '停止',

@@ -2,6 +2,7 @@ export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled'
 
 export interface TodoItem {
   content: string
+  dependsOn?: string[]
   id: string
   /** Optional id of another item — renders this as a nested subtask. */
   parent?: string
@@ -12,6 +13,7 @@ export interface TodoItem {
  *  patch still applies to an existing row. */
 export interface TodoPatch {
   content?: string
+  dependsOn?: string[]
   id: string
   status: TodoStatus
 }
@@ -25,6 +27,11 @@ export const isTodoToolName = (name: unknown): boolean => name === 'todo_list' |
 const isRecord = (v: unknown): v is Record<string, unknown> => Boolean(v && typeof v === 'object' && !Array.isArray(v))
 const isStatus = (v: unknown): v is TodoStatus => (STATUSES as readonly string[]).includes(v as string)
 
+const parseDependencies = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? [...new Set(value.slice(0, 16).map(id => String(id ?? '').trim()).filter(Boolean))]
+    : []
+
 function parseArray(value: unknown[]): TodoItem[] {
   return value.flatMap(item => {
     if (!isRecord(item) || !isStatus(item.status)) {
@@ -34,8 +41,17 @@ function parseArray(value: unknown[]): TodoItem[] {
     const id = String(item.id ?? '').trim()
     const content = String(item.content ?? '').trim()
     const parent = String(item.parent ?? '').trim()
+    const dependsOn = parseDependencies(item.depends_on)
 
-    return id && content ? [{ content, id, status: item.status, ...(parent && parent !== id ? { parent } : {}) }] : []
+    return id && content
+      ? [{
+          content,
+          id,
+          status: item.status,
+          ...(parent && parent !== id ? { parent } : {}),
+          ...(dependsOn.length > 0 ? { dependsOn } : {})
+        }]
+      : []
   })
 }
 
@@ -52,8 +68,14 @@ function parsePatchArray(value: unknown[]): TodoPatch[] {
     }
 
     const content = String(item.content ?? '').trim()
+    const dependsOn = parseDependencies(item.depends_on)
 
-    return content ? [{ content, id, status: item.status }] : [{ id, status: item.status }]
+    return {
+      ...(content ? { content } : {}),
+      ...(Array.isArray(item.depends_on) ? { dependsOn } : {}),
+      id,
+      status: item.status
+    }
   })
 }
 
@@ -82,6 +104,17 @@ function parse(value: unknown, depth: number): null | TodoItem[] {
 }
 
 export const parseTodos = (value: unknown): null | TodoItem[] => parse(value, 0)
+
+/** Missing or unfinished prerequisite ids that currently prevent this task from starting. */
+export function todoBlockers(item: TodoItem, todos: readonly TodoItem[]): string[] {
+  if (!item.dependsOn?.length) {
+    return []
+  }
+
+  const statusById = new Map(todos.map(todo => [todo.id, todo.status]))
+
+  return item.dependsOn.filter(id => statusById.get(id) !== 'completed')
+}
 
 /** DFS order of a (possibly nested) todo list: [item, depth] pairs, parents
  *  before children. Dangling/cyclic parents degrade to depth 0. */
@@ -168,7 +201,12 @@ export function mergeTodoItems(current: readonly TodoItem[], patch: readonly Tod
     const index = indexById.get(item.id)
 
     if (index === undefined) {
-      next.push({ content: item.content?.trim() || '(no description)', id: item.id, status: item.status })
+      next.push({
+        content: item.content?.trim() || '(no description)',
+        id: item.id,
+        status: item.status,
+        ...(item.dependsOn ? { dependsOn: [...item.dependsOn] } : {})
+      })
       indexById.set(item.id, next.length - 1)
 
       continue
@@ -176,6 +214,10 @@ export function mergeTodoItems(current: readonly TodoItem[], patch: readonly Tod
 
     if (item.content) {
       next[index].content = item.content
+    }
+
+    if (item.dependsOn) {
+      next[index].dependsOn = [...item.dependsOn]
     }
 
     next[index].status = item.status
