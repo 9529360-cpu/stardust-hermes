@@ -233,6 +233,50 @@ def test_goal_header_is_redacted():
     assert "deploy using" in body
 
 
+def test_manifest_completion_waits_for_all_child_statuses(tmp_path, monkeypatch):
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
+    delegation_id = "deleg_manifest_pending"
+    tasks = [{"goal": "a"}, {"goal": "b"}]
+    created_id, _writers, _paths = create_live_transcripts(tasks, delegation_id=delegation_id)
+    assert created_id == delegation_id
+
+    update_manifest_statuses(delegation_id, [{"task_index": 0, "status": "completed"}])
+    manifest_path = live_transcript_root() / delegation_id / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert [task["status"] for task in manifest["tasks"]] == ["completed", "running"]
+    assert "completed" not in manifest
+
+    update_manifest_statuses(delegation_id, [{"task_index": 1, "status": "interrupted"}])
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert [task["status"] for task in manifest["tasks"]] == ["completed", "interrupted"]
+    assert manifest["completed"]
+
+
+def test_concurrent_group_manifest_updates_do_not_lose_child_statuses(tmp_path, monkeypatch):
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
+    delegation_id = "deleg_manifest_concurrent"
+    tasks = [{"goal": f"task {i}"} for i in range(8)]
+    created_id, _writers, _paths = create_live_transcripts(tasks, delegation_id=delegation_id)
+    assert created_id == delegation_id
+    barrier = threading.Barrier(len(tasks) + 1)
+
+    def update(index):
+        barrier.wait(timeout=5)
+        update_manifest_statuses(delegation_id, [{"task_index": index, "status": "completed"}])
+
+    workers = [threading.Thread(target=update, args=(index,)) for index in range(len(tasks))]
+    for worker in workers:
+        worker.start()
+    barrier.wait(timeout=5)
+    for worker in workers:
+        worker.join(timeout=5)
+        assert not worker.is_alive()
+
+    manifest = json.loads((live_transcript_root() / delegation_id / "manifest.json").read_text(encoding="utf-8"))
+    assert [task["status"] for task in manifest["tasks"]] == ["completed"] * len(tasks)
+    assert manifest["completed"]
+
+
 def test_manifest_goal_is_redacted():
     """manifest.json shares the mounted dir with the .log files.
 

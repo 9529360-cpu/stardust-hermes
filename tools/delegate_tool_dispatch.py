@@ -8,9 +8,10 @@ from __future__ import annotations
 import contextvars
 import json
 import logging
+import threading
 import time
 from concurrent.futures import FIRST_COMPLETED, wait as _cf_wait
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Any, Dict, List, Optional
 
 from tools.async_delegation import _new_delegation_id, record_unit_child
@@ -48,6 +49,7 @@ class _Batch:
     # Set on per-group units carved out by ``_dispatch_background``; None for the whole batch / ungrouped units.
     group: Optional[str] = None
     unit_id: Optional[str] = None  # the async registry id this unit runs under (``<call_id>-k`` for split calls)
+    cancel_event: threading.Event = field(default_factory=threading.Event, repr=False)
 
     def owner_kwargs(self) -> Dict[str, Any]:
         """Steer/stop authority of the originating session, passed to every child run."""
@@ -138,31 +140,9 @@ def _run_children_parallel(batch: _Batch, results: list, *, honor_parent_interru
             for i, t, child in batch.children
         }
         pending = set(futures)
-        while pending:
-            if honor_parent_interrupt and getattr(parent_agent, "_interrupt_requested", False) is True:
-                # Never wait without a deadline on cancelled worker futures.
-                for future in pending:
-                    _signal_child_stop(child_by_index[futures[future]], "Parent cancelled delegated work")
-                done, pending = _cf_wait(pending, timeout=_SYNC_INTERRUPT_GRACE_SECONDS)
-                for future in done:
-                    entry = entry_of(future, futures[future])
-                    results.append(entry)
-                    _report_child_done(parent_agent, spinner_ref, entry, tag, task_labels, n_tasks, n_here - len(results))
-                for future in pending:
-                    idx = futures[future]
-                    entry = _fabricated_entry(
-                        idx, "unknown",
-                        "Parent cancellation was requested, but this worker did not exit within the grace period. "
-                        "It may still be finishing; inspect its transcript/worktree before retrying or integrating.",
-                        child_by_index[idx],
-                    )
-                    entry["cancellation_pending"] = True
-                    entry["exit_reason"] = "termination_unconfirmed"
-                    results.append(entry)
-                    _report_child_done(parent_agent, spinner_ref, entry, tag, task_labels, n_tasks, n_here - len(results))
-                break
-            done, pending = _cf_wait(pending, timeout=0.5, return_when=FIRST_COMPLETED)
-            for future in done:
+
+        def collect_done(done_futures):
+            for future in done_futures:
                 entry = entry_of(future, futures[future])
                 results.append(entry)
                 if not honor_parent_interrupt and batch.unit_id:
@@ -177,6 +157,65 @@ def _run_children_parallel(batch: _Batch, results: list, *, honor_parent_interru
                         push_task_failure_notice(
                             batch.unit_id, {**entry, **({"live_transcript": live} if live else {})}, n_tasks=n_tasks,
                         )
+
+        while pending:
+            done, pending = _cf_wait(pending, timeout=0.5, return_when=FIRST_COMPLETED)
+            collect_done(done)
+            if not pending:
+                break
+
+            parent_cancel = honor_parent_interrupt and getattr(parent_agent, "_interrupt_requested", False) is True
+            unit_cancel = batch.cancel_event.is_set()
+            if not (parent_cancel or unit_cancel):
+                continue
+
+            # Never wait without a deadline after either parent or registry cancellation.
+            stop_reason = (
+                (getattr(parent_agent, "_interrupt_message", None) or "Parent cancelled delegated work")
+                if parent_cancel else "Async delegation cancelled"
+            )
+            hard_event = getattr(parent_agent, "_hard_interrupt_requested", None)
+            hard_cancel = unit_cancel or hard_event is None or hard_event.is_set()
+            for future in pending:
+                child = child_by_index[futures[future]]
+                if hard_cancel:
+                    _signal_child_stop(child, stop_reason)
+                else:
+                    with _quiet("Soft child interrupt failed", exc_info=True):
+                        child.interrupt(stop_reason)
+
+            done, pending = _cf_wait(pending, timeout=_SYNC_INTERRUPT_GRACE_SECONDS)
+            collect_done(done)
+            for future in pending:
+                idx = futures[future]
+                entry = _fabricated_entry(
+                    idx, "unknown",
+                    "Cancellation was requested, but this worker did not exit within the grace period. "
+                    "It may still be finishing; inspect its transcript/worktree before retrying or integrating.",
+                    child_by_index[idx],
+                )
+                entry["cancellation_pending"] = True
+                entry["exit_reason"] = "termination_unconfirmed"
+                results.append(entry)
+                _report_child_done(parent_agent, spinner_ref, entry, tag, task_labels, n_tasks, n_here - len(results))
+
+                def finalize_after_worker_exit(done_future, task_index=idx):
+                    """Run lifecycle side effects only after an UNKNOWN worker actually exits."""
+                    late_entry = entry_of(done_future, task_index)
+                    member = next((item for item in batch.children if item[0] == task_index), None)
+                    if member is None:
+                        return
+                    _finalize_child_results([late_entry], batch.task_list, [member], parent_agent)
+                    if task_index < len(batch.live_writers) and batch.live_writers[task_index] is not None:
+                        with _quiet("Late child transcript finalize failed", exc_info=True):
+                            batch.live_writers[task_index].finalize(late_entry)
+                    if batch.live_deleg_id:
+                        with _quiet("Late child manifest update failed", exc_info=True):
+                            from tools.delegation_live_log import update_manifest_statuses
+                            update_manifest_statuses(batch.live_deleg_id, [late_entry])
+
+                future.add_done_callback(finalize_after_worker_exit)
+            break
     finally:
         # The completed path has no live workers. On cancellation, the others
         # must remain daemon-owned until their own finally blocks close them.
@@ -190,21 +229,21 @@ def _execute_and_aggregate(batch: _Batch, *, honor_parent_interrupt: bool = True
     record (retention pruning happens on future dispatches)."""
     from tools.delegation_live_log import update_manifest_statuses
     results: list = []
-    if len(batch.children) == 1:
-        results.append(batch.run_child(*batch.children[0]))
-    else:
-        _run_children_parallel(batch, results, honor_parent_interrupt=honor_parent_interrupt)
+    _run_children_parallel(batch, results, honor_parent_interrupt=honor_parent_interrupt)
 
-    _finalize_child_results(results, batch.task_list, batch.children, batch.parent_agent)
+    confirmed_results = [entry for entry in results if not entry.get("cancellation_pending")]
+    if confirmed_results:
+        _finalize_child_results(confirmed_results, batch.task_list, batch.children, batch.parent_agent)
     total_duration = round(time.monotonic() - batch.overall_start, 2)
-    for entry in results:
+    for entry in confirmed_results:
         _idx = entry.get("task_index", -1)
         if isinstance(_idx, int) and 0 <= _idx < len(batch.live_writers) and batch.live_writers[_idx] is not None:
             with _quiet("Live transcript finalize failed", exc_info=True):
                 batch.live_writers[_idx].finalize(entry)
             if _idx < len(batch.live_paths):
                 entry["live_transcript"] = batch.live_paths[_idx]
-    update_manifest_statuses(batch.live_deleg_id, results)
+    if confirmed_results:
+        update_manifest_statuses(batch.live_deleg_id, confirmed_results)
 
     combined: Dict[str, Any] = {"results": results, "total_duration_seconds": total_duration}
     # Runtime truth about children's background processes, as prose the parent can't miss inside the JSON.
@@ -413,7 +452,8 @@ def _units_of(batch: _Batch) -> List[_Batch]:
         g = t.get("group")
         key = ("g", str(g)) if g not in (None, "") else ("i", i)
         members.setdefault(key, []).append((i, t, c))
-    return [replace(batch, children=ch, group=(key[1] if key[0] == "g" else None)) for key, ch in members.items()]
+    return [replace(batch, children=ch, group=(key[1] if key[0] == "g" else None), cancel_event=threading.Event())
+            for key, ch in members.items()]
 
 def _dispatch_unit(unit: _Batch, unit_id: Optional[str], slot_key: Optional[str], routing: dict) -> dict:
     """Hand ONE unit to the async registry; the runner joins on that unit's children only."""
@@ -421,6 +461,7 @@ def _dispatch_unit(unit: _Batch, unit_id: Optional[str], slot_key: Optional[str]
     child_agents = [c for (_, _, c) in unit.children]
 
     def _interrupt():
+        unit.cancel_event.set()
         for c in child_agents:
             _signal_child_stop(c, "Async delegation cancelled")
 

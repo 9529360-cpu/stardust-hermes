@@ -271,6 +271,247 @@ def test_rejected_background_child_stops_with_parent(
         assert not worker.is_alive()
 
 
+def test_registry_cancel_of_parallel_batch_emits_one_unknown_completion_and_defers_cleanup(
+    registry_state, monkeypatch, tmp_path,
+):
+    import tools.delegate_tool_dispatch as dispatcher
+
+    (tmp_path / "config.yaml").write_text(
+        "delegation:\n  max_concurrent_children: 2\n  worktree_isolation: false\n"
+        "  independent_completions: false\n  capacity_fallback_sync: false\n",
+        encoding="utf-8",
+    )
+    parent, children = _Parent(), [_ControlledChild(), _ControlledChild()]
+    children[1].session_id += "-second"
+    batch = _batch(parent, *children)
+    monkeypatch.setattr(dispatcher, "_SYNC_INTERRUPT_GRACE_SECONDS", 0.05)
+    finalized_indexes = []
+    monkeypatch.setattr(
+        dispatcher, "_finalize_child_results",
+        lambda entries, *_args: finalized_indexes.extend(entry["task_index"] for entry in entries),
+    )
+
+    def run_child(index, _task, agent):
+        agent.started.set()
+        assert agent.stop_received.wait(5)
+        assert agent.allow_finish.wait(5)
+        agent.finished.set()
+        agent.close()
+        return {"task_index": index, "status": "interrupted"}
+
+    batch.run_child = run_child
+    try:
+        dispatch = json.loads(_dispatch_background(batch))
+        assert dispatch["status"] == "dispatched"
+        assert all(child.started.wait(5) for child in children)
+
+        assert async_delegation.interrupt_for_session(parent_session_id=parent.session_id) == 1
+        completion = registry_state.get(timeout=3)
+        assert completion["delegation_id"] == dispatch["delegation_id"]
+        assert completion["status"] == "error"
+        assert completion["batch_outcome"] == "unknown"
+        assert [entry["status"] for entry in completion["results"]] == ["unknown", "unknown"]
+        assert not finalized_indexes
+        assert all(child.close_count == 0 and not child.finished.is_set() for child in children)
+
+        for child in children:
+            child.allow_finish.set()
+        assert all(child.closed.wait(5) for child in children)
+        deadline = time.monotonic() + 5
+        while len(finalized_indexes) < 2 and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert sorted(finalized_indexes) == [0, 1]
+        assert all(child.close_count == 1 and not child.closed_while_running for child in children)
+        assert registry_state.empty(), "late worker exit must not emit a duplicate batch completion"
+    finally:
+        async_delegation.interrupt_for_session(parent_session_id=parent.session_id)
+        for child in children:
+            child.allow_finish.set()
+            if not child.finished.is_set():
+                child.hard_interrupt("test teardown")
+
+
+def test_async_cancel_returns_unknown_without_finalizing_live_worker(monkeypatch):
+    import tools.delegate_tool_dispatch as dispatcher
+
+    parent, child = _Parent(), _ControlledChild()
+    batch = _batch(parent, child)
+    batch.unit_id = "async-cancel-test"
+    batch.live_deleg_id = "deleg_async_cancel"
+    monkeypatch.setattr(dispatcher, "_SYNC_INTERRUPT_GRACE_SECONDS", 0.05)
+    finalizations = []
+    manifest_updates = []
+    import tools.delegation_live_log as live_log
+    monkeypatch.setattr(dispatcher, "_finalize_child_results", lambda *_args: finalizations.append("finalized"))
+    monkeypatch.setattr(live_log, "update_manifest_statuses", lambda delegation_id, entries: manifest_updates.append((delegation_id, entries)))
+
+    def run_child(_index, _task, agent):
+        agent.started.set()
+        assert agent.stop_received.wait(5)
+        assert agent.allow_finish.wait(5)
+        agent.finished.set()
+        agent.close()
+        return {"task_index": 0, "status": "interrupted"}
+
+    batch.run_child = run_child
+    outcome = Future()
+
+    def execute_batch():
+        try:
+            outcome.set_result(dispatcher._execute_and_aggregate(batch, honor_parent_interrupt=False))
+        except BaseException as exc:
+            outcome.set_exception(exc)
+
+    worker = threading.Thread(target=execute_batch, daemon=True)
+    worker.start()
+    try:
+        assert child.started.wait(5)
+        batch.cancel_event.set()
+        worker.join(timeout=2)
+        assert not worker.is_alive(), "single-child async cancellation left the aggregate waiting"
+        result = outcome.result(timeout=1)
+        assert result["batch_outcome"] == "unknown"
+        assert result["results"][0]["status"] == "unknown"
+        assert result["results"][0]["cancellation_pending"] is True
+        assert not child.finished.is_set()
+        assert child.close_count == 0
+        assert finalizations == []
+        assert manifest_updates == []
+
+        child.allow_finish.set()
+        assert child.closed.wait(5)
+        assert child.finished.is_set()
+        deadline = time.monotonic() + 5
+        while not finalizations and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert finalizations == ["finalized"]
+        assert len(manifest_updates) == 1
+        assert manifest_updates[0][0] == "deleg_async_cancel"
+        assert manifest_updates[0][1][0]["status"] == "interrupted"
+        assert child.close_count == 1
+        assert not child.closed_while_running
+    finally:
+        batch.cancel_event.set()
+        child.allow_finish.set()
+        if not child.finished.is_set():
+            child.hard_interrupt("test teardown")
+        worker.join(timeout=5)
+
+
+def test_parallel_async_cancel_bounds_wait_and_defers_each_child_finalization(monkeypatch):
+    import tools.delegate_tool_dispatch as dispatcher
+
+    parent, children = _Parent(), [_ControlledChild(), _ControlledChild()]
+    children[1].session_id += "-second"
+    batch = _batch(parent, *children)
+    batch.unit_id = "async-parallel-cancel-test"
+    monkeypatch.setattr(dispatcher, "_SYNC_INTERRUPT_GRACE_SECONDS", 0.05)
+    finalized_indexes = []
+    monkeypatch.setattr(
+        dispatcher, "_finalize_child_results",
+        lambda entries, *_args: finalized_indexes.extend(entry["task_index"] for entry in entries),
+    )
+
+    def run_child(index, _task, agent):
+        agent.started.set()
+        assert agent.stop_received.wait(5)
+        assert agent.allow_finish.wait(5)
+        agent.finished.set()
+        agent.close()
+        return {"task_index": index, "status": "interrupted"}
+
+    batch.run_child = run_child
+    outcome = Future()
+
+    def execute_batch():
+        try:
+            outcome.set_result(dispatcher._execute_and_aggregate(batch, honor_parent_interrupt=False))
+        except BaseException as exc:
+            outcome.set_exception(exc)
+
+    worker = threading.Thread(target=execute_batch, daemon=True)
+    worker.start()
+    try:
+        assert all(child.started.wait(5) for child in children)
+        batch.cancel_event.set()
+        worker.join(timeout=2)
+        assert not worker.is_alive(), "parallel async cancellation left aggregate waiting"
+        result = outcome.result(timeout=1)
+        assert result["batch_outcome"] == "unknown"
+        assert [entry["status"] for entry in result["results"]] == ["unknown", "unknown"]
+        assert all(entry["cancellation_pending"] for entry in result["results"])
+        assert not finalized_indexes
+        assert all(not child.finished.is_set() and child.close_count == 0 for child in children)
+
+        for child in children:
+            child.allow_finish.set()
+        assert all(child.closed.wait(5) for child in children)
+        deadline = time.monotonic() + 5
+        while len(finalized_indexes) < 2 and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert sorted(finalized_indexes) == [0, 1]
+        assert all(child.close_count == 1 and not child.closed_while_running for child in children)
+    finally:
+        batch.cancel_event.set()
+        for child in children:
+            child.allow_finish.set()
+            if not child.finished.is_set():
+                child.hard_interrupt("test teardown")
+        worker.join(timeout=5)
+
+
+def test_async_cancel_racing_with_child_exit_keeps_real_result_and_finalizes_once(monkeypatch):
+    import tools.delegate_tool_dispatch as dispatcher
+
+    parent, child = _Parent(), _ControlledChild()
+    batch = _batch(parent, child)
+    batch.unit_id = "async-cancel-race-test"
+    monkeypatch.setattr(dispatcher, "_SYNC_INTERRUPT_GRACE_SECONDS", 1.0)
+    finalizations = []
+    monkeypatch.setattr(dispatcher, "_finalize_child_results", lambda results, *_args: finalizations.append(results))
+
+    def run_child(_index, _task, agent):
+        agent.started.set()
+        assert agent.stop_received.wait(5)
+        assert agent.allow_finish.wait(5)
+        agent.finished.set()
+        agent.close()
+        return {"task_index": 0, "status": "interrupted", "exit_reason": "interrupted"}
+
+    batch.run_child = run_child
+    outcome = Future()
+
+    def execute_batch():
+        try:
+            outcome.set_result(dispatcher._execute_and_aggregate(batch, honor_parent_interrupt=False))
+        except BaseException as exc:
+            outcome.set_exception(exc)
+
+    worker = threading.Thread(target=execute_batch, daemon=True)
+    worker.start()
+    try:
+        assert child.started.wait(5)
+        batch.cancel_event.set()
+        assert child.stop_received.wait(5)
+        child.allow_finish.set()
+        worker.join(timeout=3)
+        assert not worker.is_alive()
+        result = outcome.result(timeout=1)
+        assert result["results"] == [{"task_index": 0, "status": "interrupted", "exit_reason": "interrupted"}]
+        assert result["batch_outcome"] == "failed"
+        assert len(finalizations) == 1
+        assert finalizations[0][0]["status"] == "interrupted"
+        assert child.closed.wait(5)
+        assert child.close_count == 1
+        assert not child.closed_while_running
+    finally:
+        batch.cancel_event.set()
+        child.allow_finish.set()
+        if not child.finished.is_set():
+            child.hard_interrupt("test teardown")
+        worker.join(timeout=5)
+
+
 def test_accepted_background_child_keeps_registry_cancellation_ownership(registry_state):
     parent, child = _Parent(), _ControlledChild()
     try:
@@ -345,10 +586,21 @@ def test_parent_cancellation_never_waits_forever_for_child_cleanup(registry_stat
     parent, child = _Parent(), _ControlledChild()
     batch = _batch(parent, child)
     monkeypatch.setattr(dispatch, "_SYNC_INTERRUPT_GRACE_SECONDS", 0.05)
-    result = []
+    outcome = []
+    finalized_entries = []
+    finalized = threading.Event()
+    real_finalize = dispatch._finalize_child_results
+
+    def track_finalization(entries, *args, **kwargs):
+        finalized_entries.extend(entries)
+        if entries:
+            finalized.set()
+        return real_finalize(entries, *args, **kwargs)
+
+    monkeypatch.setattr(dispatch, "_finalize_child_results", track_finalization)
 
     worker = threading.Thread(
-        target=lambda: dispatch._run_children_parallel(batch, result, honor_parent_interrupt=True),
+        target=lambda: outcome.append(dispatch._execute_and_aggregate(batch)),
         daemon=True,
     )
     worker.start()
@@ -359,15 +611,16 @@ def test_parent_cancellation_never_waits_forever_for_child_cleanup(registry_stat
         assert child.unwinding.wait(5)
         worker.join(3)
         assert not worker.is_alive(), "cancelled batch must not block on unresponsive worker"
-        assert len(result) == 1
-        assert result[0]["status"] == "unknown"
-        assert result[0]["cancellation_pending"] is True
-        assert result[0]["exit_reason"] == "termination_unconfirmed"
+        assert len(outcome) == 1
+        assert outcome[0]["results"][0]["status"] == "unknown"
+        assert outcome[0]["results"][0]["cancellation_pending"] is True
+        assert outcome[0]["results"][0]["exit_reason"] == "termination_unconfirmed"
         assert not child.closed.is_set()
+        assert finalized_entries == []
     finally:
         child.allow_finish.set()
         worker.join(3)
         assert child.finished.wait(5)
         assert child.closed.wait(5)
-
-
+        assert finalized.wait(5)
+        assert finalized_entries[0]["status"] == "interrupted"
