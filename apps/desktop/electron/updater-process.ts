@@ -11,7 +11,9 @@ export interface DevelopmentWorkspaceManualUpdate {
 
 /** Keep source checkouts out of automatic branch/environment-changing updates. */
 export function developmentWorkspaceManualUpdateMessage(isPackaged: boolean): DevelopmentWorkspaceManualUpdate | null {
-  if (isPackaged) return null
+  if (isPackaged) {
+    return null
+  }
 
   return {
     command: 'stardust update',

@@ -138,6 +138,9 @@ def _run_handoff(tmp_path, exits: dict[int, int]) -> list[dict]:
     python = venv_bin / "python"
     python.write_text("#!/bin/sh" + os.linesep + "exit 0" + os.linesep, encoding="utf-8")
     python.chmod(0o755)
+    python3 = venv_bin / "python3"
+    python3.write_text(python.read_text(encoding="utf-8"), encoding="utf-8")
+    python3.chmod(0o755)
     hermes = venv_bin / "stardust"
     hermes.write_text(FAKE_HERMES)
     hermes.chmod(0o755)
