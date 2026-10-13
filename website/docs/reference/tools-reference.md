@@ -109,6 +109,12 @@ Scoped to the Feishu document-comment handler. Drives comment read/write operati
 | `feishu_drive_list_comment_replies` | List replies on a specific Feishu comment thread (whole-doc or local-selection). | Feishu app credentials |
 | `feishu_drive_reply_comment` | Post a reply on a Feishu comment thread, with optional `@`-mention. | Feishu app credentials |
 
+## `code_intelligence` toolset
+
+| Tool | Description | Requires environment |
+|------|-------------|----------------------|
+| `code_intelligence` | Query the workspace language server for a definition, references, hover/type information, document symbols, or workspace symbols, or rename a symbol across files through the guarded patch path. Requires a supported language server and a Git worktree. | — |
+
 ## `file` toolset
 
 | Tool | Description | Requires environment |

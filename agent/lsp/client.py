@@ -32,6 +32,7 @@ INITIALIZE_TIMEOUT = 45.0
 DIAGNOSTICS_DOCUMENT_WAIT = 5.0
 DIAGNOSTICS_FULL_WAIT = 10.0
 DIAGNOSTICS_REQUEST_TIMEOUT = 3.0
+SEMANTIC_REQUEST_TIMEOUT = 6.0
 PUSH_DEBOUNCE = 0.15
 SHUTDOWN_GRACE = 1.0  # seconds between SIGTERM and SIGKILL
 # Retry policy for transient ContentModified errors: 0.5, 1.0, 2.0s.
@@ -43,8 +44,14 @@ _LIVE_STATES = {"starting", "running"}
 
 _CLIENT_CAPABILITIES: Dict[str, Any] = {
     "window": {"workDoneProgress": True},
-    "workspace": {"configuration": True, "workspaceFolders": True,
-                  "didChangeWatchedFiles": {"dynamicRegistration": True}, "diagnostics": {"refreshSupport": False}},
+    "workspace": {
+        "configuration": True,
+        "workspaceFolders": True,
+        "workspaceEdit": {"documentChanges": True},
+        "didChangeWatchedFiles": {"dynamicRegistration": True},
+        "diagnostics": {"refreshSupport": False},
+        "symbol": {"dynamicRegistration": False, "symbolKind": {"valueSet": list(range(1, 27))}},
+    },
     "textDocument": {
         "synchronization": {"dynamicRegistration": False, "didOpen": True, "didChange": True,
                             "didSave": True, "willSave": False, "willSaveWaitUntil": False},
@@ -55,6 +62,7 @@ _CLIENT_CAPABILITIES: Dict[str, Any] = {
         "definition": {"linkSupport": True},
         "references": {},
         "documentSymbol": {"hierarchicalDocumentSymbolSupport": True},
+        "rename": {"dynamicRegistration": False, "prepareSupport": True},
     },
     "general": {"positionEncodings": ["utf-16"]},
 }
@@ -121,8 +129,7 @@ class _DocState:
 
 
 class LSPClient:
-    """One server process + one workspace root.  ``start()`` → ``open_file()`` → ``wait_for_diagnostics()`` →
-    ``diagnostics_for()`` → ``shutdown()``."""
+    """One language-server process for diagnostics and semantic code queries."""
 
     def __init__(self, *, server_id: str, workspace_root: str, command: List[str],
                  env: Optional[Dict[str, str]] = None, cwd: Optional[str] = None,
@@ -534,6 +541,67 @@ class LSPClient:
             await self._send_notification(
                 "textDocument/didSave", {"textDocument": {"uri": file_uri(os.path.abspath(path))}}
             )
+
+    async def sync_file_for_query(self, path: str, *, language_id: str = "plaintext") -> int:
+        """Open or refresh a document only when its on-disk text changed.
+
+        Semantic queries often follow one another at the same cursor. Avoid sending a redundant
+        whole-document didChange for every query; a changed file still goes through open_file so
+        the server sees the current content before answering.
+        """
+        abs_path = os.path.abspath(path)
+        try:
+            text = Path(abs_path).read_text(encoding="utf-8", errors="replace")
+        except OSError as e:
+            raise LSPProtocolError(f"cannot read {abs_path}: {e}") from e
+        doc = self._docs.get(abs_path)
+        if doc is not None and doc.version >= 0 and doc.text == text:
+            return doc.version
+        return await self.open_file(abs_path, language_id=language_id)
+
+    async def semantic_query(
+        self, path: str, action: str, *, line: Optional[int] = None, character: Optional[int] = None,
+        query: str = "", include_declaration: bool = True, new_name: str = "",
+        language_id: str = "plaintext",
+    ) -> Any:
+        """Run one semantic LSP request; line/character are zero-based LSP positions."""
+        methods = {
+            "definition": "textDocument/definition",
+            "references": "textDocument/references",
+            "hover": "textDocument/hover",
+            "document_symbols": "textDocument/documentSymbol",
+            "workspace_symbols": "workspace/symbol",
+            "rename": "textDocument/rename",
+        }
+        method = methods.get(action)
+        if method is None:
+            raise ValueError(f"unsupported semantic action: {action}")
+        await self.sync_file_for_query(path, language_id=language_id)
+        if action == "rename":
+            # Rename can touch files the Agent edited earlier in this session. Refresh those
+            # open documents from disk first so the server's ranges target saved workspace text.
+            from agent.lsp.servers import language_id_for
+            abs_path = os.path.abspath(path)
+            for open_path in list(self._docs):
+                if open_path != abs_path and os.path.isfile(open_path):
+                    await self.sync_file_for_query(open_path, language_id=language_id_for(open_path))
+        uri = file_uri(os.path.abspath(path))
+        if action == "workspace_symbols":
+            params = {"query": query}
+        elif action == "document_symbols":
+            params = {"textDocument": {"uri": uri}}
+        else:
+            if line is None or character is None:
+                raise ValueError(f"{action} requires a source position")
+            position = {"line": line, "character": character}
+            params = {"textDocument": {"uri": uri}, "position": position}
+            if action == "references":
+                params["context"] = {"includeDeclaration": bool(include_declaration)}
+            elif action == "rename":
+                if not new_name:
+                    raise ValueError("rename requires a non-empty new name")
+                params["newName"] = new_name
+        return await self._send_request_with_retry(method, params, timeout=SEMANTIC_REQUEST_TIMEOUT)
 
     # ---- diagnostics: pull + wait ----
 

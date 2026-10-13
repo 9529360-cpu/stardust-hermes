@@ -1,12 +1,12 @@
 ---
 sidebar_position: 16
-title: "LSP — Semantic Diagnostics"
-description: "Real language servers (pyright, gopls, rust-analyzer, …) wired into the post-write lint check used by write_file and patch."
+title: "LSP - Semantic Diagnostics and Code Navigation"
+description: "Real language servers power post-write diagnostics and Agent code navigation."
 ---
 
 # Language Server Protocol (LSP)
 
-Hermes runs full language servers — pyright, gopls, rust-analyzer,
+Stardust runs full language servers — pyright, gopls, rust-analyzer,
 typescript-language-server, clangd, and ~20 more — as background
 subprocesses and feeds their semantic diagnostics into the post-write
 lint check used by `write_file` and `patch`. When the agent edits a
@@ -14,8 +14,7 @@ file, it sees exactly the errors that edit introduced — not just
 syntax errors, but **type errors, undefined names, missing imports,
 and project-wide semantic issues** the language server detects.
 
-This is the same architecture top-tier coding agents use. Hermes
-ships it self-contained: no editor host required, no plugins to
+Stardust runs the language servers directly through its existing agent runtime: no editor host required, no plugins to
 install, no separate daemon to manage.
 
 ## When LSP runs
@@ -33,7 +32,7 @@ falls back silently to the syntax-only result.
 
 Concretely, on every successful `write_file` or `patch`:
 
-1. Hermes captures a baseline of current diagnostics for the file.
+1. Stardust captures a baseline of current diagnostics for the file.
 2. Performs the write.
 3. Re-queries the language server, filters out diagnostics that were
    already in the baseline, and surfaces only the new ones.
@@ -90,7 +89,7 @@ agent sees a syntax-clean file with semantic problems as
 
 For "manual" entries, install the server through whatever toolchain
 manager makes sense for that language (rustup, ghcup, opam, brew,
-…). Hermes auto-detects the binary on PATH or in
+…). Stardust auto-detects the binary on PATH or in
 `<HERMES_HOME>/lsp/bin/`.
 
 ### PowerShell
@@ -104,7 +103,7 @@ host. Setup:
 2. Download the latest release zip from
    [PowerShellEditorServices releases](https://github.com/PowerShell/PowerShellEditorServices/releases)
    and extract it.
-3. Point Hermes at the extracted bundle — the directory that contains
+3. Point Stardust at the extracted bundle — the directory that contains
    `PowerShellEditorServices/Start-EditorServices.ps1`. Either:
    - set `lsp.servers.powershell.command: ["/path/to/bundle"]` in
      `config.yaml`, or
@@ -118,9 +117,15 @@ download link.
 A few servers are installed alongside a peer dependency that npm
 won't auto-pull. The current case is `typescript-language-server`,
 which requires the `typescript` SDK importable from the same
-`node_modules` tree — Hermes installs both packages together when you
+`node_modules` tree — Stardust installs both packages together when you
 run `hermes lsp install typescript` or auto-install fires on first
 use.
+
+## Agent-triggered code navigation
+
+The `code_intelligence` tool lets the Agent ask the same language server for a definition, references, hover/type information, document symbols, or workspace symbols. Results are reduced to file locations and compact symbol data, so the Agent can inspect the relevant code directly instead of searching and rereading unrelated files. It can also rename a symbol across files; that edit goes through Stardust's existing guarded patch path. Set `apply: false` to inspect a bounded diff before applying. Navigation queries use 1-based line and column arguments.
+
+The tool is available in the `coding`, `debugging`, and `hermes-acp` toolsets, and can be enabled directly with `--toolsets code_intelligence`. It requires a supported language server and a source file inside a Git worktree. Relative paths use the Agent's current working directory; the file must be visible to the Agent host. The language server is reused by the existing LSP service, and an unchanged document is not resent for each query.
 
 ## CLI
 
@@ -198,14 +203,14 @@ lsp:
 
 ## Installation locations
 
-When `install_strategy: auto`, Hermes installs binaries into
+When `install_strategy: auto`, Stardust installs binaries into
 `<HERMES_HOME>/lsp/bin/`. NPM packages land in
 `<HERMES_HOME>/lsp/node_modules/` with bin symlinks one level up.
 Go binaries come from `go install` with `GOBIN` pointed at the
 staging dir.
 
 Nothing is ever installed to `/usr/local/`, `~/.local/`, or any other
-shared location — the staging dir is fully Hermes-owned and is
+shared location — the staging dir is fully Stardust-owned and is
 removed when you reset the profile.
 
 ## Performance characteristics
@@ -238,7 +243,7 @@ respawned automatically on the next relevant file operation. Set
 for the life of the process.
 
 Servers that support multi-root workspaces (currently pyright) run as a
-**single process** per Hermes process: the first Python project spawns
+**single process** per Stardust process: the first Python project spawns
 it, and every further project root — for example sibling git worktrees
 edited by parallel subagents — is attached to that same server as an
 additional workspace folder instead of starting another copy.
@@ -283,11 +288,11 @@ scoop install shellcheck    # Windows
 ```
 
 The same warning is logged once at server spawn time in
-`~/.hermes/logs/agent.log`.
+`<HERMES_HOME>/logs/agent.log`.
 
 **Server starts but never returns diagnostics**
 
-Check `~/.hermes/logs/agent.log` for `[agent.lsp.client]` entries —
+Check `<HERMES_HOME>/logs/agent.log` for `[agent.lsp.client]` entries —
 both stderr from the language server and protocol errors land
 there. Some servers (rust-analyzer especially) need to finish a
 project-wide index before they emit per-file diagnostics; the first
