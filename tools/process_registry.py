@@ -1012,8 +1012,9 @@ class ProcessRegistry(ProcessCheckpointMixin):
         """Spawn a background process locally (TERMINAL_ENV=local; other backends use
         spawn_via_env()). ``use_pty`` requests a pseudo-terminal via ptyprocess/pywinpty
         for interactive CLIs, falling back to a plain pipe when unavailable or failing.
-        ``notify_on_complete`` / ``watch_patterns`` must be passed here, not set on the
-        returned session: the child may already have exited or printed (see ``_new_session``)."""
+        Pass ``notify_on_complete`` / ``watch_patterns`` here: the reader may see the child
+        exit or print before this returns, so flags set on the returned session can come
+        too late (see ``_new_session``)."""
         # Bash parses ``A && B &`` as ``(A && B) &`` — a subshell that holds our stdout
         # pipe open forever when B is a long-running server. The rewriter turns it into
         # ``A && { B & }``. Lazy import: terminal_tool imports this module.
