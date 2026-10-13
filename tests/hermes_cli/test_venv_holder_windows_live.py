@@ -40,7 +40,9 @@ pytestmark = [
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
-def _spawn(args: list[str], cwd: Path | None = None) -> subprocess.Popen:
+def _spawn(
+    args: list[str], cwd: Path | None = None, *, python_exe: str | None = None
+) -> subprocess.Popen:
     """Spawn a real sleeper process whose argv carries the given tail.
 
     ``python -c "sleep" <tail...>`` — the tail is inert data to the child
@@ -48,7 +50,7 @@ def _spawn(args: list[str], cwd: Path | None = None) -> subprocess.Popen:
     code classifies on.
     """
     proc = subprocess.Popen(
-        [sys.executable, "-c", "import time; time.sleep(300)", *args],
+        [python_exe or sys.executable, "-c", "import time; time.sleep(300)", *args],
         cwd=str(cwd or PROJECT_ROOT),
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
@@ -94,7 +96,8 @@ class TestDetection:
         import tempfile
 
         outside = Path(tempfile.mkdtemp())
-        proc = _spawn(["totally", "unrelated"], cwd=outside)
+        foreign_python = getattr(sys, "_base_executable", sys.executable)
+        proc = _spawn(["totally", "unrelated"], cwd=outside, python_exe=foreign_python)
         try:
             pids = [pid for pid, _, _ in _detect()]
             assert proc.pid not in pids

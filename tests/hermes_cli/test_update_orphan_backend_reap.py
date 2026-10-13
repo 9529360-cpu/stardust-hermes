@@ -25,6 +25,7 @@ from unittest.mock import MagicMock, patch
 
 from hermes_cli import main as cli_main
 from hermes_cli import update_cmd
+import hermes_cli.update_cmd_windows as update_cmd_windows
 
 
 class _FakeNoSuchProcess(Exception):
@@ -273,6 +274,10 @@ def _run_guard(detect_side_effect, orphan_return):
         cli_main, "_orphaned_desktop_backend_pids", return_value=orphan_return
     ), patch.object(
         cli_main, "_stop_process_trees", side_effect=killed.append
+    ), patch.object(
+        update_cmd_windows,
+        "_active_project_venv_resolution",
+        return_value=SimpleNamespace(error=None, venv_dir="C:/test/venv"),
     ), patch.object(
         cli_main, "PROJECT_ROOT", _RootSentinel()
     ), patch(
