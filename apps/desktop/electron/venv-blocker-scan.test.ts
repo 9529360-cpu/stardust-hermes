@@ -44,6 +44,22 @@ describe('resolveVenvPython', () => {
     }
   })
 
+  it('uses the explicitly selected .venv interpreter instead of hardcoded venv', () => {
+    const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-dot-venv-'))
+
+    try {
+      const scriptsDir = process.platform === 'win32' ? 'Scripts' : 'bin'
+      const pythonName = process.platform === 'win32' ? 'python.exe' : 'python3'
+      const dir = path.join(sandbox, '.venv', scriptsDir)
+      fs.mkdirSync(dir, { recursive: true })
+      const pyPath = path.join(dir, pythonName)
+      fs.writeFileSync(pyPath, '', { mode: 0o755 })
+      assert.equal(resolveVenvPython(sandbox, pyPath), pyPath)
+    } finally {
+      fs.rmSync(sandbox, { recursive: true, force: true })
+    }
+  })
+
   it('returns null for non-existent venv', () => {
     assert.equal(resolveVenvPython('/nonexistent'), null)
   })

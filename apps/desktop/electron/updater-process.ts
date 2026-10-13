@@ -5,9 +5,9 @@ import path from 'node:path'
 import { hiddenWindowsChildOptions } from './windows-child-options'
 
 /** File prerequisites only: dependency recovery must remain reachable through update. */
-export function windowsUpdatePrerequisiteError(updateRoot: string): string | null {
+export function windowsUpdatePrerequisiteError(updateRoot: string, pythonPath?: string | null): string | null {
   const maintainedDir = path.join(updateRoot, 'scripts', 'desktop-update')
-  const required = [path.join(updateRoot, 'venv', 'Scripts', 'python.exe')]
+  const required = [pythonPath ?? path.join(updateRoot, 'venv', 'Scripts', 'python.exe')]
 
   // Pre-reorg flat scripts remain supported; damaged modern trees do not.
   if (existsSync(maintainedDir)) {

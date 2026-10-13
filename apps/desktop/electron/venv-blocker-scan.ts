@@ -260,7 +260,19 @@ export async function scanVenvBlockers(
 // ---------------------------------------------------------------------------
 
 /** Resolve the venv python path.  Returns null if the file does not exist. */
-export function resolveVenvPython(updateRoot: string): string | null {
+export function resolveVenvPython(updateRoot: string, preferredPython?: string | null): string | null {
+  if (preferredPython !== undefined) {
+    if (!preferredPython) {return null}
+
+    try {
+      fs.accessSync(preferredPython)
+
+      return preferredPython
+    } catch {
+      return null
+    }
+  }
+
   const isWindows = process.platform === 'win32'
   const pythonName = isWindows ? 'python.exe' : 'python3'
   const scriptsDir = isWindows ? 'Scripts' : 'bin'

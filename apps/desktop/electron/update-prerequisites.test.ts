@@ -27,3 +27,21 @@ test('handoff prerequisites fail closed without requiring dependencies, shim or 
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+test('explicit .venv interpreter satisfies update prerequisites without requiring venv', () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'hermes-prerequisites-dot-venv-'))
+
+  try {
+    const python = path.join(root, '.venv', 'Scripts', 'python.exe')
+    const script = path.join(root, 'scripts', 'desktop-update', 'windows.ps1')
+    mkdirSync(path.dirname(python), { recursive: true })
+    mkdirSync(path.dirname(script), { recursive: true })
+    writeFileSync(python, 'file-presence fixture')
+    writeFileSync(script, 'script fixture')
+
+    assert.match(windowsUpdatePrerequisiteError(root)!, /venv\\Scripts\\python\.exe/i)
+    assert.equal(windowsUpdatePrerequisiteError(root, python), null)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
