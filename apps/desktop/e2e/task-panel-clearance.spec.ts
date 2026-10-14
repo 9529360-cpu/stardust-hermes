@@ -33,7 +33,7 @@ async function openFreshDraft(page: Page): Promise<void> {
 
 async function reopenWorkingSession(page: Page): Promise<void> {
   const sidebar = page.locator('[data-slot="sidebar"]')
-  const row = sidebar.getByRole('button', { name: /(?:Chat running|Needs your input|Working|对话运行中|需要.*输入|正在工作)/ }).first()
+  const row = sidebar.locator('[data-working="true"]').first()
 
   await row.waitFor({ state: 'visible', timeout: 30_000 })
   await row.click()
@@ -69,6 +69,24 @@ async function clearanceMetrics(page: Page): Promise<ClearanceMetrics> {
   })
 }
 
+async function resizeWindow(fixture: MockBackendFixture, width: number, height: number): Promise<void> {
+  await fixture.app.evaluate(
+    ({ BrowserWindow }, size) => BrowserWindow.getAllWindows()[0].setSize(size.width, size.height),
+    { width, height },
+  )
+  await expect.poll(() => fixture.page.evaluate(() => ({ width: window.innerWidth, height: window.innerHeight }))).toEqual({
+    width,
+    height,
+  })
+}
+
+async function restoreWindowFocus(fixture: MockBackendFixture): Promise<void> {
+  await fixture.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].blur())
+  await expect.poll(() => fixture.page.evaluate(() => document.hasFocus())).toBe(false)
+  await fixture.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].focus())
+  await expect.poll(() => fixture.page.evaluate(() => document.hasFocus())).toBe(true)
+}
+
 test.describe('working-session task-panel clearance', () => {
   let fixture: MockBackendFixture | null = null
 
@@ -85,7 +103,7 @@ test.describe('working-session task-panel clearance', () => {
   })
 
   // eslint-disable-next-line no-empty-pattern -- Playwright needs the object pattern here
-  test('window focus keeps a reopened working session clear after the task panel expands', async ({}, testInfo) => {
+  test('real window focus keeps a reopened working session clear at supported sizes', async ({}, testInfo) => {
     const page = fixture!.page
 
     await send(page, PROMPT)
@@ -103,6 +121,7 @@ test.describe('working-session task-panel clearance', () => {
     const taskPanel = activeSurface(page)
       .locator('[data-slot="composer-status-stack"]')
       .getByRole('button', { name: /Tasks 1\/5|任务 1\/5/ })
+
     const latestAssistant = activeSurface(page).locator('[data-role="assistant"]').last()
     const activeCommand = latestAssistant.locator('[data-tool-group] [data-tool-ticker]')
 
@@ -118,16 +137,28 @@ test.describe('working-session task-panel clearance', () => {
     await expect(taskPanel).toHaveAttribute('aria-expanded', 'false')
     await taskPanel.click()
     await expect(taskPanel).toHaveAttribute('aria-expanded', 'true')
-    await page.evaluate(() => window.dispatchEvent(new Event('focus')))
 
-    await page.waitForTimeout(1_000)
-    const metrics = await clearanceMetrics(page)
-    await page.screenshot({ path: testInfo.outputPath('task-panel-after-resume.png') })
+    for (const size of [
+      { name: 'wide', width: 1220, height: 800 },
+      { name: 'compact', width: 960, height: 680 },
+    ]) {
+      await resizeWindow(fixture!, size.width, size.height)
+      await restoreWindowFocus(fixture!)
 
-    expect(metrics.composerHeight, JSON.stringify(metrics)).toBeGreaterThanOrEqual(190)
-    expect(metrics.distanceFromBottom, JSON.stringify(metrics)).toBeLessThanOrEqual(1)
-    expect(metrics.latestAssistantBottom, JSON.stringify(metrics)).toBeLessThanOrEqual(metrics.statusPanelTop)
-    await expect(activeCommand).toBeVisible()
-    await expect(activeCommand).toContainText(/sleep 60/)
+      await expect.poll(async () => {
+        const metrics = await clearanceMetrics(page)
+
+        return metrics.distanceFromBottom <= 1 && metrics.latestAssistantBottom <= metrics.statusPanelTop
+      }).toBe(true)
+
+      const metrics = await clearanceMetrics(page)
+
+      await page.screenshot({ path: testInfo.outputPath(`task-panel-after-resume-${size.name}.png`) })
+      expect(metrics.composerHeight, JSON.stringify({ ...metrics, size })).toBeGreaterThanOrEqual(190)
+      expect(metrics.distanceFromBottom, JSON.stringify({ ...metrics, size })).toBeLessThanOrEqual(1)
+      expect(metrics.latestAssistantBottom, JSON.stringify({ ...metrics, size })).toBeLessThanOrEqual(metrics.statusPanelTop)
+      await expect(activeCommand).toBeVisible()
+      await expect(activeCommand).toContainText(/sleep 60/)
+    }
   })
 })

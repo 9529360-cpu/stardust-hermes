@@ -17,6 +17,8 @@ import * as fs from 'node:fs'
 import * as net from 'node:net'
 import * as path from 'node:path'
 
+import { startMockServer } from '../../../tests-js/scripts/mock-server'
+
 import {
   buildAppEnv,
   createSandbox,
@@ -27,7 +29,6 @@ import {
   writeEnvFile,
   writeMockProviderConfig,
 } from './fixtures'
-import { startMockServer } from '../../../tests-js/scripts/mock-server'
 import { type ElectronApplication, expect, type Page, test } from './test'
 
 const DESKTOP_ROOT = path.resolve(import.meta.dirname, '..')
@@ -204,6 +205,7 @@ async function capture(page: Page, name: string): Promise<void> {
 
 const rail = (page: Page) => page.locator('[data-slot="profile-rail"]')
 const gatewayGroup = (page: Page, id: string) => rail(page).locator(`[data-slot="profile-rail-gateway"][data-connection-id="${id}"]`)
+
 const restSquare = (page: Page, connectionId: string, profile: string) =>
   gatewayGroup(page, connectionId).locator(`[data-slot="profile-rail-rest-square"][data-profile="${profile}"]`)
 
@@ -238,12 +240,9 @@ test.describe('fleet profile rail — two registered gateways', () => {
 
     ;({ app, page } = await launchDesktop(buildAppEnv(sandbox)))
     await waitForAppReady({ app, page } as MockBackendFixture, 120_000)
-    // waitForAppReady already waits for the gateway and sessions. Give the
-    // boot-time launch-mode restore time to finish before any click; the rail
-    // must then hold whatever the user picks. Avoid matching localized status
-    // copy here because this suite runs with the default Chinese locale.
-    await expect(page.locator('[data-statusbar-item="gateway-health"]')).toBeVisible()
-    await page.waitForTimeout(2_000)
+    // waitForAppReady only means the renderer is visible and unobstructed.
+    // Each test waits on the actual roster/profile state or completes a real
+    // connection switch before asserting the selected gateway.
   })
 
   test.afterAll(async () => {
@@ -294,7 +293,9 @@ test.describe('fleet profile rail — two registered gateways', () => {
     test.setTimeout(180_000)
     await restSquare(page, REMOTE_ID, 'inbox').click()
 
-    // The workspace follows the agent and marks Homelab as the active group.
+    // This is a real source switch: selectConnection waits for the target
+    // WebSocket to open and publishes the active route only after activation.
+    // The workspace then marks Homelab as the active group.
     const homelab = gatewayGroup(page, REMOTE_ID)
     await expect(homelab).toHaveAttribute('data-active', 'true', { timeout: 30_000 })
     await expect(homelab.getByRole('button', { name: 'inbox', exact: true })).toHaveAttribute('aria-pressed', 'true', { timeout: 30_000 })

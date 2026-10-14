@@ -32,12 +32,12 @@ export function ChatSwapOverlay({ profile }: { profile: string | null }) {
   return (
     <div
       aria-hidden
-      data-slot="chat-swap-overlay"
-      data-state={profile ? 'active' : 'idle'}
       className={cn(
         'pointer-events-none absolute inset-0 z-50 flex items-center justify-center transition-opacity duration-150 ease-out',
         profile ? 'opacity-100' : 'opacity-0'
       )}
+      data-slot="chat-swap-overlay"
+      data-state={profile ? 'active' : 'idle'}
     >
       <div className="flex items-center gap-2 bg-[color-mix(in_srgb,var(--dt-card)_92%,transparent)] px-4 py-2 font-mono text-[0.8125rem] text-foreground shadow-composer">
         {/* Was a local 80ms setInterval + setState braille ticker — the same
