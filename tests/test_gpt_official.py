@@ -253,6 +253,105 @@ def test_request_boundary_rereads_external_access_without_refresh(tmp_path, monk
 
 
 
+def test_official_responses_sdk_wire_boundary_rereads_credentials_and_fails_closed(tmp_path, monkeypatch):
+    """Exercise the real SDK serialization and HTTP headers without opening a network connection."""
+    import httpx
+    from openai import OpenAI
+
+    first_token = token(account="account-fixture")
+    path = auth_file(tmp_path, monkeypatch, access=first_token)
+    requests = []
+    response = {
+        "id": "resp_fixture",
+        "object": "response",
+        "created_at": 0,
+        "status": "completed",
+        "model": "gpt-6-luna",
+        "output": [],
+    }
+
+    def respond(request):
+        requests.append(request)
+        return httpx.Response(200, json=response)
+
+    http_client = httpx.Client(transport=httpx.MockTransport(respond))
+    from agent import auxiliary_client as aux
+
+    def create_openai_client(*, api_key, base_url, **kwargs):
+        return OpenAI(
+            api_key=api_key,
+            base_url=base_url,
+            http_client=http_client,
+            **kwargs,
+        )
+
+    monkeypatch.setattr(aux, "_create_openai_client", create_openai_client)
+    client, resolved_model = aux.resolve_provider_client(
+        "gpt-official", model="gpt-6-luna", raw_codex=True,
+    )
+    assert resolved_model == "gpt-6-luna"
+    assert client is not None
+    request = {
+        "model": "gpt-6-luna",
+        "input": [{"role": "user", "content": "read the fixture"}],
+        "tools": [{
+            "type": "function",
+            "name": "read_file",
+            "description": "Read a local file",
+            "parameters": {
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": ["path"],
+            },
+        }],
+    }
+
+    def assert_responses_payload(http_request):
+        payload = json.loads(http_request.content)
+        assert payload["model"] == request["model"]
+        assert payload["input"] == request["input"]
+        assert payload["tools"] == request["tools"]
+        assert "messages" not in payload
+
+    def assert_no_external_refresh_credentials(http_request):
+        wire_surfaces = (
+            str(http_request.url),
+            "\n".join(f"{name}: {value}" for name, value in http_request.headers.items()),
+            json.dumps(json.loads(http_request.content), sort_keys=True),
+        )
+        for marker in ("DO_NOT_IMPORT_REFRESH", "DO_NOT_IMPORT_ID"):
+            assert all(marker not in surface for surface in wire_surfaces)
+
+    try:
+        client.responses.create(**request)
+        first = requests[-1]
+        assert str(first.url) == "https://chatgpt.com/backend-api/codex/responses"
+        assert first.headers["Authorization"] == f"Bearer {first_token}"
+        assert first.headers["ChatGPT-Account-ID"] == "account-fixture"
+        assert_responses_payload(first)
+        assert_no_external_refresh_credentials(first)
+
+        rotated_token = token(account="replacement-account")
+        path.write_text(json.dumps({
+            "tokens": {"access_token": rotated_token, "account_id": "replacement-account"},
+        }))
+        client.responses.create(**request)
+        second = requests[-1]
+        assert str(second.url) == "https://chatgpt.com/backend-api/codex/responses"
+        assert second.headers["Authorization"] == f"Bearer {rotated_token}"
+        assert second.headers["ChatGPT-Account-ID"] == "replacement-account"
+        assert_responses_payload(second)
+        assert_no_external_refresh_credentials(second)
+
+        path.unlink()
+        from hermes_cli.auth import AuthError
+        with pytest.raises(AuthError):
+            client.responses.create(**request)
+        assert len(requests) == 2
+    finally:
+        client.close()
+
+
 @pytest.mark.parametrize("payload", [None, {}, {"models": []},
     {"models": "bad", "fetched_at": "bad", "client_version": "0.162.0"}])
 def test_catalog_failure_is_explicit_no_fallback(tmp_path, monkeypatch, payload):
