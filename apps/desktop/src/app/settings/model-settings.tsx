@@ -206,6 +206,8 @@ function StaleAuxWarning({ applying, onReset, slots, taskLabel }: StaleAuxWarnin
 }
 
 interface ModelSettingsProps {
+  /** Shared shell callback refreshes chat model catalogs after service changes. */
+  onConfigSaved?: () => void
   /** Notified after the main model is applied, so live UI stores can sync. */
   onMainModelChanged?: (provider: string, model: string) => void
   /** Shared settings "Applies to" scope: a concrete profile to edit instead of
@@ -215,7 +217,7 @@ interface ModelSettingsProps {
   scopeProfile?: string
 }
 
-export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSettingsProps) {
+export function ModelSettings({ onConfigSaved, onMainModelChanged, scopeProfile }: ModelSettingsProps) {
   const { t } = useI18n()
   const m = t.settings.model
   const [loading, setLoading] = useState(true)
@@ -683,7 +685,10 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
   return (
     <div className="grid gap-6">
       <CustomEndpointsSettings
-        onConfigSaved={() => void refresh()}
+        onConfigSaved={() => {
+          void refresh()
+          onConfigSaved?.()
+        }}
         onMainModelChanged={onMainModelChanged}
         scopeProfile={scopeProfile}
       />

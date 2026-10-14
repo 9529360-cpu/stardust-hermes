@@ -405,7 +405,11 @@ function ConfigSettingsInner({
       <SettingsProfileScope className="mb-5" />
       {activeSectionId === 'model' && (
         <div className="mb-6">
-          <ModelSettings onMainModelChanged={onMainModelChanged} scopeProfile={scopeProfile} />
+          <ModelSettings
+            onConfigSaved={onConfigSaved}
+            onMainModelChanged={onMainModelChanged}
+            scopeProfile={scopeProfile}
+          />
         </div>
       )}
       {/* Device-local desktop prefs (not config.yaml) — they live here since
