@@ -44,9 +44,9 @@ test('settings offers one model services page without reviving provider account 
   // Magpie is an optional local gateway exposed through the existing custom
   // endpoint flow; the shortcut must not silently change the saved default.
   await page.getByRole('button', { name: /Magpie/ }).click()
-  await expect(page.getByPlaceholder('My model service')).toHaveValue('Magpie')
-  await expect(page.getByPlaceholder('http://127.0.0.1:8081/v1')).toHaveValue('http://127.0.0.1:3425/v1')
-  await expect(page.getByText(/Magpie.*updates/i)).toBeVisible()
+  await expect(page.getByLabel('服务名称')).toHaveValue('Magpie')
+  await expect(page.getByLabel('服务地址')).toHaveValue('http://127.0.0.1:3425/v1')
+  await expect(page.getByText(/Magpie.*自行更新/)).toBeVisible()
   await expect(page.getByRole('checkbox')).not.toBeChecked()
   await page.screenshot({ path: testInfo.outputPath('magpie-custom-endpoint.png') })
   await page.getByRole('button', { name: '取消' }).click()

@@ -47,7 +47,9 @@ test('at 1220x800 the composer and full model picker show their model context', 
   const pill = page.getByRole('button', { name: MODEL_PILL }).first()
   await expect(pill).toBeVisible()
   await expect(pill).toContainText(/Mock Model/i)
-  await pill.click()
+  // The composer pill owns the inline model menu. Use its documented shortcut
+  // to open the full picker dialog that this spec inspects.
+  await page.keyboard.press('Control+Shift+M')
   const picker = page.getByRole('dialog')
   await expect(picker).toBeVisible()
   await expect(picker.getByRole('button', { name: /刷新模型|Refresh models/ })).toBeVisible()
