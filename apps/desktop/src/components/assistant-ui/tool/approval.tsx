@@ -22,14 +22,12 @@ import { cn } from '@/lib/utils'
 import { $gateway } from '@/store/gateway'
 import { reconnectAction } from '@/store/gateway-reconnect'
 import { notifyError } from '@/store/notifications'
-import { answerApproval } from '@/store/prompts'
 import {
   type ApprovalRequest,
-  clearApprovalRequest,
   registerApprovalInlineAnchor,
-  replayPendingApproval,
   sessionApprovalInlineVisible,
-  sessionApprovalRequest
+  sessionApprovalRequest,
+  submitApprovalResponse
 } from '@/store/prompts'
 
 import type { ToolPart } from './fallback-model'
@@ -149,10 +147,8 @@ const ApprovalBar: FC<{ request: ApprovalRequest; surface: 'floating' | 'inline'
         // Live prompt: the response frame rides the socket the request came on
         // (the owner backend by construction). Restored prompt: queue-level
         // `approval.respond`, owner-routed (#91684 client half).
-        await answerApproval(gateway, request, choice)
+        await submitApprovalResponse(gateway, request, choice)
         triggerHaptic(choice === 'deny' ? 'cancel' : 'submit')
-        clearApprovalRequest(request.sessionId, request.requestId)
-        void replayPendingApproval(gateway, request.sessionId).catch(() => undefined)
       } catch (error) {
         notifyError(error, copy.sendFailed)
         setSubmitting(null)
