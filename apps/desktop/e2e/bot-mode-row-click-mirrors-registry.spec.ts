@@ -35,11 +35,7 @@ async function openBots(page: Page): Promise<void> {
 }
 
 async function settle(page: Page, timeout = 90_000): Promise<void> {
-  await page
-    .getByText(/Waking up/i)
-    .first()
-    .waitFor({ state: 'hidden', timeout })
-    .catch(() => undefined)
+  await page.getByText(/Waking up/i).first().waitFor({ state: 'hidden', timeout })
   await page.waitForTimeout(500)
 }
 
@@ -120,7 +116,7 @@ test('a bot row click lands on the Bot Chat the row previews, not a side thread'
     () => alphaRow.click(),
     () => expect(seededTurn.first()).toBeVisible({ timeout: 45_000 })
   )
-  await settle(page, 15_000)
+  await settle(page)
 
   // A `+` side thread for alpha, with a real turn so it is a persisted tile.
   await page.keyboard.press('Control+t')

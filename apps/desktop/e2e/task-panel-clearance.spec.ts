@@ -104,7 +104,7 @@ test.describe('working-session task-panel clearance', () => {
       .locator('[data-slot="composer-status-stack"]')
       .getByRole('button', { name: /Tasks 1\/5|任务 1\/5/ })
     const latestAssistant = activeSurface(page).locator('[data-role="assistant"]').last()
-    const activeCommand = latestAssistant.getByRole('button', { name: /(?:正在运行|Running) sleep 60/ })
+    const activeCommand = latestAssistant.locator('[data-tool-group] [data-tool-ticker]')
 
     await expect(taskPanel).toHaveAttribute('aria-expanded', 'true')
 
@@ -128,5 +128,6 @@ test.describe('working-session task-panel clearance', () => {
     expect(metrics.distanceFromBottom, JSON.stringify(metrics)).toBeLessThanOrEqual(1)
     expect(metrics.latestAssistantBottom, JSON.stringify(metrics)).toBeLessThanOrEqual(metrics.statusPanelTop)
     await expect(activeCommand).toBeVisible()
+    await expect(activeCommand).toContainText(/sleep 60/)
   })
 })
