@@ -28,10 +28,13 @@ test('the Cron editor keeps its shared 36px form fields at desktop and narrow wi
   const page = fixture!.page
 
   await resizeWindow(fixture!, DESKTOP_WINDOW)
-  await page.evaluate(() => {
-    window.location.hash = '#/cron'
-  })
-  await page.getByRole('button', { name: 'New cron', exact: true }).click()
+  const automations = page.getByRole('button', { name: /^(自动化|Automations)$/ }).first()
+  await expect(automations).toBeVisible()
+  await automations.click()
+
+  const newCron = page.getByRole('button', { name: 'New cron', exact: true })
+  await expect(newCron).toBeVisible({ timeout: 20_000 })
+  await newCron.click()
 
   const frequency = page.locator('#cron-frequency')
   await expect(frequency).toBeVisible()
@@ -60,7 +63,10 @@ test('the Cron editor keeps its shared 36px form fields at desktop and narrow wi
 
   expect(narrowGeometry).toEqual({ borderRadius: '6px', height: '36px' })
   await page.screenshot({ path: testInfo.outputPath('cron-medium-control-900x720.png') })
-  await page.getByRole('button', { name: /Cancel/ }).last().click()
+  await page
+    .getByRole('button', { name: /Cancel/ })
+    .last()
+    .click()
 })
 
 test('Bot Routines keeps its 32px schedule fields separate from the main Cron form', async ({}, testInfo) => {
@@ -68,7 +74,10 @@ test('Bot Routines keeps its 32px schedule fields separate from the main Cron fo
   const page = fixture!.page
 
   await resizeWindow(fixture!, DESKTOP_WINDOW)
-  await page.getByRole('button', { name: /Agent space/ }).first().click()
+  await page
+    .getByRole('button', { name: /Agent space/ })
+    .first()
+    .click()
 
   const roster = page.locator('[data-slot="bots-roster"]')
   await expect(roster).toBeVisible({ timeout: 20_000 })
@@ -79,7 +88,10 @@ test('Bot Routines keeps its 32px schedule fields separate from the main Cron fo
   await expect(routinesRail).toBeVisible()
   await routinesRail.click()
   await expect(page.locator('[data-tree-tab$=":routines"]:not([data-vertical])')).toBeVisible()
-  await page.getByRole('button', { name: /New cron/ }).first().click()
+  await page
+    .getByRole('button', { name: /New cron/ })
+    .first()
+    .click()
 
   const dialog = page.getByRole('dialog').last()
   await expect(dialog).toBeVisible()
