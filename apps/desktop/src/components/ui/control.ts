@@ -14,7 +14,7 @@ export const controlVariants = cva(
         compact: 'h-7 rounded-[2.5px] px-2.5 py-1.5',
         sm: 'rounded-[2.5px] px-2 py-1',
         default: 'rounded-[2.5px] px-2.5 py-1.5',
-        md: 'h-9 rounded-md px-2.5 py-1.5',
+        md: 'h-9 rounded-[6px] px-2.5 py-1.5',
         lg: 'rounded-[2.5px] px-3 py-2 text-sm leading-5'
       }
     },
