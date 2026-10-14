@@ -1171,6 +1171,7 @@ export const zh = defineLocale({
       magpieSetup: '连接 Magpie',
       magpieName: 'Magpie',
       magpieHelp: 'Magpie 需要从 Stardust 后端可达。点击“测试连接”加载模型列表；Magpie 会自行更新。',
+      magpieDownload: '获取 Magpie',
       defaultScopeHint: '默认服务用于新对话。已打开的对话会继续使用聊天中显示的模型。',
       title: '自定义服务',
       addTitle: '添加模型服务',

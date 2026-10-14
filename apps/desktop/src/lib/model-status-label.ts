@@ -131,7 +131,7 @@ export function modelCatalogLabel(provider: ModelOptionProvider | undefined, mod
 
   const parts = modelDisplayParts(model)
   const baseLabel = label || parts.name
-  const labelWords = baseLabel.toLocaleLowerCase().match(/[a-z0-9]+/g) ?? []
+  const labelWords: string[] = baseLabel.toLocaleLowerCase().match(/[a-z0-9]+/g) ?? []
 
   if (!parts.tag || labelWords.includes(parts.tag.toLocaleLowerCase())) {
     return baseLabel

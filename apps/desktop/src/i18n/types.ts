@@ -867,6 +867,7 @@ export interface Translations {
       magpieSetup: string
       magpieName: string
       magpieHelp: string
+      magpieDownload: string
       defaultScopeHint: string
       editTitle: string
       active: string

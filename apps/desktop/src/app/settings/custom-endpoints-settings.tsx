@@ -65,6 +65,7 @@ const EMPTY_FORM: EndpointForm = {
 }
 
 const MAGPIE_GATEWAY_URL = 'http://127.0.0.1:3425/v1'
+const MAGPIE_RELEASES_URL = 'https://github.com/yetone/magpie-releases/releases'
 
 // The Electron REST bridge reports HTTP failures as `Error("<status>: <body>")`.
 function isConflictError(error: unknown): boolean {
@@ -416,7 +417,17 @@ export function CustomEndpointsSettings({
 
           <div className="grid gap-3">
             {form.baseUrl === MAGPIE_GATEWAY_URL && (
-              <p className="text-xs text-muted-foreground">{c.magpieHelp}</p>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <p className="text-xs text-muted-foreground">{c.magpieHelp}</p>
+                <Button
+                  onClick={() => void window.stardustDesktop?.openExternal(MAGPIE_RELEASES_URL)}
+                  size="inline"
+                  type="button"
+                  variant="text"
+                >
+                  {c.magpieDownload}
+                </Button>
+              </div>
             )}
             <label className="grid gap-1.5 text-xs text-muted-foreground">
               {c.nameLabel}
