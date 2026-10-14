@@ -104,7 +104,7 @@ test.describe('working-session task-panel clearance', () => {
       .locator('[data-slot="composer-status-stack"]')
       .getByRole('button', { name: /Tasks 1\/5|任务 1\/5/ })
     const latestAssistant = activeSurface(page).locator('[data-role="assistant"]').last()
-    const activeCommand = latestAssistant.getByText(/sleep 60/)
+    const activeCommand = latestAssistant.getByRole('button', { name: /(?:正在运行|Running) sleep 60/ })
 
     await expect(taskPanel).toHaveAttribute('aria-expanded', 'true')
 
