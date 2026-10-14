@@ -25,7 +25,7 @@ import { getLocalModelsStatus } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { isSubmitEnter } from '@/lib/ime'
 import { catalogProviderMatches, modelOptionsQueryKey, requestModelOptions } from '@/lib/model-options'
-import { displayModelName, modelDisplayParts } from '@/lib/model-status-label'
+import { displayModelName, modelCatalogLabel } from '@/lib/model-status-label'
 import { reasoningEffortLabel } from '@/lib/reasoning-effort'
 import { foldIncludes, normalize } from '@/lib/text'
 import { useStoreSelector } from '@/lib/use-session-slice'
@@ -112,14 +112,6 @@ interface ModelCatalogMenuProps {
 interface ProviderGroup {
   families: ModelFamily[]
   provider: ModelOptionProvider
-}
-
-// Open catalog metadata is provider-owned; never derive a selectable id from a label.
-function catalogModelName(provider: ModelOptionProvider, model: string): string {
-  const names = provider.model_names ?? provider.display_names
-  const name = names && typeof names === 'object' ? (names as Record<string, unknown>)[model] : undefined
-
-  return typeof name === 'string' && name.trim() ? name : modelDisplayParts(model).name
 }
 
 /**
@@ -499,7 +491,7 @@ export function ModelCatalogMenu({
                         : null
 
                     const isCurrent = activeId !== null
-                    const name = catalogModelName(group.provider, family.id)
+                    const name = modelCatalogLabel(group.provider, family.id)
                     const caps = group.provider.capabilities?.[family.id]
 
                     // Managed local model loading into memory right now:
@@ -731,7 +723,7 @@ function groupModels(
 
     const matches = (family: ModelFamily) =>
       foldIncludes(
-        `${family.id} ${family.fastId ?? ''} ${provider.name} ${provider.slug} ${catalogModelName(provider, family.id)} ${displayModelName(family.id)}`,
+        `${family.id} ${family.fastId ?? ''} ${provider.name} ${provider.slug} ${modelCatalogLabel(provider, family.id)} ${displayModelName(family.id)}`,
         q
       )
 

@@ -28,6 +28,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  Reflect.deleteProperty(window, 'stardustDesktop')
   vi.clearAllMocks()
 })
 
@@ -115,6 +116,8 @@ describe('CustomEndpointsSettings', () => {
       models: ['magpie-model']
     })
     const { CustomEndpointsSettings } = await import('./custom-endpoints-settings')
+    const openExternal = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(window, 'stardustDesktop', { configurable: true, value: { openExternal } })
     render(<CustomEndpointsSettings />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Connect Magpie' }))
@@ -125,6 +128,8 @@ describe('CustomEndpointsSettings', () => {
       'http://127.0.0.1:3425/v1'
     )
     expect(screen.getByText(/Magpie manages its own updates/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Get Magpie' }))
+    expect(openExternal).toHaveBeenCalledWith('https://github.com/yetone/magpie-releases/releases')
     expect(screen.getByRole('checkbox', { name: 'Use for new chats' }).getAttribute('aria-checked')).toBe('false')
 
     fireEvent.click(screen.getByRole('button', { name: 'Test connection' }))

@@ -992,6 +992,7 @@ export const en: Translations = {
       magpieName: 'Magpie',
       magpieHelp:
         'Magpie must be reachable from the Stardust backend. Test the connection to load its model list; Magpie manages its own updates.',
+      magpieDownload: 'Get Magpie',
       defaultScopeHint:
         'The default applies to new chats. An open conversation keeps using the model shown in that chat.',
       editTitle: 'Edit model service',

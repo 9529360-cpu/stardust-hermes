@@ -69,6 +69,7 @@ beforeEach(() => {
         name: 'Nous',
         slug: 'nous',
         models: ['hermes-4', 'hermes-4-mini'],
+        model_names: { 'hermes-4': 'Hermes 4' },
         authenticated: true,
         capabilities: { 'hermes-4': { reasoning: true, fast: true } }
       }
@@ -291,6 +292,11 @@ describe('ModelSettings', () => {
       Node.DOCUMENT_POSITION_PRECEDING
     )
 
+    const modelSelect = await screen.findByRole('combobox', { name: 'Vision model' })
+    fireEvent.click(modelSelect)
+    expect(await screen.findByRole('option', { name: 'Hermes 4' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('option', { name: 'Hermes 4' }))
+
     fireEvent.click(reasoningSelect)
     fireEvent.click(await screen.findByRole('option', { name: 'High' }))
 
@@ -463,6 +469,10 @@ describe('ModelSettings MoA preset editor', () => {
           name: 'OpenRouter',
           slug: 'openrouter',
           models: ['deepseek/deepseek-v4-pro', 'anthropic/claude-opus-4.8'],
+          model_names: {
+            'deepseek/deepseek-v4-pro': 'DeepSeek V4 Pro',
+            'anthropic/claude-opus-4.8': 'Claude Opus 4.8'
+          },
           authenticated: true
         }
       ]
@@ -535,7 +545,7 @@ describe('ModelSettings MoA preset editor', () => {
       await vi.advanceTimersByTimeAsync(700)
 
       fireEvent.click(slotSelects().ref1Model)
-      fireEvent.click(await screen.findByRole('option', { name: 'anthropic/claude-opus-4.8' }))
+      fireEvent.click(await screen.findByRole('option', { name: 'Claude Opus 4.8' }))
       await vi.advanceTimersByTimeAsync(700)
 
       expect(saveMoaModels).toHaveBeenCalledTimes(1)
@@ -605,9 +615,13 @@ describe('ModelSettings MoA preset editor', () => {
       await openReferenceEditor()
       fireEvent.click(screen.getByRole('switch', { name: 'Enabled' }))
       await act(async () => {
-        for (const handler of [...profileSwitchHandlers]) { handler() }
+        for (const handler of [...profileSwitchHandlers]) {
+          handler()
+        }
       })
-      await act(async () => { await vi.advanceTimersByTimeAsync(700) })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(700)
+      })
       expect(saveMoaModels).not.toHaveBeenCalled()
     } finally {
       vi.useRealTimers()
@@ -619,16 +633,27 @@ describe('ModelSettings MoA preset editor', () => {
 
     try {
       let resolveSave!: (value: ReturnType<typeof moaConfig>) => void
-      saveMoaModels.mockImplementationOnce(() => new Promise(resolve => {resolveSave = resolve}))
+      saveMoaModels.mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            resolveSave = resolve
+          })
+      )
       await openReferenceEditor()
       fireEvent.click(screen.getByRole('switch', { name: 'Enabled' }))
-      await act(async () => { await vi.advanceTimersByTimeAsync(700) })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(700)
+      })
       expect(saveMoaModels).toHaveBeenCalledTimes(1)
       await act(async () => {
-        for (const handler of [...profileSwitchHandlers]) { handler() }
+        for (const handler of [...profileSwitchHandlers]) {
+          handler()
+        }
       })
       await waitFor(() => expect(getMoaModels).toHaveBeenCalledTimes(2))
-      await act(async () => { resolveSave({ ...moaConfig(), presets: { default: { ...moaConfig().presets.default, enabled: false } } }) })
+      await act(async () => {
+        resolveSave({ ...moaConfig(), presets: { default: { ...moaConfig().presets.default, enabled: false } } })
+      })
       expect(screen.getByRole('switch', { name: 'Enabled' }).getAttribute('aria-checked')).toBe('true')
     } finally {
       vi.useRealTimers()

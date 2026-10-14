@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { currentPickerSelection, displayModelName, formatModelPillLabel, modelDisplayParts } from './model-status-label'
+import {
+  currentPickerSelection,
+  displayModelName,
+  formatModelPillLabel,
+  modelCatalogLabel,
+  modelDisplayParts
+} from './model-status-label'
 import { reasoningEffortLabel } from './reasoning-effort'
 
 describe('model-status-label', () => {
@@ -26,6 +32,29 @@ describe('model-status-label', () => {
     expect(modelDisplayParts('some-model-Q6_K')).toEqual({ name: 'Some Model', tag: 'Q6' })
     // Cloud ids keep their existing behavior.
     expect(modelDisplayParts('anthropic/claude-opus-4.8-fast').tag).toBe('Fast')
+  })
+
+  it('uses provider catalog names and preserves a missing model variant tag', () => {
+    const provider = {
+      name: 'Example',
+      slug: 'example',
+      model_names: { 'vendor/model-fast': 'Friendly Model' }
+    }
+
+    expect(modelCatalogLabel(provider, 'vendor/model-fast')).toBe('Friendly Model · Fast')
+    expect(
+      modelCatalogLabel(
+        { ...provider, model_names: { 'vendor/fast-model-fast': 'Fasttrack Model' } },
+        'vendor/fast-model-fast'
+      )
+    ).toBe('Fasttrack Model · Fast')
+    expect(
+      modelCatalogLabel(
+        { ...provider, model_names: undefined, display_names: { 'vendor/model': 'Display Name' } },
+        'vendor/model'
+      )
+    ).toBe('Display Name')
+    expect(modelCatalogLabel(undefined, 'Qwen3.6-27B-UD-Q4_K_XL')).toBe('Qwen3.6 27B · Q4')
   })
 
   it('maps reasoning effort to the words Settings uses', () => {
