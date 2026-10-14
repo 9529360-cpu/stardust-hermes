@@ -13,7 +13,8 @@ test.afterAll(async () => {
   fixture = null
 })
 
-test('settings offers one model services page without reviving provider account pages', async (_, testInfo) => {
+// eslint-disable-next-line no-empty-pattern -- Playwright requires fixture destructuring to expose testInfo.
+test('settings offers one model services page without reviving provider account pages', async ({}, testInfo) => {
   const page = fixture!.page
 
   // Settings left the primary nav; the titlebar gear is its visible door.

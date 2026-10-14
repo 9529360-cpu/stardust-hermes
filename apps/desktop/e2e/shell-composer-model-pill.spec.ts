@@ -38,7 +38,8 @@ test.afterAll(async () => {
   fixture = null
 })
 
-test('at 1220x800 the composer and full model picker show their model context', async (_, testInfo) => {
+// eslint-disable-next-line no-empty-pattern -- Playwright requires fixture destructuring to expose testInfo.
+test('at 1220x800 the composer and full model picker show their model context', async ({}, testInfo) => {
   test.setTimeout(180_000)
   const page = fixture!.page
   await waitForAppReady(fixture!, 120_000)
