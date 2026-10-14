@@ -1057,6 +1057,10 @@ def _commit_tool_result(
     function_name, function_args, tool_call_id, effective_task_id = ref.name, ref.args, ref.call_id, ref.task_id
     if observed:
         if not blocked:
+            try:
+                agent._record_terminal_workspace_mutation_result(function_name, function_result)
+            except Exception as _mutation_err:
+                logging.debug("terminal workspace mutation record failed: %s", _mutation_err)
             function_result = agent._append_guardrail_observation(
                 function_name, function_args, function_result, failed=is_error, tool_call_id=tool_call_id,
             )

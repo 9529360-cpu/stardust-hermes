@@ -64,11 +64,83 @@ def _make_session(
     return s
 
 
+def test_background_exit_reinvalidates_verification_after_a_later_pass(tmp_path, monkeypatch):
+    """A verifier run while a background mutation is active cannot outlive its exit."""
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+    monkeypatch.setenv("STARDUST_VERIFY_ON_STOP", "1")
+    (tmp_path / "package.json").write_text(json.dumps({"scripts": {"test": "vitest"}}))
+    (tmp_path / "pnpm-lock.yaml").write_text("")
+    from agent.verification_evidence import record_terminal_result, verification_status
+
+    record_terminal_result(
+        command="pnpm run test", cwd=tmp_path, session_id="s1", exit_code=0, output="passed",
+    )
+    session = _make_session(
+        command="python scripts/rewrite_sources.py", task_id="task", exited=True, exit_code=0,
+    )
+    session.cwd = str(tmp_path)
+    session.verification_session_id = "s1"
+    ProcessRegistry._record_workspace_mutation_on_exit(session)
+
+    assert session.workspace_mutation_root == str(tmp_path.resolve())
+    assert verification_status(session_id="s1", cwd=tmp_path)["status"] == "stale"
+
+
+def test_background_mutation_then_successful_test_finishes_fresh(tmp_path, monkeypatch):
+    """A successful verifier after an earlier mutation clears the provisional stale state."""
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+    monkeypatch.setenv("STARDUST_VERIFY_ON_STOP", "1")
+    (tmp_path / "package.json").write_text(json.dumps({"scripts": {"test": "vitest"}}))
+    (tmp_path / "pnpm-lock.yaml").write_text("")
+    from agent.verification_evidence import record_terminal_workspace_mutation, verification_status
+
+    provisional = record_terminal_workspace_mutation(
+        command="pnpm install && pnpm run test", cwd=tmp_path, session_id="s1", exit_code=0,
+        verification_complete=False,
+    )
+    assert provisional == {"root": str(tmp_path.resolve())}
+    session = _make_session(
+        command="pnpm install && pnpm run test", task_id="task", exited=True, exit_code=0,
+    )
+    session.cwd = str(tmp_path)
+    session.verification_session_id = "s1"
+    ProcessRegistry._record_workspace_mutation_on_exit(session)
+
+    assert verification_status(session_id="s1", cwd=tmp_path)["status"] == "passed"
+
+
 def _spawn_python_sleep(seconds: float) -> subprocess.Popen:
     """Spawn a portable short-lived Python sleep process."""
     return subprocess.Popen(
         [sys.executable, "-c", f"import time; time.sleep({seconds})"],
     )
+
+
+def test_legacy_completed_process_receipt_defaults_workspace_metadata(tmp_path, monkeypatch):
+    """Receipts written before terminal mutation tracking remain readable."""
+    import gateway.session_context as session_context
+    import tools.process_registry_results as results
+
+    receipt = tmp_path / "proc_legacy.json"
+    receipt.write_text(json.dumps({
+        "id": "proc_legacy", "command": "echo done", "cwd": str(tmp_path),
+        "task_id": "task", "owner_task_id": "task", "session_key": "key",
+        "parent_session_id": "parent", "handoff_note": "", "started_at": 1,
+        "exit_code": 0, "completion_reason": "exited", "termination_source": "",
+        "notify_on_complete": True, "output": "done",
+    }), encoding="utf-8")
+    monkeypatch.setattr(results, "_result_paths", lambda prefix="": [receipt])
+    monkeypatch.setattr(results, "_owns_result", lambda owner, parent: owner == "parent")
+    monkeypatch.setattr(
+        session_context, "get_session_env",
+        lambda key, default="": "parent" if key == "STARDUST_SESSION_ID" else default,
+    )
+
+    loaded = results.load_completed_results()["proc_legacy"]
+
+    assert loaded.workspace_mutation_root == ""
+    assert loaded.verification_session_id == ""
+    assert loaded.output_buffer == "done"
 
 
 def test_kill_started_since_preserves_preexisting_and_foreign_processes(registry):

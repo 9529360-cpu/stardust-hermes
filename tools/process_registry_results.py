@@ -21,9 +21,11 @@ RESULT_RETENTION_SECONDS = 7 * 24 * 60 * 60
 MAX_RETAINED_RESULTS = 64
 _RESULT_FIELDS = (
     "id", "command", "cwd", "task_id", "owner_task_id", "session_key",
-    "parent_session_id", "handoff_note", "started_at", "exit_code", "completion_reason",
+    "parent_session_id", "verification_session_id", "workspace_mutation_root",
+    "handoff_note", "started_at", "exit_code", "completion_reason",
     "termination_source", "notify_on_complete",
 )
+_RESULT_DEFAULTS = {"verification_session_id": "", "workspace_mutation_root": ""}
 
 
 def _result_paths(home: Path | None = None):
@@ -106,7 +108,10 @@ def load_completed_results(prefix: str = "") -> dict:
                 continue
             if not _owns_result(owner, record.get("parent_session_id")):
                 continue
-            fields = {key: record[key] for key in _RESULT_FIELDS if key != "handoff_note"}
+            fields = {
+                key: record.get(key, _RESULT_DEFAULTS[key]) if key in _RESULT_DEFAULTS else record[key]
+                for key in _RESULT_FIELDS if key != "handoff_note"
+            }
             fields["handoff_note"] = record.get("handoff_note", "")
             session = ProcessSession(
                 **fields,

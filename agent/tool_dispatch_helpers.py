@@ -60,12 +60,24 @@ _DESTRUCTIVE_PATTERNS = re.compile(
         truncate\s|
         dd\s|
         shred\s|
-        git\s+(?:reset|clean|checkout)\s
+        git\s+(?:reset|clean|checkout|switch|restore|pull|merge|rebase|cherry-pick|apply)\s|
+        git\s+stash\s+(?:push|pop|apply|drop)\b|
+        (?:npm|pnpm|yarn|bun)\s+(?:ci|add|update|up|uninstall|remove|link|unlink|patch|rebuild)\b|
+        uv\s+(?:sync|add|remove|lock)\b|
+        (?:pip|pip3)\s+(?:install|uninstall)\b|
+        poetry\s+(?:install|add|remove|update|lock)\b|
+        pipenv\s+(?:install|sync|uninstall)\b|
+        cargo\s+(?:add|remove|update)\b|
+        go\s+(?:get|mod\s+tidy)\b|
+        composer\s+(?:install|update|require|remove)\b|
+        (?:(?:npx|bunx)\s+)?(?:prettier|biome|eslint|ruff|black|isort|gofmt|rustfmt)\b[^\n;]*(?:--write|--fix|-w)\b
     )""",
     re.VERBOSE,
 )
 # Output redirects that overwrite files (> but not >>)
-_REDIRECT_OVERWRITE = re.compile(r'[^>]>[^>]|^>[^>]')
+_REDIRECT_OVERWRITE = re.compile(
+    r'(?<![<>&])>(?![>&])\s*(?!/dev/null(?:\b|$))|&>\s*(?!/dev/null(?:\b|$))'
+)
 
 
 def _is_destructive_command(cmd: str) -> bool:

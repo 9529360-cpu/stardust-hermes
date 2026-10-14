@@ -122,6 +122,21 @@ class TestRecordFileMutationResult:
         )
         assert agent._turn_failed_file_mutations == {}
 
+    def test_terminal_workspace_mutation_is_added_to_turn_verifier_paths(self):
+        agent = _bare_agent()
+        root = "/tmp/project"
+        agent._record_terminal_workspace_mutation_result(
+            "terminal", json.dumps({"workspace_mutation": {"root": root}}),
+        )
+        assert agent._turn_file_mutation_paths == {root}
+
+    def test_unrelated_tool_cannot_inject_workspace_mutation_path(self):
+        agent = _bare_agent()
+        agent._record_terminal_workspace_mutation_result(
+            "read_file", json.dumps({"workspace_mutation": {"root": "/tmp/project"}}),
+        )
+        assert agent._turn_file_mutation_paths == set()
+
     def test_failure_recorded(self):
         agent = _bare_agent()
         result = json.dumps({"success": False, "error": "Could not find old_string"})

@@ -480,6 +480,9 @@ class ProcessSession:
     # Session-db id of the spawning conversation; lets the gateway drop completions whose
     # session was closed at a user boundary (/new) instead of injecting into the NEW one.
     parent_session_id: str = ""
+    verification_session_id: str = ""          # Agent session whose workspace evidence this command may invalidate
+    workspace_mutation_root: str = ""            # Set when this command may have changed a coding workspace
+    _verification_completion_recorded: bool = field(default=False, repr=False)
     notify_on_complete: bool = False            # Queue agent notification on exit
     watch_patterns: List[str] = field(default_factory=list)
     _watch_hits: int = field(default=0, repr=False)          # total matches delivered
@@ -533,7 +536,8 @@ _CHECKPOINT_FIELDS = (
     "command", "pid", "pid_scope", "host_start_time", "systemd_unit", "cwd",
     "started_at", "task_id", "owner_task_id", "session_key", "owner_home", "handoff_note",
     *(f"watcher_{k}" for k in _WATCHER_ROUTE_KEYS), "watcher_interval",
-    "parent_session_id", "notify_on_complete", "watch_patterns")
+    "parent_session_id", "verification_session_id", "workspace_mutation_root",
+    "notify_on_complete", "watch_patterns")
 _CHECKPOINT_DEFAULTS = {
     f.name: ([] if f.name == "watch_patterns" else f.default)
     for f in ProcessSession.__dataclass_fields__.values()
@@ -902,6 +906,7 @@ class ProcessRegistry(ProcessCheckpointMixin):
 
     @staticmethod
     def _new_session(command, task_id, owner_task_id, session_key, cwd, *, notify_on_complete: bool = False,
+                     verification_session_id: str = "",
                      watch_patterns: Optional[List[str]] = None, **extra) -> ProcessSession:
         """Build a session with its whole notification contract in place. The reader thread acts
         on ``notify_on_complete`` / ``watch_patterns`` (and stamps watch events with the chat
@@ -915,6 +920,7 @@ class ProcessRegistry(ProcessCheckpointMixin):
             owner_task_id=owner_task_id or task_id, session_key=session_key, cwd=cwd,
             owner_home=hermes_home_key(),
             parent_session_id=get_session_env("STARDUST_SESSION_ID", ""),
+            verification_session_id=verification_session_id,
             started_at=time.time(), notify_on_complete=notify_on_complete,
             watch_patterns=list(watch_patterns or ()), **extra)
         if (notify_on_complete or session.watch_patterns) and get_session_env("STARDUST_SESSION_PLATFORM", ""):
@@ -1008,7 +1014,8 @@ class ProcessRegistry(ProcessCheckpointMixin):
     def spawn_local(
         self, command: str, cwd: str = None, task_id: str = "", session_key: str = "",
         env_vars: dict = None, use_pty: bool = False, owner_task_id: str = "", *,
-        notify_on_complete: bool = False, watch_patterns: Optional[List[str]] = None) -> ProcessSession:
+        notify_on_complete: bool = False, watch_patterns: Optional[List[str]] = None,
+        verification_session_id: str = "") -> ProcessSession:
         """Spawn a background process locally (TERMINAL_ENV=local; other backends use
         spawn_via_env()). ``use_pty`` requests a pseudo-terminal via ptyprocess/pywinpty
         for interactive CLIs, falling back to a plain pipe when unavailable or failing.
@@ -1024,7 +1031,8 @@ class ProcessRegistry(ProcessCheckpointMixin):
         safe_command = _rewrite_bg(command)
         session = self._new_session(
             command, task_id, owner_task_id, session_key, _resolve_safe_cwd(cwd or os.getcwd()),
-            notify_on_complete=notify_on_complete, watch_patterns=watch_patterns)
+            notify_on_complete=notify_on_complete, watch_patterns=watch_patterns,
+            verification_session_id=verification_session_id)
         pty_scope_attempted = False
         if use_pty:
             try:
@@ -1093,14 +1101,15 @@ class ProcessRegistry(ProcessCheckpointMixin):
     def adopt_local(
         self, proc: subprocess.Popen, *, command: str, cwd: Optional[str], task_id: str = "",
         session_key: str = "", owner_task_id: str = "", output_so_far: str = "",
-        notify_on_complete: bool = True) -> ProcessSession:
+        notify_on_complete: bool = True, verification_session_id: str = "") -> ProcessSession:
         """Take over a still-running foreground Popen as a tracked background session
         (yield-to-background: the user sent a message while the command was running).
         The caller has stopped its own drain thread; the registry's reader continues from
         the pipe's current position and ``output_so_far`` seeds the buffer so nothing
         already captured is lost."""
         session = self._new_session(
-            command, task_id, owner_task_id, session_key, cwd, notify_on_complete=notify_on_complete)
+            command, task_id, owner_task_id, session_key, cwd, notify_on_complete=notify_on_complete,
+            verification_session_id=verification_session_id)
         session.process = proc
         session.pid = proc.pid
         session.host_start_time = self._safe_host_start_time(session.pid)
@@ -1112,14 +1121,15 @@ class ProcessRegistry(ProcessCheckpointMixin):
     def spawn_via_env(
         self, env: Any, command: str, cwd: str = None, task_id: str = "", session_key: str = "",
         timeout: int = 10, owner_task_id: str = "", *, notify_on_complete: bool = False,
-        watch_patterns: Optional[List[str]] = None) -> ProcessSession:
+        watch_patterns: Optional[List[str]] = None, verification_session_id: str = "") -> ProcessSession:
         """Spawn a background process inside a non-local backend's sandbox.
         The command is wrapped to capture its in-sandbox PID and redirect output to a
         log file that later execute() calls poll. No live pipe or stdin, but it runs in
         the correct sandbox context. The notification flags are fixed here, as in spawn_local()."""
         session = self._new_session(
             command, task_id, owner_task_id, session_key, cwd, notify_on_complete=notify_on_complete,
-            watch_patterns=watch_patterns, env_ref=env, pid_scope="sandbox")
+            watch_patterns=watch_patterns, verification_session_id=verification_session_id,
+            env_ref=env, pid_scope="sandbox")
         temp_dir = self._env_temp_dir(env)
         log_path, pid_path, exit_path = (f"{temp_dir}/hermes_bg_{session.id}.{ext}" for ext in ("log", "pid", "exit"))
         q = shlex.quote
@@ -1426,6 +1436,7 @@ class ProcessRegistry(ProcessCheckpointMixin):
             if was_running:
                 # Keep the session tracked until its result is durable. A finite
                 # parent must not observe completion and exit during this write.
+                self._record_workspace_mutation_on_exit(session)
                 save_completed_result(session)
                 self._running.pop(session.id)
             self._finished[session.id] = session
@@ -1460,6 +1471,8 @@ class ProcessRegistry(ProcessCheckpointMixin):
                 **({"handoff_note": session.handoff_note} if session.handoff_note else {}),
                 **self._exit_fields(session),
                 "output": _output_tail(session, 2000),
+                **({"workspace_mutation": {"root": session.workspace_mutation_root}}
+                   if session.workspace_mutation_root else {}),
                 # Stable producer identity across checkpoint recovery (unlike a
                 # consumer-observed completion timestamp).
                 "started_at": session.started_at,
@@ -1471,6 +1484,46 @@ class ProcessRegistry(ProcessCheckpointMixin):
             # still writing the checkpoint; had it set the event, a one-shot parent would
             # wake, drain an empty queue and exit without the follow-up turn.
             session._completion_event.set()
+
+    @staticmethod
+    def _record_workspace_mutation_on_exit(session: ProcessSession) -> None:
+        """Invalidate verification evidence when a tracked background command exits."""
+        if not session.verification_session_id or session.completion_reason == "failed_start":
+            return
+        with session._lock:
+            if session._verification_completion_recorded:
+                return
+            session._verification_completion_recorded = True
+        home_token = None
+        try:
+            if session.owner_home and session.owner_home != hermes_home_key():
+                from hermes_constants import set_hermes_home_override
+                home_token = set_hermes_home_override(session.owner_home)
+            from agent.verification_evidence import record_terminal_result
+            try:
+                record_terminal_result(
+                    command=session.command, cwd=session.cwd,
+                    session_id=session.verification_session_id,
+                    exit_code=session.exit_code if session.exit_code is not None else -1,
+                )
+            except Exception:
+                logger.debug("background verification evidence recording failed for %s", session.id, exc_info=True)
+            from agent.verification_evidence import record_terminal_workspace_mutation
+            mutation = record_terminal_workspace_mutation(
+                command=session.command, cwd=session.cwd,
+                session_id=session.verification_session_id,
+                exit_code=session.exit_code if session.exit_code is not None else -1,
+            )
+            if mutation:
+                session.workspace_mutation_root = mutation["root"]
+        except Exception:
+            logger.debug("background workspace mutation recording failed for %s", session.id, exc_info=True)
+            with session._lock:
+                session._verification_completion_recorded = False
+        finally:
+            if home_token is not None:
+                from hermes_constants import reset_hermes_home_override
+                reset_hermes_home_override(home_token)
 
     @staticmethod
     def _exit_fields(session: ProcessSession) -> dict:
@@ -2464,6 +2517,9 @@ def _handle_process(args, **kw):
             return tool_error(f"session_id is required for {action}")
         handler, redact = _SESSION_ACTIONS[action]
         result = handler(session_id, args)
+        session = process_registry.get(session_id)
+        if (isinstance(result, dict) and session and session.exited and session.workspace_mutation_root):
+            result["workspace_mutation"] = {"root": session.workspace_mutation_root}
         return json.dumps(_redact_process_result(result) if redact else result, ensure_ascii=False)
     return tool_error(f"Unknown process action: {action}. Use: list, poll, log, wait, kill, write, submit, close, handoff")
 

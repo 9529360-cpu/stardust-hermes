@@ -51,6 +51,31 @@ def test_is_destructive_command_treats_cp_as_mutating():
     assert _is_destructive_command("cp .env.local .env") is True
 
 
+@pytest.mark.parametrize("command", [
+    "pnpm add zod",
+    "npm ci",
+    "uv sync",
+    "git switch feature/branch",
+    "npx prettier --write src/app.ts",
+    "echo generated > src/generated.ts",
+])
+def test_is_destructive_command_covers_terminal_workspace_mutators(command):
+    from agent.tool_dispatch_helpers import _is_destructive_command
+
+    assert _is_destructive_command(command) is True
+
+
+@pytest.mark.parametrize("command", [
+    "git status --short",
+    "pytest 2>&1",
+    "pytest >/dev/null",
+])
+def test_is_destructive_command_ignores_terminal_reads_and_non_file_redirects(command):
+    from agent.tool_dispatch_helpers import _is_destructive_command
+
+    assert _is_destructive_command(command) is False
+
+
 @pytest.fixture()
 def agent():
     """Minimal AIAgent with mocked OpenAI client and tool loading."""

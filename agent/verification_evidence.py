@@ -40,6 +40,24 @@ _PYTEST_SPELLINGS = (
     ["python", "-m", "pytest"], ["python3", "-m", "pytest"],
     ["uv", "run", "pytest"], ["poetry", "run", "pytest"], ["pipenv", "run", "pytest"],
 )
+_PACKAGE_MANAGER_NAMES = frozenset({
+    "npm", "pnpm", "yarn", "bun", "uv", "pip", "pip3", "poetry", "pipenv", "cargo", "go", "composer",
+})
+_PACKAGE_MANAGER_READS = frozenset({
+    "audit", "config", "help", "info", "list", "ls", "outdated", "search", "show", "tree", "view", "why",
+})
+_SAFE_SCRIPT_RUNS = frozenset({"build", "check", "dev", "lint", "preview", "serve", "start", "test", "tests", "typecheck"})
+_MUTATING_VERIFY_FLAGS = frozenset({"--accept", "--fix", "--fix-only", "--update", "--update-snapshots", "--write"})
+_INLINE_MUTATION_RE = re.compile(
+    r"(?:\bopen\s*\([^)]*,\s*['\"](?:w|a|x|\+)|\.write(?:_text|_bytes)?\s*\(|"
+    r"\bwriteFile(?:Sync)?\s*\(|\b(?:unlink|remove|rename|replace|mkdir|rmdir|makedirs|rmtree|copy2?|move)\s*\(|"
+    r"\b(?:set-content|add-content|remove-item|move-item|copy-item|out-file|new-item|clear-content|rename-item)\b)",
+    re.IGNORECASE,
+)
+_READ_ONLY_GIT_COMMANDS = frozenset({
+    "add", "branch", "config", "diff", "fetch", "grep", "log", "ls-files", "push", "remote", "rev-parse", "show",
+    "status", "tag",
+})
 _SCHEMA_DDL = (
     """
         CREATE TABLE IF NOT EXISTS meta (
@@ -84,6 +102,7 @@ _SCHEMA_DDL = (
 class _ShellSegment:
     tokens: list[str]
     following_operator: str | None = None
+    raw: str = ""
 
 
 @dataclass(frozen=True)
@@ -195,7 +214,7 @@ def _split_shell_segments(command: str, *, posix: bool = True) -> list[_ShellSeg
         return []
 
     try:
-        segments = [_ShellSegment(shlex.split(raw, posix=posix), operator) for raw, operator in raw_segments]
+        segments = [_ShellSegment(shlex.split(raw, posix=posix), operator, raw) for raw, operator in raw_segments]
     except ValueError:
         return []
     return segments if all(s.tokens for s in segments) else []
@@ -271,6 +290,135 @@ def _kind_for_command(canonical: str) -> str:
     lowered = canonical.lower()
     kind = next((k for words, k in _KIND_KEYWORDS if any(w in lowered for w in words)), None)
     return kind or ("check" if "check" in lowered and "test" not in lowered else "test")
+
+
+def _canonical_match_for_segment(
+    segment: _ShellSegment, canonical_commands: list[str]
+) -> Optional[tuple[str, list[str]]]:
+    """Return the canonical verifier and trailing args for one shell segment."""
+    candidate_tokens = _strip_command_prefix(segment.tokens)
+    for canonical in canonical_commands:
+        needle = _canonical_tokens(canonical)
+        if not needle:
+            continue
+        for candidate in _equivalent_needles(needle):
+            if candidate_tokens[:len(candidate)] == candidate:
+                return canonical, candidate_tokens[len(candidate):]
+    return None
+
+
+def _verification_segment_indexes(
+    segments: list[_ShellSegment], *, canonical_commands: list[str], root: str | Path | None, exit_code: int
+) -> list[int]:
+    """Indexes of shell segments whose result can contribute fresh verification evidence."""
+    indexes: list[int] = []
+    for index, segment in enumerate(segments):
+        if canonical_commands and _canonical_match_for_segment(segment, canonical_commands) is not None:
+            if _exit_status_is_attributable(segments, index, exit_code):
+                indexes.append(index)
+        elif not canonical_commands and _ad_hoc_script_args(segment.tokens, root) is not None:
+            if _exit_status_is_attributable(segments, index, exit_code):
+                indexes.append(index)
+    return indexes
+
+
+def _script_invocation_may_modify(tokens: list[str], *, root: str | Path | None) -> bool:
+    """Treat custom scripts as effect-capable while exempting obvious test scripts."""
+    if not tokens:
+        return False
+    base = Path(tokens[0]).name.lower()
+    if base not in _INTERPRETERS | {"pwsh", "powershell", "cmd", "cmd.exe"}:
+        return False
+    args = tokens[1:]
+    if not args:
+        return False
+    inline = next((index for index, token in enumerate(args[:3]) if token in {"-c", "-e", "-command", "/c", "/k"}), None)
+    if inline is not None:
+        return bool(_INLINE_MUTATION_RE.search(" ".join(args[inline + 1:])))
+    if "-m" in args:
+        module_index = args.index("-m") + 1
+        if module_index < len(args):
+            module = args[module_index].lower()
+            return module not in {"pytest", "unittest", "nose", "nose2"}
+    script = next((token for token in args if not token.startswith("-") and "=" not in token), "")
+    return _script_path_may_modify(script, root=root)
+
+
+def _script_path_may_modify(script: str, *, root: str | Path | None) -> bool:
+    if not script or _is_temp_script_path(script, root):
+        return False
+    lowered = script.replace("\\", "/").lower()
+    name = Path(script).name.lower()
+    if any(part in lowered.split("/") for part in _TARGET_PREFIXES):
+        return False
+    if re.search(r"(?:^|[-_])(test|tests|spec|verify|check|lint|smoke|probe)(?:[-_.]|$)", name):
+        return False
+    return Path(script).suffix.lower() in {".py", ".js", ".mjs", ".cjs", ".ts", ".sh", ".bash", ".rb", ".pl", ".php", ".ps1"}
+
+
+def _segment_may_modify_workspace(
+    segment: _ShellSegment, *, canonical_commands: list[str], root: str | Path | None
+) -> bool:
+    """Use command intent to recognize writes without treating ordinary tests/builds as edits."""
+    match = _canonical_match_for_segment(segment, canonical_commands) if canonical_commands else None
+    tokens = _strip_command_prefix(segment.tokens)
+    lowered_tokens = {token.lower() for token in tokens}
+    if match is not None:
+        canonical, _trailing_args = match
+        kind = _kind_for_command(canonical)
+        if kind == "format" and not ({"--check", "--dry-run", "-n"} & lowered_tokens):
+            return True
+        return bool(_MUTATING_VERIFY_FLAGS & lowered_tokens)
+
+    # An explicitly named temporary verification script is an established ad-hoc
+    # proof surface. Other scripts are effect-capable because shell output alone
+    # cannot prove that their writes stayed outside the workspace.
+    if _ad_hoc_script_args(segment.tokens, root) is not None:
+        return False
+
+    from agent.tool_dispatch_helpers import _is_destructive_command
+
+    if _is_destructive_command(segment.raw or shlex.join(segment.tokens)):
+        return True
+    if not tokens:
+        return False
+    base = Path(tokens[0]).name.lower()
+    if base in _PACKAGE_MANAGER_NAMES:
+        if len(tokens) < 2:
+            return False
+        subcommand = tokens[1].lower()
+        if subcommand in _PACKAGE_MANAGER_READS or subcommand in {"--version", "-v", "version"}:
+            return False
+        if subcommand in _SAFE_SCRIPT_RUNS:
+            return False
+        if subcommand == "run" and len(tokens) > 2:
+            script_name = tokens[2].lower().split(":")[-1]
+            return script_name not in _SAFE_SCRIPT_RUNS
+        return subcommand not in {"help"}
+    if base == "git":
+        subcommand = _git_subcommand(tokens)
+        return subcommand not in _READ_ONLY_GIT_COMMANDS
+    if _script_invocation_may_modify(tokens, root=root):
+        return True
+    if Path(tokens[0]).suffix.lower() in {".py", ".js", ".mjs", ".cjs", ".ts", ".sh", ".bash", ".rb", ".pl", ".php", ".ps1"}:
+        return _script_path_may_modify(tokens[0], root=root)
+    return False
+
+
+def _git_subcommand(tokens: list[str]) -> str:
+    """Find git's subcommand after global options that take values."""
+    value_options = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env"}
+    index = 1
+    while index < len(tokens):
+        token = tokens[index]
+        if token in value_options:
+            index += 2
+            continue
+        if token.startswith("-"):
+            index += 1
+            continue
+        return token.lower()
+    return ""
 
 
 def _looks_like_target(arg: str) -> bool:
@@ -437,6 +585,63 @@ def record_terminal_result(
         return None
     evidence = classify_verification_command(command, cwd=cwd, session_id=session_id, exit_code=exit_code, output=output)
     return None if evidence is None else _insert_evidence(evidence)
+
+
+def terminal_workspace_mutation_root(
+    *, command: str, cwd: str | Path | None, exit_code: int, verification_complete: bool = True
+) -> str | None:
+    """Return the project root if a command may have changed it after its last verifier.
+
+    The shell result is not a filesystem diff, so this is deliberately intent-based:
+    recognized tests, lint, typechecks, and builds are read-only; package changes,
+    formatting, file operations, and custom scripts can invalidate earlier evidence.
+    In a compound command, a later verifier keeps a completed command fresh. Set
+    ``verification_complete=False`` while a background command is still running.
+    """
+    if not command or not isinstance(command, str):
+        return None
+    facts = _project_facts(cwd)
+    if not facts:
+        return None
+    segments = _split_shell_segments(command)
+    if not segments:
+        return None
+
+    canonical_commands = list(facts.get("verifyCommands") or [])
+    verification_indexes = _verification_segment_indexes(
+        segments, canonical_commands=canonical_commands, root=facts.get("root"), exit_code=int(exit_code),
+    )
+    mutating_indexes = [
+        index for index, segment in enumerate(segments)
+        if _segment_may_modify_workspace(segment, canonical_commands=canonical_commands, root=facts.get("root"))
+    ]
+    if not mutating_indexes:
+        return None
+
+    if not verification_complete:
+        return _root_for(facts, cwd)
+
+    last_mutation = max(mutating_indexes)
+    last_verification = max(verification_indexes, default=None)
+    if last_verification is not None and last_mutation < last_verification:
+        return None
+    return _root_for(facts, cwd)
+
+
+def record_terminal_workspace_mutation(
+    *, command: str, cwd: str | Path | None, session_id: str | None, exit_code: int,
+    verification_complete: bool = True,
+) -> Optional[dict[str, Any]]:
+    """Invalidate evidence after a terminal command may have changed workspace files."""
+    if not _ledger_enabled():
+        return None
+    root = terminal_workspace_mutation_root(
+        command=command, cwd=cwd, exit_code=exit_code, verification_complete=verification_complete,
+    )
+    if not root:
+        return None
+    state = mark_workspace_edited(session_id=session_id, cwd=cwd, paths=[root])
+    return {"root": state["root"]} if state else None
 
 
 def record_verify_run(
