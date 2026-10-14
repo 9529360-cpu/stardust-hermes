@@ -125,14 +125,16 @@ test.describe('working-session task-panel clearance', () => {
 
     const staleState = await viewport.evaluate((viewport): StaleClearanceState => {
       // Grow scrollHeight before the observed thread-content node. Keep the
-      // injected spacer rigid and disable native anchoring so the fixture can
-      // establish stale geometry without synthesizing a user scroll (which
-      // must escape the lock).
+      // injected spacer rigid and at least one viewport tall: a fixed 160px
+      // spacer can fit inside the otherwise empty viewport on Linux, creating
+      // no scroll range. Disable native anchoring so this remains a layout
+      // change, not a synthetic user scroll that escapes the lock.
       viewport.style.setProperty('overflow-anchor', 'none')
+      const staleClearanceHeight = Math.max(320, viewport.clientHeight)
       const staleClearance = document.createElement('div')
-      staleClearance.style.height = '160px'
-      staleClearance.style.minHeight = '160px'
-      staleClearance.style.flex = '0 0 160px'
+      staleClearance.style.height = `${staleClearanceHeight}px`
+      staleClearance.style.minHeight = `${staleClearanceHeight}px`
+      staleClearance.style.flex = `0 0 ${staleClearanceHeight}px`
       staleClearance.setAttribute('aria-hidden', 'true')
       const scrollHeightBefore = viewport.scrollHeight
       const scrollTopBefore = viewport.scrollTop
@@ -169,7 +171,7 @@ test.describe('working-session task-panel clearance', () => {
     expect(staleState.visibility, JSON.stringify(staleState)).toBe('visible')
     expect(staleState.following, JSON.stringify(staleState)).toBe('true')
     expect(staleState.overflowAnchor, JSON.stringify(staleState)).toBe('none')
-    expect(staleState.spacerHeight, JSON.stringify(staleState)).toBe(160)
+    expect(staleState.spacerHeight, JSON.stringify(staleState)).toBeGreaterThanOrEqual(staleState.viewportHeight)
     expect(
       staleState.scrollHeightAfter - staleState.scrollHeightBefore,
       JSON.stringify(staleState),
