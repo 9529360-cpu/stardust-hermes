@@ -3,6 +3,16 @@ import { expect, test } from './test'
 
 let fixture: MockBackendFixture | null = null
 
+const DESKTOP_WINDOW = { height: 800, width: 1220 }
+const NARROW_WINDOW = { height: 720, width: 900 }
+
+async function resizeWindow(target: MockBackendFixture, size: { height: number; width: number }) {
+  await target.app.evaluate(({ BrowserWindow }, bounds) => {
+    BrowserWindow.getAllWindows()[0].setSize(bounds.width, bounds.height)
+  }, size)
+  await target.page.waitForTimeout(600)
+}
+
 test.beforeAll(async () => {
   test.setTimeout(240_000)
   fixture = await setupMockBackend({ extraDisplayConfig: '  language: en' })
@@ -14,9 +24,10 @@ test.afterAll(async () => {
   fixture = null
 })
 
-test('cron form controls render the shared medium field size', async ({}, testInfo) => {
+test('the Cron editor keeps its shared 36px form fields at desktop and narrow window sizes', async ({}, testInfo) => {
   const page = fixture!.page
 
+  await resizeWindow(fixture!, DESKTOP_WINDOW)
   await page.evaluate(() => {
     window.location.hash = '#/cron'
   })
@@ -24,7 +35,7 @@ test('cron form controls render the shared medium field size', async ({}, testIn
 
   const frequency = page.locator('#cron-frequency')
   await expect(frequency).toBeVisible()
-  const geometry = await frequency.evaluate(element => {
+  const desktopGeometry = await frequency.evaluate(element => {
     const style = getComputedStyle(element)
 
     return {
@@ -33,6 +44,87 @@ test('cron form controls render the shared medium field size', async ({}, testIn
     }
   })
 
-  expect(geometry).toEqual({ borderRadius: '6px', height: '36px' })
-  await page.screenshot({ path: testInfo.outputPath('cron-medium-control.png') })
+  expect(desktopGeometry).toEqual({ borderRadius: '6px', height: '36px' })
+  await page.screenshot({ path: testInfo.outputPath('cron-medium-control-1220x800.png') })
+
+  await resizeWindow(fixture!, NARROW_WINDOW)
+  await expect(frequency).toBeVisible()
+  const narrowGeometry = await frequency.evaluate(element => {
+    const style = getComputedStyle(element)
+
+    return {
+      borderRadius: style.borderTopLeftRadius,
+      height: style.height
+    }
+  })
+
+  expect(narrowGeometry).toEqual({ borderRadius: '6px', height: '36px' })
+  await page.screenshot({ path: testInfo.outputPath('cron-medium-control-900x720.png') })
+  await page.getByRole('button', { name: /Cancel/ }).last().click()
+})
+
+test('Bot Routines keeps its 32px schedule fields separate from the main Cron form', async ({}, testInfo) => {
+  test.setTimeout(180_000)
+  const page = fixture!.page
+
+  await resizeWindow(fixture!, DESKTOP_WINDOW)
+  await page.getByRole('button', { name: /Agent space/ }).first().click()
+
+  const roster = page.locator('[data-slot="bots-roster"]')
+  await expect(roster).toBeVisible({ timeout: 20_000 })
+  await roster.locator('[data-roster-key]').first().click()
+  await expect(page.locator('[data-slot="bot_chat_empty"]')).toBeVisible({ timeout: 30_000 })
+
+  const routinesRail = page.locator('[data-tree-tab$=":routines"][data-vertical]')
+  await expect(routinesRail).toBeVisible()
+  await routinesRail.click()
+  await expect(page.locator('[data-tree-tab$=":routines"]:not([data-vertical])')).toBeVisible()
+  await page.getByRole('button', { name: /New cron/ }).first().click()
+
+  const dialog = page.getByRole('dialog').last()
+  await expect(dialog).toBeVisible()
+  const frequency = dialog.locator('[data-slot="select-trigger"]').first()
+  const repeatCount = dialog.locator('[data-slot="input"].h-7')
+  await expect(frequency).toBeVisible()
+  await expect(repeatCount).toBeVisible()
+
+  const scheduleGeometry = await frequency.evaluate(element => {
+    const style = getComputedStyle(element)
+
+    return {
+      borderRadius: style.borderTopLeftRadius,
+      height: style.height
+    }
+  })
+  const compactGeometry = await repeatCount.evaluate(element => {
+    const style = getComputedStyle(element)
+
+    return {
+      borderRadius: style.borderTopLeftRadius,
+      height: style.height
+    }
+  })
+
+  expect(scheduleGeometry).toEqual({ borderRadius: '6px', height: '32px' })
+  expect(compactGeometry).toEqual({ borderRadius: '2.5px', height: '28px' })
+  await page.screenshot({ path: testInfo.outputPath('bot-routine-control-1220x800.png') })
+
+  await frequency.click()
+  await page.getByRole('option', { name: /Once, in/ }).click()
+  const onceCount = dialog.getByPlaceholder('30')
+  await expect(onceCount).toBeVisible()
+  const onceGeometry = await onceCount.evaluate(element => {
+    const style = getComputedStyle(element)
+
+    return {
+      borderRadius: style.borderTopLeftRadius,
+      height: style.height
+    }
+  })
+  expect(onceGeometry).toEqual({ borderRadius: '6px', height: '32px' })
+
+  await resizeWindow(fixture!, NARROW_WINDOW)
+  await expect(dialog).toBeVisible()
+  await expect(onceCount).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath('bot-routine-control-900x720.png') })
 })

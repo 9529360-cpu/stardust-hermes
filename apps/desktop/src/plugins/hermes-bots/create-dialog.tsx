@@ -665,7 +665,7 @@ export function CreateAgentDialog({ open, onClose, roster }: CreateAgentDialogPr
                   }}
                   value={targetConnection || activeConnectionId || 'local'}
                 >
-                  <SelectTrigger className="h-8 rounded-md">
+                  <SelectTrigger size="sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -807,7 +807,7 @@ export function CreateAgentDialog({ open, onClose, roster }: CreateAgentDialogPr
                       }}
                       value={remoteTarget ? 'default' : cloneFrom}
                     >
-                      <SelectTrigger className="h-8 rounded-md">
+                      <SelectTrigger size="sm">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>

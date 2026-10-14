@@ -45,7 +45,9 @@ vi.mock('@stardust/plugin-sdk', async () => {
     Select: ({ children }: { children: ReactNode }) => <div>{children}</div>,
     SelectContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
     SelectItem: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-    SelectTrigger: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+    SelectTrigger: ({ children, size }: { children: ReactNode; size?: string }) => (
+      <div data-control-size={size}>{children}</div>
+    ),
     SelectValue: () => null,
     useQuery
   }
@@ -103,6 +105,14 @@ describe('a bot gateway that never answers', () => {
 })
 
 describe('the catalog read', () => {
+  it('uses the shared small field size for the Bot Mode provider selector', async () => {
+    hostMock.request.mockResolvedValue({ providers: [{ models: ['m1'], name: 'Prov', slug: 'prov' }] })
+
+    const { container } = mount(null)
+
+    await waitFor(() => expect(container.querySelectorAll('[data-control-size="sm"]')).toHaveLength(1))
+  })
+
   it('rides the bot’s own route, unforced, and survives a remount from cache', async () => {
     hostMock.requestProfile.mockResolvedValue({ providers: [{ models: ['m1'], name: 'Prov', slug: 'prov' }] })
 

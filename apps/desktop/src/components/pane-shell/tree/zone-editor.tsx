@@ -339,10 +339,11 @@ export function ZoneEditor() {
             </Button>
           ))}
           <Input
-            className="h-7 w-14 text-center text-xs"
+            className="w-14 text-center"
             max={8}
             min={1}
             onChange={e => setTemplateCount(Math.max(1, Math.min(8, Number(e.target.value) || 1)))}
+            size="compact"
             type="number"
             value={templateCount}
           />
@@ -473,7 +474,7 @@ export function ZoneEditor() {
       {/* Footer: save / cancel. */}
       <div className="flex items-center gap-1.5">
         <Input
-          className="h-7 w-64 text-xs"
+          className="w-64"
           onChange={e => setName(e.target.value)}
           // Escape while typing clears the field and yields — it must not bubble
           // up to close the whole editor and lose the name.
@@ -486,6 +487,7 @@ export function ZoneEditor() {
             }
           }}
           placeholder={t.zones.layoutNamePlaceholder(t.zones.customZoneName(zones.length))}
+          size="compact"
           value={name}
         />
         <Button disabled={!treeExpressible} onClick={save} size="sm" variant="outline">

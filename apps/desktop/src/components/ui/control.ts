@@ -10,9 +10,9 @@ export const controlVariants = cva(
   {
     variants: {
       size: {
-        xs: 'rounded-[2.5px] px-2 py-0.5 text-[0.6875rem] leading-4',
+        xs: 'h-6 rounded-[2.5px] px-2 py-0.5 text-[0.6875rem] leading-4',
         compact: 'h-7 rounded-[2.5px] px-2.5 py-1.5',
-        sm: 'rounded-[2.5px] px-2 py-1',
+        sm: 'h-8 rounded-[6px] px-2.5 py-1.5',
         default: 'rounded-[2.5px] px-2.5 py-1.5',
         md: 'h-9 rounded-[6px] px-2.5 py-1.5',
         lg: 'rounded-[2.5px] px-3 py-2 text-sm leading-5'

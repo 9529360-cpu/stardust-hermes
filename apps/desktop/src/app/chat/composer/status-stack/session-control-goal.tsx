@@ -28,6 +28,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
+import { Textarea } from '@/components/ui/textarea'
 import { Tip } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
 import {
@@ -484,14 +485,15 @@ export const SessionControlGoalSection = memo(function SessionControlGoalSection
               <DialogDescription>{ctrl.addCriterionPlaceholder}</DialogDescription>
             </DialogHeader>
             <div className="py-2">
-              <textarea
+              <Textarea
                 aria-label={ctrl.criterionLabel}
                 autoFocus
-                className="w-full rounded-md border border-(--ui-stroke-secondary) bg-transparent p-2 text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full resize-y"
                 disabled={isBusy}
                 onChange={e => setNewCriterionText(e.target.value)}
                 placeholder={ctrl.addCriterionPlaceholder}
                 rows={3}
+                size="md"
                 value={newCriterionText}
               />
             </div>
