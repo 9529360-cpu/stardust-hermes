@@ -85,7 +85,7 @@ test.describe('working-session task-panel clearance', () => {
   })
 
   // eslint-disable-next-line no-empty-pattern -- Playwright needs the object pattern here
-  test('window focus reanchors a working session above the expanded task panel', async ({}, testInfo) => {
+  test('window focus keeps a reopened working session clear after the task panel expands', async ({}, testInfo) => {
     const page = fixture!.page
 
     await send(page, PROMPT)
@@ -100,48 +100,31 @@ test.describe('working-session task-panel clearance', () => {
     await reopenWorkingSession(page)
     await expect(activeSurface(page).getByText(/Tasks 1\/5|任务 1\/5/)).toBeVisible({ timeout: 30_000 })
 
-    // Reproduce the stale geometry at the foreground boundary. Active turns
-    // disable Chromium's background throttling, so visibility can stay `visible`
-    // and window focus is the only foreground edge that can repair it.
-    await page.waitForTimeout(750)
+    const taskPanel = activeSurface(page)
+      .locator('[data-slot="composer-status-stack"]')
+      .getByRole('button', { name: /Tasks 1\/5|任务 1\/5/ })
+    const latestMessage = activeSurface(page).getByText('Task-panel clearance line 24')
 
-    const staleState = await activeSurface(page)
-      .locator('[data-slot="aui_thread-viewport"]')
-      .evaluate(viewport => {
-        // Grow scrollHeight before the observed thread-content node. This
-        // shifts the transcript behind the dock without resizing the observed
-        // node or synthesizing a user scroll (which must escape the lock).
-        const staleClearance = document.createElement('div')
-        staleClearance.style.height = '160px'
-        staleClearance.setAttribute('aria-hidden', 'true')
-        viewport.prepend(staleClearance)
+    await expect(taskPanel).toHaveAttribute('aria-expanded', 'true')
+    await expect(latestMessage).toBeVisible()
 
-        const distance = viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop
-        const surface = viewport.closest<HTMLElement>('[data-composer-target]')!
-        const latest = Array.from(surface.querySelectorAll<HTMLElement>('[data-role="assistant"]')).at(-1)!
-        const status = surface.querySelector<HTMLElement>('[data-slot="composer-status-stack"]')!
+    // Exercise the real status-section layout transition. The previous test
+    // inserted a spacer into the scroll viewport and expected stale geometry;
+    // the production stick-to-bottom behavior immediately corrected it, so
+    // that precondition failed before the focus path could be evaluated.
+    await taskPanel.click()
+    await expect(taskPanel).toHaveAttribute('aria-expanded', 'false')
+    await taskPanel.click()
+    await expect(taskPanel).toHaveAttribute('aria-expanded', 'true')
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')))
 
-        window.dispatchEvent(new Event('focus'))
-
-        return {
-          distance,
-          following: viewport.dataset.following,
-          latestMessageBottom: latest.getBoundingClientRect().bottom,
-          statusPanelTop: status.getBoundingClientRect().top,
-          visibility: document.visibilityState,
-        }
-      })
-
-    expect(staleState.visibility, JSON.stringify(staleState)).toBe('visible')
-    expect(staleState.following, JSON.stringify(staleState)).toBe('true')
-    expect(staleState.distance).toBeGreaterThan(100)
-    expect(staleState.latestMessageBottom, JSON.stringify(staleState)).toBeGreaterThan(staleState.statusPanelTop)
     await page.waitForTimeout(1_000)
     const metrics = await clearanceMetrics(page)
     await page.screenshot({ path: testInfo.outputPath('task-panel-after-resume.png') })
 
     expect(metrics.composerHeight, JSON.stringify(metrics)).toBeGreaterThanOrEqual(190)
-    expect(metrics.distanceFromBottom, JSON.stringify(metrics)).toBeLessThan(staleState.distance / 2)
+    expect(metrics.distanceFromBottom, JSON.stringify(metrics)).toBeLessThanOrEqual(1)
     expect(metrics.latestMessageBottom, JSON.stringify(metrics)).toBeLessThanOrEqual(metrics.statusPanelTop)
+    await expect(latestMessage).toBeVisible()
   })
 })

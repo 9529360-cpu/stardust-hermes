@@ -216,7 +216,6 @@ test.describe('correction session switch', () => {
     // running. Use the visible Steer action to cover the real composer path.
     await steer(page, CORRECTION)
     await waitForTranscriptText(page, CORRECTION)
-    await waitForTranscriptText(page, CORRECTION_WAITING_REPLY)
 
     const orderBeforeSwitch = relevantOrder(await transcriptTextOrder(page))
     expect(orderBeforeSwitch).toEqual([ORIGINAL_PROMPT, CORRECTION])
@@ -243,6 +242,13 @@ test.describe('correction session switch', () => {
       .toEqual(orderBeforeSwitch)
     await page.screenshot({ path: testInfo.outputPath('correction-after-warm-resume.png') })
 
+    expect(await textNodeOccurrences(page, ORIGINAL_PROMPT)).toBe(1)
+    expect(await textNodeOccurrences(page, CORRECTION)).toBe(1)
+
+    // The model may acknowledge the correction while the background process
+    // is still held. Let that response settle only after the warm-resume check
+    // so the test exercises the original live-correction boundary.
+    await waitForTranscriptText(page, CORRECTION_WAITING_REPLY)
     expect(await textNodeOccurrences(page, ORIGINAL_PROMPT)).toBe(1)
     expect(await textNodeOccurrences(page, CORRECTION)).toBe(1)
 
