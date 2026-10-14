@@ -58,6 +58,7 @@ test('at 1220x800 the composer and full model picker show their model context', 
   await expect(picker.getByText(/设置.*模型服务|Settings.*Model services/)).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('model-picker-dialog.png') })
   await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: /关闭设置|Close settings/ }).click()
   await capture(page, '1220x800-composer')
 })
 
