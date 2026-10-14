@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { textWithoutReferenceLines, WIRE_REFERENCE_KINDS } from '@/components/assistant-ui/reference-kinds'
-import { type ChatMessage, type ChatMessagePart, chatMessageText } from '@/lib/chat-messages'
+import { type ChatMessage, type ChatMessagePart, chatMessageText, toChatMessages } from '@/lib/chat-messages'
 import { $approvalModes, approvalModeForProfile } from '@/store/approval-mode'
 import { $desktopOnboarding, consumePendingCredentialWarning } from '@/store/onboarding'
 import { $activeGatewayProfile } from '@/store/profile'
@@ -1612,11 +1612,23 @@ describe('dedupeInflightUserAgainstTranscript', () => {
     expect(restored.filter(m => m.role === 'user' && chatMessageText(m) === 'current prompt')).toHaveLength(1)
   })
 
-  it('does not re-project a persisted correction turn after its post-correction tool row arrives', () => {
+  it('does not re-project a persisted correction turn followed by a model-switch marker', () => {
     const runtime = [
       msg('old-u', 'user', 'older prompt', { timestamp: 1 }),
       msg('old-a', 'assistant', 'older reply', { timestamp: 2 })
     ]
+
+    const modelSwitchMarker = toChatMessages([
+      {
+        role: 'user',
+        content: '[System: The active model for this chat has changed to k3.]',
+        display_kind: 'model_switch',
+        timestamp: 7
+      }
+    ])[0]
+
+    expect(modelSwitchMarker).toMatchObject({ role: 'system' })
+    expect(chatMessageText(modelSwitchMarker)).toBe('model changed')
 
     const persisted: ChatMessage[] = [
       ...runtime,
@@ -1630,7 +1642,8 @@ describe('dedupeInflightUserAgainstTranscript', () => {
           { type: 'tool-call', toolCallId: 'call-after-correction', toolName: 'terminal', args: {}, result: 'done' },
           { type: 'text', text: 'Moving.' }
         ]
-      }
+      },
+      modelSwitchMarker
     ]
 
     const projection = {
@@ -1654,7 +1667,8 @@ describe('dedupeInflightUserAgainstTranscript', () => {
       'user',
       'assistant',
       'user',
-      'assistant'
+      'assistant',
+      'system'
     ])
     expect(restored.at(-1)?.parts.some(part => part.type === 'tool-call')).toBe(true)
     expect(restored.filter(message => message.role === 'user').map(chatMessageText)).toEqual([
@@ -1702,6 +1716,41 @@ describe('dedupeInflightUserAgainstTranscript', () => {
       restored.filter(message => message.role === 'user' && chatMessageText(message) === 'current prompt')
     ).toHaveLength(2)
     expect(restored.at(-1)).toMatchObject({ id: 'assistant-stream-runtime-1', pending: true })
+  })
+
+  it('does not treat an unrelated system row as a model-switch marker', () => {
+    const runtime = [
+      msg('old-u', 'user', 'older prompt', { timestamp: 1 }),
+      msg('old-a', 'assistant', 'older reply', { timestamp: 2 })
+    ]
+
+    const persisted = [
+      ...runtime,
+      msg('u', 'user', 'current prompt', { timestamp: 3 }),
+      msg('a-before-correction', 'assistant', 'Hello', { timestamp: 4 }),
+      msg('c', 'user', 'redirect now', { timestamp: 5 }),
+      msg('a-after-correction', 'assistant', 'Moving.', { timestamp: 6 }),
+      msg('unrelated-system', 'system', 'unrelated system message', { timestamp: 7 })
+    ]
+
+    const projection = {
+      ...runningProjection('current prompt'),
+      inflight: {
+        user: 'current prompt',
+        assistant: 'HelloMoving.',
+        streaming: true,
+        corrections: ['redirect now'],
+        correction_offsets: [5]
+      }
+    }
+
+    const deduped = dedupeInflightUserAgainstTranscript(persisted, runtime, projection)
+    const restored = appendLiveSessionProjection(persisted, deduped)
+
+    expect(deduped).toBe(projection)
+    expect(
+      restored.filter(message => message.role === 'user' && chatMessageText(message) === 'current prompt')
+    ).toHaveLength(2)
   })
 
   it('retains the in-flight user source only when it already exists after the runtime anchor', () => {

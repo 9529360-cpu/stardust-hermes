@@ -993,6 +993,11 @@ function transcriptAnchorMatches(a: ChatMessage, b: ChatMessage): boolean {
   return Boolean(aText) && aText === bText
 }
 
+/** Hydration projects `display_kind: 'model_switch'` as this exact system row. */
+function isHydratedModelSwitchMarker(message: ChatMessage): boolean {
+  return message.role === 'system' && chatMessageText(message).trim() === 'model changed'
+}
+
 /**
  * Reconcile the live text projection against the persisted transcript.
  *
@@ -1078,6 +1083,10 @@ export function dedupeInflightUserAgainstTranscript(
 
     for (let index = latestPersistedPromptIndex + 1; index < persistedTail.length; index += 1) {
       const message = persistedTail[index]
+
+      if (isHydratedModelSwitchMarker(message)) {
+        continue
+      }
 
       if (message.role === 'user') {
         if (
