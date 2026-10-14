@@ -7483,6 +7483,19 @@
         "title": "BrowserControllerResultResult",
         "type": "object"
       },
+      "BrowserHostConnectPayload": {
+        "additionalProperties": false,
+        "description": "``tools/unified_browser_tool.py`` ``connect``: pair the user's own Chrome to this chat.",
+        "properties": {
+          "chrome_profile_dir": {
+            "default": "",
+            "title": "Chrome Profile Dir",
+            "type": "string"
+          }
+        },
+        "title": "BrowserHostConnectPayload",
+        "type": "object"
+      },
       "BrowserManageParams": {
         "additionalProperties": false,
         "properties": {
@@ -35214,6 +35227,18 @@
           "name": "payload",
           "schema": {
             "$ref": "#/components/schemas/BrowserControllerCommandPayload"
+          }
+        }
+      ]
+    },
+    {
+      "name": "browser.host.connect",
+      "summary": "Start the existing-Chrome bridge for this chat, as the Tools page's Connect Chrome does.",
+      "params": [
+        {
+          "name": "payload",
+          "schema": {
+            "$ref": "#/components/schemas/BrowserHostConnectPayload"
           }
         }
       ]

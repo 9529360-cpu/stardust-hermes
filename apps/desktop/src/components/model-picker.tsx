@@ -1,12 +1,12 @@
 import type { ModelOptionProvider, ModelPricing } from '@stardust/shared'
 import { fuzzyRank, modelSearchText } from '@stardust/shared'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 
 import { getLocalModelsStatus } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { catalogProviderMatches, modelOptionsQueryKey, requestModelOptions } from '@/lib/model-options'
-import { currentPickerSelection } from '@/lib/model-status-label'
+import { currentPickerSelection, modelCatalogLabel } from '@/lib/model-status-label'
 import { foldIncludes, normalize } from '@/lib/text'
 import { useStoreSelector } from '@/lib/use-session-slice'
 import { $localModelsEnabled } from '@/store/local-models-flag'
@@ -18,6 +18,7 @@ import { cn } from '../lib/utils'
 
 import { InlineNotice } from './notifications'
 import { Button } from './ui/button'
+import { Codicon } from './ui/codicon'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog'
 import { HighlightMatches } from './ui/highlight-matches'
@@ -58,6 +59,7 @@ export function ModelPickerDialog({
 }: ModelPickerDialogProps) {
   const { t } = useI18n()
   const copy = t.modelPicker
+  const queryClient = useQueryClient()
   // Own the search term so we can filter manually. cmdk's built-in
   // shouldFilter reorders items by its fuzzy-match score (≈alphabetical with
   // an empty query), which destroys the backend's curated order. We disable
@@ -70,6 +72,8 @@ export function ModelPickerDialog({
     queryFn: () => requestModelOptions({ gateway: gw, profile, request, sessionId }),
     enabled: open
   })
+
+  const [refreshing, setRefreshing] = useState(false)
 
   // Live load state for the managed local server: which model is loading
   // into memory right now, with a REAL percent (per-tensor callback relayed
@@ -153,6 +157,11 @@ export function ModelPickerDialog({
     modelOptions.data
   )
 
+  const selectedModel = optionsModel || currentModel
+  const selectedProvider = optionsProvider || currentProvider
+  const selectedProviderOption = providers.find(provider => catalogProviderMatches(provider, selectedProvider))
+  const selectedModelLabel = selectedModel ? modelCatalogLabel(selectedProviderOption, selectedModel) : copy.unknown
+
   const loading = modelOptions.isPending && !modelOptions.data
 
   const error = modelOptions.error
@@ -164,6 +173,25 @@ export function ModelPickerDialog({
   const selectModel = (provider: ModelOptionProvider, model: string) => {
     onSelect({ provider: provider.slug, model })
     onOpenChange(false)
+  }
+
+  const refreshModels = async () => {
+    if (refreshing) {
+      return
+    }
+
+    setRefreshing(true)
+
+    try {
+      const next = await requestModelOptions({ gateway: gw, profile, refresh: true, request, sessionId })
+      queryClient.setQueryData(modelOptionsQueryKey(profile, sessionId, ownerConnectionId), next)
+    } catch {
+      // Keep the current list visible; a normal re-fetch is still useful if an
+      // explicit catalog refresh cannot reach the backend.
+      void modelOptions.refetch()
+    } finally {
+      setRefreshing(false)
+    }
   }
 
   // Provider account catalogs are no longer a Desktop setup surface. Adding a
@@ -182,9 +210,10 @@ export function ModelPickerDialog({
         <DialogHeader className="border-b border-border px-4 py-3">
           <DialogTitle>{copy.title}</DialogTitle>
           <DialogDescription className="font-mono text-xs leading-relaxed">
-            {copy.current} {optionsModel || currentModel || copy.unknown}
-            {optionsProvider || currentProvider ? ` · ${optionsProvider || currentProvider}` : ''}
+            {copy.current} {selectedModelLabel}
+            {selectedProvider ? ` · ${selectedProvider}` : ''}
           </DialogDescription>
+          <p className="text-xs leading-relaxed text-muted-foreground">{copy.scopeHint}</p>
         </DialogHeader>
 
         <Command className="rounded-none bg-card" shouldFilter={false}>
@@ -192,8 +221,8 @@ export function ModelPickerDialog({
           <CommandList className="max-h-96">
             {!loading && !error && <CommandEmpty>{copy.noModels}</CommandEmpty>}
             <ModelResults
-              currentModel={optionsModel || currentModel}
-              currentProvider={optionsProvider || currentProvider}
+              currentModel={selectedModel}
+              currentProvider={selectedProvider}
               downloads={downloads}
               error={error}
               loading={loading}
@@ -206,6 +235,10 @@ export function ModelPickerDialog({
         </Command>
 
         <DialogFooter className="flex-row items-center justify-end gap-2 bg-card p-3">
+          <Button disabled={refreshing} onClick={() => void refreshModels()} variant="ghost">
+            <Codicon className={cn(refreshing && 'animate-spin')} name="sync" size="0.8rem" />
+            {t.shell.modelMenu.refreshModels}
+          </Button>
           <Button onClick={addProvider} variant="ghost">
             {t.onboarding.setupRelay}
           </Button>
@@ -270,7 +303,9 @@ function ModelResults({
       return [...models]
     }
 
-    return fuzzyRank(models, q, modelSearchText).map(r => r.item)
+    return fuzzyRank(models, q, model => `${modelSearchText(model)} ${modelCatalogLabel(provider, model)}`).map(
+      r => r.item
+    )
   }
 
   // Only configured providers (those with curated models) are selectable
@@ -281,7 +316,9 @@ function ModelResults({
   const localModelsShown = $localModelsEnabled.get()
 
   const configured = providers.filter(
-    p => (p.models ?? []).length > 0 && (localModelsShown || p.slug !== LOCAL_PROVIDER_SLUG)
+    p =>
+      ((p.models ?? []).length > 0 || (p.slug === 'gpt-official' && !!p.warning)) &&
+      (localModelsShown || p.slug !== LOCAL_PROVIDER_SLUG)
   )
 
   // In-flight local downloads render as disabled progress rows: inside the
@@ -297,7 +334,7 @@ function ModelResults({
         const models = rankModels(provider, provider.models ?? [])
         const groupDownloads = provider.slug === LOCAL_PROVIDER_SLUG ? visibleDownloads : []
 
-        if (models.length === 0 && groupDownloads.length === 0) {
+        if (models.length === 0 && groupDownloads.length === 0 && !provider.warning) {
           return null
         }
 
@@ -339,7 +376,7 @@ function ModelResults({
                   value={`${provider.slug}:${model}`}
                 >
                   <span className="min-w-0 flex-1 truncate">
-                    <HighlightMatches foldSeparators query={search} text={model} />
+                    <HighlightMatches foldSeparators query={search} text={modelCatalogLabel(provider, model)} />
                   </span>
                   {loadProgress && (
                     <span className="flex shrink-0 items-center gap-1.5" title={copy.loadingIntoMemory}>

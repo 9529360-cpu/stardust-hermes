@@ -306,6 +306,8 @@ def test_venv_scripts_dir_finds_both_layouts(tmp_path, monkeypatch, venv_name):
     """uv writes .venv; our installers write venv. Both must resolve (#79542)."""
     scripts = tmp_path / venv_name / "Scripts"
     scripts.mkdir(parents=True)
+    (scripts / "python.exe").write_bytes(b"fixture")
+    monkeypatch.setenv("VIRTUAL_ENV", str(tmp_path / venv_name))
     monkeypatch.setattr(cli_main, "PROJECT_ROOT", tmp_path)
     monkeypatch.setattr(main_install_repair, "_is_windows", lambda: True)
     assert main_install_repair._venv_scripts_dir() == scripts

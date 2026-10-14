@@ -84,6 +84,53 @@ def test_catalog_placeholders_match_english(lang: str):
 
 
 
+def test_real_config_language_and_machine_fallback(monkeypatch, tmp_path):
+    """Resolve through the real config loader without confusing defaults for user intent."""
+    from hermes_cli import config as cfg_mod
+
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
+    monkeypatch.delenv("STARDUST_LANGUAGE", raising=False)
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("", encoding="utf-8")
+    monkeypatch.setattr(i18n, "_machine_language_probe", lambda: "zh_CN")
+    cfg_mod._LOAD_CONFIG_CACHE.clear()
+    i18n.reset_language_cache()
+    try:
+        assert i18n.get_language() == "zh"
+        config_path.write_text("display:\n  language: en\n", encoding="utf-8")
+        cfg_mod._LOAD_CONFIG_CACHE.clear()
+        i18n.reset_language_cache()
+        assert i18n.get_language() == "en"
+    finally:
+        cfg_mod._LOAD_CONFIG_CACHE.clear()
+        i18n.reset_language_cache()
+
+
+@pytest.mark.parametrize(("machine_lang", "expected"), [("zh_CN", "zh"), ("zh_TW", "zh-hant"), ("xx_YY", "en")])
+def test_machine_language_fallback(monkeypatch, machine_lang, expected):
+    monkeypatch.delenv("STARDUST_LANGUAGE", raising=False)
+    i18n.reset_language_cache()
+    monkeypatch.setattr(i18n, "_config_language", lambda: None)
+    monkeypatch.setattr(i18n, "_machine_language_probe", lambda: machine_lang)
+    assert i18n.get_language() == expected
+
+
+def test_display_language_wins_over_machine_language(monkeypatch):
+    monkeypatch.delenv("STARDUST_LANGUAGE", raising=False)
+    i18n.reset_language_cache()
+    monkeypatch.setattr(i18n, "_config_language", lambda: "fr")
+    monkeypatch.setattr(i18n, "_machine_language_probe", lambda: "zh_CN")
+    assert i18n.get_language() == "fr"
+
+
+def test_stardust_language_wins_over_machine_and_display(monkeypatch):
+    monkeypatch.setenv("STARDUST_LANGUAGE", "de")
+    i18n.reset_language_cache()
+    monkeypatch.setattr(i18n, "_config_language", lambda: "fr")
+    monkeypatch.setattr(i18n, "_machine_language_probe", lambda: "zh_CN")
+    assert i18n.get_language() == "de"
+
+
 def test_default_when_nothing_set(monkeypatch):
     """With no env var and no config override, falls back to English."""
     monkeypatch.delenv("STARDUST_LANGUAGE", raising=False)

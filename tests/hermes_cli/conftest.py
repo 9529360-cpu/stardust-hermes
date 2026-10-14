@@ -53,6 +53,13 @@ def isolated_update_runtime(monkeypatch, tmp_path, request):
     checkout = tmp_path / "isolated-update-checkout"
     (checkout / ".git").mkdir(parents=True)
     (checkout / "apps" / "desktop").mkdir(parents=True)
+    venv_root = checkout / ".venv"
+    for venv_bin, python_name in (("Scripts", "python.exe"), ("bin", "python")):
+        fake_python = venv_root / venv_bin / python_name
+        fake_python.parent.mkdir(parents=True, exist_ok=True)
+        fake_python.touch()
+    monkeypatch.setenv("VIRTUAL_ENV", str(venv_root))
+    monkeypatch.setattr(update_cmd, "_venv_core_imports_healthy", lambda: (True, ""))
     monkeypatch.setattr(main, "PROJECT_ROOT", checkout)
     if hasattr(request.module, "PROJECT_ROOT"):
         monkeypatch.setattr(request.module, "PROJECT_ROOT", checkout)

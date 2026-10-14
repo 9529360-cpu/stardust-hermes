@@ -2,13 +2,15 @@
 
 Catalogs are ``locales/<lang>.yaml`` flattened to dotted keys. Missing keys
 fall back to English, then to the key itself, so a broken catalog never crashes.
-Language resolution: explicit ``lang=`` > ``STARDUST_LANGUAGE`` > ``display.language`` > ``en``.
+Language resolution: explicit ``lang=`` > ``STARDUST_LANGUAGE`` > ``display.language`` > machine UI language > ``en``.
 """
 
 from __future__ import annotations
 
 import logging
+import locale
 import os
+import sys
 import threading
 from functools import lru_cache
 from pathlib import Path
@@ -137,9 +139,38 @@ def _config_language() -> str | None:
     return _config_language_cached(str(get_hermes_home()))
 
 
+def _machine_language_probe() -> str | None:
+    """Return the host UI locale in its native spelling, if available."""
+    if sys.platform == "win32":
+        import ctypes
+
+        langid = ctypes.windll.kernel32.GetUserDefaultUILanguage()
+        return locale.windows_locale.get(langid)
+    for name in ("LC_ALL", "LC_MESSAGES", "LANG"):
+        value = os.environ.get(name)
+        if value and value not in {"C", "POSIX"}:
+            return value
+    return None
+
+
+@lru_cache(maxsize=1)
+def _machine_language() -> str | None:
+    """Resolve and cache a supported language from the host UI locale."""
+    try:
+        value = _machine_language_probe()
+        if not value:
+            return None
+        normalized = _normalize_lang(value.split(".", 1)[0].replace("_", "-").lower())
+        return normalized if normalized in SUPPORTED_LANGUAGES else None
+    except Exception as exc:
+        logger.debug("Could not read machine UI language: %s", exc)
+        return None
+
+
 def reset_language_cache() -> None:
     """Invalidate cached language resolution and catalogs (call after ``save_config`` changes ``display.language``)."""
     _config_language_cached.cache_clear()
+    _machine_language.cache_clear()
     with _catalog_lock:
         _catalog_cache.clear()
 
@@ -153,7 +184,11 @@ def get_language() -> str:
         env_lang = get_secret("STARDUST_LANGUAGE")
     except UnscopedSecretError:
         env_lang = os.environ.get("STARDUST_LANGUAGE")  # unscoped default-profile path: environ IS its own value
-    return _normalize_lang(env_lang) if env_lang else _config_language() or DEFAULT_LANGUAGE
+    return (
+        _normalize_lang(env_lang)
+        if env_lang
+        else _config_language() or _machine_language() or DEFAULT_LANGUAGE
+    )
 
 
 def t(key: str, lang: str | None = None, **format_kwargs: Any) -> str:

@@ -525,6 +525,8 @@ class ProcessSession:
 
 # Watcher routing fields, in event-dict key order (``watcher_<key>`` on the session).
 _WATCHER_ROUTE_KEYS = ("platform", "chat_id", "user_id", "user_name", "thread_id", "message_id")
+# Poll interval (s) of the gateway watcher that delivers a notifying process's completion.
+GATEWAY_WATCHER_INTERVAL_SECONDS = 5
 # Session fields persisted verbatim in the crash-recovery checkpoint (plus
 # ``session_id``; ``command`` is redacted and ``owner_task_id`` defaulted on write).
 _CHECKPOINT_FIELDS = (
@@ -899,15 +901,30 @@ class ProcessRegistry(ProcessCheckpointMixin):
     # ----- Spawn -----
 
     @staticmethod
-    def _new_session(command, task_id, owner_task_id, session_key, cwd, **extra) -> ProcessSession:
+    def _new_session(command, task_id, owner_task_id, session_key, cwd, *, notify_on_complete: bool = False,
+                     watch_patterns: Optional[List[str]] = None, **extra) -> ProcessSession:
+        """Build a session with its whole notification contract in place. The reader thread acts
+        on ``notify_on_complete`` / ``watch_patterns`` (and stamps watch events with the chat
+        route) from its first read, and ``_track_started`` checkpoints all of it for a gateway
+        restart, so none of it may be added once the session is tracked: a child that exited
+        first lost its notice, and a restart before the next checkpoint write lost its watcher."""
         from gateway.session_context import get_session_env
 
-        return ProcessSession(
+        session = ProcessSession(
             id=f"proc_{uuid.uuid4().hex[:12]}", command=command, task_id=task_id,
             owner_task_id=owner_task_id or task_id, session_key=session_key, cwd=cwd,
             owner_home=hermes_home_key(),
             parent_session_id=get_session_env("STARDUST_SESSION_ID", ""),
-            started_at=time.time(), **extra)
+            started_at=time.time(), notify_on_complete=notify_on_complete,
+            watch_patterns=list(watch_patterns or ()), **extra)
+        if (notify_on_complete or session.watch_patterns) and get_session_env("STARDUST_SESSION_PLATFORM", ""):
+            # Spawned from a gateway chat (it binds STARDUST_SESSION_<KEY> for each route key):
+            # notices route back to that chat/thread, and a completion gets a gateway watcher.
+            for key in _WATCHER_ROUTE_KEYS:
+                setattr(session, f"watcher_{key}", get_session_env(f"STARDUST_SESSION_{key.upper()}", ""))
+            if notify_on_complete:
+                session.watcher_interval = GATEWAY_WATCHER_INTERVAL_SECONDS
+        return session
 
     @staticmethod
     def _env_temp_dir(env: Any) -> str:
@@ -990,10 +1007,14 @@ class ProcessRegistry(ProcessCheckpointMixin):
 
     def spawn_local(
         self, command: str, cwd: str = None, task_id: str = "", session_key: str = "",
-        env_vars: dict = None, use_pty: bool = False, owner_task_id: str = "") -> ProcessSession:
+        env_vars: dict = None, use_pty: bool = False, owner_task_id: str = "", *,
+        notify_on_complete: bool = False, watch_patterns: Optional[List[str]] = None) -> ProcessSession:
         """Spawn a background process locally (TERMINAL_ENV=local; other backends use
         spawn_via_env()). ``use_pty`` requests a pseudo-terminal via ptyprocess/pywinpty
-        for interactive CLIs, falling back to a plain pipe when unavailable or failing."""
+        for interactive CLIs, falling back to a plain pipe when unavailable or failing.
+        Pass ``notify_on_complete`` / ``watch_patterns`` here: the reader may see the child
+        exit or print before this returns, so flags set on the returned session can come
+        too late (see ``_new_session``)."""
         # Bash parses ``A && B &`` as ``(A && B) &`` — a subshell that holds our stdout
         # pipe open forever when B is a long-running server. The rewriter turns it into
         # ``A && { B & }``. Lazy import: terminal_tool imports this module.
@@ -1001,7 +1022,9 @@ class ProcessRegistry(ProcessCheckpointMixin):
         from tools.terminal_tool_sudo import _rewrite_compound_background as _rewrite_bg
 
         safe_command = _rewrite_bg(command)
-        session = self._new_session(command, task_id, owner_task_id, session_key, _resolve_safe_cwd(cwd or os.getcwd()))
+        session = self._new_session(
+            command, task_id, owner_task_id, session_key, _resolve_safe_cwd(cwd or os.getcwd()),
+            notify_on_complete=notify_on_complete, watch_patterns=watch_patterns)
         pty_scope_attempted = False
         if use_pty:
             try:
@@ -1076,11 +1099,11 @@ class ProcessRegistry(ProcessCheckpointMixin):
         The caller has stopped its own drain thread; the registry's reader continues from
         the pipe's current position and ``output_so_far`` seeds the buffer so nothing
         already captured is lost."""
-        session = self._new_session(command, task_id, owner_task_id, session_key, cwd)
+        session = self._new_session(
+            command, task_id, owner_task_id, session_key, cwd, notify_on_complete=notify_on_complete)
         session.process = proc
         session.pid = proc.pid
         session.host_start_time = self._safe_host_start_time(session.pid)
-        session.notify_on_complete = notify_on_complete
         if output_so_far:
             session.append_output(output_so_far)
         self._track_started(session, self._reader_loop, f"proc-reader-{session.id}")
@@ -1088,12 +1111,15 @@ class ProcessRegistry(ProcessCheckpointMixin):
 
     def spawn_via_env(
         self, env: Any, command: str, cwd: str = None, task_id: str = "", session_key: str = "",
-        timeout: int = 10, owner_task_id: str = "") -> ProcessSession:
+        timeout: int = 10, owner_task_id: str = "", *, notify_on_complete: bool = False,
+        watch_patterns: Optional[List[str]] = None) -> ProcessSession:
         """Spawn a background process inside a non-local backend's sandbox.
         The command is wrapped to capture its in-sandbox PID and redirect output to a
         log file that later execute() calls poll. No live pipe or stdin, but it runs in
-        the correct sandbox context."""
-        session = self._new_session(command, task_id, owner_task_id, session_key, cwd, env_ref=env, pid_scope="sandbox")
+        the correct sandbox context. The notification flags are fixed here, as in spawn_local()."""
+        session = self._new_session(
+            command, task_id, owner_task_id, session_key, cwd, notify_on_complete=notify_on_complete,
+            watch_patterns=watch_patterns, env_ref=env, pid_scope="sandbox")
         temp_dir = self._env_temp_dir(env)
         log_path, pid_path, exit_path = (f"{temp_dir}/hermes_bg_{session.id}.{ext}" for ext in ("log", "pid", "exit"))
         q = shlex.quote
@@ -1391,8 +1417,10 @@ class ProcessRegistry(ProcessCheckpointMixin):
 
     def _move_to_finished(self, session: ProcessSession):
         """Move a session from running to finished.
-        Idempotent: kill_process() and the reader thread can both call this; only
-        the FIRST move enqueues the completion notification, so no duplicates."""
+        Idempotent: kill_process(), the reader thread and exit reconciliation can each
+        call this; only the FIRST move enqueues the completion notification (no
+        duplicates) and then sets ``_completion_event``, so the event never runs ahead
+        of the notification its waiters are about to drain."""
         with self._lock:
             was_running = session.id in self._running
             if was_running:
@@ -1438,7 +1466,11 @@ class ProcessRegistry(ProcessCheckpointMixin):
             }
             _redact_process_result(notification)
             self.completion_queue.put(notification)
-        session._completion_event.set()
+        if was_running:
+            # A later move (the linger's reconcile, a kill) can return while this one is
+            # still writing the checkpoint; had it set the event, a one-shot parent would
+            # wake, drain an empty queue and exit without the follow-up turn.
+            session._completion_event.set()
 
     @staticmethod
     def _exit_fields(session: ProcessSession) -> dict:

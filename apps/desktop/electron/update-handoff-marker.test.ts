@@ -14,6 +14,20 @@ function sandbox(tag: string) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), `hermes-handoff-marker-${tag}-`))
   const installRoot = path.join(home, 'hermes-agent')
   fs.mkdirSync(installRoot)
+  const scripts = process.platform === 'win32' ? 'Scripts' : 'bin'
+  const pythonName = process.platform === 'win32' ? 'python.exe' : 'python'
+  const launcherName = process.platform === 'win32' ? 'stardust.exe' : 'stardust'
+  const scriptsDir = path.join(installRoot, 'venv', scripts)
+  const pythonPath = path.join(scriptsDir, pythonName)
+  const launcherPath = path.join(scriptsDir, launcherName)
+  fs.mkdirSync(scriptsDir, { recursive: true })
+  const executableFixture = process.platform === 'win32' ? 'fixture' : ['#!/bin/sh', 'exit 0', ''].join(os.EOL)
+  fs.writeFileSync(pythonPath, executableFixture)
+  fs.writeFileSync(launcherPath, executableFixture)
+  if (process.platform !== 'win32') {
+    fs.chmodSync(pythonPath, 0o755)
+    fs.chmodSync(launcherPath, 0o755)
+  }
 
   return { home, installRoot }
 }
@@ -26,6 +40,7 @@ function markerStartedAt(home: string): number {
 
 function runPosix(installRoot: string, startedAt?: string) {
   const env = { ...process.env }
+  env.VIRTUAL_ENV = path.join(installRoot, 'venv')
 
   if (startedAt === undefined) {
     delete env.STARDUST_UPDATE_STARTED_AT
@@ -41,6 +56,7 @@ function runPosix(installRoot: string, startedAt?: string) {
 
 function runWindows(installRoot: string, startedAt?: string) {
   const env = { ...process.env }
+  env.VIRTUAL_ENV = path.join(installRoot, 'venv')
 
   if (startedAt === undefined) {
     delete env.STARDUST_UPDATE_STARTED_AT

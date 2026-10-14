@@ -327,6 +327,7 @@ export function findElectron(): string {
  */
 export async function launchDesktop(
   env: Record<string, string>,
+  launchArgs: string[] = [],
 ): Promise<{ app: ElectronApplication; page: Page }> {
   assertDistBuilt()
 
@@ -337,6 +338,7 @@ export async function launchDesktop(
   const app = await _electron.launch({
     executablePath: electronBin,
     args: [
+      ...launchArgs,
       DESKTOP_ROOT, // `electron .` — the `.` is the desktop package dir
       '--disable-gpu',
       '--no-sandbox',
@@ -372,6 +374,8 @@ export interface MockBackendOptions {
    * `display.interim_assistant_messages`.
    */
   extraDisplayConfig?: string
+  /** Explicit opt-in to local-model UI for scenarios that cover it. */
+  localModels?: boolean
   /** Additional top-level config.yaml sections for an E2E scenario. */
   extraConfig?: string
   /** Override the mock model's context window for compression scenarios. */
@@ -409,7 +413,7 @@ export async function setupMockBackend(options: MockBackendOptions = {}): Promis
 
   // 3. Build env + launch
   const env = buildAppEnv(sandbox)
-  const { app, page } = await launchDesktop(env)
+  const { app, page } = await launchDesktop(env, options.localModels ? ["--local"] : [])
 
   return {
     app,

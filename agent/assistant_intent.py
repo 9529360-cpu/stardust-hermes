@@ -524,9 +524,10 @@ def project_cron_job(
 
 ASSISTANT_EXECUTION_GUIDANCE = (
     "Choose the smallest execution mode that satisfies the user's intent: `respond` for conversation, "
-    "explanation, brainstorming, review, and advice; `execute_foreground` for bounded authorized work on the "
-    "current tool surface; `delegate` for scoped coding, research, or multi-step child work while the parent "
-    "remains the orchestrator; `delegate_background` for process-local work that can run without holding the "
+    "explanation, brainstorming, review, and advice; `execute_foreground` for authorized work on the current tool "
+    "surface, including coding and multi-step work, so the user can follow it; `delegate` only when the user asks "
+    "for helpers or independent pieces genuinely run in parallel, relaying each helper's progress and result in "
+    "the conversation; `delegate_background` for process-local work that can run without holding the "
     "foreground, never as a promise of restart durability; `schedule_or_watch` for future, recurring, monitored, "
     "or restart-surviving work through cron or another durable owner; and `clarify` only when a material "
     "user decision, authorization, recipient, or safety-critical fact is genuinely missing. Missing passwords, "

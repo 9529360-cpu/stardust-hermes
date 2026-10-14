@@ -379,7 +379,7 @@ def _resolve_api_mode(agent, api_mode, provider_name, base_url):
         agent.api_mode = "chat_completions"
     elif api_mode in _EXPLICIT_API_MODES:
         agent.api_mode = api_mode
-    elif agent.provider in {"openai-codex", "xai", "xai-oauth"}:
+    elif agent.provider in {"gpt-official", "openai-codex", "xai", "xai-oauth"}:
         agent.api_mode = "codex_responses"
     elif provider_name is None and host == "chatgpt.com" and "/backend-api/codex" in url:
         agent.api_mode = "codex_responses"
@@ -1168,6 +1168,8 @@ def _init_session_state(agent, session_id, session_db, parent_session_id, reason
 def _apply_display_config(agent, _agent_cfg, platform):
     # show_commentary: Codex phase=commentary → interim path (true) or reasoning channel.
     agent.show_commentary = bool(_cfg_dict(_agent_cfg, "display").get("show_commentary", True))
+    # progress_updates: PROGRESS_UPDATE_GUIDANCE in the prompt + the quiet-turn pulse (agent/progress_pulse.py).
+    agent.progress_updates = bool(_cfg_dict(_agent_cfg, "display").get("progress_updates", True))
 
     # Window (seconds) for the bounded /fast auto|cold modes (agent.fast_mode).
     agent.fast_auto_seconds = (_agent_cfg.get("agent") or {}).get("fast_auto_seconds", 60)

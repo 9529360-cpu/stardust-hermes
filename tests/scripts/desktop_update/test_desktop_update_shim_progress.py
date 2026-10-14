@@ -133,8 +133,15 @@ exit "$(cat "$STARDUST_TEST_EXITS.$n" 2>/dev/null || echo 0)"
 def _run_handoff(tmp_path, exits: dict[int, int]) -> list[dict]:
     """Run the real hand-off end to end; return the stage seen at each call."""
     install_root = tmp_path / "hermes-agent"
-    (install_root / "venv" / "bin").mkdir(parents=True)
-    hermes = install_root / "venv" / "bin" / "stardust"
+    venv_bin = install_root / "venv" / "bin"
+    venv_bin.mkdir(parents=True)
+    python = venv_bin / "python"
+    python.write_text("#!/bin/sh" + os.linesep + "exit 0" + os.linesep, encoding="utf-8")
+    python.chmod(0o755)
+    python3 = venv_bin / "python3"
+    python3.write_text(python.read_text(encoding="utf-8"), encoding="utf-8")
+    python3.chmod(0o755)
+    hermes = venv_bin / "stardust"
     hermes.write_text(FAKE_HERMES)
     hermes.chmod(0o755)
 
@@ -149,6 +156,7 @@ def _run_handoff(tmp_path, exits: dict[int, int]) -> list[dict]:
         "STARDUST_TEST_CAPTURE": str(capture),
         "STARDUST_TEST_CALLS": str(calls),
         "STARDUST_TEST_EXITS": str(tmp_path / "exits"),
+        "VIRTUAL_ENV": str(install_root / "venv"),
     }
     # The hand-off daemonizes and the launcher exits immediately; the result
     # file is the orchestrator's own completion signal.

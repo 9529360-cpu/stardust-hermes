@@ -4252,6 +4252,10 @@ export interface PreviewOpenPayload {
 export interface PreviewClosePayload {
   url?: string
 }
+/** ``tools/unified_browser_tool.py`` ``connect``: pair the user's own Chrome to this chat. */
+export interface BrowserHostConnectPayload {
+  chrome_profile_dir?: string
+}
 /** ``tools/apply_layout_tool.py``. */
 export interface LayoutApplyPayload {
   preset: string
@@ -5103,6 +5107,8 @@ export interface BackendGatewayEventMap {
   'browser.controller.cancel': BrowserControllerCancelPayload
   /** Dispatch one browser action to the attached controller. */
   'browser.controller.command': BrowserControllerCommandPayload
+  /** Start the existing-Chrome bridge for this chat, as the Tools page's Connect Chrome does. */
+  'browser.host.connect': BrowserHostConnectPayload
   /** Browser (CDP) connect / install progress line. */
   'browser.progress': BrowserProgressPayload
   /** A /btw side question was answered. */
@@ -5238,6 +5244,7 @@ export const GATEWAY_EVENT_TYPES = [
   'bot_relay.outbox.pending',
   'browser.controller.cancel',
   'browser.controller.command',
+  'browser.host.connect',
   'browser.progress',
   'btw.complete',
   'connection.request',

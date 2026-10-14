@@ -2,7 +2,7 @@ import { atom, computed } from 'nanostores'
 
 import { translateNow } from '@/i18n'
 import { stableArray } from '@/lib/stable-array'
-import { type TodoItem, type TodoStatus, todoTree } from '@/lib/todos'
+import { todoBlockers, type TodoItem, type TodoStatus, todoTree } from '@/lib/todos'
 
 import { $gateway } from './gateway'
 import { $goalsBySession, type GoalStatus } from './goals'
@@ -33,6 +33,8 @@ export interface ComposerStatusItem {
   currentTool?: string
   /** todo: nesting depth (0 = top-level) for indented subtask rows. */
   depth?: number
+  /** todo: prerequisite ids that are not completed yet. */
+  blockedBy?: string[]
   /** goal: active | paused | waiting | done. */
   goalStatus?: GoalStatus
   id: string
@@ -156,14 +158,19 @@ const subToItem = (s: SubagentProgress): ComposerStatusItem => ({
   type: 'subagent'
 })
 
-const todoToItem = (t: TodoItem, depth: number): ComposerStatusItem => ({
-  depth,
-  id: `todo:${t.id}`,
-  state: t.status === 'in_progress' ? 'running' : 'done',
-  title: t.content,
-  todoStatus: t.status,
-  type: 'todo'
-})
+const todoToItem = (t: TodoItem, depth: number, todos: readonly TodoItem[]): ComposerStatusItem => {
+  const blockers = todoBlockers(t, todos)
+
+  return {
+    ...(blockers.length > 0 ? { blockedBy: blockers } : {}),
+    depth,
+    id: `todo:${t.id}`,
+    state: t.status === 'in_progress' ? 'running' : 'done',
+    title: t.content,
+    todoStatus: t.status,
+    type: 'todo'
+  }
+}
 
 const goalToItem = (goal: { detail?: string; status: GoalStatus; title: string }): ComposerStatusItem => ({
   currentTool: goal.detail,
@@ -194,6 +201,8 @@ const sameStatusItem = (a: ComposerStatusItem, b: ComposerStatusItem) =>
   a.currentTool === b.currentTool &&
   a.goalStatus === b.goalStatus &&
   a.todoStatus === b.todoStatus &&
+  a.blockedBy?.length === b.blockedBy?.length &&
+  (a.blockedBy ?? []).every((id, index) => id === b.blockedBy?.[index]) &&
   a.depth === b.depth &&
   a.sessionId === b.sessionId
 
@@ -223,7 +232,7 @@ export const $statusItemsBySession = computed(
     for (const [sid, list] of Object.entries(todos)) {
       push(
         sid,
-        todoTree(list).map(([t, depth]) => todoToItem(t, depth))
+        todoTree(list).map(([t, depth]) => todoToItem(t, depth, list))
       )
     }
 

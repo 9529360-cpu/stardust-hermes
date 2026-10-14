@@ -17,6 +17,8 @@ beforeAll(() => {
 
 const getGlobalModelInfo = vi.fn()
 const getGlobalModelOptions = vi.fn()
+const getCustomEndpoints = vi.fn()
+const activateCustomEndpoint = vi.fn()
 const getAuxiliaryModels = vi.fn()
 const getMoaModels = vi.fn()
 const setModelAssignment = vi.fn()
@@ -28,8 +30,9 @@ const saveHermesConfig = vi.fn()
 const profileSwitchHandlers = new Set<() => void>()
 
 vi.mock('@/hermes', () => ({
+  activateCustomEndpoint: (...args: unknown[]) => activateCustomEndpoint(...args),
   getGlobalModelInfo: (profile?: null | string) => getGlobalModelInfo(profile),
-  getCustomEndpoints: () => Promise.resolve({ endpoints: [] }),
+  getCustomEndpoints: (...args: unknown[]) => getCustomEndpoints(...args),
   getGlobalModelOptions: (opts?: unknown, profile?: null | string) => getGlobalModelOptions(opts, profile),
   getAuxiliaryModels: (profile?: null | string) => getAuxiliaryModels(profile),
   getApiRequestProfile: () => 'default',
@@ -58,12 +61,15 @@ vi.mock('../hooks/use-on-profile-switch', () => ({
 
 beforeEach(() => {
   getGlobalModelInfo.mockResolvedValue({ provider: 'nous', model: 'hermes-4' })
+  getCustomEndpoints.mockResolvedValue({ endpoints: [] })
+  activateCustomEndpoint.mockResolvedValue({ ok: true, provider: 'custom:magpie', model: 'magpie/model' })
   getGlobalModelOptions.mockResolvedValue({
     providers: [
       {
         name: 'Nous',
         slug: 'nous',
         models: ['hermes-4', 'hermes-4-mini'],
+        model_names: { 'hermes-4': 'Hermes 4' },
         authenticated: true,
         capabilities: { 'hermes-4': { reasoning: true, fast: true } }
       }
@@ -87,7 +93,11 @@ afterEach(() => {
   profileSwitchHandlers.clear()
 })
 
-async function renderModelSettings(scopeProfile?: string, initialEntries: string[] = ['/']) {
+async function renderModelSettings(
+  scopeProfile?: string,
+  initialEntries: string[] = ['/'],
+  onConfigSaved?: () => void
+) {
   const { ModelSettings } = await import('./model-settings')
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 
@@ -96,7 +106,7 @@ async function renderModelSettings(scopeProfile?: string, initialEntries: string
     // needs a router context in tests (the app provides HashRouter at root).
     <MemoryRouter initialEntries={initialEntries}>
       <QueryClientProvider client={client}>
-        <ModelSettings scopeProfile={scopeProfile} />
+        <ModelSettings onConfigSaved={onConfigSaved} scopeProfile={scopeProfile} />
       </QueryClientProvider>
     </MemoryRouter>
   )
@@ -158,6 +168,32 @@ describe('ModelSettings', () => {
     expect(screen.queryByRole('button', { name: 'Choose another service' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Advanced connection settings' })).toBeNull()
     expect(screen.queryByText(/provider accounts/i)).toBeNull()
+  })
+
+  it('refreshes the shared chat model catalog after activating a saved service', async () => {
+    getCustomEndpoints.mockResolvedValue({
+      current: { provider: 'nous', model: 'hermes-4', base_url: '' },
+      endpoints: [
+        {
+          id: 'magpie',
+          name: 'Magpie',
+          base_url: 'http://127.0.0.1:3425/v1',
+          model: 'magpie/model',
+          models: ['magpie/model'],
+          discover_models: true,
+          is_current: false,
+          has_api_key: false,
+          source: 'providers'
+        }
+      ]
+    })
+    const onConfigSaved = vi.fn()
+
+    await renderModelSettings(undefined, ['/'], onConfigSaved)
+    fireEvent.click(await screen.findByRole('button', { name: 'Set as default' }))
+
+    await waitFor(() => expect(onConfigSaved).toHaveBeenCalledTimes(1))
+    expect(activateCustomEndpoint).toHaveBeenCalledWith('magpie', undefined)
   })
 
   it('reloads authoritative model state when the active profile changes', async () => {
@@ -255,6 +291,11 @@ describe('ModelSettings', () => {
     expect(reasoningSelect.compareDocumentPosition(await screen.findByRole('combobox', { name: 'Vision model' }))).toBe(
       Node.DOCUMENT_POSITION_PRECEDING
     )
+
+    const modelSelect = await screen.findByRole('combobox', { name: 'Vision model' })
+    fireEvent.click(modelSelect)
+    expect(await screen.findByRole('option', { name: 'Hermes 4' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('option', { name: 'Hermes 4' }))
 
     fireEvent.click(reasoningSelect)
     fireEvent.click(await screen.findByRole('option', { name: 'High' }))
@@ -428,6 +469,10 @@ describe('ModelSettings MoA preset editor', () => {
           name: 'OpenRouter',
           slug: 'openrouter',
           models: ['deepseek/deepseek-v4-pro', 'anthropic/claude-opus-4.8'],
+          model_names: {
+            'deepseek/deepseek-v4-pro': 'DeepSeek V4 Pro',
+            'anthropic/claude-opus-4.8': 'Claude Opus 4.8'
+          },
           authenticated: true
         }
       ]
@@ -500,7 +545,7 @@ describe('ModelSettings MoA preset editor', () => {
       await vi.advanceTimersByTimeAsync(700)
 
       fireEvent.click(slotSelects().ref1Model)
-      fireEvent.click(await screen.findByRole('option', { name: 'anthropic/claude-opus-4.8' }))
+      fireEvent.click(await screen.findByRole('option', { name: 'Claude Opus 4.8' }))
       await vi.advanceTimersByTimeAsync(700)
 
       expect(saveMoaModels).toHaveBeenCalledTimes(1)
@@ -570,9 +615,13 @@ describe('ModelSettings MoA preset editor', () => {
       await openReferenceEditor()
       fireEvent.click(screen.getByRole('switch', { name: 'Enabled' }))
       await act(async () => {
-        for (const handler of [...profileSwitchHandlers]) { handler() }
+        for (const handler of [...profileSwitchHandlers]) {
+          handler()
+        }
       })
-      await act(async () => { await vi.advanceTimersByTimeAsync(700) })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(700)
+      })
       expect(saveMoaModels).not.toHaveBeenCalled()
     } finally {
       vi.useRealTimers()
@@ -584,16 +633,27 @@ describe('ModelSettings MoA preset editor', () => {
 
     try {
       let resolveSave!: (value: ReturnType<typeof moaConfig>) => void
-      saveMoaModels.mockImplementationOnce(() => new Promise(resolve => {resolveSave = resolve}))
+      saveMoaModels.mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            resolveSave = resolve
+          })
+      )
       await openReferenceEditor()
       fireEvent.click(screen.getByRole('switch', { name: 'Enabled' }))
-      await act(async () => { await vi.advanceTimersByTimeAsync(700) })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(700)
+      })
       expect(saveMoaModels).toHaveBeenCalledTimes(1)
       await act(async () => {
-        for (const handler of [...profileSwitchHandlers]) { handler() }
+        for (const handler of [...profileSwitchHandlers]) {
+          handler()
+        }
       })
       await waitFor(() => expect(getMoaModels).toHaveBeenCalledTimes(2))
-      await act(async () => { resolveSave({ ...moaConfig(), presets: { default: { ...moaConfig().presets.default, enabled: false } } }) })
+      await act(async () => {
+        resolveSave({ ...moaConfig(), presets: { default: { ...moaConfig().presets.default, enabled: false } } })
+      })
       expect(screen.getByRole('switch', { name: 'Enabled' }).getAttribute('aria-checked')).toBe('true')
     } finally {
       vi.useRealTimers()

@@ -19,6 +19,7 @@ TODO_SESSION_STATE_KEY = "_todo_state"
 # model-authored items and caller-replayed API history.
 MAX_TODO_CONTENT_CHARS = 4000
 MAX_TODO_ITEMS = 256
+MAX_TODO_DEPENDENCIES = 16
 # Max single todo tool-result payload accepted during history hydration, so a forged
 # oversized result is dropped before parsing (AIAgent._hydrate_todo_store).
 MAX_TODO_RESULT_CHARS = 512_000
@@ -32,17 +33,19 @@ _ACTIVE_STATUSES = {"pending", "in_progress"}
 
 class TodoStore:
     """In-memory todo list, one per AIAgent. List position is priority; items are
-    ``{id, content, status, parent?}`` — ``parent`` nests a subtask."""
+    ``{id, content, status, parent?, depends_on?}``; ``parent`` nests a subtask, while each
+    ``depends_on`` id must be completed before the item can start."""
 
     def __init__(self):
-        self._items: List[Dict[str, str]] = []
+        self._items: List[Dict[str, Any]] = []
         self._revision = 0
 
-    def _fresh_items(self, todos: List[Dict[str, Any]]) -> List[Dict[str, str]]:
-        """Validate, dedupe and order a whole new list (replace / restore)."""
-        return self._normalize_order([self._validate(t) for t in self._dedupe_by_id(todos)])
+    def _fresh_items(self, todos: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Validate and dedupe a whole new list (replace / restore)."""
+        items = [self._validate(t) for t in self._dedupe_by_id(todos)]
+        return items
 
-    def write(self, todos: List[Dict[str, Any]], merge: bool = False) -> List[Dict[str, str]]:
+    def write(self, todos: List[Dict[str, Any]], merge: bool = False) -> List[Dict[str, Any]]:
         """Replace the list (default) or merge by id; returns the full list after writing."""
         before = self.read()
         if merge:
@@ -50,7 +53,7 @@ class TodoStore:
         else:
             self._items = self._fresh_items(todos)
         del self._items[MAX_TODO_ITEMS:]  # keep the priority head; replays can't grow unbounded
-        self._sanitize_parents(self._items)
+        self._normalize_items()
         if self._items != before:
             self._revision += 1
         return self.read()
@@ -78,12 +81,21 @@ class TodoStore:
                     cur["parent"] = parent
                 else:
                     cur.pop("parent", None)
+            if isinstance(t.get("depends_on"), list):
+                dependencies = self._normalize_dependencies(t.get("depends_on"))
+                if dependencies:
+                    cur["depends_on"] = dependencies
+                else:
+                    cur.pop("depends_on", None)
         # Rebuild preserving original order for existing items (first occurrence wins).
         rebuilt = {item["id"]: existing.get(item["id"], item) for item in self._items}
-        self._items = self._normalize_order(list(rebuilt.values()))
+        self._items = list(rebuilt.values())
 
-    def read(self) -> List[Dict[str, str]]:
-        return [item.copy() for item in self._items]
+    def read(self) -> List[Dict[str, Any]]:
+        return [
+            {**item, **({"depends_on": item["depends_on"].copy()} if "depends_on" in item else {})}
+            for item in self._items
+        ]
 
     def has_items(self) -> bool:
         return bool(self._items)
@@ -92,9 +104,10 @@ class TodoStore:
         """Full state clients can reconcile atomically."""
         return {"todos": self.read(), "revision": self._revision}
 
-    def restore(self, todos: List[Dict[str, Any]], *, revision: Any = 0) -> List[Dict[str, str]]:
+    def restore(self, todos: List[Dict[str, Any]], *, revision: Any = 0) -> List[Dict[str, Any]]:
         """Restore a trusted snapshot without manufacturing a new revision."""
         self._items = self._fresh_items(todos)[:MAX_TODO_ITEMS]
+        self._normalize_items()
         try:
             self._revision = max(0, int(revision or 0))
         except (TypeError, ValueError):
@@ -108,12 +121,12 @@ class TodoStore:
         active so subtasks keep context."""
         if not self._items:
             return None
-        children: Dict[str, List[Dict[str, str]]] = {}
+        children: Dict[str, List[Dict[str, Any]]] = {}
         for item in self._items:
             if item.get("parent"):
                 children.setdefault(item["parent"], []).append(item)
 
-        def render(item: Dict[str, str], depth: int, out: List[str]) -> bool:
+        def render(item: Dict[str, Any], depth: int, out: List[str]) -> bool:
             kid_lines: List[str] = []
             has_active_kid = False
             for kid in children.get(item["id"], []):
@@ -121,8 +134,12 @@ class TodoStore:
             keep = item["status"] in _ACTIVE_STATUSES or has_active_kid
             if keep:
                 marker = _STATUS_MARKERS.get(item["status"], "[?]")
-                out.append(f"{'  ' * depth}- {marker} {item['id']}. "
-                           f"{item['content']} ({item['status']})")
+                line = (f"{'  ' * depth}- {marker} {item['id']}. "
+                        f"{item['content']} ({item['status']})")
+                blockers = self.dependency_blockers(item, self._items)
+                if blockers:
+                    line += f" [waiting for: {', '.join(blockers)}]"
+                out.append(line)
                 out.extend(kid_lines)
             return keep
 
@@ -140,8 +157,8 @@ class TodoStore:
         return content
 
     @staticmethod
-    def _validate(item: Dict[str, Any]) -> Dict[str, str]:
-        """Normalize one item to ``{id, content, status, parent?}`` (placeholders when missing)."""
+    def _validate(item: Dict[str, Any]) -> Dict[str, Any]:
+        """Normalize one item and preserve optional hierarchy and prerequisite relationships."""
         if not isinstance(item, dict):
             return {"id": "?", "content": "(invalid item)", "status": "pending"}
         item_id = str(item.get("id", "")).strip() or "?"
@@ -153,10 +170,44 @@ class TodoStore:
         parent = str(item.get("parent") or "").strip()
         if parent and parent != item_id:
             result["parent"] = parent
+        dependencies = TodoStore._normalize_dependencies(item.get("depends_on"))
+        if dependencies:
+            result["depends_on"] = dependencies
         return result
 
     @staticmethod
-    def _sanitize_parents(items: List[Dict[str, str]]) -> None:
+    def _normalize_dependencies(value: Any) -> List[str]:
+        """Keep a bounded, ordered list of prerequisite task ids."""
+        if not isinstance(value, list):
+            return []
+        result: List[str] = []
+        for raw_id in value[:MAX_TODO_DEPENDENCIES]:
+            dependency_id = str(raw_id or "").strip()
+            if dependency_id and dependency_id not in result:
+                result.append(dependency_id)
+        return result
+
+    @staticmethod
+    def dependency_blockers(item: Dict[str, Any], items: List[Dict[str, Any]]) -> List[str]:
+        """Return missing or unfinished prerequisites in their authored order."""
+        dependencies = item.get("depends_on")
+        if not isinstance(dependencies, list) or not dependencies:
+            return []
+        status_by_id = {candidate["id"]: candidate["status"] for candidate in items}
+        return [dependency_id for dependency_id in dependencies
+                if status_by_id.get(dependency_id) != "completed"]
+
+    def _normalize_items(self) -> None:
+        """Keep hierarchy and activation state valid after writes and snapshot restores."""
+        self._sanitize_parents(self._items)
+        for item in self._items:
+            if item["status"] == "in_progress" and self.dependency_blockers(item, self._items):
+                item["status"] = "pending"
+        self._items = self._normalize_order(self._items)
+        self._items = self._keep_single_active(self._items)
+
+    @staticmethod
+    def _sanitize_parents(items: List[Dict[str, Any]]) -> None:
         """Drop dangling parent refs and break cycles in place (such items become roots)."""
         by_id = {item["id"]: item for item in items}
         for item in items:
@@ -181,7 +232,7 @@ class TodoStore:
         return [todos[i] for i in sorted(last_index.values())]
 
     @staticmethod
-    def _normalize_order(items: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    def _normalize_order(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Lift the in_progress step ahead of any earlier pending placeholder. Nested lists
         keep authored order — reordering would tear a subtask from its siblings."""
         statuses = [item["status"] for item in items]
@@ -193,6 +244,19 @@ class TodoStore:
         normalized = items.copy()
         normalized.insert(statuses.index("pending"), normalized.pop(active_index))
         return normalized
+
+    @staticmethod
+    def _keep_single_active(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Keep the first active item by list priority; return conflicting items to pending."""
+        active_seen = False
+        for item in items:
+            if item["status"] != "in_progress":
+                continue
+            if active_seen:
+                item["status"] = "pending"
+            else:
+                active_seen = True
+        return items
 
 
 def load_todo_session_state(session_db: Any, session_id: str) -> Optional[Dict[str, Any]]:
@@ -255,6 +319,10 @@ def todo_tool(todos: Optional[List[Dict[str, Any]]] = None, merge: bool = False,
     """Write ``todos`` (replace, or ``merge`` by id) or read when None -> list + summary JSON."""
     if store is None:
         return tool_error("TodoStore not initialized")
+    previously_active_ids = [
+        item["id"] for item in store.read() if item["status"] == "in_progress"
+    ]
+    requested_active_ids: List[str] = []
     if todos is None:
         items = store.read()
     else:
@@ -265,12 +333,41 @@ def todo_tool(todos: Optional[List[Dict[str, Any]]] = None, merge: bool = False,
                 return tool_error("todos must be a list of objects, got unparseable string")
         if not isinstance(todos, list):
             return tool_error(f"todos must be a list, got {type(todos).__name__}")
+        requested_active_ids = [
+            str(item.get("id", "")).strip() or "?"
+            for item in todos
+            if isinstance(item, dict)
+            and str(item.get("status", "")).strip().lower() == "in_progress"
+        ]
         items = store.write(todos, merge)
     summary = {"total": len(items)}
     for status in ("pending", "in_progress", "completed", "cancelled"):
         summary[status] = sum(1 for i in items if i["status"] == status)
-    return json.dumps({"todos": items, "revision": store.snapshot()["revision"],
-                       "summary": summary}, ensure_ascii=False)
+    result: Dict[str, Any] = {
+        "todos": items, "revision": store.snapshot()["revision"], "summary": summary,
+    }
+    active_ids = {item["id"] for item in items if item["status"] == "in_progress"}
+    items_by_id = {item["id"]: item for item in items}
+    blocked_ids = set()
+    warnings = []
+    for item_id in dict.fromkeys(requested_active_ids + previously_active_ids):
+        item = items_by_id.get(item_id)
+        blockers = TodoStore.dependency_blockers(item, items) if item else []
+        if item_id not in active_ids and blockers:
+            blocked_ids.add(item_id)
+            warnings.append(
+                f"Task {item_id} remains pending until prerequisite tasks are completed: "
+                f"{', '.join(blockers)}."
+            )
+    if any(item_id not in active_ids and item_id not in blocked_ids for item_id in requested_active_ids):
+        warnings.append(
+            "Only one todo may be in_progress. The first active item by list priority remains active; "
+            "conflicting activation requests are pending. Complete or cancel the active item before "
+            "activating another."
+        )
+    if warnings:
+        result["warnings"] = warnings
+    return json.dumps(result, ensure_ascii=False)
 
 
 def check_todo_requirements() -> bool:
@@ -291,6 +388,7 @@ TODO_SCHEMA = {
         "Call with no parameters to read the current list.\n"
         "List order is priority. Only ONE item in_progress at a time. "
         "Break large phases into subtasks via parent. "
+        "Use depends_on for prerequisites; a task cannot start until every prerequisite is completed. "
         "Mark an item completed only after the work is verified done, never "
         "based on intent. If something fails, cancel it and add a revised "
         "item. Always returns the full current list."
@@ -318,6 +416,12 @@ TODO_SCHEMA = {
                         "parent": {
                             "type": "string",
                             "description": "Optional id of another item, making this a nested subtask. Omit for top-level."
+                        },
+                        "depends_on": {
+                            "type": "array",
+                            "description": "Optional task ids that must be completed before this task can start.",
+                            "items": {"type": "string"},
+                            "maxItems": MAX_TODO_DEPENDENCIES
                         }
                     },
                     "required": ["id", "content", "status"]

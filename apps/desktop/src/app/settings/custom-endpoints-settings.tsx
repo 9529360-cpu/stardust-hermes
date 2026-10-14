@@ -64,6 +64,9 @@ const EMPTY_FORM: EndpointForm = {
   name: ''
 }
 
+const MAGPIE_GATEWAY_URL = 'http://127.0.0.1:3425/v1'
+const MAGPIE_RELEASES_URL = 'https://github.com/yetone/magpie-releases/releases'
+
 // The Electron REST bridge reports HTTP failures as `Error("<status>: <body>")`.
 function isConflictError(error: unknown): boolean {
   return /(^|\s)409:/.test(error instanceof Error ? error.message : String(error))
@@ -203,10 +206,10 @@ export function CustomEndpointsSettings({
     setProbeMessage(null)
   }
 
-  function beginAdd() {
+  function beginAdd(prefill: Partial<EndpointForm> = {}) {
     probeRevision.current++
     setEditorMode('add')
-    setForm({ ...EMPTY_FORM, makeDefault: !hasMainModel })
+    setForm({ ...EMPTY_FORM, makeDefault: !hasMainModel, ...prefill })
     setDiscoveredModels([])
     setAdvancedOpen(false)
     setProbeMessage(null)
@@ -413,6 +416,19 @@ export function CustomEndpointsSettings({
           />
 
           <div className="grid gap-3">
+            {form.baseUrl === MAGPIE_GATEWAY_URL && (
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <p className="text-xs text-muted-foreground">{c.magpieHelp}</p>
+                <Button
+                  onClick={() => void window.stardustDesktop?.openExternal(MAGPIE_RELEASES_URL)}
+                  size="inline"
+                  type="button"
+                  variant="text"
+                >
+                  {c.magpieDownload}
+                </Button>
+              </div>
+            )}
             <label className="grid gap-1.5 text-xs text-muted-foreground">
               {c.nameLabel}
               <Input
@@ -550,15 +566,27 @@ export function CustomEndpointsSettings({
       <section>
         <SectionHeading
           aside={
-            <Button onClick={beginAdd} size="sm" type="button" variant="secondary">
-              <Plus />
-              {c.addTitle}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => beginAdd({ name: c.magpieName, baseUrl: MAGPIE_GATEWAY_URL })}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                <Zap />
+                {c.magpieSetup}
+              </Button>
+              <Button onClick={() => beginAdd()} size="sm" type="button" variant="secondary">
+                <Plus />
+                {c.addTitle}
+              </Button>
+            </div>
           }
           icon={Globe}
           meta={`${endpoints.length}`}
           title={c.title}
         />
+        <p className="mb-3 text-xs text-muted-foreground">{c.defaultScopeHint}</p>
         {endpoints.length ? (
           <div>
             {endpoints.map(endpoint => (

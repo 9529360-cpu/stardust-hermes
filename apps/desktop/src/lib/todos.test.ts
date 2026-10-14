@@ -7,6 +7,7 @@ import {
   parseTodoPatch,
   parseTodoRevision,
   parseTodos,
+  todoBlockers,
   todoTree
 } from './todos'
 
@@ -52,6 +53,16 @@ describe('todoTree', () => {
     expect(parseTodos([{ content: 'x', id: 'c', parent: 'p', status: 'pending' }])).toEqual([
       { content: 'x', id: 'c', parent: 'p', status: 'pending' }
     ])
+  })
+
+  it('preserves dependencies and derives incomplete blockers', () => {
+    const todos = parseTodos([
+      { content: 'Prepare', id: 'setup', status: 'completed' },
+      { content: 'Compile', depends_on: ['setup', 'missing'], id: 'build', status: 'pending' }
+    ])!
+
+    expect(todos[1]?.dependsOn).toEqual(['setup', 'missing'])
+    expect(todoBlockers(todos[1]!, todos)).toEqual(['missing'])
   })
 })
 
@@ -164,6 +175,14 @@ describe('mergeTodoItems', () => {
     expect(mergeTodoItems(list, [{ id: 'v', status: 'pending' }])).toEqual([
       ...list,
       { content: '(no description)', id: 'v', status: 'pending' }
+    ])
+  })
+
+  it('applies dependency updates, including clearing the list', () => {
+    const current = [{ content: 'Build', dependsOn: ['setup'], id: 'build', status: 'pending' as const }]
+
+    expect(mergeTodoItems(current, [{ dependsOn: [], id: 'build', status: 'pending' }])).toEqual([
+      { content: 'Build', dependsOn: [], id: 'build', status: 'pending' }
     ])
   })
 })

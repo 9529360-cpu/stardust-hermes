@@ -1,6 +1,5 @@
-"""With verify-on-stop off (the default) the evidence ledger must be fully inert: no
-recording, no staleness tracking, and no ``verification_evidence.db`` ever created.
-The ledger's only consumer is the stop guard; an unconsumed ledger is disk churn."""
+"""When verify-on-stop resolves off for a messaging session, the evidence ledger is inert:
+no recording, no staleness tracking, and no ``verification_evidence.db`` is created."""
 
 from pathlib import Path
 
@@ -17,9 +16,11 @@ from agent.verification_evidence import (
 @pytest.fixture
 def project(tmp_path, monkeypatch):
     monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+    monkeypatch.setenv("STARDUST_SESSION_PLATFORM", "telegram")
     monkeypatch.delenv("STARDUST_VERIFY_ON_STOP", raising=False)
     root = tmp_path / "project"
     root.mkdir()
+    (root / ".git").mkdir()
     (root / "package.json").write_text('{"scripts": {"test": "vitest"}}', encoding="utf-8")
     return root
 

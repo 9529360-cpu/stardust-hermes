@@ -8,9 +8,10 @@ from __future__ import annotations
 import contextvars
 import json
 import logging
+import threading
 import time
 from concurrent.futures import FIRST_COMPLETED, wait as _cf_wait
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Any, Dict, List, Optional
 
 from tools.async_delegation import _new_delegation_id, record_unit_child
@@ -48,6 +49,7 @@ class _Batch:
     # Set on per-group units carved out by ``_dispatch_background``; None for the whole batch / ungrouped units.
     group: Optional[str] = None
     unit_id: Optional[str] = None  # the async registry id this unit runs under (``<call_id>-k`` for split calls)
+    cancel_event: threading.Event = field(default_factory=threading.Event, repr=False)
 
     def owner_kwargs(self) -> Dict[str, Any]:
         """Steer/stop authority of the originating session, passed to every child run."""
@@ -106,56 +108,126 @@ def _report_child_done(parent_agent, spinner_ref, entry, tag, task_labels, n_tas
         with _quiet("Spinner update_text failed: %s"):
             spinner_ref.update_text(f"🔀 {'[' + tag + '] ' if tag else ''}{remaining} task{'s' if remaining != 1 else ''} remaining")
 
+_SYNC_INTERRUPT_GRACE_SECONDS = 5.0
+
+
 def _run_children_parallel(batch: _Batch, results: list, *, honor_parent_interrupt: bool) -> None:
-    """Run the batch's children in parallel, appending entries to ``results`` (sorted by task_index on return, one
-    completion line printed per child). Polls futures with a short ``wait()`` timeout so a parent interrupt is
-    noticed promptly. The still-pending children already got the interrupt signal, and leaving the executor joins
-    them regardless, so their entries are what they actually returned: a child that finished its work while the
-    parent was stopping keeps its result instead of being reported ``interrupted``."""
-    # Daemon workers (tools.daemon_pool): the `with` block still joins normally, but if the parent is interrupted
-    # while a child is wedged, the abandoned worker must not block interpreter exit.
+    """Join parallel results without hanging indefinitely after parent cancellation.
+
+    A child that finishes during cancellation keeps its real result. A worker
+    that does not unwind within the grace period is explicitly UNKNOWN, not
+    falsely marked interrupted: its cooperative stop may still be pending.
+    """
     from tools.daemon_pool import DaemonThreadPoolExecutor
+
     parent_agent, n_tasks = batch.parent_agent, len(batch.task_list)
     task_labels = [t["goal"][:40] for t in batch.task_list]
     spinner_ref = getattr(parent_agent, "_delegate_spinner", None)
-    _tag = format_batch_tag(batch.live_deleg_id, parent_agent)
-    # Fabricated entries for raised futures carry the correct _delegate_role.
-    _child_by_index = {i: child for (i, _, child) in batch.children}
-    n_here = len(batch.children)  # a per-group unit runs a subset; ``n_tasks`` keeps the call-wide ``i/N`` slot
+    tag = format_batch_tag(batch.live_deleg_id, parent_agent)
+    child_by_index = {i: child for (i, _, child) in batch.children}
+    n_here = len(batch.children)
 
-    def _entry_of(future, idx):
+    def entry_of(future, idx):
         try:
             return future.result()
         except Exception as exc:
-            return _fabricated_entry(idx, "error", str(exc), _child_by_index.get(idx))
+            return _fabricated_entry(idx, "error", str(exc), child_by_index.get(idx))
 
-    with DaemonThreadPoolExecutor(max_workers=batch.max_children) as executor:
-        futures = {executor.submit(contextvars.copy_context().run, batch.run_child, i, t, child): i for i, t, child in batch.children}
+    executor = DaemonThreadPoolExecutor(max_workers=batch.max_children)
+    try:
+        futures = {
+            executor.submit(contextvars.copy_context().run, batch.run_child, i, t, child): i
+            for i, t, child in batch.children
+        }
         pending = set(futures)
-        while pending:
-            if honor_parent_interrupt and getattr(parent_agent, "_interrupt_requested", False) is True:
-                _cf_wait(pending)
-                results.extend(_entry_of(f, futures[f]) for f in pending)
-                break
-            done, pending = _cf_wait(pending, timeout=0.5, return_when=FIRST_COMPLETED)
-            for future in done:
-                entry = _entry_of(future, futures[future])
+
+        def collect_done(done_futures):
+            for future in done_futures:
+                entry = entry_of(future, futures[future])
                 results.append(entry)
                 if not honor_parent_interrupt and batch.unit_id:
-                    # Detached unit: a crash before the join must not lose children that already finished.
                     record_unit_child(batch.unit_id, entry)
-                _report_child_done(parent_agent, spinner_ref, entry, _tag, task_labels, n_tasks, n_here - len(results))
+                _report_child_done(parent_agent, spinner_ref, entry, tag, task_labels, n_tasks, n_here - len(results))
                 if (not honor_parent_interrupt and batch.unit_id and entry.get("status") in SUBAGENT_FAILURE_STATUSES
                         and len(results) < n_here):
-                    # Detached unit, a sibling is still running: tell the parent NOW, not when the last one finishes.
-                    # Non-durable and separate from the unit's final result (which is still delivered once).
                     with _quiet("task failure notice failed", exc_info=True):
                         from tools.async_delegation import push_task_failure_notice
-                        _i = entry.get("task_index", -1)
-                        _live = batch.live_paths[_i] if isinstance(_i, int) and 0 <= _i < len(batch.live_paths) else None
+                        idx = entry.get("task_index", -1)
+                        live = batch.live_paths[idx] if isinstance(idx, int) and 0 <= idx < len(batch.live_paths) else None
                         push_task_failure_notice(
-                            batch.unit_id, {**entry, **({"live_transcript": _live} if _live else {})}, n_tasks=n_tasks)
-    results.sort(key=lambda r: r["task_index"])  # match input order
+                            batch.unit_id, {**entry, **({"live_transcript": live} if live else {})}, n_tasks=n_tasks,
+                        )
+
+        while pending:
+            done, pending = _cf_wait(pending, timeout=0.5, return_when=FIRST_COMPLETED)
+            collect_done(done)
+            if not pending:
+                break
+
+            parent_cancel = honor_parent_interrupt and getattr(parent_agent, "_interrupt_requested", False) is True
+            unit_cancel = batch.cancel_event.is_set()
+            if not (parent_cancel or unit_cancel):
+                continue
+
+            # Never wait without a deadline after either parent or registry cancellation.
+            stop_reason = (
+                (getattr(parent_agent, "_interrupt_message", None) or "Parent cancelled delegated work")
+                if parent_cancel else "Async delegation cancelled"
+            )
+            hard_event = getattr(parent_agent, "_hard_interrupt_requested", None)
+            hard_cancel = unit_cancel or hard_event is None or hard_event.is_set()
+            for future in pending:
+                child = child_by_index[futures[future]]
+                if hard_cancel:
+                    _signal_child_stop(child, stop_reason)
+                else:
+                    with _quiet("Soft child interrupt failed", exc_info=True):
+                        child.interrupt(stop_reason)
+
+            done, pending = _cf_wait(pending, timeout=_SYNC_INTERRUPT_GRACE_SECONDS)
+            collect_done(done)
+            for future in pending:
+                idx = futures[future]
+                entry = _fabricated_entry(
+                    idx, "unknown",
+                    "Cancellation was requested, but this worker did not exit within the grace period. "
+                    "It may still be finishing; inspect its transcript/worktree before retrying or integrating.",
+                    child_by_index[idx],
+                )
+                entry["cancellation_pending"] = True
+                entry["exit_reason"] = "termination_unconfirmed"
+                results.append(entry)
+                _report_child_done(parent_agent, spinner_ref, entry, tag, task_labels, n_tasks, n_here - len(results))
+
+                def finalize_after_worker_exit(done_future, task_index=idx):
+                    """Run lifecycle side effects only after an UNKNOWN worker actually exits."""
+                    late_entry = entry_of(done_future, task_index)
+                    member = next((item for item in batch.children if item[0] == task_index), None)
+                    if member is None:
+                        return
+                    _finalize_child_results([late_entry], batch.task_list, [member], parent_agent)
+                    if task_index < len(batch.live_writers) and batch.live_writers[task_index] is not None:
+                        with _quiet("Late child transcript finalize failed", exc_info=True):
+                            batch.live_writers[task_index].finalize(late_entry)
+                    if batch.live_deleg_id:
+                        with _quiet("Late child manifest update failed", exc_info=True):
+                            from tools.delegation_live_log import update_manifest_statuses
+                            update_manifest_statuses(batch.live_deleg_id, [late_entry])
+
+                callback_context = contextvars.copy_context()
+
+                def finalize_in_request_context(
+                    done_future, context=callback_context, finalizer=finalize_after_worker_exit,
+                ):
+                    context.run(finalizer, done_future)
+
+                future.add_done_callback(finalize_in_request_context)
+            break
+    finally:
+        # The completed path has no live workers. On cancellation, the others
+        # must remain daemon-owned until their own finally blocks close them.
+        executor.shutdown(wait=False)
+    results.sort(key=lambda entry: entry["task_index"])
 
 def _execute_and_aggregate(batch: _Batch, *, honor_parent_interrupt: bool = True) -> dict:
     """Run the batch's built children, join, finalize (hooks + cost rollup), return the combined dict. Shared by the
@@ -164,23 +236,26 @@ def _execute_and_aggregate(batch: _Batch, *, honor_parent_interrupt: bool = True
     record (retention pruning happens on future dispatches)."""
     from tools.delegation_live_log import update_manifest_statuses
     results: list = []
-    if len(batch.children) == 1:
-        results.append(batch.run_child(*batch.children[0]))
-    else:
-        _run_children_parallel(batch, results, honor_parent_interrupt=honor_parent_interrupt)
+    _run_children_parallel(batch, results, honor_parent_interrupt=honor_parent_interrupt)
 
-    _finalize_child_results(results, batch.task_list, batch.children, batch.parent_agent)
+    confirmed_results = [entry for entry in results if not entry.get("cancellation_pending")]
+    if confirmed_results:
+        _finalize_child_results(confirmed_results, batch.task_list, batch.children, batch.parent_agent)
     total_duration = round(time.monotonic() - batch.overall_start, 2)
-    for entry in results:
+    for entry in confirmed_results:
         _idx = entry.get("task_index", -1)
         if isinstance(_idx, int) and 0 <= _idx < len(batch.live_writers) and batch.live_writers[_idx] is not None:
             with _quiet("Live transcript finalize failed", exc_info=True):
                 batch.live_writers[_idx].finalize(entry)
             if _idx < len(batch.live_paths):
                 entry["live_transcript"] = batch.live_paths[_idx]
-    update_manifest_statuses(batch.live_deleg_id, results)
+    if confirmed_results:
+        update_manifest_statuses(batch.live_deleg_id, confirmed_results)
 
     combined: Dict[str, Any] = {"results": results, "total_duration_seconds": total_duration}
+    from tools.async_delegation import _batch_outcome
+    combined["batch_outcome"] = _batch_outcome(
+        combined, expected_task_indexes=[i for i, _task, _child in batch.children])
     # Runtime truth about children's background processes, as prose the parent can't miss inside the JSON.
     from tools.process_registry_notifications import _process_accounting_lines
     process_notes = [line for entry in results for line in _process_accounting_lines(entry)]
@@ -206,6 +281,37 @@ _SYNC_FALLBACK_NOTES = {
         "delegation.max_concurrent_children in config.yaml to allow more concurrent background delegations."
     ),
 }
+
+def _capacity_fallback_sync() -> bool:
+    """Legacy opt-in; never unexpectedly block the parent at capacity."""
+    from tools.delegate_tool import _load_config
+    from utils import is_truthy_value
+    return is_truthy_value(_load_config().get("capacity_fallback_sync"), default=False)
+
+
+def _close_unstarted_units(batch: _Batch, units: List[_Batch], reason: str) -> List[dict]:
+    """Reclaim constructed-but-never-started children and report explicit rejection."""
+    from tools.delegate_tool_child_run import _close_child
+    from tools.delegation_live_log import update_manifest_statuses
+
+    rejected = []
+    members = []
+    for unit in units:
+        for index, task, child in unit.children:
+            _detach_child(unit.parent_agent, child)
+            _close_child(child, "Failed to release unstarted subagent")
+            entry = _fabricated_entry(index, "rejected", reason, child)
+            entry["exit_reason"] = "not_started"
+            rejected.append(entry)
+            members.append((index, task, child))
+            if index < len(batch.live_writers) and batch.live_writers[index] is not None:
+                with _quiet("Rejected child transcript finalization failed", exc_info=True):
+                    batch.live_writers[index].finalize(entry)
+    if rejected:
+        _finalize_child_results(rejected, batch.task_list, members, batch.parent_agent)
+        update_manifest_statuses(batch.live_deleg_id, rejected)
+    return rejected
+
 
 def _run_sync_with_note(batch: _Batch, reason: str) -> str:
     """Inline fallback: run the batch now and explain why it was not detached."""
@@ -356,7 +462,8 @@ def _units_of(batch: _Batch) -> List[_Batch]:
         g = t.get("group")
         key = ("g", str(g)) if g not in (None, "") else ("i", i)
         members.setdefault(key, []).append((i, t, c))
-    return [replace(batch, children=ch, group=(key[1] if key[0] == "g" else None)) for key, ch in members.items()]
+    return [replace(batch, children=ch, group=(key[1] if key[0] == "g" else None), cancel_event=threading.Event())
+            for key, ch in members.items()]
 
 def _dispatch_unit(unit: _Batch, unit_id: Optional[str], slot_key: Optional[str], routing: dict) -> dict:
     """Hand ONE unit to the async registry; the runner joins on that unit's children only."""
@@ -364,6 +471,7 @@ def _dispatch_unit(unit: _Batch, unit_id: Optional[str], slot_key: Optional[str]
     child_agents = [c for (_, _, c) in unit.children]
 
     def _interrupt():
+        unit.cancel_event.set()
         for c in child_agents:
             _signal_child_stop(c, "Async delegation cancelled")
 
@@ -422,15 +530,25 @@ def _dispatch_background(batch: _Batch) -> str:
             continue
         _restore_parent_cancellation(unit)
         if not dispatched:
-            logger.info(
-                "delegate_task: async pool at capacity (%s); running the whole batch synchronously instead.",
-                dispatch.get("error", "rejected"),
-            )
-            return _run_sync_with_note(batch, "at_capacity")
-        # Later units of an admitted call share its slot and cannot be capacity-rejected; a scheduler failure runs
-        # the unit inline so no task is silently dropped.
-        logger.warning("delegate_task: unit %d/%d not accepted (%s); running it inline.", k + 1, len(units), dispatch.get("error"))
-        inline_results.extend(_execute_and_aggregate(unit)["results"])
+            if _capacity_fallback_sync():
+                logger.warning("delegate_task: async admission rejected; running synchronously by explicit legacy opt-in.")
+                return _run_sync_with_note(batch, "at_capacity")
+            rejected = _close_unstarted_units(batch, units, dispatch.get("error", "async capacity exhausted"))
+            return json.dumps({
+                "status": "rejected", "reason": "async_capacity_or_scheduler",
+                "error": dispatch.get("error", "Background delegation was not accepted."),
+                "count": len(rejected), "retryable": True,
+                "note": "No subagents were started. Retry later or run explicitly in the foreground.",
+                "results": rejected,
+            }, ensure_ascii=False)
+        # An admitted batch may have a later scheduling failure. Preserve the
+        # already-running units; report unstarted siblings without blocking.
+        if _capacity_fallback_sync():
+            logger.warning("delegate_task: unit %d/%d not accepted; running inline by explicit legacy opt-in.", k + 1, len(units))
+            inline_results.extend(_execute_and_aggregate(unit)["results"])
+        else:
+            logger.warning("delegate_task: unit %d/%d not accepted (%s); skipping, not blocking.", k + 1, len(units), dispatch.get("error"))
+            inline_results.extend(_close_unstarted_units(batch, [unit], dispatch.get("error", "scheduler rejection")))
     payload = _dispatched_payload(batch, dispatched)
     if inline_results:
         payload["inline_results"] = inline_results

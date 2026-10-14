@@ -1,14 +1,18 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type * as Hermes from '@/hermes'
+import type * as Notifications from '@/store/notifications'
+import type * as Prompts from '@/store/prompts'
 import type { CronSuggestion } from '@/types/hermes'
 
 const getCronSuggestions = vi.hoisted(() => vi.fn(async () => [] as CronSuggestion[]))
 const openSession = vi.hoisted(() => vi.fn())
+const submitApprovalResponse = vi.hoisted(() => vi.fn())
+const notifyError = vi.hoisted(() => vi.fn())
 
 vi.mock('@/hermes', async importOriginal => ({
   ...(await importOriginal<typeof Hermes>()),
@@ -19,10 +23,24 @@ vi.mock('@/app/open-session', () => ({
   openSession: (...args: unknown[]) => openSession(...args)
 }))
 
+vi.mock('@/store/prompts', async importOriginal => {
+  const actual = await importOriginal<typeof Prompts>()
+
+  return { ...actual, submitApprovalResponse }
+})
+
+vi.mock('@/store/notifications', async importOriginal => {
+  const actual = await importOriginal<typeof Notifications>()
+
+  return { ...actual, notifyError }
+})
+
 import { I18nProvider } from '@/i18n'
 import { $backgroundStatusBySession } from '@/store/composer-status'
 import { setCronJobs } from '@/store/cron'
+import { $gateway } from '@/store/gateway'
 import { $projectTree } from '@/store/projects'
+import { $approvalRequests, clearApprovalRequest, setApprovalRequest } from '@/store/prompts'
 import { $currentCwd, $selectedStoredSessionId, $sessions } from '@/store/session'
 import { $sessionStates } from '@/store/session-states'
 
@@ -46,6 +64,10 @@ beforeEach(() => {
   getCronSuggestions.mockReset()
   getCronSuggestions.mockResolvedValue([])
   openSession.mockReset()
+  submitApprovalResponse.mockReset()
+  notifyError.mockReset()
+  clearApprovalRequest()
+  $gateway.set(null)
 })
 
 afterEach(() => {
@@ -57,6 +79,8 @@ afterEach(() => {
   $sessions.set([])
   $projectTree.set([])
   $backgroundStatusBySession.set({})
+  clearApprovalRequest()
+  $gateway.set(null)
 })
 
 describe('WorkspaceOverview (context rail)', () => {
@@ -152,5 +176,66 @@ describe('WorkspaceOverview (context rail)', () => {
     fireEvent.click(screen.getByRole('button', { name: '在旁边打开' }))
 
     expect(openSession).toHaveBeenCalledWith('tip', expect.any(Function), 'stack')
+  })
+
+  it('clears the card after the shared approval response succeeds', async () => {
+    const gateway = { request: vi.fn(async () => ({})) }
+
+    const request = {
+      command: 'delete generated files',
+      description: 'Allow this command?',
+      requestId: 'approval-1',
+      serverRequestId: 'server-request-1',
+      sessionId: 'runtime-session'
+    }
+
+    submitApprovalResponse.mockImplementationOnce(async (_gateway, submitted) => {
+      clearApprovalRequest(submitted.sessionId, submitted.requestId)
+    })
+    $gateway.set(gateway as never)
+    setApprovalRequest(request)
+    renderOverview('en')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }))
+
+    await waitFor(() => expect($approvalRequests.get()).toEqual({}))
+    expect(submitApprovalResponse).toHaveBeenCalledWith(gateway, request, 'once')
+    expect(screen.queryByRole('button', { name: 'Run' })).toBeNull()
+  })
+
+  it('reports an approval failure and leaves the request available for retry', async () => {
+    const gateway = { request: vi.fn(async () => ({})) }
+
+    const request = {
+      command: 'delete generated files',
+      description: 'Allow this command?',
+      requestId: 'approval-retry',
+      serverRequestId: 'server-request-retry',
+      sessionId: 'runtime-session'
+    }
+
+    const failure = new Error('connection lost')
+    submitApprovalResponse
+      .mockRejectedValueOnce(failure)
+      .mockImplementationOnce(async (_gateway, submitted) => {
+        clearApprovalRequest(submitted.sessionId, submitted.requestId)
+      })
+    $gateway.set(gateway as never)
+    setApprovalRequest(request)
+    renderOverview('en')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }))
+
+    await waitFor(() => expect(notifyError).toHaveBeenCalledWith(
+      failure,
+      'Could not submit the approval. Please try again.'
+    ))
+    expect($approvalRequests.get()).toEqual({ 'runtime-session': request })
+    expect((screen.getByRole('button', { name: 'Run' }) as HTMLButtonElement).disabled).toBe(false)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }))
+
+    await waitFor(() => expect($approvalRequests.get()).toEqual({}))
+    expect(submitApprovalResponse).toHaveBeenCalledTimes(2)
   })
 })

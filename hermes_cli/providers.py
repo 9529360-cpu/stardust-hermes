@@ -27,6 +27,8 @@ class HermesOverlay:
 
 
 STARDUST_OVERLAYS: Dict[str, HermesOverlay] = {
+    "gpt-official": HermesOverlay(transport="codex_responses", auth_type="external_access_readonly",
+                                  base_url_override="https://chatgpt.com/backend-api/codex"),
     "moa": HermesOverlay(auth_type="virtual", base_url_override="moa://local"),
     "openrouter": HermesOverlay(is_aggregator=True, base_url_env_var="OPENROUTER_BASE_URL"),
     "nous": HermesOverlay(auth_type="oauth_device_code", base_url_override="https://inference-api.nousresearch.com/v1"),
@@ -142,6 +144,7 @@ ALIASES: Dict[str, str] = {alias: canon for canon, aliases in _ALIAS_GROUPS.item
 # -- Display labels for providers not in the models.dev catalog ---------------
 
 _LABEL_OVERRIDES: Dict[str, str] = {
+    "gpt-official": "GPT官方",
     "moa": "Mixture of Agents", "nous": "Nous Portal", "openai-codex": "ChatGPT or Codex Subscription",
     "copilot-acp": "GitHub Copilot ACP", "stepfun": "StepFun Step Plan", "xiaomi": "Xiaomi MiMo", "gmi": "GMI Cloud",
     "upstage": "Upstage Solar", "actual": "Actual Computer", "tencent-tokenhub": "Tencent TokenHub",

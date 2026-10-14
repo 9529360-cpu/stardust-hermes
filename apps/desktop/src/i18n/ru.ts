@@ -1468,6 +1468,10 @@ export const ru = defineLocale({
       clearDirFailed: 'Не удалось очистить папку по умолчанию'
     },
     toolsets: {
+      browserHostControl: {
+        agentConnectingTitle: 'Подключаем ваш Chrome',
+        agentConnectingMessage: 'Этот чат подключается к открытому Chrome, включая сайты, где вы вошли в аккаунт.'
+      },
       loadingConfig: 'Загрузка конфигурации',
       savedTitle: 'Учётные данные сохранены',
       savedMessage: key => `${key} обновлён.`,
@@ -2998,6 +3002,7 @@ export const ru = defineLocale({
     goalWaiting: 'Цель ожидает',
     subagents: count => `${count} ${RU_PLURAL(count, 'субагент', 'субагента', 'субагентов')}`,
     todos: (done, total) => `Задачи ${done}/${total}`,
+    blockedBy: ids => `Ожидает: ${ids.join(', ')}`,
     running: 'Выполняется',
     cronRun: 'Запланированный запуск',
     stop: 'Стоп',

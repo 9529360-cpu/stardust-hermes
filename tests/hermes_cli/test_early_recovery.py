@@ -241,6 +241,11 @@ def test_repair_install_prefers_uv_when_base_is_externally_managed(
 
 def test_repair_install_uv_sets_virtual_env_to_project_venv(tmp_path, monkeypatch):
     root = _project(tmp_path)
+    venv_root = root / "venv"
+    python = venv_root / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
+    python.parent.mkdir(parents=True)
+    python.write_bytes(b"fixture")
+    monkeypatch.setenv("VIRTUAL_ENV", str(venv_root))
     monkeypatch.setattr(er, "_base_interpreter_is_externally_managed", lambda: True)
     monkeypatch.setattr(er, "_find_uv_binary", lambda: "/fake/uv")
 
@@ -359,10 +364,19 @@ def test_core_marker_triggers_install_before_any_native_import(
     is loaded in this process — because deferring to main()'s post-import
     recovery lets a recurring eager import remap the .pyd first."""
     root = _project(tmp_path)
+    venv_root = root / ".venv"
+    fake_python = venv_root / "Scripts" / "python.exe"
+    fake_python.parent.mkdir(parents=True)
+    fake_python.touch()
+    monkeypatch.setenv("VIRTUAL_ENV", str(venv_root))
     core_marker = root / ".update-incomplete"
     core_marker.write_text('{"attempts": 0}', encoding="utf-8")
 
-    from hermes_cli import _install_repair as ir
+    import importlib
+    import hermes_cli
+
+    ir = importlib.import_module("hermes_cli._install_repair")
+    setattr(hermes_cli, "_install_repair", ir)
 
     calls: list[dict] = []
 
@@ -380,8 +394,23 @@ def test_core_marker_triggers_install_before_any_native_import(
     # Early recovery imports _install_repair lazily inside the helper; make
     # sure the lazy import resolves to the SAME monkeypatched module object.
     import hermes_cli._install_repair  # noqa: F401  (pre-import for patch)
+    assert sys.modules["hermes_cli._install_repair"] is ir
+    assert ir.run_core_install is fake_install
 
-    er.recover_if_needed(project_root=root, argv=[])
+    preloaded_crypto = {
+        name: module
+        for name, module in sys.modules.items()
+        if name == "cryptography" or name.startswith("cryptography.")
+    }
+    for name in preloaded_crypto:
+        sys.modules.pop(name, None)
+    try:
+        er.recover_if_needed(project_root=root, argv=[])
+    finally:
+        for name in tuple(sys.modules):
+            if (name == "cryptography" or name.startswith("cryptography.")) and name not in preloaded_crypto:
+                sys.modules.pop(name, None)
+        sys.modules.update(preloaded_crypto)
 
     assert len(calls) == 1, "core install must run when the marker exists"
     assert calls[0]["root"] == root

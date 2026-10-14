@@ -26,6 +26,7 @@ import type {
 import { useI18n } from '@/i18n'
 import { isCodeSkewRestartRequired } from '@/lib/code-skew-error'
 import { AlertTriangle, Cpu, Loader2 } from '@/lib/icons'
+import { modelCatalogLabel } from '@/lib/model-status-label'
 import { cn } from '@/lib/utils'
 import { $localModelsEnabled } from '@/store/local-models-flag'
 import { notifyError, readableError } from '@/store/notifications'
@@ -206,6 +207,8 @@ function StaleAuxWarning({ applying, onReset, slots, taskLabel }: StaleAuxWarnin
 }
 
 interface ModelSettingsProps {
+  /** Shared shell callback refreshes chat model catalogs after service changes. */
+  onConfigSaved?: () => void
   /** Notified after the main model is applied, so live UI stores can sync. */
   onMainModelChanged?: (provider: string, model: string) => void
   /** Shared settings "Applies to" scope: a concrete profile to edit instead of
@@ -215,7 +218,7 @@ interface ModelSettingsProps {
   scopeProfile?: string
 }
 
-export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSettingsProps) {
+export function ModelSettings({ onConfigSaved, onMainModelChanged, scopeProfile }: ModelSettingsProps) {
   const { t } = useI18n()
   const m = t.settings.model
   const [loading, setLoading] = useState(true)
@@ -359,6 +362,12 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
     (provider: string) => providers.find(row => row.slug === provider)?.models ?? [],
     [providers]
   )
+
+  const modelLabelFor = (provider: string, model: string) =>
+    modelCatalogLabel(
+      providers.find(row => row.slug === provider),
+      model
+    )
 
   const currentMoaPreset = useMemo(() => {
     if (!moa) {
@@ -683,7 +692,10 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
   return (
     <div className="grid gap-6">
       <CustomEndpointsSettings
-        onConfigSaved={() => void refresh()}
+        onConfigSaved={() => {
+          void refresh()
+          onConfigSaved?.()
+        }}
         onMainModelChanged={onMainModelChanged}
         scopeProfile={scopeProfile}
       />
@@ -845,7 +857,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
                             <SelectContent>
                               {withActive(auxDraftProviderModels, auxDraft.model).map(model => (
                                 <SelectItem key={model} value={model}>
-                                  {model}
+                                  {modelLabelFor(auxDraft.provider, model)}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -1084,7 +1096,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
                       <SelectContent>
                         {withActive(modelsForProvider(slot.provider), slot.model).map(model => (
                           <SelectItem key={model} value={model}>
-                            {model}
+                            {modelLabelFor(slot.provider, model)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1175,7 +1187,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
                         currentMoaPreset.aggregator.model
                       ).map(model => (
                         <SelectItem key={model} value={model}>
-                          {model}
+                          {modelLabelFor(currentMoaPreset.aggregator.provider, model)}
                         </SelectItem>
                       ))}
                     </SelectContent>

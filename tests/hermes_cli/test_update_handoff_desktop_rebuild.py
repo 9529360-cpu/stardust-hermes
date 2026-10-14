@@ -54,15 +54,15 @@ def test_failed_desktop_rebuild_withholds_success_completion():
         assert not call[0][0].startswith("✓")
 
 
-def test_handoff_venv_repair_finishes_node_and_web_phase(tmp_path):
+def test_handoff_venv_repair_finishes_node_and_web_phase(tmp_path, monkeypatch):
     """A successful Python repair must not bypass the remaining update work."""
     project_root = tmp_path / "hermes"
     venv_python = project_root / "venv" / "Scripts" / "python.exe"
     venv_python.parent.mkdir(parents=True)
     venv_python.touch()
+    monkeypatch.setenv("VIRTUAL_ENV", str(project_root / "venv"))
 
     with (
-        patch.object(update_cmd, "venv_python_path", return_value=venv_python),
         patch.object(update_cmd, "_pip_install_prefix", return_value=(["uv", "pip"], None)),
         patch.object(update_cmd, "_venv_core_imports_healthy", return_value=(True, "ok")),
         patch.object(update_cmd, "_write_update_incomplete_marker"),

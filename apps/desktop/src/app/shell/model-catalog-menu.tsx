@@ -25,7 +25,7 @@ import { getLocalModelsStatus } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { isSubmitEnter } from '@/lib/ime'
 import { catalogProviderMatches, modelOptionsQueryKey, requestModelOptions } from '@/lib/model-options'
-import { displayModelName, modelDisplayParts } from '@/lib/model-status-label'
+import { displayModelName, modelCatalogLabel } from '@/lib/model-status-label'
 import { reasoningEffortLabel } from '@/lib/reasoning-effort'
 import { foldIncludes, normalize } from '@/lib/text'
 import { useStoreSelector } from '@/lib/use-session-slice'
@@ -491,7 +491,7 @@ export function ModelCatalogMenu({
                         : null
 
                     const isCurrent = activeId !== null
-                    const name = modelDisplayParts(family.id).name
+                    const name = modelCatalogLabel(group.provider, family.id)
                     const caps = group.provider.capabilities?.[family.id]
 
                     // Managed local model loading into memory right now:
@@ -535,6 +535,7 @@ export function ModelCatalogMenu({
                     return (
                       <DropdownMenuSub key={`${group.provider.slug}:${family.id}`}>
                         <DropdownMenuSubTrigger
+                          data-catalog-source={group.provider.source ?? undefined}
                           hideChevron
                           onClick={activate}
                           onKeyDown={event => {
@@ -542,6 +543,7 @@ export function ModelCatalogMenu({
                               activate()
                             }
                           }}
+                          title={[family.id, group.provider.source].filter(Boolean).join(' · ')}
                           {...kbRowProps(`${group.provider.slug}:${family.id}`)}
                         >
                           <span className="min-w-0 flex-1 truncate">
@@ -721,7 +723,7 @@ function groupModels(
 
     const matches = (family: ModelFamily) =>
       foldIncludes(
-        `${family.id} ${family.fastId ?? ''} ${provider.name} ${provider.slug} ${displayModelName(family.id)}`,
+        `${family.id} ${family.fastId ?? ''} ${provider.name} ${provider.slug} ${modelCatalogLabel(provider, family.id)} ${displayModelName(family.id)}`,
         q
       )
 

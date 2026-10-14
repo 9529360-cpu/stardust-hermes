@@ -76,7 +76,10 @@ def _default_without(*excluded):
 
 # Coding posture: everything you reach for while pairing on code; drops messaging,
 # tts, image_gen, home-assistant, cron and computer-use.
-_CODING_TOOLS = _default_without("image_generate", "text_to_speech", "cronjob_manage", "computer_use", *_HA_TOOLS)
+_CODING_TOOLS = [
+    *_default_without("image_generate", "text_to_speech", "cronjob_manage", "computer_use", *_HA_TOOLS),
+    "code_intelligence",
+]
 
 # Core toolset definitions: individual tools or references to other toolsets.
 TOOLSETS = {
@@ -127,6 +130,9 @@ TOOLSETS = {
         "trigger scheduled tasks",
         ["cronjob_manage"],
     ),
+    "code_intelligence": _ts(
+        "Language-server navigation and cross-file symbol rename", ["code_intelligence"],
+    ),
     "file": _ts(
         "File manipulation tools: read, write, patch (with fuzzy matching), and "
         "search (content + files)",
@@ -171,7 +177,10 @@ TOOLSETS = {
     ),
 
     # Scenario-specific toolsets
-    "debugging": _ts("Debugging and troubleshooting toolkit", ["terminal", "process_manage"], includes=["web", "file"]),
+    "debugging": _ts(
+        "Debugging and troubleshooting toolkit", ["terminal", "process_manage", "code_intelligence"],
+        includes=["web", "file"],
+    ),
     "safe": _ts("Safe toolkit without terminal access", [], includes=["web", "vision", "image_gen"]),
 
     # Coding posture, auto-selected in a code workspace (agent/coding_context.py).
@@ -179,7 +188,7 @@ TOOLSETS = {
     # posture=True: per-session posture, never auto-recovered into platform tool
     # config (see the non-configurable-toolset recovery loop in hermes_cli/tools_config.py).
     "coding": _ts(
-        "Coding-focused toolset: files, terminal, search, web docs, skills, todo, "
+        "Coding-focused toolset: files, terminal, semantic code navigation, search, web docs, skills, todo, "
         "delegate, vision, browser",
         _CODING_TOOLS,
         posture=True,
@@ -189,7 +198,7 @@ TOOLSETS = {
     # there is deliberately no agent-callable send_message tool. hermes-acp is the
     # coding posture minus the interactive clarify UI.
     "hermes-acp": _ts(
-        "Editor integration (VS Code, Zed, JetBrains) — coding-focused tools without "
+        "Editor integration (VS Code, Zed, JetBrains) — coding tools with language-server navigation, without "
         "messaging, audio, or clarify UI",
         [t for t in _CODING_TOOLS if t != "clarify"],
     ),

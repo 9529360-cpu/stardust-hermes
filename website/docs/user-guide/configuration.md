@@ -1230,15 +1230,15 @@ When enabled, Hermes refuses to accept a final answer on a turn where the agent 
 
 ```yaml
 agent:
-  verify_on_stop: false        # true | false | "auto" (surface-aware: on for CLI/TUI/desktop, off for messaging)
+  verify_on_stop: auto         # true | false | "auto" (default: on for CLI/TUI/desktop, off for messaging)
   verify_guidance: true        # Append creative-UI / clean-diff guidance to the missing-evidence nudge
   max_verify_nudges: 3         # Cap on consecutive continue nudges per turn (built-in + pre_verify hooks)
   coding_instructions: ""      # Standing project-wide coding rules appended to the coding brief
 ```
 
-`verify_on_stop` accepts `true` (on everywhere), `false` (off — the default), or `"auto"` (legacy surface-aware behavior: on for interactive coding surfaces — CLI, TUI, desktop — and programmatic callers; off for messaging surfaces like Telegram/Discord where the verification narrative reads as chat noise). Off is the default everywhere: fresh installs ship `false` and the config migration turned it off on existing installs, so enabling it is an explicit opt-in. The `HERMES_VERIFY_ON_STOP` env var overrides the config value when set.
+`verify_on_stop` accepts `true` (on everywhere), `false` (explicit opt-out), or `"auto"` (the default: on for interactive coding surfaces — CLI, TUI, desktop — and programmatic callers; off for messaging surfaces like Telegram/Discord). The gate runs only after code edits in a recognized workspace, and it is bounded so it cannot trap a turn. Existing explicit `false` settings remain off; configs without an explicit choice inherit `auto`. The `STARDUST_VERIFY_ON_STOP` env var overrides the config value when set.
 
-The evidence that feeds this guard (which test/lint/build commands ran, which files were edited since) lives in `~/.hermes/verification_evidence.db`. That ledger is only written or created while the guard is enabled; with `verify_on_stop: false` nothing is recorded and an existing file can be deleted freely.
+The evidence that feeds this guard (which test/lint/build commands ran, which files were edited since) lives in `~/.hermes/verification_evidence.db`. The ledger is written only while the guard is enabled; messaging sessions with the default `auto` setting do not create it.
 
 For a user/plugin policy gate at the same point — keep the agent going with your own checks — see the [`pre_verify` hook](/user-guide/features/hooks#pre_verify).
 
@@ -2013,6 +2013,7 @@ display:
   platforms: {}           # Per-platform display overrides (see below)
   interim_assistant_messages: true  # Gateway: send natural mid-turn assistant updates as separate messages
   show_commentary: true   # Codex models: deliver commentary-channel progress narration as visible mid-turn updates
+  progress_updates: true  # Ask for a one-line progress note at each step of tool work; nudge a turn that stays quiet for a minute
   skin: default           # Built-in or custom CLI skin (see user-guide/features/skins)
   personality: ""         # Legacy cosmetic field still surfaced in some summaries
   compact: false          # Compact output mode (less whitespace)
@@ -2106,9 +2107,9 @@ If writes to Hermes state (cron jobs, skills, scripts under `~/.hermes/`) are fa
 
 The `display.language` setting translates a small set of static user-facing messages — the CLI approval prompt, a handful of gateway slash-command replies (e.g. restart-drain notices, "approval expired", "goal cleared"). It does **not** translate agent responses, log lines, tool output, error tracebacks, or slash-command descriptions — those stay in English. If you want the agent itself to reply in another language, just tell it in your prompt or system message.
 
-Supported values: `en` (default), `zh` (Simplified Chinese), `zh-hant` (Traditional Chinese), `ja` (Japanese), `de` (German), `es` (Spanish), `fr` (French), `tr` (Turkish), `uk` (Ukrainian), `af` (Afrikaans), `ko` (Korean), `it` (Italian), `ga` (Irish), `pt` (Portuguese), `ru` (Russian), `hu` (Hungarian). Unknown values fall back to English.
+Supported values: `en` (English), `zh` (Simplified Chinese), `zh-hant` (Traditional Chinese), `ja` (Japanese), `de` (German), `es` (Spanish), `fr` (French), `tr` (Turkish), `uk` (Ukrainian), `af` (Afrikaans), `ko` (Korean), `it` (Italian), `ga` (Irish), `pt` (Portuguese), `ru` (Russian), `hu` (Hungarian). When unset (the default), the machine's UI language is used; set any language code to pin it. Unknown values fall back to English.
 
-You can also set this per-session with the `HERMES_LANGUAGE` env var, which overrides the config value.
+You can also set this per-session with the `STARDUST_LANGUAGE` env var, which overrides the config value.
 
 ```yaml
 display:
@@ -2219,6 +2220,8 @@ Signal is listed as a valid platform key because the setting can be saved per pl
 `interim_assistant_messages` is gateway-only. When enabled, Hermes sends completed mid-turn assistant updates as separate chat messages. This is independent from `tool_progress` and does not require gateway streaming.
 
 `show_commentary` (default `true`) controls Codex Responses models' commentary channel — the polished progress narration these models produce alongside their private reasoning. When enabled, each completed commentary message is delivered as a visible mid-turn update (on the gateway this also requires `interim_assistant_messages`). Set it to `false` if the extra narration annoys you: commentary then falls back to the reasoning channel and is only shown when `show_reasoning` is enabled.
+
+`progress_updates` (default `true`) keeps you posted while the agent works with tools. The system prompt asks for one short plain-language line at each new step (what it found, what it does next), and when a turn shows you nothing for about a minute, Stardust appends a `[Progress check]` line to the next tool result so the model's following response opens with an update. The check is only sent while a desktop or gateway client is receiving mid-turn messages. Set it to `false` to have the agent work quietly until it finishes.
 
 ## Privacy
 

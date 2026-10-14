@@ -19,7 +19,10 @@ import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from agent.lsp import eventlog
-from agent.lsp.client import DIAGNOSTICS_DOCUMENT_WAIT, LSPClient, _diagnostic_key as _diag_key
+from agent.lsp.client import (
+    DIAGNOSTICS_DOCUMENT_WAIT, SEMANTIC_REQUEST_TIMEOUT, LSPClient, _diagnostic_key as _diag_key,
+)
+from agent.lsp.protocol import LSPRequestError
 from agent.lsp.servers import ServerContext, ServerDef, find_server_for_file, language_id_for
 from agent.lsp.workspace import clear_cache, resolve_workspace_for_file
 
@@ -251,6 +254,74 @@ class LSPService:
             eventlog.log_clean(server_id, file_path)
         return diags
 
+    def semantic_query_sync(
+        self, file_path: str, action: str, *, line: Optional[int] = None, character: Optional[int] = None,
+        query: str = "", include_declaration: bool = True, new_name: str = "",
+    ) -> Dict[str, Any]:
+        """Run one bounded semantic request through the language server for ``file_path``."""
+        if not self._enabled:
+            return {"available": False, "reason": "LSP is disabled in config.yaml."}
+        srv = find_server_for_file(file_path)
+        if srv is None:
+            return {"available": False, "reason": "No language server is registered for this file type."}
+        if srv.server_id in self._disabled_servers:
+            return {"available": False, "reason": f"The {srv.server_id} server is disabled in config.yaml."}
+        _workspace_root, gated = resolve_workspace_for_file(file_path)
+        if not gated:
+            return {"available": False, "reason": "LSP queries require a file inside a Git worktree."}
+        key = self._broken_key(srv, file_path)
+        if key is not None and key in self._broken:
+            return {
+                "available": False,
+                "reason": f"The {srv.server_id} server is unavailable for this workspace; restart LSP to retry.",
+            }
+        try:
+            result = self._loop.run(
+                self._semantic_query_async(
+                    file_path, action, line=line, character=character, query=query,
+                    include_declaration=include_declaration, new_name=new_name,
+                ),
+                timeout=SEMANTIC_REQUEST_TIMEOUT + 5.0,
+            )
+        except LSPRequestError as e:
+            if e.code == -32601:
+                reason = f"The {srv.server_id} server does not support the {action} request."
+            else:
+                reason = f"The {srv.server_id} server rejected the {action} request ({e.code}): {e.message}"
+            logger.debug("LSP %s request failed for %s: %s", action, file_path, e)
+            return {"available": False, "reason": reason}
+        except asyncio.TimeoutError as e:
+            eventlog.log_timeout(srv.server_id, file_path, kind=f"{action} request")
+            self._mark_broken_for_file(file_path, e)
+            return {"available": False, "reason": f"The {srv.server_id} server timed out while handling {action}."}
+        except Exception as e:  # noqa: BLE001
+            eventlog.log_server_error(srv.server_id, file_path, e)
+            self._mark_broken_for_file(file_path, e)
+            logger.debug("LSP %s request failed for %s: %s", action, file_path, e)
+            return {
+                "available": False,
+                "reason": f"The {srv.server_id} server could not complete {action}: {e}",
+            }
+        return result
+
+    async def _semantic_query_async(
+        self, file_path: str, action: str, *, line: Optional[int], character: Optional[int], query: str,
+        include_declaration: bool, new_name: str,
+    ) -> Dict[str, Any]:
+        client = await self._get_or_spawn(file_path)
+        if client is None:
+            return {
+                "available": False,
+                "reason": "No usable language server is installed or configured for this workspace.",
+            }
+        result = await client.semantic_query(
+            file_path, action, line=line, character=character, query=query,
+            include_declaration=include_declaration, new_name=new_name,
+            language_id=language_id_for(file_path),
+        )
+        self._touch(client)
+        return {"available": True, "result": result}
+
     def _apply_delta(self, file_path: str, diags: _Diags, line_shift: Optional[Callable[[int], Optional[int]]]) -> _Diags:
         """Drop diagnostics present in the pre-write baseline, then roll the baseline forward."""
         abs_path = os.path.abspath(file_path)
@@ -441,6 +512,11 @@ class LSPService:
         )
         try:
             await client.start()
+        except asyncio.CancelledError:
+            # A bounded synchronous caller can cancel initialization; reap the local process before
+            # propagating cancellation so a timed-out semantic query cannot leak a server.
+            await client.shutdown()
+            raise
         except Exception as e:  # noqa: BLE001
             eventlog.log_spawn_failed(srv.server_id, root, e)
             return None

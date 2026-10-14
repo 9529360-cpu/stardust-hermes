@@ -21,6 +21,7 @@ from agent.message_metadata import append_message
 from agent.message_sanitization import _repair_tool_call_arguments, _sanitize_surrogates
 from agent.model_metadata import MINIMUM_CONTEXT_LENGTH, _estimate_tools_tokens_rough
 from agent.process_bootstrap import _install_safe_stdio
+from agent.progress_pulse import mark_user_updated
 from agent.prompt_builder import RUNTIME_ENVIRONMENT_END, RUNTIME_ENVIRONMENT_HEADING
 from agent.prompt_caching import (
     build_prompt_cache_plan,
@@ -1487,12 +1488,14 @@ def _run_conversation_turn(
 
     # Per-turn agent state (the gateway caches agents across turns, so none of this may
     # leak into the next message): interim-commentary dedup spans the whole turn but not
-    # the next; a SessionDB append failure (and its classified cause) halts only this turn;
+    # the next; the progress pulse's quiet clock starts at the user's message; a SessionDB
+    # append failure (and its classified cause) halts only this turn;
     # a failed compression-tip adoption is reported only against its own turn; the
     # thinking-only-truncation one-shot must not survive an interrupted turn; credential-
     # pool refresh tallies cap same-entry refreshes on a persistent 401 (#26080); usage
     # for on_turn_complete() stays None on turns that never reach a response.
     agent._delivered_interim_texts = set()
+    mark_user_updated(agent)
     agent._incremental_persistence_failed = False
     agent._last_persistence_error_cause = None
     agent._compression_adoption_failed = False

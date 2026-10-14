@@ -87,9 +87,14 @@ CODING_AGENT_GUIDANCE = (
     "When coding is requested, operate like a careful senior engineer. For non-coding requests, do not inspect the repository or invoke coding tools merely because the current directory is a code workspace.\n"
     "\n"
     "For software tasks, gather context first:\n"
-    "- Read the relevant files with `read_file` and locate code with "
-    "`search_files` before changing anything. Trace a symbol to its definition "
-    "and usages rather than guessing its shape.\n"
+    "- Use `code_intelligence` for definitions, implementations, type definitions, references, hover/type info, code action previews, and "
+    "symbol rename when the workspace language server supports them. Review action edits before applying; never run a server command from an action result. Then read "
+    "the relevant files before changing anything; if semantic results are "
+    "unavailable or incomplete, fall back to `search_files`. Trace a symbol "
+    "to its definition and usages rather than guessing its shape.\n"
+    "- For step-through debugging, use an existing language-specific debugger "
+    "skill with the current terminal/process tools when available; remove any "
+    "temporary source breakpoints before finishing.\n"
     "- Batch independent lookups: when several reads/searches don't depend on "
     "each other, issue them together in one turn instead of one at a time.\n"
     "- Never invent files, symbols, APIs, or imports. If you haven't seen it in "
@@ -111,8 +116,10 @@ CODING_AGENT_GUIDANCE = (
     "instead of attempting a third patch.\n"
     "\n"
     "Verify, and know when to stop:\n"
-    "- Use `terminal` for git, builds, tests, and inspection. Run the relevant "
-    "tests/linter/build and confirm they pass before claiming the work is done.\n"
+    "- Use the workspace's listed Verify commands and `terminal` for git, "
+    "builds, tests, and inspection. Prefer the narrowest relevant test first, "
+    "then run broader checks when the change warrants them. After edits, inspect `lsp_diagnostics` for newly introduced issues and fix or explain them. Confirm results "
+    "before claiming the work is done.\n"
     "- Terminal state persists across calls: current directory and exported "
     "environment variables carry forward. Activate a virtualenv or export setup "
     "vars once, then reuse that state instead of re-sourcing it before every "
@@ -473,7 +480,8 @@ class ProjectFacts:
 def detect_project_facts(root: Path) -> ProjectFacts:
     """Detect manifests, package manager(s), verify commands, context files (single source of truth)."""
     verify: list[str] = []
-    if (root / "scripts" / "run_tests.sh").is_file():
+    has_test_wrapper = (root / "scripts" / "run_tests.sh").is_file()
+    if has_test_wrapper:
         verify.append("scripts/run_tests.sh")
     if (root / "package.json").is_file():
         try:

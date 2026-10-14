@@ -202,12 +202,12 @@ DEFAULT_CONFIG = {
         "verify_guidance": True,
         # Max consecutive `pre_verify` "continue" nudges per turn (hooks can't trap the loop).
         "max_verify_nudges": 3,
-        # Verification closure: after code edits in a workspace, refuse a final answer until fresh
-        # verification evidence exists or the agent explains why it can't check (bounded loop,
-        # passive ledger). False (default) because the nudges proved more noise than signal; true =
-        # force on everywhere; "auto" = on for interactive coding surfaces and programmatic callers,
-        # off for messaging surfaces. Doc/markdown/skill-only edits never fire.
-        "verify_on_stop": False,
+        # Verification closure: after code edits in a workspace, require fresh verification
+        # evidence or an explanation why checks cannot run (bounded loop, passive ledger).
+        # "auto" is on for interactive coding surfaces and programmatic callers, off for messaging;
+        # true forces it on everywhere and false is an explicit opt-out. Doc/markdown/skill-only
+        # edits never fire.
+        "verify_on_stop": "auto",
         # Inactivity warning (seconds), once per run before gateway_timeout; no interrupt. 0 = off.
         "gateway_timeout_warning": 900,
         # Max seconds the gateway blocks an agent awaiting a clarify-tool reply; then it unblocks
@@ -863,8 +863,9 @@ DEFAULT_CONFIG = {
         "focus_saved_tool_progress": "all",
         "skin": "default",
         # UI language for static messages (approval prompts, some gateway slash replies); not agent
-        # responses/logs/tool outputs. en, zh, ja, de, es, fr, tr, uk; unknown → en.
-        "language": "en",
+        # responses/logs/tool outputs. Empty follows the machine UI language (agent/i18n.py); any
+        # language code pins it; unknown codes fall back to English.
+        "language": "",
         # TUI busy indicator: kaomoji | emoji | unicode (braille) | ascii. `/indicator <style>`.
         "tui_status_indicator": "kaomoji",
         # Seconds between idle prompt_toolkit redraws in the classic CLI; keeps wall-clock
@@ -885,6 +886,10 @@ DEFAULT_CONFIG = {
         # Codex Responses commentary channel: true delivers completed commentary as mid-turn interim
         # updates; false routes it to reasoning (visible only with show_reasoning).
         "show_commentary": True,
+        # Progress notes while the agent works with tools: the system prompt asks for a one-line update at
+        # each new step, and a turn that stays quiet for a minute gets a "[Progress check]" on its next
+        # tool result (agent/progress_pulse.py). False keeps the agent quiet until it finishes.
+        "progress_updates": True,
         "tool_progress_command": False,  # enable /verbose command in messaging gateway
         # display.tool_progress_overrides is deprecated (use display.platforms); a user-set value is
         # still honored at runtime and folded into platforms by migration.

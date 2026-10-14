@@ -864,6 +864,11 @@ export interface Translations {
     customEndpoints: {
       title: string
       addTitle: string
+      magpieSetup: string
+      magpieName: string
+      magpieHelp: string
+      magpieDownload: string
+      defaultScopeHint: string
       editTitle: string
       active: string
       use: string
@@ -1622,6 +1627,8 @@ export interface Translations {
         working: string
         connectedTitle: string
         connectedMessage: string
+        agentConnectingTitle: string
+        agentConnectingMessage: string
         connectFailed: string
         disconnectFailed: string
         noSession: string
@@ -2948,6 +2955,7 @@ export interface Translations {
     goalWaiting: string
     subagents: (count: number) => string
     todos: (done: number, total: number) => string
+    blockedBy: (ids: string[]) => string
     running: string
     cronRun: string
     stop: string
@@ -3374,6 +3382,7 @@ export interface Translations {
   modelPicker: {
     title: string
     current: string
+    scopeHint: string
     unknown: string
     search: string
     noModels: string

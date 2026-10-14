@@ -11,6 +11,7 @@ import stat
 import sys
 from collections.abc import Mapping
 from contextvars import ContextVar, Token
+from dataclasses import dataclass
 from pathlib import Path
 
 _profile_fallback_warned: bool = False
@@ -1268,6 +1269,192 @@ def project_venv_dir(project_root) -> Path | None:
     """
     root = Path(project_root)
     return next((root / n for n in ("venv", ".venv") if (root / n).is_dir()), None)
+
+
+@dataclass(frozen=True)
+class ProjectVenvResolution:
+    """Resolved project virtual environment; resolution does not imply dependency health."""
+
+    project_root: Path
+    venv_dir: Path | None
+    python: Path | None
+    launcher: Path | None
+    environment_type: str | None
+    error: str | None = None
+
+
+def resolve_project_venv(
+    project_root,
+    *,
+    runtime_python: str | Path | None = None,
+    virtual_env: str | Path | None = None,
+    installation_source: str = "unknown",
+    runtime_mode: str = "unknown",
+    windows: bool | None = None,
+) -> ProjectVenvResolution:
+    """Resolve one safe project venv without creating or repairing either candidate.
+
+    Selection order is the interpreter actually running the updater, its explicit VIRTUAL_ENV,
+    then the installation source when both supported layouts exist. A lone layout is accepted only
+    when its interpreter exists. When dual layouts remain indistinguishable, refuse rather than
+    silently crossing interpreter and dependency roots. ``runtime_mode`` classifies the selected
+    environment; it is not a substitute for the install-source identity.
+    """
+    root = Path(project_root).resolve(strict=False)
+    source = str(installation_source or "unknown").strip().lower()
+    mode = str(runtime_mode or "unknown").strip().lower()
+    if source not in {"managed", "development", "unknown"}:
+        return ProjectVenvResolution(root, None, None, None, None, f"unsupported installation source: {source}")
+    if mode not in {"managed", "development", "unknown"}:
+        return ProjectVenvResolution(root, None, None, None, None, f"unsupported runtime mode: {mode}")
+
+    candidates = {name: root / name for name in ("venv", ".venv") if (root / name).is_dir()}
+    if not candidates and not virtual_env:
+        return ProjectVenvResolution(root, None, None, None, None, "project virtual environment is missing")
+
+    def paths_match(left, right) -> bool:
+        left_key = os.path.normcase(os.path.abspath(os.path.expanduser(str(left))))
+        right_key = os.path.normcase(os.path.abspath(os.path.expanduser(str(right))))
+        if left_key == right_key:
+            return True
+        try:
+            return Path(left).resolve(strict=False) == Path(right).resolve(strict=False)
+        except (OSError, ValueError):
+            return False
+
+    def candidate_for_path(raw_path) -> str | None:
+        if raw_path is None or not str(raw_path).strip():
+            return None
+        for name, env_root in candidates.items():
+            expected_python = venv_python_path(env_root, windows=windows)
+            if paths_match(raw_path, expected_python) or paths_match(raw_path, env_root):
+                return name
+        return None
+
+    def external_environment(raw_root):
+        if raw_root is None or not str(raw_root).strip():
+            return None
+        env_root = Path(raw_root).expanduser()
+        if not env_root.is_dir():
+            return None
+        python = venv_python_path(env_root, windows=windows)
+        if not python.is_file() or (runtime_python and not paths_match(runtime_python, python)):
+            return None
+        return env_root
+
+    selected = candidate_for_path(runtime_python)
+    if runtime_python and selected is None and not virtual_env and source == "unknown":
+        return ProjectVenvResolution(
+            root, None, None, None, None,
+            f"running Python is outside the project venv and no installation source identifies a target: {runtime_python}",
+        )
+
+    if virtual_env:
+        virtual_selected = candidate_for_path(virtual_env)
+        if selected and virtual_selected and selected != virtual_selected:
+            return ProjectVenvResolution(root, None, None, None, None, "runtime Python and VIRTUAL_ENV identify different project environments")
+        if selected and virtual_selected is None:
+            external_root = external_environment(virtual_env)
+            if external_root is None or not paths_match(
+                venv_python_path(candidates[selected], windows=windows),
+                venv_python_path(external_root, windows=windows),
+            ):
+                return ProjectVenvResolution(root, None, None, None, None, "runtime Python and VIRTUAL_ENV identify different environments")
+        if selected is None and virtual_selected is None:
+            external_root = external_environment(virtual_env)
+            if external_root is None:
+                return ProjectVenvResolution(root, None, None, None, None, f"VIRTUAL_ENV does not identify a usable active interpreter: {virtual_env}")
+            selected = "__active__"
+            candidates[selected] = external_root
+        elif selected is None:
+            selected = virtual_selected
+
+    if selected is None and len(candidates) == 1:
+        selected = next(iter(candidates))
+    if selected is None and len(candidates) > 1:
+        if source == "managed":
+            selected = "venv"
+        elif source == "development":
+            selected = ".venv"
+        else:
+            return ProjectVenvResolution(root, None, None, None, None, "ambiguous project virtual environments; runtime Python or installation source is required")
+
+    if selected is None:
+        return ProjectVenvResolution(root, None, None, None, None, "project virtual environment is missing")
+
+    env_root = candidates[selected]
+    python = venv_python_path(env_root, windows=windows)
+    if not python.is_file():
+        return ProjectVenvResolution(root, None, None, None, None, f"selected virtual environment interpreter is missing: {python}")
+    bin_dir = venv_bin_dir(env_root, windows=windows)
+    launcher_name = "stardust.exe" if bin_dir.name == "Scripts" else "stardust"
+    launcher = bin_dir / launcher_name
+    environment_type = source if source != "unknown" else (
+        mode if mode != "unknown" else ("development" if selected == ".venv" else "managed" if selected == "venv" else "external")
+    )
+    return ProjectVenvResolution(root, env_root, python, launcher, environment_type)
+
+
+def resolve_current_project_venv(
+    project_root,
+    *,
+    installation_source: str = "unknown",
+    runtime_mode: str = "unknown",
+    windows: bool | None = None,
+) -> ProjectVenvResolution:
+    """Resolve the venv belonging to this running Python process and its explicit activation scope."""
+    active_env = os.environ.get("VIRTUAL_ENV")
+    if not active_env and Path(sys.prefix).resolve(strict=False) != Path(sys.base_prefix).resolve(strict=False):
+        active_env = sys.prefix
+    return resolve_project_venv(
+        project_root,
+        runtime_python=sys.executable,
+        virtual_env=active_env,
+        installation_source=installation_source,
+        runtime_mode=runtime_mode,
+        windows=windows,
+    )
+
+
+def probe_project_venv(
+    resolution: ProjectVenvResolution,
+    *,
+    required_modules: tuple[str, ...] = (),
+    timeout: float = 15,
+) -> tuple[bool, str]:
+    """Run the selected interpreter and optionally import required modules; never infer health from paths."""
+    if resolution.error or resolution.venv_dir is None or resolution.python is None:
+        return False, resolution.error or "no project virtual environment was resolved"
+
+    import json
+    import subprocess
+
+    script = (
+        "import importlib, json, sys; "
+        "[importlib.import_module(name) for name in json.loads(sys.argv[1])]; "
+        "print(json.dumps({'prefix': sys.prefix}))"
+    )
+    try:
+        result = subprocess.run(
+            [str(resolution.python), "-c", script, json.dumps(required_modules)],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return False, f"selected Python could not be probed: {exc}"
+
+    if result.returncode != 0:
+        detail = (result.stderr or "").strip().splitlines()
+        return False, detail[0][:240] if detail else f"selected Python exited {result.returncode}"
+    try:
+        prefix = Path(json.loads(result.stdout).get("prefix", "")).resolve(strict=False)
+    except (json.JSONDecodeError, AttributeError, OSError, ValueError):
+        return False, "selected Python returned an invalid environment identity"
+    if prefix != resolution.venv_dir.resolve(strict=False):
+        return False, f"selected Python prefix does not match the resolved environment: {prefix}"
+    return True, ""
 
 
 def venv_python_path(venv_dir, *, windows: bool | None = None) -> Path:

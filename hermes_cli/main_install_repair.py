@@ -411,22 +411,27 @@ def _reexec_dependency_sync_off_windows_shim() -> bool:
 
 
 def _default_venv_install_target() -> tuple[list[str], dict[str, str] | None]:
-    """Return ``(install_cmd_prefix, env)`` for the project venv when possible."""
+    """Return an installer target bound to the active project interpreter."""
     from hermes_cli.main import PROJECT_ROOT
+    from hermes_constants import resolve_current_project_venv
+
+    resolution = resolve_current_project_venv(PROJECT_ROOT, windows=_is_windows())
+    if resolution.error or resolution.venv_dir is None or resolution.python is None:
+        detail = resolution.error or "the active project environment could not be resolved"
+        raise RuntimeError(f"Cannot safely install repair dependencies: {detail}")
+
     try:
         from hermes_cli.managed_uv import ensure_uv
         uv_bin = ensure_uv()
     except Exception:
         uv_bin = None
     if uv_bin:
-        from hermes_constants import project_venv_dir
-        venv_dir = project_venv_dir(PROJECT_ROOT) or PROJECT_ROOT / "venv"
-        env = {**os.environ, "VIRTUAL_ENV": str(venv_dir)}
+        env = {**os.environ, "VIRTUAL_ENV": str(resolution.venv_dir)}
         if _is_termux_env(env):
             env.pop("PYTHONPATH", None)
             env.pop("PYTHONHOME", None)
         return [uv_bin, "pip"], env
-    return [sys.executable, "-m", "pip"], None
+    return [str(resolution.python), "-m", "pip"], None
 
 
 def _run_install_with_heartbeat(
@@ -492,13 +497,13 @@ def _is_windows() -> bool:
 
 
 def _venv_scripts_dir() -> Path | None:
-    """Return the venv Scripts directory if we're running inside the project venv."""
+    """Return the Scripts directory for the active project interpreter, if resolved."""
     from hermes_cli.main import PROJECT_ROOT
-    from hermes_constants import project_venv_dir, venv_bin_dir
-    venv_dir = project_venv_dir(PROJECT_ROOT)
-    if venv_dir is None:
+    from hermes_constants import resolve_current_project_venv, venv_bin_dir
+    resolution = resolve_current_project_venv(PROJECT_ROOT, windows=_is_windows())
+    if resolution.error or not resolution.venv_dir:
         return None
-    scripts = venv_bin_dir(venv_dir, windows=_is_windows())
+    scripts = venv_bin_dir(resolution.venv_dir, windows=_is_windows())
     return scripts if scripts.is_dir() else None
 
 

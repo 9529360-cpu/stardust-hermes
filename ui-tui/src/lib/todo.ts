@@ -8,6 +8,16 @@ export const todoGlyph = (status: TodoItem['status']) =>
 export const todoTone = (status: TodoItem['status']): TodoTone =>
   status === 'in_progress' ? 'active' : status === 'pending' ? 'body' : 'dim'
 
+export const todoBlockers = (item: TodoItem, todos: readonly TodoItem[]): string[] => {
+  if (!item.dependsOn?.length) {
+    return []
+  }
+
+  const statusById = new Map(todos.map(todo => [todo.id, todo.status]))
+
+  return item.dependsOn.filter(id => statusById.get(id) !== 'completed')
+}
+
 /** DFS order of a (possibly nested) todo list: [item, depth] pairs, parents
  *  before children. Dangling/cyclic parents degrade to depth 0. Mirrors
  *  apps/desktop/src/lib/todos.ts's todoTree() so both surfaces render the

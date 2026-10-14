@@ -6,12 +6,16 @@ Covers:
   - Checkpoint persistence of notify_on_complete
   - Terminal tool schema includes notify_on_complete
   - Terminal tool handler passes notify_on_complete through
+  - The notification contract is on the session before its reader starts
 """
 
 import json
 import os
+import subprocess
+import sys
 import time
 import pytest
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from tools.process_registry import (
@@ -442,3 +446,148 @@ def test_non_ci_background_command_does_not_emit_homebrew_hint(monkeypatch, tmp_
     assert "hint" not in result, (
         f"Non-CI command using awk must not be flagged as homebrew CI poller, got: {result.get('hint')!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# The notification contract is on the session before anything can observe it
+#
+# The reader thread consults notify_on_complete / watch_patterns from its first
+# read, and the checkpoint written as the process is tracked (what a restarted
+# gateway recovers) records them with the chat route and the watcher interval.
+# When the terminal tool stamped them after the spawn, a child that exited (or
+# printed its match) first lost its notice while the agent was told it would be
+# notified, and a gateway restarted before any later checkpoint write recovered
+# the process without its watcher.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def live_registry(monkeypatch, tmp_path):
+    """A fresh registry behind the terminal tool, which imports the module singleton at call time."""
+    from tools import process_registry as process_registry_module
+
+    fresh = ProcessRegistry()
+    monkeypatch.setattr(process_registry_module, "process_registry", fresh)
+    monkeypatch.setattr(process_registry_module, "CHECKPOINT_PATH", tmp_path / "processes.json")
+    return fresh
+
+
+def _bind_chat(**binding):
+    from gateway.session_context import clear_session_vars, set_session_vars
+
+    tokens = set_session_vars(**binding)
+    yield binding["session_key"]
+    clear_session_vars(tokens)
+
+
+@pytest.fixture()
+def gateway_chat():
+    """A messaging-gateway chat, bound the way the adapters bind one; notices route back to it."""
+    yield from _bind_chat(
+        platform="telegram", chat_id="4242", chat_type="dm", thread_id="77", user_id="u-1",
+        user_name="Ana", session_key="agent:main:telegram:dm:4242", session_id="sess-4242",
+        message_id="m-9")
+
+
+@pytest.fixture()
+def stateless_chat():
+    """An API-server request: nothing can deliver a notice after the turn ends."""
+    yield from _bind_chat(platform="api_server", chat_id="s1", session_key="s1", async_delivery=False)
+
+
+def _settle_reader_before_return(monkeypatch, registry, method):
+    """Force the losing interleaving: ``registry.<method>`` returns only once its reader thread
+    has seen the child exit, so anything stamped on the session after it returns is too late."""
+    launch = getattr(registry, method)
+
+    def launch_then_settle(*args, **kwargs):
+        session = launch(*args, **kwargs)
+        session._reader_thread.join(timeout=30)
+        assert not session._reader_thread.is_alive(), "the child did not exit"
+        return session
+
+    monkeypatch.setattr(registry, method, launch_then_settle)
+
+
+def _spawn_background(tmp_path, command, *, session_key="", notify_on_complete=False, watch_patterns=None):
+    """terminal(background=true) on the local backend; returns (tool result, process session id)."""
+    from tools.terminal_tool_background import spawn_background_process
+
+    result = json.loads(spawn_background_process(
+        command=command, env=SimpleNamespace(env={}), env_type="local", effective_task_id="t-contract",
+        task_id="t-contract", session_key=session_key, workdir=None, cwd=str(tmp_path),
+        effective_pty=False, notify_on_complete=notify_on_complete, watch_patterns=watch_patterns,
+        approval_note=None, pty_disabled_reason=None))
+    return result, result["session_id"]
+
+
+def _yield_to_background(tmp_path, code, *, session_key=""):
+    """A running foreground command handed to the registry because a user message arrived;
+    returns (handler result, process session id)."""
+    from tools.terminal_tool_background import yield_to_background_handler
+
+    proc = subprocess.Popen(
+        [sys.executable, "-c", code], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        stdin=subprocess.DEVNULL, text=True, start_new_session=True)
+    handler = yield_to_background_handler(
+        command=f"python -c {code!r}", env_type="local", cwd=str(tmp_path), effective_task_id="t-yield",
+        task_id="t-yield", session_key=session_key)
+    handed = handler(proc, "")
+    return handed, handed["yielded_session_id"]
+
+
+class TestContractBeforeReaderStarts:
+    # With both flags, notify_on_complete wins: the early match must not add a watch event.
+    @pytest.mark.parametrize("watch_patterns", [None, ["SERVER_READY"]], ids=["notify", "notify-and-watch"])
+    def test_child_that_exits_during_spawn_still_queues_its_completion(self, live_registry, monkeypatch, tmp_path,
+                                                                       watch_patterns):
+        _settle_reader_before_return(monkeypatch, live_registry, "spawn_local")
+
+        result, sid = _spawn_background(
+            tmp_path, "echo SERVER_READY; exit 3", notify_on_complete=True, watch_patterns=watch_patterns)
+
+        assert result["notify_on_complete"] is True
+        assert [(evt["type"], evt["session_id"], evt.get("exit_code"))
+                for evt, _text in live_registry.drain_notifications()] == [("completion", sid, 3)]
+
+    def test_match_printed_during_spawn_still_queues_its_watch_event(self, live_registry, monkeypatch, tmp_path):
+        _settle_reader_before_return(monkeypatch, live_registry, "spawn_local")
+
+        result, sid = _spawn_background(tmp_path, "echo SERVER_READY", watch_patterns=["SERVER_READY"])
+
+        assert result["watch_patterns"] == ["SERVER_READY"]
+        assert [(evt["type"], evt["session_id"], evt["pattern"])
+                for evt, _text in live_registry.drain_notifications()] == [("watch_match", sid, "SERVER_READY")]
+
+    @pytest.mark.parametrize("launch", ["spawned", "yielded"])
+    def test_gateway_restart_resumes_the_completion_watcher(self, live_registry, gateway_chat, tmp_path, launch):
+        if launch == "spawned":
+            _result, sid = _spawn_background(tmp_path, "sleep 30", session_key=gateway_chat, notify_on_complete=True)
+        else:
+            _result, sid = _yield_to_background(tmp_path, "import time; time.sleep(30)", session_key=gateway_chat)
+        try:
+            live_watchers = live_registry.take_pending_watchers()
+            # The gateway restarts before any other process event rewrites the checkpoint.
+            restarted = ProcessRegistry()
+            assert restarted.recover_from_checkpoint() == 1
+            recovered = restarted.take_pending_watchers()
+        finally:
+            live_registry.kill_process(sid, source="test")
+
+        assert [(w["session_id"], w["platform"], w["chat_id"], w["thread_id"], w["notify_on_complete"])
+                for w in recovered] == [(sid, "telegram", "4242", "77", True)]
+        assert recovered == live_watchers
+
+    @pytest.mark.parametrize("launch", ["spawned", "yielded"])
+    def test_session_that_cannot_receive_notices_queues_none(self, live_registry, stateless_chat, monkeypatch,
+                                                              tmp_path, launch):
+        if launch == "spawned":
+            _settle_reader_before_return(monkeypatch, live_registry, "spawn_local")
+            result, _sid = _spawn_background(tmp_path, "exit 3", session_key=stateless_chat, notify_on_complete=True)
+            assert result["notify_on_complete"] is False
+        else:
+            _settle_reader_before_return(monkeypatch, live_registry, "adopt_local")
+            _yield_to_background(tmp_path, "import sys; sys.exit(3)", session_key=stateless_chat)
+
+        assert live_registry.drain_notifications() == []
+        assert live_registry.take_pending_watchers() == []

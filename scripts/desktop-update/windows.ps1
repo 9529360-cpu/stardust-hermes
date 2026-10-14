@@ -20,6 +20,8 @@
 #   cmd /d /s /c start "" /min powershell -NoProfile -ExecutionPolicy Bypass
 #     -File scripts\desktop-update\windows.ps1
 #     -InstallRoot <path>   repo checkout (STARDUST_HOME\hermes-agent)
+#     -VenvRoot <path>      selected project environment root (.venv or venv)
+#     -PythonPath <path>    python.exe selected from that environment
 #     -Branch <ref>         branch to update against
 #     -DesktopPid <pid>     the Electron main process to wait out
 #     [-RelaunchExe <path>] Stardust.exe to start when done (omit = no relaunch)
@@ -43,6 +45,8 @@
 
 param(
     [string]$InstallRoot,
+    [string]$VenvRoot = "",
+    [string]$PythonPath = "",
     [string]$Branch = "main",
     [int]$DesktopPid = 0,
     [string]$RelaunchExe = "",
@@ -51,7 +55,8 @@ param(
     [switch]$SelfTestUi,
     [switch]$SelfTestPipeDrain,
     [switch]$SelfTestMarker,
-    [switch]$SelfTestWorkingDirectory
+    [switch]$SelfTestWorkingDirectory,
+    [switch]$SelfTestVenvPaths
 )
 
 if (-not $SelfTestUi -and -not $SelfTestPipeDrain -and -not $InstallRoot) {
@@ -1465,6 +1470,26 @@ try {
         exit $finalCode
     }
 
+    $VenvRoot = if ([string]::IsNullOrWhiteSpace($VenvRoot)) {
+        Join-Path $resolvedInstallRoot "venv"
+    } else {
+        [System.IO.Path]::GetFullPath($VenvRoot)
+    }
+    $expectedPython = [System.IO.Path]::GetFullPath((Join-Path $VenvRoot "Scripts\python.exe"))
+    $pythonExe = if ([string]::IsNullOrWhiteSpace($PythonPath)) {
+        $expectedPython
+    } else {
+        [System.IO.Path]::GetFullPath($PythonPath)
+    }
+    $shim = Join-Path $VenvRoot "Scripts\stardust.exe"
+
+    if (-not [string]::Equals($pythonExe, $expectedPython, [StringComparison]::OrdinalIgnoreCase)) {
+        $finalCode = 3
+        $finalMsg = "Update aborted: PythonPath does not belong to the selected environment ($VenvRoot). Nothing was changed."
+        Write-HandoffLog $finalMsg
+        exit $finalCode
+    }
+
     # Exercise the production cwd setup and native launcher without updating.
     if ($SelfTestWorkingDirectory) {
         $expectedRoot = [System.IO.Path]::GetFullPath($InstallRoot)
@@ -1482,8 +1507,14 @@ try {
         exit 0
     }
 
+    if ($SelfTestVenvPaths) {
+        $finalCode = 0
+        $finalMsg = "VENV TARGET SELF-TEST: PASS root=$VenvRoot python=$pythonExe shim=$shim"
+        Write-Host $finalMsg
+        exit 0
+    }
+
     # Check only the interpreter here: dependency recovery belongs to update.
-    $pythonExe = Join-Path $InstallRoot "venv\Scripts\python.exe"
     if (-not (Test-Path -LiteralPath $pythonExe -PathType Leaf)) {
         $finalCode = 3
         $finalMsg = "Update aborted: $pythonExe is missing. Repair the installation and review antivirus quarantine before retrying."
@@ -1514,7 +1545,6 @@ try {
 
     # -- 2. Wait for the venv shim to unlock (FAIL CLOSED) ------------------
     Publish-UiProgress "Preparing Hermes files"
-    $shim = Join-Path $InstallRoot "venv\Scripts\stardust.exe"
     if (Test-Path -LiteralPath $shim) {
         $unlocked = $false
         $deadline = (Get-Date).AddSeconds(20)
@@ -1533,7 +1563,7 @@ try {
             # Something still maps the venv. --force-ing past it guarantees a
             # half-updated venv (the exact 2026-08-09 Access-denied brick).
             $finalCode = 5
-            $finalMsg = "Update aborted: another process is still holding the Hermes install open (venv\Scripts\stardust.exe locked after 20s). Nothing was changed. Close other Hermes windows/terminals and try again."
+            $finalMsg = "Update aborted: another process is still holding the Hermes install open ($shim locked after 20s). Nothing was changed. Close other Hermes windows/terminals and try again."
             Write-HandoffLog $finalMsg
             exit $finalCode
         }
@@ -1577,7 +1607,6 @@ try {
     #
     # posix.sh is deliberately left alone: unlinking a running executable is
     # legal there, so the equivalent call is harmless.
-    $pythonExe = Join-Path $InstallRoot "venv\Scripts\python.exe"
     if (-not (Test-Path -LiteralPath $pythonExe)) {
         $finalCode = 3
         $finalMsg = "Update aborted: $pythonExe is missing. The install needs repair (run the Hermes installer or `stardust doctor`)."

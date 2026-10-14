@@ -105,10 +105,12 @@ def _get_independent_completions() -> bool:
     return is_truthy_value(_cfg().get("independent_completions", False))
 
 def _get_worktree_isolation() -> bool:
-    """delegation.worktree_isolation (bool, default False): each child gets its own
-    git worktree off the parent's HEAD so parallel children never contend for one
-    working copy. Git-only and local-backend-only; otherwise silently ignored."""
-    return bool(_cfg().get("worktree_isolation", False))
+    """Local Git children use separate worktrees by default.
+
+    Explicit false preserves legacy shared-cwd behavior. Tasks declaring
+    requires_worktree=true override that preference and always fail closed.
+    """
+    return is_truthy_value(_cfg().get("worktree_isolation"), default=True)
 
 def _get_max_async_children() -> int:
     """Concurrency cap for background delegations == delegation.max_concurrent_children. At capacity a new async

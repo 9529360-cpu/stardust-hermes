@@ -137,6 +137,17 @@ export function validateBridgeLaunchContext(raw: unknown): BridgeLaunchContext {
   }
 }
 
+/**
+ * The packaged bridge entry. scripts/stage-browser-bridge.mjs stages the bridge with its pinned
+ * @playwright/mcp packages into dist/browser-bridge, which ships asar-unpacked: the Electron-as-node
+ * child loads those packages from real files. Null when the staged bridge is missing.
+ */
+export function packagedBrowserBridgeEntry(appPath: string, exists: (file: string) => boolean = fs.existsSync) {
+  const entry = path.join(appPath.replace(/app\.asar$/, 'app.asar.unpacked'), 'dist', 'browser-bridge', 'src', 'main.mjs')
+
+  return exists(entry) ? entry : null
+}
+
 function resolveEntry(deps: Deps) {
   if (deps.bridgeEntry) {
     return deps.bridgeEntry

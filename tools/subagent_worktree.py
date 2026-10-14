@@ -1,9 +1,10 @@
-"""Opt-in git worktree isolation for delegated subagents (``delegation.worktree_isolation``).
+"""Git worktree isolation for delegated subagents (``delegation.worktree_isolation``).
 
-Git-only (outside a repo children share the parent's cwd); local terminal backend only (on
-docker/ssh/modal the host worktree is invisible in the sandbox, so isolation is skipped). One
-worktree per child under ``<repo>/.worktrees/subagent-<id>``, branch ``hermes-subagent/<id>``;
-pruned only on proof (zero commits AND clean, both probes ok), else kept + ``inspection_failed``.
+Outside a Git repository, normal tasks retain the parent's cwd. The local Git
+launcher fails rather than sharing a detected repository if worktree setup fails;
+explicitly required worktrees fail even on unsupported backends. A worktree is
+created under ``<repo>/.worktrees/subagent-<id>``, on its own branch, and pruned
+only on proof that it has neither commits nor uncommitted changes.
 """
 
 from __future__ import annotations
@@ -60,17 +61,22 @@ def resolve_repo_root(path: Optional[str]) -> Optional[str]:
 
 
 def _ensure_gitignore_entry(repo_root: str) -> None:
-    """Best-effort: keep ``.worktrees/`` out of git status."""
-    gitignore = Path(repo_root) / ".gitignore"
+    """Keep worktrees out of status without touching tracked .gitignore."""
     try:
-        existing = gitignore.read_text(encoding="utf-8-sig", errors="replace") if gitignore.exists() else ""
+        location = _run_git(["rev-parse", "--git-path", "info/exclude"], cwd=repo_root)
+        if location.returncode != 0 or not location.stdout.strip():
+            return
+        exclude = Path(location.stdout.strip())
+        if not exclude.is_absolute():
+            exclude = Path(repo_root) / exclude
+        exclude.parent.mkdir(parents=True, exist_ok=True)
+        existing = exclude.read_text(encoding="utf-8-sig", errors="replace") if exclude.exists() else ""
         if ".worktrees/" not in existing.splitlines():
-            with open(gitignore, "a", encoding="utf-8") as f:
+            with open(exclude, "a", encoding="utf-8") as f:
                 sep = "\n" if existing and not existing.endswith("\n") else ""
                 f.write(f"{sep}.worktrees/\n")
     except Exception as exc:
-        logger.debug("subagent worktree: could not update .gitignore: %s", exc)
-
+        logger.debug("subagent worktree: could not update Git info/exclude: %s", exc)
 
 def create_subagent_worktree(parent_cwd: Optional[str], subagent_id: Optional[str] = None) -> Optional[Dict[str, str]]:
     """Create an isolated worktree for one child; None (silent downgrade) outside git/on failure."""
@@ -115,6 +121,9 @@ def mark_worktree_payload_unproven(payload: Dict[str, Any], reason: str, *,
     """
     path, branch = payload.get("path", ""), payload.get("branch", "")
     payload["inspection_failed"] = True
+    for field in unmeasured.split("/"):
+        if field in {"commits", "dirty"}:
+            payload[field] = None
     payload["note"] = (f"git inspection failed ({reason}): {unmeasured} UNKNOWN — not proven "
                        f"zero/clean. The worktree and branch were preserved — inspect {path} "
                        f"(branch {branch}) before assuming no work.")
@@ -145,7 +154,7 @@ def finalize_subagent_worktree(info: Dict[str, str], *, prune: bool = True) -> D
     # See #88113.
     if not base_commit:
         return mark_worktree_payload_unproven(
-            payload, "no base_commit recorded — commit count unmeasurable", unmeasured="commits")
+            payload, "no base_commit recorded — commit count unmeasurable", unmeasured="commits/dirty")
     failed, unmeasured = [], []
     probes = (("commits", "rev-list", ["rev-list", "--count", f"{base_commit}..HEAD"],
                lambda s: int(s or 0)),
@@ -166,6 +175,22 @@ def finalize_subagent_worktree(info: Dict[str, str], *, prune: bool = True) -> D
         # Destructive cleanup requires affirmative proof; defaults prove nothing.
         return mark_worktree_payload_unproven(payload, "; ".join(failed), unmeasured="/".join(unmeasured))
     if prune and payload["commits"] == 0 and not payload["dirty"]:
+        try:
+            ignored = _run_git(["status", "--porcelain", "--ignored=matching"], cwd=path)
+            if ignored.returncode != 0:
+                return mark_worktree_payload_unproven(
+                    payload, f"ignored-file inspection exit {ignored.returncode}: {ignored.stderr.strip()[:200]}",
+                    unmeasured="ignored files")
+            ignored_paths = [line[3:] for line in ignored.stdout.splitlines() if line.startswith("!! ")]
+            if ignored_paths:
+                payload["ignored_files"] = ignored_paths
+                payload["note"] = (
+                    "ignored files present; worktree kept to avoid deleting untracked child data: "
+                    + ", ".join(ignored_paths[:5])
+                )
+                return payload
+        except Exception as exc:
+            return mark_worktree_payload_unproven(payload, f"ignored-file inspection raised: {exc}")
         cwd = info.get("repo_root", "") or path
         try:
             removed = _run_git(["worktree", "remove", "--force", path], cwd=cwd)
@@ -174,8 +199,18 @@ def finalize_subagent_worktree(info: Dict[str, str], *, prune: bool = True) -> D
                 payload["pruned"] = True
                 logger.info("subagent worktree pruned (no work): %s", path)
             else:
+                payload["cleanup_failed"] = True
+                payload["note"] = (
+                    f"git worktree remove failed ({removed.returncode}): {removed.stderr.strip()[:200]}; "
+                    f"worktree preserved for parent review at {path} (branch {branch})."
+                )
                 logger.debug("subagent worktree: prune failed: %s", removed.stderr.strip())
         except Exception as exc:
+            payload["cleanup_failed"] = True
+            payload["note"] = (
+                f"git worktree remove raised: {exc}; worktree preserved for parent review "
+                f"at {path} (branch {branch})."
+            )
             logger.debug("subagent worktree: prune failed: %s", exc)
     return payload
 

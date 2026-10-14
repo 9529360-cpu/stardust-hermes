@@ -25,6 +25,7 @@ import pytest
 
 from hermes_cli import main as cli_main
 from hermes_cli import update_cmd
+import hermes_cli.update_cmd_windows as update_cmd_windows
 
 
 # ---------------------------------------------------------------------------
@@ -64,10 +65,11 @@ def _proc(pid: int, exe: str, name: str, cmdline: list[str] | None = None, cwd: 
 
 
 @patch.object(cli_main, "_is_windows", return_value=True)
-def test_detect_venv_python_excludes_self_and_ancestors(_winp, tmp_path):
+def test_detect_venv_python_excludes_self_and_ancestors(_winp, tmp_path, monkeypatch):
     import os as _os
 
-    venv_py = str(tmp_path / "venv" / "Scripts" / "python.exe")
+    venv_py = str(_fake_venv_python(tmp_path, windows=True))
+    monkeypatch.setenv("VIRTUAL_ENV", str(tmp_path / "venv"))
     parent = MagicMock()
     parent.pid = 555
     me = MagicMock()
@@ -88,8 +90,9 @@ def test_detect_venv_python_excludes_self_and_ancestors(_winp, tmp_path):
 
 
 @patch.object(cli_main, "_is_windows", return_value=True)
-def test_detect_venv_python_prefetches_only_cheap_process_fields(_winp, tmp_path):
-    venv_py = str(tmp_path / "venv" / "Scripts" / "python.exe")
+def test_detect_venv_python_prefetches_only_cheap_process_fields(_winp, tmp_path, monkeypatch):
+    venv_py = str(_fake_venv_python(tmp_path, windows=True))
+    monkeypatch.setenv("VIRTUAL_ENV", str(tmp_path / "venv"))
     holder = _proc(101, venv_py, "python.exe", [venv_py, "-m", "hermes_cli.main", "serve"])
     unrelated = _proc(102, r"C:\Program Files\Browser\browser.exe", "browser.exe")
     unrelated.cmdline.side_effect = AssertionError("unrelated cmdline must stay lazy")
@@ -120,7 +123,9 @@ def test_detect_venv_python_prefetches_only_cheap_process_fields(_winp, tmp_path
 
 
 @patch.object(cli_main, "_is_windows", return_value=True)
-def test_detect_venv_python_keeps_external_interpreter_fallback(_winp, tmp_path):
+def test_detect_venv_python_keeps_external_interpreter_fallback(_winp, tmp_path, monkeypatch):
+    _fake_venv_python(tmp_path, windows=True)
+    monkeypatch.setenv("VIRTUAL_ENV", str(tmp_path / "venv"))
     external = _proc(
         103,
         r"C:\Python311\python.exe",
@@ -144,6 +149,78 @@ def test_detect_venv_python_keeps_external_interpreter_fallback(_winp, tmp_path)
     external.cwd.assert_called_once_with()
 
 
+
+
+# ---------------------------------------------------------------------------
+# Unified .venv/venv process target selection
+# ---------------------------------------------------------------------------
+
+
+@patch.object(cli_main, "_is_windows", return_value=True)
+def test_holder_scan_uses_only_the_active_dot_venv(_winp, tmp_path, monkeypatch):
+    root = tmp_path
+    py_paths = {}
+    shim_paths = {}
+    for name in (".venv", "venv"):
+        scripts = root / name / "Scripts"
+        scripts.mkdir(parents=True)
+        py_paths[name] = scripts / "python.exe"
+        py_paths[name].touch()
+        shim_paths[name] = scripts / "stardust.exe"
+    monkeypatch.setenv("VIRTUAL_ENV", str(root / ".venv"))
+    me = MagicMock()
+    me.parents.return_value = []
+    fake_psutil = types.SimpleNamespace(
+        process_iter=lambda _attrs: iter([
+            _proc(101, str(shim_paths[".venv"]), "stardust.exe", [str(shim_paths[".venv"])]),
+            _proc(102, str(shim_paths["venv"]), "stardust.exe", [str(shim_paths["venv"])]),
+        ]),
+        Process=lambda *a, **k: me,
+    )
+
+    with patch.object(cli_main, "PROJECT_ROOT", root), patch.dict(sys.modules, {"psutil": fake_psutil}):
+        matches = cli_main._detect_venv_python_processes()
+
+    assert [pid for pid, _name, _cmd in matches] == [101]
+
+
+@patch.object(cli_main, "_is_windows", return_value=True)
+def test_venv_launcher_ancestor_scan_uses_active_dot_venv(_winp, tmp_path, monkeypatch):
+    root = tmp_path
+    dot_python = root / ".venv" / "Scripts" / "python.exe"
+    dot_python.parent.mkdir(parents=True)
+    dot_python.touch()
+    (root / "venv" / "Scripts").mkdir(parents=True)
+    (root / "venv" / "Scripts" / "python.exe").touch()
+    monkeypatch.setenv("VIRTUAL_ENV", str(root / ".venv"))
+    parent = MagicMock()
+    parent.pid = 100
+    parent.exe.return_value = str(dot_python)
+    child = MagicMock()
+    child.parent.return_value = parent
+    fake_psutil = types.SimpleNamespace(Process=lambda *_a, **_k: child)
+
+    with patch.object(cli_main, "PROJECT_ROOT", root), patch.dict(sys.modules, {"psutil": fake_psutil}), \
+         patch.object(update_cmd_windows, "_self_and_non_gateway_ancestor_pids", return_value=set()):
+        assert update_cmd_windows._venv_launcher_ancestors([200]) == [100]
+
+
+@patch.object(cli_main, "_is_windows", return_value=True)
+def test_windows_holder_gate_refuses_when_target_environment_is_missing(_winp, tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(cli_main, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(sys, "executable", str(tmp_path / "outer-python.exe"))
+    monkeypatch.setattr(sys, "prefix", sys.base_prefix)
+    monkeypatch.delenv("VIRTUAL_ENV", raising=False)
+    resumed = []
+    monkeypatch.setattr(cli_main, "_resume_windows_gateways_after_update", lambda value: resumed.append(value))
+    monkeypatch.setattr(cli_main, "_detect_venv_python_processes", lambda: pytest.fail("scan must not run"))
+
+    with pytest.raises(SystemExit) as exc:
+        update_cmd_windows._clear_windows_venv_holders_or_exit(_update_args(), False, None)
+
+    assert exc.value.code == 2
+    assert "cannot safely resolve" in capsys.readouterr().out.lower()
+    assert resumed == [None]
 
 
 # ---------------------------------------------------------------------------

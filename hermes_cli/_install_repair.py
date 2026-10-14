@@ -61,33 +61,33 @@ def _stdout_to_stderr():
 
 
 def _resolve_install_target(root: Path) -> tuple[list[str], dict | None]:
-    """(install_cmd_prefix, env) for the project venv — stdlib uv lookup.
+    """Return an install target bound to the current interpreter's project environment."""
+    from hermes_constants import resolve_current_project_venv
 
-    ``VIRTUAL_ENV`` steers ``uv pip`` at the project venv even when invoked from the base
-    interpreter. Termux strips leaked interpreter-path env vars so uv resolves the venv correctly.
-    """
+    resolution = resolve_current_project_venv(root, windows=_is_windows())
+    if resolution.error or resolution.venv_dir is None or resolution.python is None:
+        detail = resolution.error or "the active project environment could not be resolved"
+        raise RuntimeError(f"Cannot safely install repair dependencies: {detail}")
+
     uv_bin = _er._find_uv_binary()
     if uv_bin:
-        from hermes_constants import project_venv_dir
-
-        env = {**os.environ, "VIRTUAL_ENV": str(project_venv_dir(root) or root / "venv")}
+        env = {**os.environ, "VIRTUAL_ENV": str(resolution.venv_dir)}
         if _is_termux_env(env):
             env.pop("PYTHONPATH", None)
             env.pop("PYTHONHOME", None)
         return [uv_bin, "pip"], env
-    return [sys.executable, "-m", "pip"], None
+    return [str(resolution.python), "-m", "pip"], None
 
 
-def _venv_scripts_dir(root: Path) -> Path | None:
-    """Project venv Scripts/bin dir, when present (hermes_constants is stdlib-only)."""
-    # hermes_constants is stdlib-only, so the canonical layout helpers are safe to use from this
-    # corrupted-venv repair path (#76105: never open-code the Scripts/bin split).
-    from hermes_constants import project_venv_dir, venv_bin_dir
+def _venv_scripts_dir(root: Path, *, windows: bool | None = None) -> Path | None:
+    """Active project interpreter's Scripts/bin dir when it is safely resolved."""
+    from hermes_constants import resolve_current_project_venv, venv_bin_dir
 
-    venv_dir = project_venv_dir(root)
-    if venv_dir is None:
+    windows = _is_windows() if windows is None else windows
+    resolution = resolve_current_project_venv(root, windows=windows)
+    if resolution.error or resolution.venv_dir is None:
         return None
-    scripts = venv_bin_dir(venv_dir, windows=_is_windows())
+    scripts = venv_bin_dir(resolution.venv_dir, windows=windows)
     return scripts if scripts.is_dir() else None
 
 
@@ -200,12 +200,10 @@ def ensure_windows_bin_launchers(
     if not targets:
         return []
 
-    from hermes_constants import project_venv_dir, venv_bin_dir
-
-    venv_dir = project_venv_dir(root)
-    if venv_dir is None:
+    scripts_dir = _venv_scripts_dir(root, windows=windows)
+    if scripts_dir is None:
         return []
-    scripts_dir = venv_bin_dir(venv_dir, windows=windows)
+    venv_dir = scripts_dir.parent
     sources = [(name, scripts_dir / f"{name}.exe") for name in _WINDOWS_BIN_LAUNCHERS
                if (scripts_dir / f"{name}.exe").is_file()]
     if not sources:

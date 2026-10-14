@@ -21,6 +21,7 @@ from hermes_cli import main as cli_main
 from hermes_cli import dashboard_procs
 from hermes_cli import main_install_repair
 from hermes_cli import update_cmd
+import hermes_cli.update_cmd_windows as update_cmd_windows
 
 
 # Tests in this module either exercise the REAL _detect_concurrent_hermes_instances
@@ -643,9 +644,15 @@ def _fake_psutil_tree(tree, venv_exe, worker_exe, dead=None):
     return mod
 
 
+def _stub_active_venv_target(monkeypatch):
+    target = SimpleNamespace(error=None, venv_dir=cli_main.PROJECT_ROOT / "venv")
+    monkeypatch.setattr(update_cmd_windows, "_active_project_venv_resolution", lambda: target)
+
+
 @patch.object(cli_main, "_is_windows", return_value=True)
 def test_venv_launcher_ancestors_returns_venv_side_parent(_winp, monkeypatch):
     """The worker's venv-side parent is reported so the guard set is covered."""
+    _stub_active_venv_target(monkeypatch)
     venv_exe = str(cli_main.PROJECT_ROOT / "venv" / "Scripts" / "python.exe")
     worker_exe = r"C:\Users\x\AppData\Roaming\uv\python\cpython-3.11\python.exe"
 
@@ -659,6 +666,7 @@ def test_venv_launcher_ancestors_returns_venv_side_parent(_winp, monkeypatch):
 @patch.object(cli_main, "_is_windows", return_value=True)
 def test_venv_launcher_ancestors_ignores_non_venv_parents(_winp, monkeypatch):
     """A Scheduled Task's cmd.exe / an operator shell is not a venv holder."""
+    _stub_active_venv_target(monkeypatch)
     venv_exe = str(cli_main.PROJECT_ROOT / "venv" / "Scripts" / "python.exe")
     worker_exe = r"C:\Windows\System32\cmd.exe"
 
@@ -688,6 +696,7 @@ def test_pause_kill_set_covers_venv_guard_abort_set(
     the guard reported the venv-side launcher, so the update aborted forever
     despite a "successful" pause.
     """
+    _stub_active_venv_target(monkeypatch)
     import hermes_cli.gateway as gateway_mod
     import gateway.status as status_mod
 
@@ -1107,6 +1116,7 @@ def test_update_impl_refuses_before_terminating_gateway_ancestor(
     _winp, monkeypatch, capsys
 ):
     """#98814: the live holder path must gate the destructive call itself."""
+    _stub_active_venv_target(monkeypatch)
     import gateway.status as status_mod
     import hermes_cli.gateway as gateway_cli
 

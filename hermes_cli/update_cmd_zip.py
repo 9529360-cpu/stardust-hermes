@@ -21,7 +21,7 @@ logger = logging.getLogger("hermes_cli.update_cmd")
 _ZIP_STAGING_ARTIFACT_SUFFIXES = ".hermes-update-staging", ".hermes-update-old"
 
 # Single source of truth for entries the ZIP swap preserves — used by the dirty-tree filter and the swap loop.
-_ZIP_PRESERVED_TOP_LEVEL = {"venv", "node_modules", ".git", ".env"}
+_ZIP_PRESERVED_TOP_LEVEL = {"venv", ".venv", "node_modules", ".git", ".env"}
 
 
 def _zip_archive_url(branch: str) -> str:
@@ -336,9 +336,17 @@ def _reinstall_python_deps_after_zip(active_tool_dependencies) -> None:
     )
 
     from hermes_cli.managed_uv import ensure_uv, update_managed_uv
+    from hermes_constants import resolve_current_project_venv
+
+    resolution = resolve_current_project_venv(_m().PROJECT_ROOT, windows=_m()._is_windows())
+    if resolution.error or not resolution.python or not resolution.venv_dir:
+        detail = resolution.error or "the active project interpreter could not be resolved"
+        print(f"✗ ZIP update cannot safely resolve its Python target: {detail}")
+        _m().sys.exit(1)
+
     update_managed_uv()  # keep managed uv current — runs `uv self update` if we already have one
     uv_bin = ensure_uv()
-    pip_cmd = [_m().sys.executable, "-m", "pip"]
+    pip_cmd = [str(resolution.python), "-m", "pip"]
     if not uv_bin:
         uv_bin = _ensure_uv_for_termux(pip_cmd)
     if uv_bin:
@@ -346,7 +354,7 @@ def _reinstall_python_deps_after_zip(active_tool_dependencies) -> None:
         # from unrelated software must not steer which interpreter uv resolves here.
         from hermes_cli.managed_uv import managed_python_env
         uv_env = managed_python_env()
-        uv_env["VIRTUAL_ENV"] = str(_m().PROJECT_ROOT / "venv")
+        uv_env["VIRTUAL_ENV"] = str(resolution.venv_dir)
         if _m()._is_termux_env(uv_env):
             uv_env.pop("PYTHONPATH", None)
             uv_env.pop("PYTHONHOME", None)
@@ -360,7 +368,7 @@ def _reinstall_python_deps_after_zip(active_tool_dependencies) -> None:
         install_prefix, install_env = [uv_bin, "pip"], uv_env
     else:
         # sys.executable -m pip avoids PEP 668 'externally-managed-environment' errors.
-        _ensure_venv_pip(pip_cmd, _m().sys.executable)
+        _ensure_venv_pip(pip_cmd, str(resolution.python))
         _m()._install_python_dependencies_with_optional_fallback(pip_cmd)
         install_prefix, install_env = pip_cmd, None
     _m()._restore_active_tool_dependencies(active_tool_dependencies, install_prefix, env=install_env)
@@ -400,6 +408,7 @@ def _update_via_zip(args, *, had_desktop_app_before_update: bool = False) -> boo
     # base deps and reinstall the remaining extras individually so update does not silently strip working
     # capabilities. See #86735.
     _m()._abort_dependency_sync_if_self_locked()
+    _m()._write_update_incomplete_marker()
     print("→ Updating Python dependencies...")
     _reinstall_python_deps_after_zip(active_tool_dependencies)
     # Verify the tree imports (catches the parse-OK-but-skewed tree an interrupted copy leaves). Runs
@@ -414,6 +423,7 @@ def _update_via_zip(args, *, had_desktop_app_before_update: bool = False) -> boo
         print("  This usually means the copy was interrupted partway through.")
         print("  Re-run `stardust update` to complete it.")
         _m().sys.exit(1)
+    _m()._clear_update_incomplete_marker()
     node_failures = _update_node_dependencies()
     _m()._build_web_ui(_m().PROJECT_ROOT / "web")
     desktop_build_ok = _rebuild_desktop_after_update(

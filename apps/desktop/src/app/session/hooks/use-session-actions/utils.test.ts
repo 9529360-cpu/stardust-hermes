@@ -1557,6 +1557,61 @@ const runningProjection = (user: string): SessionResumeResult =>
   }) as SessionResumeResult
 
 describe('dedupeInflightUserAgainstTranscript', () => {
+  it('preserves a new repeat when only part of the correction suffix matches', () => {
+    const runtime = [msg('old', 'assistant', 'older reply', { timestamp: 1 })]
+
+    const persisted = [
+      ...runtime,
+      msg('u', 'user', 'current prompt'),
+      msg('a', 'assistant', 'finished reply'),
+      msg('c', 'user', 'last correction')
+    ]
+
+    const projection = {
+      ...runningProjection('current prompt'),
+      inflight: {
+        user: 'current prompt',
+        assistant: '',
+        streaming: true,
+        corrections: ['different correction', 'last correction']
+      }
+    }
+
+    expect(dedupeInflightUserAgainstTranscript(persisted, runtime, projection)).toBe(projection)
+  })
+
+  it('does not duplicate an original prompt persisted before its mid-turn correction', () => {
+    const runtime = [
+      msg('old-u', 'user', 'older prompt', { timestamp: 1 }),
+      msg('old-a', 'assistant', 'older reply', { timestamp: 2 })
+    ]
+
+    const persisted = [
+      ...runtime,
+      msg('u', 'user', 'current prompt', { timestamp: 3 }),
+      msg('a', 'assistant', 'Hello', { timestamp: 4 }),
+      msg('c', 'user', 'redirect now', { timestamp: 5 })
+    ]
+
+    const projection = {
+      ...runningProjection('current prompt'),
+      inflight: {
+        user: 'current prompt',
+        assistant: 'Hello',
+        streaming: true,
+        corrections: ['redirect now'],
+        correction_offsets: [5]
+      }
+    }
+
+    const restored = appendLiveSessionProjection(
+      persisted,
+      dedupeInflightUserAgainstTranscript(persisted, runtime, projection)
+    )
+
+    expect(restored.filter(m => m.role === 'user' && chatMessageText(m) === 'current prompt')).toHaveLength(1)
+  })
+
   it('retains the in-flight user source only when it already exists after the runtime anchor', () => {
     const runtime = [
       msg('runtime-user', 'user', 'earlier prompt', { timestamp: 1 }),

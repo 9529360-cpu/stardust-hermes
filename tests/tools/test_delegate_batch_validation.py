@@ -20,6 +20,39 @@ from unittest.mock import MagicMock, patch
 from tools.delegate_tool import delegate_task
 
 
+def test_model_facing_worktree_requirement_is_enforced():
+    from tools.delegate_tool import _build_dynamic_schema_overrides
+    from tools.delegate_tool_tasks import _normalize_task_list
+
+    spec = _build_dynamic_schema_overrides()["parameters"]["properties"]["tasks"]["items"]["properties"]
+    assert spec["requires_worktree"]["type"] == "boolean"
+    tasks, err = _normalize_task_list(
+        None, None, [{"goal": "Implement isolated code fix", "requires_worktree": True}], None, "leaf", 10,
+    )
+    assert err is None and tasks[0]["requires_worktree"] is True
+    _ignored, err = _normalize_task_list(
+        None, None, [{"goal": "Implement isolated code fix", "requires_worktree": "true"}], None, "leaf", 10,
+    )
+    assert "must be a boolean" in err
+
+
+def test_required_worktree_flag_reaches_child_run():
+    from tools import delegate_tool
+    parent, child = MagicMock(), MagicMock()
+    creds = {
+        "model": "test", "provider": None, "base_url": None, "api_key": None,
+        "api_mode": None, "request_overrides": None,
+    }
+    with patch("tools.delegate_tool._build_child_preserving_parent_tools", return_value=child):
+        children, err = delegate_tool._build_children(
+            [{"goal": "Implement tested change", "requires_worktree": True}],
+            [None], creds, top_role="leaf", max_iterations=10, parent_agent=parent,
+            routing_cfg={}, live_deleg_id=None, live_writers=[],
+        )
+    assert err is None and len(children) == 1
+    assert child._delegate_worktree_required is True
+
+
 def test_model_facing_task_brief_names_completion_evidence():
     from tools.delegate_tool import _build_dynamic_schema_overrides
 

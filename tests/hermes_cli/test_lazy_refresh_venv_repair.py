@@ -206,6 +206,11 @@ def test_cmd_update_captures_and_propagates_pre_rebuild_snapshot(
         raise RestoreReached
 
     monkeypatch.setattr(m, "PROJECT_ROOT", tmp_path)
+    venv_root = tmp_path / ".venv"
+    fake_python = venv_root / "bin" / "python"
+    fake_python.parent.mkdir(parents=True, exist_ok=True)
+    fake_python.touch()
+    monkeypatch.setenv("VIRTUAL_ENV", str(venv_root))
     monkeypatch.setattr(m, "_capture_active_lazy_features", lambda: snapshot.copy())
     monkeypatch.setattr(
         m, "_capture_active_tool_dependencies", lambda: tool_snapshot.copy()
@@ -250,7 +255,7 @@ def test_cmd_update_captures_and_propagates_pre_rebuild_snapshot(
     from hermes_cli.managed_uv import managed_python_env
 
     expected_env = managed_python_env()
-    expected_env["VIRTUAL_ENV"] = str(tmp_path / "venv")
+    expected_env["VIRTUAL_ENV"] = str(tmp_path / ".venv")
     assert refresh_calls == [
         (
             ["uv", "pip"],

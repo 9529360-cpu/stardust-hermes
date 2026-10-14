@@ -1168,6 +1168,11 @@ export const zh = defineLocale({
       backendIdleTimeoutDesc: '未使用的机器人后端在关闭前保持预热的时长。调高这个值，你每隔几分钟就会再访问的机器人就不必每次冷启动。'
     },
     customEndpoints: {
+      magpieSetup: '连接 Magpie',
+      magpieName: 'Magpie',
+      magpieHelp: 'Magpie 需要从 Stardust 后端可达。点击“测试连接”加载模型列表；Magpie 会自行更新。',
+      magpieDownload: '获取 Magpie',
+      defaultScopeHint: '默认服务用于新对话。已打开的对话会继续使用聊天中显示的模型。',
       title: '自定义服务',
       addTitle: '添加模型服务',
       editTitle: '编辑模型服务',
@@ -1956,6 +1961,9 @@ export const zh = defineLocale({
         working: '处理中…',
         connectedTitle: 'Chrome 已连接',
         connectedMessage: '每个操作获得批准后，此对话即可使用已配对的 Chrome 配置文件。',
+        agentConnectingTitle: '正在连接你的 Chrome',
+        agentConnectingMessage:
+          '这个对话正在接入你已打开的 Chrome，会用到你已登录的网站。',
         connectFailed: '无法连接 Chrome',
         disconnectFailed: '无法断开 Chrome 连接',
         noSession: '请先打开或选择一个 Desktop 对话。',
@@ -3697,6 +3705,7 @@ export const zh = defineLocale({
     goalWaiting: '目标等待中',
     subagents: count => `${count} 个子代理`,
     todos: (done, total) => `任务 ${done}/${total}`,
+    blockedBy: ids => `等待：${ids.join('、')}`,
     running: '运行中',
     cronRun: '定时任务',
     stop: '停止',
@@ -4130,6 +4139,7 @@ export const zh = defineLocale({
   },
 
   modelPicker: {
+    scopeHint: '这里显示当前对话或草稿实际使用的模型。设置中的“模型服务”用于设置新对话默认值，不会切换已打开的对话。',
     title: '切换模型',
     current: '当前：',
     unknown: '(未知)',
