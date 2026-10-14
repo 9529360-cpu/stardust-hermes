@@ -72,13 +72,14 @@ def test_child_env_hides_logins_other_tools_keep_in_the_user_profile(tmp_path):
     ~/.codex, ~/.qwen). The exam's backend gets an empty profile so it neither uses nor refreshes them."""
     base = {"PATH": "/usr/bin", "HOME": "/home/me", "USERPROFILE": "C:/Users/me", "CODEX_HOME": "/home/me/.codex",
             "CLAUDE_CONFIG_DIR": "/home/me/.claude", "GH_CONFIG_DIR": "/home/me/.config/gh",
-            "LOCALAPPDATA": "C:/Users/me/AppData/Local"}
+            "LOCALAPPDATA": "C:/Users/me/AppData/Local", "APPDATA": "C:/Users/me/AppData/Roaming"}
     profile = tmp_path / "profile"
     env = sandbox.child_env(base, home=tmp_path / "home", repo_root=REPO, api_key="", tool_bin=None, profile=profile)
 
     assert (env["HOME"], env["USERPROFILE"], env["GH_CONFIG_DIR"]) == (str(profile), str(profile), str(profile / "gh"))
     assert {"CODEX_HOME", "CLAUDE_CONFIG_DIR"} & set(env) == set()
-    assert env["LOCALAPPDATA"] == "C:/Users/me/AppData/Local"  # Git Bash and pip still resolve through it
+    assert env["LOCALAPPDATA"] == str(profile / "AppData" / "Local")
+    assert env["APPDATA"] == str(profile / "AppData" / "Roaming")
     assert profile.is_dir()
 
 

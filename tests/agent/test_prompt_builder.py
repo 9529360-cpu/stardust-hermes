@@ -26,6 +26,7 @@ from agent.prompt_builder import (
     _get_context_file_max_chars,
     _CONTEXT_FILE_DYNAMIC_CEILING,
     DEFAULT_AGENT_IDENTITY,
+    TASK_COMPLETION_GUIDANCE,
     drain_truncation_warnings,
     TOOL_USE_ENFORCEMENT_GUIDANCE,
     TOOL_USE_ENFORCEMENT_MODELS,
@@ -1166,6 +1167,14 @@ class TestToolUseEnforcementGuidance:
 
     def test_guidance_requires_action(self):
         assert "MUST" in TOOL_USE_ENFORCEMENT_GUIDANCE
+
+
+class TestTaskCompletionGuidance:
+    def test_permission_denials_are_not_retryable_path_failures(self):
+        text = TASK_COMPLETION_GUIDANCE.lower()
+        assert "technical reasons" in text
+        assert "approval denial" in text
+        assert "do not repeat it or route around it" in text
 
 
 

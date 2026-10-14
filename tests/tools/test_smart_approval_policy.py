@@ -100,6 +100,19 @@ class TestSmartApprovePolicyInjection(unittest.TestCase):
         assert "rm -rf /etc/nginx" in user_content
         assert "<command>" in user_content
 
+    @patch("agent.auxiliary_client.call_llm")
+    def test_destructive_git_metadata_change_is_escalated(self, mock_call_llm):
+        """Repository history is user data, not an ordinary safe git operation."""
+        mock_call_llm.return_value = _make_response("ESCALATE")
+
+        assert _smart_approve("rm -rf .git && git init", "recursive delete") == "escalate"
+
+        messages = _messages_from(mock_call_llm)
+        system_content = messages[0]["content"]
+        assert "ESCALATE destructive version-control metadata changes" in system_content
+        assert "Treat .git history as important user data" in system_content
+        assert "rm -rf .git && git init" in messages[1]["content"]
+
     @patch("tools.approval_context._get_approval_config")
     @patch("agent.auxiliary_client.call_llm")
     def test_config_read_failure_does_not_break_approval(self, mock_call_llm, mock_cfg):

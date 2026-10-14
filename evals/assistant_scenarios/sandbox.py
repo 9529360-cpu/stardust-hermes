@@ -62,9 +62,14 @@ def child_env(base: Mapping[str, str], *, home: Path, repo_root: Path, api_key: 
     exam must neither use nor refresh them."""
     env = {k: v for k, v in base.items() if not _stripped(k)}
     profile.mkdir(parents=True, exist_ok=True)
+    local_appdata = profile / "AppData" / "Local"
+    roaming_appdata = profile / "AppData" / "Roaming"
+    local_appdata.mkdir(parents=True, exist_ok=True)
+    roaming_appdata.mkdir(parents=True, exist_ok=True)
     env.update({"STARDUST_HOME": str(home), "PYTHONPATH": str(repo_root), "PYTHONUTF8": "1",
                 "PYTHONIOENCODING": "utf-8", EXAM_KEY_ENV: api_key,
                 "HOME": str(profile), "USERPROFILE": str(profile), "GH_CONFIG_DIR": str(profile / "gh"),
+                "LOCALAPPDATA": str(local_appdata), "APPDATA": str(roaming_appdata),
                 # An explicitly set (here: unusable) Copilot token makes copilot_auth skip its `gh auth token`
                 # fallback, which on Windows reads the credential manager regardless of GH_CONFIG_DIR.
                 "COPILOT_GITHUB_TOKEN": "stardust-exam-no-copilot"})
