@@ -1573,9 +1573,10 @@ class TestApprovalTimeoutIsNotConsent:
         assert "another tool" in msg.lower()
         assert "backup, copy, or staged replacement" in msg.lower()
         assert "blocks only this attempt" in msg.lower()
-        assert "user's broader goal" in msg.lower()
+        assert "user's latest instruction" in msg.lower()
         assert "leaving the target untouched" in msg.lower()
-        assert "wait for the user's choice" in msg.lower()
+        assert "proceed when the user delegated that choice" in msg.lower()
+        assert "ask only about that choice" in msg.lower()
         assert "stop the current workflow" not in msg.lower()
 
         posts = [c for c in hook_calls if c[0] == "post_approval_response"]
@@ -1619,7 +1620,8 @@ class TestApprovalTimeoutIsNotConsent:
         assert "rephrase" in r["message"].lower()
         assert "backup, copy, or staged replacement" in r["message"].lower()
         assert "blocks only this attempt" in r["message"].lower()
-        assert "user's broader goal" in r["message"].lower()
+        assert "user's latest instruction" in r["message"].lower()
+        assert "proceed when the user delegated that choice" in r["message"].lower()
         assert "stop the current workflow" not in r["message"].lower()
 
     def test_timeout_emits_post_hook_with_timeout_outcome(self, monkeypatch):
@@ -2304,7 +2306,7 @@ class TestCliApprovalTimeoutClassifiedSeparately:
         assert len(choices) == 2
         assert results[1]["approved"] is False
         assert "already blocked during this user turn" in results[1]["message"]
-        assert "broader goal remains active" in results[1]["user_summary"]
+        assert "did not run again" in results[1]["user_summary"]
 
     def test_run_approval_gate_cli_timeout_is_not_a_denial(self):
         """The shared plugin-escalation gate (_run_approval_gate) also

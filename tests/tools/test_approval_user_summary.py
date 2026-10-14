@@ -15,7 +15,8 @@ def test_denied_result_carries_a_user_summary_beside_the_model_text(monkeypatch)
     res = approval._denied("BLOCKED: User denied this command. Do NOT retry.", pattern_key="rm",
                            description="delete files", outcome="denied")
     assert res["message"].startswith("BLOCKED")  # model contract untouched
-    assert res["user_summary"] == "Approval for this command was denied; it did not run. Your broader goal remains active."
+    assert res["user_summary"] == "Approval for this command was denied; it did not run."
+    assert "goal" not in res["user_summary"].lower()  # approval outcome must not overrule a later user cancellation
     timed = approval._denied("BLOCKED: timed out", pattern_key="rm", description="d", outcome="timeout", noun="code")
     assert "5 minutes" in timed["user_summary"] and "did not run" in timed["user_summary"]
     assert "BLOCKED" not in timed["user_summary"] and "NOT" not in timed["user_summary"]
@@ -25,9 +26,9 @@ def test_cli_completion_line_prefers_user_summary_over_blocked_text():
     from agent.display import _detect_tool_failure
     result = json.dumps({"output": "", "exit_code": -1, "status": "blocked",
                          "error": "BLOCKED: User denied this command. The user has NOT consented ...",
-                         "user_summary": "Approval for this command was denied; it did not run. Your broader goal remains active."})
+                         "user_summary": "Approval for this command was denied; it did not run."})
     failed, suffix = _detect_tool_failure("terminal", result)
-    assert failed and "broader goal remains active" in suffix and "BLOCKED" not in suffix
+    assert failed and "did not run" in suffix and "BLOCKED" not in suffix
 
 
 def test_timeout_notice_names_wait_and_config_command(monkeypatch):

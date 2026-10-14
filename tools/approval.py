@@ -531,11 +531,11 @@ def _approved() -> dict:
 # addressed to the model ("Do NOT retry ..."); surfaces render ``user_summary`` first and fold the
 # model text away, so a Reject click does not read like an error the user caused.
 _USER_SUMMARIES = {
-    "denied": "Approval for this {noun} was denied; it did not run. Your broader goal remains active.",
-    "timeout": "No answer within {minutes}; the {noun} did not run. Your broader goal remains active.",
-    "notify_failed": "Approval could not be delivered; the {noun} did not run. Your broader goal remains active.",
-    "blocked": "This {noun} requires human approval in an unattended session; it did not run. Your broader goal remains active.",
-    "repeat_blocked": "This command was already blocked in this user turn; it did not run again. Your broader goal remains active.",
+    "denied": "Approval for this {noun} was denied; it did not run.",
+    "timeout": "No answer within {minutes}; the {noun} did not run.",
+    "notify_failed": "Approval could not be delivered; the {noun} did not run.",
+    "blocked": "This {noun} requires human approval in an unattended session; it did not run.",
+    "repeat_blocked": "This command was already blocked in this user turn; it did not run again.",
 }
 
 
@@ -725,9 +725,11 @@ class _GateSpec:
 
 
 _DENIAL_SCOPE = (
-    " The approval gate blocks only this attempt, not the user's broader goal. Continue safe work toward that goal "
-    "while leaving the target untouched. If an alternative changes the destination or outcome, offer it and wait "
-    "for the user's choice."
+    " This gate blocks only this attempt; it does not decide whether the broader task is still wanted. Follow the "
+    "user's latest instruction, including if they cancel or change the goal. If the goal is still current, research "
+    "allowed routes and continue safe work while leaving the blocked target untouched. If a route materially "
+    "changes the outcome, proceed when the user delegated that choice; otherwise explain the difference and ask only "
+    "about that choice."
 )
 _STOP_COMMAND = (
     " The required execution approval was not granted for this attempt. Do NOT retry, rephrase, or reproduce the "

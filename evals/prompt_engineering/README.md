@@ -151,3 +151,15 @@ These are source-level findings and candidate experiments, not proof that the cu
   tool-failure recovery were not live-tested in this iteration; do not generalize these results to overall prompt
   quality. The remaining rule
   overlap is still an ablation candidate, not a deletion decision.
+
+- A follow-up review found an instruction conflict in the denial path: the prompt allowed a user-delegated
+  alternative to proceed, but the approval result always said to offer that alternative and wait. The human-facing
+  approval summary also asserted that the broader goal remained active, even if the user had since cancelled it.
+  The prompt and gate message now follow the latest user instruction, constrain only the effect covered by the gate,
+  research allowed routes before asking, continue safe work, honor cancellation, and proceed with a materially
+  different choice the user already delegated. Approval summaries now report only whether that attempt ran.
+- Five targeted regressions passed on this revision: prompt contract, approval summary rendering, explicit denial,
+  and same-turn repeat blocking/new-turn reauthorization. A live scenario-7 rerun selected the configured
+  `deepassk/deepseek-flash` route, but the provider returned HTTP 401 `Invalid API key`; the runner marked it
+  unscored, so this attempt provides no evidence about the updated prompt behavior. The configured default route was
+  a different model and was stopped when identified.
