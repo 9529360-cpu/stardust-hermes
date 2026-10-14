@@ -17,6 +17,8 @@ beforeAll(() => {
 
 const getGlobalModelInfo = vi.fn()
 const getGlobalModelOptions = vi.fn()
+const getCustomEndpoints = vi.fn()
+const activateCustomEndpoint = vi.fn()
 const getAuxiliaryModels = vi.fn()
 const getMoaModels = vi.fn()
 const setModelAssignment = vi.fn()
@@ -28,8 +30,9 @@ const saveHermesConfig = vi.fn()
 const profileSwitchHandlers = new Set<() => void>()
 
 vi.mock('@/hermes', () => ({
+  activateCustomEndpoint: (...args: unknown[]) => activateCustomEndpoint(...args),
   getGlobalModelInfo: (profile?: null | string) => getGlobalModelInfo(profile),
-  getCustomEndpoints: () => Promise.resolve({ endpoints: [] }),
+  getCustomEndpoints: (...args: unknown[]) => getCustomEndpoints(...args),
   getGlobalModelOptions: (opts?: unknown, profile?: null | string) => getGlobalModelOptions(opts, profile),
   getAuxiliaryModels: (profile?: null | string) => getAuxiliaryModels(profile),
   getApiRequestProfile: () => 'default',
@@ -58,6 +61,8 @@ vi.mock('../hooks/use-on-profile-switch', () => ({
 
 beforeEach(() => {
   getGlobalModelInfo.mockResolvedValue({ provider: 'nous', model: 'hermes-4' })
+  getCustomEndpoints.mockResolvedValue({ endpoints: [] })
+  activateCustomEndpoint.mockResolvedValue({ ok: true, provider: 'custom:magpie', model: 'magpie/model' })
   getGlobalModelOptions.mockResolvedValue({
     providers: [
       {
@@ -87,7 +92,11 @@ afterEach(() => {
   profileSwitchHandlers.clear()
 })
 
-async function renderModelSettings(scopeProfile?: string, initialEntries: string[] = ['/']) {
+async function renderModelSettings(
+  scopeProfile?: string,
+  initialEntries: string[] = ['/'],
+  onConfigSaved?: () => void
+) {
   const { ModelSettings } = await import('./model-settings')
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 
@@ -96,7 +105,7 @@ async function renderModelSettings(scopeProfile?: string, initialEntries: string
     // needs a router context in tests (the app provides HashRouter at root).
     <MemoryRouter initialEntries={initialEntries}>
       <QueryClientProvider client={client}>
-        <ModelSettings scopeProfile={scopeProfile} />
+        <ModelSettings onConfigSaved={onConfigSaved} scopeProfile={scopeProfile} />
       </QueryClientProvider>
     </MemoryRouter>
   )
@@ -158,6 +167,32 @@ describe('ModelSettings', () => {
     expect(screen.queryByRole('button', { name: 'Choose another service' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Advanced connection settings' })).toBeNull()
     expect(screen.queryByText(/provider accounts/i)).toBeNull()
+  })
+
+  it('refreshes the shared chat model catalog after activating a saved service', async () => {
+    getCustomEndpoints.mockResolvedValue({
+      current: { provider: 'nous', model: 'hermes-4', base_url: '' },
+      endpoints: [
+        {
+          id: 'magpie',
+          name: 'Magpie',
+          base_url: 'http://127.0.0.1:3425/v1',
+          model: 'magpie/model',
+          models: ['magpie/model'],
+          discover_models: true,
+          is_current: false,
+          has_api_key: false,
+          source: 'providers'
+        }
+      ]
+    })
+    const onConfigSaved = vi.fn()
+
+    await renderModelSettings(undefined, ['/'], onConfigSaved)
+    fireEvent.click(await screen.findByRole('button', { name: 'Set as default' }))
+
+    await waitFor(() => expect(onConfigSaved).toHaveBeenCalledTimes(1))
+    expect(activateCustomEndpoint).toHaveBeenCalledWith('magpie', undefined)
   })
 
   it('reloads authoritative model state when the active profile changes', async () => {
