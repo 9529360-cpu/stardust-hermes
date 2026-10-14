@@ -1104,8 +1104,8 @@ def _approval_observability(ids: _CallIds):
     """Bind the approval observability context (turn/tool_call/session ids) for the block."""
     try:
         from tools.approval_context import reset_current_observability_context, set_current_observability_context
-        tokens = set_current_observability_context(turn_id=ids.turn_id or "", tool_call_id=ids.tool_call_id or "",
-                                                   session_id=ids.session_id or "")
+        tokens = set_current_observability_context(turn_id=ids.turn_id or "", task_id=ids.task_id or "",
+                                                   tool_call_id=ids.tool_call_id or "", session_id=ids.session_id or "")
     except Exception:
         yield
         return

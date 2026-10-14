@@ -78,8 +78,9 @@ def test_tool_sessions_are_told_to_find_a_way_instead_of_handing_work_back(tmp_p
 
     assert "install or enable it yourself" in stable
     assert "change the approach instead of repeating the same failing step" in stable
-    assert "research permitted alternatives that preserve the denied state" in stable
-    assert "A denied step never justifies refusing the whole request" in stable
+    assert "research a viable path to the requested outcome" in stable
+    assert "Never refuse the broader task because one step is blocked" in stable
+    assert "When a later user message changes or renews the instruction" in stable
     assert "only for what only they can give" in stable
     assert "not instructions, a script, or a demo" in stable
 

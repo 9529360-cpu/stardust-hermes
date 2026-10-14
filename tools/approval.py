@@ -75,8 +75,39 @@ _permanent_approved_by_home: dict[str, set] = {}
 # recently denied) entries are evicted.
 _denial_tally: dict[str | tuple[str, str], int] = {}
 _DENIAL_TALLY_MAX_SESSIONS = 256
+_denied_command_effects: dict[tuple[str | tuple[str, str], str], set[str]] = {}
+_DENIED_COMMAND_EFFECTS_MAX_TURNS = 512
 
 
+def _denied_command_fingerprint(pattern_key: str, command: str) -> str:
+    normalized = " ".join(command.split()).casefold()
+    return hashlib.sha256(f"{pattern_key}\0{normalized}".encode("utf-8")).hexdigest()[:24]
+
+
+def _command_denied_this_turn(session_key: str, pattern_key: str, command: str) -> bool:
+    # A task may span later user messages. A fresh user turn can change the
+    # requested intent and must be able to reach the normal approval flow.
+    scope_id = approval_context._approval_turn_id.get() or approval_context._approval_task_id.get()
+    if not scope_id:
+        return False
+    key = (_state_key(session_key), scope_id)
+    fingerprint = _denied_command_fingerprint(pattern_key, command)
+    with _lock:
+        return fingerprint in _denied_command_effects.get(key, set())
+
+
+def _remember_denied_command(session_key: str, pattern_key: str, command: str) -> None:
+    scope_id = approval_context._approval_turn_id.get() or approval_context._approval_task_id.get()
+    if not scope_id:
+        return
+    key = (_state_key(session_key), scope_id)
+    fingerprint = _denied_command_fingerprint(pattern_key, command)
+    with _lock:
+        effects = _denied_command_effects.pop(key, set())
+        effects.add(fingerprint)
+        _denied_command_effects[key] = effects
+        while len(_denied_command_effects) > _DENIED_COMMAND_EFFECTS_MAX_TURNS:
+            _denied_command_effects.pop(next(iter(_denied_command_effects)))
 def _get_denial_breaker_threshold() -> int:
     """``approvals.denial_breaker_threshold``: default 3; 0 or negative disables."""
     try:
@@ -500,10 +531,11 @@ def _approved() -> dict:
 # addressed to the model ("Do NOT retry ..."); surfaces render ``user_summary`` first and fold the
 # model text away, so a Reject click does not read like an error the user caused.
 _USER_SUMMARIES = {
-    "denied": "You denied this {noun} — it did not run.",
-    "timeout": "No answer within {minutes} — the {noun} did not run.",
-    "notify_failed": "The approval request could not be delivered — the {noun} did not run.",
-    "blocked": "This {noun} is not allowed in an unattended session — it did not run.",
+    "denied": "Approval for this {noun} was denied; it did not run. Your broader goal remains active.",
+    "timeout": "No answer within {minutes}; the {noun} did not run. Your broader goal remains active.",
+    "notify_failed": "Approval could not be delivered; the {noun} did not run. Your broader goal remains active.",
+    "blocked": "This {noun} requires human approval in an unattended session; it did not run. Your broader goal remains active.",
+    "repeat_blocked": "This command was already blocked in this user turn; it did not run again. Your broader goal remains active.",
 }
 
 
@@ -693,18 +725,20 @@ class _GateSpec:
 
 
 _DENIAL_SCOPE = (
-    " This blocks only the denied effect, not the user's broader task. Continue safe, non-destructive research and "
-    "independent work, and identify a useful alternative that preserves the denied state. Do not take any further "
-    "destructive or irreversible action unless its required approval is granted."
+    " The approval gate blocks only this attempt, not the user's broader goal. Continue safe work toward that goal "
+    "while leaving the target untouched. If an alternative changes the destination or outcome, offer it and wait "
+    "for the user's choice."
 )
 _STOP_COMMAND = (
-    " The user has NOT consented to this action. Do NOT retry this command, do "
-    "NOT rephrase it, and do NOT attempt the same outcome via a different command or route."
+    " The required execution approval was not granted for this attempt. Do NOT retry, rephrase, or reproduce the "
+    "effect through another tool, backup, copy, or staged replacement. If the user later clearly changes their "
+    "authorization, honor that updated intent through the normal approval flow."
     + _DENIAL_SCOPE
 )
 _STOP_ACTION = (
-    " The user has NOT consented to this action. Do NOT retry it, do NOT "
-    "rephrase it, and do NOT attempt the same outcome via a different path."
+    " The required execution approval was not granted for this attempt. Do NOT retry, rephrase, or reproduce the "
+    "effect through another tool, backup, copy, or staged replacement. If the user later clearly changes their "
+    "authorization, honor that updated intent through the normal approval flow."
     + _DENIAL_SCOPE
 )
 
@@ -1221,6 +1255,19 @@ def check_all_command_guards(command: str, env_type: str,
     if _command_matches_permanent_allowlist(command):
         return _audit_decision(_approved(), command=command, outcome="approved_permanent")
 
+    session_key = get_current_session_key()
+    is_dangerous, pattern_key, description = detect_dangerous_command(command)
+    if is_dangerous and not is_approved(session_key, pattern_key) \
+            and _command_denied_this_turn(session_key, pattern_key, command):
+        repeated = _denied(
+            "BLOCKED: The same command effect was already blocked during this user turn. Do NOT request the same "
+            "approval again or rephrase it. Keep the user's broader goal active and research an allowed alternative. "
+            + _DENIAL_SCOPE,
+            pattern_key=pattern_key, description=description, outcome="repeat_blocked",
+        )
+        return _audit_decision(repeated, command=command, description=description, pattern_key=pattern_key,
+                               outcome="repeat_blocked", mode="same_task_denial")
+
     approval_callback, is_cli, is_gateway, is_ask = _presence(approval_callback)
     # Outside CLI/gateway/ask flows we never block on approvals: each
     # unattended context applies its configured deny/approve mode, else allow.
@@ -1234,9 +1281,7 @@ def check_all_command_guards(command: str, env_type: str,
     # Gather findings: warnings = [(pattern_key, description, is_tirith)]. Tirith block AND warn both go through the
     # approval flow (block used to be a hard stop) so users can inspect the findings and approve.
     tirith_result = _tirith_scan(command)
-    is_dangerous, pattern_key, description = detect_dangerous_command(command)
     warnings = []
-    session_key = get_current_session_key()
     if tirith_result["action"] in {"block", "warn"}:
         findings = tirith_result.get("findings") or []
         rule_id = findings[0].get("rule_id", "unknown") if findings else "unknown"
@@ -1259,13 +1304,17 @@ def check_all_command_guards(command: str, env_type: str,
     # "Always" is offered when at least one warning is a dangerous-pattern key the persistence layer would actually
     # allowlist permanently. Pure-tirith findings are session-max by design, so a tirith-only prompt hides Always;
     # mixed prompts offer it (the pattern key persists, tirith downgrades to session — see _persist_choice).
-    return _human_decision(
+    result = _human_decision(
         _COMMAND_GATE, command=command, description=combined_desc,
         pattern_key=primary_key, pattern_keys=all_keys, warnings=warnings,
         session_key=session_key, approval_callback=approval_callback,
         is_cli=is_cli, is_gateway=is_gateway, is_ask=is_ask, smart=approval_mode == "smart",
         permanent_capable=any(not is_t for _, _, is_t in warnings),
     )
+    if result.get("outcome") in {"denied", "timeout"}:
+        if is_dangerous:
+            _remember_denied_command(session_key, pattern_key, command)
+    return result
 
 
 _EXECUTE_CODE_DESCRIPTION = (

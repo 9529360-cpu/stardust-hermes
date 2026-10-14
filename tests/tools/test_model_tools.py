@@ -113,7 +113,10 @@ class TestHandleFunctionCall:
             return kwargs["next_call"]({**kwargs["args"], "wrapped": True})
 
         def fake_dispatch(tool_name, args, **kwargs):
+            from tools import approval_context
+
             seen["dispatch"] = (tool_name, args, kwargs)
+            seen["approval_task_id"] = approval_context._approval_task_id.get()
             return json.dumps({"ok": True, "args": args})
 
         manager = type(
@@ -144,6 +147,7 @@ class TestHandleFunctionCall:
 
         assert seen["execution_args"] == {"q": "test", "rewritten": True}
         assert seen["dispatch"][1] == {"q": "test", "rewritten": True, "wrapped": True}
+        assert seen["approval_task_id"] == "task-1"
         assert result["args"] == {"q": "test", "rewritten": True, "wrapped": True}
         expected_trace = [{"source": "test-middleware", "reason": "rewrite"}]
         pre_call = next(call for call in hook_calls if call[0] == "pre_tool_call")

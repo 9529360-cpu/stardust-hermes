@@ -1566,13 +1566,16 @@ class TestApprovalTimeoutIsNotConsent:
         # to try a different command achieving the same outcome.
         msg = result["message"]
         assert "BLOCKED" in msg
-        assert "NOT consented" in msg
+        assert "required execution approval was not granted for this attempt" in msg.lower()
         assert "Silence is not consent" in msg
         assert "retry" in msg.lower()
         assert "rephrase" in msg.lower()
-        assert "different command" in msg.lower()
-        assert "blocks only the denied effect" in msg.lower()
-        assert "continue safe, non-destructive research and independent work" in msg.lower()
+        assert "another tool" in msg.lower()
+        assert "backup, copy, or staged replacement" in msg.lower()
+        assert "blocks only this attempt" in msg.lower()
+        assert "user's broader goal" in msg.lower()
+        assert "leaving the target untouched" in msg.lower()
+        assert "wait for the user's choice" in msg.lower()
         assert "stop the current workflow" not in msg.lower()
 
         posts = [c for c in hook_calls if c[0] == "post_approval_response"]
@@ -1612,10 +1615,11 @@ class TestApprovalTimeoutIsNotConsent:
         assert r.get("user_consent") is False
         assert r.get("outcome") == "denied"
         assert "Silence is not consent" not in r["message"]  # this one IS denied, not timed-out
-        assert "NOT consented" in r["message"]
+        assert "required execution approval was not granted for this attempt" in r["message"].lower()
         assert "rephrase" in r["message"].lower()
-        assert "blocks only the denied effect" in r["message"].lower()
-        assert "continue safe, non-destructive research and independent work" in r["message"].lower()
+        assert "backup, copy, or staged replacement" in r["message"].lower()
+        assert "blocks only this attempt" in r["message"].lower()
+        assert "user's broader goal" in r["message"].lower()
         assert "stop the current workflow" not in r["message"].lower()
 
     def test_timeout_emits_post_hook_with_timeout_outcome(self, monkeypatch):
@@ -2262,6 +2266,45 @@ class TestCliApprovalTimeoutClassifiedSeparately:
         assert result.get("outcome") == "denied"
         assert "denied" in result["message"].lower()
         assert "Silence is not consent" not in result["message"]
+
+    def test_same_denied_command_is_blocked_for_this_turn_but_new_user_turn_can_reauthorize(self):
+        from unittest.mock import patch as _patch
+        from tools import approval as mod
+        from tools import approval_context
+
+        mod._session_approved.clear()
+        mod._permanent_approved.clear()
+        mod._denied_command_effects.clear()
+        cfg = {"approvals": {"mode": "manual"}}
+        choices = []
+
+        def _deny(*_args, **_kwargs):
+            choices.append("prompted")
+            return "deny"
+
+        results = []
+        with self._interactive_env():
+            with _patch("hermes_cli.config.load_config_readonly", return_value=cfg):
+                for task_id, turn_id, tool_call_id in (
+                    ("task-1", "turn-1", "call-1"),
+                    ("task-1", "turn-1", "call-2"),
+                    ("task-1", "turn-2", "call-3"),
+                ):
+                    tokens = approval_context.set_current_observability_context(
+                        task_id=task_id, turn_id=turn_id, tool_call_id=tool_call_id,
+                    )
+                    try:
+                        results.append(mod.check_all_command_guards(
+                            "rm -rf /var/data", "local", approval_callback=_deny,
+                        ))
+                    finally:
+                        approval_context.reset_current_observability_context(tokens)
+
+        assert [result.get("outcome") for result in results] == ["denied", "repeat_blocked", "denied"]
+        assert len(choices) == 2
+        assert results[1]["approved"] is False
+        assert "already blocked during this user turn" in results[1]["message"]
+        assert "broader goal remains active" in results[1]["user_summary"]
 
     def test_run_approval_gate_cli_timeout_is_not_a_denial(self):
         """The shared plugin-escalation gate (_run_approval_gate) also

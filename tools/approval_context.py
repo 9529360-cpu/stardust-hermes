@@ -22,6 +22,7 @@ def _ctx(name: str, default: "str | None" = "") -> contextvars.ContextVar:
 # process-global env var is racy (the env fallback stays for legacy single-threaded callers).
 _approval_session_key: contextvars.ContextVar[str] = _ctx("approval_session_key")
 _approval_turn_id: contextvars.ContextVar[str] = _ctx("approval_turn_id")
+_approval_task_id: contextvars.ContextVar[str] = _ctx("approval_task_id")
 _approval_tool_call_id: contextvars.ContextVar[str] = _ctx("approval_tool_call_id")
 # Per-run cron policy override. ``None`` means inherit ``approvals.cron_mode``.
 # The scheduler binds this from the durable job record; copy_context() carries it
@@ -87,18 +88,20 @@ def reset_current_session_key(token: contextvars.Token[str]) -> None:
     _approval_session_key.reset(token)
 
 
-_Tokens = tuple[contextvars.Token[str], contextvars.Token[str], contextvars.Token[str]]
+_Tokens = tuple[contextvars.Token[str], contextvars.Token[str], contextvars.Token[str], contextvars.Token[str]]
 
 
-def set_current_observability_context(*, turn_id: str = "", tool_call_id: str = "", session_id: str = "") -> _Tokens:
+def set_current_observability_context(*, turn_id: str = "", task_id: str = "", tool_call_id: str = "",
+                                     session_id: str = "") -> _Tokens:
     """Bind active tool correlation IDs to approval hooks."""
     return (_approval_turn_id.set(turn_id or ""), _approval_tool_call_id.set(tool_call_id or ""),
-            _approval_session_id.set(session_id or ""))
+            _approval_session_id.set(session_id or ""), _approval_task_id.set(task_id or ""))
 
 
 def reset_current_observability_context(tokens: _Tokens) -> None:
     """Restore prior approval hook correlation IDs."""
-    turn_token, tool_token, session_token = tokens
+    turn_token, tool_token, session_token, task_token = tokens
+    _approval_task_id.reset(task_token)
     _approval_session_id.reset(session_token)
     _approval_tool_call_id.reset(tool_token)
     _approval_turn_id.reset(turn_token)

@@ -1173,22 +1173,20 @@ class TestTaskCompletionGuidance:
     def test_denied_action_does_not_cancel_the_users_overall_goal(self):
         text = TASK_COMPLETION_GUIDANCE.lower()
         assert "technical reasons" in text
-        assert "stop only that action" in text
-        assert "approval denial applies to the effect, not just the command" in text
-        assert "seek the same authorization in chat" in text
-        assert "tell the user to run it" in text
-        assert "suggest an equivalent workaround" in text
-        assert "keep the user's broader goal active" in text
-        assert "research permitted alternatives that preserve the denied state" in text
-        assert "a denied step never justifies refusing the whole request" in text
-        assert "do not ask again for details or consent already given" in text
-        assert "explain what remains unchanged" in text
-
-
-
-
-
-
+        assert "the user's instructions define the goal and can change it at any time" in text
+        assert "follow the latest clear instruction" in text
+        assert "a gate denial or capability limit blocks only that attempt, not the broader goal" in text
+        assert "never bypass a gate by rewording or reproducing its effect" in text
+        assert "research a viable path to the requested outcome" in text
+        assert "a later user message changes or renews the instruction" in text
+        assert "honor that current intent through any approval flow still required" in text
+        assert "if the user delegates a choice" in text
+        assert "choose the safest reversible path" in text
+        assert "without asking them to choose again" in text
+        assert "the user has not delegated that choice" in text
+        assert "never refuse the broader task because one step is blocked" in text
+        assert "ask the user to repeat unchanged intent" in text
+        assert "tell them to perform a blocked step" in text
 
 
 class TestOpenAIModelExecutionGuidance:
