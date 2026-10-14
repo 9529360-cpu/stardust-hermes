@@ -124,7 +124,9 @@ test("an open Bot Chat's tab reads the bot's name, not the canonical 'Bot Chat' 
   await expect(botsRoster).toBeHidden({ timeout: 30_000 })
   const canonicalChat = await activeMainChat(page)
   const canonicalPaneId = canonicalChat.anchor
-  await expect(canonicalChat.surface.getByText('Hello alpha', { exact: true })).toBeVisible({ timeout: 45_000 })
+  const canonicalTranscript = canonicalChat.surface.locator('[data-slot="aui_thread-viewport"]')
+  await expect(canonicalTranscript).toBeVisible({ timeout: 45_000 })
+  await expect(canonicalTranscript).toContainText('Hello alpha', { timeout: 45_000 })
   await expect(
     canonicalChat.surface
       .locator('[data-slot="composer-root"] [contenteditable="true"]')
@@ -153,7 +155,9 @@ test("an open Bot Chat's tab reads the bot's name, not the canonical 'Bot Chat' 
   await sideTab.click()
   const sideChat = await selectedMainChat(page)
   expect(sideChat.anchor).toBe(sideTabId)
-  await expect(sideChat.surface.getByText(MOCK_REPLY).first()).toBeVisible({ timeout: 60_000 })
+  const sideTranscript = sideChat.surface.locator('[data-slot="aui_thread-viewport"]')
+  await expect(sideTranscript).toBeVisible({ timeout: 60_000 })
+  await expect(sideTranscript).toContainText(MOCK_REPLY, { timeout: 60_000 })
 
   const canonicalTab = mainTabStrip.locator(`[data-tree-tab="${canonicalPaneId}"]`)
   await canonicalTab.click()
@@ -161,7 +165,9 @@ test("an open Bot Chat's tab reads the bot's name, not the canonical 'Bot Chat' 
   await expect(activeCanonicalChat.tab).toHaveAttribute('data-tree-tab', canonicalPaneId)
   await expect(activeCanonicalChat.tab).toContainText(/alpha/i)
   await expect(activeCanonicalChat.tab).not.toContainText(/bot chat/i)
-  await expect(activeCanonicalChat.surface.getByText('Hello alpha', { exact: true })).toBeVisible({ timeout: 15_000 })
+  const activeCanonicalTranscript = activeCanonicalChat.surface.locator('[data-slot="aui_thread-viewport"]')
+  await expect(activeCanonicalTranscript).toBeVisible({ timeout: 15_000 })
+  await expect(activeCanonicalTranscript).toContainText('Hello alpha', { timeout: 15_000 })
   await expect(
     activeCanonicalChat.surface
       .locator('[data-slot="composer-root"] [contenteditable="true"]')

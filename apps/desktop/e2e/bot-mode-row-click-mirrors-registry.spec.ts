@@ -137,7 +137,9 @@ test('a bot row click lands on the Bot Chat the row previews, not a side thread'
   await alphaRow.click()
   await expect(botsRoster).toBeHidden({ timeout: 30_000 })
   const alphaChat = await activeMainChat(page)
-  await expect(alphaChat.surface.getByText('Hello alpha', { exact: true })).toBeVisible({ timeout: 45_000 })
+  const alphaTranscript = alphaChat.surface.locator('[data-slot="aui_thread-viewport"]')
+  await expect(alphaTranscript).toBeVisible({ timeout: 45_000 })
+  await expect(alphaTranscript).toContainText('Hello alpha', { timeout: 45_000 })
   const alphaComposer = alphaChat.surface
     .locator('[data-slot="composer-root"] [contenteditable="true"]')
     .filter({ visible: true })
@@ -165,7 +167,9 @@ test('a bot row click lands on the Bot Chat the row previews, not a side thread'
   await sideTab.click()
   const sideChat = await selectedMainChat(page)
   expect(sideChat.anchor).toBe(sideTabId)
-  await expect(sideChat.surface.getByText(MOCK_REPLY).first()).toBeVisible({ timeout: 60_000 })
+  const sideTranscript = sideChat.surface.locator('[data-slot="aui_thread-viewport"]')
+  await expect(sideTranscript).toBeVisible({ timeout: 60_000 })
+  await expect(sideTranscript).toContainText(MOCK_REPLY, { timeout: 60_000 })
 
   // Leave alpha on the side thread, go to beta, come back via the row.
   await openBots(page)
@@ -173,7 +177,9 @@ test('a bot row click lands on the Bot Chat the row previews, not a side thread'
   await betaRow.click()
   await expect(botsRoster).toBeHidden({ timeout: 30_000 })
   const betaChat = await activeMainChat(page)
-  await expect(betaChat.surface.getByText('Hello beta', { exact: true })).toBeVisible({ timeout: 60_000 })
+  const betaTranscript = betaChat.surface.locator('[data-slot="aui_thread-viewport"]')
+  await expect(betaTranscript).toBeVisible({ timeout: 60_000 })
+  await expect(betaTranscript).toContainText('Hello beta', { timeout: 60_000 })
   await expect(
     betaChat.surface.locator('[data-slot="composer-root"] [contenteditable="true"]').filter({ visible: true }).first()
   ).toBeVisible({ timeout: 15_000 })
@@ -186,7 +192,9 @@ test('a bot row click lands on the Bot Chat the row previews, not a side thread'
   // The scoped row click leaves the roster and selects the canonical transcript
   // with its own composer, rather than merely finding the row's sidebar preview.
   const returnedAlphaChat = await activeMainChat(page)
-  await expect(returnedAlphaChat.surface.getByText('Hello alpha', { exact: true })).toBeVisible({ timeout: 45_000 })
+  const returnedAlphaTranscript = returnedAlphaChat.surface.locator('[data-slot="aui_thread-viewport"]')
+  await expect(returnedAlphaTranscript).toBeVisible({ timeout: 45_000 })
+  await expect(returnedAlphaTranscript).toContainText('Hello alpha', { timeout: 45_000 })
   await expect(
     returnedAlphaChat.surface
       .locator('[data-slot="composer-root"] [contenteditable="true"]')
