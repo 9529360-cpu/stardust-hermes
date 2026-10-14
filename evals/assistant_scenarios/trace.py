@@ -25,6 +25,7 @@ class ToolCall:
     started_at: float
     completed: bool = False
     result_text: Optional[str] = None
+    failed: bool = False
 
 
 @dataclass
@@ -90,10 +91,12 @@ class Trace:
     subagent_tools: List[Tuple[str, str]] = field(default_factory=list)
     subagent_events: List[Dict[str, Any]] = field(default_factory=list)
     errors: List[str] = field(default_factory=list)
+    usage: Dict[str, int] = field(default_factory=dict)
     last_event_at: Optional[float] = None
     _sessions: set = field(default_factory=set)
     _pending_submit: Optional[float] = None
     _open: Optional[Turn] = None
+    _last_usage_snapshot: Dict[str, int] = field(default_factory=dict)
 
     @property
     def busy(self) -> bool:
@@ -142,7 +145,25 @@ class Trace:
         turn.text = str(payload.get("text") or "")
         turn.status = payload.get("status")
         turn.error = payload.get("error")
+        self._record_usage(payload.get("usage"))
         self._open = None
+
+    def _on_usage(self, payload: Dict[str, Any], _at: float) -> None:
+        self._record_usage(payload.get("usage"))
+
+    def _record_usage(self, snapshot: Any) -> None:
+        """Accumulate the public session counters, including when a restarted backend resets them."""
+        if not isinstance(snapshot, dict):
+            return
+        for key in _USAGE_COUNTERS:
+            value = snapshot.get(key)
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                continue
+            current = max(0, int(value))
+            previous = self._last_usage_snapshot.get(key, 0)
+            delta = current if current < previous else current - previous
+            self.usage[key] = self.usage.get(key, 0) + delta
+            self._last_usage_snapshot[key] = current
 
     def _on_tool_start(self, payload: Dict[str, Any], at: float) -> None:
         name = str(payload.get("name") or "")
@@ -164,6 +185,7 @@ class Trace:
             if call.tool_id == tool_id and not call.completed:
                 call.completed = True
                 call.result_text = text
+                call.failed = _tool_result_failed(payload.get("result"), text)
 
     def _on_subagent(self, payload: Dict[str, Any], at: float) -> None:
         self.subagent_events.append({"at": at, **payload})
@@ -199,12 +221,34 @@ class Trace:
             "clarifies": [asdict(c) for c in self.clarifies],
             "subagent_tools": self.subagent_tools,
             "errors": self.errors,
+            "usage": dict(self.usage),
         }
+
+
+_USAGE_COUNTERS = (
+    "input", "output", "reasoning", "prompt", "completion", "total", "calls",
+    "cache_read", "cache_write",
+)
+
+
+def _tool_result_failed(result: Any, result_text: Any) -> bool:
+    """Classify only explicit structured failures; don't infer from arbitrary tool prose."""
+    if isinstance(result, str):
+        try:
+            result = json.loads(result)
+        except ValueError:
+            result = None
+    if isinstance(result, dict):
+        return result.get("success") is False or bool(result.get("error")) or result.get("is_error") is True
+    if isinstance(result_text, str) and result_text.lstrip().startswith(("Error:", "Tool error:")):
+        return True
+    return False
 
 
 _HANDLERS = {
     "message.start": Trace._on_start,
     "message.complete": Trace._on_complete,
+    "session.usage": Trace._on_usage,
     "tool.start": Trace._on_tool_start,
     "tool.complete": Trace._on_tool_complete,
     "subagent.start": Trace._on_subagent,

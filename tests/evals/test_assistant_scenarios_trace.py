@@ -47,6 +47,29 @@ def test_completion_attaches_result_to_the_started_call():
 
     [call] = trace.tool_calls
     assert (call.name, call.completed, call.result_text) == ("terminal", True, "OK")
+    assert call.failed is False
+
+
+def test_structured_tool_errors_are_countable():
+    trace = watched()
+    trace.ingest(ev("tool.start", {"tool_id": "bad", "name": "browser", "args": {}}), at=1.0)
+    trace.ingest(ev("tool.complete", {"tool_id": "bad", "name": "browser",
+                                       "result": {"error": "synthetic failure", "success": False}}), at=2.0)
+
+    [call] = trace.tool_calls
+    assert call.failed is True
+
+
+def test_usage_counters_accumulate_deltas_and_survive_backend_counter_reset():
+    trace = watched()
+    trace.ingest(ev("session.usage", {"usage": {"prompt": 100, "completion": 20, "total": 120, "calls": 2}}), at=1.0)
+    trace.ingest(ev("message.complete", {"status": "complete", "usage": {
+        "prompt": 140, "completion": 22, "total": 162, "calls": 3}}), at=2.0)
+    # A resumed backend starts its in-memory counters at zero.
+    trace.ingest(ev("message.complete", {"status": "complete", "usage": {
+        "prompt": 8, "completion": 2, "total": 10, "calls": 1}}), at=3.0)
+
+    assert trace.to_json()["usage"] == {"prompt": 148, "completion": 24, "total": 172, "calls": 4}
 
 
 def test_events_from_unwatched_sessions_are_ignored():

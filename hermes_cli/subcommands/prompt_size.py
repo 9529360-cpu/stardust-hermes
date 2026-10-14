@@ -16,6 +16,6 @@ def build_prompt_size_parser(subparsers, *, cmd_prompt_size: Callable) -> None:
             "JSON. Runs offline (no API call).")
     prompt_size_parser.add_argument(
         "--platform", default="cli",
-        help="Platform to simulate (cli, telegram, discord, ...). Default: cli")
+        help="Registered CLI or messaging platform to simulate (not an attached Desktop session). Default: cli")
     add_json_flag(prompt_size_parser, "Emit the breakdown as JSON")
     prompt_size_parser.set_defaults(func=cmd_prompt_size)

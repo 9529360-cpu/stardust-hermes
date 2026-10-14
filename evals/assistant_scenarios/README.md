@@ -64,8 +64,9 @@ python -m evals.assistant_scenarios --base-url https://api.deepseek.com/v1 --mod
   `HOME`/`USERPROFILE`/`GH_CONFIG_DIR` at an empty per-scenario profile, and sets an unusable
   `COPILOT_GITHUB_TOKEN` so `copilot_auth` skips its `gh auth token` fallback. Covered by
   `test_backend_env_cannot_discover_a_copilot_login`, which runs the real resolver in the exam's environment.
-- **Errors are not scored.** A backend that fails to start or a wire error yields `error` and stays out of the
-  score. A model that stalls or never reports back is graded on what happened, so silence fails with evidence.
+- **Errors are not scored.** A backend startup/wire failure or a provider/API turn ending with `status=error`
+  yields `error` and stays out of the behavioral score. A model that completes a turn with a poor answer, stalls,
+  or never reports back is graded on what happened, so behavioral failures remain visible with evidence.
 - **Settling** waits for no open turn, no live/undelivered ledger row, and a quiet window over *both* events
   and ledger changes: the backend records a delivery just before the turn that delivers it starts.
 - **Restart** (scenario 8) hard-kills the backend process tree while the delegated worker is mid-flight, starts

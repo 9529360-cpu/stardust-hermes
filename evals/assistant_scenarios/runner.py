@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import sqlite3
 import sys
@@ -75,6 +76,22 @@ def wait_until_settled(trace: Trace, read_ledger: Callable[[], List[Dict[str, An
             return True
         time.sleep(poll)
     return False
+
+
+def _runtime_failure_note(trace: Trace) -> Optional[str]:
+    """Keep provider/runtime failures out of the behavioral score."""
+    failed_turn = next((turn for turn in trace.turns if turn.status == "error"), None)
+    if failed_turn is None:
+        return None
+    detail = failed_turn.error or failed_turn.text
+    status = re.search(r"\bHTTP\s+(\d{3})\b", detail, re.IGNORECASE)
+    code = f"（HTTP {status.group(1)}）" if status else ""
+    return f"模型或运行时请求失败{code}，未计入提示词行为评分"
+
+
+def _runtime_failure_verdict(trace: Trace) -> Optional[Verdict]:
+    note = _runtime_failure_note(trace)
+    return Verdict([], status="error", note=note) if note else None
 
 
 class RequestPolicy:
@@ -207,6 +224,9 @@ def run_scenario(scenario: Scenario, cfg: RunConfig) -> ScenarioResult:
         if scenario.seed_job:
             run.gateway.call("cron.manage", {"action": "add", "deliver": "local", **scenario.seed_job})
         run.converse()
+        if failure_verdict := _runtime_failure_verdict(run.trace):
+            run.close()
+            return _finish(run, failure_verdict, started, "")
         if scenario.restart:
             facts = run.restart()
         else:

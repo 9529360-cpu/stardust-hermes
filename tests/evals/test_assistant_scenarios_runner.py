@@ -48,3 +48,24 @@ def test_settle_gives_up_when_background_work_never_finishes():
     began = time.monotonic()
     assert runner.wait_until_settled(trace, lambda: [row("running", "pending")], timeout=1.5, quiet=0.2, poll=0.1) is False
     assert time.monotonic() - began >= 1.5
+
+
+def test_provider_error_is_not_scored_as_a_model_behavior_failure():
+    trace = Trace()
+    trace.watch(SID)
+    trace.mark_submit(SID, "解释这个错误", at=1.0)
+    trace.ingest(ev("message.complete", {"text": "provider request failed", "status": "error",
+                                         "error": "HTTP 405 — method not allowed"}), at=2.0)
+
+    verdict = runner._runtime_failure_verdict(trace)
+    assert verdict is not None
+    assert (verdict.status, verdict.note) == ("error", "模型或运行时请求失败（HTTP 405），未计入提示词行为评分")
+
+
+def test_completed_turn_with_an_error_explanation_is_still_behaviorally_scored():
+    trace = Trace()
+    trace.watch(SID)
+    trace.mark_submit(SID, "解释这个错误", at=1.0)
+    trace.ingest(ev("message.complete", {"text": "The error is a ZeroDivisionError", "status": "complete"}), at=2.0)
+
+    assert runner._runtime_failure_verdict(trace) is None

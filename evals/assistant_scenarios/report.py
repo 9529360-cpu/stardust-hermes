@@ -50,6 +50,28 @@ def summarize(results: List[ScenarioResult]) -> List[ScenarioSummary]:
     return [grouped[k] for k in sorted(grouped)]
 
 
+def _run_metrics(result: ScenarioResult) -> Dict[str, object]:
+    usage = result.trace.usage
+    return {
+        "wall_s": result.wall_s,
+        "api_calls": usage.get("calls"),
+        "prompt_tokens": usage.get("prompt"),
+        "completion_tokens": usage.get("completion"),
+        "total_tokens": usage.get("total"),
+        "tool_calls": len(result.trace.tool_calls),
+        "failed_tool_calls": sum(1 for call in result.trace.tool_calls if call.failed),
+        "subagent_tool_calls": len(result.trace.subagent_tools),
+        "clarifications": len(result.trace.clarifies),
+        "approvals": len(result.trace.approvals),
+        "turn_errors": sum(1 for turn in result.trace.turns if turn.status == "error"),
+    }
+
+
+def _average(values: List[Dict[str, object]], key: str) -> str:
+    numbers = [value[key] for value in values if isinstance(value.get(key), (int, float))]
+    return f"{sum(numbers) / len(numbers):.1f}" if numbers else "n/a"
+
+
 def render_text(summaries: List[ScenarioSummary], *, model_label: str, when: str, out_dir: Path) -> str:
     scored = [s for s in summaries if s.scored]
     unscored = len(summaries) - len(scored)
@@ -58,6 +80,15 @@ def render_text(summaries: List[ScenarioSummary], *, model_label: str, when: str
         total += f"，{unscored} 题本次不计分"
     lines = [f"星尘助理考卷 · {when} · 模型：{model_label}", total, ""]
     lines += [f"{s.scenario.id} {s.scenario.title}：{s.label()}" for s in summaries]
+    runs = [_run_metrics(r) for s in summaries for r in s.runs]
+    if runs:
+        lines += ["", "执行指标（每次运行平均；含未计分运行）：",
+                  f"  耗时 {_average(runs, 'wall_s')} 秒 · API {_average(runs, 'api_calls')} 次 · "
+                  f"Token {_average(runs, 'total_tokens')}（输入 {_average(runs, 'prompt_tokens')} / "
+                  f"输出 {_average(runs, 'completion_tokens')}）",
+                  f"  工具调用 {_average(runs, 'tool_calls')} 次 · 工具错误 {_average(runs, 'failed_tool_calls')} 次 · "
+                  f"子代理工具 {_average(runs, 'subagent_tool_calls')} 次 · "
+                  f"追问 {_average(runs, 'clarifications')} 次 · 审批 {_average(runs, 'approvals')} 次"]
     lines += ["", f"每题的详细证据（对话记录、判分依据、后台日志）在：{out_dir}"]
     return "\n".join(lines)
 
@@ -67,7 +98,8 @@ def write_json(summaries: List[ScenarioSummary], path: Path, *, model_label: str
         "id": s.scenario.id, "key": s.scenario.key, "title": s.scenario.title, "contract": s.scenario.contract,
         "passed": s.passed, "scored": s.scored,
         "runs": [{"status": r.verdict.status, "note": r.verdict.note, "wall_s": r.wall_s,
-                  "artifacts": str(r.artifacts), "checks": [asdict(c) for c in r.verdict.checks]} for r in s.runs],
+                  "metrics": _run_metrics(r), "artifacts": str(r.artifacts),
+                  "checks": [asdict(c) for c in r.verdict.checks]} for r in s.runs],
     } for s in summaries]}
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")

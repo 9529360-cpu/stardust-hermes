@@ -7,7 +7,7 @@ from pathlib import Path
 from evals.assistant_scenarios import report, scenarios
 from evals.assistant_scenarios.grading import Check, Verdict
 from evals.assistant_scenarios.runner import ScenarioResult
-from evals.assistant_scenarios.trace import Trace
+from evals.assistant_scenarios.trace import Clarify, Trace, ToolCall
 
 
 def result(key, status, *failed_labels, note=""):
@@ -42,7 +42,11 @@ def test_repeats_must_all_pass_to_count():
 
 
 def test_json_report_keeps_every_run_with_its_evidence(tmp_path):
-    summaries = report.summarize([result("explain_error", "pass"), result("explain_error", "fail", "没有改动你的项目文件")])
+    passed = result("explain_error", "pass")
+    passed.trace.usage = {"calls": 2, "prompt": 100, "completion": 20, "total": 120}
+    passed.trace.tool_calls = [ToolCall("id", "terminal", {}, False, 0, 1.0, completed=True, failed=True)]
+    passed.trace.clarifies.append(Clarify("question", [], "answer", 0, 0.5))
+    summaries = report.summarize([passed, result("explain_error", "fail", "没有改动你的项目文件")])
     report.write_json(summaries, tmp_path / "report.json", model_label="m @ host")
 
     data = json.loads((tmp_path / "report.json").read_text(encoding="utf-8"))
@@ -51,3 +55,8 @@ def test_json_report_keeps_every_run_with_its_evidence(tmp_path):
     assert [r["status"] for r in entry["runs"]] == ["pass", "fail"]
     assert entry["runs"][1]["checks"][0] == {"key": "k0", "label": "没有改动你的项目文件", "ok": False,
                                              "required": True, "evidence": ""}
+    assert entry["runs"][0]["metrics"] == {
+        "wall_s": 1.0, "api_calls": 2, "prompt_tokens": 100, "completion_tokens": 20, "total_tokens": 120,
+        "tool_calls": 1, "failed_tool_calls": 1, "subagent_tool_calls": 0, "clarifications": 1,
+        "approvals": 0, "turn_errors": 0,
+    }

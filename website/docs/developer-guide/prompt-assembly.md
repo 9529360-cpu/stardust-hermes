@@ -1,12 +1,12 @@
 ---
 sidebar_position: 5
 title: "Prompt Assembly"
-description: "How Hermes builds the system prompt, preserves cache stability, and injects ephemeral layers"
+description: "How Stardust builds the system prompt, preserves cache stability, and injects session context"
 ---
 
 # Prompt Assembly
 
-Hermes deliberately separates:
+Stardust deliberately separates:
 
 - **cached system prompt state**
 - **ephemeral API-call-time additions**
@@ -28,16 +28,21 @@ Primary files:
 
 The cached system prompt is assembled as three ordered tiers (see `agent/system_prompt.py`):
 
-1. **stable** — identity (`SOUL.md` or fallback), tool/model guidance, coding operating brief
-2. **context** — caller-supplied `system_message`, project context files (`.hermes.md` / `AGENTS.md` / `CLAUDE.md` / `.cursorrules`), then the worktree-dependent git workspace snapshot, operator instructions and platform hints
-3. **volatile** — skills index, built-in memory snapshot (`MEMORY.md`), user profile snapshot (`USER.md`), external memory-provider block, timestamp/session/model/provider line, then runtime environment hints (host / home / **current working directory**)
+1. **stable** — `SOUL.md` or the default Stardust identity and operating contract; universal, tool-aware, and model-gated guidance; configured auto-loaded skills; and the coding brief
+2. **context** — caller-supplied `system_message`; the selected project instruction file; project facts; then the worktree snapshot and remaining workspace/platform guidance
+3. **volatile** — compact skills index; built-in `MEMORY.md` and `USER.md` snapshots; external memory and plugin sections; timestamp/session/model/provider line; runtime environment hints
 
 The final system prompt is then joined as: `stable` → `context` → `volatile`.
 
 This ordering matters for precedence discussions:
-- skills are part of the **stable** tier
+- the compact skills index is in the **volatile** tier; full content for configured `skills.auto_load` entries is in **stable**
 - memory/profile snapshots are part of the **volatile** tier
 - both are still in the cached system prompt (they are not injected as ad-hoc mid-turn overlays)
+
+Tool schemas and their descriptions are sent in the API request's `tools` field, separately from the system prompt.
+They are included on every model request. The compact skills index is present only when skills tools are available;
+full skill files are normally returned as tool results when `skill_view` is called. Skill slash commands inject the
+selected content as a user message. Neither path silently changes the already-cached system prompt.
 
 Inside the context tier the shared project files come **before** anything naming the current worktree.
 Sessions of one project running in different git worktrees then share a prompt prefix covering the whole
@@ -55,87 +60,35 @@ excluding embedder descriptions. `Platform:` is deliberately not an identity fie
 the per-turn user-message channel (`agent/surface_switch.py`), so the cached prefix survives (#104414). Legacy prompts retain their original
 host-before-context anchor, so prompts persisted before the reorder still validate.
 
-When `skip_context_files` is set (e.g., subagent delegation), SOUL.md is not loaded and the hardcoded `DEFAULT_AGENT_IDENTITY` is used instead.
+When `skip_context_files` is set and the caller has not separately requested SOUL loading (for example, some subagent
+sessions), the hardcoded `DEFAULT_AGENT_IDENTITY` is used instead.
 
-### Concrete example: assembled system prompt
+### Schematic: assembled system prompt
 
-Here is a simplified view of what the final system prompt looks like when all layers are present (comments show the source of each section):
+This schematic shows the order. Actual sections are gated by the active tools, model, profile, project, and configuration:
 
 ```
-# Layer 1: Agent Identity (from ~/.hermes/SOUL.md)
-You are Hermes, an AI assistant created by Nous Research.
-You are an expert software engineer and researcher.
-You value correctness, clarity, and efficiency.
-...
+## Stable
+[SOUL.md, or Stardust's default identity plus the operating contract]
+[Tool-aware guidance and any model-gated guidance]
+[Configured auto-loaded skills and coding brief]
 
-# Layer 2: Tool-aware behavior guidance
-Task-learned procedures, pitfalls, and task-specific preferences belong
-in skills. Memory is the narrow exception for facts that apply to EVERY
-session regardless of task. Skill-writing instructions appear here only
-when skill_manage is available; its absence does not widen memory's scope.
-...
-When the user references something from a past conversation or you
-suspect relevant cross-session context exists, use session_search
-to recall it before asking them to repeat themselves.
+## Context
+[Caller system_message, selected project instruction file, project facts]
+[Workspace snapshot and platform guidance when this session has a project]
 
-# Tool-use enforcement (for GPT/Codex models only)
-You MUST use your tools to take action — do not describe what you
-would do or plan to do without actually doing it.
-...
+## Volatile
+[Compact skills index, memory/profile snapshots, external memory/plugin sections]
+[Session timestamp and runtime environment]
 
-# Layer 3: Honcho static block (when active)
-[Honcho personality/context data]
-
-# Layer 4: Optional system message (from config or API)
-[User-configured system message override]
-
-# Layer 5: Frozen MEMORY snapshot
-## Persistent Memory
-- User prefers Python 3.12, uses pyproject.toml
-- Default editor is nvim
-- Working on project "atlas" in ~/code/atlas
-- Timezone: US/Pacific
-
-# Layer 6: Frozen USER profile snapshot
-## User Profile
-- Name: Alice
-- GitHub: alice-dev
-
-# Layer 7: Skills index
-## Skills (mandatory)
-Before replying, scan the skills below. If one clearly matches
-your task, load it with skill_view(name) and follow its instructions.
-...
-<available_skills>
-  software-development:
-    - code-review: Structured code review workflow
-    - test-driven-development: TDD methodology
-  research:
-    - arxiv: Search and summarize arXiv papers
-</available_skills>
-
-# Layer 8: Context files (from project directory)
-# Project Context
-The following project context files have been loaded and should be followed:
-
-## AGENTS.md
-This is the atlas project. Use pytest for testing. The main
-entry point is src/atlas/main.py. Always run `make lint` before
-committing.
-
-# Layer 9: Timestamp + session
-Current time: 2026-03-30T14:30:00-07:00
-Session: abc123
-
-# Layer 10: Platform hint
-You are a CLI AI Agent. Try not to use markdown but simple text
-renderable inside a terminal.
+## Separate API request fields
+[Tool schemas and descriptions; full tool results and conversation history]
 ```
 
 ## Customizing platform hints
 
-The platform hint (Layer 10 above) is the per-surface guidance Hermes
-injects for Telegram, WhatsApp, Slack, CLI, and other platforms — for
+The platform hint is per-surface guidance Stardust
+adds for Telegram, WhatsApp, Slack, CLI, and other platforms — for
 example "you are on a terminal, avoid Markdown." The built-in defaults
 live in `PLATFORM_HINTS` (`agent/system_prompt.py`); plugin-provided
 platforms supply theirs through the platform registry.
@@ -187,20 +140,9 @@ def load_soul_md() -> Optional[str]:
 
 When `load_soul_md()` returns content, it replaces the hardcoded `DEFAULT_AGENT_IDENTITY`. A custom file replaces the persona only: unless it already contains `ASSISTANT_OPERATING_CONTRACT` verbatim (the seeded default does), `SOUL_OPERATING_DEFAULTS` follows it — that contract under an `# Operating defaults` heading, with explicit persona instructions taking precedence. The `build_context_files_prompt()` function is then called with `skip_soul=True` to prevent SOUL.md from appearing twice (once as identity, once as a context file).
 
-If `SOUL.md` doesn't exist, the system falls back to:
-
-```
-You are Hermes Agent, built by Nous Research. Be direct: match the length
-of your reply to the weight of the ask — a one-line question gets a
-one-line answer, and finished work gets a short report of what changed,
-what's verified, and what's left, never a replay of the process. No
-filler ("Great question," "I'd be happy to"), no restating the request
-back, no re-summarizing what you already said, no play-by-play of tool
-mechanics. Plain claims over adjectives; when unsure, say so
-plainly. Agree because it's right, not because the user said it. Depth
-is earned — give it when the user asks for detail, teaches, or the
-stakes demand it, not by default.
-```
+If `SOUL.md` is absent or intentionally skipped, the system uses `DEFAULT_AGENT_IDENTITY` from
+`agent/prompt_builder.py`. That fallback identifies the assistant as Stardust and includes the operating contract.
+The text is maintained in code; the profile seeding copy in `hermes_cli/default_soul.py` is kept aligned with it.
 
 ## How context files are injected
 
@@ -244,7 +186,7 @@ def build_context_files_prompt(cwd=None, skip_soul=False):
 
 | Priority | Files | Search scope | Notes |
 |----------|-------|-------------|-------|
-| 1 | `.hermes.md`, `HERMES.md` | CWD up to git root | Hermes-native project config |
+| 1 | `.hermes.md`, `HERMES.md` | CWD up to git root | Stardust/Hermes-compatible project config |
 | 2 | `AGENTS.md` | CWD only | Common agent instruction file |
 | 3 | `CLAUDE.md` | CWD only | Claude Code compatibility |
 | 4 | `.cursorrules`, `.cursor/rules/*.mdc` | CWD only | Cursor compatibility |
@@ -259,11 +201,12 @@ All context files are:
 These are intentionally *not* persisted as part of the cached system prompt:
 
 - `ephemeral_system_prompt`
+- `agent.system_prompt`, the selected personality, or `STARDUST_EPHEMERAL_SYSTEM_PROMPT` when they resolve to that overlay
 - prefill messages
 - gateway-derived session context overlays
 - later-turn Honcho/external recall injected into the current-turn user message
 
-`pre_llm_call` plugin context also lands in this API-call-time path: it is appended to the current turn's **user message**, not written into the cached system prompt. When multiple plugins return context, Hermes concatenates those context blocks (see [Hooks → `pre_llm_call`](../user-guide/features/hooks.md#pre_llm_call)).
+`pre_llm_call` plugin context also lands in this API-call-time path: it is appended to the current turn's **user message**, not written into the cached system prompt. When multiple plugins return context, Stardust concatenates those context blocks (see [Hooks → `pre_llm_call`](../user-guide/features/hooks.md#pre_llm_call)).
 
 This separation keeps the stable prefix stable for caching.
 
@@ -286,31 +229,42 @@ Long files are truncated before injection.
 
 ## Skills index
 
-The skills system contributes a compact skills index to the prompt when skills tooling is available.
+When skills tools are available, the compact catalog is in the volatile system-prompt tier. Configured
+`skills.auto_load` skills contribute their full text to the stable tier. Other full skill text is loaded on demand
+through `skill_view` (a tool result) or a skill slash command (a user message). The model does not receive every
+installed `SKILL.md` on every request.
+
+## Tool descriptions
+
+Tool schemas, including their descriptions and parameter definitions, are passed in the API request's `tools` field,
+not embedded in the system prompt. The active toolset is resolved for the session and its schemas are sent on every
+model request. `stardust prompt-size` reports schema bytes separately from system-prompt bytes; those byte counts are
+not token counts.
 
 ## Supported prompt customization surfaces
 
-Most users should treat `agent/prompt_builder.py` as implementation code, not a configuration surface. The supported customization path is to change the prompt inputs Hermes already loads, rather than editing Python templates in place.
+Most users should treat `agent/prompt_builder.py` as implementation code, not a configuration surface. The supported customization path is to change the prompt inputs Stardust already loads, rather than editing Python templates in place.
 
 ### Use these surfaces first
 
-- `~/.hermes/SOUL.md` — replace the built-in default persona with your own agent persona and standing behavior (explicit instructions there win over the operating defaults that follow it).
-- `~/.hermes/MEMORY.md` and `~/.hermes/USER.md` — provide durable cross-session facts and user profile data that should be snapshotted into new sessions.
+- The active Stardust profile's `SOUL.md` — customize persona and standing behavior. The shared operating contract follows a custom SOUL unless that file already contains it.
+- The active profile's `memories/MEMORY.md` and `memories/USER.md` — provide durable facts and user-profile data that are snapshotted into new sessions. Use Stardust's profile-aware home resolution; the inherited `HERMES_HOME` name is a compatibility interface.
 - Project context files such as `.hermes.md`, `HERMES.md`, `AGENTS.md`, `CLAUDE.md`, or `.cursorrules` — inject repo-specific working rules.
 - Skills — package reusable workflows and references without editing core prompt code.
-- Optional system prompt config / API overrides — add deployment-specific instruction text without forking Hermes.
-- Ephemeral overlays such as `HERMES_EPHEMERAL_SYSTEM_PROMPT` or prefill messages — add turn-scoped guidance that should not become part of the cached prompt prefix.
+- Caller-supplied `system_message` — add context to the cached prompt when a surface explicitly uses this parameter.
+- `agent.system_prompt` or the selected `display.personality` — provide a session overlay; these resolve to `ephemeral_system_prompt`, not the cached `system_message` tier.
+- `STARDUST_EPHEMERAL_SYSTEM_PROMPT` or prefill messages — add API-call-time guidance that should not become part of the cached prompt prefix.
 
 ### When to edit code instead
 
-Edit `agent/prompt_builder.py` only if you are intentionally maintaining a fork or contributing upstream behavior changes. That file assembles the prompt plumbing, cache boundaries, and injection order for every session. Direct edits there are global product changes, not per-user prompt customization.
+Edit `agent/prompt_builder.py` only when intentionally changing Stardust's global behavior. That file assembles prompt content, cache boundaries, and injection order for every session. Direct edits there are product changes, not per-user prompt customization.
 
 In other words:
 
 - if you want a different assistant identity, edit `SOUL.md`
 - if you want different repo rules, edit project context files
 - if you want reusable operating procedures, add or modify skills
-- if you want to change how Hermes assembles prompts for everyone, change Python and treat it as a code contribution
+- if you want to change how Stardust assembles prompts for everyone, change Python and treat it as a code contribution
 
 ## Why prompt assembly is split this way
 

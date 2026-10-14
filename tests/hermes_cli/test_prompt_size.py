@@ -52,6 +52,17 @@ def test_runs_offline_without_credentials(isolated_home, monkeypatch):
         monkeypatch.delenv(var, raising=False)
     data = compute_prompt_breakdown("cli")
     assert data["system_prompt"]["bytes"] > 0
+    labels = [section[0] for section in data["sections"]]
+    assert labels == [
+        "stable (identity/guidance/pinned skills)",
+        "context (project instructions/workspace)",
+        "volatile (skills index/memory/profile/time)",
+    ]
+
+
+def test_desktop_is_rejected_instead_of_reporting_an_empty_tool_surface(isolated_home):
+    with pytest.raises(ValueError, match="Desktop tool availability is session-specific"):
+        compute_prompt_breakdown("desktop")
 
 
 

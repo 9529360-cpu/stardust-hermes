@@ -150,6 +150,13 @@ def compute_prompt_breakdown(platform: str = "cli") -> Dict[str, Any]:
     largest-first ``skills_breakdown`` / ``toolsets_breakdown`` ("what should I disable?").
     """
     from agent.system_prompt import build_system_prompt, build_system_prompt_parts
+    from hermes_cli.platforms import get_all_platforms
+
+    supported_platforms = get_all_platforms()
+    if platform not in supported_platforms:
+        available = ", ".join(supported_platforms)
+        suffix = " Desktop tool availability is session-specific and cannot be simulated here." if platform == "desktop" else ""
+        raise ValueError(f"Unsupported prompt-size platform {platform!r}. Choose a registered platform: {available}.{suffix}")
 
     agent = _build_inspection_agent(platform)
     parts = build_system_prompt_parts(agent)
@@ -177,8 +184,9 @@ def compute_prompt_breakdown(platform: str = "cli") -> Dict[str, Any]:
     tools = getattr(agent, "tools", None) or []
     sections: List[Tuple[str, int, int]] = [
         (label, len(text), _bytes(text))
-        for label, text in (("stable (identity/guidance/skills)", stable), ("context (AGENTS.md/cwd files)", context),
-                            ("volatile (memory/profile/timestamp)", volatile))
+        for label, text in (("stable (identity/guidance/pinned skills)", stable),
+                            ("context (project instructions/workspace)", context),
+                            ("volatile (skills index/memory/profile/time)", volatile))
     ]
     return {
         "platform": platform,
