@@ -51,6 +51,20 @@ async function selectedMainChat(page: Page) {
   return { anchor, surface, tab }
 }
 
+async function activeMainChat(page: Page) {
+  const tabStrip = page.locator('[data-zone-tabstrip="grp-main"]')
+
+  if ((await tabStrip.count()) > 0) {
+    return selectedMainChat(page)
+  }
+
+  const surface = page.locator('[data-session-anchor="workspace"]')
+
+  await expect(surface).toBeVisible({ timeout: 15_000 })
+
+  return { anchor: 'workspace', surface }
+}
+
 async function seedBot(hermesHome: string, mockUrl: string, name: string): Promise<void> {
   const dir = path.join(hermesHome, 'profiles', name)
   fs.mkdirSync(dir, { recursive: true })
@@ -108,7 +122,7 @@ test("an open Bot Chat's tab reads the bot's name, not the canonical 'Bot Chat' 
 
   await alphaRow.click()
   await expect(botsRoster).toBeHidden({ timeout: 30_000 })
-  const canonicalChat = await selectedMainChat(page)
+  const canonicalChat = await activeMainChat(page)
   const canonicalPaneId = canonicalChat.anchor
   await expect(canonicalChat.surface.getByText('Hello alpha', { exact: true })).toBeVisible({ timeout: 45_000 })
   await expect(

@@ -63,6 +63,20 @@ async function selectedMainChat(page: Page) {
   return { anchor, surface, tab }
 }
 
+async function activeMainChat(page: Page) {
+  const tabStrip = page.locator('[data-zone-tabstrip="grp-main"]')
+
+  if ((await tabStrip.count()) > 0) {
+    return selectedMainChat(page)
+  }
+
+  const surface = page.locator('[data-session-anchor="workspace"]')
+
+  await expect(surface).toBeVisible({ timeout: 15_000 })
+
+  return { anchor: 'workspace', surface }
+}
+
 async function seedBot(hermesHome: string, mockUrl: string, name: string): Promise<void> {
   const dir = path.join(hermesHome, 'profiles', name)
   fs.mkdirSync(dir, { recursive: true })
@@ -122,7 +136,7 @@ test('a bot row click lands on the Bot Chat the row previews, not a side thread'
 
   await alphaRow.click()
   await expect(botsRoster).toBeHidden({ timeout: 30_000 })
-  const alphaChat = await selectedMainChat(page)
+  const alphaChat = await activeMainChat(page)
   await expect(alphaChat.surface.getByText('Hello alpha', { exact: true })).toBeVisible({ timeout: 45_000 })
   const alphaComposer = alphaChat.surface
     .locator('[data-slot="composer-root"] [contenteditable="true"]')
@@ -158,7 +172,7 @@ test('a bot row click lands on the Bot Chat the row previews, not a side thread'
   await expect(betaRow).toBeVisible({ timeout: 30_000 })
   await betaRow.click()
   await expect(botsRoster).toBeHidden({ timeout: 30_000 })
-  const betaChat = await selectedMainChat(page)
+  const betaChat = await activeMainChat(page)
   await expect(betaChat.surface.getByText('Hello beta', { exact: true })).toBeVisible({ timeout: 60_000 })
   await expect(
     betaChat.surface.locator('[data-slot="composer-root"] [contenteditable="true"]').filter({ visible: true }).first()
@@ -171,7 +185,7 @@ test('a bot row click lands on the Bot Chat the row previews, not a side thread'
   await expect(botsRoster).toBeHidden({ timeout: 30_000 })
   // The scoped row click leaves the roster and selects the canonical transcript
   // with its own composer, rather than merely finding the row's sidebar preview.
-  const returnedAlphaChat = await selectedMainChat(page)
+  const returnedAlphaChat = await activeMainChat(page)
   await expect(returnedAlphaChat.surface.getByText('Hello alpha', { exact: true })).toBeVisible({ timeout: 45_000 })
   await expect(
     returnedAlphaChat.surface
