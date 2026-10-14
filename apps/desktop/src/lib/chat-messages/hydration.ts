@@ -238,6 +238,18 @@ function asyncResultBody(content: string): string | undefined {
 }
 
 function timelineDisplayContent(message: SessionMessage, content: string): string {
+  if (message.display_kind === 'steer') {
+    // session.resume can return the model-facing steer row directly, while
+    // session history endpoints already project it to the user's plain text.
+    // Keep both paths visually identical and let the resume reconciler match
+    // this row with the optimistic correction instead of painting it twice.
+    const marker = content
+      .trim()
+      .match(/^\[OUT-OF-BAND USER MESSAGE[^\]]*\]\s*([\s\S]*?)\s*\[\/OUT-OF-BAND USER MESSAGE\]$/)
+
+    return marker?.[1]?.trim() || content
+  }
+
   if (message.display_kind === 'model_switch') {
     return 'model changed'
   }

@@ -413,6 +413,7 @@ export function ProfileRail() {
           glyph="layers"
           label={p.fleet.allOnGateway}
           onSelect={() => setShowAllProfiles(true)}
+          slot="profile-rail-all-on-gateway"
         />
       )}
 
@@ -523,7 +524,12 @@ export function ProfileRail() {
           overlay is the only place to edit a profile's SOUL.md, and a
           single-profile user must be able to edit the default's persona
           without first creating a throwaway second profile. */}
-      <ProfilePill active={false} glyph="ellipsis" label={p.manageProfiles} onSelect={() => navigate(PROFILES_ROUTE)} />
+      <ProfilePill
+        active={false}
+        glyph="ellipsis"
+        label={p.manageProfiles}
+        onSelect={() => navigate(PROFILES_ROUTE)}
+      />
 
       {/* Multi-gateway discoverability: before a second source exists, a plug
           pinned beside Manage deep-links to the unified Gateways page. Once
@@ -534,6 +540,7 @@ export function ProfileRail() {
           glyph="plug"
           label={p.connectGateway}
           onSelect={() => navigate(`${SETTINGS_ROUTE}?tab=gateway`)}
+          slot="profile-rail-connect-gateway"
         />
       )}
 
@@ -1084,7 +1091,7 @@ function RestSquare({
           collisionPadding={{ bottom: 44, left: 8, right: 8, top: 8 }}
           onCloseAutoFocus={event => event.preventDefault()}
         >
-          <ContextMenuItem onSelect={onSelect}>
+          <ContextMenuItem data-slot="profile-rail-rest-switch" onSelect={onSelect}>
             <Codicon name="arrow-right" size="0.875rem" />
             <span className="truncate">{p.fleet.switchTo(agent.profile, agent.connectionLabel)}</span>
           </ContextMenuItem>
@@ -1096,7 +1103,7 @@ function RestSquare({
             <Codicon name="text-size" size="0.875rem" />
             <span>{p.renameMenu}</span>
           </ContextMenuItem>
-          <ContextMenuItem onSelect={onEditSoul}>
+          <ContextMenuItem data-slot="profile-rail-rest-edit-soul" onSelect={onEditSoul}>
             <Codicon name="edit" size="0.875rem" />
             <span>{p.editSoul}</span>
           </ContextMenuItem>

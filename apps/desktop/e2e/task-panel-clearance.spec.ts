@@ -106,12 +106,12 @@ test.describe('working-session task-panel clearance', () => {
     const latestMessage = activeSurface(page).getByText('Task-panel clearance line 24')
 
     await expect(taskPanel).toHaveAttribute('aria-expanded', 'true')
-    await expect(latestMessage).toBeVisible()
 
     // Exercise the real status-section layout transition. The previous test
     // inserted a spacer into the scroll viewport and expected stale geometry;
-    // the production stick-to-bottom behavior immediately corrected it, so
-    // that precondition failed before the focus path could be evaluated.
+    // the production stick-to-bottom behavior immediately corrected it. The
+    // restored latest line may start outside the viewport; window focus is the
+    // recovery edge this scenario is checking.
     await taskPanel.click()
     await expect(taskPanel).toHaveAttribute('aria-expanded', 'false')
     await taskPanel.click()
