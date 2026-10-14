@@ -48,6 +48,7 @@ export interface PetGallery {
 }
 
 export type PetGalleryStatus = 'idle' | 'loading' | 'ready' | 'stale' | 'error'
+export type PetGalleryFullCatalogStatus = 'idle' | 'loading' | 'ready' | 'error'
 
 /** The recovering `requestGateway` from `useGatewayRequest` — passed in so the
  *  store reuses the hook's reconnect/reauth handling instead of duplicating it. */
@@ -68,6 +69,10 @@ const petRpc = <T>(request: GatewayRequest, method: string, params: Record<strin
 export const $petGallery = atom<PetGallery | null>(null)
 export const $petGalleryStatus = atom<PetGalleryStatus>('idle')
 export const $petGalleryError = atom<string | null>(null)
+// The second, full petdex fetch is optional when local pets already exist.
+// Settings reads this separately so an empty local-only result stays in its
+// loading state without changing the ready status other gallery consumers use.
+export const $petGalleryFullCatalogStatus = atom<PetGalleryFullCatalogStatus>('idle')
 
 // Which action is in flight, so rows/buttons can show a spinner. A slug for a
 // per-pet mutation; the `TOGGLE_*` sentinels for the on/off switch.
@@ -91,6 +96,7 @@ export function resetPetGallery(): void {
   $petGallery.set(null)
   $petGalleryStatus.set('idle')
   $petGalleryError.set(null)
+  $petGalleryFullCatalogStatus.set('idle')
   $petBusy.set(null)
 }
 
@@ -137,6 +143,7 @@ export function loadPetGallery(request: GatewayRequest, options: { force?: boole
       ])
 
       if (local) {
+        $petGalleryFullCatalogStatus.set('loading')
         $petGallery.set(local)
         $petGalleryStatus.set('ready')
         $petGalleryError.set(null)
@@ -151,6 +158,8 @@ export function loadPetGallery(request: GatewayRequest, options: { force?: boole
         $petGalleryStatus.set('error')
         $petGalleryError.set(e instanceof Error ? e.message : 'Could not reach the petdex gallery.')
       }
+
+      $petGalleryFullCatalogStatus.set('error')
     } finally {
       galleryLoad = null
     }
@@ -164,9 +173,13 @@ export function loadPetGallery(request: GatewayRequest, options: { force?: boole
         if (full) {
           $petGallery.set(full)
           $petGalleryStatus.set('ready')
+          $petGalleryFullCatalogStatus.set('ready')
+        } else {
+          $petGalleryFullCatalogStatus.set('error')
         }
       } catch {
         // Keep the local-only gallery; the petdex catalog just stays unmerged.
+        $petGalleryFullCatalogStatus.set('error')
       }
     }
   })()

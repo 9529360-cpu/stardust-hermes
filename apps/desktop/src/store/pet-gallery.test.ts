@@ -1,7 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { $petInfo, setPetInfo } from './pet'
-import { $petGallery, adoptPet, type GatewayRequest, loadPetGallery, resetPetGallery } from './pet-gallery'
+import {
+  $petGallery,
+  $petGalleryFullCatalogStatus,
+  $petGalleryStatus,
+  adoptPet,
+  type GatewayRequest,
+  loadPetGallery,
+  type PetGallery,
+  resetPetGallery
+} from './pet-gallery'
 
 function localGallery() {
   return {
@@ -9,6 +18,46 @@ function localGallery() {
     active: 'boba',
     pets: [{ slug: 'boba', displayName: 'Boba', installed: true }]
   }
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason: unknown) => void
+
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+
+  return { promise, reject, resolve }
+}
+
+function requestWithDeferredFullCatalog(local: PetGallery, fullCatalog: Promise<PetGallery>) {
+  let notifyFullCatalogStarted!: () => void
+
+  const fullCatalogStarted = new Promise<void>(resolve => {
+    notifyFullCatalogStarted = resolve
+  })
+
+  const request: GatewayRequest = async <T>(method: string, params: Record<string, unknown> = {}) => {
+    if (method === 'pet.info.meta') {
+      return { enabled: false } as T
+    }
+
+    if (method === 'pet.gallery' && params.localOnly) {
+      return local as T
+    }
+
+    if (method === 'pet.gallery') {
+      notifyFullCatalogStarted()
+
+      return fullCatalog as T
+    }
+
+    throw new Error(`Unexpected RPC ${method}`)
+  }
+
+  return { fullCatalogStarted, request }
 }
 
 describe('pet gallery pet.info sync', () => {
@@ -206,5 +255,59 @@ describe('pet gallery pet.info sync', () => {
     const methods = requestMock.mock.calls.map(([method]) => method)
     expect(methods).toEqual(['pet.select', 'pet.info.meta'])
     expect($petInfo.get().spritesheetBase64).toBe('large-sprite-payload')
+  })
+})
+
+describe('pet gallery full catalog loading', () => {
+  beforeEach(() => {
+    resetPetGallery()
+  })
+
+  afterEach(() => {
+    resetPetGallery()
+    vi.restoreAllMocks()
+  })
+
+  it('tracks a deferred full catalog separately while the local-only gallery is empty', async () => {
+    const fullCatalog = deferred<PetGallery>()
+
+    const { fullCatalogStarted, request } = requestWithDeferredFullCatalog(
+      { active: '', enabled: false, pets: [] },
+      fullCatalog.promise
+    )
+
+    const loading = loadPetGallery(request)
+
+    await fullCatalogStarted
+
+    expect($petGallery.get()).toEqual({ active: '', enabled: false, pets: [] })
+    expect($petGalleryStatus.get()).toBe('ready')
+    expect($petGalleryFullCatalogStatus.get()).toBe('loading')
+
+    fullCatalog.resolve(localGallery())
+    await loading
+
+    expect($petGallery.get()).toEqual(localGallery())
+    expect($petGalleryFullCatalogStatus.get()).toBe('ready')
+  })
+
+  it('keeps non-empty local pets ready while the deferred full catalog refreshes', async () => {
+    const local = localGallery()
+    const full = deferred<PetGallery>()
+    const { fullCatalogStarted, request } = requestWithDeferredFullCatalog(local, full.promise)
+    const loading = loadPetGallery(request)
+
+    await fullCatalogStarted
+
+    expect($petGallery.get()).toEqual(local)
+    expect($petGalleryStatus.get()).toBe('ready')
+    expect($petGalleryFullCatalogStatus.get()).toBe('loading')
+
+    const complete = { ...local, pets: [...local.pets, { displayName: 'Orbit', installed: false, slug: 'orbit' }] }
+    full.resolve(complete)
+    await loading
+
+    expect($petGallery.get()).toEqual(complete)
+    expect($petGalleryFullCatalogStatus.get()).toBe('ready')
   })
 })

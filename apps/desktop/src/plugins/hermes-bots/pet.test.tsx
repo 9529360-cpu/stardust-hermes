@@ -36,6 +36,22 @@ vi.mock('@stardust/plugin-sdk', () => ({
   Input: (props: React.ComponentProps<'input'>) => <input {...props} />,
   LruCache: UnboundedCache,
   RowButton: (props: React.ComponentProps<'button'>) => <button {...props} />,
+  SearchField: ({
+    onChange,
+    placeholder,
+    value
+  }: {
+    onChange: (value: string) => void
+    placeholder: string
+    value: string
+  }) => (
+    <input
+      aria-label={placeholder}
+      onChange={event => onChange(event.target.value)}
+      placeholder={placeholder}
+      value={value}
+    />
+  ),
   useQuery: useQueryMock
 }))
 

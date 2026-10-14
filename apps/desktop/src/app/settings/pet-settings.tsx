@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { SearchField } from '@/components/ui/search-field'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tip } from '@/components/ui/tooltip'
@@ -21,6 +22,7 @@ import {
   $petBusy,
   $petGallery,
   $petGalleryError,
+  $petGalleryFullCatalogStatus,
   $petGalleryStatus,
   adoptPet,
   exportPet as exportPetAction,
@@ -54,6 +56,7 @@ export function PetSettings() {
   const gatewayState = useStore($gatewayState)
   const gallery = useStore($petGallery)
   const status = useStore($petGalleryStatus)
+  const fullCatalogStatus = useStore($petGalleryFullCatalogStatus)
   const error = useStore($petGalleryError)
   const busySlug = useStore($petBusy)
   const petInfo = useStore($petInfo)
@@ -76,6 +79,8 @@ export function PetSettings() {
   const active = gallery?.active ?? ''
   const pets = gallery?.pets ?? []
   const staleBackend = status === 'stale'
+  const emptyGalleryLoading = pets.length === 0 && (status === 'loading' || fullCatalogStatus === 'loading')
+  const emptyGalleryUnavailable = pets.length === 0 && !emptyGalleryLoading && fullCatalogStatus !== 'ready'
 
   const selectPet = (slug: string) => {
     void adoptPet(requestGateway, slug, copy.adoptFailed(slug)).then(ok => ok && triggerHaptic('crisp'))
@@ -131,19 +136,22 @@ export function PetSettings() {
         <ListRow
           below={
             <>
-              <input
-                className="mt-3 w-full rounded-lg border border-(--ui-stroke-tertiary) bg-(--ui-bg-quinary) px-3 py-1.5 text-[length:var(--conversation-caption-font-size)] outline-none placeholder:text-(--ui-text-tertiary) focus:border-(--ui-stroke-secondary)"
-                onChange={event => setQuery(event.target.value)}
-                placeholder={copy.searchPlaceholder}
-                spellCheck={false}
-                value={query}
-              />
+              {pets.length > 0 && (
+                <SearchField
+                  aria-label={copy.searchPlaceholder}
+                  containerClassName="mt-3 w-full"
+                  inputClassName="flex-1"
+                  onChange={setQuery}
+                  placeholder={copy.searchPlaceholder}
+                  value={query}
+                />
+              )}
               {/* Fixed-height scroll area so filtering never grows/shrinks the
                   page (no layout thrash); the grid scrolls inside it. */}
               <div className="mt-3 h-72 overflow-y-auto pr-1">
-                {status === 'loading' && pets.length === 0 ? (
+                {emptyGalleryLoading ? (
                   // First load keeps the grid's shape rather than flashing the
-                  // "unreachable" copy before the gallery has even arrived.
+                  // "unreachable" copy while either catalog request is pending.
                   <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                     {Array.from({ length: 6 }, (_, i) => (
                       <div className="flex items-center gap-2.5 px-2.5 py-2" key={i}>
@@ -155,11 +163,11 @@ export function PetSettings() {
                       </div>
                     ))}
                   </div>
-                ) : pets.length === 0 ? (
+                ) : emptyGalleryUnavailable ? (
                   <p className="text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">
                     {copy.unreachable}
                   </p>
-                ) : shown.length === 0 ? (
+                ) : pets.length === 0 ? null : shown.length === 0 ? (
                   <p className="wrap-anywhere text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">
                     {copy.noMatch(query)}
                   </p>

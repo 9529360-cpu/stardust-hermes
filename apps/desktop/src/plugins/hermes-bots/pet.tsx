@@ -3,7 +3,7 @@
  * frame as the bot's profile picture.
  */
 
-import { Button, cn, GlyphSpinner, host, Input, LruCache, RowButton, useQuery } from '@stardust/plugin-sdk'
+import { Button, cn, GlyphSpinner, host, LruCache, RowButton, SearchField, useQuery } from '@stardust/plugin-sdk'
 import { useEffect, useState } from 'react'
 
 import { useBots } from './i18n'
@@ -190,10 +190,11 @@ export function PetTab({ image, onImage }: PetTabProps) {
   return (
     <div className="grid w-full gap-2">
       <div className="text-center text-[0.65rem] text-(--ui-text-quaternary)">{b.avatar.pickPet}</div>
-      <Input
-        className="h-7 text-xs"
+      <SearchField
+        containerClassName="w-full"
+        inputClassName="flex-1"
         onChange={event => {
-          setQuery(event.target.value)
+          setQuery(event)
           setLimit(24)
         }}
         placeholder={`Search ${pets.length} pets…`}
