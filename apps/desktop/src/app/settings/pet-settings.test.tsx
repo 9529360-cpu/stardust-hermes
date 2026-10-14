@@ -33,7 +33,10 @@ function deferred<T>() {
   return { promise, reject, resolve }
 }
 
-function requestWithDeferredFullCatalog(fullCatalog: Promise<PetGallery>) {
+function requestWithDeferredFullCatalog(
+  fullCatalog: Promise<PetGallery>,
+  localGallery: PetGallery = { active: '', enabled: false, pets: [] }
+) {
   let notifyFullCatalogStarted!: () => void
 
   const fullCatalogStarted = new Promise<void>(resolve => {
@@ -42,7 +45,7 @@ function requestWithDeferredFullCatalog(fullCatalog: Promise<PetGallery>) {
 
   requestGatewayMock.mockImplementation((method: string, params: Record<string, unknown> = {}) => {
     if (method === 'pet.gallery' && params.localOnly) {
-      return Promise.resolve({ active: '', enabled: false, pets: [] })
+      return Promise.resolve(localGallery)
     }
 
     if (method === 'pet.info.meta') {
@@ -138,6 +141,7 @@ describe('Settings pet catalog search', () => {
       fullCatalog.resolve({
         active: '',
         enabled: false,
+        catalogComplete: true,
         pets: [{ displayName: 'Axolotl', installed: false, slug: 'axolotl' }]
       })
       await fullCatalog.promise
@@ -171,10 +175,60 @@ describe('Settings pet catalog search', () => {
     expect(screen.getByText(copy.unreachable)).toBeTruthy()
   })
 
+  it('shows the installed-only warning when a successful RPC reports the offline fallback', async () => {
+    const installedOnly: PetGallery = {
+      active: 'axolotl',
+      enabled: true,
+      pets: [{ displayName: 'Axolotl', installed: true, slug: 'axolotl' }]
+    }
+
+    const fullCatalog = deferred<PetGallery>()
+    const fullCatalogStarted = requestWithDeferredFullCatalog(fullCatalog.promise, installedOnly)
+    $gatewayState.set('open')
+
+    renderPetSettings()
+
+    await fullCatalogStarted
+    await waitFor(() => expect($petGalleryFullCatalogStatus.get()).toBe('loading'))
+
+    await act(async () => {
+      fullCatalog.resolve({ ...installedOnly, catalogComplete: false })
+      await fullCatalog.promise
+    })
+
+    await waitFor(() => expect($petGalleryFullCatalogStatus.get()).toBe('error'))
+
+    expect(screen.getByRole('textbox', { name: copy.searchPlaceholder })).toBeTruthy()
+    expect(screen.getByText(copy.unreachable)).toBeTruthy()
+    expect(screen.getByText('Axolotl')).toBeTruthy()
+  })
+
+  it('shows the unavailable message for an empty successful offline fallback', async () => {
+    const fullCatalog = deferred<PetGallery>()
+    const fullCatalogStarted = requestWithDeferredFullCatalog(fullCatalog.promise)
+    $gatewayState.set('open')
+
+    const view = renderPetSettings()
+
+    await fullCatalogStarted
+    await waitFor(() => expect($petGalleryFullCatalogStatus.get()).toBe('loading'))
+
+    await act(async () => {
+      fullCatalog.resolve({ active: '', enabled: false, pets: [], catalogComplete: false })
+      await fullCatalog.promise
+    })
+
+    await waitFor(() => expect($petGalleryFullCatalogStatus.get()).toBe('error'))
+    expect(view.container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(0)
+    expect(screen.queryByRole('textbox', { name: copy.searchPlaceholder })).toBeNull()
+    expect(screen.getByText(copy.unreachable)).toBeTruthy()
+  })
+
   it('keeps search for an available catalog and reports a query with no matches separately', () => {
     $petGallery.set({
       active: '',
       enabled: false,
+      catalogComplete: true,
       pets: [{ displayName: 'Axolotl', installed: false, slug: 'axolotl' }]
     })
     $petGalleryStatus.set('ready')

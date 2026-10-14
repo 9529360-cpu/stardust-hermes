@@ -45,6 +45,8 @@ export interface PetGallery {
   enabled: boolean
   active: string
   pets: GalleryPet[]
+  /** The backend completed the Petdex manifest fetch; older backends omit it. */
+  catalogComplete?: boolean
 }
 
 export type PetGalleryStatus = 'idle' | 'loading' | 'ready' | 'stale' | 'error'
@@ -119,7 +121,12 @@ export function loadPetThumb(request: GatewayRequest, slug: string, url?: string
  * manual refresh). Concurrent callers share a single in-flight request.
  */
 export function loadPetGallery(request: GatewayRequest, options: { force?: boolean } = {}): Promise<void> {
-  if (!options.force && $petGallery.get() && $petGalleryStatus.get() === 'ready') {
+  if (
+    !options.force &&
+    $petGallery.get() &&
+    $petGalleryStatus.get() === 'ready' &&
+    $petGalleryFullCatalogStatus.get() !== 'error'
+  ) {
     return Promise.resolve()
   }
 
@@ -173,7 +180,9 @@ export function loadPetGallery(request: GatewayRequest, options: { force?: boole
         if (full) {
           $petGallery.set(full)
           $petGalleryStatus.set('ready')
-          $petGalleryFullCatalogStatus.set('ready')
+          // False is the explicit installed-only fallback. Older backends omit
+          // this additive field, so keep their prior successful-RPC behavior.
+          $petGalleryFullCatalogStatus.set(full.catalogComplete === false ? 'error' : 'ready')
         } else {
           $petGalleryFullCatalogStatus.set('error')
         }

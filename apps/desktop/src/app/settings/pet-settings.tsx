@@ -146,6 +146,11 @@ export function PetSettings() {
                   value={query}
                 />
               )}
+              {pets.length > 0 && fullCatalogStatus === 'error' && (
+                <p className="mt-3 text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">
+                  {copy.unreachable}
+                </p>
+              )}
               {/* Fixed-height scroll area so filtering never grows/shrinks the
                   page (no layout thrash); the grid scrolls inside it. */}
               <div className="mt-3 h-72 overflow-y-auto pr-1">

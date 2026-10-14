@@ -284,10 +284,10 @@ describe('pet gallery full catalog loading', () => {
     expect($petGalleryStatus.get()).toBe('ready')
     expect($petGalleryFullCatalogStatus.get()).toBe('loading')
 
-    fullCatalog.resolve(localGallery())
+    fullCatalog.resolve({ ...localGallery(), catalogComplete: true })
     await loading
 
-    expect($petGallery.get()).toEqual(localGallery())
+    expect($petGallery.get()).toEqual({ ...localGallery(), catalogComplete: true })
     expect($petGalleryFullCatalogStatus.get()).toBe('ready')
   })
 
@@ -304,10 +304,70 @@ describe('pet gallery full catalog loading', () => {
     expect($petGalleryFullCatalogStatus.get()).toBe('loading')
 
     const complete = { ...local, pets: [...local.pets, { displayName: 'Orbit', installed: false, slug: 'orbit' }] }
-    full.resolve(complete)
+    full.resolve({ ...complete, catalogComplete: true })
     await loading
 
-    expect($petGallery.get()).toEqual(complete)
+    expect($petGallery.get()).toEqual({ ...complete, catalogComplete: true })
+    expect($petGalleryFullCatalogStatus.get()).toBe('ready')
+  })
+
+  it('keeps installed pets when a successful full-catalog RPC reports the offline fallback', async () => {
+    const local = localGallery()
+    const fallback = deferred<PetGallery>()
+    const { fullCatalogStarted, request } = requestWithDeferredFullCatalog(local, fallback.promise)
+    const loading = loadPetGallery(request)
+
+    await fullCatalogStarted
+    fallback.resolve({ ...local, catalogComplete: false })
+    await loading
+
+    expect($petGallery.get()).toEqual({ ...local, catalogComplete: false })
+    expect($petGalleryFullCatalogStatus.get()).toBe('error')
+  })
+
+  it('retries a degraded catalog after the next open and recovers when it becomes available', async () => {
+    let fullCatalogCalls = 0
+    const local = localGallery()
+
+    const request: GatewayRequest = async <T>(method: string, params: Record<string, unknown> = {}) => {
+      if (method === 'pet.info.meta') {
+        return { enabled: false } as T
+      }
+
+      if (method === 'pet.gallery' && params.localOnly) {
+        return local as T
+      }
+
+      if (method === 'pet.gallery') {
+        fullCatalogCalls += 1
+
+        return {
+          ...local,
+          catalogComplete: fullCatalogCalls > 1
+        } as T
+      }
+
+      throw new Error('Unexpected RPC ' + method)
+    }
+
+    await loadPetGallery(request)
+    expect($petGalleryFullCatalogStatus.get()).toBe('error')
+
+    await loadPetGallery(request)
+
+    expect(fullCatalogCalls).toBe(2)
+    expect($petGalleryFullCatalogStatus.get()).toBe('ready')
+  })
+
+  it('keeps legacy successful catalog responses compatible when the completeness field is absent', async () => {
+    const { fullCatalogStarted, request } = requestWithDeferredFullCatalog(
+      localGallery(),
+      Promise.resolve(localGallery())
+    )
+
+    await loadPetGallery(request)
+    await fullCatalogStarted
+
     expect($petGalleryFullCatalogStatus.get()).toBe('ready')
   })
 })

@@ -2154,6 +2154,7 @@ export interface PetGalleryResult {
   enabled: boolean
   active?: string
   pets?: PetGalleryEntry[]
+  catalogComplete?: boolean
 }
 export interface PetGalleryEntry {
   slug: string

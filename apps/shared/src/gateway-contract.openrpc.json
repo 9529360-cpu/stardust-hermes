@@ -17973,6 +17973,11 @@
             },
             "title": "Pets",
             "type": "array"
+          },
+          "catalogComplete": {
+            "default": false,
+            "title": "Catalogcomplete",
+            "type": "boolean"
           }
         },
         "required": [
