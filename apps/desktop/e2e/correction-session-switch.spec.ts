@@ -10,7 +10,13 @@ import { type TestInfo } from '@playwright/test'
 import { expect, test, type Page } from './test'
 
 import { type MockBackendFixture, setupMockBackend, waitForAppReady } from './fixtures'
-import { CORRECTION_SWITCH_TRIGGER, MOCK_REPLY } from '../../../tests-js/scripts/mock-server'
+import {
+  CORRECTION_WAITING_REPLY,
+  CORRECTION_SWITCH_TRIGGER,
+  createBackgroundReleaseHandle,
+  MOCK_REPLY,
+  type BackgroundReleaseHandle,
+} from '../../../tests-js/scripts/mock-server'
 
 const OTHER_SESSION_PROMPT = 'E2E persisted session used for a warm resume.'
 const ORIGINAL_PROMPT = `${CORRECTION_SWITCH_TRIGGER}: original prompt must remain singular after a correction.`
@@ -172,17 +178,25 @@ function steerTurnOrder(messages: string[]): string[] {
 
 test.describe('correction session switch', () => {
   let fixture: MockBackendFixture | null = null
+  let bgRelease: BackgroundReleaseHandle | null = null
 
   test.beforeEach(async () => {
+    bgRelease = createBackgroundReleaseHandle()
     fixture = await setupMockBackend({
-      mockServer: { holdFirstStreamForPrompt: INFERENCE_SWITCH_TRIGGER },
+      mockServer: {
+        holdFirstStreamForPrompt: INFERENCE_SWITCH_TRIGGER,
+        backgroundReleasePath: bgRelease.path,
+      },
     })
     await waitForAppReady(fixture, 120_000)
   })
 
   test.afterEach(async () => {
+    bgRelease?.release()
     await fixture?.cleanup()
     fixture = null
+    bgRelease?.cleanup()
+    bgRelease = null
   })
 
   test('keeps a live correction in place and does not duplicate its original prompt after switching sessions', async ({}, testInfo: TestInfo) => {
@@ -202,6 +216,7 @@ test.describe('correction session switch', () => {
     // running. Use the visible Steer action to cover the real composer path.
     await steer(page, CORRECTION)
     await waitForTranscriptText(page, CORRECTION)
+    await waitForTranscriptText(page, CORRECTION_WAITING_REPLY)
 
     const orderBeforeSwitch = relevantOrder(await transcriptTextOrder(page))
     expect(orderBeforeSwitch).toEqual([ORIGINAL_PROMPT, CORRECTION])
@@ -231,6 +246,17 @@ test.describe('correction session switch', () => {
     expect(await textNodeOccurrences(page, ORIGINAL_PROMPT)).toBe(1)
     expect(await textNodeOccurrences(page, CORRECTION)).toBe(1)
 
+    // The terminal command was adopted into the background when the user
+    // steered. Hold it until the transcript reconciliation checks finish, then
+    // release it so the test observes one completion turn at a known boundary.
+    expect(fixture!.mock.receivedPrompts.some((prompt) => prompt.includes('[IMPORTANT: Background process'))).toBe(false)
+    bgRelease!.release()
+    await expect
+      .poll(
+        () => fixture!.mock.receivedPrompts.some((prompt) => prompt.includes('[IMPORTANT: Background process')),
+        { timeout: 30_000, message: 'the released process completion should reach the mock model' },
+      )
+      .toBe(true)
     await waitForTranscriptText(page, CORRECTED_REPLY)
     // The post-turn stored-history reconcile can momentarily repaint from a
     // snapshot in which the steer's user row hasn't been folded back in yet —
@@ -241,6 +267,7 @@ test.describe('correction session switch', () => {
         timeout: 30_000,
       })
       .toEqual([ORIGINAL_PROMPT, CORRECTION, CORRECTED_REPLY])
+    expect(await textNodeOccurrences(page, CORRECTED_REPLY)).toBe(1)
   })
 
   test('keeps an inference-time correction visible through a warm session switch', async ({}, testInfo: TestInfo) => {

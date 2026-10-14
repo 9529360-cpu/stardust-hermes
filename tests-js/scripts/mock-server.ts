@@ -45,11 +45,10 @@ holdFirstCompletionContaining?: string
 /** Absolute sandbox path written by the verify-on-stop scripted tool call. */
 verificationWritePath?: string
 /**
- * Sentinel path that ends the E2E_SIDEBAR_CROSS background process.
+ * Sentinel path that ends scripted background processes.
  *
- * Without it that process is a bare `sleep 5`, which races the agent turn and
- * the 4s auto-dismiss linger — see `createBackgroundReleaseHandle`. Pass a
- * handle's `path` to let the test decide when the process exits.
+ * Pass a handle's `path` from `createBackgroundReleaseHandle` to let the test
+ * decide when the process exits instead of racing a fixed sleep.
  */
 backgroundReleasePath?: string
 /** Scripts for the desktop auto-show E2E, keyed by the name in `E2E_AUTO_SHOW(<name>)`. */
@@ -289,16 +288,30 @@ const QUEUE_STOP_SCRIPT: ScriptedTurn[] = [
   { text: 'The paused task completed.' },
 ]
 
-// The reported correction arrived while a foreground tool was still running.
-// Keep that boundary open long enough for the renderer to redirect the turn,
-// then let the next model request complete normally.
-const CORRECTION_SWITCH_SCRIPT: ScriptedTurn[] = [
-  {
-    text: 'Checking the long-running task before I continue.',
-    toolCalls: [{ name: 'terminal', args: { command: 'sleep 5' } }],
-  },
-  { text: 'The corrected task finished.' },
-]
+// The user correction arrives while a foreground tool is still running. The
+// tool is yielded into the background; hold it until the session-resume checks
+// finish so the test owns when its completion notification creates a new turn.
+export const CORRECTION_WAITING_REPLY = 'The correction is recorded; I am waiting for the task to finish.'
+
+function correctionSwitchBgCommand(releasePath?: string): string {
+  if (!releasePath) {
+    return 'sleep 5'
+  }
+
+  const quoted = JSON.stringify(releasePath)
+  return `for _ in $(seq 1 600); do [ -e ${quoted} ] && break; sleep 0.1; done`
+}
+
+function correctionSwitchScript(releasePath?: string): ScriptedTurn[] {
+  return [
+    {
+      text: 'Checking the long-running task before I continue.',
+      toolCalls: [{ name: 'terminal', args: { command: correctionSwitchBgCommand(releasePath) } }],
+    },
+    { text: CORRECTION_WAITING_REPLY },
+    { text: 'The corrected task finished.' },
+  ]
+}
 
 export const CORRECTION_SWITCH_TRIGGER = 'E2E_CORRECTION_SWITCH_TRIGGER'
 
@@ -832,7 +845,8 @@ export function startMockServer(options: MockServerOptions = {}): Promise<MockSe
           }
 
           if (isCorrectionSwitchTrigger) {
-            const turn = CORRECTION_SWITCH_SCRIPT[_correctionSwitchIndex] ?? CORRECTION_SWITCH_SCRIPT[CORRECTION_SWITCH_SCRIPT.length - 1]
+            const script = correctionSwitchScript(options.backgroundReleasePath)
+            const turn = script[_correctionSwitchIndex] ?? script[script.length - 1]
             _correctionSwitchIndex++
 
             if (stream) {
@@ -1224,7 +1238,7 @@ export function restartMockServer(): void {
   resetScriptIndex()
 }
 
-/** Test-controlled lifetime for the E2E_SIDEBAR_CROSS background process. */
+/** Test-controlled lifetime for scripted E2E background processes. */
 export interface BackgroundReleaseHandle {
   /** Sentinel path — pass as `backgroundReleasePath` to `startMockServer`. */
   path: string
@@ -1235,19 +1249,12 @@ export interface BackgroundReleaseHandle {
 }
 
 /**
- * Create a sentinel that keeps the E2E_SIDEBAR_CROSS background process alive
- * until the test explicitly releases it.
+ * Create a sentinel that keeps a scripted background process alive until the
+ * test explicitly releases it.
  *
- * The cross-session sidebar tests need a background process that is still
- * RUNNING after the agent turn finishes — that is the state under test (a
- * session whose turn is done but whose background work is not). With a fixed
- * `sleep`, three independent clocks race: the sleep, the agent turn (two model
- * round trips plus a real subagent delegation), and the 4s success linger
- * before a finished task auto-dismisses. When a loaded CI runner makes the
- * turn slower than the sleep, the process is already gone and the assertion
- * samples an empty sidebar. Observed on CI 2026-07-26 across two unrelated
- * PRs: the "should appear" poll needed 7.5s to see the dot, by which point
- * `sleep 5` had exited.
+ * Cross-session E2E tests use a held process to keep one side of a state
+ * transition stable while they inspect the other. A fixed `sleep` lets runner
+ * load race the interaction and can produce a different event ordering.
  *
  * With a sentinel there is one clock and the test owns it:
  *
