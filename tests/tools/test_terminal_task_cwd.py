@@ -1,6 +1,7 @@
 """Regression tests for task/session cwd propagation in terminal_tool."""
 
 import json
+import threading
 from types import SimpleNamespace
 
 import tools.terminal_tool as terminal_tool
@@ -126,13 +127,17 @@ def test_background_command_prefers_recorded_session_cwd_over_init_time_cwd(monk
         cwd = "/workspace/live"
 
     class FakeRegistry:
+        _lock = threading.RLock()
+
         def __init__(self):
             self.calls = []
             self.pending_watchers = []
 
         def spawn_local(self, **kwargs):
             self.calls.append(kwargs)
-            return SimpleNamespace(id="proc_test", pid=1234)
+            return SimpleNamespace(
+                id="proc_test", pid=1234, exited=False, completion_reason="", workspace_mutation_root=""
+            )
 
     import tools.process_registry as process_registry_mod
 
@@ -171,6 +176,7 @@ def test_background_command_prefers_recorded_session_cwd_over_init_time_cwd(monk
         "task_id": task_id,
         "owner_task_id": task_id,
         "session_key": task_id,
+        "verification_session_id": task_id,
         "env_vars": {},
         "use_pty": False,
         "notify_on_complete": False,
@@ -187,11 +193,14 @@ def test_host_local_background_command_bypasses_configured_backend(tmp_path, mon
         cwd = str(tmp_path)
 
     class FakeRegistry:
+        _lock = threading.RLock()
         pending_watchers = []
 
         def spawn_local(self, **kwargs):
             calls.append(("local", kwargs))
-            return SimpleNamespace(id="proc_host", pid=1234)
+            return SimpleNamespace(
+                id="proc_host", pid=1234, exited=False, completion_reason="", workspace_mutation_root=""
+            )
 
         def spawn_via_env(self, **kwargs):
             calls.append(("configured", kwargs))
