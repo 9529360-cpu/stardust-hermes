@@ -92,17 +92,31 @@ it('lets users manually select every GPT官方 account model', async () => {
   const onSelect = vi.fn()
   vi.mocked(requestModelOptions).mockResolvedValue({
     ...OPTIONS,
-    providers: [{ slug: 'gpt-official', name: 'GPT官方',
-      models: ['gpt-6-luna', 'gpt-6.1-sol', 'gpt-6-astra', 'gpt-6-sol', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'],
-      model_names: { 'gpt-6-luna': 'GPT-6-Luna' },
-      warning: 'models_cache.json · 2026-10-12T06:21:55Z · 账户绑定未验证', authenticated: true }]
+    providers: [
+      {
+        slug: 'gpt-official',
+        name: 'GPT官方',
+        models: [
+          'gpt-6-luna',
+          'gpt-6.1-sol',
+          'gpt-6-astra',
+          'gpt-6-sol',
+          'gpt-5.6-sol',
+          'gpt-5.6-terra',
+          'gpt-5.6-luna'
+        ],
+        model_names: { 'gpt-6-luna': 'GPT-6-Luna' },
+        warning: 'models_cache.json · 2026-10-12T06:21:55Z · 账户绑定未验证',
+        authenticated: true
+      }
+    ]
   })
   renderPicker({ onSelect })
   expect(await screen.findByText('GPT官方')).toBeTruthy()
   expect(screen.getByText('GPT-6-Luna')).toBeTruthy()
   expect(screen.getAllByRole('option')).toHaveLength(7)
   expect(screen.getByText(/models_cache.json/)).toBeTruthy()
-  expect(screen.getByText('gpt-5.6-sol')).toBeTruthy()
+  expect(screen.getByText('GPT-5.6-sol')).toBeTruthy()
   fireEvent.click(screen.getByRole('option', { name: /GPT-6-Luna/ }))
   expect(onSelect).toHaveBeenCalledWith({ provider: 'gpt-official', model: 'gpt-6-luna' })
 })
@@ -110,8 +124,15 @@ it('lets users manually select every GPT官方 account model', async () => {
 it('shows GPT官方 login errors even without selectable models', async () => {
   vi.mocked(requestModelOptions).mockResolvedValue({
     ...OPTIONS,
-    providers: [{ slug: 'gpt-official', name: 'GPT官方', models: [], authenticated: false,
-      warning: '请在原 ChatGPT/Codex 客户端重新登录' }]
+    providers: [
+      {
+        slug: 'gpt-official',
+        name: 'GPT官方',
+        models: [],
+        authenticated: false,
+        warning: '请在原 ChatGPT/Codex 客户端重新登录'
+      }
+    ]
   })
   renderPicker()
   expect(await screen.findByText('GPT官方')).toBeTruthy()
@@ -122,6 +143,7 @@ it('refreshes the catalog from the full picker and explains model scope', async 
   renderPicker()
 
   expect(await screen.findByText('Nous')).toBeTruthy()
+  expect(screen.getByText(/current: Qwen3\.6 27B · Q4 · llamacpp/)).toBeTruthy()
   expect(screen.getByText(/Settings → Model services sets the default for new chats/)).toBeTruthy()
 
   const refreshedOptions: ModelOptionsResult = {
@@ -132,7 +154,7 @@ it('refreshes the catalog from the full picker and explains model scope', async 
   vi.mocked(requestModelOptions).mockResolvedValueOnce(refreshedOptions)
   fireEvent.click(screen.getByRole('button', { name: 'Refresh models' }))
 
-  expect(await screen.findByText('fresh-model')).toBeTruthy()
+  expect(await screen.findByText('Fresh Model')).toBeTruthy()
   expect(requestModelOptions).toHaveBeenLastCalledWith(expect.objectContaining({ refresh: true }))
 })
 
@@ -146,7 +168,7 @@ describe('ModelPickerDialog download rows', () => {
     $localRuntimeJobs.set([DOWNLOAD_JOB])
     renderPicker()
 
-    expect(await screen.findByText('Qwen3.6-27B-UD-Q4_K_XL')).toBeTruthy()
+    expect(await screen.findByText('Qwen3.6 27B · Q4')).toBeTruthy()
 
     const row = screen.getByText('Qwen3.8 Flash Next (UD-Q4_K_XL)')
 
@@ -166,7 +188,7 @@ describe('ModelPickerDialog download rows', () => {
     })
     renderPicker()
 
-    expect(await screen.findByText('Hermes-4.5')).toBeTruthy()
+    expect(await screen.findByText('Hermes 4.5')).toBeTruthy()
     expect(screen.getByText('Qwen3.8 Flash Next (UD-Q4_K_XL)')).toBeTruthy()
     expect(screen.getByText('41%')).toBeTruthy()
   })
@@ -189,7 +211,7 @@ describe('ModelPickerDialog download rows', () => {
   it('refetches the model options when a download it saw running completes', async () => {
     $localRuntimeJobs.set([DOWNLOAD_JOB])
     renderPicker()
-    await screen.findByText('Qwen3.6-27B-UD-Q4_K_XL')
+    await screen.findByText('Qwen3.6 27B · Q4')
 
     expect(vi.mocked(requestModelOptions).mock.calls.length).toBe(1)
 
@@ -212,7 +234,7 @@ describe('ModelPickerDialog search ranking', () => {
       providers: [{ slug: 'nous', name: 'Nous', models: MODELS, authenticated: true }]
     })
     renderPicker({ currentModel: 'gpt-4o', currentProvider: 'nous' })
-    await screen.findByText('gpt-4o')
+    await screen.findByText('GPT-4o')
 
     const query = 'g4o'
     fireEvent.change(screen.getByRole('combobox'), { target: { value: query } })
@@ -221,7 +243,7 @@ describe('ModelPickerDialog search ranking', () => {
 
     expect(expected).not.toEqual(MODELS.filter(m => expected.includes(m)))
     await waitFor(() => {
-      const rows = screen.getAllByRole('option').map(el => el.textContent?.trim())
+      const rows = screen.getAllByRole('option').map(el => el.getAttribute('data-value')?.slice('nous:'.length))
 
       expect(rows).toEqual(expected)
     })
@@ -241,12 +263,12 @@ describe('ModelPickerDialog search ranking', () => {
       providers: [{ slug: 'nous', name: 'Nous', models: catalog, authenticated: true }]
     })
     renderPicker({ currentModel: 'gpt-4o', currentProvider: 'nous' })
-    await screen.findByText('gpt-4o')
+    await screen.findByText('GPT-4o')
 
     fireEvent.change(screen.getByRole('combobox'), { target: { value: query } })
 
     await waitFor(() => {
-      const rows = screen.getAllByRole('option').map(el => el.textContent?.trim())
+      const rows = screen.getAllByRole('option').map(el => el.getAttribute('data-value')?.slice('nous:'.length))
 
       expect(rows).toContain(expected)
     })

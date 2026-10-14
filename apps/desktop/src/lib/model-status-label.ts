@@ -1,3 +1,5 @@
+import type { ModelOptionProvider } from '@stardust/shared'
+
 /** Which model/provider pair a picker should mark "current". SessionView state
  *  also drives the composer label, so a complete pair there wins over an older
  *  `model.options` response. During initial hydration (or pre-session startup),
@@ -105,6 +107,37 @@ export function modelDisplayParts(model: string): { name: string; tag: string } 
 /** Friendly one-line model name for menus and the status bar. */
 export function displayModelName(model: string): string {
   return modelDisplayParts(model).name
+}
+
+/** One read-only label for the same model across settings and picker surfaces.
+ * The id remains the value sent to the gateway; catalog names are presentation
+ * metadata only. Keep ID variants visible when their catalog name omits them. */
+export function modelCatalogLabel(provider: ModelOptionProvider | undefined, model: string): string {
+  let label = ''
+
+  for (const names of [provider?.model_names, provider?.display_names]) {
+    if (!names || typeof names !== 'object' || Array.isArray(names)) {
+      continue
+    }
+
+    const candidate = (names as Record<string, unknown>)[model]
+
+    if (typeof candidate === 'string' && candidate.trim()) {
+      label = candidate.trim()
+
+      break
+    }
+  }
+
+  const parts = modelDisplayParts(model)
+  const baseLabel = label || parts.name
+  const labelWords = baseLabel.toLocaleLowerCase().match(/[a-z0-9]+/g) ?? []
+
+  if (!parts.tag || labelWords.includes(parts.tag.toLocaleLowerCase())) {
+    return baseLabel
+  }
+
+  return `${baseLabel} · ${parts.tag}`
 }
 
 /** Composer model-pill label — model name plus Fast when it applies. The

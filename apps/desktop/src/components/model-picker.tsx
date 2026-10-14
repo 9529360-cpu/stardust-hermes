@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { getLocalModelsStatus } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { catalogProviderMatches, modelOptionsQueryKey, requestModelOptions } from '@/lib/model-options'
-import { currentPickerSelection } from '@/lib/model-status-label'
+import { currentPickerSelection, modelCatalogLabel } from '@/lib/model-status-label'
 import { foldIncludes, normalize } from '@/lib/text'
 import { useStoreSelector } from '@/lib/use-session-slice'
 import { $localModelsEnabled } from '@/store/local-models-flag'
@@ -157,6 +157,11 @@ export function ModelPickerDialog({
     modelOptions.data
   )
 
+  const selectedModel = optionsModel || currentModel
+  const selectedProvider = optionsProvider || currentProvider
+  const selectedProviderOption = providers.find(provider => catalogProviderMatches(provider, selectedProvider))
+  const selectedModelLabel = selectedModel ? modelCatalogLabel(selectedProviderOption, selectedModel) : copy.unknown
+
   const loading = modelOptions.isPending && !modelOptions.data
 
   const error = modelOptions.error
@@ -205,8 +210,8 @@ export function ModelPickerDialog({
         <DialogHeader className="border-b border-border px-4 py-3">
           <DialogTitle>{copy.title}</DialogTitle>
           <DialogDescription className="font-mono text-xs leading-relaxed">
-            {copy.current} {optionsModel || currentModel || copy.unknown}
-            {optionsProvider || currentProvider ? ` · ${optionsProvider || currentProvider}` : ''}
+            {copy.current} {selectedModelLabel}
+            {selectedProvider ? ` · ${selectedProvider}` : ''}
           </DialogDescription>
           <p className="text-xs leading-relaxed text-muted-foreground">{copy.scopeHint}</p>
         </DialogHeader>
@@ -216,8 +221,8 @@ export function ModelPickerDialog({
           <CommandList className="max-h-96">
             {!loading && !error && <CommandEmpty>{copy.noModels}</CommandEmpty>}
             <ModelResults
-              currentModel={optionsModel || currentModel}
-              currentProvider={optionsProvider || currentProvider}
+              currentModel={selectedModel}
+              currentProvider={selectedProvider}
               downloads={downloads}
               error={error}
               loading={loading}
@@ -298,7 +303,9 @@ function ModelResults({
       return [...models]
     }
 
-    return fuzzyRank(models, q, model => `${modelSearchText(model)} ${catalogModelName(provider, model)}`).map(r => r.item)
+    return fuzzyRank(models, q, model => `${modelSearchText(model)} ${modelCatalogLabel(provider, model)}`).map(
+      r => r.item
+    )
   }
 
   // Only configured providers (those with curated models) are selectable
@@ -309,7 +316,9 @@ function ModelResults({
   const localModelsShown = $localModelsEnabled.get()
 
   const configured = providers.filter(
-    p => ((p.models ?? []).length > 0 || (p.slug === 'gpt-official' && !!p.warning)) && (localModelsShown || p.slug !== LOCAL_PROVIDER_SLUG)
+    p =>
+      ((p.models ?? []).length > 0 || (p.slug === 'gpt-official' && !!p.warning)) &&
+      (localModelsShown || p.slug !== LOCAL_PROVIDER_SLUG)
   )
 
   // In-flight local downloads render as disabled progress rows: inside the
@@ -367,7 +376,7 @@ function ModelResults({
                   value={`${provider.slug}:${model}`}
                 >
                   <span className="min-w-0 flex-1 truncate">
-                    <HighlightMatches foldSeparators query={search} text={catalogModelName(provider, model)} />
+                    <HighlightMatches foldSeparators query={search} text={modelCatalogLabel(provider, model)} />
                   </span>
                   {loadProgress && (
                     <span className="flex shrink-0 items-center gap-1.5" title={copy.loadingIntoMemory}>
@@ -523,20 +532,6 @@ function LoadingResults() {
       ))}
     </CommandGroup>
   )
-}
-
-function catalogModelName(provider: ModelOptionProvider, model: string): string {
-  const names = provider.model_names
-
-  if (names && typeof names === 'object' && !Array.isArray(names)) {
-    const name = (names as Record<string, unknown>)[model]
-
-    if (typeof name === 'string' && name) {
-      return name
-    }
-  }
-
-  return model
 }
 
 function ProviderHeading({ provider }: { provider: ModelOptionProvider }) {
