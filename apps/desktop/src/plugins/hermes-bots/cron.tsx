@@ -898,13 +898,13 @@ function SchedulePicker({ state, setState }: SchedulePickerProps) {
           <span className="text-xs text-(--ui-text-tertiary)">Stop after</span>
           <Input
             className="w-16"
-            size="compact"
             onChange={event =>
               upd({
                 repeatN: event.target.value.replace(/[^0-9]/g, '').slice(0, 4)
               })
             }
             placeholder="∞"
+            size="compact"
             value={state.repeatN}
           />
           <span className="text-xs text-(--ui-text-tertiary)">runs (blank = forever)</span>
