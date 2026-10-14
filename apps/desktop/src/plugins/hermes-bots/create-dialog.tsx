@@ -906,9 +906,9 @@ export function CreateAgentDialog({ open, onClose, roster }: CreateAgentDialogPr
                 ) : (
                   <div className="grid gap-1.5">
                     <Input
-                      className="h-7 text-xs"
                       onChange={event => setCapFilter(event.target.value)}
                       placeholder={b.tools.filterSkills}
+                      size="compact"
                       value={capFilter}
                     />
                     <div
@@ -1380,7 +1380,9 @@ export function CreateGroupChatDialog({ open, roster, onClose, onCreated }: Crea
             {t.common.cancel}
           </Button>
           {canCreate ? (
-            <Button onClick={create}>{selected.length ? b.group.createGroupWithCount(selected.length) : b.group.createGroup}</Button>
+            <Button onClick={create}>
+              {selected.length ? b.group.createGroupWithCount(selected.length) : b.group.createGroup}
+            </Button>
           ) : (
             <Tip label={b.group.pickAtLeastTwo}>
               <span className="inline-flex">
