@@ -509,7 +509,7 @@ export function WebhooksView({ onClose }: WebhooksViewProps) {
               <div className="grid items-start gap-4 sm:grid-cols-2">
                 <Field htmlFor="webhook-deliver" label={w.fieldDeliver}>
                   <Select onValueChange={setDeliver} value={deliver}>
-                    <SelectTrigger className="h-9 rounded-md" id="webhook-deliver">
+                    <SelectTrigger id="webhook-deliver" size="md">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

@@ -218,7 +218,9 @@ blurred backdrop.
 ## Form controls
 
 - **`controlVariants`** (`src/components/ui/control.ts`) is the shared shape for
-  `Input` / `Textarea` / `SelectTrigger`. New text-entry controls compose it.
+  `Input` / `Textarea` / `SelectTrigger`. `compact` is the 28px dense field and
+  `md` is the 36px form field with a 6px radius; call sites use `size`, not
+  height or radius overrides. New text-entry controls compose it.
 - **`SearchField`** — borderless, underline-on-focus, auto-width. The only
   search input. Don't build boxed search bars; don't wrap it in a bordered tile.
   Empty lists hide their search field.
