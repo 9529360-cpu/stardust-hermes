@@ -46,7 +46,7 @@ async function reopenWorkingSession(page: Page): Promise<void> {
 interface ClearanceMetrics {
   composerHeight: number
   distanceFromBottom: number
-  latestMessageBottom: number
+  latestAssistantBottom: number
   statusPanelTop: number
   viewportHeight: number
 }
@@ -62,7 +62,7 @@ async function clearanceMetrics(page: Page): Promise<ClearanceMetrics> {
     return {
       composerHeight: Number.parseFloat(styles.getPropertyValue('--composer-measured-height')),
       distanceFromBottom: viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop,
-      latestMessageBottom: latest.getBoundingClientRect().bottom,
+      latestAssistantBottom: latest.getBoundingClientRect().bottom,
       statusPanelTop: status.getBoundingClientRect().top,
       viewportHeight: viewport.clientHeight,
     }
@@ -103,15 +103,17 @@ test.describe('working-session task-panel clearance', () => {
     const taskPanel = activeSurface(page)
       .locator('[data-slot="composer-status-stack"]')
       .getByRole('button', { name: /Tasks 1\/5|任务 1\/5/ })
-    const latestMessage = activeSurface(page).getByText('Task-panel clearance line 24')
+    const latestAssistant = activeSurface(page).locator('[data-role="assistant"]').last()
+    const activeCommand = latestAssistant.getByText(/sleep 60/)
 
     await expect(taskPanel).toHaveAttribute('aria-expanded', 'true')
 
     // Exercise the real status-section layout transition. The previous test
     // inserted a spacer into the scroll viewport and expected stale geometry;
     // the production stick-to-bottom behavior immediately corrected it. The
-    // restored latest line may start outside the viewport; window focus is the
-    // recovery edge this scenario is checking.
+    // long streamed paragraph is retained in history and may be skipped by
+    // content-visibility, so verify the live terminal status in the newest
+    // assistant message after the focus recovery edge instead.
     await taskPanel.click()
     await expect(taskPanel).toHaveAttribute('aria-expanded', 'false')
     await taskPanel.click()
@@ -124,7 +126,7 @@ test.describe('working-session task-panel clearance', () => {
 
     expect(metrics.composerHeight, JSON.stringify(metrics)).toBeGreaterThanOrEqual(190)
     expect(metrics.distanceFromBottom, JSON.stringify(metrics)).toBeLessThanOrEqual(1)
-    expect(metrics.latestMessageBottom, JSON.stringify(metrics)).toBeLessThanOrEqual(metrics.statusPanelTop)
-    await expect(latestMessage).toBeVisible()
+    expect(metrics.latestAssistantBottom, JSON.stringify(metrics)).toBeLessThanOrEqual(metrics.statusPanelTop)
+    await expect(activeCommand).toBeVisible()
   })
 })
