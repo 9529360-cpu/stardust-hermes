@@ -988,6 +988,12 @@ export const en: Translations = {
     customEndpoints: {
       title: 'Custom service',
       addTitle: 'Add model service',
+      magpieSetup: 'Connect Magpie',
+      magpieName: 'Magpie',
+      magpieHelp:
+        'Magpie must be reachable from the Stardust backend. Test the connection to load its model list; Magpie manages its own updates.',
+      defaultScopeHint:
+        'The default applies to new chats. An open conversation keeps using the model shown in that chat.',
       editTitle: 'Edit model service',
       active: 'Default',
       use: 'Set as default',
@@ -3861,6 +3867,8 @@ export const en: Translations = {
   modelPicker: {
     title: 'Switch model',
     current: 'current:',
+    scopeHint:
+      'This is the model for the current conversation or draft. Settings → Model services sets the default for new chats; it does not switch an open conversation.',
     unknown: '(unknown)',
     search: 'Filter providers and models...',
     noModels: 'No models found.',
