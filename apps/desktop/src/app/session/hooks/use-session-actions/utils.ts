@@ -752,7 +752,7 @@ export function preserveLocalPendingTurnMessages(
 const safelyPersistedInflightUser = Symbol('safelyPersistedInflightUser')
 const safelyPersistedInflightProjection = Symbol('safelyPersistedInflightProjection')
 
-type LiveSessionProjection = Pick<SessionResumeResult, 'inflight' | 'queued' | 'session_id'> & {
+type LiveSessionProjection = Pick<SessionResumeResult, 'inflight' | 'queued' | 'session_id' | 'turn_started_at'> & {
   [safelyPersistedInflightUser]?: true
   [safelyPersistedInflightProjection]?: true
 }
@@ -837,7 +837,9 @@ export function appendLiveSessionProjection(messages: ChatMessage[], projection:
 
   const persistedInLatestRun = (text: string): boolean =>
     latestUserRun.some(
-      message => textWithoutReferenceLines(chatMessageText(message)) === textWithoutReferenceLines(text)
+      message =>
+        persistedMessageBelongsToInflightTurn(message, projection.turn_started_at) &&
+        textWithoutReferenceLines(chatMessageText(message)) === textWithoutReferenceLines(text)
     )
 
   const inflightUserAlreadyPersisted =
@@ -981,8 +983,21 @@ function normalizedMessageText(message: ChatMessage): string {
   return chatMessageText(message).replace(/\s+/g, ' ').trim()
 }
 
+function persistedMessageBelongsToInflightTurn(
+  message: ChatMessage,
+  turnStartedAt: number | null | undefined
+): boolean {
+  if (typeof turnStartedAt !== 'number' || !Number.isFinite(turnStartedAt)) {
+    return true
+  }
+
+  return (
+    typeof message.timestamp === 'number' && Number.isFinite(message.timestamp) && message.timestamp >= turnStartedAt
+  )
+}
+
 function transcriptAnchorMatches(a: ChatMessage, b: ChatMessage): boolean {
-  if (a.role !== b.role) {
+  if (a.role !== b.role || a.displayKind !== b.displayKind) {
     return false
   }
 
@@ -996,9 +1011,17 @@ function transcriptAnchorMatches(a: ChatMessage, b: ChatMessage): boolean {
   return Boolean(aText) && aText === bText
 }
 
-/** Hydration retains the gateway marker kind on the projected system row. */
-function isHydratedModelSwitchMarker(message: ChatMessage): boolean {
-  return message.role === 'system' && message.displayKind === 'model_switch'
+const HYDRATED_GATEWAY_SYSTEM_MARKERS = new Set([
+  'async_delegation_complete',
+  'auto_continue',
+  'model_switch',
+  'personality_switch',
+  'process_complete'
+])
+
+/** Hydration retains gateway display markers so reconciliation can skip only typed timeline rows. */
+function isHydratedGatewaySystemMarker(message: ChatMessage): boolean {
+  return message.role === 'system' && HYDRATED_GATEWAY_SYSTEM_MARKERS.has(message.displayKind ?? '')
 }
 
 /**
@@ -1071,7 +1094,10 @@ export function dedupeInflightUserAgainstTranscript(
     .filter(Boolean)
 
   const latestPersistedPromptIndex = persistedTail.findLastIndex(
-    message => message.role === 'user' && normalizedMessageText(message) === inflightUser
+    message =>
+      message.role === 'user' &&
+      persistedMessageBelongsToInflightTurn(message, projection.turn_started_at) &&
+      normalizedMessageText(message) === inflightUser
   )
 
   if (
@@ -1087,12 +1113,13 @@ export function dedupeInflightUserAgainstTranscript(
     for (let index = latestPersistedPromptIndex + 1; index < persistedTail.length; index += 1) {
       const message = persistedTail[index]
 
-      if (isHydratedModelSwitchMarker(message)) {
+      if (isHydratedGatewaySystemMarker(message)) {
         continue
       }
 
       if (message.role === 'user') {
         if (
+          !persistedMessageBelongsToInflightTurn(message, projection.turn_started_at) ||
           correctionIndex >= normalizedCorrections.length ||
           normalizedMessageText(message) !== normalizedCorrections[correctionIndex]
         ) {
@@ -1133,9 +1160,12 @@ export function dedupeInflightUserAgainstTranscript(
   let cursor = persistedTail.length - 1
 
   for (let index = corrections.length - 1; index >= 0; index -= 1) {
+    const correctionMessage = persistedTail[cursor]
+
     if (
-      persistedTail[cursor]?.role !== 'user' ||
-      normalizedMessageText(persistedTail[cursor]) !== corrections[index].replace(/\s+/g, ' ').trim()
+      correctionMessage?.role !== 'user' ||
+      !persistedMessageBelongsToInflightTurn(correctionMessage, projection.turn_started_at) ||
+      normalizedMessageText(correctionMessage) !== corrections[index].replace(/\s+/g, ' ').trim()
     ) {
       return projection
     }
@@ -1150,7 +1180,9 @@ export function dedupeInflightUserAgainstTranscript(
   }
 
   const persistedUserPresent =
-    lastPersistedMessage?.role === 'user' && normalizedMessageText(lastPersistedMessage) === inflightUser
+    lastPersistedMessage?.role === 'user' &&
+    persistedMessageBelongsToInflightTurn(lastPersistedMessage, projection.turn_started_at) &&
+    normalizedMessageText(lastPersistedMessage) === inflightUser
 
   if (!persistedUserPresent) {
     return projection

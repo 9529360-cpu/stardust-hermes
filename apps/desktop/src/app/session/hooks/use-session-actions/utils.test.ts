@@ -1612,21 +1612,48 @@ describe('dedupeInflightUserAgainstTranscript', () => {
     expect(restored.filter(m => m.role === 'user' && chatMessageText(m) === 'current prompt')).toHaveLength(1)
   })
 
-  it('does not re-project a persisted correction turn followed by a model-switch marker', () => {
+  it('does not re-project a persisted corrected turn followed by gateway timeline markers', () => {
     const runtime = [
       msg('old-u', 'user', 'older prompt', { timestamp: 1 }),
       msg('old-a', 'assistant', 'older reply', { timestamp: 2 })
     ]
 
-    const modelSwitchMarker = toChatMessages([
+    const gatewayMarkers = toChatMessages([
       {
         role: 'user',
         content: '[System: The active model for this chat has changed to k3.]',
         display_kind: 'model_switch',
         timestamp: 7
+      },
+      {
+        role: 'user',
+        content: '[System: The assistant personality changed.]',
+        display_kind: 'personality_switch',
+        timestamp: 8
+      },
+      {
+        role: 'user',
+        content: '[System: Background agent work finished.]',
+        display_kind: 'async_delegation_complete',
+        timestamp: 9
+      },
+      {
+        role: 'user',
+        content: '[System: Background process finished.]',
+        display_kind: 'process_complete',
+        timestamp: 10
+      },
+      {
+        role: 'user',
+        content: '[System: The interrupted turn resumed.]',
+        display_kind: 'auto_continue',
+        timestamp: 11
       }
-    ])[0]
+    ])
 
+    const modelSwitchMarker = gatewayMarkers[0]
+
+    expect(gatewayMarkers.map(message => message.role)).toEqual(Array.from({ length: 5 }, () => 'system'))
     expect(modelSwitchMarker).toMatchObject({ role: 'system', displayKind: 'model_switch' })
     expect(chatMessageText(modelSwitchMarker)).toBe('model changed')
     expect(chatMessagesEquivalent(modelSwitchMarker, { ...modelSwitchMarker, displayKind: undefined })).toBe(false)
@@ -1644,7 +1671,7 @@ describe('dedupeInflightUserAgainstTranscript', () => {
           { type: 'text', text: 'Moving.' }
         ]
       },
-      modelSwitchMarker
+      ...gatewayMarkers
     ]
 
     const projection = {
@@ -1669,9 +1696,11 @@ describe('dedupeInflightUserAgainstTranscript', () => {
       'assistant',
       'user',
       'assistant',
-      'system'
+      ...gatewayMarkers.map(() => 'system')
     ])
-    expect(restored.at(-1)?.parts.some(part => part.type === 'tool-call')).toBe(true)
+    expect(
+      restored.some(message => message.role === 'assistant' && message.parts.some(part => part.type === 'tool-call'))
+    ).toBe(true)
     expect(restored.filter(message => message.role === 'user').map(chatMessageText)).toEqual([
       'older prompt',
       'current prompt',
@@ -1717,6 +1746,83 @@ describe('dedupeInflightUserAgainstTranscript', () => {
       restored.filter(message => message.role === 'user' && chatMessageText(message) === 'current prompt')
     ).toHaveLength(2)
     expect(restored.at(-1)).toMatchObject({ id: 'assistant-stream-runtime-1', pending: true })
+  })
+
+  it('keeps a new corrected repeat when a compressed runtime anchor leaves an older matching turn in the REST suffix', () => {
+    const runtime = [
+      msg('anchor-u', 'user', 'compressed runtime anchor', { timestamp: 1 }),
+      msg('anchor-a', 'assistant', 'anchor reply', { timestamp: 2 })
+    ]
+
+    const persisted = [
+      ...runtime,
+      msg('prior-u', 'user', 'repeat prompt', { timestamp: 10 }),
+      msg('prior-a-before-correction', 'assistant', 'Earlier task started.', { timestamp: 11 }),
+      msg('prior-correction', 'user', 'repeat correction', { timestamp: 12 }),
+      msg('prior-a-after-correction', 'assistant', 'The answer was completed earlier.', { timestamp: 13 })
+    ]
+
+    const projection = {
+      ...runningProjection('repeat prompt'),
+      turn_started_at: 20,
+      inflight: {
+        user: 'repeat prompt',
+        assistant: 'The answer',
+        streaming: true,
+        corrections: ['repeat correction'],
+        correction_offsets: [0]
+      }
+    }
+
+    const deduped = dedupeInflightUserAgainstTranscript(persisted, runtime, projection)
+    const restored = appendLiveSessionProjection(persisted, deduped)
+
+    expect(deduped).toBe(projection)
+    expect(
+      restored.filter(message => message.role === 'user' && chatMessageText(message) === 'repeat prompt')
+    ).toHaveLength(2)
+    expect(
+      restored.filter(message => message.role === 'user' && chatMessageText(message) === 'repeat correction')
+    ).toHaveLength(2)
+    expect(restored.at(-1)?.id).toBe('assistant-stream-runtime-1')
+  })
+
+  it('does not anchor a live marker to an unrelated same-text system row without its displayKind', () => {
+    const modelSwitchMarker = toChatMessages([
+      {
+        role: 'user',
+        content: '[System: The active model for this chat has changed to k3.]',
+        display_kind: 'model_switch',
+        timestamp: 3
+      }
+    ])[0]
+
+    const ordinarySystemRow = { ...modelSwitchMarker, displayKind: undefined }
+    const runtime = [msg('anchor-u', 'user', 'compressed runtime anchor', { timestamp: 1 }), modelSwitchMarker]
+
+    const persisted = [
+      runtime[0],
+      ordinarySystemRow,
+      msg('prior-u', 'user', 'repeat prompt', { timestamp: 4 }),
+      msg('prior-a-before-correction', 'assistant', 'Earlier task started.', { timestamp: 5 }),
+      msg('prior-correction', 'user', 'repeat correction', { timestamp: 6 }),
+      msg('prior-a-after-correction', 'assistant', 'The answer was completed earlier.', { timestamp: 7 })
+    ]
+
+    const projection = {
+      ...runningProjection('repeat prompt'),
+      inflight: {
+        user: 'repeat prompt',
+        assistant: 'The answer',
+        streaming: true,
+        corrections: ['repeat correction'],
+        correction_offsets: [0]
+      }
+    }
+
+    const deduped = dedupeInflightUserAgainstTranscript(persisted, runtime, projection)
+
+    expect(deduped).toBe(projection)
   })
 
   it('does not treat a same-text system row without displayKind as a model-switch marker', () => {
