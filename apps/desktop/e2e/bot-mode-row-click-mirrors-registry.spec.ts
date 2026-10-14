@@ -43,20 +43,24 @@ async function settle(page: Page, timeout = 90_000): Promise<void> {
   await page.waitForTimeout(500)
 }
 
-async function openUntil(action: () => Promise<void>, expected: () => Promise<void>, attempts = 3): Promise<void> {
-  for (let attempt = 1; ; attempt += 1) {
-    await action()
+const roster = (page: Page) => page.locator('[data-slot="bots-roster"]')
+const botRow = (page: Page, name: string) => roster(page).locator(`[data-roster-key="local::${name}"]`)
 
-    try {
-      await expected()
+async function selectedMainChat(page: Page) {
+  const tab = page.locator('[data-zone-tabstrip="grp-main"] [data-tree-tab][aria-selected="true"]')
 
-      return
-    } catch (error) {
-      if (attempt >= attempts) {
-        throw error
-      }
-    }
+  await expect(tab).toHaveCount(1, { timeout: 15_000 })
+  const anchor = await tab.getAttribute('data-tree-tab')
+
+  if (!anchor || !/^(workspace|session-tile:.+)$/.test(anchor)) {
+    throw new Error(`Expected a selected main chat tab, got ${anchor ?? 'no pane id'}`)
   }
+
+  const surface = page.locator(`[data-session-anchor="${anchor}"]`)
+
+  await expect(surface).toBeVisible({ timeout: 15_000 })
+
+  return { anchor, surface, tab }
 }
 
 async function seedBot(hermesHome: string, mockUrl: string, name: string): Promise<void> {
@@ -110,45 +114,80 @@ test('a bot row click lands on the Bot Chat the row previews, not a side thread'
 
   await openBots(page)
 
-  const alphaRow = page.getByRole('button', { name: /^alpha\b/i }).filter({ visible: true }).first()
-  const betaRow = page.getByRole('button', { name: /^beta\b/i }).filter({ visible: true }).first()
+  const botsRoster = roster(page)
+  const alphaRow = botRow(page, 'alpha')
+  const betaRow = botRow(page, 'beta')
   await expect(alphaRow).toBeVisible({ timeout: 30_000 })
   await expect(betaRow).toBeVisible({ timeout: 30_000 })
-  const seededTurn = page.getByText('Hello alpha', { exact: true }).filter({ visible: true })
 
-  await openUntil(
-    () => alphaRow.click(),
-    () => expect(seededTurn.first()).toBeVisible({ timeout: 45_000 })
-  )
+  await alphaRow.click()
+  await expect(botsRoster).toBeHidden({ timeout: 30_000 })
+  const alphaChat = await selectedMainChat(page)
+  await expect(alphaChat.surface.getByText('Hello alpha', { exact: true })).toBeVisible({ timeout: 45_000 })
+  const alphaComposer = alphaChat.surface
+    .locator('[data-slot="composer-root"] [contenteditable="true"]')
+    .filter({ visible: true })
+    .first()
+  await expect(alphaComposer).toBeVisible({ timeout: 15_000 })
   await settle(page, 15_000)
 
   // A `+` side thread for alpha, with a real turn so it is a persisted tile.
   await page.keyboard.press('Control+t')
-  const composer = page.locator('[data-slot="composer-root"] [contenteditable="true"]').filter({ visible: true }).first()
-  await expect(composer).toBeVisible({ timeout: 15_000 })
-  await composer.click()
-  await composer.fill('hello alpha thread')
+  const mainTabStrip = page.locator('[data-zone-tabstrip="grp-main"]')
+  const draftChat = await selectedMainChat(page)
+  expect(draftChat.anchor).toMatch(/^session-tile:/)
+  const draftComposer = draftChat.surface
+    .locator('[data-slot="composer-root"] [contenteditable="true"]')
+    .filter({ visible: true })
+    .first()
+  await expect(draftComposer).toBeVisible({ timeout: 15_000 })
+  await draftComposer.click()
+  await draftComposer.fill('hello alpha thread')
   await page.keyboard.press('Enter')
-  await expect(page.getByText(MOCK_REPLY).filter({ visible: true }).first()).toBeVisible({ timeout: 60_000 })
+  const sideTab = mainTabStrip.getByRole('tab', { name: 'hello alpha thread' }).first()
+  await expect(sideTab).toBeVisible({ timeout: 60_000 })
+  const sideTabId = await sideTab.getAttribute('data-tree-tab')
+  expect(sideTabId).toMatch(/^session-tile:/)
+  await sideTab.click()
+  const sideChat = await selectedMainChat(page)
+  expect(sideChat.anchor).toBe(sideTabId)
+  await expect(sideChat.surface.getByText(MOCK_REPLY).first()).toBeVisible({ timeout: 60_000 })
 
   // Leave alpha on the side thread, go to beta, come back via the row.
+  await openBots(page)
+  await expect(betaRow).toBeVisible({ timeout: 30_000 })
   await betaRow.click()
-  await expect(page.getByText('Hello beta', { exact: true }).filter({ visible: true }).first()).toBeVisible({
-    timeout: 60_000
-  })
+  await expect(botsRoster).toBeHidden({ timeout: 30_000 })
+  const betaChat = await selectedMainChat(page)
+  await expect(betaChat.surface.getByText('Hello beta', { exact: true })).toBeVisible({ timeout: 60_000 })
+  await expect(
+    betaChat.surface.locator('[data-slot="composer-root"] [contenteditable="true"]').filter({ visible: true }).first()
+  ).toBeVisible({ timeout: 15_000 })
   await settle(page)
 
+  await openBots(page)
+  await expect(alphaRow).toBeVisible({ timeout: 30_000 })
   await alphaRow.click()
-  // The row previews the Bot Chat; the click must front it.
-  await expect(seededTurn.first()).toBeVisible({ timeout: 45_000 })
+  await expect(botsRoster).toBeHidden({ timeout: 30_000 })
+  // The scoped row click leaves the roster and selects the canonical transcript
+  // with its own composer, rather than merely finding the row's sidebar preview.
+  const returnedAlphaChat = await selectedMainChat(page)
+  await expect(returnedAlphaChat.surface.getByText('Hello alpha', { exact: true })).toBeVisible({ timeout: 45_000 })
+  await expect(
+    returnedAlphaChat.surface
+      .locator('[data-slot="composer-root"] [contenteditable="true"]')
+      .filter({ visible: true })
+      .first()
+  ).toBeVisible({ timeout: 15_000 })
   // The side thread is still open beside it (scoped to alpha), not closed.
   await expect
     .poll(
       () =>
-        page.evaluate(() =>
-          [...document.querySelectorAll<HTMLElement>('[data-zone-tabstrip="grp-main"] [data-tree-tab]')]
-            .map(element => element.getAttribute('data-tree-tab') ?? '')
-            .filter(id => id.startsWith('session-tile:')).length
+        page.evaluate(
+          () =>
+            [...document.querySelectorAll<HTMLElement>('[data-zone-tabstrip="grp-main"] [data-tree-tab]')]
+              .map(element => element.getAttribute('data-tree-tab') ?? '')
+              .filter(id => id.startsWith('session-tile:')).length
         ),
       { timeout: 15_000 }
     )
