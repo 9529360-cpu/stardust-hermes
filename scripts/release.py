@@ -2552,6 +2552,40 @@ def main():
                         help="Write changelog to file instead of stdout")
     args = parser.parse_args()
 
+    # `git commit` below commits the whole index, not only the version files.
+    # Refuse before changing version files if the caller already has staged work.
+    if args.publish and args.bump:
+        staged_result = git_result("diff", "--cached", "--quiet")
+        if staged_result.returncode == 1:
+            print(
+                "Cannot publish a version bump while the Git index has staged changes."
+            )
+            print("Commit or stash the staged changes, then rerun the release command.")
+            return 1
+        if staged_result.returncode != 0:
+            detail = staged_result.stderr.strip() or "git diff --cached --quiet failed"
+            print(f"Cannot safely inspect the Git index: {detail}", file=sys.stderr)
+            return 1
+
+        add_files = version_files_to_stage()
+        target_paths = [Path(path).relative_to(REPO_ROOT).as_posix() for path in add_files]
+        target_status = git_result(
+            "status", "--porcelain=v1", "--untracked-files=all", "--", *target_paths
+        )
+        if target_status.returncode != 0:
+            detail = target_status.stderr.strip() or "git status failed"
+            print(f"Cannot safely inspect release version files: {detail}", file=sys.stderr)
+            return 1
+        if target_status.stdout.strip():
+            print(
+                "Cannot publish a version bump while release version files have "
+                "unstaged changes."
+            )
+            print("Commit or discard these edits, then rerun the release command:")
+            for line in target_status.stdout.splitlines():
+                print(f"    {line}")
+            return 1
+
     # Determine CalVer date
     if args.date:
         calver_date = args.date
@@ -2577,7 +2611,7 @@ def main():
         print("No previous tags found. Use --first-release for the initial release.")
         print(f"Would create tag: {tag_name}")
         print(f"Would set version: {new_version}")
-        return
+        return 1 if args.publish else None
 
     # Get commits
     commits = get_commits(since_tag=prev_tag)
@@ -2626,14 +2660,14 @@ def main():
             add_result = git_result("add", *add_files)
             if add_result.returncode != 0:
                 print(f"  ✗ Failed to stage version files: {add_result.stderr.strip()}")
-                return
+                return 1
 
             commit_result = git_result(
                 "commit", "-m", f"chore: bump version to v{new_version} ({calver_date})"
             )
             if commit_result.returncode != 0:
                 print(f"  ✗ Failed to commit version bump: {commit_result.stderr.strip()}")
-                return
+                return 1
             print("  ✓ Committed version bump")
 
         # Create annotated tag
@@ -2643,21 +2677,29 @@ def main():
         )
         if tag_result.returncode != 0:
             print(f"  ✗ Failed to create tag {tag_name}: {tag_result.stderr.strip()}")
-            return
+            return 1
         print(f"  ✓ Created tag {tag_name}")
 
-        # Push
-        push_result = git_result("push", "origin", "HEAD", "--tags")
-        if push_result.returncode == 0:
-            print("  ✓ Pushed to origin")
-        else:
-            print(f"  ✗ Failed to push to origin: {push_result.stderr.strip()}")
-            print("    Continue manually after fixing access:")
-            print("    git push origin HEAD --tags")
-
-        # Create GitHub release
         changelog_file = REPO_ROOT / ".release_notes.md"
         changelog_file.write_text(changelog, encoding="utf-8")
+
+        # Push the commit and tag before creating the GitHub release. If this
+        # fails, keep the local tag and notes so the operator can retry safely.
+        push_result = git_result("push", "origin", "HEAD", "--tags")
+        if push_result.returncode != 0:
+            print(f"  ✗ Failed to push to origin: {push_result.stderr.strip()}")
+            print(f"    Local tag {tag_name} and release notes were preserved.")
+            print(f"    Release notes kept at: {changelog_file}")
+            print("    After fixing access, run these commands in order:")
+            print("    git push origin HEAD --tags")
+            print(
+                f"    gh release create {tag_name} --title 'Stardust v{new_version} ({calver_date})' "
+                f"--notes-file .release_notes.md"
+            )
+            return 1
+        print("  ✓ Pushed to origin")
+
+        # Create GitHub release only after the commit and tag are on origin.
 
         gh_cmd = [
             "gh", "release", "create", tag_name,
@@ -2691,6 +2733,7 @@ def main():
                 f"--notes-file .release_notes.md"
             )
             print(f"\n  ✓ Release v{new_version} ({tag_name}) prepared for manual publish.")
+            return 1
     else:
         print(f"\n{'='*60}")
         print("  Dry run complete. To publish, add --publish")
@@ -2699,4 +2742,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
