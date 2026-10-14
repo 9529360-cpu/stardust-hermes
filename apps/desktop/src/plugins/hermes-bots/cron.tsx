@@ -733,7 +733,7 @@ function pickerSelect<T extends string>(
 ) {
   return (
     <Select onValueChange={onChange} value={value}>
-      <SelectTrigger className="h-8 rounded-md">
+      <SelectTrigger size="md">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
