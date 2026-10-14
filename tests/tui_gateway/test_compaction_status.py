@@ -8,19 +8,14 @@ show an explicit summarizing indicator instead of the turn looking hung
 
 from __future__ import annotations
 
-import importlib
-
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 
 @pytest.fixture()
-def server():
-    # Mocks are scoped to the initial import only (see
-    # tests/tui_gateway/test_protocol.py for the rationale).
-    with patch.dict(
-        "sys.modules",
+def server(tui_gateway_server_loader):
+    return tui_gateway_server_loader(
         {
             "hermes_constants": MagicMock(
                 get_hermes_home=MagicMock(return_value="/tmp/hermes_test_compaction")
@@ -28,10 +23,8 @@ def server():
             "hermes_cli.env_loader": MagicMock(),
             "hermes_cli.banner": MagicMock(),
             "hermes_state": MagicMock(),
-        },
-    ):
-        mod = importlib.import_module("tui_gateway.server")
-    yield mod
+        }
+    )
 
 
 def _capture(server, monkeypatch):

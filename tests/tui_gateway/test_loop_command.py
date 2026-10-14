@@ -9,7 +9,6 @@ wakeups via ``_maybe_fire_tui_loop_tick``.
 
 from __future__ import annotations
 
-import importlib
 import threading
 import time
 from pathlib import Path
@@ -33,18 +32,20 @@ def hermes_home(tmp_path, monkeypatch):
 
 
 @pytest.fixture()
-def server(hermes_home):
-    with patch.dict(
-        "sys.modules",
+def server(hermes_home, monkeypatch, tui_gateway_server_loader):
+    mod = tui_gateway_server_loader(
         {
             "hermes_cli.env_loader": MagicMock(),
             "hermes_cli.banner": MagicMock(),
-        },
-    ):
-        mod = importlib.import_module("tui_gateway.server")
-        yield mod
-        mod._sessions.clear()
-        __import__("tui_gateway.server_requests", fromlist=["x"]).reset_for_tests()
+        }
+    )
+    monkeypatch.setattr(mod, "_hermes_home", hermes_home)
+    monkeypatch.setattr(mod, "_cfg_cache", None)
+    monkeypatch.setattr(mod, "_cfg_sig", None)
+    monkeypatch.setattr(mod, "_cfg_path", None)
+    yield mod
+    mod._sessions.clear()
+    __import__("tui_gateway.server_requests", fromlist=["x"]).reset_for_tests()
 
 
 @pytest.fixture()

@@ -10,7 +10,6 @@ uses to render a system line and fire the kickoff prompt.
 
 from __future__ import annotations
 
-import importlib
 import threading
 import types
 from pathlib import Path
@@ -35,18 +34,13 @@ def hermes_home(tmp_path, monkeypatch):
 
 
 @pytest.fixture()
-def server(hermes_home, monkeypatch):
-    # Mocks are scoped to the initial import only (see
-    # tests/tui_gateway/test_protocol.py for the rationale).
-    with patch.dict(
-        "sys.modules",
+def server(hermes_home, monkeypatch, tui_gateway_server_loader):
+    mod = tui_gateway_server_loader(
         {
             "hermes_cli.env_loader": MagicMock(),
             "hermes_cli.banner": MagicMock(),
-        },
-    ):
-        mod = importlib.import_module("tui_gateway.server")
-
+        }
+    )
     # Pin config resolution to the isolated STARDUST_HOME. Sibling test
     # files (test_billing_rpc, test_delegation_session_lifecycle,
     # test_gateway_owned_session_reap, ...) import tui_gateway.server at
