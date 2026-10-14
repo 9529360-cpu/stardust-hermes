@@ -1571,6 +1571,9 @@ class TestApprovalTimeoutIsNotConsent:
         assert "retry" in msg.lower()
         assert "rephrase" in msg.lower()
         assert "different command" in msg.lower()
+        assert "blocks only the denied effect" in msg.lower()
+        assert "continue safe, non-destructive research and independent work" in msg.lower()
+        assert "stop the current workflow" not in msg.lower()
 
         posts = [c for c in hook_calls if c[0] == "post_approval_response"]
         assert posts, "post_approval_response hook did not fire"
@@ -1611,6 +1614,9 @@ class TestApprovalTimeoutIsNotConsent:
         assert "Silence is not consent" not in r["message"]  # this one IS denied, not timed-out
         assert "NOT consented" in r["message"]
         assert "rephrase" in r["message"].lower()
+        assert "blocks only the denied effect" in r["message"].lower()
+        assert "continue safe, non-destructive research and independent work" in r["message"].lower()
+        assert "stop the current workflow" not in r["message"].lower()
 
     def test_timeout_emits_post_hook_with_timeout_outcome(self, monkeypatch):
         """Plugins must be able to distinguish timeout from explicit deny.

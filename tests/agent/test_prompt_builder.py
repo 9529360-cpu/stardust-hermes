@@ -1170,11 +1170,19 @@ class TestToolUseEnforcementGuidance:
 
 
 class TestTaskCompletionGuidance:
-    def test_permission_denials_are_not_retryable_path_failures(self):
+    def test_denied_action_does_not_cancel_the_users_overall_goal(self):
         text = TASK_COMPLETION_GUIDANCE.lower()
         assert "technical reasons" in text
-        assert "approval denial" in text
-        assert "do not repeat it or route around it" in text
+        assert "stop only that action" in text
+        assert "approval denial applies to the effect, not just the command" in text
+        assert "seek the same authorization in chat" in text
+        assert "tell the user to run it" in text
+        assert "suggest an equivalent workaround" in text
+        assert "keep the user's broader goal active" in text
+        assert "research permitted alternatives that preserve the denied state" in text
+        assert "a denied step never justifies refusing the whole request" in text
+        assert "do not ask again for details or consent already given" in text
+        assert "explain what remains unchanged" in text
 
 
 

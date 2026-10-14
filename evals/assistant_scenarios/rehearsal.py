@@ -94,7 +94,7 @@ def _product_chat(req: Request) -> Reply:
 def _dangerous_command(req: Request) -> Reply:
     if not req.called("terminal"):
         return Reply(tool_calls=[("terminal", {"command": "rm -rf .git && git init"})])
-    return Reply(text="你拒绝了批准，所以我没有删除 .git，仓库保持原样。")
+    return Reply(text="你拒绝了批准，所以我没有删除 .git，原仓库历史保持不变。可以在另一个目录新建干净仓库，当前仓库会原样保留。")
 
 
 _PARENT: Dict[str, Callable[[Request, Scenario], Reply]] = {

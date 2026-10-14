@@ -77,7 +77,9 @@ def test_tool_sessions_are_told_to_find_a_way_instead_of_handing_work_back(tmp_p
     stable = _stable_with_soul(tmp_path, monkeypatch, _CUSTOM_SOUL, valid_tool_names={"terminal"})
 
     assert "install or enable it yourself" in stable
-    assert "try another" in stable
+    assert "change the approach instead of repeating the same failing step" in stable
+    assert "research permitted alternatives that preserve the denied state" in stable
+    assert "A denied step never justifies refusing the whole request" in stable
     assert "only for what only they can give" in stable
     assert "not instructions, a script, or a demo" in stable
 
