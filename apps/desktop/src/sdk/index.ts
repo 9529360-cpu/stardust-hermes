@@ -1458,6 +1458,9 @@ export const host = {
 
 // -- react bridge -------------------------------------------------------------
 
+/** Shared hover-intent pre-warm behavior for profiles and source-scoped bots. */
+export { useProfilePrewarm } from './profile-prewarm'
+
 // Every contribution surface, plugin-reachable: register keybinds, palette
 // commands, routes, themes, panes, composer extensions, and bar items with
 // the same area ids + payload types core uses.

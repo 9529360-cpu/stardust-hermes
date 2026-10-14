@@ -73,7 +73,7 @@ vi.mock('@/store/profile-share', () => ({
   runImportProfileFlow: vi.fn()
 }))
 
-vi.mock('./use-profile-prewarm', () => ({
+vi.mock('@/sdk/profile-prewarm', () => ({
   useProfilePrewarm: () => ({ cancelPrewarm: vi.fn(), startPrewarm: vi.fn() })
 }))
 
