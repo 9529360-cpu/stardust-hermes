@@ -329,6 +329,18 @@ export async function answerApproval(
   })
 }
 
+/** Submit an approval, clear that exact prompt, and then restore the next queued approval. */
+export async function submitApprovalResponse(
+  gateway: ApprovalGateway | null,
+  request: Pick<ApprovalRequest, 'requestId' | 'serverRequestId' | 'sessionId'>,
+  choice: string,
+  all = false
+): Promise<void> {
+  await answerApproval(gateway, request, choice, all)
+  clearApprovalRequest(request.sessionId, request.requestId)
+  void replayPendingApproval(gateway, request.sessionId).catch(() => undefined)
+}
+
 /** The prompt request for one specific session — the tile counterpart of the
  *  active-session `$*Request` views (same map, fixed key). */
 export const sessionApprovalRequest = (sessionId: string | null) =>

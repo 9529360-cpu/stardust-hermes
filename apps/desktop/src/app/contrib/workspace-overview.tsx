@@ -35,6 +35,7 @@ import { $backgroundStatusBySession, $statusItemsBySession, stopBackgroundProces
 import { $activeConnectionId } from '@/store/connections'
 import { $cronJobs, $cronJobsScope, setCronFocusJobId } from '@/store/cron'
 import { $gateway } from '@/store/gateway'
+import { notifyError } from '@/store/notifications'
 import { applyDesktopLayoutPreset, revealDesktopPane } from '@/store/pane-focus'
 import { $previewServerRestart } from '@/store/preview'
 import {
@@ -45,7 +46,10 @@ import {
   sidebarProfileForScope
 } from '@/store/profile'
 import { $projectScope, $projectTree, ALL_PROJECTS, projectRootCwd } from '@/store/projects'
-import { $approvalRequests, answerApproval } from '@/store/prompts'
+import {
+  $approvalRequests,
+  submitApprovalResponse
+} from '@/store/prompts'
 import {
   $pullRequestChecksByPr,
   $pullRequestsByBranch,
@@ -305,7 +309,15 @@ function TaskCenterDetail({
   )
 }
 
-function UnifiedInputCard({ task, gateway }: { task: TaskCenterTask; gateway: Parameters<typeof answerApproval>[0] }) {
+function UnifiedInputCard({
+  task,
+  gateway,
+  approvalFailureMessage
+}: {
+  task: TaskCenterTask
+  gateway: Parameters<typeof submitApprovalResponse>[0]
+  approvalFailureMessage: string
+}) {
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const request = task.approvalRequest
@@ -322,7 +334,13 @@ function UnifiedInputCard({ task, gateway }: { task: TaskCenterTask; gateway: Pa
     setBusy(true)
 
     if (request) {
-      await answerApproval(gateway, request, answer)
+      try {
+        await submitApprovalResponse(gateway, request, answer)
+      } catch (error) {
+        notifyError(error, approvalFailureMessage)
+      } finally {
+        setBusy(false)
+      }
     } else if (clarify) {
       answerClarifyRequest(clarify, answer)
     }
@@ -413,6 +431,7 @@ export function WorkspaceOverview() {
           activityFiles: (count: number) => `${count} 个文件`,
           currentStep: '当前步骤',
           needsInput: '等待你的输入',
+          approvalSubmitFailed: '批准提交失败，请重试。',
           attentionSummary: '当前任务正在等待你的确认或补充信息；工作上下文会保留，回复后可以继续。',
           workingSummary: '有任务仍在执行；可以回到对应会话查看进度，也可以继续处理其他事情。',
           hidePreview: '收起上下文',
@@ -456,6 +475,7 @@ export function WorkspaceOverview() {
             activityFiles: (count: number) => `${count} 個檔案`,
             currentStep: '目前步驟',
             needsInput: '等待你的輸入',
+            approvalSubmitFailed: '核准提交失敗，請重試。',
             attentionSummary: '目前任務正在等待你的確認或補充資訊；工作上下文會保留，回覆後可以繼續。',
             workingSummary: '有任務仍在執行；可以回到對應對話查看進度，也可以繼續處理其他事情。',
             hidePreview: '收起上下文',
@@ -500,6 +520,7 @@ export function WorkspaceOverview() {
             activityFiles: (count: number) => `${count} files`,
             currentStep: 'Current step',
             needsInput: 'Waiting for your input',
+            approvalSubmitFailed: 'Could not submit the approval. Please try again.',
             attentionSummary:
               'The current task is waiting for your input. Its working context is preserved so you can reply and continue.',
             workingSummary:
@@ -711,6 +732,7 @@ export function WorkspaceOverview() {
       : currentActivityTaskId
         ? filteredActivityTasks.filter(task => task.id !== currentActivityTaskId)
         : filteredActivityTasks
+
   const visibleActivityTasks = secondaryActivityTasks.slice(0, 10)
   const selectedTask = visibleActivityTasks.find(task => task.id === selectedTaskId)
 
@@ -974,7 +996,11 @@ export function WorkspaceOverview() {
                       )}
                     </div>
                     {task.clarifyRequest || task.approvalRequest ? (
-                      <UnifiedInputCard gateway={gateway} task={task} />
+                      <UnifiedInputCard
+                        approvalFailureMessage={systemLabels.approvalSubmitFailed}
+                        gateway={gateway}
+                        task={task}
+                      />
                     ) : null}
                     {task.action && (
                       <Button onClick={() => handleTaskAction(task)} size="xs" variant="ghost">

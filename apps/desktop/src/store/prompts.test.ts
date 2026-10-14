@@ -16,7 +16,8 @@ import {
   replayPendingApproval,
   setApprovalRequest,
   setSecretRequest,
-  setSudoRequest
+  setSudoRequest,
+  submitApprovalResponse
 } from './prompts'
 import { isSessionGone, resetBackgroundPollingGuard } from './runtime-gone'
 import { forgetServerRequest, rememberServerRequest, resetServerRequestsForTests } from './server-requests'
@@ -64,6 +65,42 @@ describe('approval prompt store', () => {
     clearApprovalRequest('s1')
 
     expect($approvalRequest.get()).toBeNull()
+  })
+
+  it('clears the answered approval and advances the queue through the shared response path', async () => {
+    const respond = vi.fn()
+    rememberServerRequest({ fail: vi.fn(), id: 'server-r1', method: 'approval', params: {}, respond })
+
+    const current = {
+      command: 'first command',
+      description: 'First approval',
+      requestId: 'r1',
+      serverRequestId: 'server-r1',
+      sessionId: 's1'
+    }
+
+    const calls: Array<[string, Record<string, unknown>]> = []
+
+    const gateway = {
+      request: async (method: string, params: Record<string, unknown>) => {
+        calls.push([method, params])
+
+        return method === 'approval.pending'
+          ? { approvals: [{ command: 'next command', description: 'Next approval', request_id: 'r2' }] }
+          : { acknowledged: true }
+      }
+    }
+
+    setApprovalRequest(current)
+
+    await submitApprovalResponse(gateway, current, 'once')
+    await vi.waitFor(() => expect($approvalRequest.get()?.requestId).toBe('r2'))
+
+    expect(respond).toHaveBeenCalledWith({ choice: 'once' })
+    expect(calls).toEqual([
+      ['approval.pending', { session_id: 's1' }],
+      ['approval.received', { request_id: 'r2', session_id: 's1' }]
+    ])
   })
 
   it('carries allowPermanent so the bar can hide "Always allow"', () => {
