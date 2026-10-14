@@ -155,8 +155,8 @@ These are source-level findings and candidate experiments, not proof that the cu
 - A follow-up review found an instruction conflict in the denial path: the prompt allowed a user-delegated
   alternative to proceed, but the approval result always said to offer that alternative and wait. The human-facing
   approval summary also asserted that the broader goal remained active, even if the user had since cancelled it.
-  The prompt and gate message now follow the latest user instruction, constrain only the effect covered by the gate,
-  research allowed routes before asking, continue safe work, honor cancellation, and proceed with a materially
+  The prompt and gate messages now follow the latest user instruction, constrain only the effect covered by the
+  gate, research allowed routes before asking, continue safe work, honor cancellation, and proceed with a materially
   different choice the user already delegated. Approval summaries now report only whether that attempt ran.
 - Five targeted regressions passed on this revision: prompt contract, approval summary rendering, explicit denial,
   and same-turn repeat blocking/new-turn reauthorization. A live scenario-7 rerun selected the configured

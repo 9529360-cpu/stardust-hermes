@@ -727,7 +727,7 @@ class _GateSpec:
 _DENIAL_SCOPE = (
     " This gate blocks only this attempt; it does not decide whether the broader task is still wanted. Follow the "
     "user's latest instruction, including if they cancel or change the goal. If the goal is still current, research "
-    "allowed routes and continue safe work while leaving the blocked target untouched. If a route materially "
+    "allowed routes and continue safe work while leaving the target untouched. If a route materially "
     "changes the outcome, proceed when the user delegated that choice; otherwise explain the difference and ask only "
     "about that choice."
 )
@@ -1263,8 +1263,8 @@ def check_all_command_guards(command: str, env_type: str,
             and _command_denied_this_turn(session_key, pattern_key, command):
         repeated = _denied(
             "BLOCKED: The same command effect was already blocked during this user turn. Do NOT request the same "
-            "approval again or rephrase it. Keep the user's broader goal active and research an allowed alternative. "
-            + _DENIAL_SCOPE,
+            "approval again, retry, rephrase, or reproduce the effect through another tool, backup, copy, or staged "
+            "replacement." + _DENIAL_SCOPE,
             pattern_key=pattern_key, description=description, outcome="repeat_blocked",
         )
         return _audit_decision(repeated, command=command, description=description, pattern_key=pattern_key,

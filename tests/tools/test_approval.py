@@ -2306,6 +2306,9 @@ class TestCliApprovalTimeoutClassifiedSeparately:
         assert len(choices) == 2
         assert results[1]["approved"] is False
         assert "already blocked during this user turn" in results[1]["message"]
+        assert "user's latest instruction" in results[1]["message"].lower()
+        assert "if the goal is still current" in results[1]["message"].lower()
+        assert "keep the user's broader goal active" not in results[1]["message"].lower()
         assert "did not run again" in results[1]["user_summary"]
 
     def test_run_approval_gate_cli_timeout_is_not_a_denial(self):
