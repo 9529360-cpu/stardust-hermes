@@ -1627,8 +1627,9 @@ describe('dedupeInflightUserAgainstTranscript', () => {
       }
     ])[0]
 
-    expect(modelSwitchMarker).toMatchObject({ role: 'system' })
+    expect(modelSwitchMarker).toMatchObject({ role: 'system', displayKind: 'model_switch' })
     expect(chatMessageText(modelSwitchMarker)).toBe('model changed')
+    expect(chatMessagesEquivalent(modelSwitchMarker, { ...modelSwitchMarker, displayKind: undefined })).toBe(false)
 
     const persisted: ChatMessage[] = [
       ...runtime,
@@ -1718,7 +1719,7 @@ describe('dedupeInflightUserAgainstTranscript', () => {
     expect(restored.at(-1)).toMatchObject({ id: 'assistant-stream-runtime-1', pending: true })
   })
 
-  it('does not treat an unrelated system row as a model-switch marker', () => {
+  it('does not treat a same-text system row without displayKind as a model-switch marker', () => {
     const runtime = [
       msg('old-u', 'user', 'older prompt', { timestamp: 1 }),
       msg('old-a', 'assistant', 'older reply', { timestamp: 2 })
@@ -1730,7 +1731,7 @@ describe('dedupeInflightUserAgainstTranscript', () => {
       msg('a-before-correction', 'assistant', 'Hello', { timestamp: 4 }),
       msg('c', 'user', 'redirect now', { timestamp: 5 }),
       msg('a-after-correction', 'assistant', 'Moving.', { timestamp: 6 }),
-      msg('unrelated-system', 'system', 'unrelated system message', { timestamp: 7 })
+      msg('unrelated-system', 'system', 'model changed', { timestamp: 7 })
     ]
 
     const projection = {

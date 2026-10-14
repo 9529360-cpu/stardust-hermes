@@ -437,9 +437,7 @@ export function toChatMessages(messages: SessionMessage[]): ChatMessage[] {
       // When a preceding assistant produced only tools, keep those tools in
       // their own bubble instead of absorbing this separate text-only row.
       const continuationAfterText =
-        parts.length > 0 &&
-        parts.every(part => part.type === 'text') &&
-        isAutoContinuation(messages[index + 1])
+        parts.length > 0 && parts.every(part => part.type === 'text') && isAutoContinuation(messages[index + 1])
 
       if (continuationAfterText && pendingToolParts.length) {
         flushPendingTools(index, true)
@@ -485,6 +483,7 @@ export function toChatMessages(messages: SessionMessage[]): ChatMessage[] {
       id: `${message.timestamp || Date.now()}-${index}-${displayRole}`,
       role: displayRole,
       parts,
+      ...(message.display_kind !== undefined ? { displayKind: message.display_kind } : {}),
       ...(isAutoContinuation(message) ? { autoContinue: true } : {}),
       ...(message.display_kind === 'async_delegation_complete' || message.display_kind === 'process_complete'
         ? { asyncResult: asyncResultBody(displayContentForMessage(message.role, message.content || content)) }
@@ -493,7 +492,8 @@ export function toChatMessages(messages: SessionMessage[]): ChatMessage[] {
       ...(rowId !== undefined ? { rowId } : {}),
       ...(message.role === 'assistant' &&
       isAutoContinuation(messages[index + 1]) &&
-      parts.length > 0 && parts.every(part => part.type === 'text')
+      parts.length > 0 &&
+      parts.every(part => part.type === 'text')
         ? { interim: true }
         : {}),
       ...(reactions.length ? { reactions } : {}),

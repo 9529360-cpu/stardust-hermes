@@ -157,6 +157,8 @@ const _chatMessageFieldsExhaustive: {
 
 const COMPARED_FIELDS = [
   'asyncResult',
+  // Reconciliation metadata distinguishes a hydrated model switch from other system rows.
+  'displayKind',
   'id',
   'role',
   'pending',
@@ -271,6 +273,7 @@ export function chatMessagesEquivalent(a: ChatMessage, b: ChatMessage): boolean 
   if (
     a.id !== b.id ||
     a.role !== b.role ||
+    a.displayKind !== b.displayKind ||
     a.pending !== b.pending ||
     a.error !== b.error ||
     // Structural compare — the descriptor arrives as a fresh object per
@@ -993,9 +996,9 @@ function transcriptAnchorMatches(a: ChatMessage, b: ChatMessage): boolean {
   return Boolean(aText) && aText === bText
 }
 
-/** Hydration projects `display_kind: 'model_switch'` as this exact system row. */
+/** Hydration retains the gateway marker kind on the projected system row. */
 function isHydratedModelSwitchMarker(message: ChatMessage): boolean {
-  return message.role === 'system' && chatMessageText(message).trim() === 'model changed'
+  return message.role === 'system' && message.displayKind === 'model_switch'
 }
 
 /**
