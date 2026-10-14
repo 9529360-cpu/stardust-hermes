@@ -51,6 +51,21 @@ interface ClearanceMetrics {
   viewportHeight: number
 }
 
+interface StaleClearanceState {
+  distance: number
+  following: string | undefined
+  latestMessageBottom: number
+  overflowAnchor: string
+  scrollHeightAfter: number
+  scrollHeightBefore: number
+  scrollTopAfter: number
+  scrollTopBefore: number
+  spacerHeight: number
+  statusPanelTop: number
+  visibility: DocumentVisibilityState
+  viewportHeight: number
+}
+
 async function clearanceMetrics(page: Page): Promise<ClearanceMetrics> {
   return activeSurface(page).evaluate(surface => {
     const chatSurface = surface.closest<HTMLElement>('[data-chat-surface]')!
@@ -105,36 +120,61 @@ test.describe('working-session task-panel clearance', () => {
     // and window focus is the only foreground edge that can repair it.
     await page.waitForTimeout(750)
 
-    const staleState = await activeSurface(page)
-      .locator('[data-slot="aui_thread-viewport"]')
-      .evaluate(viewport => {
-        // Grow scrollHeight before the observed thread-content node. This
-        // shifts the transcript behind the dock without resizing the observed
-        // node or synthesizing a user scroll (which must escape the lock).
-        const staleClearance = document.createElement('div')
-        staleClearance.style.height = '160px'
-        staleClearance.setAttribute('aria-hidden', 'true')
-        viewport.prepend(staleClearance)
+    const viewport = activeSurface(page).locator('[data-slot="aui_thread-viewport"]')
+    await expect(viewport).toHaveAttribute('data-following', 'true')
 
-        const distance = viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop
-        const surface = viewport.closest<HTMLElement>('[data-composer-target]')!
-        const latest = Array.from(surface.querySelectorAll<HTMLElement>('[data-role="assistant"]')).at(-1)!
-        const status = surface.querySelector<HTMLElement>('[data-slot="composer-status-stack"]')!
+    const staleState = await viewport.evaluate((viewport): StaleClearanceState => {
+      // Grow scrollHeight before the observed thread-content node. Keep the
+      // injected spacer rigid and disable native anchoring so the fixture can
+      // establish stale geometry without synthesizing a user scroll (which
+      // must escape the lock).
+      viewport.style.setProperty('overflow-anchor', 'none')
+      const staleClearance = document.createElement('div')
+      staleClearance.style.height = '160px'
+      staleClearance.style.minHeight = '160px'
+      staleClearance.style.flex = '0 0 160px'
+      staleClearance.setAttribute('aria-hidden', 'true')
+      const scrollHeightBefore = viewport.scrollHeight
+      const scrollTopBefore = viewport.scrollTop
+      viewport.prepend(staleClearance)
 
-        window.dispatchEvent(new Event('focus'))
+      const scrollHeightAfter = viewport.scrollHeight
+      const scrollTopAfter = viewport.scrollTop
+      const distance = scrollHeightAfter - viewport.clientHeight - scrollTopAfter
+      const surface = viewport.closest<HTMLElement>('[data-composer-target]')!
+      const latest = Array.from(surface.querySelectorAll<HTMLElement>('[data-role="assistant"]')).at(-1)!
+      const status = surface.querySelector<HTMLElement>('[data-slot="composer-status-stack"]')!
+      const following = viewport.dataset.following
+      const latestMessageBottom = latest.getBoundingClientRect().bottom
+      const statusPanelTop = status.getBoundingClientRect().top
 
-        return {
-          distance,
-          following: viewport.dataset.following,
-          latestMessageBottom: latest.getBoundingClientRect().bottom,
-          statusPanelTop: status.getBoundingClientRect().top,
-          visibility: document.visibilityState,
-        }
-      })
+      window.dispatchEvent(new Event('focus'))
+
+      return {
+        distance,
+        following,
+        latestMessageBottom,
+        overflowAnchor: getComputedStyle(viewport).overflowAnchor,
+        scrollHeightAfter,
+        scrollHeightBefore,
+        scrollTopAfter,
+        scrollTopBefore,
+        spacerHeight: staleClearance.getBoundingClientRect().height,
+        statusPanelTop,
+        visibility: document.visibilityState,
+        viewportHeight: viewport.clientHeight
+      }
+    })
 
     expect(staleState.visibility, JSON.stringify(staleState)).toBe('visible')
     expect(staleState.following, JSON.stringify(staleState)).toBe('true')
-    expect(staleState.distance).toBeGreaterThan(100)
+    expect(staleState.overflowAnchor, JSON.stringify(staleState)).toBe('none')
+    expect(staleState.spacerHeight, JSON.stringify(staleState)).toBe(160)
+    expect(
+      staleState.scrollHeightAfter - staleState.scrollHeightBefore,
+      JSON.stringify(staleState),
+    ).toBeGreaterThan(100)
+    expect(staleState.distance, JSON.stringify(staleState)).toBeGreaterThan(100)
     expect(staleState.latestMessageBottom, JSON.stringify(staleState)).toBeGreaterThan(staleState.statusPanelTop)
     await page.waitForTimeout(1_000)
     const metrics = await clearanceMetrics(page)

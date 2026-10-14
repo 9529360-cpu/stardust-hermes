@@ -225,7 +225,9 @@ test.describe('fleet profile rail — two registered gateways', () => {
     test.setTimeout(240_000)
     mock = await startMockServer()
     sandbox = createSandbox('fleet')
-    writeMockProviderConfig(sandbox.hermesHome, mock.url)
+    // This spec asserts English statusbar and gateway names; the Desktop E2E
+    // lane runs with a Chinese system locale, so pin the fixture's UI language.
+    writeMockProviderConfig(sandbox.hermesHome, mock.url, '  language: en')
     writeEnvFile(sandbox.hermesHome)
     // A named profile on This device too, so the active group has a square
     // beside its home pill. "research" exists on BOTH gateways on purpose: the
@@ -237,9 +239,9 @@ test.describe('fleet profile rail — two registered gateways', () => {
 
     ;({ app, page } = await launchDesktop(buildAppEnv(sandbox)))
     await waitForAppReady({ app, page } as MockBackendFixture, 120_000)
-    // Let boot settle fully (the gateway health item reports "ready" once the
-    // primary socket is open) so the boot-time launch-mode restore has run
-    // before any click — the rail must then hold whatever the user picks.
+    // Let boot settle fully (the gateway health item reports inference
+    // readiness) so the boot-time launch-mode restore has run before any click
+    // — the rail must then hold whatever the user picks.
     await expect(page.locator('[data-slot="statusbar"]').getByText('ready', { exact: true })).toBeVisible({ timeout: 120_000 })
     await page.waitForTimeout(2_000)
   })
