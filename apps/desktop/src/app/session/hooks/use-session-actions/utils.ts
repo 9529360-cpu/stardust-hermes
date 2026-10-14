@@ -747,19 +747,23 @@ export function preserveLocalPendingTurnMessages(
  * of growing duplicate rows.
  */
 const safelyPersistedInflightUser = Symbol('safelyPersistedInflightUser')
+const safelyPersistedInflightProjection = Symbol('safelyPersistedInflightProjection')
 
 type LiveSessionProjection = Pick<SessionResumeResult, 'inflight' | 'queued' | 'session_id'> & {
   [safelyPersistedInflightUser]?: true
+  [safelyPersistedInflightProjection]?: true
 }
 
 type ReconciledSessionResumeResult = SessionResumeResult & {
   [safelyPersistedInflightUser]?: true
+  [safelyPersistedInflightProjection]?: true
 }
 
 export function appendLiveSessionProjection(messages: ChatMessage[], projection: LiveSessionProjection): ChatMessage[] {
   const inflightUser = projection.inflight?.user?.trim() ?? ''
   const inflightAssistant = projection.inflight?.assistant ?? ''
   const inflightStreaming = Boolean(projection.inflight?.streaming)
+  const inflightProjectionAlreadyPersisted = projection[safelyPersistedInflightProjection] === true
 
   // Mid-turn redirect corrections. They are additional user bubbles belonging
   // to this same turn, ordered by arrival: after the output that had already
@@ -834,7 +838,9 @@ export function appendLiveSessionProjection(messages: ChatMessage[], projection:
     )
 
   const inflightUserAlreadyPersisted =
-    projection[safelyPersistedInflightUser] === true || (Boolean(inflightUser) && persistedInLatestRun(inflightUser))
+    inflightProjectionAlreadyPersisted ||
+    projection[safelyPersistedInflightUser] === true ||
+    (Boolean(inflightUser) && persistedInLatestRun(inflightUser))
 
   if (inflightUser && !inflightUserAlreadyPersisted) {
     projected.push({
@@ -886,10 +892,11 @@ export function appendLiveSessionProjection(messages: ChatMessage[], projection:
     inflightAssistant || inflightStreaming || inflightError || (inflightUser && queuedUser)
   )
 
-  const projectAssistantDump = wantsAssistantRow && !(turnAlreadyStructured && !inflightError)
+  const projectAssistantDump =
+    wantsAssistantRow && !inflightProjectionAlreadyPersisted && !(turnAlreadyStructured && !inflightError)
 
   const pushCorrection = (correction: string, index: number): void => {
-    if (persistedInLatestRun(correction)) {
+    if (inflightProjectionAlreadyPersisted || persistedInLatestRun(correction)) {
       return
     }
 
@@ -987,19 +994,22 @@ function transcriptAnchorMatches(a: ChatMessage, b: ChatMessage): boolean {
 }
 
 /**
- * Mark only an already-materialized `inflight.user` for visual suppression.
+ * Reconcile the live text projection against the persisted transcript.
  *
  * A running gateway returns two independent truths: its compressed runtime
  * history plus the current in-flight turn, while REST may already have flushed
- * that user row into the complete persisted transcript. Global text dedupe is
- * unsafe because users may intentionally submit the same prompt twice. Instead,
- * find the last runtime message inside the persisted transcript and inspect only
- * the newer persisted suffix.
+ * some or all of that turn into the complete persisted transcript. Global text
+ * dedupe is unsafe because users may intentionally submit the same prompt
+ * twice. Instead, find the last runtime message inside the persisted transcript
+ * and inspect only the newer persisted suffix.
  *
- * Keep `inflight.user` intact because it also carries turn structure: a queued
- * prompt needs its assistant boundary even when the persisted user has no
- * assistant delta yet. The private marker lets the renderer suppress only that
- * duplicate bubble. If the histories have no safe common anchor, keep the
+ * A fully persisted corrected turn is suppressible only when its prompt,
+ * corrections, and assistant text are all represented after the anchor. In
+ * other cases, mark only an exactly matched inflight user at the persisted
+ * correction suffix. Keep `inflight.user` intact because it also carries turn
+ * structure: a queued prompt needs its assistant boundary even when the
+ * persisted user has no assistant delta yet. If the histories have no safe
+ * common anchor, prefer leaving the
  * projection unchanged — a duplicate is recoverable, but dropping a real
  * accepted prompt is not.
  */
@@ -1039,6 +1049,73 @@ export function dedupeInflightUserAgainstTranscript(
   let lastPersistedMessage = persistedTail[persistedTail.length - 1]
   const corrections = projection.inflight?.corrections ?? []
 
+  // A history flush can commit the whole corrected turn while `inflight` still
+  // contains its earlier text-only projection. In that case the persisted
+  // suffix has assistant rows on both sides of the correction rows, so the
+  // correction-suffix check below must not treat the final assistant/tool row
+  // as a different turn. Require the latest matching prompt after the runtime
+  // anchor, the complete correction sequence, and assistant text that already
+  // covers the inflight dump before suppressing the synthetic projection.
+  const inflightAssistant = projection.inflight?.assistant?.replace(/\s+/g, ' ').trim() ?? ''
+
+  const normalizedCorrections = corrections
+    .map(correction => correction?.replace(/\s+/g, ' ').trim() ?? '')
+    .filter(Boolean)
+
+  const latestPersistedPromptIndex = persistedTail.findLastIndex(
+    message => message.role === 'user' && normalizedMessageText(message) === inflightUser
+  )
+
+  if (
+    !projection.inflight?.error?.trim() &&
+    inflightAssistant &&
+    normalizedCorrections.length &&
+    latestPersistedPromptIndex >= 0
+  ) {
+    let correctionIndex = 0
+    let assistantText = ''
+    let sequenceMatches = true
+
+    for (let index = latestPersistedPromptIndex + 1; index < persistedTail.length; index += 1) {
+      const message = persistedTail[index]
+
+      if (message.role === 'user') {
+        if (
+          correctionIndex >= normalizedCorrections.length ||
+          normalizedMessageText(message) !== normalizedCorrections[correctionIndex]
+        ) {
+          sequenceMatches = false
+
+          break
+        }
+
+        correctionIndex += 1
+
+        continue
+      }
+
+      if (message.role === 'assistant') {
+        assistantText += chatMessageText(message)
+
+        continue
+      }
+
+      sequenceMatches = false
+
+      break
+    }
+
+    const normalizedAssistantText = assistantText.replace(/\s+/g, ' ').trim()
+
+    if (
+      sequenceMatches &&
+      correctionIndex === normalizedCorrections.length &&
+      normalizedAssistantText.startsWith(inflightAssistant)
+    ) {
+      return { ...projection, [safelyPersistedInflightProjection]: true }
+    }
+  }
+
   // A persisted correction is the latest user, but still belongs to this turn.
   // Walk only an exact correction suffix; do not dedupe completed repeat turns.
   let cursor = persistedTail.length - 1
@@ -1056,6 +1133,7 @@ export function dedupeInflightUserAgainstTranscript(
     while (cursor >= 0 && persistedTail[cursor].role === 'assistant') {
       cursor -= 1
     }
+
     lastPersistedMessage = persistedTail[cursor]
   }
 

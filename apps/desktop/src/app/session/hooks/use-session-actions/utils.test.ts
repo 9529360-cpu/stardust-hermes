@@ -1612,6 +1612,98 @@ describe('dedupeInflightUserAgainstTranscript', () => {
     expect(restored.filter(m => m.role === 'user' && chatMessageText(m) === 'current prompt')).toHaveLength(1)
   })
 
+  it('does not re-project a persisted correction turn after its post-correction tool row arrives', () => {
+    const runtime = [
+      msg('old-u', 'user', 'older prompt', { timestamp: 1 }),
+      msg('old-a', 'assistant', 'older reply', { timestamp: 2 })
+    ]
+
+    const persisted: ChatMessage[] = [
+      ...runtime,
+      msg('u', 'user', 'current prompt', { timestamp: 3 }),
+      msg('a-before-correction', 'assistant', 'Hello', { timestamp: 4 }),
+      msg('c', 'user', 'redirect now', { timestamp: 5 }),
+      {
+        id: 'a-after-correction',
+        role: 'assistant',
+        parts: [
+          { type: 'tool-call', toolCallId: 'call-after-correction', toolName: 'terminal', args: {}, result: 'done' },
+          { type: 'text', text: 'Moving.' }
+        ]
+      }
+    ]
+
+    const projection = {
+      ...runningProjection('current prompt'),
+      inflight: {
+        user: 'current prompt',
+        assistant: 'HelloMoving.',
+        streaming: true,
+        corrections: ['redirect now'],
+        correction_offsets: [5]
+      }
+    }
+
+    const deduped = dedupeInflightUserAgainstTranscript(persisted, runtime, projection)
+    const restored = appendLiveSessionProjection(persisted, deduped)
+
+    expect(restored.map(message => message.id)).toEqual(persisted.map(message => message.id))
+    expect(restored.map(message => message.role)).toEqual([
+      'user',
+      'assistant',
+      'user',
+      'assistant',
+      'user',
+      'assistant'
+    ])
+    expect(restored.at(-1)?.parts.some(part => part.type === 'tool-call')).toBe(true)
+    expect(restored.filter(message => message.role === 'user').map(chatMessageText)).toEqual([
+      'older prompt',
+      'current prompt',
+      'redirect now'
+    ])
+    expect(restored.filter(message => message.role === 'assistant').map(chatMessageText)).toEqual([
+      'older reply',
+      'Hello',
+      'Moving.'
+    ])
+  })
+
+  it('preserves a repeated corrected prompt when the persisted assistant text differs', () => {
+    const runtime = [
+      msg('old-u', 'user', 'older prompt', { timestamp: 1 }),
+      msg('old-a', 'assistant', 'older reply', { timestamp: 2 })
+    ]
+
+    const persisted = [
+      ...runtime,
+      msg('prior-u', 'user', 'current prompt', { timestamp: 3 }),
+      msg('prior-a-before-correction', 'assistant', 'Hello', { timestamp: 4 }),
+      msg('prior-correction', 'user', 'redirect now', { timestamp: 5 }),
+      msg('prior-a-after-correction', 'assistant', 'Completed answer', { timestamp: 6 })
+    ]
+
+    const projection = {
+      ...runningProjection('current prompt'),
+      inflight: {
+        user: 'current prompt',
+        assistant: 'New current answer',
+        streaming: true,
+        corrections: ['redirect now'],
+        correction_offsets: [0]
+      }
+    }
+
+    const deduped = dedupeInflightUserAgainstTranscript(persisted, runtime, projection)
+    const restored = appendLiveSessionProjection(persisted, deduped)
+
+    expect(deduped).toBe(projection)
+    expect(
+      restored.filter(message => message.role === 'user' && chatMessageText(message) === 'current prompt')
+    ).toHaveLength(2)
+    expect(restored.at(-1)).toMatchObject({ id: 'assistant-stream-runtime-1', pending: true })
+  })
+
   it('retains the in-flight user source only when it already exists after the runtime anchor', () => {
     const runtime = [
       msg('runtime-user', 'user', 'earlier prompt', { timestamp: 1 }),
