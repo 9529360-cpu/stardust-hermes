@@ -32,6 +32,8 @@ export function ChatSwapOverlay({ profile }: { profile: string | null }) {
   return (
     <div
       aria-hidden
+      data-slot="chat-swap-overlay"
+      data-state={profile ? 'active' : 'idle'}
       className={cn(
         'pointer-events-none absolute inset-0 z-50 flex items-center justify-center transition-opacity duration-150 ease-out',
         profile ? 'opacity-100' : 'opacity-0'

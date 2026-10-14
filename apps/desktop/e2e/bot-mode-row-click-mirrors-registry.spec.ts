@@ -31,12 +31,13 @@ async function openBots(page: Page): Promise<void> {
   const tab = page.getByRole('button', { name: /智能体空间|Agent space/ }).first()
 
   await tab.click()
-  await expect(page.getByRole('button', { name: 'New bot or group chat' })).toBeVisible()
+  await expect(page.locator('[data-slot="bots-roster"]')).toBeVisible()
 }
 
-async function settle(page: Page, timeout = 90_000): Promise<void> {
-  await page.getByText(/Waking up/i).first().waitFor({ state: 'hidden', timeout })
-  await page.waitForTimeout(500)
+async function settle(page: Page): Promise<void> {
+  await expect(page.locator('[data-slot="chat-swap-overlay"]')).toHaveAttribute('data-state', 'idle', {
+    timeout: 15_000
+  })
 }
 
 async function openUntil(action: () => Promise<void>, expected: () => Promise<void>, attempts = 3): Promise<void> {
