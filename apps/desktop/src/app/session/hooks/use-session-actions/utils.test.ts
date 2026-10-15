@@ -778,19 +778,17 @@ describe('preserveLocalPendingTurnMessages', () => {
     expect(preserveLocalPendingTurnMessages(persisted, previous)).toBe(persisted)
   })
 
-  it('drops a sealed interim already embedded in the committed assistant turn', () => {
+  it('drops settled stream segments already embedded in committed assistant history', () => {
     const interimText = 'Now checking the details before answering.'
+    const finalText = 'All done! Here is the complete summary of what I found.'
     const previous = [
       msg('user-current', 'user', 'current prompt'),
-      msg('assistant-stream-interim', 'assistant', interimText, { pending: false, interim: true })
+      msg('assistant-stream-interim', 'assistant', interimText, { pending: false, interim: true }),
+      msg('assistant-stream-final', 'assistant', finalText, { pending: false })
     ]
     const next = [
       msg('user-current-stored', 'user', 'current prompt'),
-      msg(
-        'assistant-current-stored',
-        'assistant',
-        `Let me start by planning the approach. ${interimText} All done!`
-      )
+      msg('assistant-current-stored', 'assistant', `Let me start by planning the approach. ${interimText} ${finalText}`)
     ]
 
     expect(preserveLocalPendingTurnMessages(next, previous)).toBe(next)

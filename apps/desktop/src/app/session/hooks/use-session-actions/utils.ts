@@ -696,7 +696,7 @@ export function preserveLocalPendingTurnMessages(
     // one ordinal earlier, and re-appending it renders the same answer twice
     // (#70209). Only text-identical rows are dropped — a settled row the backend
     // has NOT committed yet is the only copy of that reply and must survive.
-    const localInterimText = message.interim === true ? normalizedTranscriptText(chatMessageText(message)) : ''
+    const localAssistantText = normalizedTranscriptText(chatMessageText(message))
 
     if (
       isPendingAssistant &&
@@ -704,8 +704,8 @@ export function preserveLocalPendingTurnMessages(
       committedAssistantMessages.some(
         candidate =>
           textWithoutReferenceLines(chatMessageText(candidate)) === textWithoutReferenceLines(chatMessageText(message)) ||
-          (localInterimText.length > 0 &&
-            normalizedTranscriptText(chatMessageText(candidate)).includes(localInterimText))
+          (localAssistantText.length > 0 &&
+            normalizedTranscriptText(chatMessageText(candidate)).includes(localAssistantText))
       )
     ) {
       continue
