@@ -173,6 +173,9 @@ test('a bot row click lands on the Bot Chat the row previews, not a side thread'
 
   // Leave alpha on the side thread, go to beta, come back via the row.
   await openBots(page)
+  // The roster can reveal seeded profiles across successive polls; wait until the
+  // complete row set is present before a click whose target may move on insert.
+  await expect(alphaRow).toBeVisible({ timeout: 30_000 })
   await expect(betaRow).toBeVisible({ timeout: 30_000 })
   await betaRow.click()
   await expect(botsRoster).toBeHidden({ timeout: 30_000 })
