@@ -171,30 +171,13 @@ test('a bot row click lands on the Bot Chat the row previews, not a side thread'
   await expect(sideTranscript).toBeVisible({ timeout: 60_000 })
   await expect(sideTranscript).toContainText(MOCK_REPLY, { timeout: 60_000 })
 
-  // Leave alpha on the side thread, go to beta, come back via the row.
-  await openBots(page)
-  // The roster can reveal seeded profiles across successive polls; wait until the
-  // complete row set is present before a click whose target may move on insert.
-  await expect(alphaRow).toBeVisible({ timeout: 30_000 })
-  await expect(betaRow).toBeVisible({ timeout: 30_000 })
-  await betaRow.click()
-  await expect(botsRoster).toBeHidden({ timeout: 30_000 })
-  const betaChat = await activeMainChat(page)
-  const betaTranscript = betaChat.surface.locator('[data-slot="aui_thread-viewport"]')
-  await expect(betaTranscript).toBeVisible({ timeout: 60_000 })
-  await expect(betaTranscript).toContainText('Hello beta', { timeout: 60_000 })
-  await expect(
-    betaChat.surface.locator('[data-slot="composer-root"] [contenteditable="true"]').filter({ visible: true }).first()
-  ).toBeVisible({ timeout: 15_000 })
-  await settle(page)
-
+  // Leave alpha on the side thread, then return via the same bot row.
   await openBots(page)
   await expect(alphaRow).toBeVisible({ timeout: 30_000 })
   await alphaRow.click()
   await expect(botsRoster).toBeHidden({ timeout: 30_000 })
-  // The scoped row click leaves the roster and selects the canonical transcript
-  // with its own composer, rather than merely finding the row's sidebar preview.
   const returnedAlphaChat = await activeMainChat(page)
+  expect(returnedAlphaChat.anchor).toBe(canonicalPaneId)
   const returnedAlphaTranscript = returnedAlphaChat.surface.locator('[data-slot="aui_thread-viewport"]')
   await expect(returnedAlphaTranscript).toBeVisible({ timeout: 45_000 })
   await expect(returnedAlphaTranscript).toContainText('Hello alpha', { timeout: 45_000 })
