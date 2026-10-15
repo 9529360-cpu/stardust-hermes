@@ -46,6 +46,46 @@ async function settle(page: Page, timeout = 90_000): Promise<void> {
 const roster = (page: Page) => page.locator('[data-slot="bots-roster"]')
 const botRow = (page: Page, name: string) => roster(page).locator(`[data-roster-key="local::${name}"]`)
 
+async function waitForStableRosterLayout(page: Page, names: string[], timeout = 30_000): Promise<void> {
+  const rows = roster(page).locator('[data-roster-key]')
+  let previousLayout = ''
+  let stableSamples = 0
+
+  await expect
+    .poll(
+      async () => {
+        const layout = await rows.evaluateAll(elements =>
+          elements.map(element => {
+            const rect = element.getBoundingClientRect()
+
+            return {
+              key: element.getAttribute('data-roster-key') ?? '',
+              top: Math.round(rect.top),
+              height: Math.round(rect.height)
+            }
+          })
+        )
+        const keys = layout.map(row => row.key)
+
+        if (!names.every(name => keys.includes(`local::${name}`))) {
+          previousLayout = ''
+          stableSamples = 0
+
+          return false
+        }
+
+        const signature = JSON.stringify(layout)
+
+        stableSamples = signature === previousLayout ? stableSamples + 1 : 0
+        previousLayout = signature
+
+        return stableSamples >= 2
+      },
+      { intervals: [100, 250, 500], timeout }
+    )
+    .toBe(true)
+}
+
 async function selectedMainChat(page: Page) {
   const tab = page.locator('[data-zone-tabstrip="grp-main"] [data-tree-tab][aria-selected="true"]')
 
@@ -131,8 +171,7 @@ test('a bot row click lands on the Bot Chat the row previews, not a side thread'
   const botsRoster = roster(page)
   const alphaRow = botRow(page, 'alpha')
   const betaRow = botRow(page, 'beta')
-  await expect(alphaRow).toBeVisible({ timeout: 30_000 })
-  await expect(betaRow).toBeVisible({ timeout: 30_000 })
+  await waitForStableRosterLayout(page, ['alpha', 'beta'])
 
   await alphaRow.click()
   await expect(botsRoster).toBeHidden({ timeout: 30_000 })
@@ -174,7 +213,7 @@ test('a bot row click lands on the Bot Chat the row previews, not a side thread'
 
   // Leave alpha on the side thread, then return via the same bot row.
   await openBots(page)
-  await expect(alphaRow).toBeVisible({ timeout: 30_000 })
+  await waitForStableRosterLayout(page, ['alpha'])
   await alphaRow.click()
   await expect(botsRoster).toBeHidden({ timeout: 30_000 })
   const returnedAlphaChat = await activeMainChat(page)
