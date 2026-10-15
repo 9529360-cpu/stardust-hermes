@@ -862,6 +862,11 @@ export const host = {
    *  also scope chrome onto that profile and collapse the sidebar. */
   openSession: async (storedSessionId: string, options: PluginOpenSessionOptions = {}): Promise<void> => {
     const generation = ++openSessionGeneration
+    // Bot workspace mode is shared by the roster page and bot-owned chat tabs.
+    // Track the route this wake last left the window on. A route change made by
+    // anyone else (the user opening another panel) supersedes a bot-owned open;
+    // the open's own navigations update this baseline.
+    let openingRoute = window.location.hash
 
     // A new wake owns the syncing affordance — a lingering badge from an
     // earlier paint-first wake must not survive into this one.
@@ -904,7 +909,9 @@ export const host = {
     const openingStillCurrent = () =>
       generation === openSessionGeneration &&
       (options.workspaceMode !== 'bots' ||
-        ($workspaceMode.get() === 'bots' && $workspaceOwnerKey.get() === (options.workspaceOwnerKey ?? null)))
+        (window.location.hash === openingRoute &&
+          $workspaceMode.get() === 'bots' &&
+          $workspaceOwnerKey.get() === (options.workspaceOwnerKey ?? null)))
 
     const plan = planPluginOpenSession({
       activeProfile: $activeGatewayProfile.get(),
@@ -1013,6 +1020,9 @@ export const host = {
             } else {
               window.location.hash = target
             }
+
+            // This wake's own navigation is not a user navigation: keep the baseline current.
+            openingRoute = window.location.hash
           }
 
           const intent = options.intent ?? 'in-place'
