@@ -141,9 +141,12 @@ done
 # STARDUST_RUN_SLOW_PET_TESTS / STARDUST_E2E_BROWSER opt-ins already forwarded.
 # Keep this an explicit allowlist (no STARDUST_TEST_* glob) so the "no
 # credential can leak" property stays auditable at a glance.
+# STARDUST_FLAKY_REPORT_DIR is a location (where retry-only failures are written
+# in full), not a credential; the runner reads it to persist flake diagnostics.
 TEST_ENV=()
 for _test_var in STARDUST_TEST_IMAGE STARDUST_TEST_WORKERS STARDUST_TEST_PATHS \
-  STARDUST_TEST_FILE_TIMEOUT STARDUST_TEST_FILE_RETRIES STARDUST_TEST_SLICE; do
+  STARDUST_TEST_FILE_TIMEOUT STARDUST_TEST_FILE_RETRIES STARDUST_TEST_SLICE \
+  STARDUST_FLAKY_REPORT_DIR; do
   if [ -n "${!_test_var:-}" ]; then
     TEST_ENV+=("$_test_var=${!_test_var}")
   fi

@@ -479,9 +479,47 @@ def _run_one_file(
 # failing assertion is only a filename, which forces another expensive full
 # run to rediscover the race.
 _FLAKY_RESULTS: List[Tuple[Path, str]] = []
+_FLAKY_REPORT_DIR_ENV = "STARDUST_FLAKY_REPORT_DIR"
 # Files whose child was still alive long after pytest's summary, with its stack dump (see above).
 _TEARDOWN_DUMPS: List[Tuple[Path, str]] = []
 _flaky_lock = threading.Lock()
+
+
+def _format_flaky_report(
+    results: List[Tuple[Path, str]], repo_root: Path
+) -> str:
+    """Format retry-only failures with their original path and both attempts."""
+    sections = [
+        f"=== {len(results)} FLAKY file(s) (failed once, passed on retry) ==="
+    ]
+    for file, output in results:
+        sections.extend((f"\n--- {_format_file(file, repo_root)} ---", output.rstrip()))
+    return "\n".join(sections) + "\n"
+
+
+def _write_flaky_report(results: List[Tuple[Path, str]], repo_root: Path) -> Path | None:
+    """Persist complete flake diagnostics when a report directory is configured."""
+    report_dir = os.environ.get(_FLAKY_REPORT_DIR_ENV)
+    if not report_dir or not results:
+        return None
+    target_dir = Path(report_dir)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    target = target_dir / f"flaky-report-{stamp}-{os.getpid()}.txt"
+    target.write_text(_format_flaky_report(results, repo_root), encoding="utf-8")
+    return target
+
+
+def _print_flaky_details(result: Tuple[Path, str], repo_root: Path) -> None:
+    """Print one completed file's full retry diagnostics immediately."""
+    print(_format_flaky_report([result], repo_root), end="", flush=True)
+
+
+def _print_flaky_summary(count: int, report_path: Path | None) -> None:
+    """Print only the final count and optional durable report location."""
+    print(f"=== ⚠ {count} FLAKY file(s) (failed once, passed on retry) ===")
+    if report_path is not None:
+        print(f"  Full flake report: {report_path}")
 
 # Parent for per-file temp roots when there is no usable OS temp location and tempfile has
 # fallen back into the checkout itself (seen on Windows with TEMP/TMP set but unwritable).
@@ -1281,6 +1319,17 @@ def main() -> int:
                 file_summary=summary,
                 subproc_wall=subproc_wall,
             )
+            # Emit retry-only failures as soon as the file completes. The final
+            # summary can be beyond the hosted CI log retention limit on a large
+            # shard, so keeping this only at end-of-run loses the traceback.
+            if rc == 0:
+                flaky_result = next(
+                    ((flaky_file, flaky_output) for flaky_file, flaky_output in _FLAKY_RESULTS
+                     if flaky_file == fpath),
+                    None,
+                )
+                if flaky_result is not None:
+                    _print_flaky_details(flaky_result, repo_root)
             if rc != 0:
                 _print_inline_failure(fpath, output, repo_root, pytest_passthrough)
 
@@ -1355,11 +1404,9 @@ def main() -> int:
     # Flaky files: failed once, passed on the automatic retry. Green, but
     # loudly reported so they get fixed instead of silently re-flaking.
     if _FLAKY_RESULTS:
+        report_path = _write_flaky_report(_FLAKY_RESULTS, repo_root)
         print()
-        print(f"=== ⚠ {len(_FLAKY_RESULTS)} FLAKY file{'s' if len(_FLAKY_RESULTS) != 1 else ''} (failed once, passed on retry — fix these) ===")
-        for f, output in _FLAKY_RESULTS:
-            print(f"  {_format_file(f, repo_root)}")
-            print(output.rstrip())
+        _print_flaky_summary(len(_FLAKY_RESULTS), report_path)
 
     # Teardown dumps: a child stayed alive after pytest's summary. The file's own result is already
     # reported above; this lists the stacks so the blocking call can be identified.

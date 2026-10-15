@@ -35,7 +35,9 @@ import pytest
 # Both tests share the same handoff file: the leaker writes here, the
 # verifier reads here. We park it in $TMPDIR with a unique-per-run name
 # so concurrent invocations of the suite don't clobber each other.
-_HANDOFF_DIR = Path(os.environ.get("TMPDIR", "/tmp")) / "hermes-isolation-probe"
+_HANDOFF_DIR = Path(
+    os.environ.get("TMPDIR") or os.environ.get("TEMP") or "/tmp"
+) / "hermes-isolation-probe"
 _HANDOFF_DIR.mkdir(exist_ok=True)
 
 
@@ -483,6 +485,7 @@ def test_file_retry_self_heals_and_prints_both_attempts(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parent.parent.parent
     runner = repo_root / "scripts" / "run_tests_parallel.py"
     marker = tmp_path / "ran-once"
+    report_dir = tmp_path / "flake-reports"
     probe = tmp_path / "test_flaky_probe.py"
     probe.write_text(
         textwrap.dedent(
@@ -518,6 +521,7 @@ def test_file_retry_self_heals_and_prints_both_attempts(tmp_path: Path) -> None:
         encoding="utf-8",
         errors="replace",
         timeout=60,
+        env={**os.environ, "STARDUST_FLAKY_REPORT_DIR": str(report_dir)},
     )
 
     assert proc.returncode == 0, proc.stdout
@@ -525,6 +529,14 @@ def test_file_retry_self_heals_and_prints_both_attempts(tmp_path: Path) -> None:
     assert "simulated first-attempt flake" in proc.stdout
     assert "first-attempt output" in proc.stdout
     assert "retry output" in proc.stdout
+    assert "test_flaky_probe.py" in proc.stdout
+    reports = list(report_dir.glob("flaky-report-*.txt"))
+    assert len(reports) == 1
+    report = reports[0].read_text(encoding="utf-8")
+    assert "test_flaky_probe.py" in report
+    assert "simulated first-attempt flake" in report
+    assert "Traceback (most recent call last)" in report
+    assert "retry output" in report
 
 
 def test_fail_on_flaky_turns_retry_only_flake_red(tmp_path: Path) -> None:
