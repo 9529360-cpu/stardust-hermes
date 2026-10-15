@@ -778,6 +778,46 @@ describe('preserveLocalPendingTurnMessages', () => {
     expect(preserveLocalPendingTurnMessages(persisted, previous)).toBe(persisted)
   })
 
+  it('drops a sealed interim already embedded in the committed assistant turn', () => {
+    const interimText = 'Now checking the details before answering.'
+    const previous = [
+      msg('user-current', 'user', 'current prompt'),
+      msg('assistant-stream-interim', 'assistant', interimText, { pending: false, interim: true })
+    ]
+    const next = [
+      msg('user-current-stored', 'user', 'current prompt'),
+      msg(
+        'assistant-current-stored',
+        'assistant',
+        `Let me start by planning the approach. ${interimText} All done!`
+      )
+    ]
+
+    expect(preserveLocalPendingTurnMessages(next, previous)).toBe(next)
+  })
+
+  it('keeps a sealed interim when identical text exists only in an earlier turn', () => {
+    const interimText = 'Now checking the details before answering.'
+    const previous = [
+      msg('user-old', 'user', 'older prompt'),
+      msg('assistant-old', 'assistant', interimText),
+      msg('user-current', 'user', 'current prompt'),
+      msg('assistant-stream-interim', 'assistant', interimText, { pending: false, interim: true })
+    ]
+    const next = [
+      msg('user-old-stored', 'user', 'older prompt'),
+      msg('assistant-old-stored', 'assistant', interimText),
+      msg('user-current-stored', 'user', 'current prompt')
+    ]
+
+    expect(preserveLocalPendingTurnMessages(next, previous).map(message => message.id)).toEqual([
+      'user-old-stored',
+      'assistant-old-stored',
+      'user-current-stored',
+      'assistant-stream-interim'
+    ])
+  })
+
   it('drops stale optimistic history after compression and keeps only the live tail', () => {
     const compressedAuthority = [
       msg('stored-user', 'user', 'first turn that survived compression'),

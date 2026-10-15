@@ -588,6 +588,58 @@ export function preserveLocalPendingTurnMessages(
   }
 
   const latestAuthoritativeUser = [...nextMessages].reverse().find(message => message.role === 'user')
+
+  // The persisted mapper can coalesce sealed interim rows into one assistant
+  // message. Scope duplicate checks to this live user run so an older turn
+  // with identical text cannot consume a new interim.
+  const liveTurnUserTexts = new Set([...liveOptimisticUsers].map(normalizedMessageText))
+  const latestLiveTurnUserIndex = nextMessages.findLastIndex(
+    message =>
+      message.role === 'user' &&
+      !isGatewaySystemMarker(message) &&
+      liveTurnUserTexts.has(normalizedMessageText(message))
+  )
+
+  let liveTurnStartIndex = latestLiveTurnUserIndex
+
+  if (latestLiveTurnUserIndex >= 0) {
+    for (let index = latestLiveTurnUserIndex - 1; index >= 0; index -= 1) {
+      const candidate = nextMessages[index]
+
+      if (candidate.role === 'system' || candidate.role === 'assistant' || isGatewaySystemMarker(candidate)) {
+        continue
+      }
+
+      if (candidate.role === 'user' && liveTurnUserTexts.has(normalizedMessageText(candidate))) {
+        liveTurnStartIndex = index
+
+        continue
+      }
+
+      break
+    }
+  }
+
+  const nextTurnUserIndex =
+    latestLiveTurnUserIndex < 0
+      ? -1
+      : nextMessages.findIndex(
+          (message, index) =>
+            index > latestLiveTurnUserIndex &&
+            message.role === 'user' &&
+            !isGatewaySystemMarker(message) &&
+            !liveTurnUserTexts.has(normalizedMessageText(message))
+        )
+
+  const liveTurnMessages =
+    liveTurnStartIndex < 0
+      ? nextMessages
+      : nextMessages.slice(liveTurnStartIndex, nextTurnUserIndex >= 0 ? nextTurnUserIndex : undefined)
+
+  const committedAssistantMessages = liveTurnMessages.filter(
+    message => message.role === 'assistant' && !isLiveTailRow(message)
+  )
+
   const preserved: ChatMessage[] = []
   // Authoritative id → richer local pending row. Replacing (not appending)
   // avoids painting both the empty inflight shell and the full stream bubble.
@@ -644,13 +696,16 @@ export function preserveLocalPendingTurnMessages(
     // one ordinal earlier, and re-appending it renders the same answer twice
     // (#70209). Only text-identical rows are dropped — a settled row the backend
     // has NOT committed yet is the only copy of that reply and must survive.
+    const localInterimText = message.interim === true ? normalizedTranscriptText(chatMessageText(message)) : ''
+
     if (
       isPendingAssistant &&
       message.pending !== true &&
-      nextMessages.some(
+      committedAssistantMessages.some(
         candidate =>
-          candidate.role === 'assistant' &&
-          textWithoutReferenceLines(chatMessageText(candidate)) === textWithoutReferenceLines(chatMessageText(message))
+          textWithoutReferenceLines(chatMessageText(candidate)) === textWithoutReferenceLines(chatMessageText(message)) ||
+          (localInterimText.length > 0 &&
+            normalizedTranscriptText(chatMessageText(candidate)).includes(localInterimText))
       )
     ) {
       continue
@@ -696,7 +751,7 @@ export function preserveLocalPendingTurnMessages(
     if (isPendingAssistant) {
       const nextText = textWithoutReferenceLines(chatMessageText(message))
 
-      const committedMatch = nextMessages.find(
+      const committedMatch = committedAssistantMessages.find(
         candidate =>
           candidate.role === 'assistant' &&
           !isLiveTailRow(candidate) &&
@@ -708,7 +763,7 @@ export function preserveLocalPendingTurnMessages(
         continue
       }
 
-      const committedPrefix = nextMessages.find(
+      const committedPrefix = committedAssistantMessages.find(
         candidate =>
           candidate.role === 'assistant' &&
           !isLiveTailRow(candidate) &&
