@@ -81,6 +81,22 @@ async function watchRosterChurn(page: Page): Promise<void> {
         change.addedNodes.forEach(node => record('added', node))
       }
     }).observe(document.body, { childList: true, subtree: true })
+
+    // Sample the roster root, its row count, and the "Waking up" state, so the dump
+    // shows which pane branch the rows disappear into, even if a mutation is missed.
+    let lastState = ''
+
+    window.setInterval(() => {
+      const root = document.querySelector('[data-slot="bots-roster"]')
+      const rows = root ? root.querySelectorAll('[data-roster-key]').length : -1
+      const waking = /Waking up/i.test(document.body.innerText)
+      const state = `root=${root ? 1 : 0} rows=${rows} waking=${waking ? 1 : 0}`
+
+      if (state !== lastState) {
+        lastState = state
+        win.__rosterChurn?.push(`${Math.round(performance.now() - started)}ms sample ${state}`)
+      }
+    }, 250)
   })
 }
 
@@ -167,7 +183,8 @@ test.afterAll(async () => {
 })
 
 test.afterEach(async ({}, testInfo) => {
-  if (fixture && testInfo.status !== testInfo.expectedStatus) {
+  // Temporary while collecting samples: dump on every run, not only on failure.
+  if (fixture) {
     await dumpRosterChurn(fixture.page, testInfo.title)
   }
 })
