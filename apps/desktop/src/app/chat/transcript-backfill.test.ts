@@ -207,6 +207,45 @@ describe('reconcileRefreshedTranscriptTail', () => {
     expect(replies).toHaveLength(1)
     expect(replies[0].parts).toContainEqual({ type: 'text', text: reply })
   })
+
+  it('converges sealed interim bubbles the committed row already carries', () => {
+    const interims = [
+      'Let me start by planning the approach.',
+      'Now checking the details before answering.',
+      'Found something interesting worth noting.'
+    ]
+
+    const finalText = 'All done! Here is the complete summary of what I found.'
+
+    // History already on screen shifts the role ordinals, so these sealed live
+    // rows never pair with the committed row that already carries their text —
+    // the refresh used to append them and render each interim twice.
+    const previous: ChatMessage[] = [
+      transcriptMessage('history-assistant', 'assistant', 'an earlier reply'),
+      transcriptMessage('history-user', 'user', 'an earlier prompt'),
+      transcriptMessage('user-live', 'user', 'E2E_INTERIM_TRIGGER'),
+      { ...transcriptMessage('assistant-stream-2', 'assistant', interims[1], undefined, true), interim: true },
+      { ...transcriptMessage('assistant-stream-3', 'assistant', interims[2], undefined, true), interim: true },
+      { ...transcriptMessage('assistant-stream-4', 'assistant', finalText, undefined, true), interim: true }
+    ]
+
+    const persisted: ChatMessage[] = [
+      transcriptMessage('stored-history-assistant', 'assistant', 'an earlier reply', 1),
+      transcriptMessage('stored-history-user', 'user', 'an earlier prompt', 2),
+      transcriptMessage('stored-user', 'user', 'E2E_INTERIM_TRIGGER', 3),
+      transcriptMessage('stored-converged', 'assistant', [...interims, finalText].join('\n'), 4)
+    ]
+
+    const reconciled = reconcileRefreshedTranscriptTail(persisted, previous)
+
+    for (const text of [...interims, finalText]) {
+      const rendered = reconciled.filter(
+        message => message.role === 'assistant' && chatMessageText(message).includes(text)
+      )
+
+      expect(rendered, `"${text}" must render once`).toHaveLength(1)
+    }
+  })
 })
 
 describe('backfillOlderTranscriptPage', () => {

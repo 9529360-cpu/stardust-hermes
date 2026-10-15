@@ -593,6 +593,7 @@ export function preserveLocalPendingTurnMessages(
   // message. Scope duplicate checks to this live user run so an older turn
   // with identical text cannot consume a new interim.
   const liveTurnUserTexts = new Set([...liveOptimisticUsers].map(normalizedMessageText))
+
   const latestLiveTurnUserIndex = nextMessages.findLastIndex(
     message =>
       message.role === 'user' &&
@@ -780,6 +781,36 @@ export function preserveLocalPendingTurnMessages(
           id: committedPrefix.id
         })
 
+        continue
+      }
+    }
+
+    // A committed row can already carry this sealed interim's text. The stored
+    // transcript converges a turn with interims into ONE assistant row that
+    // still holds every interim (see the interim-messages spec), so a live
+    // bubble whose text is contained in that row renders the same commentary
+    // twice. Text-identical rows are handled above (#70209), and the two
+    // prefix tests below only catch strict extensions — an interim sealed
+    // MID-way through the committed row matched neither and slipped through.
+    // Bounded to the authoritative turn at the tail (after its last user row),
+    // so an older committed reply that happens to contain the same words can
+    // never swallow a genuinely new live row.
+    if (isPendingAssistant) {
+      const liveText = normalizedMessageText(message)
+      const lastUserInNext = nextMessages.map(candidate => candidate.role).lastIndexOf('user')
+
+      const coveredByCommitted =
+        Boolean(liveText) &&
+        nextMessages.slice(lastUserInNext + 1).some(
+          candidate =>
+            candidate.role === 'assistant' &&
+            candidate.pending !== true &&
+            !candidate.id.startsWith('assistant-stream-') &&
+            !candidate.id.startsWith('inflight-assistant-') &&
+            normalizedMessageText(candidate).includes(liveText)
+        )
+
+      if (coveredByCommitted) {
         continue
       }
     }
