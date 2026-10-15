@@ -535,7 +535,11 @@ def test_file_retry_self_heals_and_prints_both_attempts(tmp_path: Path) -> None:
     report = reports[0].read_text(encoding="utf-8")
     assert "test_flaky_probe.py" in report
     assert "simulated first-attempt flake" in report
-    assert "Traceback (most recent call last)" in report
+    # The first attempt is a pytest assertion failure, so the retained failure
+    # is pytest's own traceback (location line and AssertionError), not the
+    # Python "Traceback (most recent call last)" header.
+    assert "test_flaky_probe.py:" in report
+    assert "AssertionError: simulated first-attempt flake" in report
     assert "retry output" in report
 
 
