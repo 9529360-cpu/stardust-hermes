@@ -94,6 +94,7 @@ import {
 } from '@/store/session'
 import {
   $focusedRuntimeId,
+  $focusedSessionIsTile,
   $focusedSessionState,
   $focusedStoredSessionId,
   $sessionStates,
@@ -616,6 +617,8 @@ export const host = {
     /** Stored (durable) id of the focused session — for navigation and
      *  session-list matching, where runtime ids don't survive reloads. */
     focusedStoredSessionId: readonlyAtom<null | string>($focusedStoredSessionId),
+    /** True when a workspace tile, rather than the primary session, has focus. */
+    focusedSessionIsTile: readonlyAtom<boolean>($focusedSessionIsTile),
     /** Live usage snapshot of the focused session (`context_used` /
      *  `context_max` / `context_percent`, token counts, `cost_usd`) —
      *  streamed by the backend, no RPC needed. Null while unresolved.
