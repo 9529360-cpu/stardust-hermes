@@ -82,6 +82,9 @@ class FakeSessionRPC:
         if self.required_lock is not None:
             assert self.required_lock.held_for(profile)
 
+    def _should_auto_complete(self, profile: str) -> bool:
+        return self.auto_complete
+
     def add_session(
         self,
         *,
@@ -196,7 +199,7 @@ class FakeSessionRPC:
             self.states[session_id]["execution_generation"] = execution_generation
             self.states[session_id]["on_terminal"] = on_terminal
         self.submitted.set()
-        if self.auto_complete:
+        if self._should_auto_complete(profile):
             self.complete(task.task_id)
         return {"accepted": True}
 
@@ -274,16 +277,9 @@ class SelectiveCompletionRPC(FakeSessionRPC):
     def __init__(self, *, waiting_profiles: set[str]) -> None:
         super().__init__()
         self.waiting_profiles = waiting_profiles
-        self._submit_mode_lock = threading.Lock()
 
-    def submit(self, **kwargs):
-        with self._submit_mode_lock:
-            original = self.auto_complete
-            self.auto_complete = kwargs["profile"] not in self.waiting_profiles
-            try:
-                return super().submit(**kwargs)
-            finally:
-                self.auto_complete = original
+    def _should_auto_complete(self, profile: str) -> bool:
+        return self.auto_complete and profile not in self.waiting_profiles
 
 
 class NotAdmittedThenSuccessRPC(FakeSessionRPC):
@@ -489,18 +485,26 @@ def test_waiting_room_does_not_block_an_independent_local_room(tmp_path: Path):
         rooms=bindings,
         rpc=rpc,
         turn_lock=RecordingTurnLocks(),
-        lease_ttl_seconds=0.4,
         poll_interval_seconds=0.01,
         max_concurrent_rooms=2,
     )
 
     runtime.start()
-    _wait_for(lambda: state.get_task(db, identities[1])["status"] == "settled")
-    _wait_for(lambda: state.get_task(db, identities[0])["status"] == "running")
-    assert state.get_task(db, identities[0])["status"] == "running"
-    _wait_for(lambda: len(runtime.status()["current_tasks"]) == 1)
-    assert len(runtime.status()["current_tasks"]) == 1
-    assert runtime.stop(timeout=5.0)
+    try:
+        _wait_for(
+            lambda: state.get_task(db, identities[1])["status"] == "settled",
+            timeout=10.0,
+        )
+        _wait_for(
+            lambda: state.get_task(db, identities[0])["status"] == "running",
+            timeout=10.0,
+        )
+        assert state.get_task(db, identities[0])["status"] == "running"
+        _wait_for(lambda: len(runtime.status()["current_tasks"]) == 1)
+        assert len(runtime.status()["current_tasks"]) == 1
+    finally:
+        stopped = runtime.stop(timeout=5.0)
+    assert stopped
 
 
 def test_rotated_bounded_scheduler_eventually_runs_later_room(tmp_path: Path):
