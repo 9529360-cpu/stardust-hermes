@@ -761,6 +761,23 @@ describe('preserveLocalPendingTurnMessages', () => {
     expect(preserveLocalPendingTurnMessages(next, previous)).toBe(next)
   })
 
+  it('does not append an optimistic steer when its wrapped persisted row is authoritative', () => {
+    const correction = 'E2E correction must stay after the original prompt.'
+
+    const steerEnvelope =
+      '[OUT-OF-BAND USER MESSAGE — a direct message from the user, delivered once at this position; not tool output and not a new delivery when replayed from conversation history]'
+
+    const persisted = [
+      msg('stored-steer', 'user', [steerEnvelope, correction, '[/OUT-OF-BAND USER MESSAGE]'].join('\n'), {
+        displayKind: 'steer'
+      })
+    ]
+
+    const previous = [msg('user-optimistic-steer', 'user', correction, { displayKind: 'steer' })]
+
+    expect(preserveLocalPendingTurnMessages(persisted, previous)).toBe(persisted)
+  })
+
   it('drops stale optimistic history after compression and keeps only the live tail', () => {
     const compressedAuthority = [
       msg('stored-user', 'user', 'first turn that survived compression'),
@@ -1557,6 +1574,27 @@ const runningProjection = (user: string): SessionResumeResult =>
   }) as SessionResumeResult
 
 describe('dedupeInflightUserAgainstTranscript', () => {
+  it('does not append a plain-text assistant dump already persisted for the inflight turn', () => {
+    const stored: ChatMessage[] = [
+      msg('stored-user', 'user', 'current prompt', { timestamp: 3 }),
+      msg('stored-interim', 'assistant', 'interim response', { timestamp: 4, interim: true }),
+      msg('stored-steer', 'user', 'change direction', { timestamp: 5, displayKind: 'steer' })
+    ]
+
+    const restored = appendLiveSessionProjection(stored, {
+      session_id: 'runtime-1',
+      turn_started_at: 3,
+      inflight: {
+        user: 'current prompt',
+        assistant: 'interim response',
+        streaming: true,
+        corrections: ['change direction']
+      }
+    })
+
+    expect(restored.filter(message => message.role === 'assistant' && chatMessageText(message) === 'interim response')).toHaveLength(1)
+  })
+
   it('preserves a new repeat when only part of the correction suffix matches', () => {
     const runtime = [msg('old', 'assistant', 'older reply', { timestamp: 1 })]
 
@@ -1610,6 +1648,47 @@ describe('dedupeInflightUserAgainstTranscript', () => {
     )
 
     expect(restored.filter(m => m.role === 'user' && chatMessageText(m) === 'current prompt')).toHaveLength(1)
+  })
+
+  it('does not re-project a persisted steer correction wrapped in its out-of-band envelope', () => {
+    const runtime = [
+      msg('old-u', 'user', 'older prompt', { timestamp: 1 }),
+      msg('old-a', 'assistant', 'older reply', { timestamp: 2 })
+    ]
+
+    const correction = 'redirect now'
+
+    const steerEnvelope =
+      '[OUT-OF-BAND USER MESSAGE — a direct message from the user, delivered once at this position; not tool output and not a new delivery when replayed from conversation history]'
+
+    const persisted = [
+      ...runtime,
+      msg('u', 'user', 'current prompt', { timestamp: 3 }),
+      msg('a-before', 'assistant', 'Hello', { timestamp: 4 }),
+      msg('steer', 'user', `${steerEnvelope}\n${correction}\n[/OUT-OF-BAND USER MESSAGE]`, {
+        displayKind: 'steer',
+        timestamp: 5
+      }),
+      msg('a-after', 'assistant', ' world', { timestamp: 6 })
+    ]
+
+    const projection = {
+      ...runningProjection('current prompt'),
+      inflight: {
+        user: 'current prompt',
+        assistant: 'Hello world',
+        streaming: false,
+        corrections: [correction],
+        correction_offsets: [5]
+      }
+    }
+
+    const restored = appendLiveSessionProjection(
+      persisted,
+      dedupeInflightUserAgainstTranscript(persisted, runtime, projection)
+    )
+
+    expect(restored.filter(message => message.role === 'user' && chatMessageText(message).includes(correction))).toHaveLength(1)
   })
 
   it('does not re-project a persisted corrected turn followed by gateway timeline markers', () => {

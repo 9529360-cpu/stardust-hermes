@@ -631,8 +631,7 @@ export function preserveLocalPendingTurnMessages(
     if (
       isOptimisticUser &&
       latestAuthoritativeUser &&
-      textWithoutReferenceLines(chatMessageText(latestAuthoritativeUser)) ===
-        textWithoutReferenceLines(chatMessageText(message))
+      normalizedMessageText(latestAuthoritativeUser) === normalizedMessageText(message)
     ) {
       continue
     }
@@ -672,8 +671,7 @@ export function preserveLocalPendingTurnMessages(
       }
 
       if (
-        textWithoutReferenceLines(chatMessageText(authoritative)) ===
-        textWithoutReferenceLines(chatMessageText(message))
+        normalizedMessageText(authoritative) === normalizedMessageText(message)
       ) {
         continue
       }
@@ -839,8 +837,10 @@ export function appendLiveSessionProjection(messages: ChatMessage[], projection:
     latestUserRun.some(
       message =>
         persistedMessageBelongsToInflightTurn(message, projection.turn_started_at) &&
-        textWithoutReferenceLines(chatMessageText(message)) === textWithoutReferenceLines(text)
+        normalizedMessageText(message) === normalizedTranscriptText(text)
     )
+
+  const latestUserRunStart = latestUserRun.length ? messages.indexOf(latestUserRun[0]) : messages.length
 
   const inflightUserAlreadyPersisted =
     inflightProjectionAlreadyPersisted ||
@@ -898,7 +898,19 @@ export function appendLiveSessionProjection(messages: ChatMessage[], projection:
   )
 
   const projectAssistantDump =
-    wantsAssistantRow && !inflightProjectionAlreadyPersisted && !(turnAlreadyStructured && !inflightError)
+    wantsAssistantRow &&
+    !inflightProjectionAlreadyPersisted &&
+    !(turnAlreadyStructured && !inflightError) &&
+    !(
+      !inflightError &&
+      inflightAssistant.trim() &&
+      messages.slice(latestUserRunStart).some(
+        message =>
+          message.role === 'assistant' &&
+          persistedMessageBelongsToInflightTurn(message, projection.turn_started_at) &&
+          normalizedMessageText(message) === normalizedTranscriptText(inflightAssistant)
+      )
+    )
 
   const pushCorrection = (correction: string, index: number): void => {
     if (inflightProjectionAlreadyPersisted || persistedInLatestRun(correction)) {
@@ -979,8 +991,30 @@ export function appendLiveSessionProjection(messages: ChatMessage[], projection:
   return projected.length ? [...messages, ...projected] : messages
 }
 
+function normalizedTranscriptText(text: string): string {
+  return textWithoutReferenceLines(text).replace(/\s+/g, ' ').trim()
+}
+
+// The gateway persists a mid-turn steer with this exact marker envelope
+// (agent/prompt_builder.py). Match the stored steer to the live projection by
+// its payload while keeping the envelope untouched in the rendered message.
+const STEER_MARKER_OPEN =
+  '[OUT-OF-BAND USER MESSAGE — a direct message from the user, delivered once at this position; not tool output and not a new delivery when replayed from conversation history]'
+
+const STEER_MARKER_CLOSE = '[/OUT-OF-BAND USER MESSAGE]'
+
 function normalizedMessageText(message: ChatMessage): string {
-  return chatMessageText(message).replace(/\s+/g, ' ').trim()
+  const raw = chatMessageText(message)
+
+  if (message.role === 'user' && message.displayKind === 'steer') {
+    const trimmed = raw.trim()
+
+    if (trimmed.startsWith(STEER_MARKER_OPEN) && trimmed.endsWith(STEER_MARKER_CLOSE)) {
+      return normalizedTranscriptText(trimmed.slice(STEER_MARKER_OPEN.length, -STEER_MARKER_CLOSE.length))
+    }
+  }
+
+  return normalizedTranscriptText(raw)
 }
 
 function persistedMessageBelongsToInflightTurn(
