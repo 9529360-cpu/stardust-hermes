@@ -46,6 +46,66 @@ async function settle(page: Page, timeout = 90_000): Promise<void> {
 const roster = (page: Page) => page.locator('[data-slot="bots-roster"]')
 const botRow = (page: Page, name: string) => roster(page).locator(`[data-roster-key="local::${name}"]`)
 
+// Diagnostics for the roster flake: record every roster-row mount and unmount in
+// the page, and print the tail only when this test fails. Assertions are unchanged.
+async function watchRosterChurn(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const win = window as unknown as { __rosterChurn?: string[] }
+    const started = performance.now()
+
+    win.__rosterChurn = []
+
+    const rosterKey = (node: Node): string | null => {
+      if (!(node instanceof HTMLElement)) {
+        return null
+      }
+
+      return (
+        node.getAttribute('data-roster-key') ??
+        node.querySelector('[data-roster-key]')?.getAttribute('data-roster-key') ??
+        null
+      )
+    }
+
+    const record = (op: string, node: Node) => {
+      const key = rosterKey(node)
+
+      if (key) {
+        win.__rosterChurn?.push(`${Math.round(performance.now() - started)}ms ${op} ${key}`)
+      }
+    }
+
+    new MutationObserver(records => {
+      for (const change of records) {
+        change.removedNodes.forEach(node => record('removed', node))
+        change.addedNodes.forEach(node => record('added', node))
+      }
+    }).observe(document.body, { childList: true, subtree: true })
+
+    // Sample the roster root, its row count, and the "Waking up" state, so the dump
+    // shows which pane branch the rows disappear into, even if a mutation is missed.
+    let lastState = ''
+
+    window.setInterval(() => {
+      const root = document.querySelector('[data-slot="bots-roster"]')
+      const rows = root ? root.querySelectorAll('[data-roster-key]').length : -1
+      const waking = /Waking up/i.test(document.body.innerText)
+      const state = `root=${root ? 1 : 0} rows=${rows} waking=${waking ? 1 : 0}`
+
+      if (state !== lastState) {
+        lastState = state
+        win.__rosterChurn?.push(`${Math.round(performance.now() - started)}ms sample ${state}`)
+      }
+    }, 250)
+  })
+}
+
+async function dumpRosterChurn(page: Page, label: string): Promise<void> {
+  const events = await page.evaluate(() => (window as unknown as { __rosterChurn?: string[] }).__rosterChurn ?? [])
+
+  console.log(`ROSTER_CHURN [${label}] total=${events.length}\n${events.slice(-120).join('\n')}`)
+}
+
 async function selectedMainChat(page: Page) {
   const tab = page.locator('[data-zone-tabstrip="grp-main"] [data-tree-tab][aria-selected="true"]')
 
@@ -122,11 +182,19 @@ test.afterAll(async () => {
   fixture = null
 })
 
+test.afterEach(async ({}, testInfo) => {
+  // Temporary while collecting samples: dump on every run, not only on failure.
+  if (fixture) {
+    await dumpRosterChurn(fixture.page, testInfo.title)
+  }
+})
+
 test('a bot row click lands on the Bot Chat the row previews, not a side thread', async () => {
   test.setTimeout(300_000)
   const page = fixture!.page
 
   await openBots(page)
+  await watchRosterChurn(page)
 
   const botsRoster = roster(page)
   const alphaRow = botRow(page, 'alpha')
