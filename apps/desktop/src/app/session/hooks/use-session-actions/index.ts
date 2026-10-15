@@ -260,7 +260,7 @@ function applyStoredUsage(stored: { input_tokens?: number | null; output_tokens?
 function reconcileAuthoritativeChatMessages(
   authoritativeMessages: ChatMessage[],
   previousMessages: ChatMessage[],
-  liveProjection?: Pick<SessionResumeResult, 'inflight' | 'queued' | 'session_id'>
+  liveProjection?: Pick<SessionResumeResult, 'inflight' | 'queued' | 'session_id' | 'turn_started_at'>
 ): ChatMessage[] {
   const withLiveProjection = liveProjection
     ? appendLiveSessionProjection(authoritativeMessages, liveProjection)
@@ -275,7 +275,7 @@ function reconcileAuthoritativeChatMessages(
 function reconcileAuthoritativeMessages(
   authoritativeMessages: SessionResumeResult['messages'],
   previousMessages: ChatMessage[],
-  liveProjection?: Pick<SessionResumeResult, 'inflight' | 'queued' | 'session_id'>
+  liveProjection?: Pick<SessionResumeResult, 'inflight' | 'queued' | 'session_id' | 'turn_started_at'>
 ): ChatMessage[] {
   return reconcileAuthoritativeChatMessages(toChatMessages(authoritativeMessages), previousMessages, liveProjection)
 }
@@ -1479,7 +1479,7 @@ export function useSessionActions({
                       acceptedPersistedDisplayTranscript || hasValidProvenance
                         ? (expectedProvenance ?? undefined)
                         : undefined,
-                    ...(livePromptStreamId(pendingConnectionProjection, pendingClarifyProjection)),
+                    ...livePromptStreamId(pendingConnectionProjection, pendingClarifyProjection),
                     ...(clearedClarifyProjection
                       ? {
                           streamId: state.busy ? (clearedClarifyProjection.streamId ?? state.streamId) : null
@@ -1829,7 +1829,12 @@ export function useSessionActions({
         const pendingApproval = restorePendingApproval(resumed, resumed.session_id)
         const pendingClarifyState = restorePendingClarifyFromSnapshot(resumed, resumed.session_id, resumeStartedAt)
         const pendingClarify = pendingClarifyState.request
-        const pendingConnection = restorePendingConnectionFromSnapshot(resumed, resumed.session_id, resumeStartedAt).request
+
+        const pendingConnection = restorePendingConnectionFromSnapshot(
+          resumed,
+          resumed.session_id,
+          resumeStartedAt
+        ).request
 
         const clarifyAuthoritativelyAbsent =
           pendingClarifyState.authoritativeAbsent && !$clarifyRequests.get()[resumed.session_id]
@@ -1909,7 +1914,7 @@ export function useSessionActions({
               : {
                   turnStartedAt: resumedRunning && resumedTurnStartedAt !== null ? resumedTurnStartedAt : null
                 }),
-            ...(livePromptStreamId(pendingConnectionProjection, pendingClarifyProjection)),
+            ...livePromptStreamId(pendingConnectionProjection, pendingClarifyProjection),
             ...(clearedClarifyProjection
               ? {
                   streamId: resumedRunning ? (clearedClarifyProjection.streamId ?? state.streamId) : null
@@ -2513,12 +2518,14 @@ export function useSessionActions({
       // delete lands in the same tick, which used to leave the doomed route in
       // place and let the generic 4001 recovery rebind it.
       const wasSelected = selectedStoredSessionIdRef.current === storedSessionId
+
       // A sidebar/background session can still own a live runtime. Deleting the
       // durable row must terminate that runtime too, not only the selected one.
       const closingRuntimeId =
         (wasSelected ? activeSessionIdRef.current : null) ??
         runtimeIdByStoredSessionIdRef.current.get(storedSessionId) ??
         null
+
       const previousMessages = $messages.get()
       const previousPinned = $pinnedSessionIds.get()
 

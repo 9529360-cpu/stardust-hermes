@@ -29,6 +29,9 @@ const isAutoContinuation = (message: SessionMessage | undefined): boolean =>
 const ATTACHED_CONTEXT_MARKER_RE = /(?:^|\n)--- Attached Context ---\s*\n/
 const CONTEXT_WARNINGS_MARKER_RE = /(?:^|\n)--- Context Warnings ---[\s\S]*$/
 const CONTEXT_REF_RE = /@(file|folder|url|image|tool|terminal):(?:"[^"\n]+"|'[^'\n]+'|`[^`\n]+`|\S+)/g
+const STEER_MARKER_OPEN =
+  '[OUT-OF-BAND USER MESSAGE — a direct message from the user, delivered once at this position; not tool output and not a new delivery when replayed from conversation history]'
+const STEER_MARKER_CLOSE = '[/OUT-OF-BAND USER MESSAGE]'
 
 /**
  * Reply text from a Responses-API `codex_message_items` sidecar (#68321), for rows
@@ -98,11 +101,25 @@ function codexMessageItemText(message: SessionMessage): string {
   return texts.join('')
 }
 
-function displayContentForMessage(role: SessionMessage['role'], content: unknown): string {
+function displayContentForMessage(
+  role: SessionMessage['role'],
+  content: unknown,
+  displayKind?: SessionMessage['display_kind']
+): string {
   const textContent = textFromUnknown(content)
 
   if (role !== 'user') {
     return textContent
+  }
+
+  const trimmed = textContent.trim()
+
+  if (
+    displayKind === 'steer' &&
+    trimmed.startsWith(STEER_MARKER_OPEN) &&
+    trimmed.endsWith(STEER_MARKER_CLOSE)
+  ) {
+    return trimmed.slice(STEER_MARKER_OPEN.length, -STEER_MARKER_CLOSE.length).trim()
   }
 
   // A `/skill` turn is stored expanded (the whole skill body). Current
@@ -349,7 +366,7 @@ export function toChatMessages(messages: SessionMessage[]): ChatMessage[] {
 
     const rawDisplayContent = transcriptContent(
       message.display_kind,
-      timelineDisplayContent(message, displayContentForMessage(message.role, content))
+      timelineDisplayContent(message, displayContentForMessage(message.role, content, message.display_kind))
     )
 
     const displayRole =
@@ -437,9 +454,7 @@ export function toChatMessages(messages: SessionMessage[]): ChatMessage[] {
       // When a preceding assistant produced only tools, keep those tools in
       // their own bubble instead of absorbing this separate text-only row.
       const continuationAfterText =
-        parts.length > 0 &&
-        parts.every(part => part.type === 'text') &&
-        isAutoContinuation(messages[index + 1])
+        parts.length > 0 && parts.every(part => part.type === 'text') && isAutoContinuation(messages[index + 1])
 
       if (continuationAfterText && pendingToolParts.length) {
         flushPendingTools(index, true)
@@ -485,6 +500,7 @@ export function toChatMessages(messages: SessionMessage[]): ChatMessage[] {
       id: `${message.timestamp || Date.now()}-${index}-${displayRole}`,
       role: displayRole,
       parts,
+      ...(message.display_kind !== undefined ? { displayKind: message.display_kind } : {}),
       ...(isAutoContinuation(message) ? { autoContinue: true } : {}),
       ...(message.display_kind === 'async_delegation_complete' || message.display_kind === 'process_complete'
         ? { asyncResult: asyncResultBody(displayContentForMessage(message.role, message.content || content)) }
@@ -493,7 +509,8 @@ export function toChatMessages(messages: SessionMessage[]): ChatMessage[] {
       ...(rowId !== undefined ? { rowId } : {}),
       ...(message.role === 'assistant' &&
       isAutoContinuation(messages[index + 1]) &&
-      parts.length > 0 && parts.every(part => part.type === 'text')
+      parts.length > 0 &&
+      parts.every(part => part.type === 'text')
         ? { interim: true }
         : {}),
       ...(reactions.length ? { reactions } : {}),

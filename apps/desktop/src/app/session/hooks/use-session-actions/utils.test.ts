@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { textWithoutReferenceLines, WIRE_REFERENCE_KINDS } from '@/components/assistant-ui/reference-kinds'
-import { type ChatMessage, type ChatMessagePart, chatMessageText } from '@/lib/chat-messages'
+import { type ChatMessage, type ChatMessagePart, chatMessageText, toChatMessages } from '@/lib/chat-messages'
 import { $approvalModes, approvalModeForProfile } from '@/store/approval-mode'
 import { $desktopOnboarding, consumePendingCredentialWarning } from '@/store/onboarding'
 import { $activeGatewayProfile } from '@/store/profile'
@@ -759,6 +759,61 @@ describe('preserveLocalPendingTurnMessages', () => {
     ]
 
     expect(preserveLocalPendingTurnMessages(next, previous)).toBe(next)
+  })
+
+  it('does not append an optimistic steer when its wrapped persisted row is authoritative', () => {
+    const correction = 'E2E correction must stay after the original prompt.'
+
+    const steerEnvelope =
+      '[OUT-OF-BAND USER MESSAGE — a direct message from the user, delivered once at this position; not tool output and not a new delivery when replayed from conversation history]'
+
+    const persisted = [
+      msg('stored-steer', 'user', [steerEnvelope, correction, '[/OUT-OF-BAND USER MESSAGE]'].join('\n'), {
+        displayKind: 'steer'
+      })
+    ]
+
+    const previous = [msg('user-optimistic-steer', 'user', correction, { displayKind: 'steer' })]
+
+    expect(preserveLocalPendingTurnMessages(persisted, previous)).toBe(persisted)
+  })
+
+  it('drops settled stream segments already embedded in committed assistant history', () => {
+    const interimText = 'Now checking the details before answering.'
+    const finalText = 'All done! Here is the complete summary of what I found.'
+    const previous = [
+      msg('user-current', 'user', 'current prompt'),
+      msg('assistant-stream-interim', 'assistant', interimText, { pending: false, interim: true }),
+      msg('assistant-stream-final', 'assistant', finalText, { pending: false })
+    ]
+    const next = [
+      msg('user-current-stored', 'user', 'current prompt'),
+      msg('assistant-current-stored', 'assistant', `Let me start by planning the approach. ${interimText} ${finalText}`)
+    ]
+
+    expect(preserveLocalPendingTurnMessages(next, previous)).toBe(next)
+  })
+
+  it('keeps a sealed interim when identical text exists only in an earlier turn', () => {
+    const interimText = 'Now checking the details before answering.'
+    const previous = [
+      msg('user-old', 'user', 'older prompt'),
+      msg('assistant-old', 'assistant', interimText),
+      msg('user-current', 'user', 'current prompt'),
+      msg('assistant-stream-interim', 'assistant', interimText, { pending: false, interim: true })
+    ]
+    const next = [
+      msg('user-old-stored', 'user', 'older prompt'),
+      msg('assistant-old-stored', 'assistant', interimText),
+      msg('user-current-stored', 'user', 'current prompt')
+    ]
+
+    expect(preserveLocalPendingTurnMessages(next, previous).map(message => message.id)).toEqual([
+      'user-old-stored',
+      'assistant-old-stored',
+      'user-current-stored',
+      'assistant-stream-interim'
+    ])
   })
 
   it('drops stale optimistic history after compression and keeps only the live tail', () => {
@@ -1557,6 +1612,27 @@ const runningProjection = (user: string): SessionResumeResult =>
   }) as SessionResumeResult
 
 describe('dedupeInflightUserAgainstTranscript', () => {
+  it('does not append a plain-text assistant dump already persisted for the inflight turn', () => {
+    const stored: ChatMessage[] = [
+      msg('stored-user', 'user', 'current prompt', { timestamp: 3 }),
+      msg('stored-interim', 'assistant', 'interim response', { timestamp: 4, interim: true }),
+      msg('stored-steer', 'user', 'change direction', { timestamp: 5, displayKind: 'steer' })
+    ]
+
+    const restored = appendLiveSessionProjection(stored, {
+      session_id: 'runtime-1',
+      turn_started_at: 3,
+      inflight: {
+        user: 'current prompt',
+        assistant: 'interim response',
+        streaming: true,
+        corrections: ['change direction']
+      }
+    })
+
+    expect(restored.filter(message => message.role === 'assistant' && chatMessageText(message) === 'interim response')).toHaveLength(1)
+  })
+
   it('preserves a new repeat when only part of the correction suffix matches', () => {
     const runtime = [msg('old', 'assistant', 'older reply', { timestamp: 1 })]
 
@@ -1610,6 +1686,295 @@ describe('dedupeInflightUserAgainstTranscript', () => {
     )
 
     expect(restored.filter(m => m.role === 'user' && chatMessageText(m) === 'current prompt')).toHaveLength(1)
+  })
+
+  it('does not re-project a persisted steer correction wrapped in its out-of-band envelope', () => {
+    const runtime = [
+      msg('old-u', 'user', 'older prompt', { timestamp: 1 }),
+      msg('old-a', 'assistant', 'older reply', { timestamp: 2 })
+    ]
+
+    const correction = 'redirect now'
+
+    const steerEnvelope =
+      '[OUT-OF-BAND USER MESSAGE — a direct message from the user, delivered once at this position; not tool output and not a new delivery when replayed from conversation history]'
+
+    const persisted = [
+      ...runtime,
+      msg('u', 'user', 'current prompt', { timestamp: 3 }),
+      msg('a-before', 'assistant', 'Hello', { timestamp: 4 }),
+      msg('steer', 'user', `${steerEnvelope}\n${correction}\n[/OUT-OF-BAND USER MESSAGE]`, {
+        displayKind: 'steer',
+        timestamp: 5
+      }),
+      msg('a-after', 'assistant', ' world', { timestamp: 6 })
+    ]
+
+    const projection = {
+      ...runningProjection('current prompt'),
+      inflight: {
+        user: 'current prompt',
+        assistant: 'Hello world',
+        streaming: false,
+        corrections: [correction],
+        correction_offsets: [5]
+      }
+    }
+
+    const restored = appendLiveSessionProjection(
+      persisted,
+      dedupeInflightUserAgainstTranscript(persisted, runtime, projection)
+    )
+
+    expect(restored.filter(message => message.role === 'user' && chatMessageText(message).includes(correction))).toHaveLength(1)
+  })
+
+  it('does not re-project a persisted corrected turn followed by gateway timeline markers', () => {
+    const runtime = [
+      msg('old-u', 'user', 'older prompt', { timestamp: 1 }),
+      msg('old-a', 'assistant', 'older reply', { timestamp: 2 })
+    ]
+
+    const gatewayMarkers = toChatMessages([
+      {
+        role: 'user',
+        content: '[System: The active model for this chat has changed to k3.]',
+        display_kind: 'model_switch',
+        timestamp: 7
+      },
+      {
+        role: 'user',
+        content: '[System: The assistant personality changed.]',
+        display_kind: 'personality_switch',
+        timestamp: 8
+      },
+      {
+        role: 'user',
+        content: '[System: Background agent work finished.]',
+        display_kind: 'async_delegation_complete',
+        timestamp: 9
+      },
+      {
+        role: 'user',
+        content: '[System: Background process finished.]',
+        display_kind: 'process_complete',
+        timestamp: 10
+      },
+      {
+        role: 'user',
+        content: '[System: The interrupted turn resumed.]',
+        display_kind: 'auto_continue',
+        timestamp: 11
+      }
+    ])
+
+    const modelSwitchMarker = gatewayMarkers[0]
+
+    expect(gatewayMarkers.map(message => message.role)).toEqual(Array.from({ length: 5 }, () => 'system'))
+    expect(modelSwitchMarker).toMatchObject({ role: 'system', displayKind: 'model_switch' })
+    expect(chatMessageText(modelSwitchMarker)).toBe('model changed')
+    expect(chatMessagesEquivalent(modelSwitchMarker, { ...modelSwitchMarker, displayKind: undefined })).toBe(false)
+
+    const persisted: ChatMessage[] = [
+      ...runtime,
+      msg('u', 'user', 'current prompt', { timestamp: 3 }),
+      msg('a-before-correction', 'assistant', 'Hello', { timestamp: 4 }),
+      msg('c', 'user', 'redirect now', { timestamp: 5 }),
+      {
+        id: 'a-after-correction',
+        role: 'assistant',
+        parts: [
+          { type: 'tool-call', toolCallId: 'call-after-correction', toolName: 'terminal', args: {}, result: 'done' },
+          { type: 'text', text: 'Moving.' }
+        ]
+      },
+      ...gatewayMarkers
+    ]
+
+    const projection = {
+      ...runningProjection('current prompt'),
+      inflight: {
+        user: 'current prompt',
+        assistant: 'HelloMoving.',
+        streaming: true,
+        corrections: ['redirect now'],
+        correction_offsets: [5]
+      }
+    }
+
+    const deduped = dedupeInflightUserAgainstTranscript(persisted, runtime, projection)
+    const restored = appendLiveSessionProjection(persisted, deduped)
+
+    expect(restored.map(message => message.id)).toEqual(persisted.map(message => message.id))
+    expect(restored.map(message => message.role)).toEqual([
+      'user',
+      'assistant',
+      'user',
+      'assistant',
+      'user',
+      'assistant',
+      ...gatewayMarkers.map(() => 'system')
+    ])
+    expect(
+      restored.some(message => message.role === 'assistant' && message.parts.some(part => part.type === 'tool-call'))
+    ).toBe(true)
+    expect(restored.filter(message => message.role === 'user').map(chatMessageText)).toEqual([
+      'older prompt',
+      'current prompt',
+      'redirect now'
+    ])
+    expect(restored.filter(message => message.role === 'assistant').map(chatMessageText)).toEqual([
+      'older reply',
+      'Hello',
+      'Moving.'
+    ])
+  })
+
+  it('preserves a repeated corrected prompt when the persisted assistant text differs', () => {
+    const runtime = [
+      msg('old-u', 'user', 'older prompt', { timestamp: 1 }),
+      msg('old-a', 'assistant', 'older reply', { timestamp: 2 })
+    ]
+
+    const persisted = [
+      ...runtime,
+      msg('prior-u', 'user', 'current prompt', { timestamp: 3 }),
+      msg('prior-a-before-correction', 'assistant', 'Hello', { timestamp: 4 }),
+      msg('prior-correction', 'user', 'redirect now', { timestamp: 5 }),
+      msg('prior-a-after-correction', 'assistant', 'Completed answer', { timestamp: 6 })
+    ]
+
+    const projection = {
+      ...runningProjection('current prompt'),
+      inflight: {
+        user: 'current prompt',
+        assistant: 'New current answer',
+        streaming: true,
+        corrections: ['redirect now'],
+        correction_offsets: [0]
+      }
+    }
+
+    const deduped = dedupeInflightUserAgainstTranscript(persisted, runtime, projection)
+    const restored = appendLiveSessionProjection(persisted, deduped)
+
+    expect(deduped).toBe(projection)
+    expect(
+      restored.filter(message => message.role === 'user' && chatMessageText(message) === 'current prompt')
+    ).toHaveLength(2)
+    expect(restored.at(-1)).toMatchObject({ id: 'assistant-stream-runtime-1', pending: true })
+  })
+
+  it('keeps a new corrected repeat when a compressed runtime anchor leaves an older matching turn in the REST suffix', () => {
+    const runtime = [
+      msg('anchor-u', 'user', 'compressed runtime anchor', { timestamp: 1 }),
+      msg('anchor-a', 'assistant', 'anchor reply', { timestamp: 2 })
+    ]
+
+    const persisted = [
+      ...runtime,
+      msg('prior-u', 'user', 'repeat prompt', { timestamp: 10 }),
+      msg('prior-a-before-correction', 'assistant', 'Earlier task started.', { timestamp: 11 }),
+      msg('prior-correction', 'user', 'repeat correction', { timestamp: 12 }),
+      msg('prior-a-after-correction', 'assistant', 'The answer was completed earlier.', { timestamp: 13 })
+    ]
+
+    const projection = {
+      ...runningProjection('repeat prompt'),
+      turn_started_at: 20,
+      inflight: {
+        user: 'repeat prompt',
+        assistant: 'The answer',
+        streaming: true,
+        corrections: ['repeat correction'],
+        correction_offsets: [0]
+      }
+    }
+
+    const deduped = dedupeInflightUserAgainstTranscript(persisted, runtime, projection)
+    const restored = appendLiveSessionProjection(persisted, deduped)
+
+    expect(deduped).toBe(projection)
+    expect(
+      restored.filter(message => message.role === 'user' && chatMessageText(message) === 'repeat prompt')
+    ).toHaveLength(2)
+    expect(
+      restored.filter(message => message.role === 'user' && chatMessageText(message) === 'repeat correction')
+    ).toHaveLength(2)
+    expect(restored.at(-1)?.id).toBe('assistant-stream-runtime-1')
+  })
+
+  it('does not anchor a live marker to an unrelated same-text system row without its displayKind', () => {
+    const modelSwitchMarker = toChatMessages([
+      {
+        role: 'user',
+        content: '[System: The active model for this chat has changed to k3.]',
+        display_kind: 'model_switch',
+        timestamp: 3
+      }
+    ])[0]
+
+    const ordinarySystemRow = { ...modelSwitchMarker, displayKind: undefined }
+    const runtime = [msg('anchor-u', 'user', 'compressed runtime anchor', { timestamp: 1 }), modelSwitchMarker]
+
+    const persisted = [
+      runtime[0],
+      ordinarySystemRow,
+      msg('prior-u', 'user', 'repeat prompt', { timestamp: 4 }),
+      msg('prior-a-before-correction', 'assistant', 'Earlier task started.', { timestamp: 5 }),
+      msg('prior-correction', 'user', 'repeat correction', { timestamp: 6 }),
+      msg('prior-a-after-correction', 'assistant', 'The answer was completed earlier.', { timestamp: 7 })
+    ]
+
+    const projection = {
+      ...runningProjection('repeat prompt'),
+      inflight: {
+        user: 'repeat prompt',
+        assistant: 'The answer',
+        streaming: true,
+        corrections: ['repeat correction'],
+        correction_offsets: [0]
+      }
+    }
+
+    const deduped = dedupeInflightUserAgainstTranscript(persisted, runtime, projection)
+
+    expect(deduped).toBe(projection)
+  })
+
+  it('does not treat a same-text system row without displayKind as a model-switch marker', () => {
+    const runtime = [
+      msg('old-u', 'user', 'older prompt', { timestamp: 1 }),
+      msg('old-a', 'assistant', 'older reply', { timestamp: 2 })
+    ]
+
+    const persisted = [
+      ...runtime,
+      msg('u', 'user', 'current prompt', { timestamp: 3 }),
+      msg('a-before-correction', 'assistant', 'Hello', { timestamp: 4 }),
+      msg('c', 'user', 'redirect now', { timestamp: 5 }),
+      msg('a-after-correction', 'assistant', 'Moving.', { timestamp: 6 }),
+      msg('unrelated-system', 'system', 'model changed', { timestamp: 7 })
+    ]
+
+    const projection = {
+      ...runningProjection('current prompt'),
+      inflight: {
+        user: 'current prompt',
+        assistant: 'HelloMoving.',
+        streaming: true,
+        corrections: ['redirect now'],
+        correction_offsets: [5]
+      }
+    }
+
+    const deduped = dedupeInflightUserAgainstTranscript(persisted, runtime, projection)
+    const restored = appendLiveSessionProjection(persisted, deduped)
+
+    expect(deduped).toBe(projection)
+    expect(
+      restored.filter(message => message.role === 'user' && chatMessageText(message) === 'current prompt')
+    ).toHaveLength(2)
   })
 
   it('retains the in-flight user source only when it already exists after the runtime anchor', () => {
