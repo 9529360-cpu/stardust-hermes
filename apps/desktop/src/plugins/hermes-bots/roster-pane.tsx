@@ -41,6 +41,7 @@ import { $activeGroupMemberKeys } from './group-presence'
 import { $showHiddenBots, isBotHidden } from './hidden-bots'
 import { useBots } from './i18n'
 import { $activityToasts } from './roster-actions'
+import { lastRosterForConnection } from './roster-last-good'
 import { renderRosterContent } from './roster-pane-content'
 import { deriveRosterPresentation, deriveRosterRows, sortRosterBots } from './roster-pane-derivation'
 import { renderRosterDialogs } from './roster-pane-dialogs'
@@ -297,7 +298,9 @@ export function BotsPane() {
   // waking from sleep fail transiently. Render the last good snapshot with
   // a notice; the full error card is reserved for "never had a roster".
   const live = Array.isArray(data?.profiles) ? data.profiles : null
-  const source = live ?? (error ? $lastRoster.get() : [])
+  // While the query reloads with no live data and no error, keep this connection's
+  // last good rows so a query-key or cache reset does not unmount them.
+  const source = live ?? (error ? $lastRoster.get() : lastRosterForConnection($lastRoster.get(), activeConnectionId))
   const sourceSnapshot = Array.isArray(data?.sources) ? data.sources : rememberedSources
 
   const sourceWithSelectedOwner =
