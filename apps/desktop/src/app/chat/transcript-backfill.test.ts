@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { ChatMessage } from '@/lib/chat-messages'
+import { type ChatMessage, chatMessageText } from '@/lib/chat-messages'
 import { $transcriptTailBySessionId, recordTranscriptTail, transcriptTailState } from '@/store/transcript-tail'
 
 import {
@@ -8,11 +8,13 @@ import {
   backfillOlderTranscriptPage,
   graftRefreshedTailOntoBackfill,
   mergeOlderTranscriptPage,
+  reconcileRefreshedTranscriptTail,
   transcriptBackfillAvailable
 } from './transcript-backfill'
 
 vi.mock('@/hermes', () => ({
-  getOlderSessionMessages: vi.fn()
+  getOlderSessionMessages: vi.fn(),
+  setApiRequestProfile: vi.fn()
 }))
 
 const { getOlderSessionMessages } = await import('@/hermes')
@@ -31,6 +33,20 @@ const row = (rowId: number, text: string) => ({
   role: 'user' as const,
   content: text,
   timestamp: 1_000 + rowId
+})
+
+const transcriptMessage = (
+  id: string,
+  role: ChatMessage['role'],
+  text: string,
+  rowId?: number,
+  pending?: boolean
+): ChatMessage => ({
+  id,
+  role,
+  parts: [{ type: 'text', text }],
+  ...(rowId !== undefined ? { rowId } : {}),
+  ...(pending !== undefined ? { pending } : {})
 })
 
 describe('transcript tail bookkeeping', () => {
@@ -156,6 +172,40 @@ describe('graftRefreshedTailOntoBackfill', () => {
     const refreshed = [chat('a', 1), chat('b', 2)]
 
     expect(graftRefreshedTailOntoBackfill(refreshed, previous)).toBe(refreshed)
+  })
+})
+
+describe('reconcileRefreshedTranscriptTail', () => {
+  it('does not append a settled corrected reply after post-turn history refresh', () => {
+    const prompt = 'E2E_CORRECTION_SWITCH_TRIGGER: original prompt must remain singular after a correction.'
+    const correction = 'E2E correction must stay after the original prompt.'
+    const reply = 'The corrected task finished.'
+    const processMarker = '[System: Background Process Finished: sleep 5]'
+
+    const previous = [
+      transcriptMessage('user-original', 'user', prompt),
+      transcriptMessage('user-correction', 'user', correction),
+      transcriptMessage('assistant-stream-live', 'assistant', reply, undefined, false),
+      transcriptMessage('process-complete-live', 'user', processMarker)
+    ]
+
+    const persisted = [
+      transcriptMessage('stored-prompt', 'user', prompt, 1),
+      transcriptMessage('stored-correction', 'user', correction, 2),
+      transcriptMessage('stored-reply', 'assistant', reply, 3),
+      transcriptMessage('stored-process-complete', 'user', processMarker, 4)
+    ]
+
+    const reconciled = reconcileRefreshedTranscriptTail(persisted, previous)
+    const replies = reconciled.filter(message => message.role === 'assistant')
+
+    const userTurns = reconciled
+      .filter(message => message.role === 'user' && [prompt, correction].includes(chatMessageText(message)))
+      .map(chatMessageText)
+
+    expect(userTurns).toEqual([prompt, correction])
+    expect(replies).toHaveLength(1)
+    expect(replies[0].parts).toContainEqual({ type: 'text', text: reply })
   })
 })
 
