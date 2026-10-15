@@ -137,6 +137,7 @@ test('a bot row click lands on the Bot Chat the row previews, not a side thread'
   await alphaRow.click()
   await expect(botsRoster).toBeHidden({ timeout: 30_000 })
   const alphaChat = await activeMainChat(page)
+  const canonicalPaneId = alphaChat.anchor
   const alphaTranscript = alphaChat.surface.locator('[data-slot="aui_thread-viewport"]')
   await expect(alphaTranscript).toBeVisible({ timeout: 45_000 })
   await expect(alphaTranscript).toContainText('Hello alpha', { timeout: 45_000 })
