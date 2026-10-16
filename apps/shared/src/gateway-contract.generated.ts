@@ -1522,6 +1522,7 @@ export interface ProfileRow {
   name: string
   path: string
   is_default?: boolean
+  profile_kind?: 'agent' | 'user'
   model?: string | null
   provider?: string | null
   description?: string
@@ -1569,6 +1570,7 @@ export interface ProfilesCreateParams {
   clone_from?: string | null
   clone_all?: boolean | string | null
   clone_channels?: boolean | string | null
+  profile_kind?: 'agent' | 'user' | null
   no_skills?: boolean | string | null
   no_alias?: boolean | string | null
   soul?: string | null
@@ -1631,6 +1633,7 @@ export interface McpServerEntry {
 export interface ProfilesConfigureParams {
   profile?: string | null
   name?: string | null
+  profile_kind?: 'agent' | 'user' | null
   ui_meta?: Record<string, unknown> | null
   ui_meta_expected_revisions?: Record<string, number> | null
   soul?: string | null
