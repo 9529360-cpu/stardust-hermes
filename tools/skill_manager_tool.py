@@ -880,6 +880,15 @@ def skill_manage(
     if operations is not None:
         return _skill_manage_batch(
             operations, default_name=name or None, task_id=task_id, session_id=session_id)
+    if action == "remove_file":
+        from tools.skill_consolidation_validation import active_validation
+        review = active_validation()
+        if review is not None and name in review.originals:
+            return tool_error(
+                "Curator must retain the original supporting files until validation "
+                "has completed; re-home copies under the umbrella instead.",
+                success=False,
+            )
     if (preflight := _background_review_preflight(action, name)) is not None:
         return json.dumps(preflight, ensure_ascii=False)
     # Approval gate: skills are too large to review inline, so they always stage regardless

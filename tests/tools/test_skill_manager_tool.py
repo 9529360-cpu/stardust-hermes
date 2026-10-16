@@ -1451,3 +1451,24 @@ def test_curator_final_check_auto_restores_archived_original(tmp_path, monkeypat
             validation.finalize()
             assert validation.summary()["restored"] == 1
             assert (root / "browser-login" / "SKILL.md").exists()
+
+
+
+def test_curator_does_not_strip_original_support_files(tmp_path, monkeypatch):
+    """A rejected merge must leave the original complete and recoverable."""
+    from tools.skill_consolidation_validation import curator_validation_pass
+
+    with _curator_pass(tmp_path, monkeypatch=monkeypatch) as root:
+        _create_curator_skill("browser-login", _skill_content("browser-login"))
+        references = root / "browser-login" / "references"
+        references.mkdir()
+        note = references / "recovery.md"
+        note.write_text("preserve this procedure", encoding="utf-8")
+
+        with curator_validation_pass([{"name": "browser-login"}]):
+            outcome = json.loads(skill_manage(
+                action="remove_file", name="browser-login",
+                file_path="references/recovery.md",
+            ))
+            assert outcome["success"] is False
+            assert note.read_text(encoding="utf-8") == "preserve this procedure"
