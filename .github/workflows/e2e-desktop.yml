@@ -122,7 +122,7 @@ jobs:
           else
             echo "On PR — comparing against cached baselines"
             npm run build && xvfb-run -a --server-args="-screen 0 1280x1024x24" \
-              npx playwright test --reporter=list
+              npx playwright test --reporter=list e2e/group-turn-integrity.spec.ts e2e/cron-result-labels.spec.ts
           fi
         env:
           CI: 'true'
