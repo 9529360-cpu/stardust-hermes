@@ -1037,3 +1037,41 @@ def test_review_prompt_does_not_steer_terminal_writes():
             "write_file/remove_file instead"
         )
         assert "&& mv" not in text
+
+
+
+def test_curator_fork_runs_under_bounded_validation_context(curator_env, monkeypatch):
+    """The existing LLM fork sees one immutable pre-review snapshot, not a new Agent."""
+    from tools.skill_consolidation_validation import active_validation
+
+    curator = curator_env["curator"]
+    usage = curator_env["usage"]
+    folder = curator_env["home"] / "skills"
+    _write_skill(folder, "sample")
+    usage.mark_agent_created("sample")
+
+    seen = {}
+    def _stub(prompt):
+        seen["active"] = active_validation()
+        return {"final": "", "summary": "no change", "model": "test", "provider": "test",
+                "tool_calls": [], "error": None}
+
+    monkeypatch.setattr(curator, "_run_llm_review", _stub)
+    curator.run_curator_review(synchronous=True, consolidate=True)
+    assert seen["active"] is not None
+    assert "sample" in seen["active"].originals
+    assert active_validation() is None
+
+    state = curator.load_state()
+    report = Path(state["last_report_path"])
+    import json
+    raw = json.loads((report / "run.json").read_text(encoding="utf-8"))
+    assert raw["validation"]["accepted"] == 0
+    assert raw["counts"]["validation_blocked"] == 0
+
+
+def test_curator_prompt_no_longer_forces_unverified_archive_quota():
+    from agent.curator import CURATOR_REVIEW_PROMPT
+    assert "fewer than 10 archives" not in CURATOR_REVIEW_PROMPT
+    assert "same" in CURATOR_REVIEW_PROMPT.lower()
+    assert "validation" in CURATOR_REVIEW_PROMPT.lower() or "verif" in CURATOR_REVIEW_PROMPT.lower()

@@ -600,6 +600,26 @@ def _delete_skill(name: str, absorbed_into: Optional[str] = None) -> Dict[str, A
     skills_root = _containing_skills_root(skill_dir)
     if unsafe := _validate_delete_target(skill_dir):  # defense-in-depth before rmtree
         return _err(unsafe)
+    # A separate deterministic gate checks source and target on the same cases.
+    verification = None
+    run = None
+    if _is_background_review() and absorbed_target:
+        from tools.skill_consolidation_validation import active_validation
+        run = active_validation()
+        if run is None:
+            # A copied worker context must never silently bypass Curator's
+            # comparison gate. Explicit attended /refine keeps its own approval.
+            from tools.skill_provenance import is_unattended_review
+            if is_unattended_review():
+                return _err("Unattended consolidation needs the Curator validation pass; "
+                            "source will not be archived outside that verified context.")
+        if run is not None:
+            target_info = _find_skill(absorbed_target)
+            verification = run.assess(name, absorbed_target, skill_dir, target_info["path"])
+            if not verification["passed"]:
+                return _err("Curator refused unverified archive of "
+                            f"'{name}' into '{absorbed_target}': {verification['reason']}. "
+                            "Keep source intact and repair the umbrella before retrying.")
     # Curator consolidations must be RECOVERABLE (`stardust curator restore`): archive instead
     # of rmtree. Foreground deletes keep hard-delete semantics.
     absorbed_note = f" Content absorbed into '{absorbed_target}'." if absorbed_target else ""
@@ -611,9 +631,12 @@ def _delete_skill(name: str, absorbed_into: Optional[str] = None) -> Dict[str, A
             return _err(f"failed to archive '{name}': {e}")
         if not ok:
             return _err(archive_msg)
+        if run is not None and verification and verification["passed"]:
+            run.archived(name, absorbed_target)
         return {"success": True,
                 "message": f"Skill '{name}' archived ({archive_msg}).{absorbed_note}",
-                "_archived": True}
+                "_archived": True,
+                **({"_validation": verification} if verification else {})}
     shutil.rmtree(skill_dir)
     _rmdir_if_empty(skill_dir.parent, skills_root)  # empty category dir, never the root
     return {"success": True, "message": f"Skill '{name}' deleted.{absorbed_note}"}
@@ -808,7 +831,8 @@ def _record_success(action, name, result, *, file_path, absorbed_into, curator_m
         from tools import skill_ledger as _ledger
         _post = _find_skill(name)
         # delete: consolidation vs prune, and whether the recoverable archive handled it
-        _evidence = ({"absorbed_into": absorbed_into, "archived": bool(result.get("_archived"))}
+        _evidence = ({"absorbed_into": absorbed_into, "archived": bool(result.get("_archived")),
+                      **({"validation": result["_validation"]} if result.get("_validation") else {})}
                      if action == "delete" else {})
         _evidence.update({k: v for k, v in (("session_id", session_id), ("file_path", file_path)) if v})
         _ledger.record_mutation(
