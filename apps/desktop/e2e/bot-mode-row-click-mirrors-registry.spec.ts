@@ -46,83 +46,6 @@ async function settle(page: Page, timeout = 90_000): Promise<void> {
 const roster = (page: Page) => page.locator('[data-slot="bots-roster"]')
 const botRow = (page: Page, name: string) => roster(page).locator(`[data-roster-key="local::${name}"]`)
 
-// Diagnostics for the roster flake: record every roster-row mount and unmount in
-// the page, and print the tail only when this test fails. Assertions are unchanged.
-async function watchRosterChurn(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    const win = window as unknown as { __rosterChurn?: string[]; __rosterStarted?: number }
-    const started = performance.now()
-
-    win.__rosterChurn = []
-    win.__rosterStarted = started
-
-    const rosterKey = (node: Node): string | null => {
-      if (!(node instanceof HTMLElement)) {
-        return null
-      }
-
-      return (
-        node.getAttribute('data-roster-key') ??
-        node.querySelector('[data-roster-key]')?.getAttribute('data-roster-key') ??
-        null
-      )
-    }
-
-    const record = (op: string, node: Node) => {
-      const key = rosterKey(node)
-
-      if (key) {
-        win.__rosterChurn?.push(`${Math.round(performance.now() - started)}ms ${op} ${key}`)
-      }
-    }
-
-    new MutationObserver(records => {
-      for (const change of records) {
-        change.removedNodes.forEach(node => record('removed', node))
-        change.addedNodes.forEach(node => record('added', node))
-      }
-    }).observe(document.body, { childList: true, subtree: true })
-
-    // A hash change is the route leaving or re-entering Agent space (/bots).
-    window.addEventListener('hashchange', () => {
-      win.__rosterChurn?.push(`${Math.round(performance.now() - started)}ms hash ${window.location.hash}`)
-    })
-
-    // Sample the roster root, its row count, the "Waking up" state, the route and
-    // whether a chat thread is mounted, so the dump shows which pane the rows
-    // disappear into, even if a mutation is missed.
-    let lastState = ''
-
-    window.setInterval(() => {
-      const root = document.querySelector('[data-slot="bots-roster"]')
-      const rows = root ? root.querySelectorAll('[data-roster-key]').length : -1
-      const waking = /Waking up/i.test(document.body.innerText)
-      const thread = document.querySelectorAll('[data-slot="aui_thread-viewport"]').length
-      const state = `root=${root ? 1 : 0} rows=${rows} waking=${waking ? 1 : 0} thread=${thread} hash=${window.location.hash}`
-
-      if (state !== lastState) {
-        lastState = state
-        win.__rosterChurn?.push(`${Math.round(performance.now() - started)}ms sample ${state}`)
-      }
-    }, 250)
-  })
-}
-
-// Marks a spec step in the same timeline as the churn events.
-async function markChurn(page: Page, label: string): Promise<void> {
-  await page.evaluate(text => {
-    const win = window as unknown as { __rosterChurn?: string[]; __rosterStarted?: number }
-
-    win.__rosterChurn?.push(`${Math.round(performance.now() - (win.__rosterStarted ?? 0))}ms step ${text}`)
-  }, label)
-}
-
-async function dumpRosterChurn(page: Page, label: string): Promise<void> {
-  const events = await page.evaluate(() => (window as unknown as { __rosterChurn?: string[] }).__rosterChurn ?? [])
-
-  console.log(`ROSTER_CHURN [${label}] total=${events.length}\n${events.slice(-400).join('\n')}`)
-}
-
 async function selectedMainChat(page: Page) {
   const tab = page.locator('[data-zone-tabstrip="grp-main"] [data-tree-tab][aria-selected="true"]')
 
@@ -199,19 +122,11 @@ test.afterAll(async () => {
   fixture = null
 })
 
-test.afterEach(async ({}, testInfo) => {
-  // Temporary while collecting samples: dump on every run, not only on failure.
-  if (fixture) {
-    await dumpRosterChurn(fixture.page, testInfo.title)
-  }
-})
-
 test('a bot row click lands on the Bot Chat the row previews, not a side thread', async () => {
   test.setTimeout(300_000)
   const page = fixture!.page
 
   await openBots(page)
-  await watchRosterChurn(page)
 
   const botsRoster = roster(page)
   const alphaRow = botRow(page, 'alpha')
@@ -219,10 +134,8 @@ test('a bot row click lands on the Bot Chat the row previews, not a side thread'
   await expect(alphaRow).toBeVisible({ timeout: 30_000 })
   await expect(betaRow).toBeVisible({ timeout: 30_000 })
 
-  await markChurn(page, 'click alpha row (1)')
   await alphaRow.click()
   await expect(botsRoster).toBeHidden({ timeout: 30_000 })
-  await markChurn(page, 'alpha roster hidden (1)')
   const alphaChat = await activeMainChat(page)
   const alphaTranscript = alphaChat.surface.locator('[data-slot="aui_thread-viewport"]')
   await expect(alphaTranscript).toBeVisible({ timeout: 45_000 })
@@ -235,7 +148,6 @@ test('a bot row click lands on the Bot Chat the row previews, not a side thread'
   await settle(page, 15_000)
 
   // A `+` side thread for alpha, with a real turn so it is a persisted tile.
-  await markChurn(page, 'ctrl+t side thread')
   await page.keyboard.press('Control+t')
   const mainTabStrip = page.locator('[data-zone-tabstrip="grp-main"]')
   const draftChat = await selectedMainChat(page)
@@ -252,7 +164,6 @@ test('a bot row click lands on the Bot Chat the row previews, not a side thread'
   await expect(sideTab).toBeVisible({ timeout: 60_000 })
   const sideTabId = await sideTab.getAttribute('data-tree-tab')
   expect(sideTabId).toMatch(/^session-tile:/)
-  await markChurn(page, 'click side tab')
   await sideTab.click()
   const sideChat = await selectedMainChat(page)
   expect(sideChat.anchor).toBe(sideTabId)
@@ -261,12 +172,9 @@ test('a bot row click lands on the Bot Chat the row previews, not a side thread'
   await expect(sideTranscript).toContainText(MOCK_REPLY, { timeout: 60_000 })
 
   // Leave alpha on the side thread, go to beta, come back via the row.
-  await markChurn(page, 'open agent space (2)')
   await openBots(page)
   await expect(betaRow).toBeVisible({ timeout: 30_000 })
-  await markChurn(page, 'beta row visible')
   await betaRow.click()
-  await markChurn(page, 'clicked beta row')
   await expect(botsRoster).toBeHidden({ timeout: 30_000 })
   const betaChat = await activeMainChat(page)
   const betaTranscript = betaChat.surface.locator('[data-slot="aui_thread-viewport"]')
@@ -277,10 +185,8 @@ test('a bot row click lands on the Bot Chat the row previews, not a side thread'
   ).toBeVisible({ timeout: 15_000 })
   await settle(page)
 
-  await markChurn(page, 'open agent space (3)')
   await openBots(page)
   await expect(alphaRow).toBeVisible({ timeout: 30_000 })
-  await markChurn(page, 'alpha row visible (2)')
   await alphaRow.click()
   await expect(botsRoster).toBeHidden({ timeout: 30_000 })
   // The scoped row click leaves the roster and selects the canonical transcript
