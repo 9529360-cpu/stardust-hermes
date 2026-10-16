@@ -188,6 +188,13 @@ test('the nav has no 个性化 row, and its other rows still switch pages, at bo
     await productNav(page).getByRole('button', { name: '工具', exact: true }).click()
     await expect(page.getByRole('textbox', { name: '搜索工具集…' })).toBeVisible({ timeout: 15_000 })
   }
+
+  // The tools page has no composer, and the next test's beforeEach waits for one to attach. End on
+  // a new chat, as sendPlainChat does, so the next test starts from the chat page.
+  await setWindowSize(WIDE)
+  await revealNav(page)
+  await productNav(page).getByRole('button', { name: '新建对话', exact: true }).click()
+  await expect(page.getByRole('textbox', { name: '消息' })).toBeVisible()
 })
 
 test('the open page nav row carries aria-current="page"', async () => {
