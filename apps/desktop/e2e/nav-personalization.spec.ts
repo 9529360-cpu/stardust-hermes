@@ -1,7 +1,6 @@
 /**
- * The personal product nav: the 项目 section never lists the Home bucket, the 个性化 row opens
- * its panel at both widths, the panel's own link opens Settings on the appearance tab, and the
- * open page's nav row carries aria-current="page".
+ * The personal product nav: the 项目 section never lists the Home bucket, the nav carries no
+ * 个性化 row at either width, and the open page's nav row carries aria-current="page".
  *
  * NAV_PERSONALIZATION_SCREENSHOT_DIR=<dir> saves captures for design review; never part of the
  * assertions.
@@ -153,12 +152,6 @@ test.afterEach(async () => {
     await settingsClose.click()
   }
 
-  const panelSlider = page.getByRole('slider', { name: '图片不透明度', exact: true })
-
-  if (await panelSlider.isVisible()) {
-    await page.keyboard.press('Escape')
-  }
-
   await setWindowSize(WIDE)
 })
 
@@ -184,39 +177,17 @@ test('P0: plain chats never make the Home bucket a project row, and 新建项目
   await capture(page, `case1-plain-chats-${NARROW.name}`)
 })
 
-test('the 个性化 row opens the panel with the theme control and the image opacity slider', async () => {
+test('the nav has no 个性化 row, and its other rows still switch pages, at both widths', async () => {
   const page = fixture!.page
 
   for (const size of [WIDE, NARROW]) {
     await setWindowSize(size)
     await revealNav(page)
-    await productNav(page).getByRole('button', { name: '个性化', exact: true }).click()
 
-    await expect(page.getByRole('button', { name: '明亮', exact: true })).toBeVisible({ timeout: 10_000 })
-    await expect(page.getByRole('button', { name: '暗色', exact: true })).toBeVisible()
-    await expect(page.getByRole('button', { name: '跟随系统', exact: true })).toBeVisible()
-    await expect(page.getByRole('slider', { name: '图片不透明度', exact: true })).toBeVisible()
-    await capture(page, `case2-personalization-${size.name}`)
-
-    await page.keyboard.press('Escape')
-    await expect(page.getByRole('slider', { name: '图片不透明度', exact: true })).toBeHidden()
+    await expect(productNav(page).getByText('个性化')).toHaveCount(0)
+    await productNav(page).getByRole('button', { name: '工具', exact: true }).click()
+    await expect(page.getByRole('textbox', { name: '搜索工具集…' })).toBeVisible({ timeout: 15_000 })
   }
-})
-
-test('更多外观设置 in the panel opens Settings on the appearance tab', async () => {
-  const page = fixture!.page
-
-  await setWindowSize(WIDE)
-  await revealNav(page)
-  await productNav(page).getByRole('button', { name: '个性化', exact: true }).click()
-  await page.getByRole('button', { name: '更多外观设置', exact: true }).click()
-
-  await expect(page.getByRole('button', { name: '关闭设置', exact: true })).toBeVisible({ timeout: 15_000 })
-  await capture(page, `case3-more-settings-${WIDE.name}`)
-
-  // The interface-scale row belongs to the Appearance pane. A link that lands on another
-  // settings tab shows that tab instead, so this row is the check that the right pane opened.
-  await expect(page.getByText('界面缩放', { exact: true })).toBeVisible({ timeout: 15_000 })
 })
 
 test('the open page nav row carries aria-current="page"', async () => {
