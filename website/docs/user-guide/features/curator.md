@@ -40,6 +40,25 @@ A run has two phases:
    - **Never-used skills** (`use_count == 0`) get a grace floor: they are not archived until they are at least `stale_after_days` old. Zero uses is absence of evidence, not proof the skill is disposable.
 2. **LLM consolidation** (single aux-model pass with a high iteration ceiling — a full curation sweep can take 50–100 API calls) — **ON by default for curator-managed agent-created skills**. On the normal low-frequency curator cycle, the fork surveys only skills explicitly owned by the curator (`created_by: "agent"`), reads them with `skill_view`, and decides whether to keep, patch (via `skill_manage`), or consolidate overlapping skills into class-level umbrellas. Bundled skills may still participate in the deterministic inactivity policy when `prune_builtins: true`, but they are never inputs to this LLM restructuring pass. Consolidation treats a skill as a full package: if a skill has `references/`, `templates/`, `scripts/`, `assets/`, or relative links to those paths, the curator must either keep it standalone, re-home the needed support files and rewrite paths, or archive the entire package unchanged — not flatten only `SKILL.md` into another skill's `references/` file.
 
+### Verification and recovery
+
+Before archiving a merged Skill, the existing Curator compares **the same
+source-derived capability cases** on the original package and proposed umbrella.
+The read-only tests check capability headings/description, dangling local links,
+and preservation of scripts/templates/assets. An untestable or regressed
+candidate fails closed; the original Skill stays active and intact.
+
+Accepted merges are rechecked at the end of the Curator pass, when later
+edits could have invalidated earlier ones. A detected regression restores the
+original through the existing recoverable archive. Validation decisions and
+restores appear in the normal Curator report; no new Agent, scheduler, memory
+store or executable test runner is added.
+
+**Limits:** this is structural non-regression verification, not execution of
+arbitrary real browser/API tasks or untrusted Skill scripts. Passing these
+cases does not establish that the model itself became smarter or that tasks
+ran faster; external outcomes require separate evidence.
+
 :::info Consolidation follows autonomous ownership
 The opinionated LLM **consolidation** pass runs only when the regular curator interval is due; it does not run after every Skill creation. User-owned foreground skills are outside its scope, and when there are no curator-managed agent skills the LLM call is skipped entirely. Set `curator.consolidate: false` to keep deterministic prune-only maintenance with zero consolidation-model cost. You can still force one pass with `hermes curator run --consolidate`.
 :::
