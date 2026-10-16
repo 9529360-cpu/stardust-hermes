@@ -29,7 +29,10 @@ interface SkillsViewProps {
 
 const mocks = vi.hoisted(() => ({
   connections: vi.fn(async () => [] as { id: string; label: string }[]),
-  createCanonicalChat: vi.fn(async () => 'session-1'),
+  createCanonicalChat: vi.fn(
+    async (_name: RosterRow | string, _options?: { kickoff?: boolean; openingStillCurrent?: () => boolean | null }) =>
+      'session-1'
+  ),
   deleteBot: vi.fn(async () => undefined),
   /** Flipped off to model a desktop build that predates the live surface. */
   hasSkillsView: { value: true },
@@ -62,7 +65,11 @@ vi.mock('@stardust/plugin-sdk', async importOriginal => {
       notify: mocks.notify,
       notifyError: mocks.notifyError,
       request: mocks.request,
-      requestProfile: mocks.requestProfile
+      requestProfile: mocks.requestProfile,
+      state: {
+        ...original.host.state,
+        connectionId: { get: () => 'local' }
+      }
     },
     // The plugin bundle normally lands via `ctx.i18n.register` at load.
     usePluginI18n: () => translateBots
@@ -115,6 +122,24 @@ async function renderDialog(hasSkillsView: boolean) {
   return view
 }
 
+async function renderFriendlyDialog() {
+  mocks.hasSkillsView.value = true
+  vi.resetModules()
+
+  const { CreateAgentDialog } = await import('./create-dialog')
+
+  const view = render(
+    withQueryClient(<CreateAgentDialog onClose={() => undefined} open roster={roster} userFriendly />)
+  )
+
+  fireEvent.change(screen.getByLabelText('What should we call them?'), { target: { value: 'Alex' } })
+  fireEvent.change(screen.getByLabelText('What would you like help with?'), {
+    target: { value: 'Help plan my week' }
+  })
+
+  return view
+}
+
 function createCalls() {
   return mocks.request.mock.calls.filter(([method]) => method === 'profiles.create')
 }
@@ -145,6 +170,9 @@ beforeEach(() => {
       case 'mcp.catalog':
         return { servers: [catalog] }
 
+      case 'profiles.create':
+        return { ok: true }
+
       case 'mcp.servers.test':
         return { ok: true }
 
@@ -162,6 +190,43 @@ afterEach(() => {
 })
 
 describe('materializing the draft profile', () => {
+  it('keeps the friendly title attached to the created profile route', async () => {
+    await renderFriendlyDialog()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create and say hello' }))
+
+    const createdOwner = await waitFor(() => {
+      expect(mocks.createCanonicalChat).toHaveBeenCalledOnce()
+
+      return mocks.createCanonicalChat.mock.calls[0][0]
+    })
+
+    expect(createdOwner).not.toBeNull()
+    expect(typeof createdOwner).toBe('object')
+    if (!createdOwner || typeof createdOwner === 'string') {
+      throw new Error('Expected a roster owner')
+    }
+    expect(createdOwner).toMatchObject({ name: expect.stringMatching(/^alex-/) })
+    const created = createdOwner.name
+    expect(createCalls()[0][1]).toMatchObject({ name: created, profile_kind: 'agent' })
+    expect(mocks.createCanonicalChat).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: created,
+        route: expect.objectContaining({ connectionId: 'local', profile: created, targetProfile: created }),
+        sourceScoped: true
+      }),
+      { kickoff: true }
+    )
+    expect(mocks.saveBotMeta).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: created,
+        route: expect.objectContaining({ profile: created, targetProfile: created }),
+        sourceScoped: true
+      }),
+      expect.objectContaining({ title: 'Alex' })
+    )
+  })
+
   it('creates it once when the Capabilities tab opens, pinned to the new slug', async () => {
     await renderDialog(true)
 
@@ -175,7 +240,12 @@ describe('materializing the draft profile', () => {
     // Create Bot goes through the same helper — no duplicate profiles.create.
     fireEvent.click(screen.getByRole('button', { name: 'Create Bot' }))
 
-    await waitFor(() => expect(mocks.createCanonicalChat).toHaveBeenCalledWith('inbox-triage', { kickoff: true }))
+    await waitFor(() =>
+      expect(mocks.createCanonicalChat).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'inbox-triage', sourceScoped: true }),
+        { kickoff: true }
+      )
+    )
     expect(createCalls()).toHaveLength(1)
   })
 

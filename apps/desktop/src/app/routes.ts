@@ -221,6 +221,10 @@ export function appViewForPath(pathname: string): AppView {
     return 'chat'
   }
 
+  if (path === BOTS_ROUTE) {
+    return 'extension'
+  }
+
   if (isContributedPath(path)) {
     return 'extension'
   }
@@ -287,6 +291,7 @@ export function navigateToWorkspacePage(navigate: NavigateLike, to: string, opti
   navigate(to, options)
 
   if (isWorkspacePageRoute(to)) {
+    $workspaceIsPage.set(true)
     revealWorkspacePane()
   }
 }
