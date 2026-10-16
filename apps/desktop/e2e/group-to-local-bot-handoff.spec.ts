@@ -4,9 +4,18 @@ import { expect, test } from './test'
 let fixture: MockBackendFixture | null = null
 
 async function openBots(page: MockBackendFixture['page']): Promise<void> {
-  const tab = page.getByRole('button', { name: /智能体空间|Agent space/ }).first()
-  await tab.click()
-  await expect(page.getByRole('button', { name: 'New bot or group chat' })).toBeVisible()
+  const home = page.locator('[data-slot-page="agents-home"]')
+
+  if (!(await home.isVisible())) {
+    await page.getByRole('button', { name: /智能体空间|Agent space/ }).first().click()
+    await expect(home).toBeVisible()
+  }
+
+  if (!(await page.locator('[data-slot-page="agents-manager"]').isVisible())) {
+    await page.getByRole('button', { name: 'Manage', exact: true }).click()
+  }
+
+  await expect(page.locator('[data-slot="bots-roster"]')).toBeVisible()
 }
 
 async function createAgent(page: MockBackendFixture['page'], name: string, title: string): Promise<void> {
@@ -18,6 +27,8 @@ async function createAgent(page: MockBackendFixture['page'], name: string, title
   await dialog.getByPlaceholder('Inbox Triage').fill(title)
   await dialog.getByRole('button', { name: 'Create Bot' }).click()
   await expect(dialog).toBeHidden({ timeout: 30_000 })
+  await page.locator('[data-personal-product-nav]').getByRole('button', { name: /智能体空间|Agent space/ }).click()
+  await expect(page.locator('[data-slot-page="agents-home"]')).toBeVisible()
   await expect(page.getByRole('button', { name: new RegExp(`^${title}\\b`) }).first()).toBeVisible({ timeout: 30_000 })
 }
 
@@ -38,9 +49,9 @@ test('local bot replaces an open group main workspace', async () => {
   await openBots(page)
   await createAgent(page, 'programmer', 'Programmer')
   await createAgent(page, 'reviewer', 'Reviewer')
-
-  await page.getByRole('button', { name: 'New bot or group chat' }).click()
-  await page.getByRole('menuitem', { name: 'New Group Chat' }).click()
+  await page.locator('[data-personal-product-nav]').getByRole('button', { name: /智能体空间|Agent space/ }).click()
+  await expect(page.locator('[data-slot-page="agents-home"]')).toBeVisible()
+  await page.getByRole('button', { name: 'Create a team' }).click()
 
   const dialog = page.getByRole('dialog', { name: 'New Group Chat' })
 
@@ -59,7 +70,10 @@ test('local bot replaces an open group main workspace', async () => {
 
   // Creating the group leaves the Agent space, so the roster row is reached again from it.
   await openBots(page)
-  const programmer = page.getByRole('button', { name: /^Programmer\b/ }).filter({ visible: true }).first()
+  const programmer = page
+    .getByRole('button', { name: /^Programmer\b/ })
+    .filter({ visible: true })
+    .first()
   await programmer.click()
 
   // The bot's canonical chat opens INTO the main workspace pane (post
@@ -78,5 +92,7 @@ test('local bot replaces an open group main workspace', async () => {
   // around indefinitely (see bot-mode-row-click-mirrors-registry's settle()),
   // so its presence no longer distinguishes a stranded handoff. The splash
   // and composer above are the proof the bot's chat took the workspace.
-  await expect(page.locator('[data-slot="composer-root"] [contenteditable="true"]').filter({ visible: true }).first()).toBeVisible()
+  await expect(
+    page.locator('[data-slot="composer-root"] [contenteditable="true"]').filter({ visible: true }).first()
+  ).toBeVisible()
 })

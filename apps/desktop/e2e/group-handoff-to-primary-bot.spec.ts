@@ -26,10 +26,18 @@ interface RoomLogEntry {
 }
 
 async function openBots(page: Page): Promise<void> {
-  const tab = page.getByRole('button', { name: /智能体空间|Agent space/ }).first()
+  const home = page.locator('[data-slot-page="agents-home"]')
 
-  await tab.click()
-  await expect(page.getByRole('button', { name: 'New bot or group chat' })).toBeVisible()
+  if (!(await home.isVisible())) {
+    await page.getByRole('button', { name: /智能体空间|Agent space/ }).first().click()
+    await expect(home).toBeVisible()
+  }
+
+  if (!(await page.locator('[data-slot-page="agents-manager"]').isVisible())) {
+    await page.getByRole('button', { name: 'Manage', exact: true }).click()
+  }
+
+  await expect(page.locator('[data-slot="bots-roster"]')).toBeVisible()
 }
 
 async function createAgent(page: Page, name: string, title: string): Promise<void> {
@@ -41,6 +49,8 @@ async function createAgent(page: Page, name: string, title: string): Promise<voi
   await dialog.getByPlaceholder('Inbox Triage').fill(title)
   await dialog.getByRole('button', { name: 'Create Bot' }).click()
   await expect(dialog).toBeHidden({ timeout: 30_000 })
+  await page.locator('[data-personal-product-nav]').getByRole('button', { name: /智能体空间|Agent space/ }).click()
+  await expect(page.locator('[data-slot-page="agents-home"]')).toBeVisible()
   await expect(page.getByRole('button', { name: new RegExp(`^${title}\\b`) }).first()).toBeVisible({ timeout: 30_000 })
 }
 
@@ -110,8 +120,9 @@ test('a teammate handing off with @hermes drives the primary profile', async () 
     timeout: 30_000
   })
 
-  await page.getByRole('button', { name: 'New bot or group chat' }).click()
-  await page.getByRole('menuitem', { name: 'New Group Chat' }).click()
+  await page.locator('[data-personal-product-nav]').getByRole('button', { name: /智能体空间|Agent space/ }).click()
+  await expect(page.locator('[data-slot-page="agents-home"]')).toBeVisible()
+  await page.getByRole('button', { name: 'Create a team' }).click()
 
   const dialog = page.getByRole('dialog', { name: 'New Group Chat' })
 
@@ -170,8 +181,11 @@ test('a teammate handing off with @hermes drives the primary profile', async () 
   )
   await composer.press('Enter')
   await expect
-    .poll(async () => (await roomLog(page, group)).some(e => e.from?.name === 'code-farmer' && e.text?.trim() === 'D'), {
-      timeout: 180_000
-    })
+    .poll(
+      async () => (await roomLog(page, group)).some(e => e.from?.name === 'code-farmer' && e.text?.trim() === 'D'),
+      {
+        timeout: 180_000
+      }
+    )
     .toBe(true)
 })

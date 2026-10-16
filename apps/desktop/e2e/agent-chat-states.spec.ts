@@ -48,13 +48,20 @@ test('an empty bot chat greets, offers starters, and seats the Routines tile as 
   const routinesRail = page.locator('[data-tree-tab$=":routines"][data-vertical]')
 
   // The roster is not a bot chat, so the Routines tile is not seated beside it.
-  await page.getByRole('button', { name: /智能体空间|Agent space/ }).first().click()
+  await page
+    .getByRole('button', { name: /智能体空间|Agent space/ })
+    .first()
+    .click()
   await expect(roster).toBeVisible({ timeout: 20_000 })
   await expect(routinesTab).toHaveCount(0)
   await capture(page, '1-roster-default-bot')
 
   // Opening the bot shows its empty chat and seats the tile as an icon.
-  await page.locator('[data-slot="bots-roster"] [data-roster-key]').first().click()
+  await page
+    .locator('[data-agent-card]')
+    .first()
+    .getByRole('button', { name: /Start a chat|开始交流|チャットを始める/ })
+    .click()
   await expect(roster).toBeHidden({ timeout: 30_000 })
   await expect(empty).toBeVisible({ timeout: 20_000 })
   await expect(starters).toHaveCount(3)
@@ -81,7 +88,10 @@ test('an empty bot chat greets, offers starters, and seats the Routines tile as 
   await capture(page, '4-routines-expanded')
 
   // A new chat is not a bot chat, so the tile goes away again.
-  await page.getByRole('button', { name: /新建对话|New chat/ }).first().click()
+  await page
+    .getByRole('button', { name: /新建对话|New chat/ })
+    .first()
+    .click()
   await expect(routinesTab).toHaveCount(0)
   await capture(page, '5-new-chat-no-routines')
 })
