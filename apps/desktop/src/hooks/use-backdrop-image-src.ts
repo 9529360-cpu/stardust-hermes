@@ -3,8 +3,8 @@ import { useEffect, useState } from 'react'
 /**
  * The data URL of a device-local backdrop image, read through the desktop
  * bridge. Null while disabled, while the path is empty, when the bridge is
- * unavailable, or when the file does not decode as an image. Shared by the
- * window backdrop and the personalization preview so both show the same bytes.
+ * unavailable, or when the file does not decode as an image. Used by the
+ * window backdrop.
  */
 export function useBackdropImageSrc(path: null | string, enabled = true): null | string {
   const [src, setSrc] = useState<null | string>(null)

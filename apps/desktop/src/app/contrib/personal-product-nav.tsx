@@ -6,7 +6,6 @@ import { useLocation } from 'react-router'
 
 import { revealTreePane } from '@/components/pane-shell/tree/store'
 import { Codicon } from '@/components/ui/codicon'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 import { $sidebarGrouping, dismissNarrowSidebar, setSidebarAgentsGrouped, setSidebarOpen } from '@/store/layout'
@@ -32,18 +31,8 @@ import type { SessionInfo } from '@/types/hermes'
 import { ProjectContextMenu } from '../chat/sidebar/projects/project-menu'
 import type { SidebarProjectTree } from '../chat/sidebar/projects/workspace-groups'
 import { WorkspaceAddButton } from '../chat/sidebar/projects/workspace-header'
-import {
-  type AppView,
-  BOTS_ROUTE,
-  CRON_ROUTE,
-  MESSAGING_ROUTE,
-  routePathname,
-  SETTINGS_ROUTE,
-  SKILLS_ROUTE
-} from '../routes'
+import { type AppView, BOTS_ROUTE, CRON_ROUTE, MESSAGING_ROUTE, routePathname, SKILLS_ROUTE } from '../routes'
 import type { SidebarNavItem } from '../types'
-
-import { PersonalizationPanel } from './personalization-panel'
 
 // Tools is the one entry for the skills page. Its Plugins tab is reached from inside Tools, so the
 // nav carries no separate Plugins button. Messaging takes its label from the i18n bundle.
@@ -131,7 +120,6 @@ export function PersonalProductNav({
   const [expandedProjectId, setExpandedProjectId] = useState<null | string>(null)
   const [enteredProject, setEnteredProject] = useState<null | SidebarProjectTree>(null)
   const [projectLoadFailed, setProjectLoadFailed] = useState(false)
-  const [personalizeOpen, setPersonalizeOpen] = useState(false)
   const projects = useStore($projectTree)
   // Home is the backend's bucket for chats with no folder. Those chats belong to
   // 对话 (recents) and never to a project, so the bucket is not listed as one.
@@ -225,17 +213,6 @@ export function PersonalProductNav({
       icon: NULL_ICON,
       route: BOTS_ROUTE
     })
-
-  // The quick panel points at the detailed controls; they live in Settings > Appearance.
-  const openAppearance = () => {
-    setPersonalizeOpen(false)
-    pick({
-      id: 'settings',
-      label: t.personalization.moreSettings,
-      icon: NULL_ICON,
-      route: `${SETTINGS_ROUTE}?tab=config:appearance`
-    })
-  }
 
   const openTasks = () =>
     pick({
@@ -345,14 +322,6 @@ export function PersonalProductNav({
           onClick={openTools}
           tour="sidebar-nav-skills"
         />
-        <Popover onOpenChange={setPersonalizeOpen} open={personalizeOpen}>
-          <PopoverTrigger asChild>
-            <ProductNavButton icon="paintcan" label={t.personalization.navLabel} />
-          </PopoverTrigger>
-          <PopoverContent align="start" className="w-72 p-4" side="right" sideOffset={10}>
-            <PersonalizationPanel onOpenAppearance={openAppearance} />
-          </PopoverContent>
-        </Popover>
         <ProductNavButton expanded={projectsOpen} icon="repo" label={copy.project} onClick={openProject} />
         {projectsOpen && (
           <div
