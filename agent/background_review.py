@@ -314,6 +314,14 @@ _MEMORY_REVIEW_PROMPT = (
 # hoarding library: one references/ file per session, incident narration instead of rules, PR numbers
 # and quotes as content, and duplicating what the repo's AGENTS.md / the tool schemas already teach.
 _LESSON_LAYER_BLOCK = (
+    "SELF-DISTILLATION: review your OWN conversation and actions as evidence. "
+    "Reconstruct the original task, assistant attempts, explicit user corrections, "
+    "the revised approach, confirmations and objective verification. Distill both "
+    "effective moves and pitfalls into reusable procedures, decisions and tests, "
+    "not a narrative. User approval of wording is NOT proof external work succeeded. "
+    "Untested fixes remain hypotheses, not established rules. Never store raw "
+    "transcripts, secrets, private task details or tool output in Skills. Apply "
+    "the normal ownership, approval and read-before-write guards.\n\n"
     "What a skill IS: the instructions for doing a class of task the most efficient and correct "
     "way, to THIS user's specifications — the procedure, the tools and commands that work, the "
     "order, the user's preferences for how the result should look, and the pitfalls that cost time. "
@@ -477,8 +485,8 @@ _COMBINED_REVIEW_PROMPT = (
     "this', 'I hate when you Y' — embed the lesson in the skill that governs that task so the next "
     "session starts fixed.\n"
     "  • Non-trivial technique, fix, workaround, or debugging path emerged.\n"
-    "  • A skill that was loaded or consulted turned out wrong, missing, or outdated — patch it "
-    "now.\n\n"
+    "  • A skill that was loaded or consulted turned out wrong, missing, or outdated — investigate "
+    "and patch only after the issue and remedy are verified.\n\n"
     "Preference order if a change has real, reusable evidence behind it:\n"
     "  1. UPDATE A CURRENTLY-LOADED SKILL. Check what skills were loaded via /skill-name or "
     "skill_view in the conversation. If one of them covers the learning, PATCH it first (re-load "
@@ -1201,7 +1209,7 @@ def _publish_review_summary(agent: Any, actions: List[str]) -> None:
 def _run_review_in_thread(
     agent: Any, messages_snapshot: List[Dict], prompt: str,
     task_cfg: Optional[Dict[str, Any]] = None, review_run: Optional[_BackgroundReviewRun] = None,
-    review_memory: bool = False, explicit: bool = False,
+    review_memory: bool = False, explicit: bool = False, self_distill: bool = False,
 ) -> None:
     """Daemon-thread worker: build the fork, run the prompt, surface the action summary via
     ``agent._safe_print`` / ``background_review_callback``. ``review_run`` (from
@@ -1262,13 +1270,14 @@ def _run_review_in_thread(
             )
             actions = []
         _log_review_completion(st.review_usage, _classify_review_result(actions))
-        if actions:
+        if actions and not self_distill:
             _publish_review_summary(agent, actions)
     except Exception as e:
         logger.warning("Background memory/skill review failed: %s", e)
         if st.review_usage:
             _log_review_completion(st.review_usage, "error")
-        agent._emit_auxiliary_failure("background review", e)
+        if not self_distill:
+            agent._emit_auxiliary_failure("background review", e)
     finally:
         # Safety net for the exception path (setup failures before the request-phase finally).
         # Both cleanups are identity-scoped and idempotent; re-enter thread-scoped silence so
@@ -1293,7 +1302,7 @@ def spawn_background_review_thread(
     agent: Any, messages_snapshot: List[Dict], review_memory: bool = False,
     review_skills: bool = False, focus: Optional[str] = None,
     task_cfg: Optional[Dict[str, Any]] = None, review_run: Optional[_BackgroundReviewRun] = None,
-    explicit: bool = False,
+    explicit: bool = False, self_distill: bool = False,
 ):
     """Return ``(target, prompt)``; the caller builds the ``threading.Thread`` so test patches of
     ``run_agent.threading.Thread`` keep working. ``focus`` (``/refine [instructions]``) is appended
@@ -1313,6 +1322,10 @@ def spawn_background_review_thread(
         evidence = build_skill_review_evidence(messages_snapshot)
         if evidence:
             prompt = f"{prompt}\n\n{evidence}"
+        from agent.background_review_distillation import build_conversation_distillation_brief
+        distillation = build_conversation_distillation_brief(messages_snapshot)
+        if distillation:
+            prompt = f"{prompt}\n\n{distillation}"
     if focus := (focus or "").strip():
         prompt = (
             f"{prompt}\n\nThe user explicitly requested this review with the following "
@@ -1320,9 +1333,11 @@ def spawn_background_review_thread(
         )
 
     def _target() -> None:  # resolves _run_review_in_thread at call time (tests patch it)
+        # Ordinary /refine and memory-only reviews retain their legacy worker signature.
+        quiet_kwargs = {"self_distill": True} if self_distill else {}
         _run_review_in_thread(
             agent, messages_snapshot, prompt, task_cfg=task_cfg, review_run=review_run,
-            review_memory=review_memory, explicit=explicit)
+            review_memory=review_memory, explicit=explicit, **quiet_kwargs)
 
     return _target, prompt
 
