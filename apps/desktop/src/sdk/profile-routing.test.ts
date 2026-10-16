@@ -643,6 +643,23 @@ describe('profile-aware plugin session opens', () => {
     })
   })
 
+  it('routes a Bot chat into the main pane when a full workspace page is open', async () => {
+    window.location.hash = '#/bots'
+    $workspaceMode.set('bots')
+    $workspaceOwnerKey.set('bot:local::default')
+
+    await host.openSession('bot-chat-from-page', {
+      profile: 'default',
+      workspaceMode: 'bots',
+      workspaceOwnerKey: 'bot:local::default'
+    })
+
+    const [, navigate] = vi.mocked(openSessionCore).mock.calls.at(-1)!
+    navigate('#/chat/bot-chat-from-page')
+
+    expect(window.location.hash).toBe('#/chat/bot-chat-from-page')
+  })
+
   it('finishes hydration on the focused Bot tile without moving the Sessions gateway', async () => {
     const route = {
       connectionId: 'source-a',
