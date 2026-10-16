@@ -40,6 +40,17 @@ def home(tmp_path, monkeypatch):
     return h
 
 
+def test_profiles_list_exposes_profile_kind(home):
+    from hermes_cli.profiles import write_profile_meta
+
+    write_profile_meta(home / "profiles" / "ops", profile_kind="agent")
+
+    rows = _profiles({"include_sessions": False})
+
+    assert _row(rows, "ops")["profile_kind"] == "agent"
+    assert _row(rows, "default")["profile_kind"] == "user"
+
+
 def _db(profile_dir):
     from hermes_state import SessionDB
 

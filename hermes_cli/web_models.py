@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, SecretStr, StrictBool, field_validator
 
@@ -421,6 +421,7 @@ class ProfileCreate(BaseModel):
     # Opt-in: also copy the source's messaging channels (bot tokens, allowlists, platform sections).
     # Default False — a copied bot credential makes two profiles collide over one bot.
     clone_channels: bool = False
+    profile_kind: Optional[Literal["agent", "user"]] = None
     no_skills: bool = False
     description: Optional[str] = None
     provider: Optional[str] = None
