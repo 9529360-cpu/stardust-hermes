@@ -32,10 +32,10 @@ describe('host.state focused-session atoms', () => {
     return { host, states, session }
   }
 
-  it('exposes readonly atoms for the focused session (runtime id, stored id, usage)', async () => {
+  it('exposes readonly atoms for the focused session (runtime id, stored id, tile focus, usage)', async () => {
     const { host } = await setup()
 
-    for (const key of ['focusedSessionId', 'focusedStoredSessionId', 'focusedUsage'] as const) {
+    for (const key of ['focusedSessionId', 'focusedStoredSessionId', 'focusedSessionIsTile', 'focusedUsage'] as const) {
       const store = host.state[key]
       expect(store, key).toBeDefined()
       expect(typeof store.get, key).toBe('function')
@@ -49,6 +49,7 @@ describe('host.state focused-session atoms', () => {
 
     expect(host.state.focusedSessionId.get()).toBe(states.$focusedRuntimeId.get())
     expect(host.state.focusedStoredSessionId.get()).toBe(states.$focusedStoredSessionId.get())
+    expect(host.state.focusedSessionIsTile.get()).toBe(states.$focusedSessionIsTile.get())
   })
 
   it('mirrors whether a full page holds the workspace', async () => {
