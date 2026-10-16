@@ -89,7 +89,7 @@ function ProductNavButton({ active = false, expanded, icon, label, tour, ...prop
       aria-current={active ? 'page' : undefined}
       aria-expanded={expanded}
       className={cn(
-        'flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[0.74rem] font-medium transition-colors',
+        'flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[0.74rem] font-medium transition-colors pointer-events-auto',
         active
           ? 'bg-(--ui-control-active-background) text-(--ui-text-primary)'
           : 'text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-(--ui-text-primary)'
@@ -290,18 +290,13 @@ export function PersonalProductNav({
   return (
     <nav
       aria-label="Product navigation"
-      className="jarvis-product-nav relative isolate shrink-0 overflow-hidden border-b border-(--ui-stroke-tertiary) bg-(--ui-sidebar-surface-background) px-2.5 pb-2 pt-0"
+      className="jarvis-product-nav relative isolate shrink-0 overflow-hidden border-b border-(--ui-stroke-tertiary) bg-(--ui-sidebar-surface-background) px-2.5 pb-2 pt-0 pointer-events-auto"
       data-personal-product-nav=""
     >
       <div className="mb-3 px-2 text-[0.82rem] font-semibold tracking-[-0.01em] text-(--ui-text-primary)">Stardust</div>
       <div className="flex flex-col gap-0.5">
         <ProductNavButton icon="add" label={copy.newChat} onClick={newChat} tour="sidebar-nav-new-session" />
-        <ProductNavButton
-          active={agentSpaceShowing}
-          icon="hubot"
-          label={copy.agentSpace}
-          onClick={openAgentSpace}
-        />
+        <ProductNavButton active={agentSpaceShowing} icon="hubot" label={copy.agentSpace} onClick={openAgentSpace} />
         <ProductNavButton
           active={currentView === 'cron'}
           icon="checklist"
