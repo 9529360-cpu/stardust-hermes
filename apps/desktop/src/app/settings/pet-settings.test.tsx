@@ -129,7 +129,9 @@ describe('Settings pet catalog search', () => {
 
     const view = renderPetSettings()
 
-    await fullCatalogStarted
+    await act(async () => {
+      await fullCatalogStarted
+    })
     await waitFor(() => expect($petGalleryFullCatalogStatus.get()).toBe('loading'))
 
     expect($petGalleryStatus.get()).toBe('ready')
@@ -159,7 +161,9 @@ describe('Settings pet catalog search', () => {
 
     const view = renderPetSettings()
 
-    await fullCatalogStarted
+    await act(async () => {
+      await fullCatalogStarted
+    })
     await waitFor(() => expect($petGalleryFullCatalogStatus.get()).toBe('loading'))
     expect(screen.queryByText(copy.unreachable)).toBeNull()
 
@@ -188,7 +192,9 @@ describe('Settings pet catalog search', () => {
 
     renderPetSettings()
 
-    await fullCatalogStarted
+    await act(async () => {
+      await fullCatalogStarted
+    })
     await waitFor(() => expect($petGalleryFullCatalogStatus.get()).toBe('loading'))
 
     await act(async () => {
@@ -210,7 +216,9 @@ describe('Settings pet catalog search', () => {
 
     const view = renderPetSettings()
 
-    await fullCatalogStarted
+    await act(async () => {
+      await fullCatalogStarted
+    })
     await waitFor(() => expect($petGalleryFullCatalogStatus.get()).toBe('loading'))
 
     await act(async () => {

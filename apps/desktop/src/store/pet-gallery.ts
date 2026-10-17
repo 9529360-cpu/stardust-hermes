@@ -2,6 +2,7 @@ import { atom } from 'nanostores'
 
 import { isMissingRpcMethod } from '@/lib/gateway-rpc'
 import { normalize } from '@/lib/text'
+import { activeGatewayConnectionId } from '@/store/gateway'
 import {
   $petInfo,
   hasPetSpriteForMeta,
@@ -84,7 +85,42 @@ export const $petBusy = atom<string | null>(null)
 
 // Process-global caches (survive component unmount → instant reopen).
 const thumbCache = new Map<string, Promise<string | null>>()
-let galleryLoad: Promise<void> | null = null
+
+interface PetGalleryOwner {
+  connectionId: null | string
+  generation: number
+  profile: string
+}
+
+interface PetGalleryScope {
+  connectionId: null | string
+  profile: string
+}
+
+interface PetGalleryLoad {
+  owner: PetGalleryOwner
+  promise: Promise<void>
+}
+
+let galleryGeneration = 0
+let galleryLoad: PetGalleryLoad | null = null
+let galleryOwner: PetGalleryScope | null = null
+
+function currentGalleryScope(): PetGalleryScope {
+  return { connectionId: activeGatewayConnectionId(), profile: petProfile() }
+}
+
+function currentGalleryOwner(): PetGalleryOwner {
+  return { ...currentGalleryScope(), generation: galleryGeneration }
+}
+
+function sameGalleryScope(left: PetGalleryScope, right: PetGalleryScope): boolean {
+  return left.connectionId === right.connectionId && left.profile === right.profile
+}
+
+function ownsGalleryLoad(owner: PetGalleryOwner): boolean {
+  return owner.generation === galleryGeneration && sameGalleryScope(owner, currentGalleryScope())
+}
 
 /**
  * Drop the cached gallery, thumbnails, and in-flight load so the next open
@@ -93,7 +129,9 @@ let galleryLoad: Promise<void> | null = null
  * new profile's mascot, and the picker reloads its gallery on next mount.
  */
 export function resetPetGallery(): void {
+  galleryGeneration += 1
   galleryLoad = null
+  galleryOwner = null
   thumbCache.clear()
   $petGallery.set(null)
   $petGalleryStatus.set('idle')
@@ -121,8 +159,24 @@ export function loadPetThumb(request: GatewayRequest, slug: string, url?: string
  * manual refresh). Concurrent callers share a single in-flight request.
  */
 export function loadPetGallery(request: GatewayRequest, options: { force?: boolean } = {}): Promise<void> {
+  const scope = currentGalleryScope()
+
+  if (galleryOwner && !sameGalleryScope(galleryOwner, scope)) {
+    // Profiles can share a name across gateway sources. A changed source is a
+    // new gallery owner even if no profile-switch reset ran. Clear the sprite
+    // too: revision strings are scoped to the source and may collide.
+    resetPetGallery()
+    setPetInfo({ enabled: false })
+  }
+
+  if (galleryLoad && galleryLoad.owner.generation === galleryGeneration && sameGalleryScope(galleryLoad.owner, scope)) {
+    return galleryLoad.promise
+  }
+
   if (
     !options.force &&
+    galleryOwner &&
+    sameGalleryScope(galleryOwner, scope) &&
     $petGallery.get() &&
     $petGalleryStatus.get() === 'ready' &&
     $petGalleryFullCatalogStatus.get() !== 'error'
@@ -130,11 +184,11 @@ export function loadPetGallery(request: GatewayRequest, options: { force?: boole
     return Promise.resolve()
   }
 
-  if (galleryLoad) {
-    return galleryLoad
-  }
+  const owner: PetGalleryOwner = { ...scope, generation: ++galleryGeneration }
+  galleryOwner = scope
 
-  galleryLoad = (async () => {
+  let loadPromise!: Promise<void>
+  loadPromise = (async () => {
     if (!$petGallery.get()) {
       $petGalleryStatus.set('loading')
     }
@@ -144,10 +198,18 @@ export function loadPetGallery(request: GatewayRequest, options: { force?: boole
     try {
       // Phase 1: local pets only — instant, never blocks on the remote petdex
       // manifest. The user's own/generated pets render right away.
+      if (!ownsGalleryLoad(owner)) {
+        return
+      }
+
       const [local] = await Promise.all([
         petRpc<PetGallery>(request, 'pet.gallery', { localOnly: true }),
-        syncInfo(request)
+        syncInfo(request, owner)
       ])
+
+      if (!ownsGalleryLoad(owner)) {
+        return
+      }
 
       if (local) {
         $petGalleryFullCatalogStatus.set('loading')
@@ -157,6 +219,10 @@ export function loadPetGallery(request: GatewayRequest, options: { force?: boole
         localOk = true
       }
     } catch (e) {
+      if (!ownsGalleryLoad(owner)) {
+        return
+      }
+
       if (isMissingRpcMethod(e)) {
         $petGalleryStatus.set('stale')
       } else if (!$petGallery.get()) {
@@ -168,14 +234,20 @@ export function loadPetGallery(request: GatewayRequest, options: { force?: boole
 
       $petGalleryFullCatalogStatus.set('error')
     } finally {
-      galleryLoad = null
+      if (galleryLoad?.promise === loadPromise) {
+        galleryLoad = null
+      }
     }
 
     // Phase 2: merge in the full petdex catalog in the background. A slow/failed
     // manifest fetch never hides the local pets shown in phase 1.
-    if (localOk) {
+    if (localOk && ownsGalleryLoad(owner)) {
       try {
         const full = await petRpc<PetGallery>(request, 'pet.gallery')
+
+        if (!ownsGalleryLoad(owner)) {
+          return
+        }
 
         if (full) {
           $petGallery.set(full)
@@ -187,19 +259,27 @@ export function loadPetGallery(request: GatewayRequest, options: { force?: boole
           $petGalleryFullCatalogStatus.set('error')
         }
       } catch {
-        // Keep the local-only gallery; the petdex catalog just stays unmerged.
-        $petGalleryFullCatalogStatus.set('error')
+        if (ownsGalleryLoad(owner)) {
+          // Keep the local-only gallery; the petdex catalog just stays unmerged.
+          $petGalleryFullCatalogStatus.set('error')
+        }
       }
     }
   })()
 
-  return galleryLoad
+  galleryLoad = { owner, promise: loadPromise }
+
+  return loadPromise
 }
 
 // Push the live mascot state (cheap, local config read) without re-pulling the
 // network gallery — the floating pet repaints, the picker keeps its cache.
-async function syncInfo(request: GatewayRequest): Promise<void> {
+async function syncInfo(request: GatewayRequest, owner = currentGalleryOwner()): Promise<void> {
   try {
+    if (!ownsGalleryLoad(owner)) {
+      return
+    }
+
     let meta: PetInfoMeta | null = null
 
     try {
@@ -209,16 +289,20 @@ async function syncInfo(request: GatewayRequest): Promise<void> {
         throw e
       }
 
+      if (!ownsGalleryLoad(owner)) {
+        return
+      }
+
       const info = await petRpc<PetInfo>(request, 'pet.info')
 
-      if (info) {
+      if (ownsGalleryLoad(owner) && info) {
         setPetInfo(info)
       }
 
       return
     }
 
-    if (!meta) {
+    if (!ownsGalleryLoad(owner) || !meta) {
       return
     }
 
@@ -242,7 +326,7 @@ async function syncInfo(request: GatewayRequest): Promise<void> {
 
     const info = await petRpc<PetInfo>(request, 'pet.info')
 
-    if (info) {
+    if (ownsGalleryLoad(owner) && info) {
       setPetInfo(info)
     }
   } catch {
