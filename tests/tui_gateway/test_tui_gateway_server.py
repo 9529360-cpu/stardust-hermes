@@ -8752,6 +8752,80 @@ def test_config_set_approval_mode_persists_three_way_value_and_emits_live_status
     assert emitted[-1][2]["approval_mode"] == "off"
 
 
+def test_pet_gallery_marks_full_catalog_after_manifest_success(tmp_path, monkeypatch):
+    from agent.pet import manifest, store
+
+    monkeypatch.setattr(server, "_hermes_home", tmp_path)
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
+    monkeypatch.setattr(store, "installed_pets", lambda: [])
+    monkeypatch.setattr(
+        manifest,
+        "fetch_manifest",
+        lambda: [
+            types.SimpleNamespace(
+                slug="catalog-pet",
+                display_name="Catalog Pet",
+                spritesheet_url="https://example.invalid/curated/catalog-pet.png",
+            )
+        ],
+    )
+
+    response = server.handle_request({"id": "1", "method": "pet.gallery", "params": {}})
+
+    assert response["result"]["catalogComplete"] is True
+    assert response["result"]["pets"] == [
+        {
+            "slug": "catalog-pet",
+            "displayName": "Catalog Pet",
+            "installed": False,
+            "spritesheetUrl": "https://example.invalid/curated/catalog-pet.png",
+            "curated": True,
+            "generated": False,
+        }
+    ]
+
+
+def test_pet_gallery_marks_installed_only_fallback_incomplete_when_manifest_is_offline(tmp_path, monkeypatch):
+    from agent.pet import manifest, store
+
+    installed = types.SimpleNamespace(
+        slug="local-pet",
+        display_name="Local Pet",
+        generated=True,
+    )
+    monkeypatch.setattr(server, "_hermes_home", tmp_path)
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
+    monkeypatch.setattr(store, "installed_pets", lambda: [installed])
+    monkeypatch.setattr(manifest, "fetch_manifest", Mock(side_effect=OSError("petdex offline")))
+
+    response = server.handle_request({"id": "1", "method": "pet.gallery", "params": {}})
+
+    assert response["result"]["catalogComplete"] is False
+    assert response["result"]["pets"] == [
+        {
+            "slug": "local-pet",
+            "displayName": "Local Pet",
+            "installed": True,
+            "spritesheetUrl": "",
+            "generated": True,
+        }
+    ]
+
+
+def test_pet_gallery_marks_empty_offline_fallback_incomplete(tmp_path, monkeypatch):
+    from agent.pet import manifest, store
+
+    monkeypatch.setattr(server, "_hermes_home", tmp_path)
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
+    monkeypatch.setattr(store, "installed_pets", lambda: [])
+    monkeypatch.setattr(manifest, "fetch_manifest", Mock(side_effect=OSError("petdex offline")))
+
+    response = server.handle_request({"id": "1", "method": "pet.gallery", "params": {}})
+
+    assert response["result"]["catalogComplete"] is False
+    assert response["result"]["pets"] == []
+
+
 def test_pet_gallery_quoted_false_enabled_reports_disabled(tmp_path, monkeypatch):
     """display.pet.enabled: "false" (quoted) must report enabled=False.
 

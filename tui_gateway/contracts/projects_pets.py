@@ -400,6 +400,8 @@ class PetGalleryResult(Result):
     enabled: bool
     active: str = ""
     pets: list[PetGalleryEntry] = Field(default_factory=list)
+    # False when the response only contains local installs or the manifest is unavailable.
+    catalogComplete: bool = False
 
 
 method("pet.gallery", params=PetGalleryParams, result=PetGalleryResult,

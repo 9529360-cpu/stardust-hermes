@@ -568,6 +568,34 @@ They differ when a route explicitly maps to another backend profile (for example
 SSH `remoteProfile` override or a legacy per-profile URL alias). This distinction
 preserves backend identity without exposing connection secrets.
 
+### Hover-intent pre-warming
+
+Use `useProfilePrewarm(profile, connectionId?)` for profile-backed rows. It
+returns `startPrewarm` and `cancelPrewarm` handlers: warming starts only after
+a short intentional hover; pointer leave or pointer down cancels it. Cancel on
+pointer down so a click opens the target directly instead of racing a speculative
+backend start. Pass the row's `connectionId` for a multi-gateway agent so the
+warm stays on that source.
+
+```javascript
+import { RowButton, useProfilePrewarm } from '@stardust/plugin-sdk'
+
+function AgentRow({ connectionId, profile, onOpen }) {
+  const { cancelPrewarm, startPrewarm } = useProfilePrewarm(profile, connectionId)
+
+  return (
+    <RowButton
+      onClick={onOpen}
+      onPointerDown={cancelPrewarm}
+      onPointerEnter={startPrewarm}
+      onPointerLeave={cancelPrewarm}
+    >
+      {profile}
+    </RowButton>
+  )
+}
+```
+
 Profile-shaped plugins get first-class methods too:
 `profiles.list` (each profile + its most recent conversation as
 `last_session`; pass `include_sessions: false` to skip the per-profile DB
@@ -915,7 +943,7 @@ not treat this pipeline as a trust boundary.
 | Plugin contract | `HermesPlugin`, `PluginContext`, `PluginContribution`, `PluginStorage`, `PluginOs`, `PluginRestOptions`, `PluginNativeNotificationInput`, `PluginNotificationAction`, `HermesOpenTarget`, `Contribution` |
 | Area constants | `PANES_AREA`, `ROUTES_AREA`, `SIDEBAR_NAV_AREA`, `STATUSBAR_AREAS`, `TITLEBAR_AREAS`, `PALETTE_AREA`, `KEYBINDS_AREA`, `THEMES_AREA`, `COMPOSER_AREAS` |
 | Area payloads | `RouteContribution`, `SidebarNavContribution`, `StatusbarItem`, `TitlebarTool`, `PaletteContribution`, `KeybindContribution`, `ComposerMiddleware`, `ComposerAttachmentProvider` |
-| React / state | `useValue`, `atom`, `computed`, `useQuery`, `useMutation`, `useQueryClient`, `queryClient`, `Contribute` |
+| React / state | `useValue`, `useProfilePrewarm`, `atom`, `computed`, `useQuery`, `useMutation`, `useQueryClient`, `queryClient`, `Contribute` |
 | Theming | `useTheme`, `requestTheme`, `setAccentOverride`, `$accentOverride`, `retintTheme`, `themeHue`, `DesktopTheme`, `DesktopThemeColors`, plus OKLCH math (`hexToOklch`, `oklchToHex`, `oklchToSrgb255`, `mixOklab`, `maxChroma`, `hueDelta`, `normalizeHex`) and sRGB measures (`contrastRatio` — `number | null`, null for unparseable input — `readableOn`) |
 | UI kit | `Button`, `Input`, `Textarea`, `Select*`, `Switch`, `Checkbox`, `SegmentedControl`, `Tabs*`, `Dialog*`, `ConfirmDialog`, `DropdownMenu*`, `ContextMenu*`, `Popover*`, `Tip`/`Tooltip*`, `Badge`, `Kbd`/`KbdGroup`, `SearchField`, `ScrollArea`, `Separator`, `Skeleton`, `GlyphSpinner`, `Loader`, `EmptyState`, `ErrorState`, `CopyButton`, `StatusDot`, `LogView`, `Codicon`, `DecodeText` |
 | Helpers | `cn`, `icons`, `haptic`, `useI18n`, `profileColor`, `profileColorSoft`, `relativeTime`, `fmtDateTime`, `fmtDayTime`, `coarseElapsed`, `evaluateRuntimeReadiness` |

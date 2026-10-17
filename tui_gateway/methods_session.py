@@ -1346,7 +1346,7 @@ def _(rid, params: dict) -> dict:
                      "scale": scale})
 
 
-@_pet_method("pet.gallery", fail_open={"enabled": False, "active": "", "pets": []})
+@_pet_method("pet.gallery", fail_open={"enabled": False, "active": "", "pets": [], "catalogComplete": False})
 def _(rid, params: dict) -> dict:
     """Petdex gallery + local install state (installed-only offline); ``localOnly`` skips the remote manifest."""
     local_only = bool(params.get("localOnly"))
@@ -1354,18 +1354,21 @@ def _(rid, params: dict) -> dict:
     pet_cfg = _pet_display_cfg()
     installed = {p.slug: p for p in store.installed_pets()}
     gallery: list[dict] = []
+    catalog_complete = False
     try:
         from agent.pet.manifest import fetch_manifest, prefetch
         # Local-only still warms the manifest cache in the background.
         if local_only:
             prefetch()
-        for entry in [] if local_only else fetch_manifest():
-            gallery.append({
-                "slug": entry.slug, "displayName": entry.display_name, "installed": entry.slug in installed,
-                "spritesheetUrl": entry.spritesheet_url,
-                # No popularity metric; petdex's hand-picked set (by asset path) is closest.
-                "curated": "/curated/" in entry.spritesheet_url,
-                "generated": entry.slug in installed and installed[entry.slug].generated})
+        else:
+            for entry in fetch_manifest():
+                gallery.append({
+                    "slug": entry.slug, "displayName": entry.display_name, "installed": entry.slug in installed,
+                    "spritesheetUrl": entry.spritesheet_url,
+                    # No popularity metric; petdex's hand-picked set (by asset path) is closest.
+                    "curated": "/curated/" in entry.spritesheet_url,
+                    "generated": entry.slug in installed and installed[entry.slug].generated})
+            catalog_complete = True
     except Exception as exc:  # noqa: BLE001 - offline: fall back to installed
         logger.debug("pet.gallery manifest fetch failed: %s", exc)
     seen = {item["slug"] for item in gallery}
@@ -1374,7 +1377,8 @@ def _(rid, params: dict) -> dict:
          "generated": pet.generated}
         for slug, pet in installed.items() if slug not in seen)
     return _ok(rid, {"enabled": is_truthy_value(pet_cfg.get("enabled"), default=False),
-                     "active": str(pet_cfg.get("slug", "") or ""), "pets": gallery})
+                     "active": str(pet_cfg.get("slug", "") or ""), "pets": gallery,
+                     "catalogComplete": catalog_complete})
 
 
 @_pet_method("pet.select", slug=True)

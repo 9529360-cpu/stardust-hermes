@@ -26,6 +26,7 @@ import {
   SidebarRowLead,
   Tip,
   useI18n,
+  useProfilePrewarm,
   useValue
 } from '@stardust/plugin-sdk'
 
@@ -209,7 +210,12 @@ export function BotRow({ bot, onDelete, onEdit, onGroup, onNewSection, showHandl
 
   // Rows and Active Now share the exact-owner open path; only that path may
   // activate a source and resolve the canonical Bot Chat.
-  const open = () => void openRosterBot(bot)
+  const { cancelPrewarm, startPrewarm } = useProfilePrewarm(bot.name, bot.sourceScoped ? bot.connectionId : null)
+
+  const open = () => {
+    cancelPrewarm()
+    void openRosterBot(bot)
+  }
 
   // DRAG lives on the row button itself: it already takes pointer events, so
   // the click that opens the bot and the drag that files it are one element's
@@ -240,7 +246,9 @@ export function BotRow({ bot, onDelete, onEdit, onGroup, onNewSection, showHandl
         event.dataTransfer.effectAllowed = 'move'
         $draggingBot.set(rosterKey)
       }}
-      onPointerEnter={warm}
+      onPointerDown={cancelPrewarm}
+      onPointerEnter={startPrewarm}
+      onPointerLeave={cancelPrewarm}
     >
       <div className={cn('shrink-0', !sourceStatus.available && 'grayscale opacity-60')}>
         <BotFace
