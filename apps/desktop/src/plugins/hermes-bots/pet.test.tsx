@@ -36,6 +36,28 @@ vi.mock('@stardust/plugin-sdk', () => ({
   Input: (props: React.ComponentProps<'input'>) => <input {...props} />,
   LruCache: UnboundedCache,
   RowButton: (props: React.ComponentProps<'button'>) => <button {...props} />,
+  SearchField: ({
+    onChange,
+    placeholder,
+    value
+  }: {
+    onChange: (value: string) => void
+    placeholder: string
+    value: string
+  }) => (
+    <input
+      aria-label={placeholder}
+      onChange={event => onChange(event.target.value)}
+      placeholder={placeholder}
+      value={value}
+    />
+  ),
+  useI18n: () => ({
+    t: {
+      common: { retry: 'Retry' },
+      settings: { appearance: { pet: { unreachable: 'The pet catalog is unavailable.' } } }
+    }
+  }),
   useQuery: useQueryMock
 }))
 
@@ -83,6 +105,35 @@ afterEach(() => {
 })
 
 describe('the pet gallery', () => {
+  it.each([
+    { name: 'an empty offline fallback', data: { catalogComplete: false, pets: [] }, isError: false },
+    { name: 'a failed gallery RPC', data: undefined, isError: true },
+    {
+      name: 'installed pets with an offline catalog',
+      data: { catalogComplete: false, pets: [{ displayName: 'Mine', slug: 'mine', installed: true }] },
+      isError: false
+    }
+  ])('offers recovery for $name without reporting an empty catalog', async ({ data, isError }) => {
+    const refetch = vi.fn().mockResolvedValue({})
+
+    useQueryMock.mockReturnValue({ data, isError, isFetching: false, isLoading: false, refetch })
+
+    const PetTab = await loadPetTab()
+    const view = render(<PetTab image={null} onImage={vi.fn()} />)
+
+    expect(view.queryByText(/No pets in the petdex gallery/)).toBeNull()
+    expect(view.getByRole('status').textContent).toContain('The pet catalog is unavailable.')
+
+    if (data?.pets.length) {
+      expect(view.getByText('Mine')).toBeTruthy()
+      await waitFor(() => expect(view.container.querySelector('img')).toBeTruthy())
+    }
+
+    fireEvent.click(view.getByRole('button', { name: 'Retry' }))
+    expect(refetch).toHaveBeenCalledTimes(1)
+    view.unmount()
+  })
+
   it('reserves paint space around boundary tiles inside the bounded scroller', async () => {
     const PetTab = await loadPetTab()
     const view = render(<PetTab image={null} onImage={vi.fn()} />)

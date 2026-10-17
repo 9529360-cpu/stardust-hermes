@@ -8,14 +8,16 @@ import { prewarmProfileBackend } from '@/store/profile'
 const PREWARM_DWELL_MS = 120
 
 /**
- * pointerenter/pointerleave handlers that pre-warm `profile`'s pool backend
- * after a short hover dwell (see prewarmProfileBackend in store/profile).
- * Consumers merge these with their own pointer handlers.
+ * Pointerenter/pointerleave handlers that pre-warm a profile's pool backend
+ * after a short hover dwell. A source ID keeps multi-source rows on their own
+ * connection; consumers cancel on pointerdown when the user intends to click.
  */
-export function useProfilePrewarm(profile: string | null | undefined) {
+export function useProfilePrewarm(profile: string | null | undefined, connectionId: null | string = null) {
   const timer = useRef<null | number>(null)
   const profileRef = useRef(profile)
+  const connectionIdRef = useRef(connectionId)
   profileRef.current = profile
+  connectionIdRef.current = connectionId
 
   const cancelPrewarm = useCallback(() => {
     if (timer.current != null) {
@@ -30,7 +32,7 @@ export function useProfilePrewarm(profile: string | null | undefined) {
     cancelPrewarm()
     timer.current = window.setTimeout(() => {
       timer.current = null
-      prewarmProfileBackend(profileRef.current || 'default')
+      prewarmProfileBackend(profileRef.current || 'default', connectionIdRef.current)
     }, PREWARM_DWELL_MS)
   }, [cancelPrewarm])
 

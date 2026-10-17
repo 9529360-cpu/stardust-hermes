@@ -24,6 +24,7 @@ import { handoffOriginSource, sessionSourceLabel } from '@/lib/session-source'
 import { coarseElapsed } from '@/lib/time'
 import { useStoreSelector } from '@/lib/use-session-slice'
 import { cn } from '@/lib/utils'
+import { useProfilePrewarm } from '@/sdk/profile-prewarm'
 import { $sidebarRowMeta } from '@/store/layout'
 import { normalizeProfileKey } from '@/store/profile'
 import { $projects } from '@/store/projects'
@@ -54,7 +55,6 @@ import {
 import { SessionActionsMenu, SessionContextMenu } from './session-actions-menu'
 import { sessionRowDetails } from './session-row-details'
 import { resolveSessionRowClick } from './session-row-gesture'
-import { useProfilePrewarm } from './use-profile-prewarm'
 
 interface SidebarSessionRowProps extends React.ComponentProps<'div'> {
   session: SessionInfo

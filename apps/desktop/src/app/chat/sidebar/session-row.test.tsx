@@ -128,7 +128,7 @@ vi.mock('./session-actions-menu', () => ({
   SessionContextMenu: ({ children }: { children: React.ReactNode }) => <>{children}</>
 }))
 
-vi.mock('./use-profile-prewarm', () => ({
+vi.mock('@/sdk/profile-prewarm', () => ({
   useProfilePrewarm: () => ({ cancelPrewarm: vi.fn(), startPrewarm: vi.fn() })
 }))
 

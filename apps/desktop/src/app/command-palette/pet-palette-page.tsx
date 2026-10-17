@@ -22,6 +22,7 @@ import {
   $petBusy,
   $petGallery,
   $petGalleryError,
+  $petGalleryFullCatalogStatus,
   $petGalleryStatus,
   adoptPet,
   loadPetGallery,
@@ -43,6 +44,7 @@ export function PetPalettePage({ search, onGenerate }: PetPalettePageProps) {
 
   const gallery = useStore($petGallery)
   const status = useStore($petGalleryStatus)
+  const fullCatalogStatus = useStore($petGalleryFullCatalogStatus)
   const error = useStore($petGalleryError)
   const busy = useStore($petBusy)
 
@@ -59,7 +61,7 @@ export function PetPalettePage({ search, onGenerate }: PetPalettePageProps) {
     void adoptPet(requestGateway, slug, copy.adoptFailed).then(ok => ok && triggerHaptic('crisp'))
   }
 
-  if (status === 'loading' && !gallery) {
+  if ((status === 'loading' && !gallery) || (shown.length === 0 && fullCatalogStatus === 'loading')) {
     return <StatusRow icon={<Loader2 className="size-3.5 animate-spin" />} text={copy.loading} />
   }
 
@@ -67,8 +69,8 @@ export function PetPalettePage({ search, onGenerate }: PetPalettePageProps) {
     return <StatusRow text={copy.staleBackend} tone="error" />
   }
 
-  if (!gallery?.pets.length && error) {
-    return <StatusRow text={error} tone="error" />
+  if (!gallery?.pets.length && (error || fullCatalogStatus === 'error')) {
+    return <StatusRow text={error || copy.error} tone="error" />
   }
 
   const mutating = Boolean(busy)
@@ -93,7 +95,9 @@ export function PetPalettePage({ search, onGenerate }: PetPalettePageProps) {
         </button>
       )}
 
-      {error && <p className="px-2 pb-1 pt-1.5 text-[0.6875rem] text-(--ui-red)">{error}</p>}
+      {(error || fullCatalogStatus === 'error') && (
+        <p className="px-2 pb-1 pt-1.5 text-[0.6875rem] text-(--ui-red)">{error || copy.error}</p>
+      )}
 
       {shown.length === 0 ? (
         <StatusRow text={copy.empty} />

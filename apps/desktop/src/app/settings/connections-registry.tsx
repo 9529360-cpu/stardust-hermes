@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { ErrorBanner, ErrorState } from '@/components/ui/error-state'
 import { Input } from '@/components/ui/input'
+import { SearchField } from '@/components/ui/search-field'
 import type {
   DesktopConnectionKind,
   DesktopConnectionProbeResult,
@@ -20,19 +21,7 @@ import {
 } from '@/lib/connection-display'
 import { deriveRemoteAuthProviderShape } from '@/lib/desktop-remote-auth'
 import { triggerHaptic } from '@/lib/haptics'
-import {
-  Check,
-  Globe,
-  Loader2,
-  LogIn,
-  Monitor,
-  Pencil,
-  Plus,
-  RefreshCw,
-  SearchIcon,
-  Terminal,
-  Trash2
-} from '@/lib/icons'
+import { Check, Globe, Loader2, LogIn, Monitor, Pencil, Plus, RefreshCw, Terminal, Trash2 } from '@/lib/icons'
 import { coerceRemoteUrlScheme } from '@/lib/remote-url'
 import { $activeConnectionId, setConnectionsRegistry } from '@/store/connections'
 import { refreshFleetRoster } from '@/store/fleet-roster'
@@ -656,15 +645,13 @@ export function ConnectionsRegistrySection() {
       </p>
 
       {!loading && showSearch && (
-        <Input
+        <SearchField
           aria-label={s.searchPlaceholder}
           containerClassName="mt-3 mb-0 w-full max-w-sm"
-          onChange={event => updateSearchQuery(event.target.value)}
+          inputClassName="flex-1"
+          inputRef={searchInputRef}
+          onChange={updateSearchQuery}
           placeholder={s.searchPlaceholder}
-          prefix={<SearchIcon className="size-3.5" />}
-          ref={searchInputRef}
-          size="sm"
-          type="search"
           value={searchQuery}
         />
       )}

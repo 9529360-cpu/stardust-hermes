@@ -208,7 +208,7 @@ describe('ConnectionsRegistrySection', () => {
     render(<ConnectionsRegistrySection />)
 
     await waitFor(() => expect(screen.getByText('Homelab')).toBeTruthy())
-    expect(screen.queryByRole('searchbox', { name: 'Search gateways…' })).toBeNull()
+    expect(screen.queryByRole('textbox', { name: 'Search gateways…' })).toBeNull()
   })
 
   it('sorts a large registry and searches names and endpoints', async () => {
@@ -249,7 +249,7 @@ describe('ConnectionsRegistrySection', () => {
       </div>
     )
 
-    const search = await screen.findByRole('searchbox', { name: 'Search gateways…' })
+    const search = await screen.findByRole('textbox', { name: 'Search gateways…' })
     expect(search.parentElement?.className).toContain('mt-3')
     expect(search.parentElement?.className).toContain('mb-0')
     const settingsScroller = screen.getByTestId('settings-scroller')

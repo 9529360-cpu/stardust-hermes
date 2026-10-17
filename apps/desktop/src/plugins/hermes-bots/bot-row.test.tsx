@@ -24,16 +24,29 @@ import { $groupChats } from './group-chat'
 import { translateBots } from './i18n-test-helper'
 import type { RosterRow } from './types'
 
-const { ensureAgent, ensureBotMetadata, notifyError, openRosterBot, requestProfile, warmAgent, warmProfile } =
-  vi.hoisted(() => ({
-    ensureAgent: vi.fn(),
-    ensureBotMetadata: vi.fn(),
-    notifyError: vi.fn(),
-    openRosterBot: vi.fn(),
-    requestProfile: vi.fn(),
-    warmAgent: vi.fn(),
-    warmProfile: vi.fn()
-  }))
+const {
+  cancelPrewarm,
+  ensureAgent,
+  ensureBotMetadata,
+  notifyError,
+  openRosterBot,
+  requestProfile,
+  startPrewarm,
+  useProfilePrewarm,
+  warmAgent,
+  warmProfile
+} = vi.hoisted(() => ({
+  cancelPrewarm: vi.fn(),
+  ensureAgent: vi.fn(),
+  ensureBotMetadata: vi.fn(),
+  notifyError: vi.fn(),
+  openRosterBot: vi.fn(),
+  requestProfile: vi.fn(),
+  startPrewarm: vi.fn(),
+  useProfilePrewarm: vi.fn(() => ({ cancelPrewarm, startPrewarm })),
+  warmAgent: vi.fn(),
+  warmProfile: vi.fn()
+}))
 
 vi.mock('@stardust/plugin-sdk', async importOriginal => {
   const sdk = await importOriginal<typeof HermesSdk>()
@@ -41,6 +54,7 @@ vi.mock('@stardust/plugin-sdk', async importOriginal => {
   return {
     ...sdk,
     host: { ...sdk.host, ensureAgent, notifyError, requestProfile, warmAgent, warmProfile },
+    useProfilePrewarm,
     // The plugin bundle normally lands via `ctx.i18n.register` at load, so
     // without this every localized label in the row renders empty.
     usePluginI18n: () => translateBots
@@ -96,30 +110,61 @@ describe('group-turn presence', () => {
 })
 
 describe('pre-warm is hover-scoped, never roster-wide', () => {
-  it('warms nothing on paint and exactly the hovered bot on pointer entry', async () => {
-    const row = renderRow({ name: 'alpha' } as RosterRow)
+  it('starts the shared dwell pre-warm only for the hovered bot and cancels on leave', async () => {
+    const bot = { name: 'alpha' } as RosterRow
+    const row = renderRow(bot)
 
     expect(warmProfile).not.toHaveBeenCalled()
+    expect(warmAgent).not.toHaveBeenCalled()
+    expect(useProfilePrewarm).toHaveBeenCalledWith('alpha', null)
 
     fireEvent.pointerEnter(row)
+    expect(startPrewarm).toHaveBeenCalledOnce()
+    expect(warmProfile).not.toHaveBeenCalled()
 
-    expect(warmProfile.mock.calls).toEqual([['alpha']])
-    expect(warmAgent).not.toHaveBeenCalled()
+    fireEvent.pointerLeave(row)
+    expect(cancelPrewarm).toHaveBeenCalledOnce()
   })
 
-  it('pre-dials a source-scoped row on its own source', async () => {
-    const row = renderRow({
+  it('pre-dials a source-scoped row on its own source and cancels speculative warming on click', async () => {
+    const bot = {
       connectionId: 'work',
       connectionLabel: 'Work',
       name: 'research',
       remoteSource: true,
       sourceScoped: true
+    } as RosterRow
+
+    const row = renderRow(bot)
+
+    expect(useProfilePrewarm).toHaveBeenCalledWith('research', 'work')
+
+    fireEvent.pointerEnter(row)
+    expect(startPrewarm).toHaveBeenCalledOnce()
+    fireEvent.pointerDown(row)
+    expect(cancelPrewarm).toHaveBeenCalledOnce()
+    fireEvent.click(row)
+
+    expect(cancelPrewarm).toHaveBeenCalledTimes(2)
+    expect(openRosterBot).toHaveBeenCalledWith(bot)
+    expect(warmProfile).not.toHaveBeenCalled()
+    expect(warmAgent).not.toHaveBeenCalled()
+  })
+
+  it('cancels the scheduled warm when a row is clicked before the hover dwell', () => {
+    const row = renderRow({
+      name: 'alpha'
     } as RosterRow)
 
     fireEvent.pointerEnter(row)
+    fireEvent.pointerDown(row)
+    fireEvent.click(row)
+    fireEvent.pointerLeave(row)
 
-    expect(warmAgent.mock.calls).toEqual([['work', 'research']])
+    expect(cancelPrewarm).toHaveBeenCalled()
+    expect(openRosterBot).toHaveBeenCalled()
     expect(warmProfile).not.toHaveBeenCalled()
+    expect(warmAgent).not.toHaveBeenCalled()
   })
 })
 

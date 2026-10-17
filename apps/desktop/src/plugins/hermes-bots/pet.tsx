@@ -3,7 +3,17 @@
  * frame as the bot's profile picture.
  */
 
-import { Button, cn, GlyphSpinner, host, Input, LruCache, RowButton, useQuery } from '@stardust/plugin-sdk'
+import {
+  Button,
+  cn,
+  GlyphSpinner,
+  host,
+  LruCache,
+  RowButton,
+  SearchField,
+  useI18n,
+  useQuery
+} from '@stardust/plugin-sdk'
 import { useEffect, useState } from 'react'
 
 import { useBots } from './i18n'
@@ -130,15 +140,16 @@ interface PetTabProps {
 }
 
 export function PetTab({ image, onImage }: PetTabProps) {
+  const { t } = useI18n()
   const b = useBots()
   // Selection is dialog-local: committed by the dialog's Save like any
   // uploaded/generated image (a direct meta write here gets clobbered by
   // Save's own image state).
   const [selectedSlug, setSelectedSlug] = useState<null | string>(null)
 
-  const { data, isLoading } = useQuery({
+  const { data, isError, isFetching, isLoading, refetch } = useQuery({
     queryKey: [ID, 'pet-gallery'],
-    queryFn: () => host.request<{ pets?: PetGalleryEntry[] }>('pet.gallery', {}),
+    queryFn: () => host.request<{ catalogComplete?: boolean; pets?: PetGalleryEntry[] }>('pet.gallery', {}),
     staleTime: 300000
   })
 
@@ -156,7 +167,21 @@ export function PetTab({ image, onImage }: PetTabProps) {
     )
   }
 
+  const catalogNotice =
+    isError || data?.catalogComplete === false ? (
+      <div className="flex items-center gap-2 text-xs text-(--ui-text-tertiary)" role="status">
+        <span className="flex-1">{t.settings.appearance.pet.unreachable}</span>
+        <Button disabled={isFetching} onClick={() => void refetch()} size="sm" type="button" variant="ghost">
+          {t.common.retry}
+        </Button>
+      </div>
+    ) : null
+
   if (!pets.length) {
+    if (catalogNotice) {
+      return catalogNotice
+    }
+
     return (
       <div className="px-2 py-3 text-center text-xs text-(--ui-text-tertiary)">
         No pets in the petdex gallery. Run `stardust pets` to explore.
@@ -190,10 +215,12 @@ export function PetTab({ image, onImage }: PetTabProps) {
   return (
     <div className="grid w-full gap-2">
       <div className="text-center text-[0.65rem] text-(--ui-text-quaternary)">{b.avatar.pickPet}</div>
-      <Input
-        className="h-7 text-xs"
+      {catalogNotice}
+      <SearchField
+        containerClassName="w-full"
+        inputClassName="flex-1"
         onChange={event => {
-          setQuery(event.target.value)
+          setQuery(event)
           setLimit(24)
         }}
         placeholder={`Search ${pets.length} pets…`}
