@@ -758,7 +758,7 @@ export function CreateAgentDialog({ open, onClose, roster, userFriendly = false 
                   }}
                   value={targetConnection || activeConnectionId || 'local'}
                 >
-                  <SelectTrigger className="h-8 rounded-md">
+                  <SelectTrigger size="sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -917,7 +917,7 @@ export function CreateAgentDialog({ open, onClose, roster, userFriendly = false 
                       }}
                       value={remoteTarget ? 'default' : cloneFrom}
                     >
-                      <SelectTrigger className="h-8 rounded-md">
+                      <SelectTrigger size="sm">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1016,9 +1016,9 @@ export function CreateAgentDialog({ open, onClose, roster, userFriendly = false 
                 ) : (
                   <div className="grid gap-1.5">
                     <Input
-                      className="h-7 text-xs"
                       onChange={event => setCapFilter(event.target.value)}
                       placeholder={b.tools.filterSkills}
+                      size="compact"
                       value={capFilter}
                     />
                     <div

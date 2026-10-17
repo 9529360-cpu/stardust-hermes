@@ -802,10 +802,11 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
           <ListRow
             action={
               <Input
-                className={cn('h-8', CONTROL_TEXT)}
+                className={CONTROL_TEXT}
                 disabled={state.envOverride}
                 onChange={event => setState(current => ({ ...current, remoteUrl: event.target.value }))}
                 placeholder="https://gateway.example.com/hermes"
+                size="sm"
                 value={state.remoteUrl}
               />
             }
@@ -868,7 +869,7 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
                 action={
                   <Input
                     autoComplete="off"
-                    className={cn('h-8 font-mono', CONTROL_TEXT)}
+                    className={cn('font-mono', CONTROL_TEXT)}
                     disabled={state.envOverride}
                     onChange={event => setRemoteToken(event.target.value)}
                     placeholder={
@@ -876,6 +877,7 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
                         ? g.existingToken(state.remoteTokenPreview ?? g.savedToken)
                         : g.pasteSessionToken
                     }
+                    size="sm"
                     type="password"
                     value={remoteToken}
                   />
@@ -909,7 +911,7 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
                   onValueChange={selectHost}
                   value={sshHostSuggestions.includes(state.sshHost) ? state.sshHost : SSH_HOST_CUSTOM}
                 >
-                  <SelectTrigger className={cn('h-8', CONTROL_TEXT)}>
+                  <SelectTrigger size="sm">
                     <SelectValue placeholder={g.sshHostPick} />
                   </SelectTrigger>
                   <SelectContent>
@@ -930,7 +932,7 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
               action={
                 <Input
                   autoFocus={sshCustomHost}
-                  className={cn('h-8', CONTROL_TEXT)}
+                  className={CONTROL_TEXT}
                   onBlur={() => {
                     // Empty host on blur with suggestions available = the user backed
                     // out of Custom; return to the dropdown.
@@ -943,6 +945,7 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
                     void resolveSshHost(state.sshHost)
                   }}
                   onChange={event => setState(current => selectSshHost(current, event.target.value))}
+                  size="sm"
                   value={state.sshHost}
                 />
               }
@@ -953,9 +956,10 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
           <ListRow
             action={
               <Input
-                className={cn('h-8', CONTROL_TEXT)}
+                className={CONTROL_TEXT}
                 onChange={event => setState(current => ({ ...current, sshUser: event.target.value }))}
                 placeholder={g.sshUserPlaceholder}
+                size="sm"
                 value={state.sshUser}
               />
             }
@@ -965,12 +969,13 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
           <ListRow
             action={
               <Input
-                className={cn('h-8', CONTROL_TEXT)}
+                className={CONTROL_TEXT}
                 inputMode="numeric"
                 onChange={event =>
                   setState(current => ({ ...current, sshPort: event.target.value ? Number(event.target.value) : null }))
                 }
                 placeholder="22"
+                size="sm"
                 value={state.sshPort ?? ''}
               />
             }
@@ -980,8 +985,9 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
           <ListRow
             action={
               <Input
-                className={cn('h-8 font-mono', CONTROL_TEXT)}
+                className={cn('font-mono', CONTROL_TEXT)}
                 onChange={event => setState(current => ({ ...current, sshKeyPath: event.target.value }))}
+                size="sm"
                 value={state.sshKeyPath}
               />
             }
@@ -991,9 +997,10 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
           <ListRow
             action={
               <Input
-                className={cn('h-8 font-mono', CONTROL_TEXT)}
+                className={cn('font-mono', CONTROL_TEXT)}
                 onChange={event => setState(current => ({ ...current, sshRemoteHermesPath: event.target.value }))}
                 placeholder={g.sshHermesPathPlaceholder}
+                size="sm"
                 value={state.sshRemoteHermesPath}
               />
             }

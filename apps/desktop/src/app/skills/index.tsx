@@ -896,7 +896,10 @@ export function SkillsView({
           <span className="text-[0.7rem] font-medium text-(--ui-text-tertiary)">{t.skills.configuringProfile}</span>
         )}
         <Select onValueChange={changeScope} value={scopeSelectValue}>
-          <SelectTrigger className={cn('text-xs', compactSelector ? 'h-6 w-full max-w-64 px-2' : 'h-7 w-56')}>
+          <SelectTrigger
+            className={cn('text-xs', compactSelector ? 'w-full max-w-64' : 'w-56')}
+            size={compactSelector ? 'xs' : 'compact'}
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
