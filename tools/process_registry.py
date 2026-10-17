@@ -482,6 +482,7 @@ class ProcessSession:
     parent_session_id: str = ""
     verification_session_id: str = ""          # Agent session whose workspace evidence this command may invalidate
     workspace_mutation_root: str = ""            # Set when this command may have changed a coding workspace
+    verification_started_at: str = field(default="", repr=False)  # Ledger time from which this run's evidence covers edits
     _verification_completion_recorded: bool = field(default=False, repr=False)
     notify_on_complete: bool = False            # Queue agent notification on exit
     watch_patterns: List[str] = field(default_factory=list)
@@ -1505,6 +1506,8 @@ class ProcessRegistry(ProcessCheckpointMixin):
                     command=session.command, cwd=session.cwd,
                     session_id=session.verification_session_id,
                     exit_code=session.exit_code if session.exit_code is not None else -1,
+                    # The run finished later than it began; edits made in between were not covered by it.
+                    observed_at=session.verification_started_at or None,
                 )
             except Exception:
                 logger.debug("background verification evidence recording failed for %s", session.id, exc_info=True)

@@ -69,6 +69,8 @@ def test_is_destructive_command_covers_terminal_workspace_mutators(command):
     "git status --short",
     "pytest 2>&1",
     "pytest >/dev/null",
+    "pytest > /dev/null",
+    "pytest 2> /dev/null",
 ])
 def test_is_destructive_command_ignores_terminal_reads_and_non_file_redirects(command):
     from agent.tool_dispatch_helpers import _is_destructive_command

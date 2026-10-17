@@ -306,6 +306,7 @@ def test_compound_terminal_install_before_test_keeps_evidence_fresh(tmp_path, mo
 
 @pytest.mark.parametrize("command", [
     "git status --short",
+    "git --version",
     "git -C /tmp/project status --short",
     "git diff --check",
     "npm test",
@@ -460,3 +461,66 @@ def test_windows_backslash_ad_hoc_script_path_is_matched(tmp_path, monkeypatch):
     assert result is not None, (
         "Windows backslash path should be matched via posix=False fallback"
     )
+
+
+@pytest.mark.parametrize("command", [
+    "touch src/new.py",
+    "echo 'x = 2' >> src/mod.py",
+    "printf 'x = 2' | tee src/mod.py",
+    "echo note | tee -a notes.txt",
+    "mkdir -p build/out",
+    "ln -s src/mod.py src/link.py",
+    "patch -p1 < fix.diff",
+    "perl -pi -e 's/1/2/' src/mod.py",
+    "black .",
+    "ruff format src",
+    "isort src",
+    "cargo fmt",
+    "Set-Content src/mod.py 'x'",
+    "New-Item src/n.py -ItemType File",
+    "Remove-Item src/mod.py",
+    "del src\mod.py",
+])
+def test_common_shell_writers_invalidate_evidence(tmp_path, monkeypatch, command):
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+    _python_project(tmp_path)
+
+    assert terminal_workspace_mutation_root(command=command, cwd=tmp_path, exit_code=0) == str(tmp_path.resolve())
+
+
+@pytest.mark.parametrize("command", [
+    "echo hello > /dev/null",
+    "python -m pytest tests/test_example.py 2>/dev/null",
+    "python -m pytest tests/test_example.py > /dev/null 2>&1",
+    "python -m pytest tests/test_example.py 2>&1 | tee test.log",
+    "black --check .",
+    "ruff format --check src",
+    "cargo fmt -- --check",
+    "git log --oneline > /dev/null",
+    "ls | tee",
+])
+def test_null_sinks_check_only_formatters_and_verifier_capture_keep_evidence_fresh(tmp_path, monkeypatch, command):
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+    _python_project(tmp_path)
+
+    assert terminal_workspace_mutation_root(command=command, cwd=tmp_path, exit_code=0) is None
+
+
+def test_ledger_clock_is_strictly_increasing_even_when_the_wall_clock_repeats(monkeypatch):
+    """Staleness compares ledger stamps, so equal stamps from a coarse clock must never occur."""
+    import agent.verification_evidence as ledger
+
+    frozen = datetime(2026, 10, 17, 12, 0, 0, tzinfo=timezone.utc)
+
+    class _FrozenDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return frozen
+
+    monkeypatch.setattr(ledger, "datetime", _FrozenDatetime)
+    monkeypatch.setattr(ledger, "_last_stamp", None)
+
+    stamps = [ledger.ledger_timestamp() for _ in range(50)]
+
+    assert stamps == sorted(set(stamps))
+    assert datetime.fromisoformat(stamps[-1]) - datetime.fromisoformat(stamps[0]) < timedelta(milliseconds=1)

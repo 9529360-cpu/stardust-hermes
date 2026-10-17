@@ -3256,3 +3256,81 @@ def test_model_not_found_notice_absent_when_fallback_chain_configured(monkeypatc
     text = _format_async(evt)
     assert text.count("SUBAGENT MODEL REJECTED") == 1
     assert "No fallback chain is configured" not in text
+
+
+def _ledger_project(tmp_path, monkeypatch):
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+    monkeypatch.setenv("STARDUST_VERIFY_ON_STOP", "1")
+    (tmp_path / "package.json").write_text(json.dumps({"scripts": {"test": "vitest"}}))
+    (tmp_path / "pnpm-lock.yaml").write_text("")
+
+
+def _iso_offset(seconds: float) -> str:
+    from datetime import datetime, timedelta, timezone
+
+    return (datetime.now(timezone.utc) + timedelta(seconds=seconds)).isoformat()
+
+
+def test_background_verifier_exit_keeps_edits_made_after_it_started_stale(tmp_path, monkeypatch):
+    """A background test run cannot vouch for a file the agent edited after the run began."""
+    _ledger_project(tmp_path, monkeypatch)
+    from agent.verification_evidence import mark_workspace_edited, verification_status
+
+    session = _make_session(command="pnpm run test", task_id="task", exited=True, exit_code=0)
+    session.cwd = str(tmp_path)
+    session.verification_session_id = "s1"
+    session.verification_started_at = _iso_offset(-5)
+    mark_workspace_edited(session_id="s1", cwd=tmp_path, paths=[str(tmp_path / "src.ts")])
+
+    ProcessRegistry._record_workspace_mutation_on_exit(session)
+
+    status = verification_status(session_id="s1", cwd=tmp_path)
+    assert status["status"] == "stale"
+    assert status["changed_paths"] == [str(tmp_path / "src.ts")]
+
+
+def test_background_verifier_exit_clears_edits_made_before_it_started(tmp_path, monkeypatch):
+    """Edits that predate the run are exactly what the run verified."""
+    _ledger_project(tmp_path, monkeypatch)
+    from agent.verification_evidence import mark_workspace_edited, verification_status
+
+    session = _make_session(command="pnpm run test", task_id="task", exited=True, exit_code=0)
+    session.cwd = str(tmp_path)
+    session.verification_session_id = "s1"
+    mark_workspace_edited(session_id="s1", cwd=tmp_path, paths=[str(tmp_path / "src.ts")])
+    session.verification_started_at = _iso_offset(5)
+
+    ProcessRegistry._record_workspace_mutation_on_exit(session)
+
+    status = verification_status(session_id="s1", cwd=tmp_path)
+    assert status["status"] == "passed"
+    assert status["changed_paths"] == []
+
+
+def test_background_spawn_stamps_the_verification_baseline_after_the_provisional_invalidation(tmp_path, monkeypatch):
+    """The baseline must follow the spawn-time invalidation so a mutate-then-test command still finishes fresh."""
+    _ledger_project(tmp_path, monkeypatch)
+    import sqlite3
+    from types import SimpleNamespace
+
+    import tools.terminal_tool_background as background
+    from agent.verification_evidence import _db_path, record_terminal_result, verification_status
+
+    record_terminal_result(command="pnpm run test", cwd=tmp_path, session_id="s1", exit_code=0, output="passed")
+    command = "python -c \"open('baseline.txt', 'w').write('x')\""
+    running = _make_session(sid="proc_baseline", command=command, task_id="t-baseline")
+    monkeypatch.setattr(background, "_spawn", lambda *args, **kwargs: running)
+
+    json.loads(background.spawn_background_process(
+        command=command, env=SimpleNamespace(env={}), env_type="local", effective_task_id="t-baseline",
+        task_id="t-baseline", session_key="", session_id="s1", workdir=None, cwd=str(tmp_path),
+        effective_pty=False, notify_on_complete=False, watch_patterns=None, approval_note=None,
+        pty_disabled_reason=None))
+
+    assert running.verification_started_at
+    assert verification_status(session_id="s1", cwd=tmp_path)["status"] == "stale"  # invalidated at spawn
+    with sqlite3.connect(_db_path()) as conn:
+        last_edit_at = conn.execute(
+            "SELECT last_edit_at FROM verification_state WHERE session_id = 's1'",
+        ).fetchone()[0]
+    assert last_edit_at <= running.verification_started_at

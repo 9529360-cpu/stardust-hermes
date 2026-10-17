@@ -150,6 +150,10 @@ def spawn_background_process(
                     )
                 except Exception:
                     logger.debug("background workspace mutation recording failed", exc_info=True)
+            # Taken after the provisional invalidation above and under the lock the exit handler also needs,
+            # so this run's own mutation predates its baseline and an edit made later does not.
+            from agent.verification_evidence import ledger_timestamp
+            proc_session.verification_started_at = ledger_timestamp()
         if mutation is None and proc_session.workspace_mutation_root:
             mutation = {"root": proc_session.workspace_mutation_root}
         if mutation:
@@ -240,6 +244,10 @@ def yield_to_background_handler(
             owner_task_id=task_id or effective_task_id, session_key=session_key,
             output_so_far=output_so_far, notify_on_complete=async_delivery_supported(),
             verification_session_id=session_id or task_id or effective_task_id)
+        # The agent resumes now while the command keeps running; its evidence will not cover edits made from here on.
+        from agent.verification_evidence import ledger_timestamp
+        with process_registry._lock:
+            session.verification_started_at = ledger_timestamp()
         if session.notify_on_complete and session.watcher_platform:
             _register_completion_watcher(process_registry, session, session_key)
         logger.info("foreground command yielded to background as %s (pid %s)", session.id, session.pid)

@@ -76,7 +76,7 @@ _DESTRUCTIVE_PATTERNS = re.compile(
 )
 # Output redirects that overwrite files (> but not >>)
 _REDIRECT_OVERWRITE = re.compile(
-    r'(?<![<>&])>(?![>&])\s*(?!/dev/null(?:\b|$))|&>\s*(?!/dev/null(?:\b|$))'
+    r'(?<![<>&])>(?![>&])(?!\s*/dev/null\b)|&>(?!\s*/dev/null\b)'
 )
 
 
