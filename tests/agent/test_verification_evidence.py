@@ -472,6 +472,10 @@ def test_windows_backslash_ad_hoc_script_path_is_matched(tmp_path, monkeypatch):
     "ln -s src/mod.py src/link.py",
     "patch -p1 < fix.diff",
     "perl -pi -e 's/1/2/' src/mod.py",
+    "sed -i 's/1/2/' src/mod.py",
+    "sed --in-place 's/1/2/' src/mod.py",
+    "sed -n -i 's/1/2/' src/mod.py",
+    "gsed -i 's/1/2/' src/mod.py",
     "black .",
     "ruff format src",
     "isort src",
@@ -498,6 +502,8 @@ def test_common_shell_writers_invalidate_evidence(tmp_path, monkeypatch, command
     "cargo fmt -- --check",
     "git log --oneline > /dev/null",
     "ls | tee",
+    "sed -n '1p' src/mod.py",
+    "sed 's/-i/foo/' src/mod.py",
 ])
 def test_null_sinks_check_only_formatters_and_verifier_capture_keep_evidence_fresh(tmp_path, monkeypatch, command):
     monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))

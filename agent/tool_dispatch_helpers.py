@@ -56,7 +56,7 @@ _DESTRUCTIVE_PATTERNS = re.compile(
         rm\s|rmdir\s|
         cp\s|install\s|
         mv\s|
-        sed\s+-i|
+        \b(?i:(?:g?sed)(?:\.exe)?)\s+(?:-\S+\s+)*(?:--in-place(?:=\S+)?|-[A-Za-z]*i[A-Za-z0-9.]*)\b|
         truncate\s|
         dd\s|
         shred\s|
