@@ -57,7 +57,7 @@ import {
   liveGroupChatNames
 } from './group-membership'
 import { useBots } from './i18n'
-import { displayName, slugify } from './labels'
+import { displayName, profileKeyFromFriendlyName, slugify } from './labels'
 import { McpSetupButton } from './mcp-setup'
 import { ModelPicker } from './model-picker'
 import type {
@@ -75,7 +75,7 @@ import {
 } from './profile-config'
 import { deleteBot } from './profile-ops'
 import { botRosterMeta } from './routing'
-import { getPluginCtx } from './shared'
+import { getBotOpenGeneration, getPluginCtx } from './shared'
 import { composeSoul } from './soul'
 import type { BotMeta, ConnectionRow, RosterRow } from './types'
 
@@ -119,12 +119,14 @@ interface CreateAgentDialogProps {
   onClose: () => void
   open: boolean
   roster: RosterRow[]
+  userFriendly?: boolean
 }
 
-export function CreateAgentDialog({ open, onClose, roster }: CreateAgentDialogProps) {
+export function CreateAgentDialog({ open, onClose, roster, userFriendly = false }: CreateAgentDialogProps) {
   const { t } = useI18n()
   const b = useBots()
   const [name, setName] = useState('')
+  const [friendlyName, setFriendlyName] = useState('')
   // Create mode: the profile is created LAZILY. Capability toggles are staged in
   // component state; the profile is materialized either on Create (submit) or on
   // the first MCP credential setup (ensureAgentCreated), whichever comes first —
@@ -218,7 +220,35 @@ export function CreateAgentDialog({ open, onClose, roster }: CreateAgentDialogPr
   const [capFilter, setCapFilter] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<null | string>(null)
-  const slug = slugify(name)
+  const friendlyNameTaken = userFriendly
+    ? roster.some(
+        bot =>
+          (bot.connectionId || 'local') === (activeConnectionId || 'local') &&
+          displayName(bot, botRosterMeta(bot, $botMeta.get())).normalize('NFKC').trim().toLowerCase() ===
+            friendlyName.normalize('NFKC').trim().toLowerCase()
+      )
+    : false
+  const occupiedProfileKeys = userFriendly
+    ? new Set(
+        roster.filter(bot => (bot.connectionId || 'local') === (activeConnectionId || 'local')).map(bot => bot.name)
+      )
+    : undefined
+  const slug = userFriendly
+    ? friendlyNameTaken
+      ? ''
+      : profileKeyFromFriendlyName(friendlyName, occupiedProfileKeys)
+    : slugify(name)
+  const displayTitle = userFriendly ? friendlyName.trim() : title.trim()
+
+  const activeRoute = activeConnectionId
+    ? {
+        connectionId: activeConnectionId,
+        mode: activeConnectionId === 'local' ? ('local' as const) : ('remote' as const),
+        profile: slug,
+        targetProfile: slug
+      }
+    : null
+
   const valid = slug.length > 0 && NAME_RE.test(slug)
 
   // Once the draft profile is materialized (Capabilities tab / MCP setup) it
@@ -230,7 +260,13 @@ export function CreateAgentDialog({ open, onClose, roster }: CreateAgentDialogPr
     ? roster.some(
         b => b.remoteSource && b.connectionId === targetConnection && b.name === slug && b.name !== createdRef.current
       )
-    : roster.some(b => !b.remoteSource && b.name === slug && b.name !== createdRef.current)
+    : roster.some(
+        b =>
+          (userFriendly || !b.remoteSource) &&
+          (!userFriendly || b.connectionId === (activeConnectionId || 'local')) &&
+          b.name === slug &&
+          b.name !== createdRef.current
+      )
 
   // Draft semantics for the lazily-created profile: opening the Capabilities
   // tab (or running MCP setup) materializes the profile so the LIVE config
@@ -260,14 +296,20 @@ export function CreateAgentDialog({ open, onClose, roster }: CreateAgentDialogPr
       .then(() =>
         host.notify({
           kind: 'success',
-          message: `Draft agent "${draft}" discarded`
+          message: userFriendly ? b.createFlow.draftDiscarded(draft) : `Draft agent "${draft}" discarded`
         })
       )
-      .catch(err => host.notifyError(err, `Could not clean up draft profile "${draft}"`))
+      .catch(err =>
+        host.notifyError(
+          err,
+          userFriendly ? b.createFlow.draftCleanupFailed(draft) : `Could not clean up draft profile "${draft}"`
+        )
+      )
   }
 
   const reset = () => {
     setName('')
+    setFriendlyName('')
     setTitle('')
     setDescription('')
     setShape(blobatarSvg ? 'blobatar' : 'circle')
@@ -387,10 +429,14 @@ export function CreateAgentDialog({ open, onClose, roster }: CreateAgentDialogPr
         return null
       }
 
-      const descriptionText = [title, description].filter(Boolean).join(' — ')
+      const descriptionText = userFriendly
+        ? description.trim()
+        : [displayTitle, description].filter(Boolean).join(' — ')
+
       await requestForTarget('profiles.create', {
         name: slug,
         description: descriptionText,
+        profile_kind: 'agent',
         // Clone sources are profiles of the TARGET backend. The picker's
         // roster is the local one, so a remote create always starts from the
         // remote machine's default (or fresh) — never a local profile name
@@ -403,7 +449,7 @@ export function CreateAgentDialog({ open, onClose, roster }: CreateAgentDialogPr
         share_auth: shareAuth,
         soul: composeSoul({
           name: slug,
-          title,
+          title: displayTitle,
           description,
           roster,
           customSoul: soul
@@ -461,7 +507,7 @@ export function CreateAgentDialog({ open, onClose, roster }: CreateAgentDialogPr
           color,
           image,
           imageKind: image ? 'photo' : 'shape',
-          title: title.trim(),
+          title: displayTitle,
           created: Date.now()
         }
 
@@ -484,14 +530,25 @@ export function CreateAgentDialog({ open, onClose, roster }: CreateAgentDialogPr
           /* older remote gateway */
         }
       } else {
-        saveBotMeta(slug, {
-          shape,
-          color: color ?? undefined,
-          image,
-          imageKind: image ? 'photo' : 'shape',
-          title: title.trim(),
-          created: Date.now()
-        })
+        saveBotMeta(
+          activeRoute
+            ? {
+                connectionId: activeConnectionId,
+                name: slug,
+                route: activeRoute,
+                sourceScoped: true,
+                targetProfile: slug
+              }
+            : slug,
+          {
+            shape,
+            color: color ?? undefined,
+            image,
+            imageKind: image ? 'photo' : 'shape',
+            title: displayTitle,
+            created: Date.now()
+          }
+        )
       }
 
       queryClient.invalidateQueries({
@@ -517,22 +574,20 @@ export function CreateAgentDialog({ open, onClose, roster }: CreateAgentDialogPr
 
       if (!slugCreated) {
         setBusy(false)
-        setError('Could not create the bot.')
+        setError(userFriendly ? b.createFlow.createFailed : 'Could not create the bot.')
 
         return
       }
 
       host.notify({
         kind: 'success',
-        message: remoteTarget
-          ? `Bot "${displayName({
-              name: slug,
-              title
-            })}" created on ${targetLabel}`
-          : `Bot "${displayName({
-              name: slug,
-              title
-            })}" created`
+        message: userFriendly
+          ? remoteTarget
+            ? b.createFlow.createdOn(displayName({ name: slug, title: displayTitle }), targetLabel)
+            : b.createFlow.created(displayName({ name: slug, title: displayTitle }))
+          : remoteTarget
+            ? `Bot "${displayName({ name: slug, title: displayTitle })}" created on ${targetLabel}`
+            : `Bot "${displayName({ name: slug, title: displayTitle })}" created`
       })
       const wasRemote = remoteTarget
       reset()
@@ -549,17 +604,22 @@ export function CreateAgentDialog({ open, onClose, roster }: CreateAgentDialogPr
         return
       }
 
+      const createdOwner: RosterRow = {
+        connectionId: activeConnectionId || 'local',
+        name: slug,
+        route: activeRoute || undefined,
+        sourceScoped: Boolean(activeRoute)
+      }
       $selectedBot.set(slug)
 
       // Birth the bot's forever chat right away: it introduces itself as
       // the first thing the user sees, and the pin exists from minute one.
+      // A group or roster click supersedes an in-flight canonical-chat open.
+      const creationGeneration = getBotOpenGeneration()
       try {
-        // Creates, pins, opens, and kicks off the intro in one flow. This is
-        // the ONE caller allowed to request the intro turn — genuine New
-        // Agent creation. Click-path resolution (openBotCanonicalChat) mints
-        // silently so a resolution miss never burns a turn (ScottFive).
-        const sid = await createCanonicalChat(slug, {
-          kickoff: true
+        const sid = await createCanonicalChat(createdOwner, {
+          kickoff: true,
+          openingStillCurrent: () => getBotOpenGeneration() === creationGeneration
         })
 
         if (!sid && typeof host.newChat === 'function') {
@@ -607,49 +667,82 @@ export function CreateAgentDialog({ open, onClose, roster }: CreateAgentDialogPr
         }
       >
         <DialogHeader>
-          <DialogTitle>{b.bot.newTitle}</DialogTitle>
+          <DialogTitle>{userFriendly ? b.createFlow.title : b.bot.newTitle}</DialogTitle>
           <DialogDescription>
-            A named teammate with its own memory, skills, and chat. It can message your other agents.
+            {userFriendly
+              ? b.createFlow.description
+              : 'A named teammate with its own memory, skills, and chat. It can message your other agents.'}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-3.5">
-          <div className="flex justify-center py-1">
-            <BotFace
-              color={avatarColor(color, slug || 'agent')}
+          {userFriendly ? null : (
+            <div className="flex justify-center py-1">
+              <BotFace
+                color={avatarColor(color, slug || 'agent')}
+                image={image}
+                name={slug || 'agent'}
+                shape={shape}
+                size={56}
+              />
+            </div>
+          )}
+          {userFriendly ? null : (
+            <AvatarPicker
+              color={color}
+              generateSeed={{
+                name: slug || 'agent',
+                title: displayTitle,
+                description
+              }}
               image={image}
-              name={slug || 'agent'}
+              onColor={setColor}
+              onImage={setImage}
+              onShape={setShape}
               shape={shape}
-              size={56}
             />
-          </div>
-          <AvatarPicker
-            color={color}
-            generateSeed={{
-              name: slug || 'agent',
-              title,
-              description
-            }}
-            image={image}
-            onColor={setColor}
-            onImage={setImage}
-            onShape={setShape}
-            shape={shape}
-          />
-          {labeled(
-            'Name',
-            <Input autoFocus onChange={event => setName(event.target.value)} placeholder="inbox-triage" value={name} />
+          )}
+          {userFriendly ? (
+            <div className="grid gap-3">
+              <label className="grid gap-1.5 text-sm font-medium text-(--ui-text-primary)">
+                {b.createFlow.nameLabel}
+                <Input
+                  autoFocus
+                  onChange={event => setFriendlyName(event.target.value)}
+                  placeholder={b.createFlow.namePlaceholder}
+                  value={friendlyName}
+                />
+              </label>
+            </div>
+          ) : (
+            labeled(
+              'Name',
+              <Input
+                autoFocus
+                onChange={event => setName(event.target.value)}
+                placeholder="inbox-triage"
+                value={name}
+              />
+            )
           )}
           {taken ? (
             <div className="text-xs text-(--ui-accent)">
-              {remoteTarget
-                ? `An agent named "${slug}" already exists on ${targetLabel}.`
-                : `An agent named "${slug}" already exists.`}
+              {userFriendly
+                ? b.createFlow.nameTaken
+                : remoteTarget
+                  ? `An agent named "${slug}" already exists on ${targetLabel}.`
+                  : `An agent named "${slug}" already exists.`}
             </div>
+          ) : null}
+          {userFriendly && !friendlyName.trim() ? (
+            <div className="text-xs text-(--ui-text-tertiary)">{b.createFlow.nameRequired}</div>
+          ) : null}
+          {userFriendly && friendlyName.trim() && !valid ? (
+            <div className="text-xs text-(--ui-accent)">{b.createFlow.invalidName}</div>
           ) : null}
           {/* Multi-connection desktops choose WHERE the agent lives. Hidden */
           /* on single-connection setups — the active gateway is the only */
           /* possible home, exactly the old behavior. */}
-          {Array.isArray(connections) && connections.length > 1
+          {!userFriendly && Array.isArray(connections) && connections.length > 1
             ? labeled(
                 'Create on',
                 <Select
@@ -680,38 +773,53 @@ export function CreateAgentDialog({ open, onClose, roster }: CreateAgentDialogPr
                 </Select>
               )
             : null}
-          {remoteTarget ? (
+          {!userFriendly && remoteTarget ? (
             <div className="text-[0.7rem] leading-5 text-(--ui-text-tertiary)">{`The agent is created on ${targetLabel} and appears in the roster as a Connections bot. Chat routes to that machine.`}</div>
           ) : null}
-          <div className="flex justify-start">
-            <Button
-              onClick={() => {
-                setTitle(b.bot.leadPreset)
-                setSoul(b.bot.leadSoul)
+          {userFriendly ? null : (
+            <>
+              <div className="flex justify-start">
+                <Button
+                  onClick={() => {
+                    setTitle(b.bot.leadPreset)
+                    setSoul(b.bot.leadSoul)
 
-                if (!name.trim()) {
-                  setName('project-lead')
-                }
-              }}
-              type="button"
-            >
-              {b.bot.leadPreset}
-            </Button>
-          </div>
-          {labeled(
-            'Title',
-            <Input onChange={event => setTitle(event.target.value)} placeholder="Inbox Triage" value={title} />
+                    if (!name.trim()) {
+                      setName('project-lead')
+                    }
+                  }}
+                  type="button"
+                >
+                  {b.bot.leadPreset}
+                </Button>
+              </div>
+              {labeled(
+                'Title',
+                <Input onChange={event => setTitle(event.target.value)} placeholder="Inbox Triage" value={title} />
+              )}
+              {labeled(
+                'Description',
+                <Textarea
+                  className="min-h-16"
+                  onChange={event => setDescription(event.target.value)}
+                  placeholder={b.bot.helpPromptPlaceholder}
+                  value={description}
+                />
+              )}
+            </>
           )}
-          {labeled(
-            'Description',
-            <Textarea
-              className="min-h-16"
-              onChange={event => setDescription(event.target.value)}
-              placeholder={b.bot.helpPromptPlaceholder}
-              value={description}
-            />
-          )}
-          {remoteTarget
+          {userFriendly ? (
+            <label className="grid gap-1.5 text-sm font-medium text-(--ui-text-primary)">
+              {b.createFlow.purposeLabel}
+              <Textarea
+                className="min-h-24"
+                onChange={event => setDescription(event.target.value)}
+                placeholder={b.createFlow.purposePlaceholder}
+                value={description}
+              />
+            </label>
+          ) : null}
+          {remoteTarget || userFriendly
             ? null
             : labeled(
                 b.bot.repoLabel,
@@ -744,24 +852,26 @@ export function CreateAgentDialog({ open, onClose, roster }: CreateAgentDialogPr
                   <div className="text-[0.7rem] leading-5 text-(--ui-text-tertiary)">{b.bot.repoHint}</div>
                 </div>
               )}
-          <Button
-            className="flex items-center gap-1 text-xs font-medium text-(--ui-text-tertiary) hover:text-(--ui-text-secondary)"
-            onClick={() => {
-              setAdvanced(v => {
-                if (!v) {
-                  ensureCaps()
-                }
+          {userFriendly ? null : (
+            <Button
+              className="flex items-center gap-1 text-xs font-medium text-(--ui-text-tertiary) hover:text-(--ui-text-secondary)"
+              onClick={() => {
+                setAdvanced(v => {
+                  if (!v) {
+                    ensureCaps()
+                  }
 
-                return !v
-              })
-            }}
-            size="inline"
-            variant="text"
-          >
-            <DisclosureCaret open={advanced} />
-            {b.bot.advanced}
-          </Button>
-          {advanced ? (
+                  return !v
+                })
+              }}
+              size="inline"
+              variant="text"
+            >
+              <DisclosureCaret open={advanced} />
+              {b.bot.advanced}
+            </Button>
+          )}
+          {!userFriendly && advanced ? (
             <div className="grid gap-3 rounded-md border border-(--ui-stroke-secondary) p-3">
               <SegmentedControl
                 onChange={id => {
@@ -1048,7 +1158,7 @@ export function CreateAgentDialog({ open, onClose, roster }: CreateAgentDialogPr
             {t.common.cancel}
           </Button>
           <Button disabled={busy || !valid || taken} onClick={submit}>
-            {busy ? 'Creating…' : 'Create Bot'}
+            {busy ? t.common.saving : userFriendly ? b.createFlow.create : 'Create Bot'}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -13,7 +13,7 @@ import { AlertTriangle, Save } from '@/lib/icons'
 import { resolveProfileColor } from '@/lib/profile-color'
 import { normalize } from '@/lib/text'
 import { notify, notifyError } from '@/store/notifications'
-import { $profileColors, profileLabel, refreshProfiles } from '@/store/profile'
+import { $profileColors, isUserProfile, profileLabel, refreshProfiles } from '@/store/profile'
 
 import { useRefreshHotkey } from '../hooks/use-refresh-hotkey'
 import {
@@ -52,13 +52,15 @@ export function ProfilesView({ onClose }: ProfilesViewProps) {
   const refresh = useCallback(async () => {
     try {
       const list = await refreshProfiles()
-      setProfiles(list)
+      setProfiles(list.filter(isUserProfile))
       setSelectedName(current => {
-        if (current && list.some(p => p.name === current)) {
+        const userProfiles = list.filter(isUserProfile)
+
+        if (current && userProfiles.some(p => p.name === current)) {
           return current
         }
 
-        return list.find(p => p.is_default)?.name ?? list[0]?.name ?? null
+        return userProfiles.find(p => p.is_default)?.name ?? userProfiles[0]?.name ?? null
       })
     } catch (err) {
       notifyError(err, p.failedLoad)
@@ -107,16 +109,19 @@ export function ProfilesView({ onClose }: ProfilesViewProps) {
       {!profiles ? (
         <PageLoader label={p.loading} />
       ) : profiles.length === 0 ? (
-        <PanelEmpty
-          action={
-            <Button onClick={() => setCreateOpen(true)} size="sm">
-              {p.newProfile}
-            </Button>
-          }
-          description={p.createDesc}
-          icon="organization"
-          title={p.noProfiles}
-        />
+        <>
+          <PanelEmpty
+            action={
+              <Button onClick={() => setCreateOpen(true)} size="sm">
+                {p.newProfile}
+              </Button>
+            }
+            description={p.createDesc}
+            icon="organization"
+            title={p.noProfiles}
+          />
+          <PanelAddButton label={p.newProfile} onClick={() => setCreateOpen(true)} />
+        </>
       ) : (
         <>
           <PanelHeader subtitle={p.count(profiles.length)} title={p.title} />

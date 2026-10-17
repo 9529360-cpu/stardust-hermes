@@ -4,19 +4,7 @@ import { defineLocale } from './define-locale'
 
 export const zhHant = defineLocale({
   personalization: {
-    navLabel: '個人化',
-    title: '個人化',
-    subtitle: '快速調整外觀。更多選項在設定的「外觀」裡。',
-    themeTitle: '主題',
-    backgroundTitle: '背景圖片',
-    backgroundShow: '顯示背景圖片',
-    opacityLabel: '圖片不透明度',
-    noImage: '尚未選擇圖片。',
-    chooseImage: '選擇圖片…',
-    removeImage: '移除',
-    petTitle: '桌面寵物',
-    petDesc: '在桌面上顯示一隻寵物陪伴你。',
-    moreSettings: '更多外觀設定'
+    opacityLabel: '圖片不透明度'
   },
   sessionImport: {
     title: '從其他應用程式繼續',

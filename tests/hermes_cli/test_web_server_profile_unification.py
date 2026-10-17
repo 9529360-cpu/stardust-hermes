@@ -66,6 +66,25 @@ def _write_jobs(home, jobs):
     (cron_dir / "jobs.json").write_text(json.dumps(jobs), encoding="utf-8")
 
 
+class TestProfileListFallback:
+    def test_profiles_fallback_includes_profile_kind(self, client, isolated_profiles, monkeypatch):
+        from hermes_cli import profiles as profiles_mod
+
+        worker_home = isolated_profiles["worker_beta"]
+        (worker_home / "profile.yaml").write_text("profile_kind: agent\n", encoding="utf-8")
+
+        def fail_list_profiles():
+            raise RuntimeError("profile listing unavailable")
+
+        monkeypatch.setattr(profiles_mod, "list_profiles", fail_list_profiles)
+
+        response = client.get("/api/profiles")
+
+        assert response.status_code == 200
+        row = next(profile for profile in response.json()["profiles"] if profile["name"] == "worker_beta")
+        assert row["profile_kind"] == "agent"
+
+
 class TestProfileScopedConfig:
 
 

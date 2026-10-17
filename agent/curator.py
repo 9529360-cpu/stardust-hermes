@@ -355,7 +355,7 @@ CURATOR_REVIEW_PROMPT = (
     "      Then archive the old sibling. Re-home the content through the "
     "LEDGERED tool surface: `skill_manage action=write_file` on the umbrella "
     "to place the file (subdirectories are created for you), then "
-    "`skill_manage action=remove_file` on the source to drop the original, "
+    "do not remove supporting files from the source before archive; "
     "then `skill_manage action=delete` on the source. Never a terminal move "
     "— a shell mv/cp writes the same bytes with no ledger entry, so the "
     "archive that follows snapshots an already-stripped package and "
@@ -383,9 +383,14 @@ CURATOR_REVIEW_PROMPT = (
     "a feature codename, a specific error string, an 'audit' / "
     "'diagnosis' / 'salvage' session artifact). These almost always "
     "belong as a subsection or support file under a class-level umbrella.\n"
-    "5. Iterate. After one consolidation round, scan the remaining set "
-    "and look for the NEXT umbrella opportunity. Don't stop after 3 "
-    "merges.\n\n"
+    "5. Before archiving ANY source, derive representative capability/task "
+    "cases from its procedures, error handling and supporting files. Compare "
+    "the source and merged umbrella on the SAME cases. The skill_manage delete "
+    "path independently checks preservation and refuses untestable regressions. "
+    "If refused, keep the original. Never run external or side-effectful tests "
+    "in this background pass.\n\n"
+    "6. Continue only while defensible merges remain. The goal is quality, "
+    "not a high archive count.\n\n"
     "Your toolset:\n"
     "  - skills_list, skill_view        — read the current landscape\n"
     "    READ BEFORE WRITE — enforced, not advisory. Before skill_manage "
@@ -400,7 +405,8 @@ CURATOR_REVIEW_PROMPT = (
     "  - skill_manage action=write_file — add a references/, templates/, "
     "or scripts/ file under an existing skill (the skill must already "
     "exist)\n"
-    "  - skill_manage action=delete     — archive a skill. MUST pass "
+    "  - skill_manage action=delete     — gated archive AFTER capability check; "
+    "if refused, keep source intact and repair umbrella. MUST pass "
     "`absorbed_into=<umbrella>` when you've merged its content into another "
     "skill, or `absorbed_into=\"\"` when you're truly pruning with no "
     "forwarding target. This drives cron-job skill-reference migration — "
@@ -414,10 +420,8 @@ CURATOR_REVIEW_PROMPT = (
     "discoverability. 'This is narrow but distinct from its siblings' "
     "is NOT a reason to keep — it's a reason to move it under an "
     "umbrella as a subsection or support file.\n\n"
-    "Expected output: real umbrella-ification. Process every obvious "
-    "cluster. If you end the pass with fewer than 10 archives, you "
-    "stopped too early — go back and look at the clusters you left "
-    "alone.\n\n"
+    "Expected output: verified umbrella-ification, not a high archive count. "
+    "Report clusters kept because the checks could not establish preservation.\n\n"
     "When done, write a human summary AND a structured machine-readable "
     "block so downstream tooling can distinguish consolidation from "
     "pruning. Format EXACTLY:\n\n"
@@ -694,6 +698,7 @@ def _write_run_report(
     tc_counts: Dict[str, int] = dict(Counter(tc.get("name", "unknown") for tc in tool_calls))
     cron_rewrites = _rewrite_cron_refs(diff.consolidated, diff.pruned)
     jobs_updated = int(cron_rewrites.get("jobs_updated", 0))
+    validation = llm_meta.get("validation") or {}
     payload = {
         "started_at": started_at.isoformat(), "duration_seconds": round(elapsed_seconds, 2),
         "model": llm_meta.get("model", ""), "provider": llm_meta.get("provider", ""), "auto_transitions": auto_counts,
@@ -702,11 +707,15 @@ def _write_run_report(
             "archived_this_run": len(diff.removed), "added_this_run": len(diff.added),
             "consolidated_this_run": len(diff.consolidated), "pruned_this_run": len(diff.pruned),
             "state_transitions": len(transitions), "cron_jobs_rewritten": jobs_updated, "tool_calls_total": sum(tc_counts.values()),
+            "validation_accepted": validation.get("accepted", 0),
+            "validation_blocked": validation.get("blocked", 0),
+            "validation_restored": validation.get("restored", 0),
         },
         "tool_call_counts": tc_counts, "archived": diff.removed, "consolidated": diff.consolidated, "pruned": diff.pruned,
         "pruned_names": [p["name"] for p in diff.pruned], "added": diff.added, "state_transitions": transitions, "cron_rewrites": cron_rewrites,
         "llm_final": llm_meta.get("final", ""), "llm_summary": llm_meta.get("summary", ""),
         "llm_error": llm_meta.get("error"), "tool_calls": llm_meta.get("tool_calls", []),
+        "validation": validation,
     }
     _write_file(run_dir / "run.json", "run.json", payload)
     _write_file(run_dir / "REPORT.md", "REPORT.md", lambda: _render_report_markdown(payload))
@@ -777,6 +786,9 @@ def _render_report_markdown(p: Dict[str, Any]) -> str:
         "## LLM consolidation pass\n",
         f"- tool calls: **{counts.get('tool_calls_total', 0)}** (by name: {', '.join(f'{k}={v}' for k, v in sorted(tc_counts.items())) or 'none'})",
         f"- consolidated into umbrellas: **{counts.get('consolidated_this_run', 0)}**",
+        f"- validation accepted: **{counts.get('validation_accepted', 0)}**",
+        f"- validation blocked: **{counts.get('validation_blocked', 0)}**",
+        f"- post-review restorations: **{counts.get('validation_restored', 0)}**",
         f"- pruned (archived for staleness): **{counts.get('pruned_this_run', 0)}**", f"- new skills this run: **{counts.get('added_this_run', 0)}**",
         f"- state transitions (active ↔ stale ↔ archived): **{counts.get('state_transitions', 0)}**", "",
     ]
@@ -873,7 +885,15 @@ def _consolidation_pass(prefix: str, auto_summary: str, dry_run: bool, before_na
             prompt = f"{CURATOR_REVIEW_PROMPT}\n\n{candidate_list}"
             if dry_run:
                 prompt = f"{CURATOR_DRY_RUN_BANNER}\n\n{prompt}"
-            llm_meta = _run_llm_review(prompt)
+            from tools.skill_consolidation_validation import curator_validation_pass
+            with curator_validation_pass(candidates) as validation:
+                llm_meta = _run_llm_review(prompt)
+                # The model may edit a target again after archiving earlier sources.
+                # Restore originals if the final target fails the same cases.
+                if not dry_run:
+                    validation.finalize()
+                if isinstance(llm_meta, dict):
+                    llm_meta["validation"] = validation.summary()
             final_summary = f"{prefix}{auto_summary}; llm: {llm_meta.get('summary', 'no change')}"
     except Exception as e:
         logger.debug("Curator LLM pass failed: %s", e, exc_info=True)

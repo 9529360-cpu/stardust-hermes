@@ -71,6 +71,47 @@ export function slugify(value: string) {
     .slice(0, 64)
 }
 
+function friendlyNameHash(value: string): string {
+  let hash = 0x811c9dc5
+
+  for (const character of value.normalize('NFKC').trim().toLowerCase()) {
+    const codePoint = character.codePointAt(0)!
+
+    hash ^= codePoint & 0xff
+    hash = Math.imul(hash, 0x01000193)
+    hash ^= codePoint >>> 8
+    hash = Math.imul(hash, 0x01000193)
+  }
+
+  return (hash >>> 0).toString(36).padStart(7, '0')
+}
+
+/** Internal profile key for a friendly name, including names in Unicode scripts. */
+export function profileKeyFromFriendlyName(value: string, occupied: ReadonlySet<string> = new Set()): string {
+  const trimmed = value.normalize('NFKC').trim()
+
+  if (!trimmed) {
+    return ''
+  }
+
+  const hash = friendlyNameHash(trimmed)
+  const unicode = Array.from(trimmed).some(character => character.codePointAt(0)! > 0x7f)
+  const normalized = unicode ? 'partner' : slugify(trimmed)
+
+  if (!normalized) {
+    return ''
+  }
+
+  for (let salt = 0; ; salt += 1) {
+    const suffix = salt === 0 ? hash : `${hash}-${salt.toString(36)}`
+    const candidate = `${normalized.slice(0, Math.max(1, 64 - suffix.length - 1)).replace(/-+$/, '')}-${suffix}`
+
+    if (!occupied.has(candidate)) {
+      return candidate
+    }
+  }
+}
+
 // A preview is one truncated line, so a GFM table often arrives flattened onto
 // it with its newlines gone. A table line has outer pipes, or sits beside a
 // delimiter row (`---`, one or more hyphens per cell, with or without outer

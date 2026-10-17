@@ -4,19 +4,7 @@ import type { Translations } from './types'
 
 export const en: Translations = {
   personalization: {
-    navLabel: 'Personalization',
-    title: 'Personalization',
-    subtitle: 'Adjust the look quickly. More options are in Settings › Appearance.',
-    themeTitle: 'Theme',
-    backgroundTitle: 'Background image',
-    backgroundShow: 'Show background image',
-    opacityLabel: 'Image opacity',
-    noImage: 'No image chosen yet.',
-    chooseImage: 'Choose image…',
-    removeImage: 'Remove',
-    petTitle: 'Desktop pet',
-    petDesc: 'Show a pet on your desktop.',
-    moreSettings: 'More appearance settings'
+    opacityLabel: 'Image opacity'
   },
   connectors: {
     title: 'Connect your apps',

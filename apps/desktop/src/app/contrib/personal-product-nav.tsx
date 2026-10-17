@@ -6,7 +6,6 @@ import { useLocation } from 'react-router'
 
 import { revealTreePane } from '@/components/pane-shell/tree/store'
 import { Codicon } from '@/components/ui/codicon'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 import { $sidebarGrouping, dismissNarrowSidebar, setSidebarAgentsGrouped, setSidebarOpen } from '@/store/layout'
@@ -32,18 +31,8 @@ import type { SessionInfo } from '@/types/hermes'
 import { ProjectContextMenu } from '../chat/sidebar/projects/project-menu'
 import type { SidebarProjectTree } from '../chat/sidebar/projects/workspace-groups'
 import { WorkspaceAddButton } from '../chat/sidebar/projects/workspace-header'
-import {
-  type AppView,
-  BOTS_ROUTE,
-  CRON_ROUTE,
-  MESSAGING_ROUTE,
-  routePathname,
-  SETTINGS_ROUTE,
-  SKILLS_ROUTE
-} from '../routes'
+import { type AppView, BOTS_ROUTE, CRON_ROUTE, MESSAGING_ROUTE, routePathname, SKILLS_ROUTE } from '../routes'
 import type { SidebarNavItem } from '../types'
-
-import { PersonalizationPanel } from './personalization-panel'
 
 // Tools is the one entry for the skills page. Its Plugins tab is reached from inside Tools, so the
 // nav carries no separate Plugins button. Messaging takes its label from the i18n bundle.
@@ -100,7 +89,7 @@ function ProductNavButton({ active = false, expanded, icon, label, tour, ...prop
       aria-current={active ? 'page' : undefined}
       aria-expanded={expanded}
       className={cn(
-        'flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[0.74rem] font-medium transition-colors',
+        'flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[0.74rem] font-medium transition-colors pointer-events-auto',
         active
           ? 'bg-(--ui-control-active-background) text-(--ui-text-primary)'
           : 'text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-(--ui-text-primary)'
@@ -131,7 +120,6 @@ export function PersonalProductNav({
   const [expandedProjectId, setExpandedProjectId] = useState<null | string>(null)
   const [enteredProject, setEnteredProject] = useState<null | SidebarProjectTree>(null)
   const [projectLoadFailed, setProjectLoadFailed] = useState(false)
-  const [personalizeOpen, setPersonalizeOpen] = useState(false)
   const projects = useStore($projectTree)
   // Home is the backend's bucket for chats with no folder. Those chats belong to
   // 对话 (recents) and never to a project, so the bucket is not listed as one.
@@ -226,17 +214,6 @@ export function PersonalProductNav({
       route: BOTS_ROUTE
     })
 
-  // The quick panel points at the detailed controls; they live in Settings > Appearance.
-  const openAppearance = () => {
-    setPersonalizeOpen(false)
-    pick({
-      id: 'settings',
-      label: t.personalization.moreSettings,
-      icon: NULL_ICON,
-      route: `${SETTINGS_ROUTE}?tab=config:appearance`
-    })
-  }
-
   const openTasks = () =>
     pick({
       id: 'cron',
@@ -313,18 +290,13 @@ export function PersonalProductNav({
   return (
     <nav
       aria-label="Product navigation"
-      className="jarvis-product-nav relative isolate shrink-0 overflow-hidden border-b border-(--ui-stroke-tertiary) bg-(--ui-sidebar-surface-background) px-2.5 pb-2 pt-0"
+      className="jarvis-product-nav relative isolate shrink-0 overflow-hidden border-b border-(--ui-stroke-tertiary) bg-(--ui-sidebar-surface-background) px-2.5 pb-2 pt-0 pointer-events-auto"
       data-personal-product-nav=""
     >
       <div className="mb-3 px-2 text-[0.82rem] font-semibold tracking-[-0.01em] text-(--ui-text-primary)">Stardust</div>
       <div className="flex flex-col gap-0.5">
         <ProductNavButton icon="add" label={copy.newChat} onClick={newChat} tour="sidebar-nav-new-session" />
-        <ProductNavButton
-          active={agentSpaceShowing}
-          icon="hubot"
-          label={copy.agentSpace}
-          onClick={openAgentSpace}
-        />
+        <ProductNavButton active={agentSpaceShowing} icon="hubot" label={copy.agentSpace} onClick={openAgentSpace} />
         <ProductNavButton
           active={currentView === 'cron'}
           icon="checklist"
@@ -345,14 +317,6 @@ export function PersonalProductNav({
           onClick={openTools}
           tour="sidebar-nav-skills"
         />
-        <Popover onOpenChange={setPersonalizeOpen} open={personalizeOpen}>
-          <PopoverTrigger asChild>
-            <ProductNavButton icon="paintcan" label={t.personalization.navLabel} />
-          </PopoverTrigger>
-          <PopoverContent align="start" className="w-72 p-4" side="right" sideOffset={10}>
-            <PersonalizationPanel onOpenAppearance={openAppearance} />
-          </PopoverContent>
-        </Popover>
         <ProductNavButton expanded={projectsOpen} icon="repo" label={copy.project} onClick={openProject} />
         {projectsOpen && (
           <div

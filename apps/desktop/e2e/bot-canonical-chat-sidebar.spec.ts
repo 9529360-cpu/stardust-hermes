@@ -53,7 +53,11 @@ test('opening the default bot row never lists its canonical Bot Chat in the side
   await expect(roster).toBeVisible({ timeout: 20_000 })
 
   // The default profile is the first bot row on a fresh install.
-  await page.locator('[data-slot="bots-roster"] [data-roster-key]').first().click()
+  await page
+    .locator('[data-agent-card]')
+    .first()
+    .getByRole('button', { name: /Start a chat|开始交流|チャットを始める/ })
+    .click()
   await expect(roster).toBeHidden({ timeout: 30_000 })
 
   // The Bot Chat is the open, focused chat: its empty state is on screen.
@@ -61,7 +65,10 @@ test('opening the default bot row never lists its canonical Bot Chat in the side
 
   // A first turn proves the chat is live. Its open has already resolved the
   // chat into the sidebar cache, so an empty list after that is a real answer.
-  const composer = page.locator('[data-slot="composer-root"] [contenteditable="true"]').filter({ visible: true }).first()
+  const composer = page
+    .locator('[data-slot="composer-root"] [contenteditable="true"]')
+    .filter({ visible: true })
+    .first()
   await expect(composer).toBeVisible({ timeout: 15_000 })
   await composer.click()
   await composer.fill('hello bot')

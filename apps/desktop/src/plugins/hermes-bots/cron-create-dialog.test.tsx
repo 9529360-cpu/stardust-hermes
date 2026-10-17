@@ -74,15 +74,18 @@ describe('Bot Routines control geometry', () => {
 
     const dialog = screen.getByRole('dialog')
     const selects = within(dialog).getAllByRole('combobox')
+
     const compactInputs = within(dialog)
       .getAllByRole('textbox')
       .filter(element => element.className.split(/\s+/).includes('h-7'))
 
     expect(selects).toHaveLength(3)
+
     for (const select of selects) {
       expect(select.className).toContain('h-8')
       expect(select.className).toContain('rounded-[6px]')
     }
+
     expect(compactInputs).toHaveLength(1)
     expect(compactInputs[0].className).toContain('rounded-[2.5px]')
   })

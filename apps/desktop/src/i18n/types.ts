@@ -59,21 +59,9 @@ interface AuxTaskCopy {
 }
 
 export interface Translations {
-  /** Quick personalization entry in the left navigation and its panel. */
+  /** Backdrop opacity copy shared with Settings > Appearance. */
   personalization: {
-    navLabel: string
-    title: string
-    subtitle: string
-    themeTitle: string
-    backgroundTitle: string
-    backgroundShow: string
     opacityLabel: string
-    noImage: string
-    chooseImage: string
-    removeImage: string
-    petTitle: string
-    petDesc: string
-    moreSettings: string
   }
   connectors: {
     title: string

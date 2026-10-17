@@ -536,6 +536,7 @@ class ProfileInfo:
     description_auto: bool = False
     # Presentation-only display name; resolution/comparison/spawn always use ``name``.
     display_name: str = ""
+    profile_kind: str = "user"
 
 
 def _load_yaml_dict(path: Path) -> Optional[dict]:
@@ -679,12 +680,13 @@ def read_profile_meta(profile_dir: Path) -> dict:
         "description": str(data.get("description") or "").strip(),
         "description_auto": bool(data.get("description_auto", False)),
         "display_name": str(data.get("display_name") or "").strip(),
+        "profile_kind": "agent" if data.get("profile_kind") == "agent" else "user",
     }
 
 
 def write_profile_meta(
     profile_dir: Path, *, description: Optional[str] = None, description_auto: Optional[bool] = None,
-    display_name: Optional[str] = None,
+    display_name: Optional[str] = None, profile_kind: Optional[str] = None,
 ) -> None:
     """Update ``profile.yaml`` in place: only passed fields are overwritten; the file is
     created if missing. The profile directory itself must exist."""
@@ -702,6 +704,13 @@ def write_profile_meta(
             existing["display_name"] = display_name.strip()
         else:
             existing.pop("display_name", None)
+    if profile_kind is not None:
+        if profile_kind not in {"agent", "user"}:
+            raise ValueError("profile_kind must be 'agent' or 'user'")
+        if profile_kind == "agent":
+            existing["profile_kind"] = "agent"
+        else:
+            existing.pop("profile_kind", None)
     # Atomic write: bare open("w") truncates before the dump, and the read path swallows
     # parse errors as {}, so a crashed write would silently drop unspecified fields.
     # See #51356.

@@ -348,6 +348,18 @@ ones — waits for your yes/no before it ever enters your profile.
 
 ## Background review notifications (`display.memory_notifications`)
 
+**Conversation self-distillation:** after a user explicitly corrects an assistant reply,
+or confirms a recent correction, Stardust can use its existing background review
+fork even when the skill-tool-iteration threshold is not reached. It examines
+earlier behavior, corrections, revised approaches and reported tool outcomes,
+then writes only supported reusable lessons through the existing guarded
+memory/skill tools. Feedback-triggered passes are silent in chat; ordinary
+reviews and explicit `/refine` retain their configured notification behavior.
+The existing `auxiliary.background_review.enabled`, `skip_background_review`,
+skill-review interval, ownership and approval gates still apply. User approval
+of a reply and a tool success flag are not proof of external task completion.
+No additional copy of the transcript is persisted for this feature.
+
 After a turn, the background self-improvement review may quietly save a memory
 or update a skill. This is Hermes' consent-aware learning loop: repeated
 corrections and durable workflow lessons become compact memory entries or

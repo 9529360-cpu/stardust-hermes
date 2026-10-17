@@ -24,7 +24,7 @@ test.afterAll(async () => {
   fixture = null
 })
 
-test('the Cron editor keeps its shared 36px form fields at desktop and narrow window sizes', async ({}, testInfo) => {
+test('the Cron editor keeps its shared 36px form fields at desktop and narrow window sizes', async () => {
   const page = fixture!.page
 
   await resizeWindow(fixture!, DESKTOP_WINDOW)
@@ -38,6 +38,7 @@ test('the Cron editor keeps its shared 36px form fields at desktop and narrow wi
 
   const frequency = page.locator('#cron-frequency')
   await expect(frequency).toBeVisible()
+
   const desktopGeometry = await frequency.evaluate(element => {
     const style = getComputedStyle(element)
 
@@ -48,10 +49,11 @@ test('the Cron editor keeps its shared 36px form fields at desktop and narrow wi
   })
 
   expect(desktopGeometry).toEqual({ borderRadius: '6px', height: '36px' })
-  await page.screenshot({ path: testInfo.outputPath('cron-medium-control-1220x800.png') })
+  await page.screenshot({ path: test.info().outputPath('cron-medium-control-1220x800.png') })
 
   await resizeWindow(fixture!, NARROW_WINDOW)
   await expect(frequency).toBeVisible()
+
   const narrowGeometry = await frequency.evaluate(element => {
     const style = getComputedStyle(element)
 
@@ -62,14 +64,14 @@ test('the Cron editor keeps its shared 36px form fields at desktop and narrow wi
   })
 
   expect(narrowGeometry).toEqual({ borderRadius: '6px', height: '36px' })
-  await page.screenshot({ path: testInfo.outputPath('cron-medium-control-900x720.png') })
+  await page.screenshot({ path: test.info().outputPath('cron-medium-control-900x720.png') })
   await page
     .getByRole('button', { name: /Cancel/ })
     .last()
     .click()
 })
 
-test('Bot Routines keeps its 32px schedule fields separate from the main Cron form', async ({}, testInfo) => {
+test('Bot Routines keeps its 32px schedule fields separate from the main Cron form', async () => {
   test.setTimeout(180_000)
   const page = fixture!.page
 
@@ -79,9 +81,13 @@ test('Bot Routines keeps its 32px schedule fields separate from the main Cron fo
     .first()
     .click()
 
-  const roster = page.locator('[data-slot="bots-roster"]')
-  await expect(roster).toBeVisible({ timeout: 20_000 })
-  await roster.locator('[data-roster-key]').first().click()
+  const agentSpace = page.locator('[data-slot-page="agents-home"]')
+  await expect(agentSpace).toBeVisible({ timeout: 20_000 })
+  await agentSpace
+    .locator('[data-agent-card]')
+    .first()
+    .getByRole('button', { name: /Start a chat/ })
+    .click()
   await expect(page.locator('[data-slot="bot_chat_empty"]')).toBeVisible({ timeout: 30_000 })
 
   const routinesRail = page.locator('[data-tree-tab$=":routines"][data-vertical]')
@@ -96,7 +102,7 @@ test('Bot Routines keeps its 32px schedule fields separate from the main Cron fo
   const dialog = page.getByRole('dialog').last()
   await expect(dialog).toBeVisible()
   const frequency = dialog.locator('[data-slot="select-trigger"]').first()
-  const repeatCount = dialog.locator('[data-slot="input"].h-7')
+  const repeatCount = dialog.getByPlaceholder('∞')
   await expect(frequency).toBeVisible()
   await expect(repeatCount).toBeVisible()
 
@@ -108,6 +114,7 @@ test('Bot Routines keeps its 32px schedule fields separate from the main Cron fo
       height: style.height
     }
   })
+
   const compactGeometry = await repeatCount.evaluate(element => {
     const style = getComputedStyle(element)
 
@@ -119,12 +126,13 @@ test('Bot Routines keeps its 32px schedule fields separate from the main Cron fo
 
   expect(scheduleGeometry).toEqual({ borderRadius: '6px', height: '32px' })
   expect(compactGeometry).toEqual({ borderRadius: '2.5px', height: '28px' })
-  await page.screenshot({ path: testInfo.outputPath('bot-routine-control-1220x800.png') })
+  await page.screenshot({ path: test.info().outputPath('bot-routine-control-1220x800.png') })
 
   await frequency.click()
   await page.getByRole('option', { name: /Once, in/ }).click()
   const onceCount = dialog.getByPlaceholder('30')
   await expect(onceCount).toBeVisible()
+
   const onceGeometry = await onceCount.evaluate(element => {
     const style = getComputedStyle(element)
 
@@ -133,10 +141,15 @@ test('Bot Routines keeps its 32px schedule fields separate from the main Cron fo
       height: style.height
     }
   })
+
   expect(onceGeometry).toEqual({ borderRadius: '6px', height: '32px' })
+  await onceCount.fill('45')
+  await expect(onceCount).toHaveValue('45')
 
   await resizeWindow(fixture!, NARROW_WINDOW)
   await expect(dialog).toBeVisible()
   await expect(onceCount).toBeVisible()
-  await page.screenshot({ path: testInfo.outputPath('bot-routine-control-900x720.png') })
+  await page.screenshot({ path: test.info().outputPath('bot-routine-control-900x720.png') })
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(dialog).toBeHidden()
 })

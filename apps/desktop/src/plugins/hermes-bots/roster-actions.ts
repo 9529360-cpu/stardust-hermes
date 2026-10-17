@@ -114,20 +114,33 @@ export function trackInboundActivity(roster: RosterRow[]) {
   }
 }
 
+/** Whether the bot's canonical chat is what the user is looking at: it is the
+ *  focused session AND either a workspace tile holds focus or the workspace is
+ *  not showing a full page. Focus falls back to the primary selection even while
+ *  the Agents page covers it, so the focus check alone reads a chat hidden
+ *  behind that page as open. */
+export function isFocusedBotChatOnScreen(bot: RosterRow): boolean {
+  const canonicalIds = [bot.canonical_session?.id, bot.canonical_session?.resolved_id].filter(Boolean).map(String)
+  const focused = String(host.state.focusedStoredSessionId?.get?.() || '')
+
+  return Boolean(
+    focused &&
+    canonicalIds.includes(focused) &&
+    (host.state.focusedSessionIsTile?.get?.() || host.state.workspaceIsPage?.get?.() !== true)
+  )
+}
+
 /** The open Bot Chat's canonical session moved on the gateway (a cron
  *  `bot-chat:` delivery, a teammate's `message_agent`, a group round, a CLI
  *  turn) — none of those arrive on this window's live stream, so the pane
  *  kept painting a stale transcript until an app restart (#99393). Re-run the
  *  same registry open the row click uses: it fronts the chat in place and
  *  forceResume re-pulls the transcript. Only while that chat is the FOCUSED
- *  session — a group room or another tab owning the center must not be
- *  yanked away by background activity — and never mid-turn, when the
- *  activity is the turn itself, already streaming. */
+ *  session and on screen — a group room, another tab owning the center, or the
+ *  Agents page covering it must not be yanked away by background activity — and
+ *  never mid-turn, when the activity is the turn itself, already streaming. */
 function refreshOpenBotChat(bot: RosterRow, { allowWhileBusy = false }: { allowWhileBusy?: boolean } = {}) {
-  const canonicalIds = [bot.canonical_session?.id, bot.canonical_session?.resolved_id].filter(Boolean).map(String)
-  const focused = String(host.state.focusedStoredSessionId?.get?.() || '')
-
-  if (!focused || !canonicalIds.includes(focused) || (!allowWhileBusy && host.state.busy.get())) {
+  if (!isFocusedBotChatOnScreen(bot) || (!allowWhileBusy && host.state.busy.get())) {
     return
   }
 

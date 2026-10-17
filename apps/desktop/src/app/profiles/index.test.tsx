@@ -59,6 +59,7 @@ vi.mock('@/store/profile', () => ({
   normalizeProfileKey: (name: null | string | undefined) => (name ?? '').trim() || 'default',
   profileLabel: (profile: { display_name?: string; name: string }) =>
     (profile.display_name ?? '').trim() || profile.name,
+  isUserProfile: (profile: { profile_kind?: 'agent' | 'user' }) => profile.profile_kind !== 'agent',
   refreshProfiles: vi.fn(async () => [] as ProfileInfo[]),
   selectProfile: vi.fn(),
   setActiveProfile: vi.fn()
@@ -68,13 +69,14 @@ vi.mock('@/store/profile', () => ({
 // accessible name, so the delete helper queries by it rather than a literal.
 const NAMED_PROFILE = 'work'
 
-function makeProfile(name: string, isDefault = false): ProfileInfo {
+function makeProfile(name: string, isDefault = false, profileKind: 'agent' | 'user' = 'user'): ProfileInfo {
   return {
     has_env: false,
     is_default: isDefault,
     model: null,
     name,
     path: `/home/user/.stardust/profiles/${name}`,
+    profile_kind: profileKind,
     provider: null,
     skill_count: 0
   }
@@ -119,12 +121,26 @@ async function deleteTheNamedProfile() {
 }
 
 describe('ProfilesView', () => {
+  it('hides agent profiles from general profile management', async () => {
+    vi.mocked(refreshProfiles).mockResolvedValue([
+      makeProfile('default', true),
+      makeProfile('partner-key', false, 'agent'),
+      makeProfile(NAMED_PROFILE)
+    ])
+
+    await renderProfilesView()
+
+    expect(screen.getByText(NAMED_PROFILE, { selector: '[data-panel-row] span.truncate' })).toBeTruthy()
+    expect(screen.queryByText('partner-key', { selector: '[data-panel-row] span.truncate' })).toBeNull()
+  })
+
   it('opens the shared create dialog with the SOUL.md field (parity with the rail)', async () => {
     vi.mocked(refreshProfiles).mockResolvedValue([])
 
     await renderProfilesView()
 
-    realClick(await screen.findByRole('button', { name: 'New profile' }))
+    const newProfileButton = screen.getAllByRole('button', { name: 'New profile' })[0]
+    realClick(newProfileButton)
 
     const soul = await screen.findByLabelText(/SOUL\.md/i)
 
