@@ -57,6 +57,9 @@ def test_is_destructive_command_treats_cp_as_mutating():
     "uv sync",
     "git switch feature/branch",
     "npx prettier --write src/app.ts",
+    "sed --in-place 's/x/y/' src/app.py",
+    "sed -Ei 's/x/y/' src/app.py",
+    "sed -n -i 's/x/y/' src/app.py",
     "echo generated > src/generated.ts",
 ])
 def test_is_destructive_command_covers_terminal_workspace_mutators(command):
@@ -71,6 +74,8 @@ def test_is_destructive_command_covers_terminal_workspace_mutators(command):
     "pytest >/dev/null",
     "pytest > /dev/null",
     "pytest 2> /dev/null",
+    "sed -n '1,5p' src/app.py",
+    "sed 's/-i/foo/' src/app.py",
 ])
 def test_is_destructive_command_ignores_terminal_reads_and_non_file_redirects(command):
     from agent.tool_dispatch_helpers import _is_destructive_command
