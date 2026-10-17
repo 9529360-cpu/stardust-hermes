@@ -3,6 +3,7 @@
 The footer tells the model (and user) when a claimed file mutation did not land; the explainer
 summarises why a turn ended without a final answer. Every method resolves through ``AIAgent``'s MRO.
 """
+import json
 import os
 import re
 from contextlib import suppress
@@ -199,6 +200,22 @@ def _display_flag_enabled(agent, *, env_var: str, config_key: str, cache_attr: s
 
 class TurnExplainersMixin:
     """File-mutation failure footer + turn-completion explainer (see module docstring)."""
+
+    def _record_terminal_workspace_mutation_result(self, tool_name: str, result: Any) -> None:
+        """Carry terminal mutation evidence into the existing turn-end verification gate."""
+        if tool_name not in {"terminal", "process_manage"} or not isinstance(result, str):
+            return
+        try:
+            payload, _end = json.JSONDecoder().raw_decode(result.lstrip())
+        except (json.JSONDecodeError, TypeError, ValueError):
+            return
+        mutation = payload.get("workspace_mutation") if isinstance(payload, dict) else None
+        root = mutation.get("root") if isinstance(mutation, dict) else None
+        if not isinstance(root, str) or not root:
+            return
+        changed = getattr(self, "_turn_file_mutation_paths", None)
+        if changed is not None:
+            changed.add(root)
 
     def _record_file_mutation_result(
         self, tool_name: str, args: Dict[str, Any], result: Any, is_error: bool

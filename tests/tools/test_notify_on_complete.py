@@ -315,6 +315,9 @@ def _silent_bg_harness(monkeypatch, tmp_path):
         return SimpleNamespace(
             id="proc_silent_test",
             pid=4242,
+            exited=False,
+            completion_reason="",
+            workspace_mutation_root="",
             notify_on_complete=False,
             watcher_platform="",
             watcher_chat_id="",

@@ -203,6 +203,14 @@ def _verification_evidence(command, cwd, session_id, returncode, output) -> Opti
     return None
 
 
+def _workspace_mutation(command, cwd, session_id, returncode) -> Optional[dict]:
+    with _quiet("terminal workspace mutation recording"):
+        from agent.verification_evidence import record_terminal_workspace_mutation
+        return record_terminal_workspace_mutation(
+            command=command, cwd=cwd, session_id=session_id, exit_code=returncode,
+        )
+
+
 def finalize_foreground_result(
     *, command: str, result: dict, env: Any, env_type: str, effective_task_id: str,
     task_id: Optional[str], session_id: Optional[str], session_key: str,
@@ -265,6 +273,8 @@ def finalize_foreground_result(
         ("verification_evidence", _verification_evidence(
             command, command_cwd, session_id or task_id or effective_task_id or "default",
             returncode, output)),
+        ("workspace_mutation", _workspace_mutation(
+            command, command_cwd, session_id or task_id or effective_task_id or "default", returncode)),
         ("approval", approval_note or None),
         ("exit_code_meaning", exit_note or None),
         ("hint", failure_hint or None),

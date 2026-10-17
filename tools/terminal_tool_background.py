@@ -63,10 +63,11 @@ def _looks_like_homebrew_ci_poller(command: str) -> bool:
 
 
 def _spawn(process_registry, *, env, env_type, command, cwd, effective_task_id, task_id,
-           session_key, effective_pty, notify_on_complete, watch_patterns):
+           session_key, effective_pty, notify_on_complete, watch_patterns, verification_session_id=""):
     common = dict(command=command, cwd=cwd, task_id=effective_task_id,
                   owner_task_id=task_id or effective_task_id, session_key=session_key,
-                  notify_on_complete=notify_on_complete, watch_patterns=watch_patterns)
+                  notify_on_complete=notify_on_complete, watch_patterns=watch_patterns,
+                  verification_session_id=verification_session_id)
     if env_type == "local":
         return process_registry.spawn_local(
             env_vars=env.env if hasattr(env, 'env') else None, use_pty=effective_pty, **common)
@@ -103,7 +104,7 @@ def _register_completion_watcher(process_registry, proc_session, session_key) ->
 
 def spawn_background_process(
     *, command: str, env: Any, env_type: str, effective_task_id: str, task_id: Optional[str],
-    session_key: str, workdir: Optional[str], cwd: str, effective_pty: bool,
+    session_key: str, session_id: Optional[str] = None, workdir: Optional[str], cwd: str, effective_pty: bool,
     notify_on_complete: bool, watch_patterns: Optional[List[str]], approval_note: Optional[str],
     pty_disabled_reason: Optional[str],
 ) -> str:
@@ -131,9 +132,33 @@ def spawn_background_process(
             process_registry, env=env, env_type=env_type, command=command, cwd=effective_cwd,
             effective_task_id=effective_task_id, task_id=task_id, session_key=session_key,
             effective_pty=effective_pty, notify_on_complete=bool(notify), watch_patterns=watch,
+            verification_session_id=session_id or task_id or effective_task_id,
         )
         result_data = {"output": "Background process started", "session_id": proc_session.id,
                        "pid": proc_session.pid, "exit_code": 0, "error": None}
+        mutation = None
+        with process_registry._lock:
+            if proc_session.exited:
+                process_registry._record_workspace_mutation_on_exit(proc_session)
+            elif proc_session.completion_reason != "failed_start":
+                try:
+                    from agent.verification_evidence import record_terminal_workspace_mutation
+                    mutation = record_terminal_workspace_mutation(
+                        command=command, cwd=effective_cwd,
+                        session_id=session_id or task_id or effective_task_id, exit_code=0,
+                        verification_complete=False,
+                    )
+                except Exception:
+                    logger.debug("background workspace mutation recording failed", exc_info=True)
+            # Taken after the provisional invalidation above and under the lock the exit handler also needs,
+            # so this run's own mutation predates its baseline and an edit made later does not.
+            from agent.verification_evidence import ledger_timestamp
+            proc_session.verification_started_at = ledger_timestamp()
+        if mutation is None and proc_session.workspace_mutation_root:
+            mutation = {"root": proc_session.workspace_mutation_root}
+        if mutation:
+            proc_session.workspace_mutation_root = mutation["root"]
+            result_data["workspace_mutation"] = mutation
         if approval_note:
             result_data["approval"] = approval_note
         if pty_disabled_reason:
@@ -198,7 +223,7 @@ _YIELDED_NOTE = (
 
 def yield_to_background_handler(
     *, command: str, env_type: str, cwd: Optional[str], effective_task_id: str,
-    task_id: Optional[str], session_key: str,
+    task_id: Optional[str], session_key: str, session_id: Optional[str] = None,
 ):
     """Build the ``yield_handler`` a foreground ``env.execute`` calls when the tool thread is
     asked to yield (a user message arrived mid-command). Local backend only: the live Popen
@@ -217,7 +242,12 @@ def yield_to_background_handler(
         session = process_registry.adopt_local(
             proc, command=command, cwd=cwd, task_id=effective_task_id,
             owner_task_id=task_id or effective_task_id, session_key=session_key,
-            output_so_far=output_so_far, notify_on_complete=async_delivery_supported())
+            output_so_far=output_so_far, notify_on_complete=async_delivery_supported(),
+            verification_session_id=session_id or task_id or effective_task_id)
+        # The agent resumes now while the command keeps running; its evidence will not cover edits made from here on.
+        from agent.verification_evidence import ledger_timestamp
+        with process_registry._lock:
+            session.verification_started_at = ledger_timestamp()
         if session.notify_on_complete and session.watcher_platform:
             _register_completion_watcher(process_registry, session, session_key)
         logger.info("foreground command yielded to background as %s (pid %s)", session.id, session.pid)

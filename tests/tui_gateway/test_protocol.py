@@ -1009,10 +1009,21 @@ def test_enforce_session_cap_evicts_oldest_detached_only(server, monkeypatch):
 
     monkeypatch.setattr(server, "_load_cfg", lambda: {"max_live_sessions": 2})
     evicted: list[str] = []
+
+    def _close_session(sid, end_reason=None, predicate=None):
+        # Real session teardown removes the row. The gateway also schedules
+        # this same cap sweep asynchronously after session mutations, so an
+        # already-pending sweep may overlap the explicit call below. Model
+        # teardown's idempotent removal instead of recording duplicate closes.
+        with server._sessions_lock:
+            if sid in server._sessions:
+                server._sessions.pop(sid)
+                evicted.append(sid)
+
     monkeypatch.setattr(
         server,
         "_close_session_by_id",
-        lambda sid, end_reason=None, predicate=None: evicted.append(sid),
+        _close_session,
     )
 
     def _ready() -> threading.Event:

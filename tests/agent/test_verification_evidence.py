@@ -10,6 +10,8 @@ from agent.verification_evidence import (
     classify_verification_command,
     mark_workspace_edited,
     record_terminal_result,
+    record_terminal_workspace_mutation,
+    terminal_workspace_mutation_root,
     verification_status,
 )
 
@@ -22,7 +24,12 @@ def _ledger_on(monkeypatch):
 
 def _node_project(root: Path) -> None:
     (root / "package.json").write_text(
-        json.dumps({"scripts": {"test": "vitest", "lint": "eslint .", "dev": "vite"}})
+        json.dumps({
+            "scripts": {
+                "test": "vitest", "lint": "eslint .", "build": "vite build",
+                "format": "prettier --write .", "dev": "vite",
+            }
+        })
     )
     (root / "pnpm-lock.yaml").write_text("")
     scripts = root / "scripts"
@@ -228,6 +235,104 @@ def test_masked_verifier_does_not_clear_edited_ledger_state(tmp_path, monkeypatc
     assert verification_status(session_id="s1", cwd=tmp_path)["status"] == "stale"
 
 
+def test_terminal_script_after_passing_test_stales_evidence_and_stop_gate(tmp_path, monkeypatch):
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+    _node_project(tmp_path)
+    record_terminal_result(
+        command="pnpm run test", cwd=tmp_path, session_id="s1", exit_code=0, output="passed",
+    )
+
+    mutation = record_terminal_workspace_mutation(
+        command="python scripts/rewrite_sources.py", cwd=tmp_path, session_id="s1", exit_code=0,
+    )
+
+    assert mutation == {"root": str(tmp_path.resolve())}
+    assert verification_status(session_id="s1", cwd=tmp_path)["status"] == "stale"
+    from agent.verification_stop import build_verify_on_stop_nudge
+
+    nudge = build_verify_on_stop_nudge(session_id="s1", changed_paths=[mutation["root"]])
+    assert nudge is not None
+    assert "Verification status: stale" in nudge
+
+
+def test_foreground_terminal_result_exposes_mutation_and_stales_ledger(tmp_path, monkeypatch):
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+    _node_project(tmp_path)
+    record_terminal_result(
+        command="pnpm run test", cwd=tmp_path, session_id="s1", exit_code=0, output="passed",
+    )
+    from tools.terminal_tool_result import finalize_foreground_result
+
+    result = json.loads(finalize_foreground_result(
+        command="python scripts/rewrite_sources.py",
+        result={"output": "rewrote", "returncode": 0}, env=object(), env_type="local",
+        effective_task_id="task", task_id="task", session_id="s1", session_key="key",
+        workdir=None, command_cwd=str(tmp_path), approval_note=None,
+    ))
+
+    assert result["workspace_mutation"] == {"root": str(tmp_path.resolve())}
+    assert verification_status(session_id="s1", cwd=tmp_path)["status"] == "stale"
+
+
+def test_compound_terminal_install_before_test_keeps_evidence_fresh(tmp_path, monkeypatch):
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+    _node_project(tmp_path)
+    record_terminal_result(
+        command="pnpm run test", cwd=tmp_path, session_id="s1", exit_code=0, output="previous pass",
+    )
+
+    while_running = terminal_workspace_mutation_root(
+        command="pnpm install && pnpm run test", cwd=tmp_path, exit_code=0, verification_complete=False,
+    )
+    provisional = record_terminal_workspace_mutation(
+        command="pnpm install && pnpm run test", cwd=tmp_path, session_id="s1", exit_code=0,
+        verification_complete=False,
+    )
+    assert provisional == {"root": str(tmp_path.resolve())}
+    assert verification_status(session_id="s1", cwd=tmp_path)["status"] == "stale"
+
+    evidence = record_terminal_result(
+        command="pnpm install && pnpm run test", cwd=tmp_path, session_id="s1", exit_code=0, output="passed",
+    )
+    mutation = terminal_workspace_mutation_root(
+        command="pnpm install && pnpm run test", cwd=tmp_path, exit_code=0,
+    )
+
+    assert evidence is not None and evidence["status"] == "passed"
+    assert mutation is None
+    assert while_running == str(tmp_path.resolve())
+    assert verification_status(session_id="s1", cwd=tmp_path)["status"] == "passed"
+
+
+@pytest.mark.parametrize("command", [
+    "git status --short",
+    "git --version",
+    "git -C /tmp/project status --short",
+    "git diff --check",
+    "npm test",
+    "pnpm run test",
+    "pnpm run build",
+    "python -m pytest tests/test_example.py",
+    "python tests/test_runner.py",
+    "python -c 'print(1)'",
+])
+def test_read_only_test_and_build_terminal_commands_do_not_stale_evidence(tmp_path, monkeypatch, command):
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+    _node_project(tmp_path)
+
+    assert terminal_workspace_mutation_root(command=command, cwd=tmp_path, exit_code=0) is None
+
+
+def test_inline_python_file_write_invalidates_workspace(tmp_path, monkeypatch):
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+    _node_project(tmp_path)
+
+    assert terminal_workspace_mutation_root(
+        command="python -c \"from pathlib import Path; Path('src.py').write_text('x')\"",
+        cwd=tmp_path, exit_code=0,
+    ) == str(tmp_path.resolve())
+
+
 
 
 def test_temp_script_records_ad_hoc_evidence_without_canonical_suite(tmp_path, monkeypatch):
@@ -356,3 +461,66 @@ def test_windows_backslash_ad_hoc_script_path_is_matched(tmp_path, monkeypatch):
     assert result is not None, (
         "Windows backslash path should be matched via posix=False fallback"
     )
+
+
+@pytest.mark.parametrize("command", [
+    "touch src/new.py",
+    "echo 'x = 2' >> src/mod.py",
+    "printf 'x = 2' | tee src/mod.py",
+    "echo note | tee -a notes.txt",
+    "mkdir -p build/out",
+    "ln -s src/mod.py src/link.py",
+    "patch -p1 < fix.diff",
+    "perl -pi -e 's/1/2/' src/mod.py",
+    "black .",
+    "ruff format src",
+    "isort src",
+    "cargo fmt",
+    "Set-Content src/mod.py 'x'",
+    "New-Item src/n.py -ItemType File",
+    "Remove-Item src/mod.py",
+    "del src\mod.py",
+])
+def test_common_shell_writers_invalidate_evidence(tmp_path, monkeypatch, command):
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+    _python_project(tmp_path)
+
+    assert terminal_workspace_mutation_root(command=command, cwd=tmp_path, exit_code=0) == str(tmp_path.resolve())
+
+
+@pytest.mark.parametrize("command", [
+    "echo hello > /dev/null",
+    "python -m pytest tests/test_example.py 2>/dev/null",
+    "python -m pytest tests/test_example.py > /dev/null 2>&1",
+    "python -m pytest tests/test_example.py 2>&1 | tee test.log",
+    "black --check .",
+    "ruff format --check src",
+    "cargo fmt -- --check",
+    "git log --oneline > /dev/null",
+    "ls | tee",
+])
+def test_null_sinks_check_only_formatters_and_verifier_capture_keep_evidence_fresh(tmp_path, monkeypatch, command):
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+    _python_project(tmp_path)
+
+    assert terminal_workspace_mutation_root(command=command, cwd=tmp_path, exit_code=0) is None
+
+
+def test_ledger_clock_is_strictly_increasing_even_when_the_wall_clock_repeats(monkeypatch):
+    """Staleness compares ledger stamps, so equal stamps from a coarse clock must never occur."""
+    import agent.verification_evidence as ledger
+
+    frozen = datetime(2026, 10, 17, 12, 0, 0, tzinfo=timezone.utc)
+
+    class _FrozenDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return frozen
+
+    monkeypatch.setattr(ledger, "datetime", _FrozenDatetime)
+    monkeypatch.setattr(ledger, "_last_stamp", None)
+
+    stamps = [ledger.ledger_timestamp() for _ in range(50)]
+
+    assert stamps == sorted(set(stamps))
+    assert datetime.fromisoformat(stamps[-1]) - datetime.fromisoformat(stamps[0]) < timedelta(milliseconds=1)
