@@ -29,6 +29,7 @@ class StopGateVerdict:
     final_response: Any
     pending_verification_response: Any
     pending_verification_response_previewed: Any
+    persistence_failed: bool = False
 
 
 def _verify_on_stop_nudge(agent) -> Optional[str]:
@@ -75,15 +76,34 @@ def _pre_verify_nudge(agent, final_response, attempt: int) -> Optional[str]:
     return None
 
 
-def _append_interim_answer(agent, final_msg, messages, conversation_history, flush_fail_msg: str) -> None:
-    """Real content: persist and emit as interim so the user sees the attempted answer;
-    only the nudge is flagged synthetic (#65919)."""
-    agent._emit_interim_assistant_message(final_msg)
+def persist_interim_answer(agent, final_msg, messages, conversation_history, flush_fail_msg: str) -> bool:
+    """Persist an interim answer before projecting it or continuing execution.
+
+    Keep failed rows in memory for the existing finalizer/recovery path, but do not
+    advertise or build another model request from an uncommitted answer. Legacy
+    embedders may return None on a successful flush; explicit False means failure.
+    """
     append_message(messages, final_msg)
     try:
-        agent._flush_messages_to_session_db(messages, conversation_history)
+        persisted = agent._flush_messages_to_session_db(messages, conversation_history)
+    except Exception as exc:
+        from hermes_state import classify_persistence_error
+
+        if getattr(agent, "_last_persistence_error_cause", None) is None:
+            agent._last_persistence_error_cause = classify_persistence_error(exc)
+        logger.warning(flush_fail_msg, exc_info=True)
+        persisted = False
+    if persisted is False:
+        agent._incremental_persistence_failed = True
+        if getattr(agent, "_last_persistence_error_cause", None) is None:
+            agent._last_persistence_error_cause = "unknown"
+        return False
+    try:
+        agent._emit_interim_assistant_message(final_msg)
     except Exception:
-        logger.debug(flush_fail_msg, exc_info=True)
+        # A presentation failure must not replay an already durable continuation.
+        logger.warning("durable interim answer projection failed", exc_info=True)
+    return True
 
 
 def apply_stop_gates(
@@ -113,11 +133,12 @@ def apply_stop_gates(
 
     _verify_nudge = _verify_on_stop_nudge(agent)
     if _verify_nudge:
-        agent._verification_stop_nudges = getattr(agent, "_verification_stop_nudges", 0) + 1
         final_msg["finish_reason"] = "verification_required"
-        _append_interim_answer(
+        if not persist_interim_answer(
             agent, final_msg, messages, conversation_history, "verify-on-stop interim flush failed"
-        )
+        ):
+            return StopGateVerdict(False, "", None, False, persistence_failed=True)
+        agent._verification_stop_nudges = getattr(agent, "_verification_stop_nudges", 0) + 1
         verdict = _continue(_verify_nudge, "_verification_stop_synthetic")
         # Internal nudge: stay silent on the terminal, debug-log only.
         logger.debug("verification stop-loop nudge issued (attempt %d)", agent._verification_stop_nudges)
@@ -126,11 +147,12 @@ def apply_stop_gates(
     _attempt = getattr(agent, "_pre_verify_nudges", 0)
     _verify_nudge2 = _pre_verify_nudge(agent, final_response, _attempt)
     if _verify_nudge2:
-        agent._pre_verify_nudges = _attempt + 1
         final_msg["finish_reason"] = "verify_hook_continue"
-        _append_interim_answer(
+        if not persist_interim_answer(
             agent, final_msg, messages, conversation_history, "pre_verify interim flush failed"
-        )
+        ):
+            return StopGateVerdict(False, "", None, False, persistence_failed=True)
+        agent._pre_verify_nudges = _attempt + 1
         verdict = _continue(_verify_nudge2, "_pre_verify_synthetic")
         logger.debug("pre_verify nudge issued (attempt %d)", agent._pre_verify_nudges)
         return verdict
