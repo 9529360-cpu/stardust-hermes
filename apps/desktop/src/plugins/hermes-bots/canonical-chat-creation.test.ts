@@ -288,7 +288,7 @@ describe('a superseded click completes registry-side but never navigates', () =>
         return { session_id: 'runtime-1', stored_session_id: 'stored-1' }
       }
 
-      if (method === 'prompt.submit') {
+      if (method === 'session.title') {
         botGeneration.current += 1
       }
 
@@ -298,7 +298,7 @@ describe('a superseded click completes registry-side but never navigates', () =>
     const { createCanonicalChat } = await loadModule()
     await createCanonicalChat('ops', { kickoff: true, openingStillCurrent: () => botGeneration.current === capturedGeneration })
 
-    expect(events.filter(event => event.startsWith('open:'))).toHaveLength(1)
+    expect(hostMock.openSession).not.toHaveBeenCalled()
   })
 
   it('creates the canonical row without stealing the workspace', async () => {
