@@ -17,6 +17,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+# Imported once, outside the per-test ``sys.modules`` patch in the ``server`` fixture (modules that were
+# already imported survive ``patch.dict``). Re-importing the server graph for every test re-acquired the
+# ``tools.environments`` package lock each time, and on CPython 3.11 that acquisition lost importlib's
+# ``_blocking_on`` bookkeeping on CI: KeyError at fixture setup, first attempt, same test on every run.
+import tools.environments.local  # noqa: E402,F401  pylint: disable=unused-import
+
 
 @pytest.fixture()
 def hermes_home(tmp_path, monkeypatch):
