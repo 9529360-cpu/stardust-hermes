@@ -314,6 +314,14 @@ _MEMORY_REVIEW_PROMPT = (
 # hoarding library: one references/ file per session, incident narration instead of rules, PR numbers
 # and quotes as content, and duplicating what the repo's AGENTS.md / the tool schemas already teach.
 _LESSON_LAYER_BLOCK = (
+    "SELF-DISTILLATION: review your OWN conversation and actions as evidence. "
+    "Reconstruct the original task, assistant attempts, explicit user corrections, "
+    "the revised approach, confirmations and objective verification. Distill both "
+    "effective moves and pitfalls into reusable procedures, decisions and tests, "
+    "not a narrative. User approval of wording is NOT proof external work succeeded. "
+    "Untested fixes remain hypotheses, not established rules. Never store raw "
+    "transcripts, secrets, private task details or tool output in Skills. Apply "
+    "the normal ownership, approval and read-before-write guards.\n\n"
     "What a skill IS: the instructions for doing a class of task the most efficient and correct "
     "way, to THIS user's specifications — the procedure, the tools and commands that work, the "
     "order, the user's preferences for how the result should look, and the pitfalls that cost time. "
@@ -369,14 +377,18 @@ _DO_NOT_CAPTURE_BLOCK = (
 )
 
 _SKILL_REVIEW_PROMPT = (
-    "Review the conversation above and update the skill library. Be ACTIVE — most sessions produce "
-    "at least one skill update, even if small. A pass that does nothing is a missed learning "
-    "opportunity, not a neutral outcome.\n\n"
+    "Review the conversation above and update the skill library only when the task supplies "
+    "a reusable, supported improvement opportunity. No change is correct if "
+    "the evidence is weak, redundant, or environment-specific.\n\n"
+    "Before proposing a change, identify the observed problem and actual task outcome; "
+    "inspect the current skill and recent usage history; prefer the smallest correct fix. "
+    "Tool failures and skill loads are correlations, not proof that a skill caused an issue. "
+    "Do not describe a guessed or untested technique as a verified fix.\n\n"
     "Target shape of the library: CLASS-LEVEL skills, each with a SKILL.md of always-on rules and a "
     "small `references/` set of topical depth. Not a flat list of narrow one-session skills, and "
     "not an umbrella hoarding a references/ file per session. This shapes HOW you update, not "
     "WHETHER you update.\n\n" + _LESSON_LAYER_BLOCK +
-    "Signals to look for (any one of these warrants action):\n"
+    "Signals to evaluate against the real task outcome (not automatic reasons to write):\n"
     "  • User corrected your style, tone, format, legibility, or verbosity. Frustration signals "
     "like 'stop doing X', 'this is too verbose', 'don't format like this', 'why are you "
     "explaining', 'just give me the answer', 'you always do Y and I hate it', or an explicit "
@@ -387,9 +399,8 @@ _SKILL_REVIEW_PROMPT = (
     "  • Non-trivial technique, fix, workaround, debugging path, or tool-usage pattern emerged "
     "that a future session would benefit from. Capture it.\n"
     "  • A skill that got loaded or consulted this session turned out to be wrong, missing a step, "
-    "or outdated. Patch it NOW.\n\n"
-    "Preference order — prefer the earliest action that fits, but do pick one when a signal above "
-    "fired:\n"
+    "or outdated. Verify the issue before patching it.\n\n"
+    "Preference order for justified, evidence-backed edits (never force an action):\n"
     "  1. UPDATE A CURRENTLY-LOADED SKILL. Look back through the conversation for skills the user "
     "loaded via /skill-name or you read via skill_view. If any of them covers the territory of the "
     "new learning, PATCH that one first (re-load it with skill_view during this review — see "
@@ -449,9 +460,9 @@ _SKILL_REVIEW_PROMPT = (
     "If the only skills that need updating are protected, say\n"
     "'Nothing to save.' and stop.\n\n"
     "Do NOT capture" + _DO_NOT_CAPTURE_BLOCK +
-    "'Nothing to save.' is a real option but should NOT be the default. If the session ran "
-    "smoothly with no corrections and produced no new technique, just say 'Nothing to save.' and "
-    "stop. Otherwise, act."
+    "If there is no concrete, reusable and sufficiently validated change, say 'Nothing to save.' "
+    "and stop. Repeated rewriting is not improvement: reassess the previous method when "
+    "subsequent task evidence contradicts it, and leave protections unchanged."
 )
 
 _COMBINED_REVIEW_PROMPT = (
@@ -461,21 +472,22 @@ _COMBINED_REVIEW_PROMPT = (
     "state in target='topic'. For a topic use one stable key, compact summary, and useful keywords; update "
     "the same topic when state changes and remove superseded facts instead of appending history. Raw details "
     "remain searchable in session history.\n\n"
-    "**Skills**: how to do this class of task. Be ACTIVE — most sessions produce at least one "
-    "skill update. A pass that does nothing is a missed learning opportunity, not a neutral "
-    "outcome.\n\n"
+    "**Skills**: improve the procedure for this class of task only when a concrete outcome "
+    "supports the change. Inspect existing content and usage history before editing. A tool "
+    "failure or skill load alone is not evidence that the skill caused the failure; do not "
+    "claim an untested alternative is verified. Doing nothing can be the best result.\n\n"
     "Target shape of the skill library: CLASS-LEVEL skills with a SKILL.md of always-on rules and a "
     "small `references/` set of topical depth — not narrow one-session skills, and not an umbrella "
     "hoarding a references/ file per session.\n\n" + _LESSON_LAYER_BLOCK +
-    "Signals that warrant a skill update (any one is enough):\n"
+    "Signals to investigate before deciding on a skill update:\n"
     "  • User corrected your style, tone, format, legibility, verbosity, or approach. Frustration "
     "is a FIRST-CLASS skill signal, not just a memory signal. 'stop doing X', 'don't format like "
     "this', 'I hate when you Y' — embed the lesson in the skill that governs that task so the next "
     "session starts fixed.\n"
     "  • Non-trivial technique, fix, workaround, or debugging path emerged.\n"
-    "  • A skill that was loaded or consulted turned out wrong, missing, or outdated — patch it "
-    "now.\n\n"
-    "Preference order for skills — pick the earliest that fits:\n"
+    "  • A skill that was loaded or consulted turned out wrong, missing, or outdated — investigate "
+    "and patch only after the issue and remedy are verified.\n\n"
+    "Preference order if a change has real, reusable evidence behind it:\n"
     "  1. UPDATE A CURRENTLY-LOADED SKILL. Check what skills were loaded via /skill-name or "
     "skill_view in the conversation. If one of them covers the learning, PATCH it first (re-load "
     "it with skill_view during this review — see Read-before-write below). It was in play; it's "
@@ -517,8 +529,9 @@ _COMBINED_REVIEW_PROMPT = (
     "If the only skills that need updating are protected, say\n"
     "'Nothing to save.' and stop.\n\n"
     "Do NOT capture as skills" + _DO_NOT_CAPTURE_BLOCK +
-    "Act on whichever of the two dimensions has real signal. If genuinely nothing stands out on "
-    "either, say 'Nothing to save.' and stop — but don't reach for that conclusion as a default."
+    "Only write when there is a concrete, defensible and reusable improvement. If neither "
+    "memory nor skill has durable evidence, say 'Nothing to save.' and stop; do not manufacture "
+    "a change to satisfy this review."
 )
 
 
@@ -1196,7 +1209,7 @@ def _publish_review_summary(agent: Any, actions: List[str]) -> None:
 def _run_review_in_thread(
     agent: Any, messages_snapshot: List[Dict], prompt: str,
     task_cfg: Optional[Dict[str, Any]] = None, review_run: Optional[_BackgroundReviewRun] = None,
-    review_memory: bool = False, explicit: bool = False,
+    review_memory: bool = False, explicit: bool = False, self_distill: bool = False,
 ) -> None:
     """Daemon-thread worker: build the fork, run the prompt, surface the action summary via
     ``agent._safe_print`` / ``background_review_callback``. ``review_run`` (from
@@ -1257,13 +1270,14 @@ def _run_review_in_thread(
             )
             actions = []
         _log_review_completion(st.review_usage, _classify_review_result(actions))
-        if actions:
+        if actions and not self_distill:
             _publish_review_summary(agent, actions)
     except Exception as e:
         logger.warning("Background memory/skill review failed: %s", e)
         if st.review_usage:
             _log_review_completion(st.review_usage, "error")
-        agent._emit_auxiliary_failure("background review", e)
+        if not self_distill:
+            agent._emit_auxiliary_failure("background review", e)
     finally:
         # Safety net for the exception path (setup failures before the request-phase finally).
         # Both cleanups are identity-scoped and idempotent; re-enter thread-scoped silence so
@@ -1288,7 +1302,7 @@ def spawn_background_review_thread(
     agent: Any, messages_snapshot: List[Dict], review_memory: bool = False,
     review_skills: bool = False, focus: Optional[str] = None,
     task_cfg: Optional[Dict[str, Any]] = None, review_run: Optional[_BackgroundReviewRun] = None,
-    explicit: bool = False,
+    explicit: bool = False, self_distill: bool = False,
 ):
     """Return ``(target, prompt)``; the caller builds the ``threading.Thread`` so test patches of
     ``run_agent.threading.Thread`` keep working. ``focus`` (``/refine [instructions]``) is appended
@@ -1301,6 +1315,17 @@ def spawn_background_review_thread(
     # Per-agent overrides (agent._MEMORY_REVIEW_PROMPT etc.) keep working.
     name = _PROMPT_NAME_BY_SCOPE[(review_memory, review_skills)]
     prompt = getattr(agent, name, globals()[name])
+    if review_skills:
+        # Read-only evidence is added to the detached review *user turn* only.
+        # The main agent, cached prefix, tool permissions and scheduling are unchanged.
+        from agent.background_review_evidence import build_skill_review_evidence
+        evidence = build_skill_review_evidence(messages_snapshot)
+        if evidence:
+            prompt = f"{prompt}\n\n{evidence}"
+        from agent.background_review_distillation import build_conversation_distillation_brief
+        distillation = build_conversation_distillation_brief(messages_snapshot)
+        if distillation:
+            prompt = f"{prompt}\n\n{distillation}"
     if focus := (focus or "").strip():
         prompt = (
             f"{prompt}\n\nThe user explicitly requested this review with the following "
@@ -1308,9 +1333,11 @@ def spawn_background_review_thread(
         )
 
     def _target() -> None:  # resolves _run_review_in_thread at call time (tests patch it)
+        # Ordinary /refine and memory-only reviews retain their legacy worker signature.
+        quiet_kwargs = {"self_distill": True} if self_distill else {}
         _run_review_in_thread(
             agent, messages_snapshot, prompt, task_cfg=task_cfg, review_run=review_run,
-            review_memory=review_memory, explicit=explicit)
+            review_memory=review_memory, explicit=explicit, **quiet_kwargs)
 
     return _target, prompt
 

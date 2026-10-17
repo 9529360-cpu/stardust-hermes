@@ -20221,6 +20221,15 @@
             "title": "Is Default",
             "type": "boolean"
           },
+          "profile_kind": {
+            "default": "user",
+            "enum": [
+              "agent",
+              "user"
+            ],
+            "title": "Profile Kind",
+            "type": "string"
+          },
           "model": {
             "anyOf": [
               {
@@ -20579,6 +20588,22 @@
             "default": null,
             "title": "Name"
           },
+          "profile_kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "agent",
+                  "user"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile Kind"
+          },
           "ui_meta": {
             "anyOf": [
               {
@@ -20847,6 +20872,22 @@
             ],
             "default": null,
             "title": "Clone Channels"
+          },
+          "profile_kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "agent",
+                  "user"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile Kind"
           },
           "no_skills": {
             "anyOf": [

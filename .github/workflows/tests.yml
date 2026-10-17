@@ -107,11 +107,22 @@ jobs:
           OPENROUTER_API_KEY: ""
           OPENAI_API_KEY: ""
           NOUS_API_KEY: ""
+          STARDUST_FLAKY_REPORT_DIR: ${{ github.workspace }}/flaky-reports
         run: |
           source .venv/bin/activate
           # Replace the Actions step shell with the test runner so cancellation
           # targets the real parent instead of orphaning it under PID 1.
           exec scripts/run_tests.sh --files "$TEST_FILES" --fail-on-flaky
+
+      - name: Upload flaky diagnostics (failure only)
+        if: failure()
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: flaky-reports-${{ matrix.slice.index }}
+          path: flaky-reports
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Record shard membership
         if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'

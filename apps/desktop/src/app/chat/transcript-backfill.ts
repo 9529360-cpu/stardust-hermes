@@ -15,8 +15,9 @@
  * drift on the next page.
  */
 
+import { preserveLocalPendingTurnMessages } from '@/app/session/hooks/use-session-actions/utils'
 import { getOlderSessionMessages } from '@/hermes'
-import { type ChatMessage, toChatMessages } from '@/lib/chat-messages'
+import { type ChatMessage, preserveLocalAssistantErrors, toChatMessages } from '@/lib/chat-messages'
 import { recordTranscriptBackfillPage, type TranscriptProfileScope, transcriptTailState } from '@/store/transcript-tail'
 
 /** Older rows likely exist beyond what the in-memory store holds. */
@@ -90,6 +91,20 @@ export function graftRefreshedTailOntoBackfill(refreshedTail: ChatMessage[], pre
   }
 
   return [...previous.slice(0, anchor), ...refreshedTail]
+}
+
+/**
+ * Reconcile a persisted tail with the live transcript in one order: retain any
+ * older backfill, merge still-visible turn rows against committed history, and
+ * preserve local assistant errors. Every history refresh path should use this
+ * so post-turn hydration cannot append the streamed reply after its committed
+ * copy.
+ */
+export function reconcileRefreshedTranscriptTail(refreshedTail: ChatMessage[], previous: ChatMessage[]): ChatMessage[] {
+  const grafted = graftRefreshedTailOntoBackfill(refreshedTail, previous)
+  const withPendingTurn = preserveLocalPendingTurnMessages(grafted, previous)
+
+  return preserveLocalAssistantErrors(withPendingTurn, previous)
 }
 
 export interface BackfillRequest {

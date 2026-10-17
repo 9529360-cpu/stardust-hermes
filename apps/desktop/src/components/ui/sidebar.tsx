@@ -296,9 +296,10 @@ function SidebarInset({ className, ...props }: React.ComponentProps<'main'>) {
 function SidebarInput({ className, ...props }: React.ComponentProps<typeof Input>) {
   return (
     <Input
-      className={cn('h-8 w-full bg-background shadow-none', className)}
+      className={cn('w-full bg-background shadow-none', className)}
       data-sidebar="input"
       data-slot="sidebar-input"
+      size="sm"
       {...props}
     />
   )

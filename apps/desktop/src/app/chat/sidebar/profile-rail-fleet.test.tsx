@@ -76,6 +76,7 @@ vi.mock('@/store/profile', () => ({
   $profiles: atom([{ is_default: true, name: 'default' }]),
   $profileScope: atom('default'),
   ALL_PROFILES: '*',
+  isUserProfile: (profile: { profile_kind?: 'agent' | 'user' }) => profile.profile_kind !== 'agent',
   normalizeProfileKey: (name: string) => name,
   profileLabel: (profile: { display_name?: string; name: string }) =>
     (profile.display_name ?? '').trim() || profile.name,

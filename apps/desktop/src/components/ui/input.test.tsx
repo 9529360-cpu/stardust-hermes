@@ -6,6 +6,14 @@ import { Input } from './input'
 afterEach(cleanup)
 
 describe('Input', () => {
+  it('applies the named 32px field size and its shared radius', () => {
+    const { getByRole } = render(<Input aria-label="small field" size="sm" />)
+    const el = getByRole('textbox')
+
+    expect(el.className).toContain('h-8')
+    expect(el.className).toContain('rounded-[6px]')
+  })
+
   it('renders a bare input carrying the control chrome when unadorned', () => {
     const { getByRole } = render(<Input aria-label="plain" />)
     const el = getByRole('textbox')

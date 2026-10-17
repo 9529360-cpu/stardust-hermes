@@ -100,7 +100,11 @@ async function openDefaultBot(page: Page): Promise<void> {
   await expect(roster).toBeVisible({ timeout: 20_000 })
 
   // The default profile is the first bot row on a fresh install.
-  await page.locator('[data-slot="bots-roster"] [data-roster-key]').first().click()
+  await page
+    .locator('[data-agent-card]')
+    .first()
+    .getByRole('button', { name: /Start a chat|开始交流|チャットを始める/ })
+    .click()
   await expect(roster).toBeHidden({ timeout: 30_000 })
   await expect(page.locator('[data-slot="bot_chat_empty"]')).toBeVisible({ timeout: 60_000 })
 }
@@ -127,12 +131,14 @@ test('a bot side-chat stays listed after a reload, and the Bot Chat stays hidden
   // The Bot Chat has a composer on screen too, so the text goes to whichever
   // composer holds the keyboard after the draft opens. Click none of them.
   await page.keyboard.press('Control+t')
-  await expect(page.getByRole('tab', { name: /New chat|New session|新建对话|新建会话|尚未发送/, selected: true }).first()).toBeVisible({
+  await expect(
+    page.getByRole('tab', { name: /New chat|New session|新建对话|新建会话|尚未发送/, selected: true }).first()
+  ).toBeVisible({
     timeout: 15_000
   })
 
-  const typingInComposer = await page.evaluate(
-    () => Boolean(document.activeElement?.closest('[data-slot="composer-root"]'))
+  const typingInComposer = await page.evaluate(() =>
+    Boolean(document.activeElement?.closest('[data-slot="composer-root"]'))
   )
 
   expect(typingInComposer, 'the new side-chat draft must hold keyboard focus').toBe(true)

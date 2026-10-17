@@ -519,7 +519,6 @@ export function GroupClarifyCard({ entry, members }: GroupClarifyCardProps) {
           {isApproval ? null : (
             <Input
               aria-label={b.group.answerTo(entry.member)}
-              className="h-7 text-xs"
               key={`input:${q.qid}`}
               onChange={event => {
                 const value = event.target.value
@@ -544,6 +543,7 @@ export function GroupClarifyCard({ entry, members }: GroupClarifyCardProps) {
                 }
               }}
               placeholder={q.choices.length ? b.group.answerOwn : b.group.answerTyped}
+              size="compact"
               value={drafts[q.qid] || ''}
             />
           )}

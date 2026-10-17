@@ -255,6 +255,28 @@ class TestCommandCodeFetchModelsPickerContract:
         assert profile is not None
         assert "base_url" in inspect.signature(profile.fetch_models).parameters
 
+    def test_provider_resolution_keeps_registered_profile_credentials(self, monkeypatch):
+        import model_tools  # noqa: F401 — triggers provider profile discovery
+        import hermes_cli.providers as provider_registry
+        from agent.models_dev import ProviderInfo
+        from hermes_cli.providers import resolve_provider_full
+
+        monkeypatch.setattr(
+            provider_registry,
+            "_models_dev_info",
+            lambda canonical, allow_network=True: ProviderInfo(
+                id=canonical,
+                name="CommandCode",
+                env=("CMD_API_KEY",),
+                api="https://api.commandcode.ai/provider/v1",
+            ),
+        )
+
+        provider = resolve_provider_full("commandcode", {}, [])
+
+        assert provider is not None
+        assert provider.api_key_env_vars == ("CMD_API_KEY", "COMMANDCODE_API_KEY")
+
     def test_resolve_provider_full(self):
         """Both profiles must resolve through the model-switch path.
 

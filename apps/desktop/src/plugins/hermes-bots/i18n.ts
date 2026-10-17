@@ -36,6 +36,58 @@ import { getPluginCtx } from './shared'
 
 type BotsMessages = {
   paneTitle: string
+  /** User-facing Agents home and first-run flow. */
+  home: {
+    eyebrow: string
+    title: string
+    description: string
+    manage: string
+    backToPartners: string
+    hiddenPartners: (count: number, showing: boolean) => string
+    create: string
+    loadFailedTitle: string
+    loadFailedDescription: string
+    retry: string
+    loading: string
+    emptyTitle: string
+    emptyDescription: string
+    partners: string
+    partnerCount: (count: number) => string
+    noDescription: string
+    readyToChat: string
+    connectsWhenChatStarts: string
+    statusUnknown: string
+    cannotReach: string
+    availableOn: (place: string) => string
+    startChat: string
+    startChatWith: (name: string) => string
+    tryAgain: string
+    retryChatWith: (name: string) => string
+    configure: string
+    configureAgent: (name: string) => string
+    groupChats: string
+    groupDescription: string
+    createGroup: string
+    groupMemberCount: (count: number) => string
+  }
+  createFlow: {
+    title: string
+    description: string
+    nameLabel: string
+    namePlaceholder: string
+    purposeLabel: string
+    purposePlaceholder: string
+    nameRequired: string
+    invalidName: string
+    nameTaken: string
+    cancel: string
+    create: string
+    created: (name: string) => string
+    createdOn: (name: string, place: string) => string
+    createFailed: string
+    draftDiscarded: (name: string) => string
+    draftCleanupFailed: (name: string) => string
+  }
   /** Left rail: the bot + group-chat roster. */
   roster: {
     search: string
@@ -312,6 +364,57 @@ type BotsMessages = {
 
 const en: BotsMessages = {
   paneTitle: 'Agents',
+  home: {
+    eyebrow: 'YOUR AI TEAM',
+    title: 'Meet your AI partners',
+    description: 'Choose someone to talk to, or create a new partner for the things you want help with.',
+    manage: 'Manage',
+    backToPartners: 'Back to my partners',
+    hiddenPartners: (count, showing) => (showing ? 'Hide hidden partners' : `Show ${count} hidden partners`),
+    create: 'Create a partner',
+    loadFailedTitle: 'Your partners could not be loaded',
+    loadFailedDescription: 'Check your connection and try again. Your saved partners are not affected.',
+    retry: 'Try again',
+    loading: 'Loading your partners',
+    emptyTitle: 'Your team starts here',
+    emptyDescription: 'Create a partner for research, writing, planning, or anything you would like a hand with.',
+    partners: 'Your partners',
+    partnerCount: count => `${count} ${count === 1 ? 'partner' : 'partners'}`,
+    noDescription: 'Ready to help with whatever is on your mind.',
+    readyToChat: 'You can reach them now',
+    connectsWhenChatStarts: 'They’ll connect when you start chatting',
+    statusUnknown: 'We’ll check when you start chatting',
+    cannotReach: 'Can’t reach this partner right now',
+    availableOn: place => `Available on ${place}`,
+    startChat: 'Start a chat',
+    startChatWith: name => `Start a chat with ${name}`,
+    tryAgain: 'Try again',
+    retryChatWith: name => `Try again, chat with ${name}`,
+    configure: 'Personalize',
+    configureAgent: name => `Personalize ${name}`,
+    groupChats: 'Teams',
+    groupDescription: 'A few partners working together',
+    createGroup: 'Create a team',
+    groupMemberCount: count => `${count} ${count === 1 ? 'partner' : 'partners'}`
+  },
+  createFlow: {
+    title: 'Create a partner',
+    description: 'Give your partner a name and tell them what you would like help with. You can change this later.',
+    nameLabel: 'What should we call them?',
+    namePlaceholder: 'e.g. Alex',
+    purposeLabel: 'What would you like help with?',
+    purposePlaceholder: 'e.g. Help me plan my week and keep track of important things.',
+    nameRequired: 'Add a name to continue.',
+    invalidName: 'That name can’t be used. Try a shorter name with letters or numbers.',
+    nameTaken: 'You already have a partner with that name.',
+    cancel: 'Cancel',
+    create: 'Create and say hello',
+    created: name => `“${name}” is ready to chat.`,
+    createdOn: (name, place) => `“${name}” is ready on ${place}.`,
+    createFailed: 'Could not create this partner.',
+    draftDiscarded: name => `Draft partner “${name}” discarded.`,
+    draftCleanupFailed: name => `Could not clean up draft partner “${name}”.`
+  },
   roster: {
     search: 'Search bots and group chats',
     searchPlaceholder: 'Search bots and group chats…',
@@ -485,7 +588,8 @@ const en: BotsMessages = {
     heldMembersStatus: members => `Paused: ${members}`,
     holdReleaseHint: 'Mention a paused bot or send @all resume to release them.',
     needsYourInput: 'A bot in this group chat needs your input',
-    noMembersToSend: group => `${group} has no members to send to — add a bot, or reopen the room if members are still loading.`,
+    noMembersToSend: group =>
+      `${group} has no members to send to — add a bot, or reopen the room if members are still loading.`,
     pictureGenerationFailed: 'Group picture generation failed',
     nameTaken: name => `A group named “${name}” already exists.`,
     memberCount: count => `${count} bots`,
@@ -576,6 +680,57 @@ const en: BotsMessages = {
 
 const ja: BotsMessages = {
   paneTitle: 'エージェント',
+  home: {
+    eyebrow: 'あなたのAIチーム',
+    title: 'AIパートナーに会いましょう',
+    description: '話したい相手を選ぶか、手伝ってほしいことに合わせて新しいパートナーを作成できます。',
+    manage: '管理',
+    backToPartners: 'パートナーに戻る',
+    hiddenPartners: (count, showing) => (showing ? '非表示のパートナーを隠す' : `非表示のパートナーを${count}人表示`),
+    create: 'パートナーを作成',
+    loadFailedTitle: 'パートナーを読み込めませんでした',
+    loadFailedDescription: '接続を確認して、もう一度お試しください。保存済みのパートナーには影響しません。',
+    retry: 'もう一度試す',
+    loading: 'パートナーを読み込んでいます',
+    emptyTitle: 'ここからチームを始めましょう',
+    emptyDescription: '調査、文章作成、計画など、手伝ってほしいことに合わせてパートナーを作成できます。',
+    partners: 'あなたのパートナー',
+    partnerCount: count => `${count} 人のパートナー`,
+    noDescription: '気になることがあれば何でもお手伝いします。',
+    readyToChat: 'すぐに話しかけられます',
+    connectsWhenChatStarts: '話しかけると接続します',
+    statusUnknown: '話しかけるときに確認します',
+    cannotReach: '現在このパートナーに接続できません',
+    availableOn: place => `${place} で利用できます`,
+    startChat: 'チャットを始める',
+    startChatWith: name => `${name} とチャットを始める`,
+    tryAgain: 'もう一度試す',
+    retryChatWith: name => `再試行して${name}と話す`,
+    configure: 'カスタマイズ',
+    configureAgent: name => `${name} をカスタマイズ`,
+    groupChats: 'チーム',
+    groupDescription: '複数のパートナーが協力します',
+    createGroup: 'チームを作成',
+    groupMemberCount: count => `${count} 人のパートナー`
+  },
+  createFlow: {
+    title: 'パートナーを作成',
+    description: '名前を付けて、手伝ってほしいことを伝えましょう。後から変更できます。',
+    nameLabel: '何と呼びますか？',
+    namePlaceholder: '例：アレックス',
+    purposeLabel: '何を手伝ってほしいですか？',
+    purposePlaceholder: '例：今週の予定を立てて、大切なことを覚えておくのを手伝って。',
+    nameRequired: '続けるには名前を入力してください。',
+    invalidName: 'この名前は使用できません。短い名前を試してください。',
+    nameTaken: '同じ名前のパートナーがすでにいます。',
+    cancel: 'キャンセル',
+    create: '作成して挨拶する',
+    created: name => `「${name}」に話しかけられます。`,
+    createdOn: (name, place) => `「${name}」を${place}で利用できます。`,
+    createFailed: 'パートナーを作成できませんでした。',
+    draftDiscarded: name => `下書きパートナー「${name}」を破棄しました。`,
+    draftCleanupFailed: name => `下書きパートナー「${name}」を削除できませんでした。`
+  },
   roster: {
     search: 'ボットとグループチャットを検索',
     searchPlaceholder: 'ボットとグループチャットを検索…',
@@ -748,7 +903,8 @@ const ja: BotsMessages = {
     heldMembersStatus: members => `一時停止中: ${members}`,
     holdReleaseHint: '一時停止中のボットにメンションするか、@all resume を送信して再開します。',
     needsYourInput: 'このグループチャットのボットが入力を待っています',
-    noMembersToSend: group => `${group} に送信先のメンバーがいません。ボットを追加するか、メンバーの読み込み中であればルームを開き直してください。`,
+    noMembersToSend: group =>
+      `${group} に送信先のメンバーがいません。ボットを追加するか、メンバーの読み込み中であればルームを開き直してください。`,
     pictureGenerationFailed: 'グループ画像の生成に失敗しました',
     nameTaken: name => `「${name}」という名前のグループはすでに存在します。`,
     memberCount: count => `ボット${count}体`,
@@ -839,6 +995,57 @@ const ja: BotsMessages = {
 
 const zh: BotsMessages = {
   paneTitle: '智能体',
+  home: {
+    eyebrow: '你的 AI 团队',
+    title: '认识你的 AI 伙伴',
+    description: '选择一位伙伴开始交流，也可以为你想做的事创建新的帮手。',
+    manage: '管理伙伴',
+    backToPartners: '返回我的伙伴',
+    hiddenPartners: (count, showing) => (showing ? '隐藏这些伙伴' : `显示 ${count} 位已隐藏伙伴`),
+    create: '创建伙伴',
+    loadFailedTitle: '暂时无法加载你的伙伴',
+    loadFailedDescription: '检查一下连接后重试。已保存的伙伴不会受影响。',
+    retry: '重试',
+    loading: '正在加载伙伴',
+    emptyTitle: '从这里组建你的团队',
+    emptyDescription: '你可以创建研究、写作、规划等不同伙伴，也可以告诉它你希望它帮什么忙。',
+    partners: '你的伙伴',
+    partnerCount: count => `${count} 位伙伴`,
+    noDescription: '随时准备好帮你一起处理手头的事。',
+    readyToChat: '现在可以联系它',
+    connectsWhenChatStarts: '开始聊天时会连接',
+    statusUnknown: '开始交流时会检查连接',
+    cannotReach: '暂时联系不上这位伙伴',
+    availableOn: place => `在${place}上使用`,
+    startChat: '开始交流',
+    startChatWith: name => `与${name}开始交流`,
+    tryAgain: '再试一次',
+    retryChatWith: name => `重试并与${name}交流`,
+    configure: '个性化设置',
+    configureAgent: name => `设置${name}`,
+    groupChats: '协作团队',
+    groupDescription: '让几位伙伴一起帮你完成事情',
+    createGroup: '创建协作团队',
+    groupMemberCount: count => `${count} 位伙伴`
+  },
+  createFlow: {
+    title: '创建一位伙伴',
+    description: '给伙伴起个名字，再告诉它你希望它帮什么忙。之后还可以随时调整。',
+    nameLabel: '你想怎么称呼它？',
+    namePlaceholder: '例如：小安',
+    purposeLabel: '你希望它帮你做什么？',
+    purposePlaceholder: '例如：帮我安排每周计划，提醒我留意重要事项。',
+    nameRequired: '请先给伙伴起个名字。',
+    invalidName: '这个名字暂时无法使用，试试更短一些的名字。',
+    nameTaken: '已经有一位同名伙伴了。',
+    cancel: '取消',
+    create: '创建并打个招呼',
+    created: name => `“${name}”已经可以和你交流了。`,
+    createdOn: (name, place) => `“${name}”已在${place}上创建。`,
+    createFailed: '创建伙伴失败。',
+    draftDiscarded: name => `已放弃伙伴“${name}”的草稿。`,
+    draftCleanupFailed: name => `无法清理伙伴“${name}”的草稿。`
+  },
   roster: {
     search: '搜索机器人和群聊',
     searchPlaceholder: '搜索机器人和群聊…',
@@ -1097,6 +1304,57 @@ const zh: BotsMessages = {
 
 const zhHant: BotsMessages = {
   paneTitle: '智能體',
+  home: {
+    eyebrow: '你的 AI 團隊',
+    title: '認識你的 AI 夥伴',
+    description: '選擇一位夥伴開始交流，也可以為想做的事建立新的幫手。',
+    manage: '管理夥伴',
+    backToPartners: '返回我的夥伴',
+    hiddenPartners: (count, showing) => (showing ? '隱藏這些夥伴' : `顯示 ${count} 位已隱藏夥伴`),
+    create: '建立夥伴',
+    loadFailedTitle: '暫時無法載入你的夥伴',
+    loadFailedDescription: '檢查連線後再試一次。已儲存的夥伴不會受到影響。',
+    retry: '重試',
+    loading: '正在載入夥伴',
+    emptyTitle: '從這裡組建你的團隊',
+    emptyDescription: '你可以建立研究、寫作、規劃等不同夥伴，也可以告訴它你希望它幫什麼忙。',
+    partners: '你的夥伴',
+    partnerCount: count => `${count} 位夥伴`,
+    noDescription: '隨時準備好幫你一起處理手邊的事。',
+    readyToChat: '現在可以聯絡它',
+    connectsWhenChatStarts: '開始聊天時會連線',
+    statusUnknown: '開始交流時會檢查連線',
+    cannotReach: '暫時聯絡不上這位夥伴',
+    availableOn: place => `在${place}上使用`,
+    startChat: '開始交流',
+    startChatWith: name => `與${name}開始交流`,
+    tryAgain: '再試一次',
+    retryChatWith: name => `重試並與${name}交流`,
+    configure: '個人化設定',
+    configureAgent: name => `設定${name}`,
+    groupChats: '協作團隊',
+    groupDescription: '讓幾位夥伴一起幫你完成事情',
+    createGroup: '建立協作團隊',
+    groupMemberCount: count => `${count} 位夥伴`
+  },
+  createFlow: {
+    title: '建立一位夥伴',
+    description: '為夥伴取個名字，再告訴它你希望它幫什麼忙。之後還能隨時調整。',
+    nameLabel: '你想怎麼稱呼它？',
+    namePlaceholder: '例如：小安',
+    purposeLabel: '你希望它幫你做什麼？',
+    purposePlaceholder: '例如：幫我安排每週計畫，提醒我留意重要事項。',
+    nameRequired: '請先為夥伴取個名字。',
+    invalidName: '這個名稱暫時無法使用，試試更短的名字。',
+    nameTaken: '已經有一位同名夥伴了。',
+    cancel: '取消',
+    create: '建立並打聲招呼',
+    created: name => `「${name}」已經可以和你交流了。`,
+    createdOn: (name, place) => `「${name}」已在${place}上建立。`,
+    createFailed: '建立夥伴失敗。',
+    draftDiscarded: name => `已放棄夥伴「${name}」的草稿。`,
+    draftCleanupFailed: name => `無法清理夥伴「${name}」的草稿。`
+  },
   roster: {
     search: '搜尋機器人和群組聊天',
     searchPlaceholder: '搜尋機器人和群組聊天…',

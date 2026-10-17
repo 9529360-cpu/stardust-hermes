@@ -388,9 +388,9 @@ export function AdvancedProfileConfig({ bot, state, setState }: AdvancedProfileC
         `Skills (${enabledSkills}/${state.skills.length} enabled)`,
         <div className="grid gap-1.5 rounded-md border border-(--ui-stroke-secondary) p-2">
           <Input
-            className="h-7 text-xs"
             onChange={event => setSkillFilter(event.target.value)}
             placeholder={b.tools.filterSkills}
+            size="compact"
             value={skillFilter}
           />
           <div

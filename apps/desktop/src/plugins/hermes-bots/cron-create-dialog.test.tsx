@@ -68,6 +68,29 @@ afterEach(() => {
   cleanup()
 })
 
+describe('Bot Routines control geometry', () => {
+  it('uses shared 32px selects and a compact repeat-count field', () => {
+    render(<CreateRoutineDialog bot={{ name: 'ops' }} onClose={() => undefined} open />)
+
+    const dialog = screen.getByRole('dialog')
+    const selects = within(dialog).getAllByRole('combobox')
+
+    const compactInputs = within(dialog)
+      .getAllByRole('textbox')
+      .filter(element => element.className.split(/\s+/).includes('h-7'))
+
+    expect(selects).toHaveLength(3)
+
+    for (const select of selects) {
+      expect(select.className).toContain('h-8')
+      expect(select.className).toContain('rounded-[6px]')
+    }
+
+    expect(compactInputs).toHaveLength(1)
+    expect(compactInputs[0].className).toContain('rounded-[2.5px]')
+  })
+})
+
 describe('the dialog names the bot, never its object', () => {
   it('resolves an owner OBJECT through the roster-aware meta lookup', () => {
     $botMeta.set({ ops: { title: 'Ops Bot' } })
