@@ -233,7 +233,11 @@ describe('materializing the draft profile', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Capabilities' }))
 
     await waitFor(() => expect(createCalls()).toHaveLength(1))
-    expect(createCalls()[0][1]).toMatchObject({ clone_from: 'default', name: 'inbox-triage' })
+    expect(createCalls()[0][1]).toMatchObject({
+      clone_from: 'default',
+      name: 'inbox-triage',
+      profile_kind: 'agent'
+    })
     // The live surface needs a REAL backend row to write to.
     await waitFor(() => expect(mocks.skillsView.at(-1)).toMatchObject({ fixedProfile: 'inbox-triage' }))
 

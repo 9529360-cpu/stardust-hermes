@@ -436,7 +436,7 @@ export function CreateAgentDialog({ open, onClose, roster, userFriendly = false 
       await requestForTarget('profiles.create', {
         name: slug,
         description: descriptionText,
-        ...(userFriendly ? { profile_kind: 'agent' } : {}),
+        profile_kind: 'agent',
         // Clone sources are profiles of the TARGET backend. The picker's
         // roster is the local one, so a remote create always starts from the
         // remote machine's default (or fresh) — never a local profile name
