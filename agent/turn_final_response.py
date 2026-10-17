@@ -13,7 +13,7 @@ from typing import Any, Dict, Optional
 
 from agent.message_metadata import append_message
 from agent.turn_empty_response import recover_empty_response
-from agent.turn_stop_gates import apply_stop_gates
+from agent.turn_stop_gates import apply_stop_gates, persist_interim_answer
 
 logger = logging.getLogger("agent.conversation_loop")
 
@@ -41,6 +41,7 @@ class FinalResponseVerdict:
     _pending_verification_response: Any
     _pending_verification_response_previewed: Any
     result: Optional[Dict[str, Any]] = None
+    failed: bool = False
 
 
 def finish_text_response(
@@ -50,6 +51,7 @@ def finish_text_response(
     _preflight_compression_blocked: Any, codex_ack_continuations: Any,
     truncated_response_parts: Any, length_continue_retries: Any,
     _pending_verification_response: Any, _pending_verification_response_previewed: Any,
+    failed: bool = False,
 ) -> FinalResponseVerdict:
     """Finish (or defer) a text-only assistant response in the original guard order. Every
     continuation path sets ``final_response = None`` so an acknowledgment never suppresses
@@ -69,7 +71,7 @@ def finish_text_response(
             length_continue_retries=length_continue_retries,
             _pending_verification_response=_pending_verification_response,
             _pending_verification_response_previewed=_pending_verification_response_previewed,
-            result=result,
+            result=result, failed=failed,
         )
 
     # Reasoning-only clean stop: some reasoning parsers (vLLM nemotron_v3 past ~500K
@@ -161,10 +163,16 @@ def finish_text_response(
                 "intent with no tool calls — re-prompting to act "
                 "(%d/2)", codex_ack_continuations + 1,
             )
-        codex_ack_continuations += 1
         interim_msg = agent._build_assistant_message(assistant_message, "incomplete")
-        append_message(messages, interim_msg)
-        agent._emit_interim_assistant_message(interim_msg)
+        if not persist_interim_answer(
+            agent, interim_msg, messages, conversation_history, "intent-ack interim flush failed"
+        ):
+            failed, final_response = True, ""
+            _pending_verification_response = None
+            _pending_verification_response_previewed = False
+            _turn_exit_reason = "session_persistence_failed"
+            return _verdict("break")
+        codex_ack_continuations += 1
         append_message(messages, {"role": "user", "content": _CODEX_ACK_CONTINUATION_NUDGE})
         agent._session_messages = messages
         # An acknowledgment is non-final: its text must not suppress iteration-limit
@@ -239,6 +247,10 @@ def finish_text_response(
     )
     _pending_verification_response = _sg.pending_verification_response
     _pending_verification_response_previewed = _sg.pending_verification_response_previewed
+    if _sg.persistence_failed:
+        failed, final_response = True, ""
+        _turn_exit_reason = "session_persistence_failed"
+        return _verdict("break")
     if _sg.continue_turn:
         final_response = None
         return _verdict("continue")
