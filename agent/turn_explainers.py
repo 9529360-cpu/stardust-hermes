@@ -202,8 +202,8 @@ class TurnExplainersMixin:
     """File-mutation failure footer + turn-completion explainer (see module docstring)."""
 
     def _record_terminal_workspace_mutation_result(self, tool_name: str, result: Any) -> None:
-        """Carry terminal mutation evidence into the existing turn-end verification gate."""
-        if tool_name not in {"terminal", "process_manage"} or not isinstance(result, str):
+        """Carry terminal and opaque-code mutation evidence into the turn-end verification gate."""
+        if tool_name not in {"terminal", "process_manage", "execute_code"} or not isinstance(result, str):
             return
         try:
             payload, _end = json.JSONDecoder().raw_decode(result.lstrip())
