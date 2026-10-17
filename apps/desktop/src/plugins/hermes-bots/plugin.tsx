@@ -71,7 +71,7 @@ import { annotateOrphanedGroupChatMembers } from './hygiene'
 import { BOTS_LOCALES } from './i18n'
 import { displayName } from './labels'
 import { startBotRelay, stopBotRelay } from './relay'
-import { $activityToasts } from './roster-actions'
+import { $activityToasts, isFocusedBotChatOnScreen } from './roster-actions'
 import {
   botChatOwnsWorkspace,
   BotsPage,
@@ -553,6 +553,13 @@ export default {
               const bot = selectedRosterBot($lastRoster.get(), $selectedRosterKey.get())
 
               if (!bot) {
+                return
+              }
+
+              // A chat the user is not looking at (the Agents page covers it) is
+              // re-resumed on its next send instead; re-opening it here would pull
+              // the user off the page they are on.
+              if (!isFocusedBotChatOnScreen(bot)) {
                 return
               }
 

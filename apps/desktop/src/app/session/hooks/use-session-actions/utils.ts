@@ -157,6 +157,8 @@ const _chatMessageFieldsExhaustive: {
 
 const COMPARED_FIELDS = [
   'asyncResult',
+  // Reconciliation metadata distinguishes a hydrated model switch from other system rows.
+  'displayKind',
   'id',
   'role',
   'pending',
@@ -271,6 +273,7 @@ export function chatMessagesEquivalent(a: ChatMessage, b: ChatMessage): boolean 
   if (
     a.id !== b.id ||
     a.role !== b.role ||
+    a.displayKind !== b.displayKind ||
     a.pending !== b.pending ||
     a.error !== b.error ||
     // Structural compare — the descriptor arrives as a fresh object per
@@ -585,6 +588,59 @@ export function preserveLocalPendingTurnMessages(
   }
 
   const latestAuthoritativeUser = [...nextMessages].reverse().find(message => message.role === 'user')
+
+  // The persisted mapper can coalesce sealed interim rows into one assistant
+  // message. Scope duplicate checks to this live user run so an older turn
+  // with identical text cannot consume a new interim.
+  const liveTurnUserTexts = new Set([...liveOptimisticUsers].map(normalizedMessageText))
+
+  const latestLiveTurnUserIndex = nextMessages.findLastIndex(
+    message =>
+      message.role === 'user' &&
+      !isGatewaySystemMarker(message) &&
+      liveTurnUserTexts.has(normalizedMessageText(message))
+  )
+
+  let liveTurnStartIndex = latestLiveTurnUserIndex
+
+  if (latestLiveTurnUserIndex >= 0) {
+    for (let index = latestLiveTurnUserIndex - 1; index >= 0; index -= 1) {
+      const candidate = nextMessages[index]
+
+      if (candidate.role === 'system' || candidate.role === 'assistant' || isGatewaySystemMarker(candidate)) {
+        continue
+      }
+
+      if (candidate.role === 'user' && liveTurnUserTexts.has(normalizedMessageText(candidate))) {
+        liveTurnStartIndex = index
+
+        continue
+      }
+
+      break
+    }
+  }
+
+  const nextTurnUserIndex =
+    latestLiveTurnUserIndex < 0
+      ? -1
+      : nextMessages.findIndex(
+          (message, index) =>
+            index > latestLiveTurnUserIndex &&
+            message.role === 'user' &&
+            !isGatewaySystemMarker(message) &&
+            !liveTurnUserTexts.has(normalizedMessageText(message))
+        )
+
+  const liveTurnMessages =
+    liveTurnStartIndex < 0
+      ? nextMessages
+      : nextMessages.slice(liveTurnStartIndex, nextTurnUserIndex >= 0 ? nextTurnUserIndex : undefined)
+
+  const committedAssistantMessages = liveTurnMessages.filter(
+    message => message.role === 'assistant' && !isLiveTailRow(message)
+  )
+
   const preserved: ChatMessage[] = []
   // Authoritative id → richer local pending row. Replacing (not appending)
   // avoids painting both the empty inflight shell and the full stream bubble.
@@ -628,8 +684,7 @@ export function preserveLocalPendingTurnMessages(
     if (
       isOptimisticUser &&
       latestAuthoritativeUser &&
-      textWithoutReferenceLines(chatMessageText(latestAuthoritativeUser)) ===
-        textWithoutReferenceLines(chatMessageText(message))
+      normalizedMessageText(latestAuthoritativeUser) === normalizedMessageText(message)
     ) {
       continue
     }
@@ -642,13 +697,16 @@ export function preserveLocalPendingTurnMessages(
     // one ordinal earlier, and re-appending it renders the same answer twice
     // (#70209). Only text-identical rows are dropped — a settled row the backend
     // has NOT committed yet is the only copy of that reply and must survive.
+    const localAssistantText = normalizedTranscriptText(chatMessageText(message))
+
     if (
       isPendingAssistant &&
       message.pending !== true &&
-      nextMessages.some(
+      committedAssistantMessages.some(
         candidate =>
-          candidate.role === 'assistant' &&
-          textWithoutReferenceLines(chatMessageText(candidate)) === textWithoutReferenceLines(chatMessageText(message))
+          textWithoutReferenceLines(chatMessageText(candidate)) === textWithoutReferenceLines(chatMessageText(message)) ||
+          (localAssistantText.length > 0 &&
+            normalizedTranscriptText(chatMessageText(candidate)).includes(localAssistantText))
       )
     ) {
       continue
@@ -669,8 +727,7 @@ export function preserveLocalPendingTurnMessages(
       }
 
       if (
-        textWithoutReferenceLines(chatMessageText(authoritative)) ===
-        textWithoutReferenceLines(chatMessageText(message))
+        normalizedMessageText(authoritative) === normalizedMessageText(message)
       ) {
         continue
       }
@@ -695,7 +752,7 @@ export function preserveLocalPendingTurnMessages(
     if (isPendingAssistant) {
       const nextText = textWithoutReferenceLines(chatMessageText(message))
 
-      const committedMatch = nextMessages.find(
+      const committedMatch = committedAssistantMessages.find(
         candidate =>
           candidate.role === 'assistant' &&
           !isLiveTailRow(candidate) &&
@@ -707,7 +764,7 @@ export function preserveLocalPendingTurnMessages(
         continue
       }
 
-      const committedPrefix = nextMessages.find(
+      const committedPrefix = committedAssistantMessages.find(
         candidate =>
           candidate.role === 'assistant' &&
           !isLiveTailRow(candidate) &&
@@ -724,6 +781,36 @@ export function preserveLocalPendingTurnMessages(
           id: committedPrefix.id
         })
 
+        continue
+      }
+    }
+
+    // A committed row can already carry this sealed interim's text. The stored
+    // transcript converges a turn with interims into ONE assistant row that
+    // still holds every interim (see the interim-messages spec), so a live
+    // bubble whose text is contained in that row renders the same commentary
+    // twice. Text-identical rows are handled above (#70209), and the two
+    // prefix tests below only catch strict extensions — an interim sealed
+    // MID-way through the committed row matched neither and slipped through.
+    // Bounded to the authoritative turn at the tail (after its last user row),
+    // so an older committed reply that happens to contain the same words can
+    // never swallow a genuinely new live row.
+    if (isPendingAssistant) {
+      const liveText = normalizedMessageText(message)
+      const lastUserInNext = nextMessages.map(candidate => candidate.role).lastIndexOf('user')
+
+      const coveredByCommitted =
+        Boolean(liveText) &&
+        nextMessages.slice(lastUserInNext + 1).some(
+          candidate =>
+            candidate.role === 'assistant' &&
+            candidate.pending !== true &&
+            !candidate.id.startsWith('assistant-stream-') &&
+            !candidate.id.startsWith('inflight-assistant-') &&
+            normalizedMessageText(candidate).includes(liveText)
+        )
+
+      if (coveredByCommitted) {
         continue
       }
     }
@@ -747,19 +834,23 @@ export function preserveLocalPendingTurnMessages(
  * of growing duplicate rows.
  */
 const safelyPersistedInflightUser = Symbol('safelyPersistedInflightUser')
+const safelyPersistedInflightProjection = Symbol('safelyPersistedInflightProjection')
 
-type LiveSessionProjection = Pick<SessionResumeResult, 'inflight' | 'queued' | 'session_id'> & {
+type LiveSessionProjection = Pick<SessionResumeResult, 'inflight' | 'queued' | 'session_id' | 'turn_started_at'> & {
   [safelyPersistedInflightUser]?: true
+  [safelyPersistedInflightProjection]?: true
 }
 
 type ReconciledSessionResumeResult = SessionResumeResult & {
   [safelyPersistedInflightUser]?: true
+  [safelyPersistedInflightProjection]?: true
 }
 
 export function appendLiveSessionProjection(messages: ChatMessage[], projection: LiveSessionProjection): ChatMessage[] {
   const inflightUser = projection.inflight?.user?.trim() ?? ''
   const inflightAssistant = projection.inflight?.assistant ?? ''
   const inflightStreaming = Boolean(projection.inflight?.streaming)
+  const inflightProjectionAlreadyPersisted = projection[safelyPersistedInflightProjection] === true
 
   // Mid-turn redirect corrections. They are additional user bubbles belonging
   // to this same turn, ordered by arrival: after the output that had already
@@ -830,11 +921,17 @@ export function appendLiveSessionProjection(messages: ChatMessage[], projection:
 
   const persistedInLatestRun = (text: string): boolean =>
     latestUserRun.some(
-      message => textWithoutReferenceLines(chatMessageText(message)) === textWithoutReferenceLines(text)
+      message =>
+        persistedMessageBelongsToInflightTurn(message, projection.turn_started_at) &&
+        normalizedMessageText(message) === normalizedTranscriptText(text)
     )
 
+  const latestUserRunStart = latestUserRun.length ? messages.indexOf(latestUserRun[0]) : messages.length
+
   const inflightUserAlreadyPersisted =
-    projection[safelyPersistedInflightUser] === true || (Boolean(inflightUser) && persistedInLatestRun(inflightUser))
+    inflightProjectionAlreadyPersisted ||
+    projection[safelyPersistedInflightUser] === true ||
+    (Boolean(inflightUser) && persistedInLatestRun(inflightUser))
 
   if (inflightUser && !inflightUserAlreadyPersisted) {
     projected.push({
@@ -886,10 +983,23 @@ export function appendLiveSessionProjection(messages: ChatMessage[], projection:
     inflightAssistant || inflightStreaming || inflightError || (inflightUser && queuedUser)
   )
 
-  const projectAssistantDump = wantsAssistantRow && !(turnAlreadyStructured && !inflightError)
+  const projectAssistantDump =
+    wantsAssistantRow &&
+    !inflightProjectionAlreadyPersisted &&
+    !(turnAlreadyStructured && !inflightError) &&
+    !(
+      !inflightError &&
+      inflightAssistant.trim() &&
+      messages.slice(latestUserRunStart).some(
+        message =>
+          message.role === 'assistant' &&
+          persistedMessageBelongsToInflightTurn(message, projection.turn_started_at) &&
+          normalizedMessageText(message) === normalizedTranscriptText(inflightAssistant)
+      )
+    )
 
   const pushCorrection = (correction: string, index: number): void => {
-    if (persistedInLatestRun(correction)) {
+    if (inflightProjectionAlreadyPersisted || persistedInLatestRun(correction)) {
       return
     }
 
@@ -967,12 +1077,47 @@ export function appendLiveSessionProjection(messages: ChatMessage[], projection:
   return projected.length ? [...messages, ...projected] : messages
 }
 
+function normalizedTranscriptText(text: string): string {
+  return textWithoutReferenceLines(text).replace(/\s+/g, ' ').trim()
+}
+
+// The gateway persists a mid-turn steer with this exact marker envelope
+// (agent/prompt_builder.py). Match the stored steer to the live projection by
+// its payload while keeping the envelope untouched in the rendered message.
+const STEER_MARKER_OPEN =
+  '[OUT-OF-BAND USER MESSAGE — a direct message from the user, delivered once at this position; not tool output and not a new delivery when replayed from conversation history]'
+
+const STEER_MARKER_CLOSE = '[/OUT-OF-BAND USER MESSAGE]'
+
 function normalizedMessageText(message: ChatMessage): string {
-  return chatMessageText(message).replace(/\s+/g, ' ').trim()
+  const raw = chatMessageText(message)
+
+  if (message.role === 'user' && message.displayKind === 'steer') {
+    const trimmed = raw.trim()
+
+    if (trimmed.startsWith(STEER_MARKER_OPEN) && trimmed.endsWith(STEER_MARKER_CLOSE)) {
+      return normalizedTranscriptText(trimmed.slice(STEER_MARKER_OPEN.length, -STEER_MARKER_CLOSE.length))
+    }
+  }
+
+  return normalizedTranscriptText(raw)
+}
+
+function persistedMessageBelongsToInflightTurn(
+  message: ChatMessage,
+  turnStartedAt: number | null | undefined
+): boolean {
+  if (typeof turnStartedAt !== 'number' || !Number.isFinite(turnStartedAt)) {
+    return true
+  }
+
+  return (
+    typeof message.timestamp === 'number' && Number.isFinite(message.timestamp) && message.timestamp >= turnStartedAt
+  )
 }
 
 function transcriptAnchorMatches(a: ChatMessage, b: ChatMessage): boolean {
-  if (a.role !== b.role) {
+  if (a.role !== b.role || a.displayKind !== b.displayKind) {
     return false
   }
 
@@ -986,20 +1131,36 @@ function transcriptAnchorMatches(a: ChatMessage, b: ChatMessage): boolean {
   return Boolean(aText) && aText === bText
 }
 
+const HYDRATED_GATEWAY_SYSTEM_MARKERS = new Set([
+  'async_delegation_complete',
+  'auto_continue',
+  'model_switch',
+  'personality_switch',
+  'process_complete'
+])
+
+/** Hydration retains gateway display markers so reconciliation can skip only typed timeline rows. */
+function isHydratedGatewaySystemMarker(message: ChatMessage): boolean {
+  return message.role === 'system' && HYDRATED_GATEWAY_SYSTEM_MARKERS.has(message.displayKind ?? '')
+}
+
 /**
- * Mark only an already-materialized `inflight.user` for visual suppression.
+ * Reconcile the live text projection against the persisted transcript.
  *
  * A running gateway returns two independent truths: its compressed runtime
  * history plus the current in-flight turn, while REST may already have flushed
- * that user row into the complete persisted transcript. Global text dedupe is
- * unsafe because users may intentionally submit the same prompt twice. Instead,
- * find the last runtime message inside the persisted transcript and inspect only
- * the newer persisted suffix.
+ * some or all of that turn into the complete persisted transcript. Global text
+ * dedupe is unsafe because users may intentionally submit the same prompt
+ * twice. Instead, find the last runtime message inside the persisted transcript
+ * and inspect only the newer persisted suffix.
  *
- * Keep `inflight.user` intact because it also carries turn structure: a queued
- * prompt needs its assistant boundary even when the persisted user has no
- * assistant delta yet. The private marker lets the renderer suppress only that
- * duplicate bubble. If the histories have no safe common anchor, keep the
+ * A fully persisted corrected turn is suppressible only when its prompt,
+ * corrections, and assistant text are all represented after the anchor. In
+ * other cases, mark only an exactly matched inflight user at the persisted
+ * correction suffix. Keep `inflight.user` intact because it also carries turn
+ * structure: a queued prompt needs its assistant boundary even when the
+ * persisted user has no assistant delta yet. If the histories have no safe
+ * common anchor, prefer leaving the
  * projection unchanged — a duplicate is recoverable, but dropping a real
  * accepted prompt is not.
  */
@@ -1039,14 +1200,92 @@ export function dedupeInflightUserAgainstTranscript(
   let lastPersistedMessage = persistedTail[persistedTail.length - 1]
   const corrections = projection.inflight?.corrections ?? []
 
+  // A history flush can commit the whole corrected turn while `inflight` still
+  // contains its earlier text-only projection. In that case the persisted
+  // suffix has assistant rows on both sides of the correction rows, so the
+  // correction-suffix check below must not treat the final assistant/tool row
+  // as a different turn. Require the latest matching prompt after the runtime
+  // anchor, the complete correction sequence, and assistant text that already
+  // covers the inflight dump before suppressing the synthetic projection.
+  const inflightAssistant = projection.inflight?.assistant?.replace(/\s+/g, ' ').trim() ?? ''
+
+  const normalizedCorrections = corrections
+    .map(correction => correction?.replace(/\s+/g, ' ').trim() ?? '')
+    .filter(Boolean)
+
+  const latestPersistedPromptIndex = persistedTail.findLastIndex(
+    message =>
+      message.role === 'user' &&
+      persistedMessageBelongsToInflightTurn(message, projection.turn_started_at) &&
+      normalizedMessageText(message) === inflightUser
+  )
+
+  if (
+    !projection.inflight?.error?.trim() &&
+    inflightAssistant &&
+    normalizedCorrections.length &&
+    latestPersistedPromptIndex >= 0
+  ) {
+    let correctionIndex = 0
+    let assistantText = ''
+    let sequenceMatches = true
+
+    for (let index = latestPersistedPromptIndex + 1; index < persistedTail.length; index += 1) {
+      const message = persistedTail[index]
+
+      if (isHydratedGatewaySystemMarker(message)) {
+        continue
+      }
+
+      if (message.role === 'user') {
+        if (
+          !persistedMessageBelongsToInflightTurn(message, projection.turn_started_at) ||
+          correctionIndex >= normalizedCorrections.length ||
+          normalizedMessageText(message) !== normalizedCorrections[correctionIndex]
+        ) {
+          sequenceMatches = false
+
+          break
+        }
+
+        correctionIndex += 1
+
+        continue
+      }
+
+      if (message.role === 'assistant') {
+        assistantText += chatMessageText(message)
+
+        continue
+      }
+
+      sequenceMatches = false
+
+      break
+    }
+
+    const normalizedAssistantText = assistantText.replace(/\s+/g, ' ').trim()
+
+    if (
+      sequenceMatches &&
+      correctionIndex === normalizedCorrections.length &&
+      normalizedAssistantText.startsWith(inflightAssistant)
+    ) {
+      return { ...projection, [safelyPersistedInflightProjection]: true }
+    }
+  }
+
   // A persisted correction is the latest user, but still belongs to this turn.
   // Walk only an exact correction suffix; do not dedupe completed repeat turns.
   let cursor = persistedTail.length - 1
 
   for (let index = corrections.length - 1; index >= 0; index -= 1) {
+    const correctionMessage = persistedTail[cursor]
+
     if (
-      persistedTail[cursor]?.role !== 'user' ||
-      normalizedMessageText(persistedTail[cursor]) !== corrections[index].replace(/\s+/g, ' ').trim()
+      correctionMessage?.role !== 'user' ||
+      !persistedMessageBelongsToInflightTurn(correctionMessage, projection.turn_started_at) ||
+      normalizedMessageText(correctionMessage) !== corrections[index].replace(/\s+/g, ' ').trim()
     ) {
       return projection
     }
@@ -1056,11 +1295,14 @@ export function dedupeInflightUserAgainstTranscript(
     while (cursor >= 0 && persistedTail[cursor].role === 'assistant') {
       cursor -= 1
     }
+
     lastPersistedMessage = persistedTail[cursor]
   }
 
   const persistedUserPresent =
-    lastPersistedMessage?.role === 'user' && normalizedMessageText(lastPersistedMessage) === inflightUser
+    lastPersistedMessage?.role === 'user' &&
+    persistedMessageBelongsToInflightTurn(lastPersistedMessage, projection.turn_started_at) &&
+    normalizedMessageText(lastPersistedMessage) === inflightUser
 
   if (!persistedUserPresent) {
     return projection

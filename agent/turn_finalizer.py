@@ -559,6 +559,14 @@ def finalize_turn(
     if _should_review_skills:
         agent._iters_since_skill = 0
 
+    # Strong corrections and confirmations of recent corrections are cheap, local
+    # self-distillation cues even when no skill tool iteration threshold is reached.
+    feedback_distill = False
+    if (final_response and not interrupted and not getattr(agent, "skip_background_review", False)
+            and agent._skill_nudge_interval > 0 and "skill_manage" in agent.valid_tool_names):
+        from agent.background_review_distillation import has_actionable_self_distillation_feedback
+        feedback_distill = has_actionable_self_distillation_feedback(messages)
+
     # External memory provider: sync the completed turn + queue next prefetch.
     agent._sync_external_memory_for_turn(
         original_user_message=original_user_message, final_response=final_response,
@@ -573,13 +581,21 @@ def finalize_turn(
         final_response
         and not interrupted
         and not getattr(agent, "skip_background_review", False)
-        and (_should_review_memory or _should_review_skills)
+        and (_should_review_memory or _should_review_skills or feedback_distill)
     ):
         with suppress(Exception):
-            agent._spawn_background_review(
-                messages_snapshot=list(messages), review_memory=_should_review_memory,
-                review_skills=_should_review_skills,
+            can_learn_preference = (
+                feedback_distill and getattr(agent, "_memory_persistence_enabled", False)
+                and (getattr(agent, "_memory_enabled", False) or getattr(agent, "_user_profile_enabled", False))
             )
+            review_kwargs = dict(
+                messages_snapshot=list(messages),
+                review_memory=bool(_should_review_memory or can_learn_preference),
+                review_skills=bool(_should_review_skills or feedback_distill),
+            )
+            if feedback_distill:
+                review_kwargs["self_distill"] = True  # quiet but still audited and logged
+            agent._spawn_background_review(**review_kwargs)
 
     # Memory provider on_session_end()/shutdown_all() are NOT called here:
     # run_conversation() runs once per message; CLI/gateway own session-end cleanup.

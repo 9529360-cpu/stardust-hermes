@@ -199,10 +199,21 @@ def get_provider(name: str, *, allow_network: bool = True) -> Optional[ProviderD
     Hermes-only overlay (nous, openai-codex, …); plugin provider profiles with a concrete endpoint."""
     canonical = normalize_provider(name)
     mdev_info = _models_dev_info(canonical, allow_network)
+    try:
+        from providers import get_provider_profile as _profile
+        plugin_profile = _profile(canonical)
+    except Exception:
+        plugin_profile = None
     overlay = STARDUST_OVERLAYS.get(canonical)
     if mdev_info is not None:
         ov = overlay or HermesOverlay()
         env_vars = list(mdev_info.env)
+        if plugin_profile is not None and (plugin_profile.base_url or "").strip():
+            for ev in plugin_profile.env_vars or ():
+                if ev.endswith(("_BASE_URL", "_URL")):
+                    continue
+                if ev not in env_vars:
+                    env_vars.append(ev)
         for ev in ov.extra_env_vars:
             if ev not in env_vars:
                 env_vars.append(ev)
@@ -217,17 +228,12 @@ def get_provider(name: str, *, allow_network: bool = True) -> Optional[ProviderD
     # placeholder profiles like ``custom`` (aliases ollama/local/vllm) ship an empty base_url and
     # are completed by config.yaml custom_providers — resolving them would preempt
     # resolve_provider_full's custom step and collapse keyed ``custom:<name>`` ids to bare custom.
-    try:
-        from providers import get_provider_profile as _profile
-        _prof = _profile(canonical)
-        if _prof is not None and (_prof.base_url or "").strip():
-            _api_mode_to_transport = {v: k for k, v in TRANSPORT_TO_API_MODE.items()}
-            return ProviderDef(id=canonical, name=_prof.display_name or _prof.name or canonical,
-                               transport=_api_mode_to_transport.get(_prof.api_mode, "openai_chat"),
-                               api_key_env_vars=tuple(_prof.env_vars or ()), base_url=_prof.base_url or "",
-                               auth_type=_prof.auth_type or "api_key", source="plugin-profile")
-    except Exception:
-        pass
+    if plugin_profile is not None and (plugin_profile.base_url or "").strip():
+        _api_mode_to_transport = {v: k for k, v in TRANSPORT_TO_API_MODE.items()}
+        return ProviderDef(id=canonical, name=plugin_profile.display_name or plugin_profile.name or canonical,
+                           transport=_api_mode_to_transport.get(plugin_profile.api_mode, "openai_chat"),
+                           api_key_env_vars=tuple(plugin_profile.env_vars or ()), base_url=plugin_profile.base_url or "",
+                           auth_type=plugin_profile.auth_type or "api_key", source="plugin-profile")
     return None
 
 

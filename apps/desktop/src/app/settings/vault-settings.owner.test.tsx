@@ -22,7 +22,7 @@ vi.mock('@/store/gateway', async importActual => ({
   }
 }))
 vi.mock('@/lib/haptics', () => ({ triggerHaptic: vi.fn() }))
-vi.mock('@/store/notifications', () => ({ notify: vi.fn(), notifyError: vi.fn() }))
+vi.mock('@/store/notifications', () => ({ notify: vi.fn(), notifyError: vi.fn(), dismissNotification: vi.fn() }))
 
 import { useStore } from '@nanostores/react'
 

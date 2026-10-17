@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { $workspaceMode, $workspaceOwnerKey } from '@/components/pane-shell/workspace-scope'
 import type { ProfileInfo } from '@/types/hermes'
 
 vi.mock('@/app/chat/session-view', async () => {
@@ -52,6 +53,7 @@ vi.mock('@/store/session-states', async () => {
     $attentionSessionIds: atom([]),
     $draftSessionIds: atom([]),
     $focusedRuntimeId: atom(null),
+    $focusedSessionIsTile: atom(false),
     $focusedSessionState: atom(null),
     $focusedStoredSessionId: atom(null),
     $sessionTiles: atom([]),
@@ -641,6 +643,23 @@ describe('profile-aware plugin session opens', () => {
     })
   })
 
+  it('routes a Bot chat into the main pane when a full workspace page is open', async () => {
+    window.location.hash = '#/bots'
+    $workspaceMode.set('bots')
+    $workspaceOwnerKey.set('bot:local::default')
+
+    await host.openSession('bot-chat-from-page', {
+      profile: 'default',
+      workspaceMode: 'bots',
+      workspaceOwnerKey: 'bot:local::default'
+    })
+
+    const [, navigate] = vi.mocked(openSessionCore).mock.calls.at(-1)!
+    navigate('#/chat/bot-chat-from-page')
+
+    expect(window.location.hash).toBe('#/chat/bot-chat-from-page')
+  })
+
   it('finishes hydration on the focused Bot tile without moving the Sessions gateway', async () => {
     const route = {
       connectionId: 'source-a',
@@ -741,6 +760,74 @@ describe('profile-aware plugin session opens', () => {
     await expect(opening).rejects.toThrow(/superseded/i)
     expect(openSessionCore).not.toHaveBeenCalled()
     expect(setResumeExhaustedSessionId).not.toHaveBeenCalled()
+  })
+
+  it('does not let a late bot-row wake leave Agent space after the user opens another panel', async () => {
+    let releaseDial: (() => void) | undefined
+
+    window.location.hash = '#/bots'
+    vi.mocked(openGatewayForAgent).mockImplementationOnce(
+      () =>
+        new Promise<void>(resolve => {
+          releaseDial = resolve
+        })
+    )
+
+    const opening = host.openSession('late-bot-chat', {
+      awaitHydration: true,
+      hydrationTimeoutMs: 1_000,
+      route: {
+        connectionId: 'source-a',
+        mode: 'remote',
+        profile: 'writer',
+        targetProfile: 'writer'
+      },
+      workspaceMode: 'bots',
+      workspaceOwnerKey: 'bot:source-a::writer'
+    })
+
+    window.location.hash = '#/skills'
+    releaseDial?.()
+
+    await expect(opening).rejects.toThrow(/superseded/i)
+    expect(openSessionCore).not.toHaveBeenCalled()
+    expect(setShowAllProfiles).not.toHaveBeenCalled()
+    expect($gatewaySwapTarget.get()).toBeNull()
+  })
+
+  it('lets a bot-owned open navigate itself without being superseded by its own route change', async () => {
+    window.location.hash = '#/bots'
+    $workspaceMode.set('bots')
+    $workspaceOwnerKey.set('bot:source-a::writer')
+
+    try {
+      vi.mocked(openSessionCore).mockImplementationOnce((_storedSessionId, navigate) => {
+        navigate('#/chat/own-bot-chat')
+        setMockAtom($selectedStoredSessionId, 'own-bot-chat')
+        setMockAtom($activeSessionId, 'runtime-own')
+        setMockAtom($messages, [{ id: 'history-own', parts: [], role: 'assistant' }] as never)
+      })
+
+      await host.openSession('own-bot-chat', {
+        awaitHydration: true,
+        expectHistory: true,
+        hydrationTimeoutMs: 1_000,
+        route: {
+          connectionId: 'source-a',
+          mode: 'remote',
+          profile: 'writer',
+          targetProfile: 'writer'
+        },
+        workspaceMode: 'bots',
+        workspaceOwnerKey: 'bot:source-a::writer'
+      })
+
+      expect(openSessionCore).toHaveBeenCalledTimes(1)
+      expect(window.location.hash).toBe('#/chat/own-bot-chat')
+    } finally {
+      $workspaceMode.set('sessions')
+      $workspaceOwnerKey.set(null)
+    }
   })
 
   it('revalidates an exact route before the one allowed hydration retry', async () => {
@@ -1151,6 +1238,34 @@ describe('profile-aware plugin session opens', () => {
     expect(await firstOutcome).toMatch(/superseded/i)
     expect($activeGatewayProfile.get()).toBe('remote-worker')
     expect($selectedStoredSessionId.get()).toBe('chat-b')
+    expect($gatewaySwapTarget.get()).toBeNull()
+  })
+
+  it('clears a stale overlay when a superseded wake never gets its own clear (#115844)', async () => {
+    $activeGatewayProfile.set('jimin')
+
+    const firstOutcome = host
+      .openSession('chat-a', {
+        profile: 'jimin',
+        awaitHydration: true,
+        expectHistory: true,
+        hydrationTimeoutMs: 30
+      })
+      .then(
+        () => 'resolved',
+        error => String(error)
+      )
+
+    await Promise.resolve()
+    expect($gatewaySwapTarget.get()).toBe('jimin')
+
+    // A later open that never awaits hydration (a paint-first wake) bumps the
+    // generation counter but never touches $gatewaySwapTarget - it has
+    // nothing of its own to clear, so the first wake's own cleanup is the
+    // only thing standing between here and a permanently stuck overlay.
+    await host.openSession('chat-b', { profile: 'hyoseob' })
+
+    expect(await firstOutcome).toMatch(/timed out loading/i)
     expect($gatewaySwapTarget.get()).toBeNull()
   })
 

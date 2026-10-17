@@ -2846,9 +2846,12 @@ class TestNewEndpoints:
 
 
 
-    def test_profiles_create_builder_mcp_auth_is_profile_scoped(
-        self, monkeypatch
-    ):
+    def test_profiles_create_rejects_unknown_profile_kind(self):
+        response = self.client.post("/api/profiles", json={"name": "partner", "profile_kind": "bot"})
+
+        assert response.status_code == 422
+
+    def test_profiles_create_builder_mcp_auth_is_profile_scoped(self, monkeypatch):
         from hermes_constants import get_hermes_home
         import hermes_cli.profiles as profiles_mod
 
@@ -2859,6 +2862,7 @@ class TestNewEndpoints:
             "/api/profiles",
             json={
                 "name": "builder-auth",
+                "profile_kind": "agent",
                 "mcp_servers": [
                     {
                         "name": "Bearer Server",
@@ -2896,6 +2900,8 @@ class TestNewEndpoints:
 
         root = get_hermes_home()
         profile_dir = root / "profiles" / "builder-auth"
+        listed = self.client.get("/api/profiles").json()["profiles"]
+        assert next(p for p in listed if p["name"] == "builder-auth")["profile_kind"] == "agent"
         config_text = (profile_dir / "config.yaml").read_text(encoding="utf-8")
         config = yaml.safe_load(config_text)
         servers = config["mcp_servers"]

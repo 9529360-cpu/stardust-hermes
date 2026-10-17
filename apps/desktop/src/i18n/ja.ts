@@ -4,19 +4,7 @@ import { defineLocale } from './define-locale'
 
 export const ja = defineLocale({
   personalization: {
-    navLabel: 'パーソナライズ',
-    title: 'パーソナライズ',
-    subtitle: '外観をすばやく調整できます。詳細は設定の「外観」にあります。',
-    themeTitle: 'テーマ',
-    backgroundTitle: '背景画像',
-    backgroundShow: '背景画像を表示',
-    opacityLabel: '画像の不透明度',
-    noImage: '画像がまだ選択されていません。',
-    chooseImage: '画像を選択…',
-    removeImage: '削除',
-    petTitle: 'デスクトップペット',
-    petDesc: 'デスクトップにペットを表示します。',
-    moreSettings: '外観の詳細設定'
+    opacityLabel: '画像の不透明度'
   },
   sessionImport: {
     title: '別のアプリから続ける',

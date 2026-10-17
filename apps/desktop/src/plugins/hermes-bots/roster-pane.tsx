@@ -1,6 +1,7 @@
-import { host, useI18n, useValue } from '@stardust/plugin-sdk'
+import { Button, Codicon, host, useI18n, useValue } from '@stardust/plugin-sdk'
 import { useEffect, useRef, useState } from 'react'
 
+import { AgentsHomePage } from './agents-home'
 import { BotRow } from './bot-row'
 import {
   $botChatFocused,
@@ -225,13 +226,27 @@ function useReconcileRosterOwner(
 
 /** The roster as a full page in the workspace, beside Tools and Plugins. */
 export function BotsPage() {
+  const b = useBots()
+  const [manage, setManage] = useState(false)
   useEffect(() => {
     $botsPageOpen.set(true)
 
     return () => $botsPageOpen.set(false)
   }, [])
 
-  return <BotsPane />
+  return manage ? (
+    <div className="flex min-h-0 flex-1 flex-col" data-slot-page="agents-manager">
+      <div className="flex shrink-0 items-center border-b border-(--ui-stroke-secondary) px-4 py-2">
+        <Button onClick={() => setManage(false)} size="sm" variant="ghost">
+          <Codicon className="mr-1.5" name="arrow-left" />
+          {b.home.backToPartners}
+        </Button>
+      </div>
+      <BotsPane />
+    </div>
+  ) : (
+    <AgentsHomePage onManageAgents={() => setManage(true)} />
+  )
 }
 
 export function BotsPane() {

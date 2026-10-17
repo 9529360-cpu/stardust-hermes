@@ -129,3 +129,55 @@ def test_cron_construction_sets_skip_background_review() -> None:
     assert "AIAgent(" in source and "skip_background_review=True" in source, (
         "the cron scheduler must construct AIAgent with skip_background_review=True."
     )
+
+
+def _run_feedback_finalize(agent: AIAgent, feedback: str) -> None:
+    """Exercise the actual post-turn review decision with a purely conversational correction."""
+    finalize_turn(
+        agent, final_response="corrected", api_call_count=1, interrupted=False, failed=False,
+        messages=[
+            {"role": "user", "content": "Create a plan"},
+            {"role": "assistant", "content": "unhelpful plan"},
+            {"role": "user", "content": feedback},
+            {"role": "assistant", "content": "revised plan"},
+        ],
+        conversation_history=[], effective_task_id="test", turn_id="feedback",
+        user_message=feedback, original_user_message=feedback,
+        _should_review_memory=False, _turn_exit_reason="text_response(1)",
+    )
+
+
+def test_feedback_triggers_silent_skill_distillation_below_tool_threshold():
+    agent = _make_agent()
+    _stub_agent_for_finalize(agent)
+    agent._iters_since_skill = 0
+    _run_feedback_finalize(agent, "你的回答我不满意")
+    agent._spawn_background_review.assert_called_once()
+    kwargs = agent._spawn_background_review.call_args.kwargs
+    assert kwargs["review_skills"] is True
+    assert kwargs["self_distill"] is True
+
+
+def test_feedback_distillation_respects_skip_background_review():
+    agent = _make_agent(skip_background_review=True)
+    _stub_agent_for_finalize(agent)
+    agent._iters_since_skill = 0
+    _run_feedback_finalize(agent, "不是这个意思，重来")
+    agent._spawn_background_review.assert_not_called()
+
+
+def test_feedback_distillation_respects_zero_skill_interval():
+    agent = _make_agent()
+    _stub_agent_for_finalize(agent)
+    agent._iters_since_skill = 0
+    agent._skill_nudge_interval = 0
+    _run_feedback_finalize(agent, "不是这个意思，重来")
+    agent._spawn_background_review.assert_not_called()
+
+
+def test_praise_without_prior_correction_does_not_trigger_review():
+    agent = _make_agent()
+    _stub_agent_for_finalize(agent)
+    agent._iters_since_skill = 0
+    _run_feedback_finalize(agent, "对，就是这样")
+    agent._spawn_background_review.assert_not_called()

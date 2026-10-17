@@ -38,7 +38,7 @@ test('the agent space is a page beside the nav, and a nav item leaves it', async
   const page = fixture!.page
   await waitForAppReady(fixture!, 120_000)
 
-  const roster = page.locator('[data-slot="bots-roster"]')
+  const roster = page.locator('[data-slot-page="agents-home"]')
   const navNewChat = page.getByRole('button', { name: /新建对话|New chat/ }).first()
   const navAgentSpace = page.getByRole('button', { name: /智能体空间|Agent space/ }).first()
 
@@ -49,7 +49,11 @@ test('the agent space is a page beside the nav, and a nav item leaves it', async
   await capture(page, '1-agent-space-page')
 
   // Opening a bot shows its chat where the page was, and the page closes.
-  await page.locator('[data-slot="bots-roster"] [data-roster-key]').first().click()
+  await page
+    .locator('[data-agent-card]')
+    .first()
+    .getByRole('button', { name: /Start a chat|开始交流|チャットを始める/ })
+    .click()
   await expect(roster).toBeHidden({ timeout: 30_000 })
   await expect(navNewChat).toBeVisible()
   await capture(page, '2-bot-chat-from-page')
@@ -57,7 +61,10 @@ test('the agent space is a page beside the nav, and a nav item leaves it', async
   // Any nav item leaves the page for its own page, like Tools and Plugins.
   await navAgentSpace.click()
   await expect(roster).toBeVisible({ timeout: 20_000 })
-  await page.getByRole('button', { name: /^(自动化|Automations)$/ }).first().click()
+  await page
+    .getByRole('button', { name: /^(自动化|Automations)$/ })
+    .first()
+    .click()
   await expect(roster).toBeHidden({ timeout: 10_000 })
   await expect(navNewChat).toBeVisible()
 })

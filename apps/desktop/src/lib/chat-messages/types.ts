@@ -20,6 +20,8 @@ export type ChatMessage = {
   id: string
   role: SessionMessage['role']
   parts: ChatMessagePart[]
+  /** Persisted gateway display marker, retained for renderer reconciliation. */
+  displayKind?: SessionMessage['display_kind']
   /** Result body only; the system text remains the compact completion label. */
   asyncResult?: string
   /** Backend-authored synthetic continuation, not a new human turn. */

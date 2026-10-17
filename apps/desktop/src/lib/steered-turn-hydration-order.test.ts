@@ -74,6 +74,19 @@ const steeredTurnRows: SessionMessage[] = [
 ]
 
 describe('toChatMessages on a persisted steered turn', () => {
+  it('renders a persisted steer payload without its transport envelope', () => {
+    const open = '[OUT-OF-BAND USER MESSAGE — a direct message from the user, delivered once at this position; not tool output and not a new delivery when replayed from conversation history]'
+    const close = '[/OUT-OF-BAND USER MESSAGE]'
+    const [message] = toChatMessages([
+      { content: `${open}\nplease change direction\n${close}`, role: 'user', display_kind: 'steer', timestamp: 104 }
+    ])
+    const renderedText = chatMessageText(message)
+
+    expect(renderedText).toContain('please change direction')
+    expect(renderedText).not.toContain(open)
+    expect(renderedText).not.toContain(close)
+  })
+
   it('keeps the correction between the output it followed and the output it redirected', () => {
     const messages = toChatMessages(steeredTurnRows)
     const flat = messages.map(message => `${message.role}:${chatMessageText(message).slice(0, 24)}`)
