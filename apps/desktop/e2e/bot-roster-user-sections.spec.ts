@@ -62,19 +62,25 @@ const sectionLabel = (page: Page, name: string) =>
 
 /** The heading's fold button (label + count) — the ⋯ menu trigger is a sibling with no text. */
 const sectionHeading = (page: Page, name: string) =>
-  roster(page).locator('[data-slot="bots-section"] button[aria-expanded]').filter({ has: sectionLabel(page, name) })
+  roster(page)
+    .locator('[data-slot="bots-section"] button[aria-expanded]')
+    .filter({ has: sectionLabel(page, name) })
 
 const sectionBlock = (page: Page, name: string) =>
-  roster(page).locator('[data-slot="bots-section"]').filter({ has: sectionLabel(page, name) })
+  roster(page)
+    .locator('[data-slot="bots-section"]')
+    .filter({ has: sectionLabel(page, name) })
 
 /** Section name → roster keys of the rows under it (the plain list has no sections). */
 async function layout(page: Page): Promise<Array<[string, string[]]>> {
-  return roster(page).locator('[data-slot="bots-section"]').evaluateAll(blocks =>
-    blocks.map(block => [
-      block.querySelector('button[aria-expanded] span.truncate')?.textContent?.trim() ?? '',
-      [...block.querySelectorAll<HTMLElement>('[data-roster-key]')].map(row => row.dataset.rosterKey ?? '')
-    ])
-  )
+  return roster(page)
+    .locator('[data-slot="bots-section"]')
+    .evaluateAll(blocks =>
+      blocks.map(block => [
+        block.querySelector('button[aria-expanded] span.truncate')?.textContent?.trim() ?? '',
+        [...block.querySelectorAll<HTMLElement>('[data-roster-key]')].map(row => row.dataset.rosterKey ?? '')
+      ])
+    )
 }
 
 test.beforeAll(async () => {
@@ -116,7 +122,9 @@ test('file bots into user sections by menu and drag; rename; delete returns them
   const tab = page.getByRole('button', { name: /智能体空间|Agent space/ }).first()
 
   await tab.click()
-  await expect(page.getByRole('button', { name: 'New bot or group chat' })).toBeVisible()
+  await expect(page.locator('[data-slot-page="agents-home"]')).toBeVisible()
+  await page.getByRole('button', { name: 'Manage', exact: true }).click()
+  await expect(page.locator('[data-slot="bots-roster"]')).toBeVisible()
   await expect(botRow(page, 'alpha')).toBeVisible({ timeout: 30_000 })
   await expect(botRow(page, 'beta')).toBeVisible({ timeout: 30_000 })
 
@@ -239,7 +247,9 @@ test('file bots into user sections by menu and drag; rename; delete returns them
 
   // Membership rides the bot's profile ui_meta, so it follows profile sync.
   const alphaProfile = path.join(fixture!.sandbox.hermesHome, 'profiles', 'alpha', 'profile.yaml')
-  await expect.poll(() => (fs.existsSync(alphaProfile) ? fs.readFileSync(alphaProfile, 'utf8') : '')).toMatch(/sectionId:\s*sec-/)
+  await expect
+    .poll(() => (fs.existsSync(alphaProfile) ? fs.readFileSync(alphaProfile, 'utf8') : ''))
+    .toMatch(/sectionId:\s*sec-/)
 
   // Delete both sections: the roster is the plain list again.
   for (const name of ['Customers', 'Team']) {

@@ -121,6 +121,15 @@ describe('PersonalProductNav', () => {
     expect($projectScope.get()).toBe(ALL_PROJECTS)
   })
 
+  it('restores pointer events when the surrounding chat/sidebar surface disables them', () => {
+    renderNav('chat')
+
+    const nav = screen.getByRole('navigation', { name: 'Product navigation' })
+
+    expect(nav.className).toContain('pointer-events-auto')
+    expect(screen.getByRole('button', { name: '智能体空间' }).className).toContain('pointer-events-auto')
+  })
+
   it('renders only the compact Stardust primary navigation in product order', () => {
     renderNav('chat')
 

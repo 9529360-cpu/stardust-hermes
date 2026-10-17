@@ -73,6 +73,7 @@ import {
   $profiles,
   $profileScope,
   ALL_PROFILES,
+  isUserProfile,
   normalizeProfileKey,
   profileLabel,
   refreshActiveProfile,
@@ -270,7 +271,7 @@ export function ProfileRail() {
   const onDefault = !isAll && activeKey === 'default'
 
   const named = sortByProfileOrder(
-    profiles.filter(profile => !profile.is_default),
+    profiles.filter(profile => !profile.is_default && isUserProfile(profile)),
     order
   )
 

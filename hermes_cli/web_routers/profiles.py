@@ -80,6 +80,7 @@ def _profile_to_dict(info) -> Dict[str, Any]:
     return {
         "name": attr("name", ""), "path": str(attr("path", "")),
         "is_default": bool(attr("is_default", False)),
+        "profile_kind": attr("profile_kind", "user"),
         "model": attr("model", None), "provider": attr("provider", None),
         "has_env": bool(attr("has_env", False)),
         "skill_count": int(attr("skill_count", 0) or 0),
@@ -685,6 +686,8 @@ async def create_profile_endpoint(body: ProfileCreate):
             name=body.name, clone_from=clone_from, clone_all=body.clone_all,
             clone_config=clone_config, no_skills=body.no_skills, description=body.description,
             clone_channels=body.clone_channels)
+        if body.profile_kind in {"agent", "user"}:
+            profiles_mod.write_profile_meta(path, profile_kind=body.profile_kind)
         # Match the CLI flow: fresh named profiles get the bundled skills (cloning already
         # copied the source's; no_skills wrote the opt-out marker so seeding no-ops) and a
         # ~/.local/bin wrapper when the alias is safe.

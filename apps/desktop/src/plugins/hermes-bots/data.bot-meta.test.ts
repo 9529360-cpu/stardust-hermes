@@ -77,6 +77,25 @@ beforeEach(() => {
 })
 
 describe('a save reports what the SERVER did, not just what the screen shows', () => {
+  it('saves presentation metadata under the source-scoped owner route', async () => {
+    const owner: RosterRow = {
+      connectionId: 'local',
+      name: 'partner-alex',
+      route: { connectionId: 'local', mode: 'local', profile: 'partner-alex', targetProfile: 'partner-alex' },
+      sourceScoped: true
+    }
+
+    await saveBotMeta(owner, { title: 'Alex' })
+
+    expect($botMeta.get()['local::partner-alex']).toMatchObject({ title: 'Alex' })
+    expect($botMeta.get()['partner-alex']).toBeUndefined()
+    expect(hostMock.requestProfile).toHaveBeenCalledWith(
+      owner.route,
+      'profiles.configure',
+      expect.objectContaining({ name: 'partner-alex' })
+    )
+  })
+
   it('keeps the look locally and reports the remote failure', async () => {
     recordRequests(method => (method === 'profiles.configure' ? { applied: { ui_meta: false } } : {}))
 

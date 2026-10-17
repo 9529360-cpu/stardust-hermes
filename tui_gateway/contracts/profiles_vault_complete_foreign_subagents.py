@@ -147,6 +147,7 @@ class ProfileRow(Result):
     name: str
     path: str
     is_default: bool = False
+    profile_kind: Literal["agent", "user"] = "user"
     model: str | None = None
     provider: str | None = None
     description: str = ""
@@ -184,6 +185,7 @@ class ProfilesCreateParams(ProfileParams):
     clone_from: str | None = None
     clone_all: bool | str | None = None
     clone_channels: bool | str | None = None
+    profile_kind: Literal["agent", "user"] | None = None
     no_skills: bool | str | None = None
     no_alias: bool | str | None = None
     soul: str | None = None
@@ -260,6 +262,7 @@ class ProfilesConfigureParams(ProfileParams):
     """Sections are independent; ``ui_meta_expected_revisions`` is a per-key compare-and-swap."""
 
     name: str | None = None
+    profile_kind: Literal["agent", "user"] | None = None
     ui_meta: dict[str, JsonValue] | None = None
     ui_meta_expected_revisions: dict[str, int] | None = None
     soul: str | None = None

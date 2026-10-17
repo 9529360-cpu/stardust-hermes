@@ -25,10 +25,18 @@ type Page = MockBackendFixture['page']
 let fixture: MockBackendFixture | null = null
 
 async function openBots(page: Page): Promise<void> {
-  const tab = page.getByRole('button', { name: /智能体空间|Agent space/ }).first()
+  const home = page.locator('[data-slot-page="agents-home"]')
 
-  await tab.click()
-  await expect(page.getByRole('button', { name: 'New bot or group chat' })).toBeVisible()
+  if (!(await home.isVisible())) {
+    await page
+      .getByRole('button', { name: /智能体空间|Agent space/ })
+      .first()
+      .click()
+    await expect(home).toBeVisible()
+  }
+
+  await page.getByRole('button', { name: 'Manage', exact: true }).click()
+  await expect(page.locator('[data-slot="bots-roster"]')).toBeVisible()
 }
 
 const roster = (page: Page) => page.locator('[data-slot="bots-roster"]')

@@ -1038,6 +1038,7 @@ export interface ProfileInfo {
   model: null | string
   name: string
   path: string
+  profile_kind?: 'agent' | 'user'
   provider: null | string
   skill_count: number
 }
