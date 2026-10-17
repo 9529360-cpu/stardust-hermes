@@ -1646,13 +1646,13 @@ function McpCatalog({
                           {env.required ? ' *' : ''}
                         </span>
                         <Input
-                          className="h-7 text-xs"
                           onChange={event =>
                             setEnvDrafts(prev => ({
                               ...prev,
                               [entry.name]: { ...prev[entry.name], [env.name]: event.currentTarget.value }
                             }))
                           }
+                          size="compact"
                           type="password"
                           value={draft[env.name] ?? ''}
                         />

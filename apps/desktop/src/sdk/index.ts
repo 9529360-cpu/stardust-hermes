@@ -94,6 +94,7 @@ import {
 } from '@/store/session'
 import {
   $focusedRuntimeId,
+  $focusedSessionIsTile,
   $focusedSessionState,
   $focusedStoredSessionId,
   $sessionStates,
@@ -336,6 +337,13 @@ export const DEFAULT_SESSION_HYDRATION_TIMEOUT_MS = 20_000
  *  ceiling is two bounded attempts rather than an unbounded wait. */
 export const BOT_CHAT_SESSION_HYDRATION_TIMEOUT_MS = 60_000
 let openSessionGeneration = 0
+/** Which generation's wake most recently set $gatewaySwapTarget. Clearing it
+ *  keys off this, not off `generation === openSessionGeneration`, so a
+ *  superseded wake still clears the overlay IT put up — the generation
+ *  counter has already moved on by the time its `finally` runs, and a later
+ *  wake that never sets the target (e.g. a paint-first open without
+ *  awaitHydration) would otherwise leave it stuck forever (#115844). */
+let gatewaySwapTargetOwnerGeneration: number | null = null
 
 export interface PluginOpenSessionOptions {
   awaitHydration?: boolean
@@ -616,6 +624,8 @@ export const host = {
     /** Stored (durable) id of the focused session — for navigation and
      *  session-list matching, where runtime ids don't survive reloads. */
     focusedStoredSessionId: readonlyAtom<null | string>($focusedStoredSessionId),
+    /** True when a workspace tile, rather than the primary session, has focus. */
+    focusedSessionIsTile: readonlyAtom<boolean>($focusedSessionIsTile),
     /** Live usage snapshot of the focused session (`context_used` /
      *  `context_max` / `context_percent`, token counts, `cost_usd`) —
      *  streamed by the backend, no RPC needed. Null while unresolved.
@@ -862,6 +872,11 @@ export const host = {
    *  also scope chrome onto that profile and collapse the sidebar. */
   openSession: async (storedSessionId: string, options: PluginOpenSessionOptions = {}): Promise<void> => {
     const generation = ++openSessionGeneration
+    // Bot workspace mode is shared by the roster page and bot-owned chat tabs.
+    // Track the route this wake last left the window on. A route change made by
+    // anyone else (the user opening another panel) supersedes a bot-owned open;
+    // the open's own navigations update this baseline.
+    let openingRoute = window.location.hash
 
     // A new wake owns the syncing affordance — a lingering badge from an
     // earlier paint-first wake must not survive into this one.
@@ -904,7 +919,9 @@ export const host = {
     const openingStillCurrent = () =>
       generation === openSessionGeneration &&
       (options.workspaceMode !== 'bots' ||
-        ($workspaceMode.get() === 'bots' && $workspaceOwnerKey.get() === (options.workspaceOwnerKey ?? null)))
+        (window.location.hash === openingRoute &&
+          $workspaceMode.get() === 'bots' &&
+          $workspaceOwnerKey.get() === (options.workspaceOwnerKey ?? null)))
 
     const plan = planPluginOpenSession({
       activeProfile: $activeGatewayProfile.get(),
@@ -998,6 +1015,7 @@ export const host = {
         // Keep the target-specific overlay visible through transcript hydration,
         // not merely through the gateway/profile activation that precedes it.
         $gatewaySwapTarget.set(targetProfile)
+        gatewaySwapTargetOwnerGeneration = generation
       }
 
       // Only the HYDRATION half retries. Activation already failed its own
@@ -1013,6 +1031,9 @@ export const host = {
             } else {
               window.location.hash = target
             }
+
+            // This wake's own navigation is not a user navigation: keep the baseline current.
+            openingRoute = window.location.hash
           }
 
           const intent = options.intent ?? 'in-place'
@@ -1140,8 +1161,13 @@ export const host = {
 
       throw error
     } finally {
-      if (options.awaitHydration && generation === openSessionGeneration) {
+      // Clear the overlay THIS wake set, even when a later open superseded
+      // it: `generation === openSessionGeneration` is false by then, but
+      // nothing else is coming to clear it. Skip only when a newer wake has
+      // since taken ownership of the target.
+      if (gatewaySwapTargetOwnerGeneration === generation) {
         $gatewaySwapTarget.set(null)
+        gatewaySwapTargetOwnerGeneration = null
       }
     }
   },

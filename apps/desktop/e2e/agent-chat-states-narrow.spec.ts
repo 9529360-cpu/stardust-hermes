@@ -54,12 +54,19 @@ test('at a narrow width an empty bot chat greets and seats the Routines rail ico
 
   // Ctrl+B is view.toggleSidebar: at this width it opens the sessions overlay.
   await page.keyboard.press('Control+b')
-  await page.getByRole('button', { name: /智能体空间|Agent space/ }).first().click()
+  await page
+    .getByRole('button', { name: /智能体空间|Agent space/ })
+    .first()
+    .click()
   await expect(roster).toBeVisible({ timeout: 20_000 })
   await expect(page.locator('[data-tree-tab$=":routines"]')).toHaveCount(0)
   await capture(page, 'narrow-1-roster-default-bot')
 
-  await page.locator('[data-slot="bots-roster"] [data-roster-key]').first().click()
+  await page
+    .locator('[data-agent-card]')
+    .first()
+    .getByRole('button', { name: /Start a chat|开始交流|チャットを始める/ })
+    .click()
   await expect(roster).toBeHidden({ timeout: 30_000 })
   await expect(empty).toBeVisible({ timeout: 20_000 })
   await expect(starters).toHaveCount(3)

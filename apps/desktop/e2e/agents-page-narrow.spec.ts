@@ -47,18 +47,25 @@ test('at a narrow width the agent space page opens from the nav and a bot opens 
   // The breakpoint is a media query; give the layout a frame to re-evaluate.
   await page.waitForTimeout(600)
 
-  const roster = page.locator('[data-slot="bots-roster"]')
+  const roster = page.locator('[data-slot-page="agents-home"]')
   const navNewChat = page.getByRole('button', { name: /新建对话|New chat/ }).first()
 
   // Ctrl+B is view.toggleSidebar: at this width it opens the sessions overlay.
   await page.keyboard.press('Control+b')
-  await page.getByRole('button', { name: /智能体空间|Agent space/ }).first().click()
+  await page
+    .getByRole('button', { name: /智能体空间|Agent space/ })
+    .first()
+    .click()
   await expect(roster).toBeVisible({ timeout: 20_000 })
   // Picking the page closes the overlay, so the roster is not left under the nav.
   await expect(navNewChat).toBeHidden({ timeout: 10_000 })
   await capture(page, '1-narrow-agent-space-page')
 
-  await page.locator('[data-slot="bots-roster"] [data-roster-key]').first().click()
+  await page
+    .locator('[data-agent-card]')
+    .first()
+    .getByRole('button', { name: /Start a chat|开始交流|チャットを始める/ })
+    .click()
   await expect(roster).toBeHidden({ timeout: 30_000 })
   await capture(page, '2-narrow-bot-chat')
 })

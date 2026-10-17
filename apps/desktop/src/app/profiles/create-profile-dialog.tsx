@@ -119,7 +119,7 @@ export function CreateProfileDialog({
               onValueChange={value => setCloneFrom(value === '__none__' ? null : value)}
               value={cloneFrom ?? '__none__'}
             >
-              <SelectTrigger className="h-9 rounded-md" id="new-profile-clone-from">
+              <SelectTrigger id="new-profile-clone-from" size="md">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

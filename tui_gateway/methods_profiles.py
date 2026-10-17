@@ -247,7 +247,8 @@ def _(rid, params: dict) -> dict:
     for p in list_profiles():
         row = {"name": p.name, "path": str(p.path), "is_default": bool(p.is_default), "model": p.model,
                "provider": p.provider, "description": p.description or "",
-               "display_name": p.display_name or "", "skill_count": p.skill_count or 0}
+               "display_name": p.display_name or "", "profile_kind": p.profile_kind or "user",
+               "skill_count": p.skill_count or 0}
         if include_sessions:
             _profile_session_fields(row, p.path)
         _profile_ui_meta_fields(row, Path(str(p.path)))
@@ -361,6 +362,9 @@ def _(rid, params: dict) -> dict:
             no_skills=is_truthy_value(params.get("no_skills", False)),
             description=str(params.get("description") or "").strip() or None,
             clone_channels=is_truthy_value(params.get("clone_channels", False)))
+        profile_kind = params.get("profile_kind")
+        if profile_kind in {"agent", "user"}:
+            profiles_mod.write_profile_meta(path, profile_kind=profile_kind)
     except (ValueError, FileExistsError, FileNotFoundError) as e:
         return _err(rid, 4062, str(e))
     except Exception as e:
@@ -615,6 +619,10 @@ def _(rid, params: dict) -> dict:
         write_meta = _lazy("hermes_cli.profiles", "write_profile_meta")
         applied["description"] = _best_effort(lambda: write_meta(
             profile_dir, description=params["description"].strip(), description_auto=False))
+    if params.get("profile_kind") in {"agent", "user"}:
+        write_meta = _lazy("hermes_cli.profiles", "write_profile_meta")
+        applied["profile_kind"] = _best_effort(
+            lambda: write_meta(profile_dir, profile_kind=params["profile_kind"]))
     confirm_message = _configure_model(profile_dir, params, applied)
     if any(isinstance(params.get(k), list) for k in ("disabled_skills", "enabled_toolsets", "enabled_mcp_servers")):
         _configure_cfg_sections(profile_dir, params, applied)

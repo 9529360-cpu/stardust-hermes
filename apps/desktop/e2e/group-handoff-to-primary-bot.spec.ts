@@ -26,10 +26,21 @@ interface RoomLogEntry {
 }
 
 async function openBots(page: Page): Promise<void> {
-  const tab = page.getByRole('button', { name: /智能体空间|Agent space/ }).first()
+  const home = page.locator('[data-slot-page="agents-home"]')
 
-  await tab.click()
-  await expect(page.getByRole('button', { name: 'New bot or group chat' })).toBeVisible()
+  if (await page.locator('[data-slot-page="agents-manager"]').isVisible()) {
+    await page.getByRole('button', { name: 'Back to my partners', exact: true }).click()
+    await expect(home).toBeVisible()
+  } else if (!(await home.isVisible())) {
+    await page.getByRole('button', { name: /智能体空间|Agent space/ }).first().click()
+    await expect(home).toBeVisible()
+  }
+
+  if (!(await page.locator('[data-slot-page="agents-manager"]').isVisible())) {
+    await page.getByRole('button', { name: 'Manage', exact: true }).click()
+  }
+
+  await expect(page.locator('[data-slot="bots-roster"]')).toBeVisible()
 }
 
 async function createAgent(page: Page, name: string, title: string): Promise<void> {
@@ -41,7 +52,11 @@ async function createAgent(page: Page, name: string, title: string): Promise<voi
   await dialog.getByPlaceholder('Inbox Triage').fill(title)
   await dialog.getByRole('button', { name: 'Create Bot' }).click()
   await expect(dialog).toBeHidden({ timeout: 30_000 })
-  await expect(page.getByRole('button', { name: new RegExp(`^${title}\\b`) }).first()).toBeVisible({ timeout: 30_000 })
+  await page.getByRole('button', { name: 'Back to my partners', exact: true }).click()
+  await expect(page.locator('[data-slot-page="agents-home"]')).toBeVisible({ timeout: 20_000 })
+  await expect(page.locator(`[data-agent-card="${name}"]`)).toBeVisible({ timeout: 30_000 })
+  await page.getByRole('button', { name: 'Manage', exact: true }).click()
+  await expect(page.locator('[data-slot="bots-roster"]')).toBeVisible()
 }
 
 /** The plugin's persisted room log (`hermes.plugin.hermes-bots.group-chats`). */
@@ -105,13 +120,12 @@ test('a teammate handing off with @hermes drives the primary profile', async () 
   await openBots(page)
   await createAgent(page, 'code-farmer', 'Code Farmer')
 
-  // The primary's roster row and its New Group Chat entry, as the PR body cites them.
-  await expect(page.getByRole('button', { name: /^Stardust · @stardust/ }).first()).toBeVisible({
-    timeout: 30_000
-  })
-
-  await page.getByRole('button', { name: 'New bot or group chat' }).click()
-  await page.getByRole('menuitem', { name: 'New Group Chat' }).click()
+  if (await page.locator('[data-slot-page="agents-manager"]').isVisible()) {
+    await page.getByRole('button', { name: 'Back to my partners', exact: true }).click()
+    await expect(page.locator('[data-slot-page="agents-home"]')).toBeVisible()
+  }
+  await expect(page.locator('[data-agent-card="default"]')).toBeVisible({ timeout: 30_000 })
+  await page.getByRole('button', { name: 'Create a team' }).click()
 
   const dialog = page.getByRole('dialog', { name: 'New Group Chat' })
 
@@ -128,16 +142,21 @@ test('a teammate handing off with @hermes drives the primary profile', async () 
 
   const composer = page.getByRole('textbox', { name: `Message ${group}` }).filter({ visible: true })
   await expect(composer).toBeVisible({ timeout: 20_000 })
+  const groupTab = page.getByRole('tab', { name: /Stardust, Code Farmer Close/ })
+  await groupTab.click()
+  await expect(groupTab).toHaveAttribute('aria-selected', 'true')
+  const activeComposer = page.getByRole('textbox', { name: `Message ${group}` }).filter({ visible: true })
+  await expect(activeComposer).toBeVisible()
 
   // Only Code Farmer is addressed by the user. Its scripted reply hands off
   // to @hermes (the legacy alias); the primary's scripted reply is "B". Neither
   // script token carries a literal `@`, so the user send itself never mentions
   // the primary.
-  await composer.fill(
+  await activeComposer.fill(
     '@code-farmer Please reply with one line only. ' +
       'E2E_SAY(code-farmer)[{at}hermes Please reply with the letter B.] E2E_SAY(stardust)[B]'
   )
-  await composer.press('Enter')
+  await activeComposer.press('Enter')
 
   // Code Farmer's handoff line lands first (the reverse direction is not in
   // question); then the room must NOT settle without the primary's turn.
@@ -165,13 +184,16 @@ test('a teammate handing off with @hermes drives the primary profile', async () 
   // And the transcript shows the handoff answered.
   await expect(page.getByText('B', { exact: true }).filter({ visible: true }).first()).toBeVisible()
 
-  await composer.fill(
+  await activeComposer.fill(
     '@hermes Begin the reverse handoff. E2E_SAY(stardust)[{at}code-farmer Reply with D.] E2E_SAY(code-farmer)[D]'
   )
-  await composer.press('Enter')
+  await activeComposer.press('Enter')
   await expect
-    .poll(async () => (await roomLog(page, group)).some(e => e.from?.name === 'code-farmer' && e.text?.trim() === 'D'), {
-      timeout: 180_000
-    })
+    .poll(
+      async () => (await roomLog(page, group)).some(e => e.from?.name === 'code-farmer' && e.text?.trim() === 'D'),
+      {
+        timeout: 180_000
+      }
+    )
     .toBe(true)
 })

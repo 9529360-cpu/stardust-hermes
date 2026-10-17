@@ -1020,7 +1020,34 @@ class TestWriteProfileMetaDurability:
     any parse error and falls back to ``{}``, so a truncated profile.yaml is
     not transient corruption — the *next* call reads ``{}`` and silently and
     permanently drops every field the caller did not explicitly pass.
+    Profile kind metadata must also persist here so profile pickers can
+    distinguish Bot Mode partners from user work profiles.
     """
+
+    def test_profile_kind_round_trips_and_defaults_to_user_profile(self, tmp_path):
+        profile_dir = tmp_path / "partner-key"
+        profile_dir.mkdir()
+
+        assert profiles.read_profile_meta(profile_dir)["profile_kind"] == "user"
+
+        profiles.write_profile_meta(profile_dir, profile_kind="agent")
+        profiles.write_profile_meta(profile_dir, display_name="Alex")
+
+        assert profiles.read_profile_meta(profile_dir)["profile_kind"] == "agent"
+        assert profiles.read_profile_meta(profile_dir)["display_name"] == "Alex"
+
+    def test_profile_kind_is_exposed_by_web_profile_list(self, tmp_path, monkeypatch):
+        profile_dir = tmp_path / "partner-key"
+        profile_dir.mkdir()
+        info = profiles._profile_info("partner-key", profile_dir, is_default=False)
+
+        assert info.profile_kind == "user"
+        profiles.write_profile_meta(profile_dir, profile_kind="agent")
+        info = profiles._profile_info("partner-key", profile_dir, is_default=False)
+        assert info.profile_kind == "agent"
+
+    def test_profile_kind_does_not_change_name_based_type_inference(self):
+        assert profiles.read_profile_meta(Path("/does/not/exist"))["profile_kind"] == "user"
 
     @staticmethod
     def _seed(tmp_path):

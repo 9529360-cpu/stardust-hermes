@@ -461,11 +461,29 @@ def _finish_codex_turn(agent, turn, messages: List[Dict[str, Any]], *, original_
         _call_guarded(getattr(agent, "_sync_external_memory_for_turn", None), "external memory sync raised", kwargs=dict(
             original_user_message=original_user_message, final_response=turn.final_text, interrupted=False, messages=messages,
         ))
-    # Background review fork: only when a trigger tripped AND a real final response exists.
-    if turn.final_text and not turn.interrupted and (should_review_memory or should_review_skills):
-        _call_guarded(getattr(agent, "_spawn_background_review", None), "background review spawn raised", kwargs=dict(
-            messages_snapshot=list(messages), review_memory=should_review_memory, review_skills=should_review_skills,
-        ))
+    # Match the normal finalizer's lightweight, feedback-triggered self-distillation.
+    feedback_distill = False
+    if (turn.final_text and not turn.interrupted and turn.error is None
+            and not getattr(agent, "skip_background_review", False)
+            and agent._skill_nudge_interval > 0 and "skill_manage" in agent.valid_tool_names):
+        from agent.background_review_distillation import has_actionable_self_distillation_feedback
+        feedback_distill = has_actionable_self_distillation_feedback(messages)
+    if (turn.final_text and not turn.interrupted
+            and not getattr(agent, "skip_background_review", False)
+            and (should_review_memory or should_review_skills or feedback_distill)):
+        can_learn_preference = (
+            feedback_distill and getattr(agent, "_memory_persistence_enabled", False)
+            and (getattr(agent, "_memory_enabled", False) or getattr(agent, "_user_profile_enabled", False))
+        )
+        review_kwargs = dict(
+            messages_snapshot=list(messages),
+            review_memory=bool(should_review_memory or can_learn_preference),
+            review_skills=bool(should_review_skills or feedback_distill),
+        )
+        if feedback_distill:
+            review_kwargs["self_distill"] = True
+        _call_guarded(getattr(agent, "_spawn_background_review", None),
+                      "background review spawn raised", kwargs=review_kwargs)
     return usage_result
 
 

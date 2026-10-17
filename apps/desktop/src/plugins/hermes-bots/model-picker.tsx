@@ -239,7 +239,7 @@ export function ModelPicker({ bot = null, value, onChange, placeholderModel = 'g
           }}
           value={value.provider || NONE}
         >
-          <SelectTrigger className="h-8 rounded-md">
+          <SelectTrigger size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -264,7 +264,7 @@ export function ModelPicker({ bot = null, value, onChange, placeholderModel = 'g
             }
             value={value.model || (models[0] ?? '')}
           >
-            <SelectTrigger className="h-8 rounded-md">
+            <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

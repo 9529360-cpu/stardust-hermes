@@ -1,10 +1,9 @@
 name: Installer tests
 
-# scripts/install.ps1's PowerShell tests. They exercise the installer as a real
-# subprocess, and every path contract they assert (8.3 short-name aliases,
-# Git Bash layouts, provider-cmdlet behavior) is Windows-specific — so they need
-# a Windows runner. Before this workflow existed the files were in the tree but
-# nothing ever ran them.
+# PowerShell installer tests and Stardust bootstrap-wrapper process tests. The
+# wrapper suites use local fake downloads, so they need a Windows runner for
+# Windows PowerShell 5.1, PowerShell 7, and Git Bash without contacting a remote
+# installer.
 
 on:
   workflow_call:
@@ -44,3 +43,15 @@ jobs:
       - name: System Node and npm compatibility (Windows PowerShell 5.1)
         shell: powershell
         run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/test-install-ps1-node-compatibility.ps1
+
+      - name: Stardust PowerShell wrapper (pwsh 7)
+        shell: pwsh
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/tests/test-install-stardust-wrapper.ps1
+
+      - name: Stardust PowerShell wrapper (Windows PowerShell 5.1)
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/test-install-stardust-wrapper.ps1
+
+      - name: Stardust shell wrapper (Git Bash)
+        shell: bash
+        run: bash --login scripts/tests/test-install-stardust-wrapper.sh

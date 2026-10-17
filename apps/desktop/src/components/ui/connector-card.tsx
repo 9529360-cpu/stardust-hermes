@@ -116,8 +116,8 @@ export function ConnectorRow({
                 {env.required ? ' *' : ''}
               </span>
               <Input
-                className="h-7 text-xs"
                 onChange={event => onEnvChange?.(env.name, event.currentTarget.value)}
+                size="compact"
                 type="password"
                 value={envDraft[env.name] ?? ''}
               />

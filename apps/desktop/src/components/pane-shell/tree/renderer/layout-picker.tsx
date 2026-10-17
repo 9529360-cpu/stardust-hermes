@@ -166,7 +166,7 @@ export function LayoutPicker() {
         >
           <Input
             autoFocus
-            className="h-7 flex-1 text-xs"
+            className="flex-1"
             onChange={e => setName(e.target.value)}
             onKeyDown={e => {
               if (e.key === 'Escape') {
@@ -175,6 +175,7 @@ export function LayoutPicker() {
               }
             }}
             placeholder={t.zones.nameLayoutPlaceholder}
+            size="compact"
             value={name}
           />
           <Button disabled={!name.trim()} size="sm" type="submit" variant="outline">

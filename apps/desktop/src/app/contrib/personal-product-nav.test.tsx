@@ -39,11 +39,6 @@ class NoopResizeObserver {
 
 vi.stubGlobal('ResizeObserver', NoopResizeObserver)
 
-// The quick personalization panel reads the gateway only through this hook; the nav test does not need a live socket.
-vi.mock('@/app/gateway/hooks/use-gateway-request', () => ({
-  useGatewayRequest: () => ({ requestGateway: vi.fn() })
-}))
-
 // Spy on the real pane reveal so the agent-space row's call can be asserted without changing its behavior.
 vi.mock('@/components/pane-shell/tree/store', async importOriginal => {
   const actual = await importOriginal<Record<string, unknown>>()
@@ -126,6 +121,15 @@ describe('PersonalProductNav', () => {
     expect($projectScope.get()).toBe(ALL_PROJECTS)
   })
 
+  it('restores pointer events when the surrounding chat/sidebar surface disables them', () => {
+    renderNav('chat')
+
+    const nav = screen.getByRole('navigation', { name: 'Product navigation' })
+
+    expect(nav.className).toContain('pointer-events-auto')
+    expect(screen.getByRole('button', { name: '智能体空间' }).className).toContain('pointer-events-auto')
+  })
+
   it('renders only the compact Stardust primary navigation in product order', () => {
     renderNav('chat')
 
@@ -139,25 +143,11 @@ describe('PersonalProductNav', () => {
       '自动化',
       '消息平台',
       '工具',
-      '个性化',
       '项目'
     ])
     expect(screen.queryByRole('button', { name: '对话' })).toBeNull()
     expect(screen.queryByRole('button', { name: '知识库' })).toBeNull()
     expect(screen.queryByRole('button', { name: '设置' })).toBeNull()
-  })
-
-  it('opens the personalization panel from the nav and hands the detailed controls to Appearance settings', () => {
-    const onNavigate = renderNav('chat')
-
-    fireEvent.click(screen.getByRole('button', { name: '个性化' }))
-    expect(screen.getByRole('switch', { name: '桌面宠物' })).toBeTruthy()
-
-    fireEvent.click(screen.getByRole('button', { name: '更多外观设置' }))
-
-    expect(onNavigate).toHaveBeenLastCalledWith(
-      expect.objectContaining({ id: 'settings', route: '/settings?tab=config:appearance' })
-    )
   })
 
   it('opens the agent space as a page beside the nav, like tools and plugins', () => {

@@ -16,14 +16,13 @@ import type { EnvRowProps } from './types'
 export type KeyRowProps = Omit<EnvRowProps, 'info' | 'varKey'>
 
 /** Matches Advanced / config field controls (ListRow + Input). */
-export const CREDENTIAL_CONTROL_CLASS = cn('h-8', CONTROL_TEXT)
+export const CREDENTIAL_CONTROL_CLASS = CONTROL_TEXT
 
 // Resting credential field: chrome stripped so it reads as plain subtext.
 // Stacked (<@2xl) it collapses to zero box (flush under its label); at @2xl it
-// keeps the full control metrics (h-8 + px-2.5/py-1.5) so it centres on the
-// label and nothing shifts when focus/expand adds the border. `!` beats the
-// unlayered chrome CSS and the shared control sizing.
-const CRED_BARE = 'border-0! bg-transparent! shadow-none! h-auto! p-0! @2xl:h-8! @2xl:px-2.5! @2xl:py-1.5!'
+// falls through to the shared `sm` metrics so focus/expand adds the border
+// without changing height. `!` beats the unlayered chrome CSS.
+const CRED_BARE = 'border-0! bg-transparent! shadow-none! @max-2xl:h-auto! @max-2xl:p-0!'
 
 export const isKeyVar = (key: string, info: EnvVarInfo) => info.is_password || /(?:_API_KEY|_TOKEN|_KEY)$/.test(key)
 
@@ -89,6 +88,7 @@ export function KeyField({
         className={cn(CREDENTIAL_CONTROL_CLASS, bare && CRED_BARE, 'cursor-pointer text-muted-foreground')}
         onFocus={startEdit}
         readOnly
+        size="sm"
         value={masked}
       />
     )
@@ -107,6 +107,7 @@ export function KeyField({
         }}
         onKeyDown={keydown}
         placeholder={placeholder ?? t.settings.credentials.pasteKey}
+        size="sm"
         type={editType}
         value={draft}
       />

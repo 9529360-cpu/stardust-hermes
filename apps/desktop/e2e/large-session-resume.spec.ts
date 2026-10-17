@@ -11,24 +11,29 @@ import {
   type Sandbox,
   waitForAppReady,
   writeEnvFile,
-  writeMockProviderConfig,
+  writeMockProviderConfig
 } from './fixtures'
-import { MOCK_REPLY, startMockServer, type MockServer, type MockServerOptions } from '../../../tests-js/scripts/mock-server'
+import {
+  MOCK_REPLY,
+  startMockServer,
+  type MockServer,
+  type MockServerOptions
+} from '../../../tests-js/scripts/mock-server'
 import { RealSessionBuilder } from './real-session-builder'
 
 const DESKTOP_ROOT = path.resolve(import.meta.dirname, '..')
 const SESSION_TITLE = 'E2E large persisted session'
 const EXPECTED_TEXT = 'E2E persisted user message 52'
 // The oldest seeded turn (HISTORY_TURNS[0]). The transcript first paints only
-// the newest turns (FIRST_PAINT_BUDGET) and backfills the rest in a rAF; a
-// baseline count taken before that backfill sees a clipped transcript and
-// falsely reports duplicates once the full list mounts. Waiting for this
-// oldest row means the baseline reflects the fully-mounted transcript.
+// the newest turns (FIRST_PAINT_BUDGET) and backfills the rest in a rAF; wait
+// for it so this test resumes a fully restored large transcript.
 const OLDEST_SEEDED_TEXT = 'E2E persisted user message 0: audit the compatibility matrix'
 const BACKGROUND_PROMPT = 'E2E background inference must remain attached across resume'
+const BACKGROUND_REPLY = 'Unique background inference reply for E2E resume verification.'
+const ACTIVE_SURFACE_SELECTOR = '[data-composer-target]:not([data-pane-hidden] [data-composer-target])'
 const HISTORY_TURNS = Array.from(
   { length: 27 },
-  (_, index) => `E2E persisted user message ${index * 2}: audit the compatibility matrix`,
+  (_, index) => `E2E persisted user message ${index * 2}: audit the compatibility matrix`
 )
 
 interface SeededFixture {
@@ -70,12 +75,20 @@ async function setupSeededDesktop(mockServer?: MockServerOptions): Promise<Seede
       await app.close().catch(() => undefined)
       await mock.close()
       sandbox.cleanup()
-    },
+    }
   }
 }
 
 function sessionRow(page: Page) {
   return page.locator('[data-slot="sidebar"] button').filter({ hasText: SESSION_TITLE }).first()
+}
+
+function activeTranscriptViewport(page: Page) {
+  return page
+    .locator(ACTIVE_SURFACE_SELECTOR)
+    .filter({ visible: true })
+    .last()
+    .locator('[data-slot="aui_thread-viewport"]')
 }
 
 async function openSeededSession(page: Page): Promise<void> {
@@ -85,7 +98,7 @@ async function openSeededSession(page: Page): Promise<void> {
   await page.waitForFunction(
     expected => (document.querySelector('[data-slot="aui_thread-viewport"]')?.textContent ?? '').includes(expected),
     EXPECTED_TEXT,
-    { timeout: 30_000 },
+    { timeout: 30_000 }
   )
 }
 
@@ -96,7 +109,7 @@ async function openNewSession(page: Page): Promise<void> {
   await page.waitForFunction(
     expected => !(document.querySelector('[data-slot="aui_thread-viewport"]')?.textContent ?? '').includes(expected),
     EXPECTED_TEXT,
-    { timeout: 15_000 },
+    { timeout: 15_000 }
   )
 }
 
@@ -109,7 +122,7 @@ async function submitPrompt(page: Page, prompt: string): Promise<void> {
   await page.waitForFunction(
     expected => (document.querySelector('[data-slot="aui_thread-viewport"]')?.textContent ?? '').includes(expected),
     prompt,
-    { timeout: 15_000 },
+    { timeout: 15_000 }
   )
 }
 
@@ -125,7 +138,7 @@ async function startPaintObserver(page: Page): Promise<void> {
     new MutationObserver(records => {
       additions += records.reduce(
         (count, record) => count + (record.type === 'childList' && record.addedNodes.length > 0 ? 1 : 0),
-        0,
+        0
       )
       if (additions === 0) return
       if (flushTimer) clearTimeout(flushTimer)
@@ -139,16 +152,15 @@ async function startPaintObserver(page: Page): Promise<void> {
 }
 
 async function paintState(page: Page): Promise<PaintState> {
-  const state = await page.evaluate(() => (window as Window & { __largeSessionPaints?: PaintState }).__largeSessionPaints)
+  const state = await page.evaluate(
+    () => (window as Window & { __largeSessionPaints?: PaintState }).__largeSessionPaints
+  )
   expect(state, 'paint observer should attach to the thread viewport').toBeDefined()
   return state!
 }
 
 async function textNodeOccurrences(page: Page, expected: string): Promise<number> {
-  return page.evaluate(text => {
-    const viewport = document.querySelector('[data-slot="aui_thread-viewport"]')
-    if (!viewport) return 0
-
+  return activeTranscriptViewport(page).evaluate((viewport, text) => {
     const walker = document.createTreeWalker(viewport, NodeFilter.SHOW_TEXT)
     let count = 0
     while (walker.nextNode()) {
@@ -212,21 +224,21 @@ test.describe('large session resume', () => {
 
   for (const resumeKind of ['fast', 'cold'] as const) {
     test(`${resumeKind} resume keeps background inference attached without duplicate messages`, async ({}, testInfo) => {
-      fixture = await setupSeededDesktop({ holdFirstStreamForPrompt: BACKGROUND_PROMPT })
+      fixture = await setupSeededDesktop({
+        holdFirstStreamForPrompt: BACKGROUND_PROMPT,
+        replyForPrompt: prompt => (prompt.includes(BACKGROUND_PROMPT) ? BACKGROUND_REPLY : MOCK_REPLY)
+      })
       await waitForAppReady(fixture, 120_000)
 
       await openSeededSession(fixture.page)
       // The transcript first paints only the newest turns (FIRST_PAINT_BUDGET)
-      // and backfills older turns in a rAF. Wait for the oldest seeded row to
-      // mount before taking the baseline so it reflects the full transcript —
-      // otherwise a clipped baseline makes the backfilled rows look like
-      // duplicates of the completed reply.
+      // and backfills older turns in a rAF. Wait for the full history before
+      // starting the background inference.
       await fixture.page.waitForFunction(
         expected => (document.querySelector('[data-slot="aui_thread-viewport"]')?.textContent ?? '').includes(expected),
         OLDEST_SEEDED_TEXT,
-        { timeout: 30_000 },
+        { timeout: 30_000 }
       )
-      const initialMockReplyCount = await textNodeOccurrences(fixture.page, MOCK_REPLY)
       await submitPrompt(fixture.page, BACKGROUND_PROMPT)
       await fixture.mock.waitForHeldStream()
       await openNewSession(fixture.page)
@@ -237,19 +249,21 @@ test.describe('large session resume', () => {
 
       await openSeededSession(fixture.page)
       fixture.mock.releaseHeldStream()
-      await fixture.page.waitForFunction(
-        expected => (document.querySelector('[data-slot="aui_thread-viewport"]')?.textContent ?? '').includes(expected),
-        MOCK_REPLY,
-        { timeout: 60_000 },
-      )
+      await expect(activeTranscriptViewport(fixture.page)).toContainText(BACKGROUND_REPLY, { timeout: 60_000 })
       await fixture.page.waitForTimeout(300)
-      await fixture.page.screenshot({ path: testInfo.outputPath(`${resumeKind}-background-inference-resume.png`), fullPage: false })
+      await fixture.page.screenshot({
+        path: testInfo.outputPath(`${resumeKind}-background-inference-resume.png`),
+        fullPage: false
+      })
 
-      expect(await textNodeOccurrences(fixture.page, BACKGROUND_PROMPT), 'the running user prompt should appear once').toBe(1)
       expect(
-        await textNodeOccurrences(fixture.page, MOCK_REPLY),
-        'the completed assistant reply should add exactly one transcript row',
-      ).toBe(initialMockReplyCount + 1)
+        await textNodeOccurrences(fixture.page, BACKGROUND_PROMPT),
+        'the running user prompt should appear once'
+      ).toBe(1)
+      expect(
+        await textNodeOccurrences(fixture.page, BACKGROUND_REPLY),
+        'the completed assistant reply should add exactly one transcript row'
+      ).toBe(1)
     })
   }
 })

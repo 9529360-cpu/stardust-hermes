@@ -4,19 +4,7 @@ import { defineLocale } from './define-locale'
 
 export const zh = defineLocale({
   personalization: {
-    navLabel: '个性化',
-    title: '个性化',
-    subtitle: '快速调整外观。更多选项在设置的「外观」里。',
-    themeTitle: '主题',
-    backgroundTitle: '背景图片',
-    backgroundShow: '显示背景图片',
-    opacityLabel: '图片不透明度',
-    noImage: '还没有选择图片。',
-    chooseImage: '选择图片…',
-    removeImage: '移除',
-    petTitle: '桌面宠物',
-    petDesc: '在桌面上显示一只宠物陪伴你。',
-    moreSettings: '更多外观设置'
+    opacityLabel: '图片不透明度'
   },
   connectors: {
     title: '连接你的应用',

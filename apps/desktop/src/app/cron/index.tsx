@@ -1745,7 +1745,7 @@ function CronEditorDialog({
         {!isEdit && blueprintList.length > 0 && (
           <Field htmlFor="cron-template" label={c.blueprints.startFrom}>
             <Select onValueChange={setTemplateChoice} value={templateChoice}>
-              <SelectTrigger className="h-9 rounded-md" id="cron-template">
+              <SelectTrigger id="cron-template" size="md">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1867,7 +1867,7 @@ function CronEditorDialog({
               <div className="grid items-start gap-4 sm:grid-cols-2">
                 <Field htmlFor="cron-frequency" label={c.frequencyLabel}>
                   <Select onValueChange={handleSchedulePresetChange} value={schedulePreset}>
-                    <SelectTrigger className="h-9 rounded-md" id="cron-frequency">
+                    <SelectTrigger id="cron-frequency" size="md">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1902,7 +1902,7 @@ function CronEditorDialog({
             {!scriptOnlyJob && (
               <Field htmlFor="cron-model" label={c.modelLabel} optional optionalLabel={c.optional}>
                 <Select onValueChange={setModelChoice} value={modelChoice}>
-                  <SelectTrigger className="h-9 rounded-md" id="cron-model">
+                  <SelectTrigger id="cron-model" size="md">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

@@ -47,9 +47,10 @@ vi.mock('@/store/profile', () => ({
   $profileColors: atom({}),
   $profileCreateRequest: atom(0),
   $profileOrder: atom([]),
-  $profiles: atom([{ is_default: true, name: 'default' }]),
+  $profiles: atom([{ is_default: true, name: 'default', profile_kind: 'user' as const }]),
   $profileScope: atom('default'),
   ALL_PROFILES: '*',
+  isUserProfile: (profile: { profile_kind?: 'agent' | 'user' }) => profile.profile_kind !== 'agent',
   normalizeProfileKey: (name: string) => name,
   profileLabel: (profile: { display_name?: string; name: string }) =>
     (profile.display_name ?? '').trim() || profile.name,
@@ -90,7 +91,7 @@ vi.mock('../../profiles/rename-profile-dialog', () => ({ RenameProfileDialog: ()
 const { $hasMultipleConnections } = await import('@/store/connections')
 const hasMultipleConnections = $hasMultipleConnections as ReturnType<typeof atom<boolean>>
 const { $profiles } = await import('@/store/profile')
-const profiles = $profiles as ReturnType<typeof atom<Array<{ is_default: boolean; name: string }>>>
+const profiles = $profiles as ReturnType<typeof atom<Array<{ is_default: boolean; name: string; profile_kind?: 'agent' | 'user' }>>>
 
 afterEach(() => {
   cleanup()
@@ -124,6 +125,18 @@ describe('ProfileRail multi-gateway entry point', () => {
     expect(screen.getByRole('button', { name: 'default' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Manage gateways…' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Manage profiles…' })).toBeTruthy()
+  })
+
+  it('does not expose Bot Mode agent profiles in the profile rail', () => {
+    profiles.set([
+      { is_default: true, name: 'default' },
+      { is_default: false, name: 'partner-key', profile_kind: 'agent' },
+      { is_default: false, name: 'writing', profile_kind: 'user' }
+    ])
+    render(<ProfileRail />)
+
+    expect(screen.getByRole('button', { name: 'writing' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'partner-key' })).toBeNull()
   })
 
   it('keeps thirteen profiles direct and condenses the fourteenth', () => {

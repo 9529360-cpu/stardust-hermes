@@ -25,26 +25,52 @@ type Page = MockBackendFixture['page']
 let fixture: MockBackendFixture | null = null
 
 async function openBots(page: Page): Promise<void> {
-  const tab = page.getByRole('button', { name: /智能体空间|Agent space/ }).first()
+  const home = page.locator('[data-slot-page="agents-home"]')
 
-  await tab.click()
-  await expect(page.getByRole('button', { name: 'New bot or group chat' })).toBeVisible()
+  if (!(await home.isVisible())) {
+    await page
+      .getByRole('button', { name: /智能体空间|Agent space/ })
+      .first()
+      .click()
+    await expect(home).toBeVisible()
+  }
+
+  await page.getByRole('button', { name: 'Manage', exact: true }).click()
+  await expect(page.locator('[data-slot="bots-roster"]')).toBeVisible()
 }
 
-async function openUntil(action: () => Promise<void>, expected: () => Promise<void>, attempts = 3): Promise<void> {
-  for (let attempt = 1; ; attempt += 1) {
-    await action()
+const roster = (page: Page) => page.locator('[data-slot="bots-roster"]')
+const botRow = (page: Page, name: string) => roster(page).locator(`[data-roster-key="local::${name}"]`)
 
-    try {
-      await expected()
+async function selectedMainChat(page: Page) {
+  const tab = page.locator('[data-zone-tabstrip="grp-main"] [data-tree-tab][aria-selected="true"]')
 
-      return
-    } catch (error) {
-      if (attempt >= attempts) {
-        throw error
-      }
-    }
+  await expect(tab).toHaveCount(1, { timeout: 15_000 })
+  const anchor = await tab.getAttribute('data-tree-tab')
+
+  if (!anchor || !/^(workspace|session-tile:.+)$/.test(anchor)) {
+    throw new Error(`Expected a selected main chat tab, got ${anchor ?? 'no pane id'}`)
   }
+
+  const surface = page.locator(`[data-session-anchor="${anchor}"]`)
+
+  await expect(surface).toBeVisible({ timeout: 15_000 })
+
+  return { anchor, surface, tab }
+}
+
+async function activeMainChat(page: Page) {
+  const tabStrip = page.locator('[data-zone-tabstrip="grp-main"]')
+
+  if ((await tabStrip.count()) > 0) {
+    return selectedMainChat(page)
+  }
+
+  const surface = page.locator('[data-session-anchor="workspace"]')
+
+  await expect(surface).toBeVisible({ timeout: 15_000 })
+
+  return { anchor: 'workspace', surface }
 }
 
 async function seedBot(hermesHome: string, mockUrl: string, name: string): Promise<void> {
@@ -60,15 +86,6 @@ async function seedBot(hermesHome: string, mockUrl: string, name: string): Promi
   } finally {
     await builder.close()
   }
-}
-
-/** Every tab caption in the main strip (the main `workspace` tab + tiles). */
-function mainStripTabTitles(page: Page): Promise<string[]> {
-  return page.evaluate(() =>
-    [...document.querySelectorAll<HTMLElement>('[data-zone-tabstrip="grp-main"] [data-tree-tab]')].map(element =>
-      (element.textContent ?? '').trim()
-    )
-  )
 }
 
 test.beforeAll(async () => {
@@ -107,29 +124,62 @@ test("an open Bot Chat's tab reads the bot's name, not the canonical 'Bot Chat' 
 
   await openBots(page)
 
-  const alphaRow = page.getByRole('button', { name: /^alpha\b/i }).filter({ visible: true }).first()
+  const botsRoster = roster(page)
+  const alphaRow = botRow(page, 'alpha')
   await expect(alphaRow).toBeVisible({ timeout: 30_000 })
 
-  await openUntil(
-    () => alphaRow.click(),
-    () =>
-      expect(page.getByText('Hello alpha', { exact: true }).filter({ visible: true }).first()).toBeVisible({
-        timeout: 45_000
-      })
-  )
+  await alphaRow.click()
+  await expect(botsRoster).toBeHidden({ timeout: 30_000 })
+  const canonicalChat = await activeMainChat(page)
+  const canonicalPaneId = canonicalChat.anchor
+  const canonicalTranscript = canonicalChat.surface.locator('[data-slot="aui_thread-viewport"]')
+  await expect(canonicalTranscript).toBeVisible({ timeout: 45_000 })
+  await expect(canonicalTranscript).toContainText('Hello alpha', { timeout: 45_000 })
+  await expect(
+    canonicalChat.surface
+      .locator('[data-slot="composer-root"] [contenteditable="true"]')
+      .filter({ visible: true })
+      .first()
+  ).toBeVisible({ timeout: 15_000 })
 
   // A `+` side thread beside the Bot Chat gives the main zone a tab strip —
   // the surface where every bot chat used to read "Bot Chat".
   await page.keyboard.press('Control+t')
-  const composer = page.locator('[data-slot="composer-root"] [contenteditable="true"]').filter({ visible: true }).first()
-  await expect(composer).toBeVisible({ timeout: 15_000 })
-  await composer.click()
-  await composer.fill('hello alpha thread')
+  const mainTabStrip = page.locator('[data-zone-tabstrip="grp-main"]')
+  const draftChat = await selectedMainChat(page)
+  expect(draftChat.anchor).toMatch(/^session-tile:/)
+  const draftComposer = draftChat.surface
+    .locator('[data-slot="composer-root"] [contenteditable="true"]')
+    .filter({ visible: true })
+    .first()
+  await expect(draftComposer).toBeVisible({ timeout: 15_000 })
+  await draftComposer.click()
+  await draftComposer.fill('hello alpha thread')
   await page.keyboard.press('Enter')
-  await expect(page.getByText(MOCK_REPLY).filter({ visible: true }).first()).toBeVisible({ timeout: 60_000 })
+  const sideTab = mainTabStrip.getByRole('tab', { name: 'hello alpha thread' }).first()
+  await expect(sideTab).toBeVisible({ timeout: 60_000 })
+  const sideTabId = await sideTab.getAttribute('data-tree-tab')
+  expect(sideTabId).toMatch(/^session-tile:/)
+  await sideTab.click()
+  const sideChat = await selectedMainChat(page)
+  expect(sideChat.anchor).toBe(sideTabId)
+  const sideTranscript = sideChat.surface.locator('[data-slot="aui_thread-viewport"]')
+  await expect(sideTranscript).toBeVisible({ timeout: 60_000 })
+  await expect(sideTranscript).toContainText(MOCK_REPLY, { timeout: 60_000 })
 
-  await expect.poll(() => mainStripTabTitles(page), { timeout: 15_000 }).toHaveLength(2)
-  const captions = await mainStripTabTitles(page)
-  expect(captions.some(caption => /alpha/i.test(caption))).toBe(true)
-  expect(captions.some(caption => /bot chat/i.test(caption))).toBe(false)
+  const canonicalTab = mainTabStrip.locator(`[data-tree-tab="${canonicalPaneId}"]`)
+  await canonicalTab.click()
+  const activeCanonicalChat = await selectedMainChat(page)
+  await expect(activeCanonicalChat.tab).toHaveAttribute('data-tree-tab', canonicalPaneId)
+  await expect(activeCanonicalChat.tab).toContainText(/alpha/i)
+  await expect(activeCanonicalChat.tab).not.toContainText(/bot chat/i)
+  const activeCanonicalTranscript = activeCanonicalChat.surface.locator('[data-slot="aui_thread-viewport"]')
+  await expect(activeCanonicalTranscript).toBeVisible({ timeout: 15_000 })
+  await expect(activeCanonicalTranscript).toContainText('Hello alpha', { timeout: 15_000 })
+  await expect(
+    activeCanonicalChat.surface
+      .locator('[data-slot="composer-root"] [contenteditable="true"]')
+      .filter({ visible: true })
+      .first()
+  ).toBeVisible({ timeout: 15_000 })
 })

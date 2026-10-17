@@ -34,6 +34,10 @@ import type { SessionOwnerRoute } from '@/store/session-request-router'
 import { resetStarmapGraph } from '@/store/starmap'
 import type { ProfileInfo } from '@/types/hermes'
 
+export function isUserProfile(profile: Pick<ProfileInfo, 'profile_kind'>): boolean {
+  return profile.profile_kind !== 'agent'
+}
+
 // Canonical key for a profile: trimmed, empty → "default". Used everywhere we
 // compare a session's owning profile against the live gateway's profile.
 export function normalizeProfileKey(name: string | null | undefined): string {

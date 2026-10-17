@@ -1392,3 +1392,83 @@ class TestCuratorConsolidationDeleteGuard:
             assert allowed["success"] is True, allowed
 
         _reset_background_review_read_marks()
+
+
+
+def test_curator_verified_merge_archives_only_after_same_cases_pass(tmp_path, monkeypatch):
+    """Real skill_manage archive path, usage telemetry and guarded validation."""
+    from tools.skill_consolidation_validation import curator_validation_pass
+
+    with _curator_pass(tmp_path, monkeypatch=monkeypatch) as root:
+        _create_curator_skill("browser-login", _skill_content("browser-login"))
+        _create_curator_skill("web-automation", _skill_content("web-automation"))
+        with curator_validation_pass([{"name": "browser-login"}]) as validation:
+            result = _delete_skill("browser-login", absorbed_into="web-automation")
+            assert result["success"] is True, result
+            assert result["_validation"]["passed"] is True
+            assert not (root / "browser-login").exists()
+            assert (root / ".archive" / "browser-login").exists()
+            validation.finalize()
+            assert validation.summary()["accepted"] == 1
+            assert validation.summary()["restored"] == 0
+
+
+def test_curator_refuses_unverified_merge_without_archiving(tmp_path, monkeypatch):
+    """Do not trade a real working skill for an umbrella that lost its behavior."""
+    from tools.skill_consolidation_validation import curator_validation_pass
+
+    with _curator_pass(tmp_path, monkeypatch=monkeypatch) as root:
+        _create_curator_skill("browser-login", _skill_content("browser-login"))
+        _create_curator_skill("web-automation", _skill_content("web-automation"))
+        with curator_validation_pass([{"name": "browser-login"}]) as validation:
+            (root / "web-automation" / "SKILL.md").write_text(
+                "---\nname: web-automation\ndescription: unrelated capability\n---\n",
+                encoding="utf-8",
+            )
+            result = _delete_skill("browser-login", absorbed_into="web-automation")
+            assert result["success"] is False
+            assert "validation" in result["error"].lower() or "unverified" in result["error"].lower()
+            assert (root / "browser-login" / "SKILL.md").exists()
+            assert not (root / ".archive" / "browser-login").exists()
+            assert validation.summary()["blocked"] == 1
+
+
+def test_curator_final_check_auto_restores_archived_original(tmp_path, monkeypatch):
+    """Later umbrella patches cannot invalidate the previously archived Skill."""
+    from tools.skill_consolidation_validation import curator_validation_pass
+
+    with _curator_pass(tmp_path, monkeypatch=monkeypatch) as root:
+        _create_curator_skill("browser-login", _skill_content("browser-login"))
+        _create_curator_skill("web-automation", _skill_content("web-automation"))
+        with curator_validation_pass([{"name": "browser-login"}]) as validation:
+            accepted = _delete_skill("browser-login", absorbed_into="web-automation")
+            assert accepted["success"] is True
+            assert not (root / "browser-login").exists()
+            (root / "web-automation" / "SKILL.md").write_text(
+                "---\nname: web-automation\ndescription: unrelated capability\n---\n",
+                encoding="utf-8",
+            )
+            validation.finalize()
+            assert validation.summary()["restored"] == 1
+            assert (root / "browser-login" / "SKILL.md").exists()
+
+
+
+def test_curator_does_not_strip_original_support_files(tmp_path, monkeypatch):
+    """A rejected merge must leave the original complete and recoverable."""
+    from tools.skill_consolidation_validation import curator_validation_pass
+
+    with _curator_pass(tmp_path, monkeypatch=monkeypatch) as root:
+        _create_curator_skill("browser-login", _skill_content("browser-login"))
+        references = root / "browser-login" / "references"
+        references.mkdir()
+        note = references / "recovery.md"
+        note.write_text("preserve this procedure", encoding="utf-8")
+
+        with curator_validation_pass([{"name": "browser-login"}]):
+            outcome = json.loads(skill_manage(
+                action="remove_file", name="browser-login",
+                file_path="references/recovery.md",
+            ))
+            assert outcome["success"] is False
+            assert note.read_text(encoding="utf-8") == "preserve this procedure"

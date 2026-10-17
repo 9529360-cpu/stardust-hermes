@@ -39,13 +39,39 @@ async function setZoomPercent(percent: number): Promise<void> {
   await expect.poll(readZoomPercent).toBe(percent)
 }
 
-async function gotoRoute(route: string): Promise<void> {
+async function openSettings(): Promise<void> {
   const page = fixture!.page
+  const closeSettings = page.getByRole('button', { name: /close settings|关闭设置/i })
 
-  await page.evaluate(target => {
-    window.location.hash = target
-  }, route)
-  await page.waitForFunction(target => window.location.hash === `#${target}`, route)
+  if (await closeSettings.isVisible()) {
+    return
+  }
+
+  await Promise.all([
+    page.waitForURL(url => url.hash.startsWith('#/settings')),
+    page.getByRole('button', { name: /open settings|打开设置/i }).click()
+  ])
+  await expect(closeSettings).toBeVisible()
+}
+
+async function openAppearanceSettings(): Promise<void> {
+  const page = fixture!.page
+  const appearanceNavigation = page.getByRole('complementary').locator('[data-tour="nav-config:appearance"]')
+
+  await expect(appearanceNavigation).toBeVisible()
+  await Promise.all([
+    page.waitForURL(url => {
+      if (!url.hash.startsWith('#/settings?')) {
+        return false
+      }
+
+      const query = url.hash.slice(url.hash.indexOf('?') + 1)
+
+      return new URLSearchParams(query).get('tab') === 'config:appearance'
+    }),
+    appearanceNavigation.click()
+  ])
+  await expect(appearanceNavigation).toHaveClass(/bg-\(--ui-bg-tertiary\)/)
 }
 
 test.beforeAll(async () => {
@@ -61,27 +87,29 @@ test.afterAll(async () => {
 test('a non-default UI scale survives navigation to never-zoomed routes', async () => {
   await setZoomPercent(SCALE)
 
-  // Routes Chromium has no zoom record for — what opening a new session looks
-  // like to the per-URL store. Pre-fix, the first hop reports 100%.
-  const fresh = `/e2e-zoom-${Date.now()}`
+  // Exercise the actual React Router controls. Settings and its Appearance
+  // tab are distinct hash URLs that have not been zoomed earlier in this test.
+  await openSettings()
+  await expect.poll(readZoomPercent, { message: 'UI scale after opening Settings' }).toBe(SCALE)
 
-  for (const route of [`${fresh}-one`, `${fresh}-two`, '/settings?tab=config%3Aappearance']) {
-    await gotoRoute(route)
-    await expect.poll(readZoomPercent, { message: `UI scale after navigating to ${route}` }).toBe(SCALE)
-  }
+  await openAppearanceSettings()
+  await expect.poll(readZoomPercent, { message: 'UI scale after opening Settings → Appearance' }).toBe(SCALE)
 })
 
 test('Cmd/Ctrl+N preserves a non-default UI scale', async () => {
   const page = fixture!.page
 
-  await gotoRoute('/settings')
+  await openSettings()
   await setZoomPercent(SCALE)
 
   await page.evaluate(() => {
     ;(document.activeElement as HTMLElement | null)?.blur()
   })
-  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+N' : 'Control+N')
-  await page.waitForFunction(() => window.location.hash === '#/')
+  await Promise.all([
+    page.waitForURL(url => url.hash === '#/'),
+    page.keyboard.press(process.platform === 'darwin' ? 'Meta+N' : 'Control+N')
+  ])
+  await expect(page.getByRole('button', { name: /close settings|关闭设置/i })).toHaveCount(0)
 
   await expect.poll(readZoomPercent).toBe(SCALE)
 })

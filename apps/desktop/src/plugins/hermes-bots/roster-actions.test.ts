@@ -22,7 +22,15 @@ const { hostMock, markUnreadMock, storageMock } = vi.hoisted(() => ({
   hostMock: {
     notify: vi.fn(),
     request: vi.fn(),
-    state: { connectionId: { get: () => 'local' }, focusedSessionOwner: null, profile: { get: () => 'default' } }
+    state: {
+      connectionId: { get: () => 'local' },
+      focusedSessionOwner: null,
+      focusedStoredSessionId: { get: () => 'researcher-chat' },
+      focusedSessionIsTile: { get: (): boolean => false },
+      workspaceIsPage: { get: (): boolean => false },
+      busy: { get: () => false },
+      profile: { get: () => 'default' }
+    }
   },
   markUnreadMock: vi.fn(),
   storageMock: { get: vi.fn(), set: vi.fn() }
@@ -55,7 +63,7 @@ vi.mock('./shared', () => ({
 vi.mock('./canonical-chat', () => ({
   CANONICAL_CHAT_TITLE: 'Bot Chat',
   notifyBotOpenFailure: vi.fn(),
-  openBotCanonicalChat: vi.fn(),
+  openBotCanonicalChat: vi.fn().mockResolvedValue(undefined),
   prepareBotSource: vi.fn()
 }))
 vi.mock('./group-chat', async () => {
@@ -86,6 +94,9 @@ async function loadActions() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Each case sets the focus it needs; the shared host mock must not leak one case's state into the next.
+  hostMock.state.focusedSessionIsTile.get = () => false
+  hostMock.state.workspaceIsPage.get = () => false
 })
 
 describe('the first poll only seeds watermarks', () => {
@@ -100,6 +111,44 @@ describe('the first poll only seeds watermarks', () => {
 })
 
 describe('new activity after the seed', () => {
+  it('does not reopen a focused chat behind the Bots page', async () => {
+    const { $selectedBot, trackInboundActivity } = await loadActions()
+    hostMock.state.workspaceIsPage.get = () => true
+    hostMock.state.focusedSessionIsTile.get = () => false
+    $selectedBot.set('researcher')
+
+    trackInboundActivity([chatting('researcher', 5000)])
+    trackInboundActivity([chatting('researcher', 6000)])
+
+    const { openBotCanonicalChat } = await import('./canonical-chat')
+    expect(openBotCanonicalChat).not.toHaveBeenCalled()
+  })
+
+  it('refreshes the focused chat in the primary workspace', async () => {
+    const { $selectedBot, trackInboundActivity } = await loadActions()
+    hostMock.state.workspaceIsPage.get = () => false
+    $selectedBot.set('researcher')
+
+    trackInboundActivity([chatting('researcher', 5000)])
+    trackInboundActivity([chatting('researcher', 6000)])
+
+    const { openBotCanonicalChat } = await import('./canonical-chat')
+    expect(openBotCanonicalChat).toHaveBeenCalledTimes(1)
+  })
+
+  it('refreshes the focused canonical tile while another page owns the primary', async () => {
+    const { $selectedBot, trackInboundActivity } = await loadActions()
+    hostMock.state.workspaceIsPage.get = () => true
+    hostMock.state.focusedSessionIsTile.get = () => true
+    $selectedBot.set('researcher')
+
+    trackInboundActivity([chatting('researcher', 5000)])
+    trackInboundActivity([chatting('researcher', 6000)])
+
+    const { openBotCanonicalChat } = await import('./canonical-chat')
+    expect(openBotCanonicalChat).toHaveBeenCalledTimes(1)
+  })
+
   it('marks the canonical chat unread through core’s store', async () => {
     const { trackInboundActivity } = await loadActions()
 

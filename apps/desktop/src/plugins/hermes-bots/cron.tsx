@@ -733,7 +733,7 @@ function pickerSelect<T extends string>(
 ) {
   return (
     <Select onValueChange={onChange} value={value}>
-      <SelectTrigger className="h-8 rounded-md">
+      <SelectTrigger size="sm">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -788,13 +788,13 @@ function SchedulePicker({ state, setState }: SchedulePickerProps) {
       {state.freq === 'once' ? (
         <div className="grid grid-cols-2 gap-2">
           <Input
-            className="h-8"
             onChange={event =>
               upd({
                 onceN: event.target.value.replace(/[^0-9]/g, '').slice(0, 4)
               })
             }
             placeholder="30"
+            size="sm"
             value={state.onceN}
           />
           {pickerSelect(
@@ -834,13 +834,13 @@ function SchedulePicker({ state, setState }: SchedulePickerProps) {
         ? labeled(
             b.cron.dayOfMonth,
             <Input
-              className="h-8"
               onChange={event =>
                 upd({
                   monthday: event.target.value.replace(/[^0-9]/g, '').slice(0, 2)
                 })
               }
               placeholder="1"
+              size="sm"
               value={state.monthday}
             />
           )
@@ -848,13 +848,13 @@ function SchedulePicker({ state, setState }: SchedulePickerProps) {
       {state.freq === 'interval' ? (
         <div className="grid grid-cols-2 gap-2">
           <Input
-            className="h-8"
             onChange={event =>
               upd({
                 intervalN: event.target.value.replace(/[^0-9]/g, '').slice(0, 4)
               })
             }
             placeholder="2"
+            size="sm"
             value={state.intervalN}
           />
           {pickerSelect(
@@ -882,13 +882,14 @@ function SchedulePicker({ state, setState }: SchedulePickerProps) {
       ) : null}
       {state.freq === 'advanced' ? (
         <Input
-          className="h-8 font-mono text-xs"
+          className="font-mono"
           onChange={event =>
             upd({
               raw: event.target.value
             })
           }
           placeholder="every 1d · every 2h · 0 9 * * * (cron)"
+          size="sm"
           value={state.raw}
         />
       ) : null}
@@ -896,13 +897,14 @@ function SchedulePicker({ state, setState }: SchedulePickerProps) {
         <div className="flex items-center gap-2">
           <span className="text-xs text-(--ui-text-tertiary)">Stop after</span>
           <Input
-            className="h-7 w-16 text-xs"
+            className="w-16"
             onChange={event =>
               upd({
                 repeatN: event.target.value.replace(/[^0-9]/g, '').slice(0, 4)
               })
             }
             placeholder="∞"
+            size="compact"
             value={state.repeatN}
           />
           <span className="text-xs text-(--ui-text-tertiary)">runs (blank = forever)</span>
