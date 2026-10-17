@@ -44,6 +44,7 @@ import { isBackfilledFacePng } from './avatar-image'
 import { AvatarPicker } from './avatar-picker'
 import { $selectedBot } from './bot-state'
 import { createCanonicalChat } from './canonical-chat'
+import { getBotOpenGeneration } from './shared'
 import { $botMeta, botHandle, botRosterKey, filterBots, ROSTER_KEY, saveBotMeta } from './data'
 import { labeled, ResizableFrame } from './dialog-parts'
 import { GROUP_CHAT_MAX_MEMBERS, mintGroupRoomId, uniqueGroupChatName, updateGroupChat } from './group-chat'
@@ -614,9 +615,12 @@ export function CreateAgentDialog({ open, onClose, roster, userFriendly = false 
 
       // Birth the bot's forever chat right away: it introduces itself as
       // the first thing the user sees, and the pin exists from minute one.
+      // A group or roster click supersedes an in-flight canonical-chat open.
+      const creationGeneration = getBotOpenGeneration()
       try {
         const sid = await createCanonicalChat(createdOwner, {
-          kickoff: true
+          kickoff: true,
+          openingStillCurrent: () => getBotOpenGeneration() === creationGeneration
         })
 
         if (!sid && typeof host.newChat === 'function') {

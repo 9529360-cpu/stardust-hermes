@@ -21,7 +21,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { RosterRow } from './types'
 
-const { hostMock, persistMock, pluginCtx, requestForBotMock, saveBotMetaMock } = vi.hoisted(() => ({
+const { botGeneration, hostMock, persistMock, pluginCtx, requestForBotMock, saveBotMetaMock } = vi.hoisted(() => ({
+  botGeneration: { current: 0 },
   hostMock: { openSession: vi.fn(), request: vi.fn() },
   persistMock: vi.fn(),
   // Null unless a test installs one — the plugin ctx is genuinely absent until
@@ -56,7 +57,10 @@ vi.mock('./data', () => ({
   saveBotMeta: saveBotMetaMock
 }))
 
-vi.mock('./shared', () => ({ getPluginCtx: () => pluginCtx.current }))
+vi.mock('./shared', () => ({
+  getBotOpenGeneration: () => botGeneration.current,
+  getPluginCtx: () => pluginCtx.current
+}))
 
 /** Ordered log of everything creation did — RPCs and navigations interleaved,
  *  because the ORDER between them is most of what this suite pins. */
@@ -78,6 +82,7 @@ async function loadModule() {
 beforeEach(() => {
   vi.clearAllMocks()
   events = []
+  botGeneration.current = 0
   pluginCtx.current = null
   hostMock.openSession.mockImplementation(async (id: string) => {
     events.push(`open:${id}`)
@@ -272,6 +277,30 @@ describe('the lazy row is materialized before anything else touches it', () => {
 })
 
 describe('a superseded click completes registry-side but never navigates', () => {
+  it('does not let a late kickoff open a bot chat after the group workspace supersedes it', async () => {
+    const capturedGeneration = botGeneration.current
+
+    hostMock.openSession.mockImplementation(async (id: string) => {
+      events.push(`open:${id}`)
+    })
+    respondWith(method => {
+      if (method === 'session.create') {
+        return { session_id: 'runtime-1', stored_session_id: 'stored-1' }
+      }
+
+      if (method === 'prompt.submit') {
+        botGeneration.current += 1
+      }
+
+      return {}
+    })
+
+    const { createCanonicalChat } = await loadModule()
+    await createCanonicalChat('ops', { kickoff: true, openingStillCurrent: () => botGeneration.current === capturedGeneration })
+
+    expect(events.filter(event => event.startsWith('open:'))).toHaveLength(1)
+  })
+
   it('creates the canonical row without stealing the workspace', async () => {
     let current = true
 

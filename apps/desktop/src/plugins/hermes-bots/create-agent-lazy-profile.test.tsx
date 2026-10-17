@@ -215,7 +215,7 @@ describe('materializing the draft profile', () => {
         route: expect.objectContaining({ connectionId: 'local', profile: created, targetProfile: created }),
         sourceScoped: true
       }),
-      { kickoff: true }
+      expect.objectContaining({ kickoff: true, openingStillCurrent: expect.any(Function) })
     )
     expect(mocks.saveBotMeta).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -243,7 +243,7 @@ describe('materializing the draft profile', () => {
     await waitFor(() =>
       expect(mocks.createCanonicalChat).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'inbox-triage', sourceScoped: true }),
-        { kickoff: true }
+        expect.objectContaining({ kickoff: true, openingStillCurrent: expect.any(Function) })
       )
     )
     expect(createCalls()).toHaveLength(1)

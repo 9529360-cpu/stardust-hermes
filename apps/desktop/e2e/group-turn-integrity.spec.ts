@@ -18,12 +18,21 @@ async function publicLog(page: MockBackendFixture['page']) {
 }
 
 async function openBots(page: MockBackendFixture['page']): Promise<void> {
-  const tab = page.getByRole('button', { name: /智能体空间|Agent space/ }).first()
-  await tab.click()
-  await expect(page.getByRole('button', { name: 'New bot or group chat' })).toBeVisible()
+  const home = page.locator('[data-slot-page="agents-home"]')
+
+  if (!(await home.isVisible())) {
+    await page.getByRole('button', { name: /智能体空间|Agent space/ }).first().click()
+  }
+
+  await expect(home).toBeVisible()
 }
 
 async function createAgent(page: MockBackendFixture['page'], name: string, title: string): Promise<void> {
+  if (!(await page.locator('[data-slot-page="agents-manager"]').isVisible())) {
+    await page.getByRole('button', { name: 'Manage', exact: true }).click()
+    await expect(page.locator('[data-slot="bots-roster"]')).toBeVisible()
+  }
+
   await page.getByRole('button', { name: 'New bot or group chat' }).click()
   await page.getByRole('menuitem', { name: 'New Bot' }).click()
 
@@ -32,7 +41,11 @@ async function createAgent(page: MockBackendFixture['page'], name: string, title
   await dialog.getByPlaceholder('Inbox Triage').fill(title)
   await dialog.getByRole('button', { name: 'Create Bot' }).click()
   await expect(dialog).toBeHidden({ timeout: 30_000 })
-  await expect(page.getByRole('button', { name: new RegExp(`^${title}\\b`) }).first()).toBeVisible({ timeout: 30_000 })
+  await page.getByRole('button', { name: 'Back to my partners', exact: true }).click()
+  await expect(page.locator('[data-slot-page="agents-home"]')).toBeVisible({ timeout: 20_000 })
+  await expect(page.locator(`[data-agent-card="${name}"]`)).toBeVisible({ timeout: 30_000 })
+  await page.getByRole('button', { name: 'Manage', exact: true }).click()
+  await expect(page.locator('[data-slot="bots-roster"]')).toBeVisible()
 }
 
 async function createRoom(page: MockBackendFixture['page']) {
@@ -189,7 +202,7 @@ test('a rejected member turn stays visible when the room settles', async () => {
   await page.waitForTimeout(2000)
   expect(await page.evaluate(() => (window as any).__rejected)).toBe(1)
   expect((await publicLog(page)).filter(entry => entry.from !== 'You')).toEqual([])
-  await expect(page.getByRole('button', { name: /^Activity/ })).toContainText('Programmer hit an error')
+  await expect(page.getByRole('button', { name: /^Activity/ })).toContainText(/programmer hit an error/i)
   await page.screenshot({ path: '/tmp/botmode-campaign/lane-a-error-after.png' })
 
   // One epoch: A fails, B waits, the user retries A, then B and A fail.
@@ -206,7 +219,7 @@ test('a rejected member turn stays visible when the room settles', async () => {
   await page.evaluate(() => (window as any).__releaseRefusal())
   await expect.poll(() => page.evaluate(() => (window as any).__rejected), { timeout: 30000 }).toBe(4)
   await expect(page.getByRole('button', { name: 'Stop', exact: true })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: /^Activity/ })).toContainText('Programmer hit an error')
+  await expect(page.getByRole('button', { name: /^Activity/ })).toContainText(/programmer hit an error/i)
   console.log('CONTROLLED REFUSAL: A failed, B failed, A failed again; newest unresolved summary:', await page.getByRole('button', { name: /^Activity/ }).textContent())
 })
 
@@ -230,6 +243,6 @@ test('Stop clears a queued follow-up and a direct mention resumes the held membe
   await groupComposer.fill('@programmer LANE_A_RESUME')
   await groupComposer.press('Enter')
   await expect.poll(() => fixture!.mock.receivedPrompts.some(p => p.includes('LANE_A_RESUME')), { timeout: 60000 }).toBe(true)
-  await expect(page.getByText(MOCK_REPLY, { exact: true }).first()).toBeVisible()
+  await expect(page.getByText(MOCK_REPLY, { exact: true }).filter({ visible: true }).first()).toBeVisible()
   await page.screenshot({ path: '/tmp/botmode-campaign/lane-a-stop-resume.png' })
 })
