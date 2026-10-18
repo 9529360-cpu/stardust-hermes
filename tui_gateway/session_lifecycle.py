@@ -279,7 +279,8 @@ def _finalize_session(session: dict | None, end_reason: str = "tui_close") -> No
         from tools.async_delegation import interrupt_for_session
         interrupt_for_session(
             session_key=str(session_key or "") if _tui_owns_lifecycle else "",
-            origin_ui_session_id=_lifecycle_own_sid(session), reason=end_reason)
+            origin_ui_session_id=_lifecycle_own_sid(session), reason=end_reason,
+            profile_home=str(session.get("profile_home") or _hermes_home))
     # Close the slash-worker in this single ``_finalized``-guarded chokepoint (a direct caller can't leak it); idempotent.
     with contextlib.suppress(Exception):
         if worker := session.get("slash_worker"):
@@ -509,7 +510,9 @@ def _session_has_active_delegations(sid: str, session: dict | None = None) -> bo
         return False
     try:
         from tools.async_delegation import has_live_for_session
-        return has_live_for_session(session_key=owned_session_key, origin_ui_session_id=own_sid)
+        return has_live_for_session(
+            session_key=owned_session_key, origin_ui_session_id=own_sid,
+            profile_home=str(session.get("profile_home") or _hermes_home))
     except Exception:
         logger.debug("Failed to query active delegations for UI session %s", sid, exc_info=True)
         return True  # a transient registry/import failure must not become destructive cleanup

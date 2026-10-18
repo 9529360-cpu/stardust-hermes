@@ -582,9 +582,12 @@ def active_task_count() -> int:
             for r in _records.values() if r.get("status") in {"running", "finalizing"})
 
 
-def _session_records(statuses, session_key: str, origin_ui_session_id: str, parent_session_id: str) -> list:
-    """Records in ``statuses`` owned by a session: any non-empty selector claims the
-    record — ``origin_ui_session_id`` (TUI tab), ``session_key`` (routing key at
+def _session_records(
+    statuses, session_key: str, origin_ui_session_id: str, parent_session_id: str, *, profile_home: Optional[str] = None,
+) -> list:
+    """Profile-owned session records (ambient home unless the lifecycle supplies it). Ownerless legacy
+    records retain the single-id interrupt compatibility; explicit foreign owners never
+    match. Any non-empty selector claims the record — ``origin_ui_session_id`` (TUI tab), ``session_key`` (routing key at
     dispatch), or ``parent_session_id`` (spawner's durable id — the right one for
     gateway chats, whose session_key survives ``/new`` while the session id rotates)."""
     selectors = [(field, wanted) for field, wanted in (
@@ -592,14 +595,20 @@ def _session_records(statuses, session_key: str, origin_ui_session_id: str, pare
         ("parent_session_id", parent_session_id)) if wanted]
     if not selectors:
         return []
+    owner_home = hermes_home_key(profile_home)
     with _records_lock:
         return [r for r in _records.values() if r.get("status") in statuses
+                and r.get(_OWNER_KEY) in (None, "", owner_home)
                 and any(str(r.get(field) or "") == wanted for field, wanted in selectors)]
 
 
-def has_live_for_session(session_key: str = "", origin_ui_session_id: str = "", parent_session_id: str = "") -> bool:
+def has_live_for_session(
+    session_key: str = "", origin_ui_session_id: str = "", parent_session_id: str = "", *,
+    profile_home: Optional[str] = None,
+) -> bool:
     """Whether a session still owns any live (running/stalling/finalizing) delegation."""
-    return bool(_session_records(_LIVE_STATES, session_key, origin_ui_session_id, parent_session_id))
+    return bool(_session_records(
+        _LIVE_STATES, session_key, origin_ui_session_id, parent_session_id, profile_home=profile_home))
 
 
 def _new_delegation_id() -> str:
@@ -1213,10 +1222,12 @@ def interrupt_all(reason: str = "shutdown") -> int:
 
 def interrupt_for_session(
     session_key: str = "", origin_ui_session_id: str = "", parent_session_id: str = "", reason: str = "session_end",
+    *, profile_home: Optional[str] = None,
 ) -> int:
     """Signal running async delegations owned by ONE ending session to stop (any
     selector matches, see ``_session_records``). Returns how many."""
-    targets = _session_records(_ACTIVE_STATES, session_key, origin_ui_session_id, parent_session_id)
+    targets = _session_records(
+        _ACTIVE_STATES, session_key, origin_ui_session_id, parent_session_id, profile_home=profile_home)
     return _interrupt_records(
         targets, "interrupt_for_session", reason, "Interrupted %d async delegation(s) for ending session (%s)")
 
