@@ -280,6 +280,10 @@ _SYNC_FALLBACK_NOTES = {
         "SYNCHRONOUSLY and the result is included above. Raise "
         "delegation.max_concurrent_children in config.yaml to allow more concurrent background delegations."
     ),
+    "admission_failed": (
+        "The background delegation could not be admitted (its durable dispatch record could not be written), so the "
+        "subagent(s) ran SYNCHRONOUSLY and the result is included above."
+    ),
 }
 
 def _capacity_fallback_sync() -> bool:
@@ -523,7 +527,18 @@ def _dispatch_background(batch: _Batch) -> str:
         # unsubmitted units must still receive parent stops while a fallback runs.
         for _, _, child in unit.children:
             _detach_child(parent_agent, child)
-        dispatch = _dispatch_unit(unit, unit_id, slot_key, routing)
+        try:
+            dispatch = _dispatch_unit(unit, unit_id, slot_key, routing)
+        except Exception as exc:
+            # Admission rolls its own record back before it raises, so a raise (e.g. the durable dispatch record
+            # could not be written) means this unit was NOT admitted. It is a rejection like any other: the children
+            # detached above must be returned below, not stranded behind an exception, and units admitted earlier
+            # keep running instead of hiding behind a failed call.
+            logger.warning("delegate_task: async admission failed for unit %d/%d: %s", k + 1, len(units), exc, exc_info=True)
+            dispatch = {
+                "status": "rejected", "reason": "async_admission_failed",
+                "error": f"Background delegation could not be admitted: {exc}",
+            }
         if dispatch.get("status") == "dispatched":
             slot_key = slot_key or dispatch["delegation_id"]
             dispatched.append((unit, dispatch["delegation_id"]))
@@ -532,10 +547,12 @@ def _dispatch_background(batch: _Batch) -> str:
         if not dispatched:
             if _capacity_fallback_sync():
                 logger.warning("delegate_task: async admission rejected; running synchronously by explicit legacy opt-in.")
-                return _run_sync_with_note(batch, "at_capacity")
+                return _run_sync_with_note(
+                    batch, "admission_failed" if dispatch.get("reason") == "async_admission_failed" else "at_capacity",
+                )
             rejected = _close_unstarted_units(batch, units, dispatch.get("error", "async capacity exhausted"))
             return json.dumps({
-                "status": "rejected", "reason": "async_capacity_or_scheduler",
+                "status": "rejected", "reason": dispatch.get("reason", "async_capacity_or_scheduler"),
                 "error": dispatch.get("error", "Background delegation was not accepted."),
                 "count": len(rejected), "retryable": True,
                 "note": "No subagents were started. Retry later or run explicitly in the foreground.",

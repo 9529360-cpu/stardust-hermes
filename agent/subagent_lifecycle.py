@@ -270,17 +270,18 @@ class SubagentLifecycleService:
                 toolsets=list(request.allowed_toolsets) if request.allowed_toolsets else None,
                 model=request.model, max_iterations=DEFAULT_MAX_ITERATIONS, task_count=1, parent_agent=parent, role=request.role,
             )
-            subagent_id = str(getattr(child, "_subagent_id", "") or "")
-            if not subagent_id:
-                raise SubagentLifecycleError("Hermes failed to assign a child identity.")
-            created = time.time()
-            handle = SubagentHandle(
-                PUBLIC_CONTRACT_VERSION, subagent_id, parent_session_id, request.correlation_id, created,
-                getattr(child, "provider", None), getattr(child, "model", None), getattr(child, "_delegate_role", request.role),
-                int(getattr(child, "_delegate_depth", 1) or 1), self._capability(subagent_id, parent_session_id, created),
-            )
-            record = _Record(handle, SubagentState.PENDING, created, agent=child)
+            scheduled = False
             try:
+                subagent_id = str(getattr(child, "_subagent_id", "") or "")
+                if not subagent_id:
+                    raise SubagentLifecycleError("Hermes failed to assign a child identity.")
+                created = time.time()
+                handle = SubagentHandle(
+                    PUBLIC_CONTRACT_VERSION, subagent_id, parent_session_id, request.correlation_id, created,
+                    getattr(child, "provider", None), getattr(child, "model", None), getattr(child, "_delegate_role", request.role),
+                    int(getattr(child, "_delegate_depth", 1) or 1), self._capability(subagent_id, parent_session_id, created),
+                )
+                record = _Record(handle, SubagentState.PENDING, created, agent=child)
                 with _REGISTRY.lock:
                     _REGISTRY.records[subagent_id] = record
                     if request.correlation_id:
@@ -295,21 +296,18 @@ class SubagentLifecycleService:
                         if request.correlation_id and _REGISTRY.correlations.get(correlation_key) == subagent_id:
                             _REGISTRY.correlations.pop(correlation_key, None)
                         raise
-            except Exception:
-                # Scheduling failed after construction: roll back the child's
-                # ownership too. Construction attaches it to the parent for
-                # interrupt propagation (tools/delegate_tool.py::_build_child_agent),
-                # and close() alone leaves that stale entry behind - the parent
-                # would then look busy forever. Detach outside the registry lock.
-                with contextlib.suppress(Exception):
-                    from tools.delegate_tool_child_run import _detach_child
-                    _detach_child(parent, child)
-                # The constructed child owns its dedicated SessionDB handle.
-                close = getattr(child, "close", None)
-                if callable(close):
+                scheduled = True
+            finally:
+                if not scheduled:
+                    # Nothing past this point can run the child: give back everything construction took, whatever
+                    # failed first (no identity to key it by, a refused submit). Construction attaches the child to
+                    # the parent for interrupt propagation (tools/delegate_tool.py::_build_child_agent) and gives it a
+                    # dedicated SessionDB handle; close() alone would leave the stale attachment behind and the
+                    # parent would look busy forever. Runs outside the registry lock.
+                    from tools.delegate_tool_child_run import _close_child, _detach_child
                     with contextlib.suppress(Exception):
-                        close()
-                raise
+                        _detach_child(parent, child)
+                    _close_child(child, "Failed to close subagent that was never scheduled")
             return handle
         finally:
             if request.correlation_id:

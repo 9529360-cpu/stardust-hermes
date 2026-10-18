@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import queue
+import sqlite3
 import threading
 import time
 from concurrent.futures import Future
@@ -653,3 +654,100 @@ def test_parent_cancellation_never_waits_forever_for_child_cleanup(registry_stat
         assert child.closed.wait(5)
         assert finalized.wait(5)
         assert finalized_entries[0]["status"] == "interrupted"
+
+
+def _ledger_locked(_record):
+    raise sqlite3.OperationalError("database is locked")
+
+
+def test_admission_persistence_failure_is_a_rejection_that_reclaims_children(registry_state, monkeypatch):
+    """The durable dispatch record is the admission gate. When it cannot be written the unit is rejected and
+    its children are returned; the error must not be raised past a caller that already detached them."""
+    from tools import delegate_tool_dispatch as dispatch
+
+    parent, child = _Parent(), _ControlledChild()
+    batch = _batch(parent, child)
+    monkeypatch.setattr(async_delegation, "_persist_dispatch", _ledger_locked)
+    monkeypatch.setattr(dispatch, "_resolve_async_wake_sid", lambda *_args: "")
+    monkeypatch.setattr(dispatch, "_capacity_fallback_sync", lambda: False)
+
+    outcome = json.loads(_dispatch_background(batch))
+
+    assert outcome["status"] == "rejected"
+    assert outcome["retryable"] is True
+    assert outcome["reason"] == "async_admission_failed"
+    assert "database is locked" in outcome["error"]
+    assert outcome["results"][0]["exit_reason"] == "not_started"
+    assert not child.started.is_set()
+    assert child.close_count == 1, "a rejected child was left open"
+    assert parent._active_children == [], "a rejected child was left detached from parent cancellation"
+    assert async_delegation.active_count() == 0
+
+
+def test_admission_failure_of_a_later_unit_keeps_earlier_units_running(registry_state, monkeypatch, tmp_path):
+    """Units of one call are admitted one by one. A refusal of unit N must not turn the units that were
+    already admitted into a failed call: they run and deliver, the refused unit is reported unstarted."""
+    from tools import delegate_tool_dispatch as dispatch
+
+    (tmp_path / "config.yaml").write_text(
+        "delegation:\n  max_concurrent_children: 3\n  worktree_isolation: false\n"
+        "  independent_completions: true\n",
+        encoding="utf-8",
+    )
+    parent = _Parent()
+    running, refused = _ControlledChild(), _ControlledChild()
+    running.session_id += "-running"
+    refused.session_id += "-refused"
+    batch = _batch(parent, running, refused)
+    real_persist = async_delegation._persist_dispatch
+    attempts = []
+
+    def lock_second_unit(record):
+        attempts.append(record["delegation_id"])
+        if len(attempts) == 2:
+            raise sqlite3.OperationalError("database is locked")
+        return real_persist(record)
+
+    monkeypatch.setattr(async_delegation, "_persist_dispatch", lock_second_unit)
+    monkeypatch.setattr(dispatch, "_resolve_async_wake_sid", lambda *_args: "")
+    monkeypatch.setattr(dispatch, "_capacity_fallback_sync", lambda: False)
+    try:
+        outcome = json.loads(_dispatch_background(batch))
+
+        assert outcome["status"] == "dispatched"
+        assert [entry["exit_reason"] for entry in outcome["inline_results"]] == ["not_started"]
+        assert running.started.wait(5)
+        assert not refused.started.is_set()
+        assert refused.close_count == 1
+        assert running.close_count == 0, "an admitted unit lost its child"
+        assert parent._active_children == []
+        assert async_delegation.active_count() == 1
+    finally:
+        async_delegation.interrupt_for_session(parent_session_id=parent.session_id)
+        running.allow_finish.set()
+        assert running.closed.wait(5)
+        assert registry_state.get(timeout=5)["delegation_id"] == attempts[0]
+
+
+def test_admission_failure_under_legacy_sync_opt_in_names_the_real_cause(registry_state, monkeypatch):
+    from tools import delegate_tool_dispatch as dispatch
+
+    class QuickChild(_ControlledChild):
+        def run_conversation(self, **_kwargs):
+            self.started.set()
+            self.finished.set()
+            return {"final_response": "ran inline", "completed": True, "api_calls": 0, "messages": []}
+
+    parent, child = _Parent(), QuickChild()
+    monkeypatch.setattr(async_delegation, "_persist_dispatch", _ledger_locked)
+    monkeypatch.setattr(dispatch, "_resolve_async_wake_sid", lambda *_args: "")
+    monkeypatch.setattr(dispatch, "_capacity_fallback_sync", lambda: True)
+
+    outcome = json.loads(_dispatch_background(_batch(parent, child)))
+
+    assert outcome["results"][0]["status"] == "completed"
+    assert "SYNCHRONOUSLY" in outcome["note"]
+    assert "capacity" not in outcome["note"], "the pool was not full; the note must not blame capacity"
+    assert "dispatch record" in outcome["note"]
+    assert child.close_count == 1
+    assert parent._active_children == []
