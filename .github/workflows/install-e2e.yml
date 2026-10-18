@@ -259,10 +259,18 @@ jobs:
           sparse-checkout-cone-mode: false
       - env:
           GH_TOKEN: ${{ github.token }}
+          # A failed tag picker has no output. Keep the report's JSON input
+          # valid so it can explain why upgrade coverage did not run.
+          TAG_ANNOTATIONS: ${{ needs.pick-releases.outputs.tags || '[]' }}
+          TAG_PICK_RESULT: ${{ needs.pick-releases.result }}
         run: |
           set -euo pipefail
           {
             echo "OS jobs: linux ${{ needs.linux.result }}, windows ${{ needs.windows.result }}, macos ${{ needs.macos.result }}"
+            echo "Release tag selection: $TAG_PICK_RESULT"
+            if [[ "$TAG_PICK_RESULT" != success ]]; then
+              echo 'Upgrade coverage unavailable: release-tag selection did not succeed, so no release-upgrade legs were scheduled. See the Pick release tags job for the cause.'
+            fi
             echo
             # The tag annotations let the chart say WHY a cell skipped
             # (pre-desktop vs declared TODO) instead of a flat "skip".
@@ -273,6 +281,12 @@ jobs:
             echo 'Legend: ✅ upgrade passed · known [n] = exact historical failure, see footnote · ❌ unexpected failure · pre-desktop / TODO = why a leg skipped · 📼 opens the leg player (recording + synced logs)'
             echo
             node scripts/sandbox/generate-e2e-matrix.mjs --format results \
-              --tags '${{ needs.pick-releases.outputs.tags }}' \
+              --tags "$TAG_ANNOTATIONS" \
               --artifacts /tmp/e2e-artifacts.ndjson < /tmp/e2e-jobs.ndjson
           } >> "$GITHUB_STEP_SUMMARY"
+          # Keep Result chart red too: a readable empty chart must not become
+          # an independently green check when its required release tag is absent.
+          if [[ "$TAG_PICK_RESULT" != success ]]; then
+            echo '::error::Install & Update E2E is incomplete because release-tag selection failed; inspect the summary and Pick release tags logs.'
+            exit 1
+          fi
