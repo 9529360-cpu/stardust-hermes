@@ -152,6 +152,8 @@ class _Registry:
     lock: threading.RLock = dataclasses.field(default_factory=threading.RLock)
     records: dict[str, _Record] = dataclasses.field(default_factory=dict)
     correlations: dict[tuple[Optional[str], str], str] = dataclasses.field(default_factory=dict)
+    # Correlation keys reserved during child construction, before registration.
+    pending_correlations: set[tuple[Optional[str], str]] = dataclasses.field(default_factory=set)
 
 
 _REGISTRY = _Registry()
@@ -253,31 +255,66 @@ class SubagentLifecycleService:
         correlation_key = (parent_session_id, request.correlation_id or "")
         with _REGISTRY.lock:
             self._cleanup_locked()
-            if request.correlation_id and correlation_key in _REGISTRY.correlations:
-                raise SubagentLifecycleError("Duplicate correlation_id for this parent session.")
-        # Lazy: delegate construction stays internal, plugins never import private delegation helpers.
-        from tools.delegate_tool import _build_child_preserving_parent_tools, DEFAULT_MAX_ITERATIONS
-        child = _build_child_preserving_parent_tools(
-            task_index=0, goal=request.goal, context=request.context,
-            toolsets=list(request.allowed_toolsets) if request.allowed_toolsets else None,
-            model=request.model, max_iterations=DEFAULT_MAX_ITERATIONS, task_count=1, parent_agent=parent, role=request.role,
-        )
-        subagent_id = str(getattr(child, "_subagent_id", "") or "")
-        if not subagent_id:
-            raise SubagentLifecycleError("Hermes failed to assign a child identity.")
-        created = time.time()
-        handle = SubagentHandle(
-            PUBLIC_CONTRACT_VERSION, subagent_id, parent_session_id, request.correlation_id, created,
-            getattr(child, "provider", None), getattr(child, "model", None), getattr(child, "_delegate_role", request.role),
-            int(getattr(child, "_delegate_depth", 1) or 1), self._capability(subagent_id, parent_session_id, created),
-        )
-        record = _Record(handle, SubagentState.PENDING, created, agent=child)
-        with _REGISTRY.lock:
-            _REGISTRY.records[subagent_id] = record
             if request.correlation_id:
-                _REGISTRY.correlations[correlation_key] = subagent_id
-        record.future = _EXECUTOR.submit(self._run, record, request.goal, parent)
-        return handle
+                if (correlation_key in _REGISTRY.correlations
+                        or correlation_key in _REGISTRY.pending_correlations):
+                    raise SubagentLifecycleError("Duplicate correlation_id for this parent session.")
+                # Reserve BEFORE child construction: it can open sessions and publish
+                # spawn events. A concurrent launcher must not construct another child.
+                _REGISTRY.pending_correlations.add(correlation_key)
+        try:
+            # Lazy: delegate construction stays internal, plugins never import private delegation helpers.
+            from tools.delegate_tool import _build_child_preserving_parent_tools, DEFAULT_MAX_ITERATIONS
+            child = _build_child_preserving_parent_tools(
+                task_index=0, goal=request.goal, context=request.context,
+                toolsets=list(request.allowed_toolsets) if request.allowed_toolsets else None,
+                model=request.model, max_iterations=DEFAULT_MAX_ITERATIONS, task_count=1, parent_agent=parent, role=request.role,
+            )
+            subagent_id = str(getattr(child, "_subagent_id", "") or "")
+            if not subagent_id:
+                raise SubagentLifecycleError("Hermes failed to assign a child identity.")
+            created = time.time()
+            handle = SubagentHandle(
+                PUBLIC_CONTRACT_VERSION, subagent_id, parent_session_id, request.correlation_id, created,
+                getattr(child, "provider", None), getattr(child, "model", None), getattr(child, "_delegate_role", request.role),
+                int(getattr(child, "_delegate_depth", 1) or 1), self._capability(subagent_id, parent_session_id, created),
+            )
+            record = _Record(handle, SubagentState.PENDING, created, agent=child)
+            try:
+                with _REGISTRY.lock:
+                    _REGISTRY.records[subagent_id] = record
+                    if request.correlation_id:
+                        _REGISTRY.correlations[correlation_key] = subagent_id
+                    # Publish only a schedulable handle: status/wait cannot see
+                    # a record whose future has not been assigned yet.
+                    try:
+                        record.future = _EXECUTOR.submit(self._run, record, request.goal, parent)
+                    except Exception:
+                        if _REGISTRY.records.get(subagent_id) is record:
+                            _REGISTRY.records.pop(subagent_id, None)
+                        if request.correlation_id and _REGISTRY.correlations.get(correlation_key) == subagent_id:
+                            _REGISTRY.correlations.pop(correlation_key, None)
+                        raise
+            except Exception:
+                # Scheduling failed after construction: roll back the child's
+                # ownership too. Construction attaches it to the parent for
+                # interrupt propagation (tools/delegate_tool.py::_build_child_agent),
+                # and close() alone leaves that stale entry behind - the parent
+                # would then look busy forever. Detach outside the registry lock.
+                with contextlib.suppress(Exception):
+                    from tools.delegate_tool_child_run import _detach_child
+                    _detach_child(parent, child)
+                # The constructed child owns its dedicated SessionDB handle.
+                close = getattr(child, "close", None)
+                if callable(close):
+                    with contextlib.suppress(Exception):
+                        close()
+                raise
+            return handle
+        finally:
+            if request.correlation_id:
+                with _REGISTRY.lock:
+                    _REGISTRY.pending_correlations.discard(correlation_key)
 
     def status(self, handle: SubagentHandle) -> SubagentStatus:
         record = self._record(handle)
