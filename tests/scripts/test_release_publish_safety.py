@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import http.server
 import importlib.util
+import os
 import runpy
 import subprocess
 import sys
+import threading
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import pytest
 
@@ -47,6 +51,72 @@ def _new_repo(tmp_path: Path) -> tuple[Path, Path, Path]:
     _git(repo, "add", "hermes_cli/__init__.py", "pyproject.toml")
     _git(repo, "commit", "-m", "initial version")
     return repo, version_file, pyproject_file
+
+
+def _start_http_git_origin(project_root: Path):
+    class GitBackendHandler(http.server.BaseHTTPRequestHandler):
+        timeout = 10
+
+        def _serve_backend(self):
+            request_body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
+            query = urlsplit(self.path)
+            env = os.environ.copy()
+            env.update(
+                {
+                    "GIT_PROJECT_ROOT": str(project_root),
+                    "GIT_HTTP_EXPORT_ALL": "1",
+                    "PATH_INFO": query.path,
+                    "QUERY_STRING": query.query,
+                    "REQUEST_METHOD": self.command,
+                    "CONTENT_TYPE": self.headers.get("Content-Type", ""),
+                    "CONTENT_LENGTH": str(len(request_body)),
+                    "REMOTE_ADDR": self.client_address[0],
+                }
+            )
+            if protocol := self.headers.get("Git-Protocol"):
+                env["HTTP_GIT_PROTOCOL"] = protocol
+            try:
+                result = subprocess.run(
+                    ["git", "http-backend"],
+                    input=request_body,
+                    capture_output=True,
+                    env=env,
+                    timeout=10,
+                )
+            except subprocess.TimeoutExpired:
+                self.send_error(504, "Git backend timed out")
+                return
+            headers, separator, body = result.stdout.partition(b"\r\n\r\n")
+            if not separator:
+                headers, separator, body = result.stdout.partition(b"\n\n")
+            if result.returncode or not separator:
+                self.send_error(500, result.stderr.decode(errors="replace"))
+                return
+
+            status = 200
+            response_headers = []
+            for line in headers.splitlines():
+                name, _, value = line.decode("latin-1").partition(":")
+                if name.lower() == "status":
+                    status = int(value.strip().split(" ", 1)[0])
+                elif name:
+                    response_headers.append((name, value.strip()))
+            self.send_response(status)
+            for name, value in response_headers:
+                self.send_header(name, value)
+            self.end_headers()
+            self.wfile.write(body)
+
+        do_GET = _serve_backend
+        do_POST = _serve_backend
+
+        def log_message(self, format, *args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), GitBackendHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server, thread
 
 
 def _configure_first_release(monkeypatch, repo, version_file, pyproject_file, *extra_args):
@@ -388,12 +458,18 @@ def test_push_failure_keeps_local_tag_and_notes_without_attempting_gh(
         ("add", str(version_file), str(pyproject_file)),
         ("commit", "-m", "chore: bump version to v1.2.4 (2026.10.14)"),
         ("tag", "-a", tag_name, "-m", "Stardust v1.2.4 (2026.10.14)\n\nStardust release"),
-        ("push", "origin", "HEAD", "--tags"),
+        (
+            "push",
+            "--no-follow-tags",
+            "origin",
+            "HEAD",
+            f"refs/tags/{tag_name}:refs/tags/{tag_name}",
+        ),
     ]
     assert not any(command and command[0] == "gh" for command in spawned_commands)
     assert "remote rejected" in output
     assert f"Local tag {tag_name} and release notes were preserved." in output
-    assert "git push origin HEAD --tags" in output
+    assert f"git push --no-follow-tags origin HEAD refs/tags/{tag_name}:refs/tags/{tag_name}" in output
     assert f"gh release create {tag_name}" in output
 
 
@@ -610,3 +686,74 @@ def test_publish_without_previous_tag_requires_first_release_but_preview_is_noop
     assert "Would create tag: v2026.10.14" in preview
     assert _git(repo, "tag", "--list") == ""
     assert spawned_commands == []
+
+
+@pytest.mark.parametrize("same_named_branch", [False, True])
+def test_publish_pushes_only_final_tag_and_branch_with_follow_tags_enabled(
+    tmp_path, monkeypatch, capsys, same_named_branch
+):
+    repo, version_file, pyproject_file = _new_repo(tmp_path)
+    tag_name = "v2026.10.14.3"
+    history_tags = ["legacy-lightweight", "v2026.9.1", "v2026.10.14", "v2026.10.14.2"]
+    _git(repo, "tag", history_tags[0])
+    _git(repo, "tag", "-a", history_tags[1], "-m", "historical annotated release")
+    for history_tag in history_tags[2:]:
+        _git(repo, "tag", history_tag)
+    branch_name = tag_name if same_named_branch else "release-target"
+    _git(repo, "branch", "-m", branch_name)
+    _git(repo, "config", "push.followTags", "true")
+
+    origin = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "--bare", "--quiet", str(origin)], check=True)
+    _git(origin, "config", "http.receivepack", "true")
+
+    _configure_first_release(monkeypatch, repo, version_file, pyproject_file)
+    real_run = subprocess.run
+    gh_commands = []
+
+    def intercept_gh(command, *args, **kwargs):
+        if command[:3] == ["gh", "release", "create"]:
+            gh_commands.append(command)
+            return subprocess.CompletedProcess(
+                command, 1, stdout="", stderr="GitHub release intentionally withheld"
+            )
+        return real_run(command, *args, **kwargs)
+
+    monkeypatch.setattr(release.subprocess, "run", intercept_gh)
+    monkeypatch.setattr(release.shutil, "which", lambda command: "fake-gh")
+
+    server, server_thread = _start_http_git_origin(tmp_path)
+    try:
+        _git(
+            repo,
+            "remote",
+            "add",
+            "origin",
+            f"http://127.0.0.1:{server.server_address[1]}/origin.git",
+        )
+        status = release.main()
+    finally:
+        server.shutdown()
+        server.server_close()
+        server_thread.join(timeout=5)
+
+    output = capsys.readouterr().out
+    remote_refs = _git(
+        origin,
+        "for-each-ref",
+        "--format=%(refname)",
+    ).splitlines()
+    assert status == 1
+    assert remote_refs == [f"refs/heads/{branch_name}", f"refs/tags/{tag_name}"], output
+    assert _git(repo, "tag", "--list", "--sort=refname") == "\n".join(
+        sorted([*history_tags, tag_name])
+    )
+    expected_head = _git(repo, "rev-parse", "HEAD")
+    assert _git(origin, "rev-parse", f"refs/heads/{branch_name}") == expected_head
+    assert _git(origin, "rev-parse", f"refs/tags/{tag_name}^{{}}") == expected_head
+    assert _git(origin, "rev-parse", f"refs/tags/{tag_name}") == _git(
+        repo, "rev-parse", f"refs/tags/{tag_name}"
+    )
+    assert len(gh_commands) == 1
+    assert gh_commands[0][3] == tag_name
+    assert "GitHub release intentionally withheld" in output
