@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+from agent.terminal_writers import command_words, conditional_write, executable_name, interpreter_kind
 from hermes_constants import get_hermes_home
 
 
@@ -51,9 +52,20 @@ _MUTATING_VERIFY_FLAGS = frozenset({"--accept", "--fix", "--fix-only", "--update
 _INLINE_MUTATION_RE = re.compile(
     r"(?:\bopen\s*\([^)]*,\s*['\"](?:w|a|x|\+)|\.write(?:_text|_bytes)?\s*\(|"
     r"\bwriteFile(?:Sync)?\s*\(|\b(?:unlink|remove|rename|replace|mkdir|rmdir|makedirs|rmtree|copy2?|move)\s*\(|"
+    r"\b(?:appendFile|copyFile|createWriteStream|rmSync|cpSync|truncate|symlink|chmod|chown|WriteAll\w*|AppendAll\w*)\w*\s*\(|"
+    # A program that can start another process can do anything: it is not provably read-only.
+    r"\b(?:subprocess|Popen|child_process|execSync|spawnSync|execFileSync)\b|\bos\s*\.\s*(?:system|popen|exec\w*|spawn\w*)\s*\(|"
     r"\b(?:set-content|add-content|remove-item|move-item|copy-item|out-file|new-item|clear-content|rename-item)\b)",
     re.IGNORECASE,
 )
+# Flags that carry the program text inline, per interpreter kind (see terminal_writers.interpreter_kind).
+_INLINE_PROGRAM_FLAGS = {
+    "python": {"-c"}, "node": {"-e", "--eval", "-p", "--print"}, "ruby": {"-e"}, "perl": {"-e", "-E"}, "php": {"-r"},
+    "shell": {"-c"}, "powershell": {"-c", "-command"}, "cmd": {"/c", "/k", "/r"},
+}
+_SHELL_COMMAND_FLAG_RE = re.compile(r"-[a-z]*c")  # bash -c, bash -lc, sh -ec, ...
+_SCRIPT_FILE_SUFFIXES = {".py", ".js", ".mjs", ".cjs", ".ts", ".sh", ".bash", ".rb", ".pl", ".php", ".ps1"}
+_HEREDOC_DELIMITER_RE = re.compile(r"""'([^'\n]+)'|"([^"\n]+)"|([^\s;&|()<>'"]+)""")
 _READ_ONLY_GIT_COMMANDS = frozenset({
     "add", "branch", "config", "diff", "fetch", "grep", "log", "ls-files", "push", "remote", "rev-parse", "show",
     "status", "tag",
@@ -120,6 +132,17 @@ class _ShellSegment:
     tokens: list[str]
     following_operator: str | None = None
     raw: str = ""
+    # Text of the heredoc bodies that start on this segment's line. It is data for a program that reads
+    # stdin, never commands, and is kept out of the tokenizer so its quotes cannot unbalance the command.
+    heredoc: str = ""
+
+
+@dataclass(frozen=True)
+class _Stdin:
+    """What can feed the standard input of the segment being judged."""
+
+    piped: bool = False
+    heredocs: str = ""
 
 
 @dataclass(frozen=True)
@@ -194,17 +217,64 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def _heredoc_marker(command: str, index: int) -> tuple[str, bool, int] | None:
+    """``<<[-]WORD`` at ``index`` as ``(delimiter, strip_tabs, end)``; ``<<<`` (a here-string) is not one."""
+    if not command.startswith("<<", index) or command.startswith("<<<", index):
+        return None
+    cursor = index + 2
+    strip_tabs = command.startswith("-", cursor)
+    cursor += 1 if strip_tabs else 0
+    while cursor < len(command) and command[cursor] in " \t":
+        cursor += 1
+    match = _HEREDOC_DELIMITER_RE.match(command, cursor)
+    if match is None:
+        return None
+    delimiter = next(group for group in match.groups() if group)
+    if match.group(3) is not None and delimiter.isdigit():
+        return None  # `$((1<<3))` shifts bits; a later line reading `3` must not hide the commands after it
+    return delimiter, strip_tabs, match.end()
+
+
+def _read_heredoc_bodies(command: str, start: int, pending: list[tuple[str, bool]]) -> tuple[list[str], int] | None:
+    """Bodies of the heredocs opened on the previous line, and the index just after the last terminator.
+
+    ``None`` when a terminator is missing. A shell would then read to the end of its input, but a ``<<`` that was
+    not really a heredoc (arithmetic, text) must not hide the commands that follow it, so the caller ignores it."""
+    position, bodies = start, []
+    for delimiter, strip_tabs in pending:
+        lines: list[str] = []
+        while True:
+            end = command.find("\n", position)
+            line = command[position:len(command) if end == -1 else end].rstrip("\r")
+            if (line.lstrip("\t") if strip_tabs else line) == delimiter:
+                position = len(command) if end == -1 else end + 1
+                break
+            if end == -1:
+                return None
+            lines.append(line)
+            position = end + 1
+        bodies.append("\n".join(lines))
+    return bodies, position
+
+
 def _split_shell_segments(command: str, *, posix: bool = True) -> list[_ShellSegment]:
     """Tokenize top-level shell commands while preserving their control operators.
 
-    Returns ``[]`` for anything unparseable (unbalanced quotes, empty segment,
-    trailing operator other than ``;``) so callers never match a partial parse.
+    Blank lines, ``#`` comments and a line break after an operator separate nothing and are dropped. Heredoc
+    bodies are not commands: they are attached to the segment on whose line they start. Returns ``[]`` for
+    anything unparseable (unbalanced quotes, an operator with nothing on one side, a trailing operator other
+    than ``;`` or a background ``&``) so callers never match a partial parse.
     """
-    raw_segments: list[tuple[str, str | None]] = []
-    start = 0
+    raw_segments: list[tuple[str, str | None, str]] = []
+    pieces: list[str] = []  # text of the current segment that precedes a comment cut out of it
+    chunk = 0  # where the uncut tail of the current segment begins
     quote: str | None = None
     escaped = False
+    pending: list[tuple[str, bool]] = []  # heredocs opened on the current line
     index = 0
+
+    def segment_text(end: int) -> str:
+        return ("".join(pieces) + command[chunk:end]).strip()
 
     while index < len(command):
         char = command[index]
@@ -215,6 +285,18 @@ def _split_shell_segments(command: str, *, posix: bool = True) -> list[_ShellSeg
         if quote or char in "'\"":
             quote = None if char == quote else (quote or char)  # close / stay / open
             index += 1
+            continue
+        if char == "#" and (index == 0 or command[index - 1] in " \t\r\n;&|()"):
+            # A comment runs to the end of the line and is no part of the command (its apostrophes are not quotes).
+            end = command.find("\n", index)
+            end = len(command) if end == -1 else end
+            pieces.append(command[chunk:index])
+            chunk = index = end
+            continue
+        marker = _heredoc_marker(command, index)
+        if marker is not None:
+            pending.append(marker[:2])
+            index = marker[2]
             continue
 
         operator = None
@@ -233,23 +315,35 @@ def _split_shell_segments(command: str, *, posix: bool = True) -> list[_ShellSeg
             index += 1
             continue
 
-        raw = command[start:index].strip()
+        raw = segment_text(index)
+        resume = index + (1 if char == "\n" else len(operator))
+        heredoc = ""
+        if char == "\n":
+            bodies = _read_heredoc_bodies(command, resume, pending) if pending and raw else None
+            if bodies is not None:
+                heredoc, resume = "\n".join(bodies[0]), bodies[1]
+            pending = []
         if not raw:
-            return []
-        raw_segments.append((raw, operator))
-        index += 1 if char == "\n" else len(operator)
-        start = index
+            if char != "\n":
+                return []
+            # a blank line, a comment-only line or a break after an operator: nothing to separate
+        else:
+            raw_segments.append((raw, operator, heredoc))
+        pieces, chunk, index = [], resume, resume
 
     if quote or escaped:
         return []
-    trailing = command[start:].strip()
+    trailing = segment_text(len(command))
     if trailing:
-        raw_segments.append((trailing, None))
-    elif raw_segments and raw_segments[-1][1] != ";":
+        raw_segments.append((trailing, None, ""))
+    elif raw_segments and raw_segments[-1][1] not in {";", "&"}:  # `cmd &` (a background job) is a complete command
         return []
 
     try:
-        segments = [_ShellSegment(shlex.split(raw, posix=posix), operator, raw) for raw, operator in raw_segments]
+        segments = [
+            _ShellSegment(shlex.split(raw, posix=posix), operator, raw, heredoc)
+            for raw, operator, heredoc in raw_segments
+        ]
     except ValueError:
         return []
     return segments if all(s.tokens for s in segments) else []
@@ -357,26 +451,96 @@ def _verification_segment_indexes(
     return indexes
 
 
-def _script_invocation_may_modify(tokens: list[str], *, root: str | Path | None) -> bool:
-    """Treat custom scripts as effect-capable while exempting obvious test scripts."""
-    if not tokens:
-        return False
-    base = Path(tokens[0]).name.lower()
-    if base not in _INTERPRETERS | {"pwsh", "powershell", "cmd", "cmd.exe"}:
-        return False
-    args = tokens[1:]
-    if not args:
-        return False
-    inline = next((index for index, token in enumerate(args[:3]) if token in {"-c", "-e", "-command", "/c", "/k"}), None)
-    if inline is not None:
-        return bool(_INLINE_MUTATION_RE.search(" ".join(args[inline + 1:])))
-    if "-m" in args:
-        module_index = args.index("-m") + 1
-        if module_index < len(args):
-            module = args[module_index].lower()
-            return module not in {"pytest", "unittest", "nose", "nose2"}
-    script = next((token for token in args if not token.startswith("-") and "=" not in token), "")
-    return _script_path_may_modify(script, root=root)
+# Flags that take a separate value, so the value is not mistaken for the script operand.
+_INTERPRETER_VALUE_FLAGS = {
+    "python": {"-w", "-x"},
+    "node": {"-r", "--require", "--import", "--loader", "--experimental-loader"},
+    "powershell": {"-executionpolicy", "-ep", "-windowstyle", "-inputformat", "-outputformat", "-configurationname",
+                   "-workingdirectory", "-wd", "-version"},
+    "shell": {"-o", "--rcfile", "--init-file"},
+}
+_REDIRECT_OPERATOR_TOKENS = frozenset({"<", ">", ">>", ">|", "<<", "&>", "&>>", "1>", "2>", "1>>", "2>>"})
+
+
+def _interpreter_may_modify(
+    kind: str, args: list[str], *, canonical_commands: list[str], root: str | Path | None, stdin: _Stdin,
+) -> bool:
+    """Whether an interpreter run may write files. Its program is inline text, a module, a script file, or is read
+    from stdin; custom scripts are effect-capable while obvious test scripts are exempt."""
+    flags, value_flags = _INLINE_PROGRAM_FLAGS[kind], _INTERPRETER_VALUE_FLAGS.get(kind, ())
+    operand, redirected, position = "", False, 0
+    while position < len(args):
+        arg = args[position]
+        lowered = arg.lower()
+        position += 1
+        if lowered == "-encodedcommand":
+            return True  # an opaque base64 program
+        if lowered in flags or (kind == "shell" and _SHELL_COMMAND_FLAG_RE.fullmatch(lowered)):
+            rest = args[position:]
+            if not rest:
+                return False
+            text = " ".join(rest) if kind in {"powershell", "cmd"} else rest[0]
+            return _inline_program_may_modify(kind, text, canonical_commands=canonical_commands, root=root)
+        if kind == "python" and arg == "-m":
+            module = args[position].lower() if position < len(args) else ""
+            return bool(module) and module not in {"pytest", "unittest", "nose", "nose2"}
+        if kind == "shell" and arg == "-s":
+            operand = "-"  # the shell reads its commands from stdin
+            break
+        if arg in _REDIRECT_OPERATOR_TOKENS:
+            redirected = redirected or arg == "<"
+            position += 1  # the redirect target is not the script
+            continue
+        if arg.startswith("<") and not arg.startswith("<<"):
+            redirected = True
+            continue
+        if arg.startswith(("<", ">")) or re.match(r"\d+[<>]", arg):
+            continue
+        if lowered in value_flags:
+            position += 1
+            continue
+        if arg.startswith("-") or (kind == "cmd" and arg.startswith("/")) or "=" in arg:
+            continue
+        operand = arg
+        break
+    if operand and operand != "-":
+        return _script_path_may_modify(operand, root=root)
+    # No script operand: the program comes from stdin (`python -`, `python <<EOF`, `curl ... | sh`).
+    if stdin.heredocs:
+        return _inline_program_may_modify(kind, stdin.heredocs, canonical_commands=canonical_commands, root=root)
+    return stdin.piped or redirected  # an unknown producer or a file: opaque; otherwise nothing is fed
+
+
+def _inline_program_may_modify(kind: str, text: str, *, canonical_commands: list[str], root: str | Path | None) -> bool:
+    """Program text we can read: writes by pattern, and for a shell the text is itself a command line."""
+    if _INLINE_MUTATION_RE.search(text):
+        return True
+    if kind in {"shell", "powershell", "cmd"}:
+        return _command_line_may_modify(text, canonical_commands=canonical_commands, root=root)
+    return False
+
+
+def _command_line_may_modify(command: str, *, canonical_commands: list[str], root: str | Path | None) -> bool:
+    """Whether a command line (a shell's inline script, or heredoc text fed to one) may write files."""
+    segments = _split_shell_segments(command)
+    if not segments:
+        return True  # unparseable: nothing proves it read-only
+    return bool(_mutating_segment_indexes(segments, canonical_commands=canonical_commands, root=root))
+
+
+def _mutating_segment_indexes(
+    segments: list[_ShellSegment], *, canonical_commands: list[str], root: str | Path | None,
+) -> list[int]:
+    """Indexes of the segments that may change workspace files (verifier output capture excepted)."""
+    heredocs = "\n".join(segment.heredoc for segment in segments if segment.heredoc)
+    return [
+        index for index, segment in enumerate(segments)
+        if _segment_may_modify_workspace(
+            segment, canonical_commands=canonical_commands, root=root,
+            stdin=_Stdin(piped=index > 0 and segments[index - 1].following_operator in {"|", "|&"}, heredocs=heredocs),
+        )
+        and not _is_verifier_output_capture(segments, index, canonical_commands=canonical_commands, root=root)
+    ]
 
 
 def _script_path_may_modify(script: str, *, root: str | Path | None) -> bool:
@@ -388,11 +552,11 @@ def _script_path_may_modify(script: str, *, root: str | Path | None) -> bool:
         return False
     if re.search(r"(?:^|[-_])(test|tests|spec|verify|check|lint|smoke|probe)(?:[-_.]|$)", name):
         return False
-    return Path(script).suffix.lower() in {".py", ".js", ".mjs", ".cjs", ".ts", ".sh", ".bash", ".rb", ".pl", ".php", ".ps1"}
+    return Path(script).suffix.lower() in _SCRIPT_FILE_SUFFIXES
 
 
 def _segment_may_modify_workspace(
-    segment: _ShellSegment, *, canonical_commands: list[str], root: str | Path | None
+    segment: _ShellSegment, *, canonical_commands: list[str], root: str | Path | None, stdin: _Stdin = _Stdin(),
 ) -> bool:
     """Use command intent to recognize writes without treating ordinary tests/builds as edits."""
     match = _canonical_match_for_segment(segment, canonical_commands) if canonical_commands else None
@@ -423,9 +587,14 @@ def _segment_may_modify_workspace(
         return format_verdict
     if _DESTRUCTIVE_PATTERNS.search(raw):
         return True
-    base = _command_name(tokens[0])
+    # The command word as typed: POSIX splitting eats the backslashes of `.venv\Scripts\python.exe`.
+    words = _strip_command_prefix(command_words(raw)) or tokens
+    base = executable_name(words[0])
     if base in _SHELL_WRITER_COMMANDS:
         return _writer_has_target(base, tokens)
+    conditional = conditional_write(base, tokens[1:])
+    if conditional is not None:
+        return conditional
     if _inplace_edit(tokens):
         return True
     if base in _PACKAGE_MANAGER_NAMES:
@@ -444,10 +613,13 @@ def _segment_may_modify_workspace(
         subcommand = _git_subcommand(tokens)
         # No subcommand at all (`git --version`, `git --help`) only prints.
         return bool(subcommand) and subcommand not in _READ_ONLY_GIT_COMMANDS
-    if _script_invocation_may_modify(tokens, root=root):
+    kind = interpreter_kind(base)
+    if kind is not None and _interpreter_may_modify(
+        kind, tokens[1:], canonical_commands=canonical_commands, root=root, stdin=stdin,
+    ):
         return True
-    if Path(tokens[0]).suffix.lower() in {".py", ".js", ".mjs", ".cjs", ".ts", ".sh", ".bash", ".rb", ".pl", ".php", ".ps1"}:
-        return _script_path_may_modify(tokens[0], root=root)
+    if Path(words[0]).suffix.lower() in _SCRIPT_FILE_SUFFIXES:
+        return _script_path_may_modify(words[0], root=root)
     return False
 
 
@@ -713,6 +885,8 @@ def terminal_workspace_mutation_root(
     The shell result is not a filesystem diff, so this is deliberately intent-based:
     recognized tests, lint, typechecks, and builds are read-only; package changes,
     formatting, file operations, and custom scripts can invalidate earlier evidence.
+    Read-only is proven, never assumed: a command that cannot be parsed, or a program
+    fed through stdin that cannot be read, counts as a possible mutation.
     In a compound command, a later verifier keeps a completed command fresh. Set
     ``verification_complete=False`` while a background command is still running.
     """
@@ -723,19 +897,17 @@ def terminal_workspace_mutation_root(
         return None
     segments = _split_shell_segments(command)
     if not segments:
-        return None
+        # Unparseable (unbalanced quotes, a dangling operator): nothing proves the workspace is unchanged, and a
+        # false "unchanged" lets stale proof pass for fresh while a false "changed" costs one more verification.
+        return _root_for(facts, cwd)
 
     canonical_commands = list(facts.get("verifyCommands") or [])
     verification_indexes = _verification_segment_indexes(
         segments, canonical_commands=canonical_commands, root=facts.get("root"), exit_code=int(exit_code),
     )
-    mutating_indexes = [
-        index for index, segment in enumerate(segments)
-        if _segment_may_modify_workspace(segment, canonical_commands=canonical_commands, root=facts.get("root"))
-        and not _is_verifier_output_capture(
-            segments, index, canonical_commands=canonical_commands, root=facts.get("root"),
-        )
-    ]
+    mutating_indexes = _mutating_segment_indexes(
+        segments, canonical_commands=canonical_commands, root=facts.get("root"),
+    )
     if not mutating_indexes:
         return None
 
