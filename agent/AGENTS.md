@@ -112,6 +112,19 @@ image-gen plugins (all in `plugins/AGENTS.md`). `agent/curator.py` + `curator_ba
 the skill curator (`skills/AGENTS.md`). Cron sessions pass `skip_memory=True` by default — memory
 providers intentionally do not run during cron.
 
+## Verification ledger (`verification_evidence.py`, `terminal_writers.py`)
+
+The ledger records what the agent proved (`stardust verify`, canonical test/lint/build runs) and when the workspace
+changed afterwards; verify-on-stop turns stale or missing proof into a bounded follow-up. Terminal commands are judged
+by intent in `terminal_workspace_mutation_root`, and the rule is **read-only is proven, never assumed**: an unparseable
+command, an opaque program (a script file, a program fed through stdin or a pipe, `-EncodedCommand`) or a known writer
+counts as a possible mutation, because a false "changed" costs one more verification run while a false "unchanged" lets
+stale proof pass for fresh. Command knowledge lives in `terminal_writers.py` (name normalisation including Windows
+spellings such as `python.exe`, `py`, `powershell.exe`, and the table of commands whose effect depends on their
+arguments). The tokenizer (`_split_shell_segments`) keeps heredoc bodies out of the command line, drops comments and
+blank lines, and must leave Windows backslash paths intact for the command word; extend the parametrized command lists
+in `tests/agent/test_verification_evidence.py` for every new writer or spelling, with a read-only twin for each.
+
 ## Tests
 
 Loop/phase tests go in `tests/agent/`; patch the binding the phase actually reads (siblings often

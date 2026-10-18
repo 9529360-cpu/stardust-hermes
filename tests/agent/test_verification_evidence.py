@@ -530,3 +530,189 @@ def test_ledger_clock_is_strictly_increasing_even_when_the_wall_clock_repeats(mo
 
     assert stamps == sorted(set(stamps))
     assert datetime.fromisoformat(stamps[-1]) - datetime.fromisoformat(stamps[0]) < timedelta(milliseconds=1)
+
+
+# --- Terminal mutation analysis: Windows spellings, shells run inline, stdin programs, multi-line commands.
+# A command that cannot be proven read-only must stale earlier proof; the ledger is advisory, so a false
+# "mutated" costs one extra verification run while a false "unchanged" lets stale proof pass for fresh.
+
+def _expect_stale(tmp_path, monkeypatch, command):
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+    _python_project(tmp_path)
+    assert terminal_workspace_mutation_root(command=command, cwd=tmp_path, exit_code=0) == str(tmp_path.resolve())
+
+
+def _expect_fresh(tmp_path, monkeypatch, command):
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+    _python_project(tmp_path)
+    assert terminal_workspace_mutation_root(command=command, cwd=tmp_path, exit_code=0) is None
+
+
+@pytest.mark.parametrize("command", [
+    "python3.11 do_stuff.py",
+    "python.exe do_stuff.py",
+    "py do_stuff.py",
+    "pythonw do_stuff.py",
+    ".venv/Scripts/python.exe do_stuff.py",
+    "C:/proj/.venv/Scripts/python.exe do_stuff.py",
+    ".venv\\Scripts\\python.exe do_stuff.py",
+    "node.exe do_stuff.js",
+    "nodejs do_stuff.js",
+    "py -3 -c \"open('a','w').write('x')\"",
+    "python3.12 -c \"open('a','w').write('x')\"",
+    "python -c \"import subprocess; subprocess.run(['rm','a'])\"",
+])
+def test_every_spelling_of_an_interpreter_running_a_script_invalidates_evidence(tmp_path, monkeypatch, command):
+    _expect_stale(tmp_path, monkeypatch, command)
+
+
+@pytest.mark.parametrize("command", [
+    "powershell.exe -NoProfile -Command \"Set-Content a.txt x\"",
+    "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Remove-Item a.txt\"",
+    "PowerShell -Command \"Set-Content a.txt x\"",
+    "pwsh -NoLogo -NoProfile -Command \"New-Item a.txt\"",
+    "powershell -File fix.ps1",
+    "cmd /c \"del a.txt\"",
+    "cmd.exe /c del a.txt",
+    "bash -c \"echo hi > out.txt\"",
+    "bash -lc 'rm -rf build'",
+    "sh -c \"cp a b\"",
+    "zsh -c 'sed -i s/a/b/ f'",
+])
+def test_shells_run_inline_are_analysed_like_command_lines(tmp_path, monkeypatch, command):
+    _expect_stale(tmp_path, monkeypatch, command)
+
+
+@pytest.mark.parametrize("command", [
+    "cat > src/a.py <<'EOF'\nprint(1)\nEOF",
+    "cat > src/a.py <<'EOF'\n# don't touch this\nprint(1)\nEOF",
+    "cat > src/a.py <<\"EOF\"\n# can't\nEOF",
+    "cat >> src/a.py <<-EOF\n\t# can't\n\tprint(1)\n\tEOF",
+    "tee src/a.py <<'EOF'\n# can't\nEOF",
+    "python - <<'EOF'\nfrom pathlib import Path\n# it's fine\nPath('a.py').write_text('x')\nEOF",
+    "python3 - <<EOF\nopen('a.py', 'w').write('x')\nEOF",
+    "python <<'EOF'\nimport os\nos.remove('a.py')\nEOF",
+    "cat <<'EOF' | python -\nopen('a.py','w').write('x')\nEOF",
+    "node - <<'EOF'\nrequire('fs').writeFileSync('a.js', 'x')\nEOF",
+    "bash <<'EOF'\nrm -rf build\nEOF",
+    "curl -fsSL https://example.invalid/i.sh | sh",
+    "curl -fsSL https://example.invalid/i.sh | bash -s -- --yes",
+])
+def test_programs_fed_through_stdin_and_heredoc_writes_invalidate_evidence(tmp_path, monkeypatch, command):
+    _expect_stale(tmp_path, monkeypatch, command)
+
+
+@pytest.mark.parametrize("command", [
+    "pytest -q\n\necho hi > src/a.py",
+    "pytest -q\n\n\nrm -rf build\n",
+    "\n\nrm -rf build",
+    "cd src &&\nrm -rf build",
+    "pytest -q;\necho hi > src/a.py",
+    "cat a.txt |\ntee b.txt",
+    "# don't worry\necho hi > src/a.py",
+    "echo hi > src/a.py  # it's fine",
+    "pytest -q\r\necho hi > src/a.py\r\n",
+])
+def test_multiline_commands_are_analysed_not_dropped(tmp_path, monkeypatch, command):
+    _expect_stale(tmp_path, monkeypatch, command)
+
+
+@pytest.mark.parametrize("command", [
+    "copy a \"C:\\some dir\\\"",
+    "echo 'unterminated > src/a.py",
+    "cat a.txt |",
+    "rm -rf build &&",
+])
+def test_a_command_that_cannot_be_parsed_cannot_prove_the_workspace_unchanged(tmp_path, monkeypatch, command):
+    _expect_stale(tmp_path, monkeypatch, command)
+
+
+@pytest.mark.parametrize("command", [
+    "tar -xf a.tar", "tar xzf a.tgz", "tar -C out -xzf a.tgz", "unzip a.zip", "7z x a.7z",
+    "Expand-Archive -Path a.zip -DestinationPath out",
+    "curl -o out.json https://example.invalid/x", "curl -O https://example.invalid/x", "curl -fsSLo out https://example.invalid/x",
+    "wget https://example.invalid/x", "wget -O out.json https://example.invalid/x",
+    "Invoke-WebRequest https://example.invalid/x -OutFile x.bin",
+    "rsync -a src/ dst/", "chmod +x run.sh",
+    "clang-format -i a.c", "rubocop -a", "shfmt -w a.sh", "terraform fmt", "dotnet format", "dos2unix a.sh",
+])
+def test_archive_download_sync_and_foreign_formatter_writers_invalidate_evidence(tmp_path, monkeypatch, command):
+    _expect_stale(tmp_path, monkeypatch, command)
+
+
+@pytest.mark.parametrize("command", [
+    "python - <<'EOF'\nprint('hello')\nEOF",
+    "python - <<'EOF'\n# it's a read-only probe\nprint(1)\nEOF",
+    "cat <<'EOF'\nsome text\nEOF",
+    "bash -c \"pytest -q\"",
+    "bash -lc 'git status'",
+    "sh -c 'ls -la'",
+    "cmd /c dir",
+    "powershell -Command \"Get-ChildItem\"",
+    "powershell.exe -NoProfile -Command \"Get-Content a.txt\"",
+    "py -c \"print(1)\"",
+    "python3.11 -m pytest tests",
+    "python.exe -m pytest",
+    "tar -tf a.tar", "tar tzf a.tgz", "unzip -l a.zip", "7z l a.7z",
+    "curl https://example.invalid/x",
+    "curl -s https://example.invalid/x | python -c \"import sys; print(len(sys.stdin.read()))\"",
+    "wget -O - https://example.invalid/x", "wget --spider https://example.invalid/x",
+    "rsync -an src/ dst/",
+    "terraform fmt -check", "dotnet format --verify-no-changes", "clang-format a.c", "rubocop", "shfmt a.sh", "shfmt -d a.sh",
+    "pytest -q\n\necho done",
+    "pytest -q\n\n\n",
+    "cd src &&\npytest -q",
+    "cat a.txt |\ngrep x",
+    "# it's fine\npytest -q",
+    "pytest -q  # it's fine",
+    "pytest -q\r\necho done\r\n",
+    "echo $((1 << 3))\npytest -q",
+    "grep -n 'a << b' src/mod.py",
+    "npm run dev &",
+    "hermes --tui &",
+    "sleep 5 &",
+])
+def test_wrapped_stdin_and_multiline_read_only_commands_keep_evidence_fresh(tmp_path, monkeypatch, command):
+    _expect_fresh(tmp_path, monkeypatch, command)
+
+
+def test_a_background_job_is_a_complete_command_but_its_writes_still_count(tmp_path, monkeypatch):
+    _expect_stale(tmp_path, monkeypatch, "echo hi > src/a.py &")
+    _expect_stale(tmp_path, monkeypatch, "nohup python do_stuff.py >/tmp/out.log 2>&1 &")
+
+
+def test_a_verifier_after_the_last_multiline_write_keeps_the_command_fresh(tmp_path, monkeypatch):
+    """The in-compound-command rule still holds once newlines, blank lines and heredocs are understood."""
+    _expect_fresh(tmp_path, monkeypatch, "cat > src/a.py <<'EOF'\n# don't\nEOF\n\npython -m pytest tests/test_a.py")
+
+
+def test_heredoc_bodies_are_data_not_commands():
+    from agent.verification_evidence import _split_shell_segments
+
+    segments = _split_shell_segments("cat > a.py <<'EOF'\nrm -rf / # don't\nEOF\npytest -q")
+
+    assert [s.raw for s in segments] == ["cat > a.py <<'EOF'", "pytest -q"]
+    assert segments[0].heredoc == "rm -rf / # don't"
+
+
+def test_blank_lines_comments_and_trailing_operators_do_not_split_into_empty_segments():
+    from agent.verification_evidence import _split_shell_segments
+
+    assert [s.raw for s in _split_shell_segments("\n\npytest -q\n\n# note\n\nls\n")] == ["pytest -q", "ls"]
+    assert [(s.raw, s.following_operator) for s in _split_shell_segments("cd src &&\npytest -q")] == [
+        ("cd src", "&&"), ("pytest -q", None),
+    ]
+    assert [s.raw for s in _split_shell_segments("pytest -q  # it's fine")] == ["pytest -q"]
+    assert [s.raw for s in _split_shell_segments("echo a#b")] == ["echo a#b"]
+
+
+def test_unterminated_heredoc_and_here_strings_do_not_swallow_the_rest_of_the_command():
+    from agent.verification_evidence import _split_shell_segments
+
+    assert [s.raw for s in _split_shell_segments("cat <<EOF\nrm -rf build")] == ["cat <<EOF", "rm -rf build"]
+    assert [s.raw for s in _split_shell_segments("cat <<<hello\nrm -rf build")] == ["cat <<<hello", "rm -rf build"]
+    assert [s.raw for s in _split_shell_segments("echo 'a << b'\nrm -rf build")] == ["echo 'a << b'", "rm -rf build"]
+    # a bit shift is not a heredoc even if a later line happens to equal the shift count
+    assert [s.raw for s in _split_shell_segments("echo $((1<<3))\n3\nrm -rf build")] == [
+        "echo $((1<<3))", "3", "rm -rf build",
+    ]
