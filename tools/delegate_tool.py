@@ -264,44 +264,53 @@ def _build_child_agent(
                     from hermes_state_registry import release_or_close
                     release_or_close(child_session_db)
             raise
-    child._print_fn = getattr(parent_agent, "_print_fn", None)
-    _apply_child_cache_ttl(child)
+    # The fully initialized child owns its dedicated handle before any post-init work.
     if child_session_db is not None:
-        child._owns_session_db = True  # released by the child's close(), never by the parent
-    # Ownership transfer for the dedicated handle: the child's close() must release it (nothing else holds a
-    # reference), and no parent teardown can close it out from under a background child (#81267).
-    child_session_ref["session_id"] = getattr(child, "session_id", "") or ""
-    child._progress_identity_ref = child_session_ref
-    child._delegate_depth, child._delegate_role = child_depth, effective_role  # post-degrade role
-    child._subagent_id, child._parent_subagent_id = subagent_id, parent_subagent_id
-    _apply_child_compression_cap(child, delegation_cfg)
-    # Ownership chain for observation/control; weakref so a finished parent
-    # can be collected while a detached child record lingers in the registry.
+        child._owns_session_db = True
+    complete = False
     try:
-        child._delegate_parent_ref = weakref.ref(parent_agent)
-    except TypeError:
-        child._delegate_parent_ref = None  # non-weakref-able test doubles
-    # Sidebar marker: subagent sessions stay out of session pickers even when a
-    # parent delete orphans them (mirrors /branch's ``_branched_from``).
-    if parent_sid and getattr(child, "_session_init_model_config", None) is not None:
-        child._session_init_model_config["_delegate_from"] = parent_sid
-    # Pool identity was already resolved for the privacy-boundary decision.
-    if child_pool is not None:
-        child._credential_pool = child_pool
+        child._print_fn = getattr(parent_agent, "_print_fn", None)
+        _apply_child_cache_ttl(child)
+        child_session_ref["session_id"] = getattr(child, "session_id", "") or ""
+        child._progress_identity_ref = child_session_ref
+        child._delegate_depth, child._delegate_role = child_depth, effective_role  # post-degrade role
+        child._subagent_id, child._parent_subagent_id = subagent_id, parent_subagent_id
+        _apply_child_compression_cap(child, delegation_cfg)
+        # Ownership chain for observation/control; weakref so a finished parent
+        # can be collected while a detached child record lingers in the registry.
+        try:
+            child._delegate_parent_ref = weakref.ref(parent_agent)
+        except TypeError:
+            child._delegate_parent_ref = None  # non-weakref-able test doubles
+        # Sidebar marker: subagent sessions stay out of session pickers even when a
+        # parent delete orphans them (mirrors /branch's ``_branched_from``).
+        if parent_sid and getattr(child, "_session_init_model_config", None) is not None:
+            child._session_init_model_config["_delegate_from"] = parent_sid
+        # Pool identity was already resolved for the privacy-boundary decision.
+        if child_pool is not None:
+            child._credential_pool = child_pool
 
-    _attach_child(parent_agent, child)  # interrupt propagation
-    # spawn_requested now — the child may queue for seconds when the pool is
-    # saturated — then the subagent_start lifecycle hook.
-    _safe_progress(child_progress_cb, "subagent.spawn_requested", preview=goal)
-    with _quiet("subagent_start hook invocation failed", exc_info=True):
-        from hermes_cli.lifecycle import invoke_hook as _invoke_hook
-        _invoke_hook(
-            "subagent_start", parent_session_id=parent_sid,
-            parent_turn_id=getattr(parent_agent, "_current_turn_id", "") or "", parent_subagent_id=parent_subagent_id,
-            child_session_id=getattr(child, "session_id", None), child_subagent_id=subagent_id,
-            child_role=effective_role, child_goal=goal,
-        )
-    return child
+        _attach_child(parent_agent, child)  # interrupt propagation
+        # spawn_requested now — the child may queue for seconds when the pool is
+        # saturated — then the subagent_start lifecycle hook.
+        _safe_progress(child_progress_cb, "subagent.spawn_requested", preview=goal)
+        with _quiet("subagent_start hook invocation failed", exc_info=True):
+            from hermes_cli.lifecycle import invoke_hook as _invoke_hook
+            _invoke_hook(
+                "subagent_start", parent_session_id=parent_sid,
+                parent_turn_id=getattr(parent_agent, "_current_turn_id", "") or "", parent_subagent_id=parent_subagent_id,
+                child_session_id=getattr(child, "session_id", None), child_subagent_id=subagent_id,
+                child_role=effective_role, child_goal=goal,
+            )
+        complete = True
+        return child
+    finally:
+        if not complete:
+            # No caller has received this child, including when a start hook cancels.
+            from tools.delegate_tool_child_run import _close_child, _detach_child
+            with _quiet("Failed to detach child after construction failure", exc_info=True):
+                _detach_child(parent_agent, child)
+            _close_child(child, "Failed to close child after construction failure")
 
 def _run_single_child(
     task_index: int, goal: str, child=None, parent_agent=None, *, owner_session_id: Optional[str] = None,
