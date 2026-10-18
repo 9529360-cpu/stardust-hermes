@@ -86,3 +86,45 @@ it('renders known receipts as footnotes, without suppressing a red job', async (
   const passed = renderMarkdownResults([{ name: name + ' / e2e', conclusion: 'success' }])
   expect(passed).toContain('1 passed, 0 failed, 0 known failures')
 })
+const matrixGenerator = path.resolve(import.meta.dirname, '../scripts/sandbox/generate-e2e-matrix.mjs')
+
+describe('install E2E matrix CLI', () => {
+  const run = (args: string[], input = '') => spawnSync(process.execPath, [matrixGenerator, ...args], { input, encoding: 'utf8' })
+
+  it.each([['blank', ['--tags', '']], ['missing', []]])('reports no upgrade legs when tags are %s', (_label, tagArgs) => {
+    const result = run(['--format', 'results', ...tagArgs])
+    expect(result.status).toBe(0)
+    expect(result.stdout).toContain('No upgrade legs ran; check tag selection and matrix.')
+    expect(result.stdout).toContain('(no legs found in this run)')
+  })
+
+  it.each([
+    ['json with blank tags', 'json', ['--tags', '']],
+    ['markdown with blank tags', 'markdown', ['--tags', '']],
+    ['json with missing tags', 'json', []],
+    ['markdown with missing tags', 'markdown', []],
+  ])('fails closed for zero tags in %s', (_label, format, tagArgs) => {
+    const result = run(['--format', format, ...tagArgs])
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('no upgrade tags selected; check tag selection and matrix')
+    expect(result.stdout).toBe('')
+  })
+
+  it('retains tagged matrix generation and pass/fail result counts', () => {
+    const tags = JSON.stringify([{ ref: 'v2026.8.3', desktop: true }])
+    const matrix = run(['--tags', tags])
+    expect(matrix.status).toBe(0)
+    expect(JSON.parse(matrix.stdout).linux.include.length).toBeGreaterThan(0)
+
+    const name = 'windows: installer-script -> hermes-update (v2026.8.3 -> HEAD) / e2e'
+
+    const results = run(['--format', 'results', '--tags', tags], [
+      JSON.stringify({ name, conclusion: 'success' }),
+      JSON.stringify({ name: name.replace('windows:', 'linux:'), conclusion: 'failure' }),
+    ].join('\n'))
+
+    expect(results.status).toBe(0)
+    expect(results.stdout).toContain('1 passed, 1 failed, 0 known failures')
+    expect(results.stdout).not.toContain('No upgrade legs ran')
+  })
+})

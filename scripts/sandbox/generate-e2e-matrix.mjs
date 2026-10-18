@@ -417,7 +417,8 @@ async function main() {
   });
   if (values.format === 'results') {
     const jobs = (await readStdin()).split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l));
-    const annotations = /** @type {TagAnnotation[]} */ (JSON.parse(values.tags));
+    const tagsValue = values.tags.trim() || '[]';
+    const annotations = /** @type {TagAnnotation[]} */ (JSON.parse(tagsValue));
     /** @type {Map<string, number>} */
     const artifactById = new Map();
     if (values.artifacts) {
@@ -427,10 +428,19 @@ async function main() {
         if (typeof a.name === 'string' && typeof a.id === 'number') artifactById.set(a.name, a.id);
       }
     }
-    process.stdout.write(renderMarkdownResults(jobs, annotations, artifactById));
+    let report = renderMarkdownResults(jobs, annotations, artifactById);
+    if (!jobs.some((job) => typeof job.name === 'string' && /^(linux|windows|macos):/.test(job.name))) {
+      report += '\nNo upgrade legs ran; check tag selection and matrix.\n';
+    }
+    process.stdout.write(report);
     return;
   }
-  const tags = /** @type {TagAnnotation[]} */ (JSON.parse(values.tags));
+  const tags = /** @type {TagAnnotation[]} */ (JSON.parse(values.tags.trim() || '[]'));
+  if (tags.length === 0) {
+    process.stderr.write('Error: no upgrade tags selected; check tag selection and matrix.\n');
+    process.exitCode = 1;
+    return;
+  }
   const envs = generateEnvironments(SPEC);
   if (values.format === 'markdown') {
     process.stdout.write(renderMarkdownPlan(envs, tags));
