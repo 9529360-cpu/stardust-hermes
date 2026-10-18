@@ -399,50 +399,61 @@ def _build_children(
                 return [], f"Member model configuration: {exc}"
         routes.append((member_cfg, member_creds))
     children = []
-    for i, t in enumerate(task_list):
-        member_cfg, member_creds = routes[i]
-        overrides = {
-            "override_provider": member_creds["provider"], "override_base_url": member_creds["base_url"],
-            "override_api_key": member_creds["api_key"], "override_api_mode": member_creds["api_mode"],
-            "override_request_overrides": member_creds.get("request_overrides"),
-            "override_acp_command": member_creds.get("command"), "override_acp_args": member_creds.get("args"),
-            "routing_cfg": member_cfg,
-        }
-        _task_schema = task_schemas[i] if i < len(task_schemas) else None
-        _child_context = t.get("context")
-        if _task_schema is not None:
-            _child_context = append_output_contract(_child_context, _task_schema)
-        try:
-            child = _build_child_preserving_parent_tools(
-                task_index=i, goal=t["goal"], context=_child_context,
-                toolsets=None,  # always inherit the parent's toolsets
-                model=member_creds["model"], max_iterations=max_iterations, task_count=len(task_list),
-                parent_agent=parent_agent, role=_normalize_role(t.get("role") or top_role), **overrides,
-            )
-        except ValueError as exc:
-            return [], str(exc)
-        if _task_schema is not None:
-            with _quiet("Could not attach output schema to child %d", i):
-                child._delegate_output_schema = _task_schema
-        # Validated per-task images; absent on image-less tasks, which keep the text-only goal turn.
-        _t_images = task_images[i] if task_images and i < len(task_images) else None
-        if _t_images:
-            with _quiet("Could not attach images to child %d", i):
-                child._delegate_images = _t_images
-        # Tee progress events into the live transcript (wrapper keeps the
-        # _flush contract and swallows writer failures).
-        _writer = live_writers[i] if i < len(live_writers) else None
-        if _writer is not None:
-            child.tool_progress_callback = wrap_progress_callback(getattr(child, "tool_progress_callback", None), _writer)
-            child._live_transcript_path = str(_writer.path)
-        child._delegate_worktree_required = t.get("requires_worktree", False) is True
-        if live_deleg_id:
-            setattr(child, "_delegation_id", live_deleg_id)
-            _ident_ref = getattr(child, "_progress_identity_ref", None)
-            if isinstance(_ident_ref, dict):
-                _ident_ref["delegation_id"] = live_deleg_id
-        children.append((i, t, child))
-    return children, None
+    complete = False
+    try:
+        for i, t in enumerate(task_list):
+            member_cfg, member_creds = routes[i]
+            overrides = {
+                "override_provider": member_creds["provider"], "override_base_url": member_creds["base_url"],
+                "override_api_key": member_creds["api_key"], "override_api_mode": member_creds["api_mode"],
+                "override_request_overrides": member_creds.get("request_overrides"),
+                "override_acp_command": member_creds.get("command"), "override_acp_args": member_creds.get("args"),
+                "routing_cfg": member_cfg,
+            }
+            _task_schema = task_schemas[i] if i < len(task_schemas) else None
+            _child_context = t.get("context")
+            if _task_schema is not None:
+                _child_context = append_output_contract(_child_context, _task_schema)
+            try:
+                child = _build_child_preserving_parent_tools(
+                    task_index=i, goal=t["goal"], context=_child_context,
+                    toolsets=None,  # always inherit the parent's toolsets
+                    model=member_creds["model"], max_iterations=max_iterations, task_count=len(task_list),
+                    parent_agent=parent_agent, role=_normalize_role(t.get("role") or top_role), **overrides,
+                )
+            except ValueError as exc:
+                return [], str(exc)
+            children.append((i, t, child))
+            if _task_schema is not None:
+                with _quiet("Could not attach output schema to child %d", i):
+                    child._delegate_output_schema = _task_schema
+            # Validated per-task images; absent on image-less tasks, which keep the text-only goal turn.
+            _t_images = task_images[i] if task_images and i < len(task_images) else None
+            if _t_images:
+                with _quiet("Could not attach images to child %d", i):
+                    child._delegate_images = _t_images
+            # Tee progress events into the live transcript (wrapper keeps the
+            # _flush contract and swallows writer failures).
+            _writer = live_writers[i] if i < len(live_writers) else None
+            if _writer is not None:
+                child.tool_progress_callback = wrap_progress_callback(getattr(child, "tool_progress_callback", None), _writer)
+                child._live_transcript_path = str(_writer.path)
+            child._delegate_worktree_required = t.get("requires_worktree", False) is True
+            if live_deleg_id:
+                setattr(child, "_delegation_id", live_deleg_id)
+                _ident_ref = getattr(child, "_progress_identity_ref", None)
+                if isinstance(_ident_ref, dict):
+                    _ident_ref["delegation_id"] = live_deleg_id
+        complete = True
+        return children, None
+    finally:
+        if not complete:
+            # No batch runner owns these children until the whole build succeeds.
+            from tools.delegate_tool_child_run import _close_child, _detach_child
+            for _index, _task, child in children:
+                with _quiet("Failed to detach unstarted child after batch construction failure", exc_info=True):
+                    _detach_child(parent_agent, child)
+                _close_child(child, "Failed to close unstarted child after batch construction failure")
 
 
 def delegate_task(
