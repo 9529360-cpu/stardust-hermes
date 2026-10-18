@@ -178,3 +178,87 @@ def test_agent_turn_binds_and_clears_lifecycle_parent(monkeypatch):
     assert agent.run_conversation("hello") == {"final_response": "ok"}
     assert observed == [agent]
     assert get_active_subagent_parent() is None
+
+
+def test_duplicate_correlation_is_rejected_while_first_child_is_building(lifecycle, monkeypatch):
+    """Two launchers with the same logical key must never construct two children."""
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    entered = threading.Event()
+    release = threading.Event()
+    built = []
+
+    def slow_build(**_kwargs):
+        built.append(True)
+        if len(built) == 1:
+            entered.set()
+            if not release.wait(timeout=5):
+                raise AssertionError("test did not release the blocked constructor")
+        return FakeChild(f"sa-correlation-race-{len(built)}")
+
+    monkeypatch.setattr("tools.delegate_tool._build_child_agent", slow_build)
+    request = SubagentLaunchRequest(goal="one logical task", correlation_id="lifecycle-race-test")
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first = executor.submit(lifecycle.launch, request)
+        assert entered.wait(timeout=2)
+        duplicate = executor.submit(lifecycle.launch, request)
+        try:
+            with pytest.raises(SubagentLifecycleError, match="Duplicate correlation_id"):
+                duplicate.result(timeout=2)
+        finally:
+            release.set()
+        handle = first.result(timeout=3)
+
+    assert built == [True], "duplicate launch must not enter the child constructor"
+    assert lifecycle.wait(handle, timeout_seconds=2).state is SubagentState.SUCCEEDED
+
+
+def test_failed_child_construction_releases_correlation_reservation(lifecycle, monkeypatch):
+    import tools.delegate_tool as delegate_tool
+
+    original_build = delegate_tool._build_child_agent
+    attempts = []
+
+    def fail_first(**kwargs):
+        attempts.append(True)
+        if len(attempts) == 1:
+            raise RuntimeError("construction failed")
+        return original_build(**kwargs)
+
+    monkeypatch.setattr("tools.delegate_tool._build_child_agent", fail_first)
+    request = SubagentLaunchRequest(goal="retry after construction failure", correlation_id="lifecycle-build-failure")
+    with pytest.raises(RuntimeError, match="construction failed"):
+        lifecycle.launch(request)
+    handle = lifecycle.launch(request)
+    assert lifecycle.wait(handle, timeout_seconds=2).state is SubagentState.SUCCEEDED
+    assert len(attempts) == 2
+
+
+def test_failed_executor_submission_does_not_publish_ghost_child(lifecycle, monkeypatch):
+    import agent.subagent_lifecycle as lifecycle_module
+
+    request = SubagentLaunchRequest(goal="can retry after executor refusal", correlation_id="lifecycle-pool-failure")
+    with monkeypatch.context() as patcher:
+        def refused(*_args, **_kwargs):
+            raise RuntimeError("executor unavailable")
+        patcher.setattr(lifecycle_module._EXECUTOR, "submit", refused)
+        with pytest.raises(RuntimeError, match="executor unavailable"):
+            lifecycle.launch(request)
+    assert ("parent-1", request.correlation_id) not in lifecycle_module._REGISTRY.correlations
+    assert ("parent-1", request.correlation_id) not in lifecycle_module._REGISTRY.pending_correlations
+    handle = lifecycle.launch(request)
+    assert lifecycle.wait(handle, timeout_seconds=2).state is SubagentState.SUCCEEDED
+
+
+def test_same_correlation_is_allowed_for_different_parent_sessions(lifecycle):
+    from types import SimpleNamespace
+
+    request = SubagentLaunchRequest(goal="scoped task", correlation_id="lifecycle-parent-scope")
+    first = lifecycle.launch(request)
+    second_parent = SimpleNamespace(session_id="parent-2", enabled_toolsets=["file"])
+    other = SubagentLifecycleService(lambda: second_parent)
+    second = other.launch(request)
+    assert first.parent_session_id != second.parent_session_id
+    assert lifecycle.wait(first, timeout_seconds=2).state is SubagentState.SUCCEEDED
+    assert other.wait(second, timeout_seconds=2).state is SubagentState.SUCCEEDED
