@@ -23,10 +23,14 @@ class FakeChild:
         self._delegate_depth = 1
         self.provider = "test"
         self.model = "test-model"
+        self.closed = False
         self.interrupted = False
         self.interrupt_kind = None
         self.interrupt_message = None
         self.tool_reason = None
+
+    def close(self):
+        self.closed = True
 
     def interrupt(self, _reason):
         self.interrupted = True
@@ -237,16 +241,35 @@ def test_failed_child_construction_releases_correlation_reservation(lifecycle, m
 
 def test_failed_executor_submission_does_not_publish_ghost_child(lifecycle, monkeypatch):
     import agent.subagent_lifecycle as lifecycle_module
+    from tools.delegate_tool_child_run import _attach_child
 
+    # Real child construction attaches the child to the parent for interrupt
+    # propagation (tools/delegate_tool.py::_build_child_agent). A refused submit
+    # must roll back that ownership, not only close the child.
+    parent = lifecycle._parent_agent_resolver()
+    parent._active_children = []
+    constructed = []
+
+    def build_and_attach(**_kwargs):
+        child = FakeChild("sa-pool-failure")
+        constructed.append(child)
+        _attach_child(parent, child)
+        return child
+
+    monkeypatch.setattr("tools.delegate_tool._build_child_agent", build_and_attach)
     request = SubagentLaunchRequest(goal="can retry after executor refusal", correlation_id="lifecycle-pool-failure")
+    records_before = set(lifecycle_module._REGISTRY.records)
     with monkeypatch.context() as patcher:
         def refused(*_args, **_kwargs):
             raise RuntimeError("executor unavailable")
         patcher.setattr(lifecycle_module._EXECUTOR, "submit", refused)
         with pytest.raises(RuntimeError, match="executor unavailable"):
             lifecycle.launch(request)
+    assert set(lifecycle_module._REGISTRY.records) == records_before
     assert ("parent-1", request.correlation_id) not in lifecycle_module._REGISTRY.correlations
     assert ("parent-1", request.correlation_id) not in lifecycle_module._REGISTRY.pending_correlations
+    assert constructed[0].closed is True
+    assert parent._active_children == []
     handle = lifecycle.launch(request)
     assert lifecycle.wait(handle, timeout_seconds=2).state is SubagentState.SUCCEEDED
 

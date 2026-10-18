@@ -296,8 +296,15 @@ class SubagentLifecycleService:
                             _REGISTRY.correlations.pop(correlation_key, None)
                         raise
             except Exception:
-                # A constructed child may own its SessionDB handle; close it
-                # outside the registry lock if scheduling did not succeed.
+                # Scheduling failed after construction: roll back the child's
+                # ownership too. Construction attaches it to the parent for
+                # interrupt propagation (tools/delegate_tool.py::_build_child_agent),
+                # and close() alone leaves that stale entry behind - the parent
+                # would then look busy forever. Detach outside the registry lock.
+                with contextlib.suppress(Exception):
+                    from tools.delegate_tool_child_run import _detach_child
+                    _detach_child(parent, child)
+                # The constructed child owns its dedicated SessionDB handle.
                 close = getattr(child, "close", None)
                 if callable(close):
                     with contextlib.suppress(Exception):
