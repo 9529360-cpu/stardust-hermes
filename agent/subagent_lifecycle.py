@@ -396,6 +396,10 @@ class SubagentLifecycleService:
 
     def _run(self, record: _Record, goal: str, parent: Any) -> None:
         with _REGISTRY.lock:
+            # submit() may enqueue before worker startup raises; rollback removes this record
+            # and closes the child, but a later worker could still dequeue the stale work item.
+            if _REGISTRY.records.get(record.handle.subagent_id) is not record:
+                return
             if record.state is not SubagentState.CANCEL_REQUESTED:
                 record.state = SubagentState.RUNNING
             record.started_at = record.updated_at = time.time()
