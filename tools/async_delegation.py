@@ -771,6 +771,10 @@ def _dispatch(
             _finalize(delegation_id, result, status)
 
     try:
+        # Admission is all-or-nothing: everything that can still fail runs BEFORE the unit is submitted, so a
+        # failure rolls the record back below instead of raising past a unit that is already running.
+        if progress_fn is not None:
+            _ensure_stale_monitor()
         # Propagate the dispatching profile so the detached child resolves get_hermes_home() correctly.
         executor.submit(propagate_context_to_thread(_worker))
     except Exception as exc:  # pragma: no cover — pool submit failure is rare
@@ -779,8 +783,6 @@ def _dispatch(
         with _DB_LOCK, _transaction() as conn:
             conn.execute("DELETE FROM async_delegations WHERE delegation_id=?", (delegation_id,))
         return {"status": "rejected", "error": f"Failed to schedule async delegation{label}: {exc}"}
-    if progress_fn is not None:
-        _ensure_stale_monitor()
     return {"status": "dispatched", "delegation_id": delegation_id}
 
 

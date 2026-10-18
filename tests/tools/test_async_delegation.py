@@ -200,6 +200,36 @@ def test_dispatch_persistence_failure_releases_capacity(monkeypatch):
     assert ad.list_async_delegations() == []
 
 
+def test_stale_monitor_start_failure_rejects_before_the_unit_is_scheduled(monkeypatch):
+    """Admission is all-or-nothing: raising after the unit was submitted would leave it running behind a
+    failed dispatch call, with a caller that believes nothing started."""
+    class RecordingExecutor:
+        def __init__(self):
+            self.submitted = []
+
+        def submit(self, fn, *args, **kwargs):
+            self.submitted.append(fn)
+
+    executor = RecordingExecutor()
+    monkeypatch.setattr(ad, "_get_executor", lambda _workers: executor)
+
+    def cannot_start_monitor():
+        raise RuntimeError("can't start new thread")
+
+    monkeypatch.setattr(ad, "_ensure_stale_monitor", cannot_start_monitor)
+    handle = ad.dispatch_async_delegation(
+        goal="monitored", context=None, toolsets=None, role="leaf", model=None, session_key="owner",
+        runner=lambda: {"status": "completed", "summary": "ran"}, progress_fn=lambda: ((), False),
+    )
+
+    assert handle["status"] == "rejected"
+    assert "can't start new thread" in handle["error"]
+    assert executor.submitted == [], "a rejected unit was still scheduled"
+    assert ad.active_count() == 0
+    assert ad.list_async_delegations() == []
+    assert ad.list_durable_delegations() == [], "the rejected unit left a durable running row behind"
+
+
 def test_completion_persistence_failure_retries_same_result(monkeypatch):
     """A completed child remains recoverable in memory until its receipt is durable."""
     real_persist = ad._persist_completion

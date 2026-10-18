@@ -274,6 +274,37 @@ def test_failed_executor_submission_does_not_publish_ghost_child(lifecycle, monk
     assert lifecycle.wait(handle, timeout_seconds=2).state is SubagentState.SUCCEEDED
 
 
+def test_unidentifiable_child_is_detached_and_closed(lifecycle, monkeypatch):
+    """Construction hands launch() an attached child. A failure after construction but before the record
+    is published (no identity to key it by) must return that ownership, not only a refused submit."""
+    import agent.subagent_lifecycle as lifecycle_module
+    from tools.delegate_tool_child_run import _attach_child
+
+    parent = lifecycle._parent_agent_resolver()
+    parent._active_children = []
+    constructed = []
+
+    def build_without_identity(**_kwargs):
+        child = FakeChild("")
+        constructed.append(child)
+        _attach_child(parent, child)
+        return child
+
+    monkeypatch.setattr("tools.delegate_tool._build_child_agent", build_without_identity)
+    request = SubagentLaunchRequest(goal="cannot be keyed", correlation_id="lifecycle-no-identity")
+    records_before = set(lifecycle_module._REGISTRY.records)
+    try:
+        with pytest.raises(SubagentLifecycleError, match="child identity"):
+            lifecycle.launch(request)
+        assert constructed[0].closed is True, "the unregistered child was left open"
+        assert parent._active_children == [], "the unregistered child stayed attached to its parent"
+    finally:
+        parent._active_children[:] = []
+        constructed[0].close()
+    assert set(lifecycle_module._REGISTRY.records) == records_before
+    assert ("parent-1", request.correlation_id) not in lifecycle_module._REGISTRY.pending_correlations
+
+
 def test_same_correlation_is_allowed_for_different_parent_sessions(lifecycle):
     from types import SimpleNamespace
 
