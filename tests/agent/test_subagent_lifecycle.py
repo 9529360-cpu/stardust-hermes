@@ -285,3 +285,62 @@ def test_same_correlation_is_allowed_for_different_parent_sessions(lifecycle):
     assert first.parent_session_id != second.parent_session_id
     assert lifecycle.wait(first, timeout_seconds=2).state is SubagentState.SUCCEEDED
     assert other.wait(second, timeout_seconds=2).state is SubagentState.SUCCEEDED
+
+
+def test_queued_submit_failure_never_runs_after_later_thread_start(lifecycle, monkeypatch):
+    """CPython can raise after enqueuing work if a daemon worker cannot start."""
+    import agent.subagent_lifecycle as lifecycle_module
+    import tools.delegate_tool as delegate_tool
+    from tools.daemon_pool import DaemonThreadPoolExecutor
+    from tools.delegate_tool_child_run import _attach_child, _detach_child
+
+    parent = lifecycle._parent_agent_resolver()
+    parent._active_children = []
+    constructed, run_attempts = [], []
+
+    def build_and_attach(**_kwargs):
+        child = FakeChild(f"sa-queued-{len(constructed)}")
+        _attach_child(parent, child)
+        constructed.append(child)
+        return child
+
+    monkeypatch.setattr(delegate_tool, "_build_child_agent", build_and_attach)
+    real_child_runner = delegate_tool._run_child_lifecycle
+
+    def record_child_runner(index, goal, child, owner):
+        run_attempts.append(child)
+        return real_child_runner(index, goal, child, owner)
+
+    monkeypatch.setattr(delegate_tool, "_run_child_lifecycle", record_child_runner)
+    executor = DaemonThreadPoolExecutor(max_workers=1, thread_name_prefix="rollback-test")
+    original_adjust = executor._adjust_thread_count
+    monkeypatch.setattr(lifecycle_module, "_EXECUTOR", executor)
+    executor._adjust_thread_count = lambda: (_ for _ in ()).throw(
+        RuntimeError("controlled native worker-start failure after queue insertion")
+    )
+    request = SubagentLaunchRequest(goal="first child must not run after scheduling refusal",
+                                    correlation_id="lifecycle-queued-submit-refusal")
+    try:
+        with pytest.raises(RuntimeError, match="after queue insertion"):
+            lifecycle.launch(request)
+        assert executor._work_queue.qsize() == 1, "real submit enqueued work before worker startup failed"
+        abandoned = constructed[0]
+        assert abandoned.closed is True
+        assert parent._active_children == []
+        assert ("parent-1", request.correlation_id) not in lifecycle_module._REGISTRY.correlations
+        assert ("parent-1", request.correlation_id) not in lifecycle_module._REGISTRY.pending_correlations
+
+        # A later accepted submission starts the real worker, which encounters the older queued item first.
+        executor._adjust_thread_count = original_adjust
+        handle = lifecycle.launch(request)
+        assert lifecycle.wait(handle, timeout_seconds=3).state is SubagentState.SUCCEEDED
+        live_child = constructed[1]
+        assert run_attempts == [live_child], "the rolled-back closed child was later scheduled"
+        assert abandoned not in parent._active_children
+    finally:
+        executor._adjust_thread_count = original_adjust
+        for child in constructed:
+            _detach_child(parent, child)
+            if not child.closed:
+                child.close()
+        executor.shutdown(wait=True)
