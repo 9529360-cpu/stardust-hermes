@@ -2685,13 +2685,19 @@ def main():
 
         # Push the commit and tag before creating the GitHub release. If this
         # fails, keep the local tag and notes so the operator can retry safely.
-        push_result = git_result("push", "origin", "HEAD", "--tags")
+        push_result = git_result(
+            "push", "--no-follow-tags", "origin", "HEAD",
+            f"refs/tags/{tag_name}:refs/tags/{tag_name}",
+        )
         if push_result.returncode != 0:
             print(f"  ✗ Failed to push to origin: {push_result.stderr.strip()}")
             print(f"    Local tag {tag_name} and release notes were preserved.")
             print(f"    Release notes kept at: {changelog_file}")
             print("    After fixing access, run these commands in order:")
-            print("    git push origin HEAD --tags")
+            print(
+                f"    git push --no-follow-tags origin HEAD "
+                f"refs/tags/{tag_name}:refs/tags/{tag_name}"
+            )
             print(
                 f"    gh release create {tag_name} --title 'Stardust v{new_version} ({calver_date})' "
                 f"--notes-file .release_notes.md"
