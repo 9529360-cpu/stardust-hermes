@@ -11,7 +11,10 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import tomllib
 from pathlib import Path
+
+import pytest
 
 SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "release.py"
 
@@ -41,7 +44,7 @@ def _patch_repo(tmp_path, monkeypatch, *, with_installer: bool = True):
         encoding="utf-8",
     )
     pyproject = repo / "pyproject.toml"
-    pyproject.write_text('version = "0.0.1"\n', encoding="utf-8")
+    pyproject.write_text('[project]\nname = "stardust"\nversion = "0.0.1"\n', encoding="utf-8")
 
     desktop_pkg = repo / "apps" / "desktop" / "package.json"
     desktop_pkg.parent.mkdir(parents=True)
@@ -142,3 +145,45 @@ def test_version_files_to_stage_omits_missing_installer(tmp_path, monkeypatch):
     assert str(paths["desktop_pkg"]) in staged
     assert str(paths["init_py"]) in staged
     assert str(paths["pyproject"]) in staged
+
+
+@pytest.mark.parametrize(
+    ("header", "version"),
+    [("[project] # release metadata", '"0.0.1"'), ("  [project] # release metadata", "'0.0.1'")],
+)
+def test_update_version_files_scopes_pyproject_with_commented_header(
+    tmp_path, monkeypatch, header, version
+):
+    paths = _patch_repo(tmp_path, monkeypatch)
+    paths["pyproject"].write_text(
+        f'{header}\nname = "stardust"\nversion = {version} # keep comment\n'
+        '\n[tool.unrelated]\nversion = "9.9.9"\n', encoding="utf-8",
+    )
+    release.update_version_files("0.21.1", "2026.9.10")
+    result = tomllib.loads(paths["pyproject"].read_text(encoding="utf-8"))
+    assert result["project"]["version"] == "0.21.1"
+    assert result["tool"]["unrelated"]["version"] == "9.9.9"
+
+
+@pytest.mark.parametrize("table", ["project", "package"])
+@pytest.mark.parametrize("embedded_version", ["0.0.1", "0.21.1"])
+def test_ambiguous_toml_version_in_multiline_string_is_rejected_before_writing(
+    tmp_path, monkeypatch, table, embedded_version
+):
+    paths = _patch_repo(tmp_path, monkeypatch)
+    target = paths["pyproject" if table == "project" else "cargo_toml"]
+    target.write_text(
+        f'[{table}]\ndescription = """\nversion = "{embedded_version}"\n"""\n'
+        'version = "0.21.1"\n', encoding="utf-8",
+    )
+    before = {p: p.read_bytes() for p in paths.values() if p.is_file()}
+    with pytest.raises(ValueError, match="version|metadata"):
+        release.update_version_files("0.21.1", "2026.9.10")
+    assert {p: p.read_bytes() for p in before} == before
+
+
+@pytest.mark.parametrize("table", ["project", "package"])
+def test_toml_version_scanner_accepts_crlf(table):
+    text = f'[{table}] # metadata\r\nversion = "0.0.1"\r\n'
+    start, end = release._toml_table_version_span(text, table)
+    assert text[start:end] == '"0.0.1"'

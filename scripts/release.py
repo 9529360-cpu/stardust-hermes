@@ -29,6 +29,13 @@ import sys
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
+import tomllib
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+try:
+    from scripts import release_metadata
+finally:
+    sys.path.pop(0)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 VERSION_FILE = REPO_ROOT / "hermes_cli" / "__init__.py"
@@ -2156,10 +2163,8 @@ def next_available_tag(base_tag: str) -> tuple[str, str]:
 
 
 def get_current_version():
-    """Read current semver from __init__.py."""
-    content = VERSION_FILE.read_text(encoding="utf-8")
-    match = re.search(r'__version__\s*=\s*"([^"]+)"', content)
-    return match.group(1) if match else "0.0.0"
+    """Read the declared CLI version without importing runtime code."""
+    return release_metadata.read_metadata({"python": VERSION_FILE})["python"][0]
 
 
 def bump_version(current: str, part: str) -> str:
@@ -2184,97 +2189,180 @@ def bump_version(current: str, part: str) -> str:
     return f"{major}.{minor}.{patch}"
 
 
-def update_version_files(semver: str, calver_date: str):
-    """Update version strings in source files."""
-    # Update __init__.py
-    content = VERSION_FILE.read_text(encoding="utf-8")
-    content = re.sub(
-        r'__version__\s*=\s*"[^"]+"',
+def _toml_table_version_span(text: str, table: str) -> tuple[int, int] | None:
+    """Span of a TOML table's version value, quotes included, or None."""
+    header = f"[{table}]"
+    offset = 0
+    in_table = False
+    for line in text.splitlines(keepends=True):
+        stripped = line.strip()
+        if stripped.startswith("["):
+            in_table = stripped.split("#", 1)[0].strip() == header
+        elif in_table:
+            match = re.match(r"[ \t]*version[ \t]*=[ \t]*(['\"])([^'\"]*)\1", line)
+            if match:
+                start, end = offset + match.start(2) - 1, offset + match.end(2) + 1
+                # Prove the span belongs to the parsed field, even if a string
+                # elsewhere happens to contain the exact same version value.
+                marker = "__stardust_release_version_probe__"
+                expected = tomllib.loads(text)
+                expected[table]["version"] = marker
+                projected = text[:start] + json.dumps(marker) + text[end:]
+                if tomllib.loads(projected) != expected:
+                    raise ValueError(f"ambiguous [{table}] version metadata location")
+                return start, end
+        offset += len(line)
+    return None
+
+
+def _json_root_version_span(text: str) -> tuple[int, int] | None:
+    """Span of the root object's version string value, or None when absent."""
+    index, length = 0, len(text)
+    while index < length and text[index] in " \t\r\n":
+        index += 1
+    if index >= length or text[index] != "{":
+        raise ValueError("expected a JSON object at the document root")
+    index += 1
+    depth = 1
+    while index < length:
+        char = text[index]
+        if char == '"':
+            start = index
+            index += 1
+            escaped = False
+            while index < length:
+                current = text[index]
+                if escaped:
+                    escaped = False
+                elif current == "\\":
+                    escaped = True
+                elif current == '"':
+                    break
+                index += 1
+            if index >= length:
+                raise ValueError("unterminated JSON string")
+            key = text[start:index + 1]
+            index += 1
+            while index < length and text[index] in " \t\r\n":
+                index += 1
+            if depth == 1 and key == '"version"' and index < length and text[index] == ":":
+                index += 1
+                while index < length and text[index] in " \t\r\n":
+                    index += 1
+                if index >= length or text[index] != '"':
+                    raise ValueError('root "version" must be a string')
+                value_start = index
+                index += 1
+                escaped = False
+                while index < length:
+                    current = text[index]
+                    if escaped:
+                        escaped = False
+                    elif current == "\\":
+                        escaped = True
+                    elif current == '"':
+                        return value_start, index + 1
+                    index += 1
+                raise ValueError("unterminated JSON string")
+            continue
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                break
+        index += 1
+    return None
+
+
+def prepare_version_updates(semver: str, calver_date: str) -> dict[Path, str]:
+    """Compute new metadata text for every existing version file, without writing."""
+    updates: dict[Path, str] = {}
+
+    content = VERSION_FILE.read_text(encoding="utf-8-sig")
+    content, version_count = re.subn(
+        r"^__version__\s*=\s*(['\"])[^'\"]+\1",
         f'__version__ = "{semver}"',
         content,
-    )
-    content = re.sub(
-        r'__release_date__\s*=\s*"[^"]+"',
-        f'__release_date__ = "{calver_date}"',
-        content,
-    )
-    VERSION_FILE.write_text(content, encoding="utf-8")
-
-    # Update pyproject.toml
-    pyproject = PYPROJECT_FILE.read_text(encoding="utf-8")
-    pyproject = re.sub(
-        r'^version\s*=\s*"[^"]+"',
-        f'version = "{semver}"',
-        pyproject,
-        # Turn-end file-mutation verifier footer appended by run_agent.py
-        # (``_format_file_mutation_failure_footer``). It's a UI affordance — reading "warning file mutation
-        # verifier, 2 files were NOT modified..." aloud is noise (#40772). The footer is a ``⚠️
-        # File-mutation verifier:`` header line followed by indented ``•`` bullet lines; strip the whole
-        # block.
         flags=re.MULTILINE,
     )
-    PYPROJECT_FILE.write_text(pyproject, encoding="utf-8")
+    content, date_count = re.subn(
+        r"^__release_date__\s*=\s*(['\"])[^'\"]+\1",
+        f'__release_date__ = "{calver_date}"',
+        content,
+        flags=re.MULTILINE,
+    )
+    if version_count != 1 or date_count != 1:
+        raise ValueError(
+            f"{VERSION_FILE}: need exactly one top-level __version__ and __release_date__"
+        )
+    updates[VERSION_FILE] = content
+
+    # Update pyproject.toml. The span is verified against the parsed value so a
+    # coincidental `version =` inside another construct can never be rewritten.
+    pyproject = PYPROJECT_FILE.read_text(encoding="utf-8-sig")
+    project_version = tomllib.loads(pyproject).get("project", {}).get("version")
+    project_span = _toml_table_version_span(pyproject, "project")
+    if project_span is None or not isinstance(project_version, str):
+        raise ValueError(f"{PYPROJECT_FILE}: need exactly one [project] version")
+    if tomllib.loads("v = " + pyproject[project_span[0]:project_span[1]])["v"] != project_version:
+        raise ValueError(f"{PYPROJECT_FILE}: located [project] version is not the parsed value")
+    updates[PYPROJECT_FILE] = (
+        f'{pyproject[:project_span[0]]}"{semver}"{pyproject[project_span[1]:]}'
+    )
 
     # Keep the desktop Electron app's package.json version in lockstep with the
     # Python package version. The desktop About panel reads the live Hermes
     # version at runtime, but app.getVersion()/packaging metadata still come
     # from this field, so it must track pyproject to avoid drift.
-    desktop_pkg = REPO_ROOT / "apps" / "desktop" / "package.json"
-    if desktop_pkg.exists():
-        pkg_text = desktop_pkg.read_text(encoding="utf-8")
-        pkg_text = re.sub(
-            r'("version"\s*:\s*)"[^"]+"',
-            rf'\g<1>"{semver}"',
-            pkg_text,
-            count=1,
-        )
-        desktop_pkg.write_text(pkg_text, encoding="utf-8")
+    for path in (
+        REPO_ROOT / "apps" / "desktop" / "package.json",
+        REPO_ROOT / "apps" / "bootstrap-installer" / "package.json",
+        REPO_ROOT / "apps" / "bootstrap-installer" / "src-tauri" / "tauri.conf.json",
+    ):
+        if not path.exists():
+            continue
+        text = path.read_text(encoding="utf-8-sig")
+        span = _json_root_version_span(text)
+        if span is None:
+            continue
+        parsed = json.loads(text, object_pairs_hook=release_metadata._unique_json_object).get("version")
+        if json.loads(text[span[0]:span[1]]) != parsed:
+            raise ValueError(f"{path}: located root version is not the parsed value")
+        updates[path] = f'{text[:span[0]]}"{semver}"{text[span[1]:]}'
 
     # Keep the bootstrap installer (Hermes-Setup.dmg CFBundleShortVersionString)
     # in lockstep with the Python package version. Tauri reads `version` from
     # package.json + tauri.conf.json; a hardcoded 0.0.1 ships in the DMG.
-    installer_pkg = REPO_ROOT / "apps" / "bootstrap-installer" / "package.json"
-    if installer_pkg.exists():
-        pkg_text = installer_pkg.read_text(encoding="utf-8")
-        pkg_text = re.sub(
-            r'("version"\s*:\s*)"[^"]+"',
-            rf'\g<1>"{semver}"',
-            pkg_text,
-            count=1,
-        )
-        installer_pkg.write_text(pkg_text, encoding="utf-8")
-
-    installer_tauri = (
-        REPO_ROOT / "apps" / "bootstrap-installer" / "src-tauri" / "tauri.conf.json"
-    )
-    if installer_tauri.exists():
-        pkg_text = installer_tauri.read_text(encoding="utf-8")
-        pkg_text = re.sub(
-            r'("version"\s*:\s*)"[^"]+"',
-            rf'\g<1>"{semver}"',
-            pkg_text,
-            count=1,
-        )
-        installer_tauri.write_text(pkg_text, encoding="utf-8")
-
     installer_cargo = (
         REPO_ROOT / "apps" / "bootstrap-installer" / "src-tauri" / "Cargo.toml"
     )
     if installer_cargo.exists():
-        cargo_text = installer_cargo.read_text(encoding="utf-8")
-        cargo_text = re.sub(
-            r'^version\s*=\s*"[^"]+"',
-            f'version = "{semver}"',
-            cargo_text,
-            count=1,
-            flags=re.MULTILINE,
-        )
-        installer_cargo.write_text(cargo_text, encoding="utf-8")
+        text = installer_cargo.read_text(encoding="utf-8-sig")
+        span = _toml_table_version_span(text, "package")
+        parsed = tomllib.loads(text).get("package", {}).get("version")
+        if span is not None and isinstance(parsed, str):
+            if tomllib.loads("v = " + text[span[0]:span[1]])["v"] != parsed:
+                raise ValueError(
+                    f"{installer_cargo}: located [package] version is not the parsed value"
+                )
+            updates[installer_cargo] = f'{text[:span[0]]}"{semver}"{text[span[1]:]}'
+
+    return updates
 
 
-def version_files_to_stage() -> list[str]:
-    """Return version-bearing files that exist and should be `git add`ed after a bump."""
-    candidates = [
+def update_version_files(
+    semver: str, calver_date: str, updates: dict[Path, str] | None = None
+):
+    """Write prepared version metadata; callers may pass already-validated text."""
+    prepared = prepare_version_updates(semver, calver_date) if updates is None else updates
+    for path, text in prepared.items():
+        path.write_text(text, encoding="utf-8")
+
+
+def version_file_candidates() -> list[Path]:
+    """Return all release metadata paths, including locally deleted components."""
+    return [
         VERSION_FILE,
         PYPROJECT_FILE,
         REPO_ROOT / "apps" / "desktop" / "package.json",
@@ -2282,7 +2370,11 @@ def version_files_to_stage() -> list[str]:
         REPO_ROOT / "apps" / "bootstrap-installer" / "src-tauri" / "tauri.conf.json",
         REPO_ROOT / "apps" / "bootstrap-installer" / "src-tauri" / "Cargo.toml",
     ]
-    return [str(path) for path in candidates if path.exists()]
+
+
+def version_files_to_stage() -> list[str]:
+    """Return existing version files to stage after a bump."""
+    return [str(path) for path in version_file_candidates() if path.exists()]
 
 
 def resolve_author(name: str, email: str) -> str:
@@ -2440,8 +2532,9 @@ def generate_changelog(commits, tag_name, semver, repo_url="https://github.com/9
     lines = []
 
     # Header
-    now = datetime.now()
-    date_str = now.strftime("%B %d, %Y")
+    release_date = release_metadata.date_from_tag(tag_name)
+    year, month, day = (int(part) for part in release_date.split("."))
+    date_str = datetime(year, month, day).strftime("%B %d, %Y")
     lines.append(f"# Stardust v{semver} ({tag_name})")
     lines.append("")
     lines.append(f"**Release Date:** {date_str}")
@@ -2544,13 +2637,23 @@ def main():
                         help="Which semver component to bump")
     parser.add_argument("--publish", action="store_true",
                         help="Actually create the tag and GitHub release (otherwise dry run)")
-    parser.add_argument("--date", type=str,
+    parser.add_argument("--date", type=release_metadata.parse_calver_date,
                         help="Override CalVer date (format: YYYY.M.D)")
     parser.add_argument("--first-release", action="store_true",
                         help="Mark as first release (no previous tag expected)")
     parser.add_argument("--output", type=str,
                         help="Write changelog to file instead of stdout")
     args = parser.parse_args()
+
+    if not VERSION_FILE.is_file() or not PYPROJECT_FILE.is_file():
+        missing = VERSION_FILE if not VERSION_FILE.is_file() else PYPROJECT_FILE
+        print(f"{missing}: required release metadata file is missing", file=sys.stderr)
+        return 1
+    metadata_paths = {"python": VERSION_FILE, "pyproject": PYPROJECT_FILE}
+    for path_text in version_files_to_stage():
+        path = Path(path_text)
+        if path not in {VERSION_FILE, PYPROJECT_FILE}:
+            metadata_paths[str(path)] = path
 
     # `git commit` below commits the whole index, not only the version files.
     # Refuse before changing version files if the caller already has staged work.
@@ -2567,8 +2670,10 @@ def main():
             print(f"Cannot safely inspect the Git index: {detail}", file=sys.stderr)
             return 1
 
-        add_files = version_files_to_stage()
-        target_paths = [Path(path).relative_to(REPO_ROOT).as_posix() for path in add_files]
+    # A tag names committed metadata. Check every candidate path, even when a
+    # tracked optional component was deleted locally and no bump is requested.
+    if args.publish:
+        target_paths = [path.relative_to(REPO_ROOT).as_posix() for path in version_file_candidates()]
         target_status = git_result(
             "status", "--porcelain=v1", "--untracked-files=all", "--", *target_paths
         )
@@ -2578,8 +2683,8 @@ def main():
             return 1
         if target_status.stdout.strip():
             print(
-                "Cannot publish a version bump while release version files have "
-                "unstaged changes."
+                "Cannot publish while release version files have "
+                "uncommitted changes."
             )
             print("Commit or discard these edits, then rerun the release command:")
             for line in target_status.stdout.splitlines():
@@ -2598,6 +2703,19 @@ def main():
     if tag_name != base_tag:
         print(f"Note: Tag {base_tag} already exists, using {tag_name}")
 
+    try:
+        current_metadata = release_metadata.validate_metadata(
+            metadata_paths,
+            expected_version=None if args.bump else get_current_version(),
+            expected_date=calver_date if not args.bump else None,
+            require_consistent=not args.bump,
+        )
+    except (OSError, UnicodeError, ValueError) as exc:
+        print(str(exc), file=sys.stderr)
+        if not args.bump:
+            print("Use --bump or prepare consistent release metadata.", file=sys.stderr)
+        return 1
+
     # Determine semver
     current_version = get_current_version()
     if args.bump:
@@ -2605,8 +2723,35 @@ def main():
     else:
         new_version = current_version
 
+    # Prove the bumped metadata before anything is printed to --output, written
+    # to disk, or tagged. Paths the writer cannot locate keep their current
+    # value here, so an unlocatable field fails closed instead of being skipped.
+    planned_updates: dict[Path, str] = {}
+    if args.bump:
+        try:
+            planned_updates = prepare_version_updates(new_version, calver_date)
+            release_metadata.check_metadata_values(
+                {
+                    kind: (
+                        release_metadata.parse_metadata(kind, planned_updates[path], path)
+                        if path in planned_updates
+                        else current_metadata[kind]
+                    )
+                    for kind, path in metadata_paths.items()
+                },
+                metadata_paths,
+                expected_version=new_version,
+                expected_date=calver_date,
+            )
+        except (OSError, UnicodeError, ValueError, SyntaxError) as exc:
+            print(
+                f"Release metadata update would produce an inconsistent candidate: {exc}",
+                file=sys.stderr,
+            )
+            return 1
+
     # Get previous tag
-    prev_tag = get_last_tag()
+    prev_tag = None if args.first_release else get_last_tag()
     if not prev_tag and not args.first_release:
         print("No previous tags found. Use --first-release for the initial release.")
         print(f"Would create tag: {tag_name}")
@@ -2652,7 +2797,21 @@ def main():
 
         # Update version files
         if args.bump:
-            update_version_files(new_version, calver_date)
+            try:
+                update_version_files(new_version, calver_date, planned_updates)
+                release_metadata.validate_metadata(
+                    metadata_paths, expected_version=new_version,
+                    expected_date=calver_date,
+                )
+            except (OSError, UnicodeError, ValueError) as exc:
+                print(f"Release metadata update failed validation: {exc}", file=sys.stderr)
+                print(
+                    "Version files may be partially updated; inspect git diff. "
+                    "To discard this failed bump, run: git restore -- "
+                    + " ".join(path.relative_to(REPO_ROOT).as_posix() for path in metadata_paths.values()),
+                    file=sys.stderr,
+                )
+                return 1
             print(f"  ✓ Updated version files to v{new_version} ({calver_date})")
 
             # Commit version bump
