@@ -362,6 +362,29 @@ def clear_run_claim(job_id: str) -> bool:
     return _jobs._with_job(job_id, apply, False)
 
 
+def release_pre_dispatch_claims(job_id: str, *, expected_fire_owner: Optional[str] = None) -> bool:
+    """Release reminder claims after a failure that happened before dispatch was consumed.
+
+    Deterministic reminders persist their idempotent notification before ``claim_dispatch``.
+    If that persistence fails, both the due-scan one-shot claim and this fire claim must be
+    released so the same occurrence remains retryable. The fire-owner comparison prevents a
+    stale worker from clearing a replacement run\'s claim.
+    """
+    def apply(jobs, _i, job):
+        if expected_fire_owner is not None:
+            claim = job.get("fire_claim")
+            if not isinstance(claim, dict) or claim.get("by") != expected_fire_owner:
+                return False
+        changed = job.get("fire_claim") is not None or job.get("run_claim") is not None
+        job["fire_claim"] = None
+        if job.get("schedule", {}).get("kind") == "once":
+            job["run_claim"] = None
+        if changed:
+            _jobs.save_jobs(jobs)
+        return changed
+
+    return _jobs._with_job(job_id, apply, False)
+
 def advance_next_runs(job_ids) -> int:
     """Batch form of :func:`advance_next_run`: one load + at most one save for the whole due set;
     one-shot/unknown ids are skipped. Returns the count advanced. Persisted once at the end, so a
