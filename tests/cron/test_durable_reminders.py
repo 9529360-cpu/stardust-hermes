@@ -93,7 +93,9 @@ def test_publish_reminder_uses_stable_durable_completion(monkeypatch):
         yield True
 
     class Fence:
-        side_effect_fence = staticmethod(side_effect_fence)
+        pass
+
+    Fence.side_effect_fence = staticmethod(side_effect_fence)
 
     monkeypatch.setattr(
         async_delegation,
