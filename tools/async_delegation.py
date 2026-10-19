@@ -162,37 +162,57 @@ def _persist_dispatch(record: Dict[str, Any]) -> None:
         logger.warning("Async delegation retention pruning failed after dispatch", exc_info=True)
 
 
-def _durable_payload_role(payload: Optional[str]) -> str:
-    """Best-effort role from one persisted JSON payload."""
+def _durable_payload_dict(payload: Optional[str]) -> Dict[str, Any]:
+    """Best-effort decoded persisted JSON payload."""
     if not payload:
-        return ""
+        return {}
     try:
         decoded = json.loads(payload)
     except Exception:
-        return ""
-    return str(decoded.get("role") or "") if isinstance(decoded, dict) else ""
+        return {}
+    return decoded if isinstance(decoded, dict) else {}
 
 
-def _is_pending_reminder_payload(task_json: Optional[str], event_json: Optional[str]) -> bool:
-    """Pending reminders are outstanding user obligations, not disposable history."""
-    return (
-        _durable_payload_role(task_json) == "reminder"
-        or _durable_payload_role(event_json) == "reminder"
-    )
+def _is_reminder_payload(task_json: Optional[str], event_json: Optional[str]) -> bool:
+    task = _durable_payload_dict(task_json)
+    event = _durable_payload_dict(event_json)
+    return task.get("role") == "reminder" or event.get("role") == "reminder"
+
+
+def _is_protected_reminder_receipt(
+    delivery_state: str, task_json: Optional[str], event_json: Optional[str]
+) -> bool:
+    """True while a reminder receipt is still required for delivery or deduplication."""
+    if not _is_reminder_payload(task_json, event_json):
+        return False
+    if delivery_state == "pending":
+        return True
+    task = _durable_payload_dict(task_json)
+    return not bool(task.get("source_settled"))
+
 
 def _prune_durable_records() -> None:
-    """Bound ordinary completion history without deleting undelivered reminders.
+    """Bound ordinary completion history without deleting reminder obligations/receipts.
 
-    A pending reminder is still an outstanding user obligation. It is excluded from
-    generic terminal-history and pending-result caps until delivery is acknowledged.
-    Delivered reminders immediately return to the ordinary retention policy.
+    Pending reminders remain until acknowledged. A delivered reminder remains protected as a
+    deduplication receipt until the source cron one-shot has also been durably settled. Only
+    then does it re-enter the ordinary retention and count-based pruning policy.
     """
     cutoff = time.time() - _DURABLE_RETENTION_SECONDS
     with _DB_LOCK, _transaction() as conn:
-        conn.execute(
-            "DELETE FROM async_delegations WHERE delivery_state=\'delivered\' AND updated_at < ?",
-            (cutoff,),
-        )
+        delivered_rows = conn.execute("""SELECT delegation_id, task_json, event_json
+               FROM async_delegations
+               WHERE delivery_state=\'delivered\' AND updated_at < ?
+               ORDER BY updated_at ASC""", (cutoff,)).fetchall()
+        expired = [
+            row[0] for row in delivered_rows
+            if not _is_protected_reminder_receipt("delivered", row[1], row[2])
+        ]
+        if expired:
+            conn.executemany(
+                "DELETE FROM async_delegations WHERE delegation_id=?",
+                [(delegation_id,) for delegation_id in expired],
+            )
 
         terminal_rows = conn.execute("""SELECT delegation_id, delivery_state, task_json, event_json
                FROM async_delegations
@@ -200,7 +220,7 @@ def _prune_durable_records() -> None:
                ORDER BY CASE delivery_state WHEN \'delivered\' THEN 0 ELSE 1 END, updated_at ASC""").fetchall()
         generic_terminal = [
             row for row in terminal_rows
-            if not (row[1] == "pending" and _is_pending_reminder_payload(row[2], row[3]))
+            if not _is_protected_reminder_receipt(row[1], row[2], row[3])
         ]
         overflow = len(generic_terminal) - _MAX_RETAINED_COMPLETED
         if overflow > 0:
@@ -215,7 +235,7 @@ def _prune_durable_records() -> None:
                ORDER BY updated_at ASC""").fetchall()
         generic_pending = [
             row for row in pending_rows
-            if not _is_pending_reminder_payload(row[1], row[2])
+            if not _is_protected_reminder_receipt("pending", row[1], row[2])
         ]
         overflow = len(generic_pending) - _MAX_DURABLE_PENDING
         if overflow > 0:
@@ -267,6 +287,8 @@ def publish_durable_completion(
         "goal": goal, "context": context, "toolsets": None, "role": role, "model": model,
         **{k: v for k, v in metadata.items() if k in {"cron_job_id", "cron_job_name"}},
     }
+    if role == "reminder":
+        task_payload["source_settled"] = False
     process_registry = None
     external_cron_worker = bool(os.environ.get("_HERMES_CRON_EXTERNAL_WORKER"))
     if not external_cron_worker:
@@ -541,6 +563,26 @@ def release_completion_delivery(delegation_id: str, claim_id: str) -> bool:
                       delivery_claimed_at=NULL, updated_at=?
                WHERE delegation_id=? AND delivery_state=\'pending\' AND delivery_claim=?""",
             (now, delegation_id, claim_id)).rowcount == 1
+
+def mark_durable_completion_source_settled(delegation_id: str) -> bool:
+    """Mark a reminder receipt safe for ordinary retention after its source job settles."""
+    now = time.time()
+    with _DB_LOCK, _transaction() as conn:
+        row = conn.execute(
+            "SELECT task_json, event_json FROM async_delegations WHERE delegation_id=?",
+            (delegation_id,),
+        ).fetchone()
+        if row is None or not _is_reminder_payload(row[0], row[1]):
+            return False
+        task = _durable_payload_dict(row[0])
+        if task.get("source_settled") is True:
+            return True
+        task["source_settled"] = True
+        return conn.execute(
+            """UPDATE async_delegations SET task_json=?, updated_at=?
+               WHERE delegation_id=?""",
+            (json.dumps(task), now, delegation_id),
+        ).rowcount == 1
 
 def complete_completion_delivery(delegation_id: str, claim_id: str) -> bool:
     """Acknowledge acceptance for the consumer holding this claim."""
