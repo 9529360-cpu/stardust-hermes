@@ -332,19 +332,50 @@ def _fast_forward_missed_recurring(d: _DueJob, grace: int) -> bool:
 
 
 def _retire_expired_oneshot(d: _DueJob) -> bool:
-    """One-shot grace gate; True when the job must not fire this tick.
+    """One-shot grace gate; deterministic reminders are the narrow durable exception.
 
-    A one-shot beyond the grace window must never fire (create/update/resume reject such schedules
-    and recovery never revives them; only the due scan used to dispatch them hours late). With no
-    claim stamped, retire it with a diagnostic (never silently delete). A claim may mean a run is
-    still in flight elsewhere — skip but keep the record so its mark_job_run can land."""
+    Generic one-shots beyond the grace window never replay because their side effects may be
+    ambiguous. A ``reminder`` has no model/tool side effect and persists its local notification
+    under a stable occurrence id before consuming dispatch, so an unconsumed reminder may safely
+    fire late after downtime or a pre-persistence crash.
+    """
     if (d.scan.now - d.next_run_dt).total_seconds() <= _jobs.ONESHOT_GRACE_SECONDS:
         return False
+
+    if d.job.get("reminder"):
+        repeat = d.job.get("repeat") or {}
+        times = repeat.get("times")
+        completed = repeat.get("completed", 0)
+        if times is not None and times > 0 and completed >= times:
+            # The reminder was already durably published before dispatch was consumed.
+            # Let the ordinary dispatch-limit guard retire the stale record without replay.
+            return False
+        run_live = _jobs._claim_is_live(
+            d.job.get("run_claim"), d.scan.now, _jobs._oneshot_run_claim_ttl_seconds())
+        fire_live = _jobs._claim_is_live(
+            d.job.get("fire_claim"), d.scan.now, _jobs.FIRE_CLAIM_TTL_SECONDS)
+        if run_live or fire_live:
+            return True
+        if d.job.get("run_claim") is not None or d.job.get("fire_claim") is not None:
+            # Both claims are stale/provably dead. Clear them in the scan snapshot so this
+            # exact reminder occurrence can be reclaimed now instead of waiting forever.
+            d.job["run_claim"] = None
+            d.job["fire_claim"] = None
+            raw = d.scan.find(d.job["id"])
+            if raw is not None:
+                raw["run_claim"] = None
+                raw["fire_claim"] = None
+            d.scan.persist(d.job["id"], run_claim=None, fire_claim=None)
+        logger.warning(
+            "Reminder %r (%s) is past the ordinary one-shot grace window; replaying the "
+            "unconsumed deterministic reminder occurrence %s.",
+            d.job.get("name", d.job.get("id")), d.job.get("id"), d.next_run)
+        return False
+
     if not (d.job.get("run_claim") or d.job.get("fire_claim")):
         _jobs._write_missed_oneshot_diagnostic(d.job, d.next_run)
         d.scan.retire(d.job["id"])
     return True
-
 
 def _oneshot_dispatch_limit_reached(job: Dict[str, Any], scan: _DueScan) -> bool:
     """One-shot dispatch-limit guard; True when the job must not fire this tick.
