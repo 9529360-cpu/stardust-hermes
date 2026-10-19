@@ -237,6 +237,7 @@ import { createHudSnapShortcut } from './hud-snap-shortcut'
 import { buildHudWindowUrl } from './hud-url'
 import { resolveHudWindowing } from './hud-windowing'
 import { createIntroRevealWindowController } from './intro-reveal-window'
+import { createDesktopInstancePolicy } from './isolated-instance'
 import { createLinkTitleWindow, guardLinkTitleSession, readLinkTitleWindowTitle } from './link-title-window'
 import { createLocalBackendLifecycle, waitForTeardown } from './local-backend-lifecycle'
 import { ensureMainWindow } from './main-window-lifecycle'
@@ -478,6 +479,7 @@ if (USER_DATA_OVERRIDE) {
 }
 
 const DEV_SERVER = process.env.STARDUST_DESKTOP_DEV_SERVER
+const desktopInstancePolicy = createDesktopInstancePolicy(process.env)
 const IS_PACKAGED = app.isPackaged || Boolean(process.env.STARDUST_DESKTOP_IS_PACKAGED)
 const IS_MAC = process.platform === 'darwin'
 const IS_WINDOWS = process.platform === 'win32'
@@ -13418,9 +13420,11 @@ function applyHudSnapToPointer() {
 const hudSnapShortcut = createHudSnapShortcut(globalShortcut, applyHudSnapToPointer)
 
 function registerHudSnapShortcut() {
-  if (!hudSnapShortcut.register()) {
-    rememberLog('[hud] snap shortcut unavailable — CommandOrControl+Shift+G may be owned by another app')
-  }
+  desktopInstancePolicy.runSystemIntegration(() => {
+    if (!hudSnapShortcut.register()) {
+      rememberLog('[hud] snap shortcut unavailable — CommandOrControl+Shift+G may be owned by another app')
+    }
+  })
 }
 
 /**
@@ -13983,9 +13987,10 @@ function toggleQuickEntryWindow() {
 const quickEntryShortcut = createQuickEntryShortcut(globalShortcut, toggleQuickEntryWindow)
 
 function applyQuickEntrySettings(settings) {
-  const state = quickEntryShortcut.apply(settings)
+  const effectiveSettings = desktopInstancePolicy.quickEntrySettings(settings)
+  const state = quickEntryShortcut.apply(effectiveSettings)
 
-  if (!settings.enabled) {
+  if (!effectiveSettings.enabled) {
     // Turning the feature off must not leave an orphan always-on-top window.
     if (quickEntryWindow && !quickEntryWindow.isDestroyed()) {
       quickEntryWindow.close()
@@ -14000,7 +14005,7 @@ function applyQuickEntrySettings(settings) {
     rememberLog(`[quick-entry] shortcut ${state.shortcut} is not a valid accelerator`)
   }
 
-  return { ...state, enabled: settings.enabled }
+  return { ...state, enabled: effectiveSettings.enabled }
 }
 
 function closeQuickEntryWindow() {
@@ -16679,7 +16684,7 @@ ipcMain.on('stardust:keep-awake', (_event, on) => {
 // including `registered: false` + `error: 'taken'` when another app owns the
 // chord. See electron/quick-entry.ts + store/quick-entry.
 ipcMain.handle('stardust:quick-entry:settings:get', async () => {
-  const settings = readQuickEntrySettings()
+  const settings = desktopInstancePolicy.quickEntrySettings(readQuickEntrySettings())
   const state = quickEntryShortcut.current()
 
   // Ground truth is what the last apply produced; the shortcut we report is the
@@ -17564,7 +17569,7 @@ app.whenReady().then(() => {
   registerMediaProtocol()
   installEmbedReferer()
   installRemoteHeaderRules()
-  registerDeepLinkProtocol()
+  desktopInstancePolicy.runSystemIntegration(registerDeepLinkProtocol)
 
   ensureWslWindowsFonts()
   configureSpellChecker()

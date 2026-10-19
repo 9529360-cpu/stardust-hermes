@@ -64,6 +64,8 @@ def test_two_char_korean_hits_cjk_index(db):
     assert rows and "웅기" in rows[0]["snippet"]
     rows = db.search_messages("일본", limit=10)
     assert rows
+    assert db.search_messages("웅기*", limit=10)
+    assert db.search_messages("일본*", limit=10)
 
 
 def test_mixed_and_ascii_queries(db):

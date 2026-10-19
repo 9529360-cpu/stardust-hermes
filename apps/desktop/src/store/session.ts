@@ -907,6 +907,8 @@ export const $awaitingResponse = atom(false)
 export const $resumeFailedSessionId = atom<string | null>(null)
 export interface SessionResumeRequest {
   ownerRoute?: SessionOwnerRoute
+  /** Explicit profile selection on a legacy source with no registry id. */
+  selectedProfile?: string
   sequence: number
   sessionId: string
 }
@@ -1320,7 +1322,7 @@ export const setMessages = (next: Updater<ChatMessage[]>) => updateAtom($message
 export const setFreshDraftReady = (next: Updater<boolean>) => updateAtom($freshDraftReady, next)
 export const setResumeFailedSessionId = (next: Updater<string | null>) => updateAtom($resumeFailedSessionId, next)
 
-export const requestSessionResume = (sessionId: string, ownerRoute?: SessionOwnerRoute) => {
+export const requestSessionResume = (sessionId: string, ownerRoute?: SessionOwnerRoute, selectedProfile?: string) => {
   const id = sessionId.trim()
 
   if (!id) {
@@ -1339,10 +1341,15 @@ export const requestSessionResume = (sessionId: string, ownerRoute?: SessionOwne
 
   if (ownerRoute) {
     setSessionOwnerHint(id, ownerRoute)
+  } else if (selectedProfile?.trim()) {
+    // The explicit legacy profile choice also owns subsequent session RPCs.
+    // An older exact hint for a same-id twin must not override its fresh row.
+    forgetSessionOwnerHintsForSession(id)
   }
 
   $sessionResumeRequest.set({
     ...(ownerRoute ? { ownerRoute: { ...ownerRoute } } : {}),
+    ...(!ownerRoute && selectedProfile?.trim() ? { selectedProfile: selectedProfile.trim() } : {}),
     sequence: ++sessionResumeRequestSequence,
     sessionId: id
   })

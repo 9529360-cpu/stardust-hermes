@@ -10,22 +10,8 @@ import { SearchField } from '@/components/ui/search-field'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { ResponsiveTabs } from '@/components/ui/tab-dropdown'
 import { Tip } from '@/components/ui/tooltip'
-import {
-  getActionStatus,
-  getLogs,
-  getStatus,
-  getUsageAnalytics,
-  restartGateway,
-  searchSessions,
-  updateHermes
-} from '@/hermes'
-import type {
-  ActionStatusResponse,
-  AnalyticsResponse,
-  SessionInfo,
-  SessionSearchResult,
-  StatusResponse
-} from '@/hermes'
+import { getActionStatus, getLogs, getStatus, getUsageAnalytics, restartGateway, updateHermes } from '@/hermes'
+import type { ActionStatusResponse, AnalyticsResponse, SessionInfo, StatusResponse } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { sessionTitle } from '@/lib/chat-runtime'
 import {
@@ -41,6 +27,7 @@ import {
 } from '@/lib/icons'
 import { exportSession } from '@/lib/session-export'
 import { mergeSessionSearchResults } from '@/lib/session-search'
+import { sessionSourceLabel } from '@/lib/session-source'
 import { fmtDateTime } from '@/lib/time'
 import { useStoreSelector } from '@/lib/use-session-slice'
 import { cn } from '@/lib/utils'
@@ -56,6 +43,8 @@ import { OverlayMain, OverlayNav, OverlaySplitLayout } from '../overlays/overlay
 import { OverlayView } from '../overlays/overlay-view'
 
 import { MaintenancePanel } from './maintenance'
+import { SessionSearchText } from './session-search-text'
+import { useSessionSearch } from './use-session-search'
 
 export type CommandCenterSection = 'maintenance' | 'sessions' | 'system' | 'usage'
 
@@ -72,7 +61,6 @@ type UsagePeriod = (typeof USAGE_PERIODS)[number]
 // component never re-renders from $sessions ticks while on System/Usage/etc.
 const EMPTY_SESSIONS: readonly never[] = []
 const EMPTY_PINNED: readonly string[] = []
-const NO_SERVER_MATCHES: { query: string; results: SessionSearchResult[] } = { query: '', results: [] }
 
 interface CommandCenterViewProps {
   initialSection?: CommandCenterSection
@@ -80,7 +68,7 @@ interface CommandCenterViewProps {
   onDeleteSession: (sessionId: string) => Promise<void>
   // Accepted for call-site parity; navigation lives in the global Cmd+K palette.
   onNavigateRoute?: (path: string) => void
-  onOpenSession: (sessionId: string) => void
+  onOpenSession: (sessionId: string, session: SessionInfo) => void
 }
 
 function formatTimestamp(value?: number | null): string {
@@ -95,18 +83,6 @@ function formatTimestamp(value?: number | null): string {
   }
 
   return fmtDateTime.format(date)
-}
-
-function useDebouncedValue<T>(value: T, delayMs: number): T {
-  const [debounced, setDebounced] = useState(value)
-
-  useEffect(() => {
-    const id = window.setTimeout(() => setDebounced(value), delayMs)
-
-    return () => window.clearTimeout(id)
-  }, [delayMs, value])
-
-  return debounced
 }
 
 function RowIconButton({
@@ -178,40 +154,8 @@ export function CommandCenterView({ initialSection, onClose, onDeleteSession, on
   const [usageError, setUsageError] = useState('')
   const usageRequestRef = useRef(0)
 
-  const debouncedQuery = useDebouncedValue(query.trim(), 180)
-
-  // Full-text hits for exactly one query. Keyed by the query that produced
-  // them, so a slow response for an older query can never repaint the list.
-  const [serverMatches, setServerMatches] = useState<{ query: string; results: SessionSearchResult[] }>(
-    NO_SERVER_MATCHES
-  )
-
-  // The message index reaches every stored conversation — older pages and
-  // messaging threads the loaded list does not hold — so searching never stops
-  // at whatever happens to be loaded. A failed lookup keeps the instant
-  // client-side matches.
-  useEffect(() => {
-    if (section !== 'sessions' || !debouncedQuery) {
-      return
-    }
-
-    let cancelled = false
-
-    void searchSessions(debouncedQuery)
-      .then(response => response.results)
-      .catch(() => [])
-      .then(results => {
-        if (!cancelled) {
-          setServerMatches({ query: debouncedQuery, results })
-        }
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [debouncedQuery, section])
-
-  const serverSearchPending = Boolean(debouncedQuery) && serverMatches.query !== debouncedQuery
+  const sessionSearch = useSessionSearch(query, section === 'sessions')
+  const searchQuery = sessionSearch.query
 
   const filteredSessions = useMemo(() => {
     const sorted = [...sessions].sort((a, b) => {
@@ -221,16 +165,12 @@ export function CommandCenterView({ initialSection, onClose, onDeleteSession, on
       return right - left
     })
 
-    if (!debouncedQuery) {
-      return sorted
-    }
-
     return mergeSessionSearchResults(
-      sorted,
-      debouncedQuery,
-      serverMatches.query === debouncedQuery ? serverMatches.results : []
+      searchQuery ? sorted.filter(sessionSearch.matchesScope) : sorted,
+      searchQuery,
+      sessionSearch.results
     )
-  }, [debouncedQuery, serverMatches, sessions])
+  }, [searchQuery, sessionSearch.matchesScope, sessionSearch.results, sessions])
 
   const refreshSystem = useCallback(async () => {
     setSystemLoading(true)
@@ -403,9 +343,11 @@ export function CommandCenterView({ initialSection, onClose, onDeleteSession, on
             <div className="flex shrink-0 items-center gap-2">
               {section === 'sessions' && (
                 <SearchField
+                  aria-label={t.sidebar.searchAria}
+                  autoFocus
                   containerClassName="max-w-[40vw]"
                   onChange={next => setQuery(next)}
-                  placeholder={cc.searchPlaceholder}
+                  placeholder={cc.sessionSearchPlaceholder}
                   value={query}
                 />
               )}
@@ -421,13 +363,39 @@ export function CommandCenterView({ initialSection, onClose, onDeleteSession, on
 
           {section === 'sessions' ? (
             <div className="min-h-0 flex-1 overflow-y-auto">
+              <p className="mb-2 text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">
+                {cc.sessionSearchHint}
+              </p>
+              {searchQuery && (
+                <div
+                  aria-live="polite"
+                  className="mb-2 flex items-center gap-2 text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)"
+                  role="status"
+                >
+                  {sessionSearch.pending && <GlyphSpinner ariaLabel={t.common.loading} />}
+                  {cc.sessionSearchCount(filteredSessions.length)}
+                  {sessionSearch.pending && <span>{cc.sessionSearchPending}</span>}
+                </div>
+              )}
+              {sessionSearch.failed && (
+                <div
+                  className="mb-3 flex flex-wrap items-center gap-2 text-[length:var(--conversation-caption-font-size)] text-(--ui-text-secondary)"
+                  role="alert"
+                >
+                  <AlertCircle aria-hidden="true" className="size-3.5 shrink-0" />
+                  <span>{cc.sessionSearchFailed}</span>
+                  <Button onClick={sessionSearch.retry} size="xs" variant="textStrong">
+                    {cc.retry}
+                  </Button>
+                </div>
+              )}
               {!sessionListHasResults ? (
-                serverSearchPending ? (
+                sessionSearch.pending ? (
                   <div className="grid min-h-48 place-items-center">
                     <GlyphSpinner ariaLabel={t.common.loading} className="text-(--ui-text-tertiary)" />
                   </div>
-                ) : (
-                  <EmptyPanel description={debouncedQuery ? cc.noResults : cc.noSessions} />
+                ) : sessionSearch.failed ? null : (
+                  <EmptyPanel description={searchQuery ? cc.noResults : cc.noSessions} />
                 )
               ) : (
                 <ul>
@@ -436,17 +404,38 @@ export function CommandCenterView({ initialSection, onClose, onDeleteSession, on
                     const pinned = pinnedSessionIds.includes(pinId)
 
                     return (
-                      <li className="group flex items-center gap-2 py-2" key={session.id}>
+                      <li
+                        className="group flex items-center gap-2 py-2"
+                        data-session-search-result={session.id}
+                        key={session.id}
+                      >
                         <button
                           className="min-w-0 flex-1 text-left"
-                          onClick={() => onOpenSession(session.id)}
+                          onClick={() => onOpenSession(session.id, session)}
                           type="button"
                         >
                           <div className="truncate text-[length:var(--conversation-text-font-size)] font-medium text-foreground">
-                            {sessionTitle(session)}
+                            <SessionSearchText query={searchQuery} text={sessionTitle(session)} />
                           </div>
-                          <div className="truncate text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">
-                            {formatTimestamp(session.last_active || session.started_at)}
+                          {searchQuery && (session.searchSnippet || session.preview) && (
+                            <div
+                              className="mt-1 line-clamp-2 break-words text-[length:var(--conversation-caption-font-size)] text-(--ui-text-secondary)"
+                              data-session-search-snippet
+                            >
+                              <SessionSearchText
+                                query={searchQuery}
+                                text={session.searchSnippet || session.preview || ''}
+                              />
+                            </div>
+                          )}
+                          <div className="mt-0.5 truncate text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">
+                            {[
+                              sessionSourceLabel(session.source),
+                              formatTimestamp(session.last_active || session.started_at),
+                              session.archived ? cc.archivedChats : null
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
                           </div>
                         </button>
                         <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">

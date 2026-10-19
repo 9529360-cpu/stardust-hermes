@@ -241,21 +241,11 @@ def get_sessions(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-def _is_compression_edge(child: dict, parent: dict) -> bool:
-    parent_ended_at = parent.get("ended_at")
-    started_at = child.get("started_at")
-    return (
-        parent.get("end_reason") == "compression"
-        and parent_ended_at is not None
-        and started_at is not None
-        and started_at >= parent_ended_at)
-
-
 @search_router.get("/api/sessions/search")
 async def search_sessions(
     q: str = "", limit: int = 20, profile: Optional[str] = None, source: str = None,
     sources: str = None, exclude_sources: str = None):
-    """Search sessions by ID (first) plus FTS5 message content.
+    """Search sessions by ID (first), stored titles and FTS5 message content.
 
     Results are deduped by compression lineage, not raw ``session_id``:
     auto-compression rotates a chat onto a fresh id and leaves the old segment
@@ -280,25 +270,30 @@ async def search_sessions(
                 except Exception:
                     return None
 
-            # Walk parent_session_id to the compression root, memoized per
-            # chain; stops at branch/delegate edges (those stay searchable).
+            # Resolve ancestors only through the canonical preferred chain.
+            # get_compression_lineage has a different forward sibling order;
+            # neither that order nor timestamps define the live continuation.
             root_cache: dict = {}
+            chain_cache: dict = {}
 
             def compression_root(session_id: str) -> str:
-                chain, cur, root = [], session_id, session_id
-                while cur and cur not in chain:  # ``not in chain`` guards parent cycles
+                path, cur = [], session_id
+                while cur and cur not in path:
                     if cur in root_cache:
-                        root = root_cache[cur]
+                        cur = root_cache[cur]
                         break
-                    chain.append(cur)
-                    s = get_session(cur)
-                    parent = s.get("parent_session_id") if isinstance(s, dict) else None
-                    parent_session = get_session(parent) if parent else None
-                    if not parent_session or not _is_compression_edge(s, parent_session):
-                        root = cur
+                    path.append(cur)
+                    row = get_session(cur)
+                    parent = row.get("parent_session_id") if row else None
+                    if not parent:
+                        break
+                    if parent not in chain_cache:
+                        chain_cache[parent] = db.get_compression_chain(parent)
+                    if cur not in chain_cache[parent][1:]:
                         break
                     cur = parent
-                for node in chain:
+                root = cur or session_id
+                for node in path:
                     root_cache[node] = root
                 return root
 
@@ -323,6 +318,7 @@ async def search_sessions(
                 if root in seen or len(seen) >= safe_limit:
                     return
                 payload = dict(payload)
+                payload["profile"] = _serving_profile(profile)
                 sid = lineage_tip(root)
                 payload["session_id"] = sid
                 payload["lineage_root"] = root
@@ -332,11 +328,15 @@ async def search_sessions(
                     row = None
                 if row:
                     last_active = row.get("last_active") or row.get("started_at")
+                    title = row.get("title")
+                    if title is None:
+                        root_row = get_session(root)
+                        title = root_row.get("title") if root_row else None
                     payload.update({
                         "id": row.get("id") or sid,
                         "source": row.get("source"),
                         "model": row.get("model"),
-                        "title": row.get("title"),
+                        "title": title,
                         "started_at": row.get("started_at"),
                         "ended_at": row.get("ended_at"),
                         "last_active": last_active,
@@ -366,6 +366,20 @@ async def search_sessions(
                 preview = (row.get("preview") or "").strip()
                 snippet = preview or f"Session ID: {sid}"
                 add_lineage_result(sid, hit_payload(row, snippet, None, row.get("started_at")))
+
+            # Search stored titles after direct IDs so an exact/pasted ID
+            # keeps its position and payload when the same row matches its title.
+            metadata_matches = db.list_sessions_rich(
+                search_query=q, order_by_last_active=True, include_archived=True,
+                source=source_filter, sources=source_list or None,
+                exclude_sources=exclude_list or None, limit=safe_limit)
+            for row in metadata_matches:
+                if len(seen) >= safe_limit:
+                    break
+                sid = row.get("id")
+                snippet = row.get("title") or row.get("preview") or f"Session ID: {sid}"
+                add_lineage_result(
+                    sid, hit_payload(row, snippet, None, row.get("started_at")))
 
             # Prefix wildcards so partial words match ("nimb" -> "nimb*");
             # quoted phrases and existing wildcards are kept as-is.

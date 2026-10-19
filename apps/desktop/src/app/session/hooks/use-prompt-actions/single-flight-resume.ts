@@ -15,8 +15,17 @@
 
 const _inFlightResumeByStoredSessionId = new Map<string, Promise<unknown>>()
 
-export function singleFlightSessionResume<T>(storedSessionId: string, run: () => Promise<T>): Promise<T> {
-  const existing = _inFlightResumeByStoredSessionId.get(storedSessionId)
+function flightKey(storedSessionId: string, scopeKey?: string): string {
+  return JSON.stringify([storedSessionId, scopeKey ?? null])
+}
+
+export function singleFlightSessionResume<T>(
+  storedSessionId: string,
+  run: () => Promise<T>,
+  scopeKey?: string
+): Promise<T> {
+  const key = flightKey(storedSessionId, scopeKey)
+  const existing = _inFlightResumeByStoredSessionId.get(key)
 
   if (existing) {
     return existing as Promise<T>
@@ -28,12 +37,12 @@ export function singleFlightSessionResume<T>(storedSessionId: string, run: () =>
   const flight = Promise.resolve()
     .then(run)
     .finally(() => {
-      if (_inFlightResumeByStoredSessionId.get(storedSessionId) === flight) {
-        _inFlightResumeByStoredSessionId.delete(storedSessionId)
+      if (_inFlightResumeByStoredSessionId.get(key) === flight) {
+        _inFlightResumeByStoredSessionId.delete(key)
       }
     })
 
-  _inFlightResumeByStoredSessionId.set(storedSessionId, flight)
+  _inFlightResumeByStoredSessionId.set(key, flight)
 
   return flight
 }

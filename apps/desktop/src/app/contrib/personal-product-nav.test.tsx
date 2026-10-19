@@ -139,6 +139,7 @@ describe('PersonalProductNav', () => {
 
     expect(screen.getAllByRole('button').map(button => button.textContent?.trim())).toEqual([
       '新建对话',
+      '搜索对话',
       '智能体空间',
       '自动化',
       '消息平台',
@@ -148,6 +149,30 @@ describe('PersonalProductNav', () => {
     expect(screen.queryByRole('button', { name: '对话' })).toBeNull()
     expect(screen.queryByRole('button', { name: '知识库' })).toBeNull()
     expect(screen.queryByRole('button', { name: '设置' })).toBeNull()
+  })
+
+  it('opens conversation search through the shared route without changing project or chat context', () => {
+    $projectScope.set('p_example')
+    $currentCwd.set('D:/Example')
+    const onNavigate = renderNav('chat')
+
+    fireEvent.click(screen.getByRole('button', { name: '搜索对话' }))
+
+    expect(onNavigate).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ id: 'command-center', route: '/command-center?section=sessions' })
+    )
+    expect($projectScope.get()).toBe('p_example')
+    expect($currentCwd.get()).toBe('D:/Example')
+  })
+
+  it.each(['/command-center', '/command-center?section=sessions'])('marks conversation search current at %s', path => {
+    renderNav('command-center', path)
+    expect(screen.getByRole('button', { name: '搜索对话' }).getAttribute('aria-current')).toBe('page')
+  })
+
+  it('keeps search inactive on other command center sections', () => {
+    renderNav('command-center', '/command-center?section=system')
+    expect(screen.getByRole('button', { name: '搜索对话' }).hasAttribute('aria-current')).toBe(false)
   })
 
   it('opens the agent space as a page beside the nav, like tools and plugins', () => {
@@ -163,14 +188,14 @@ describe('PersonalProductNav', () => {
     vi.mocked(dismissNarrowSidebar).mockClear()
     renderNav('chat')
 
-    for (const name of ['新建对话', '智能体空间', '自动化', '消息平台', '工具']) {
+    for (const name of ['新建对话', '搜索对话', '智能体空间', '自动化', '消息平台', '工具']) {
       fireEvent.click(screen.getByRole('button', { name }))
     }
 
-    expect(dismissNarrowSidebar).toHaveBeenCalledTimes(5)
+    expect(dismissNarrowSidebar).toHaveBeenCalledTimes(6)
 
     fireEvent.click(screen.getByRole('button', { name: '项目' }))
-    expect(dismissNarrowSidebar).toHaveBeenCalledTimes(5)
+    expect(dismissNarrowSidebar).toHaveBeenCalledTimes(6)
   })
 
   it('routes new chat, tasks, messaging, and tools through their existing owners', () => {

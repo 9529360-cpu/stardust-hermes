@@ -11,14 +11,45 @@ vi.mock('./client', () => ({
 
 const client = await import('./client')
 
-const { deleteSession, setSessionArchived, setSessionPinnedRemote, setSessionUnreadRemote, listSidebarSessions } =
-  await import('./sessions')
+const {
+  deleteSession,
+  searchSessions,
+  setSessionArchived,
+  setSessionPinnedRemote,
+  setSessionUnreadRemote,
+  listSidebarSessions
+} = await import('./sessions')
 
 const hermesApi = vi.mocked(client.hermesApi)
 
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(client.getApiRequestConnection).mockReturnValue('prometheus')
+})
+
+describe('searchSessions profile scoping', () => {
+  it('targets the active profile and encodes the complete literal query', async () => {
+    hermesApi.mockResolvedValue({ results: [] } as never)
+    vi.mocked(client.profileScoped).mockReturnValueOnce({ profile: 'personal' })
+
+    await searchSessions('报销 & 周末?')
+
+    expect(hermesApi).toHaveBeenCalledExactlyOnceWith({
+      profile: 'personal',
+      path: `/api/sessions/search?q=${encodeURIComponent('报销 & 周末?')}`
+    })
+  })
+
+  it('keeps the primary profile request untagged', async () => {
+    hermesApi.mockResolvedValue({ results: [] } as never)
+    vi.mocked(client.profileScoped).mockReturnValueOnce({})
+
+    await searchSessions('收据')
+
+    expect(hermesApi).toHaveBeenCalledExactlyOnceWith({
+      path: `/api/sessions/search?q=${encodeURIComponent('收据')}`
+    })
+  })
 })
 
 describe('deleteSession profile scoping', () => {

@@ -1794,6 +1794,12 @@ export const ja = defineLocale({
     refresh: '更新',
     refreshing: '更新中...',
     noResults: '一致する結果が見つかりません。',
+    sessionSearchPlaceholder: 'タイトルや以前話した内容を検索…',
+    sessionSearchHint: '現在のプロファイルのタイトルとメッセージ本文を検索します。結果を選ぶとチャットが開きます。',
+    sessionSearchCount: count => `${count} 件のチャット`,
+    sessionSearchPending: 'メッセージ本文を検索中…',
+    sessionSearchFailed:
+      '全文検索が完了しませんでした。読み込み済みチャットの一致のみ表示しています。再試行してください。',
     pinSession: 'チャットをピン留め',
     unpinSession: 'チャットのピン留めを解除',
     exportSession: 'チャットをエクスポート',

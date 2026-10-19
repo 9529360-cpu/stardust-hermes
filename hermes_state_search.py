@@ -1167,7 +1167,14 @@ class SessionSearchMixin:
         1-char CJK runs (bigrams only exist for runs >=2 — LIKE is broader); then trigram
         (>=3 CJK chars per token); then a LIKE substring scan with one clause per
         non-operator token so "广西 OR 桂林 OR 漓江" matches each term."""
-        raw_query = query.strip('"').strip()
+        # CJK indexes/LIKE already provide substring matching. A terminal '*'
+        # outside a quoted phrase is FTS prefix syntax, not part of that text;
+        # quoting it below would require a literal star in the stored message.
+        substring_query = re.sub(
+            r'"[^"]*"|\*(?=\s|$)',
+            lambda match: match.group(0) if match.group(0).startswith('"') else "",
+            query)
+        raw_query = substring_query.strip('"').strip()
         match_query = _quote_fts_tokens(raw_query)
         if self._fts_cjk_available and not wants_unindexed_rows and not self._has_lone_cjk_run(raw_query):
             matches = self._match_rows(

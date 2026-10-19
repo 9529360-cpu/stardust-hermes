@@ -162,6 +162,7 @@ import { useOnboardingHandoff } from './onboarding-handoff'
 import { useOnboardingKickoff } from './onboarding-kickoff'
 import { $restartPreviewServer, useTitlebarToolContributions } from './panes'
 import { type AmbientGatewayRequest, createSessionRpcDispatcher } from './session-rpc-dispatcher'
+import { openSessionSearchResult, retrySessionSelection } from './session-search-open'
 import { ChatRoutesSurface, SidebarSurface, StatusbarSurface, TerminalSurface } from './surfaces'
 import type { WiringActions, WiringApi } from './types'
 import { POOL_LIMITS_SETTINGS_ROUTE } from './wiring-routing'
@@ -1168,7 +1169,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
 
       openSession(sessionId, navigate)
     },
-    onRetryResume: sessionId => void resumeSession(sessionId, true),
+    onRetryResume: sessionId => retrySessionSelection(sessionId, resumeSession),
     onSteer: steerPrompt,
     onSteerHidden: injectHiddenPrompt,
     onSubmit: submitText,
@@ -1379,7 +1380,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
             onClose={closeOverlayToPreviousRoute}
             onDeleteSession={removeSession}
             onNavigateRoute={path => navigateToWorkspacePage(navigate, path)}
-            onOpenSession={sessionId => openSession(sessionId, navigate)}
+            onOpenSession={(_sessionId, session) => openSessionSearchResult(session, navigate)}
           />
         </Suspense>
       )}
