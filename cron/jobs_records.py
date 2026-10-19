@@ -301,12 +301,21 @@ def _validate_durable_reminder_job(job: Dict[str, Any]) -> None:
         raise ValueError("reminder=True requires a durable Desktop/TUI conversation origin.")
     if not str(job.get("prompt") or "").strip():
         raise ValueError("reminder=True requires non-empty reminder text in prompt.")
+    deliver = str(job.get("deliver") or "").strip().lower()
+    if deliver not in {"local", "origin"}:
+        raise ValueError("reminder=True only supports local/origin delivery.")
     incompatible = []
-    for key in ("script", "monitor_script", "monitor_url", "context_from"):
+    for key in (
+        "script", "completion_script", "monitor_script", "monitor_url", "context_from",
+        "enabled_toolsets", "workdir", "handoff_context", "model", "provider", "base_url",
+        "reasoning_effort", "approval_mode",
+    ):
         if job.get(key):
             incompatible.append(key)
     if job.get("skills") or job.get("skill"):
         incompatible.append("skills")
+    if job.get("attach_to_session"):
+        incompatible.append("attach_to_session")
     if job.get("no_agent"):
         incompatible.append("no_agent")
     if job.get("stop_when_done"):
