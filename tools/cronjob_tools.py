@@ -1317,7 +1317,7 @@ Jobs run in a fresh session. Normally they have no current-chat context, so prom
             },
             "reminder": {
                 "type": "boolean",
-                "description": "Deterministic one-shot reminder mode for the creating Desktop/TUI conversation. The stored prompt is the exact reminder text; no model, memory, tool, or script run occurs at fire time. The reminder is durably persisted under a stable occurrence id before the one-shot dispatch is consumed, so restart recovery cannot create a second logical reminder. Requires a one-shot schedule and implicit/origin local delivery. Do not use for tasks that need checking, browsing, tools, or external side effects."
+                "description": "Deterministic one-shot reminder mode for the creating Desktop/TUI conversation. The stored prompt is the exact reminder text; no model, memory, tool, or script run occurs at fire time. The reminder is durably persisted under a stable occurrence id before the one-shot dispatch is consumed, so restart recovery cannot create a second logical reminder. This execution mode is fixed at creation; edit its time/text normally, but create a new job to switch between reminder and agent-task modes. Requires a one-shot schedule and implicit/origin local delivery. Do not use for tasks that need checking, browsing, tools, or external side effects."
             },
             "enabled_toolsets": {
                 "type": "array",
