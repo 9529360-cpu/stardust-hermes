@@ -1,7 +1,7 @@
 """LIVE Windows E2E for background-executor spawn parity (#70716 / PR salvage).
 
-Runs ONLY on a real Windows host (the on-demand ``windows-venv-e2e.yml``
-lane). The systemd cgroup-isolation feature for local background executors
+Runs ONLY on a real Windows host (the Windows lane of ``tests-os.yml``, and the
+on-demand ``windows-venv-e2e.yml`` lane). The systemd cgroup-isolation feature for local background executors
 must be a strict no-op on Windows: jobs spawn exactly as before, output is
 captured, exit codes are correct, and no systemd code path is ever reached
 — even when the process claims gateway identity.
@@ -14,14 +14,11 @@ thread) — no mocked spawn.
 from __future__ import annotations
 
 import os
-import sys
 import time
 
 import pytest
 
-pytestmark = pytest.mark.skipif(
-    sys.platform != "win32", reason="live Windows background-executor E2E"
-)
+pytestmark = pytest.mark.windows_only  # also selects this file for the Windows lane (tests-os.yml)
 
 
 @pytest.fixture()
