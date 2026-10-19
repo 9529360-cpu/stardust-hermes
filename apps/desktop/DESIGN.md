@@ -227,7 +227,10 @@ blurred backdrop.
   Empty lists hide their search field.
 - **`SegmentedControl`** — the choice control for small mutually-exclusive sets
   (color mode, tool-call display, usage period). Replaces radio piles and
-  pill rows.
+  pill rows. Its controlled `value/onChange` remains authoritative; one local
+  indicator slides between choices without delaying selection. Arrow keys
+  (RTL-aware), Home and End move a single tab stop. Reduced motion removes the
+  positional transition. Optional `aria-label` / `aria-labelledby` name the group.
 - **`Switch`** (`size="xs"`) — bare, with `aria-label`. No bordered text wrapper.
 
 ## Layout
@@ -248,6 +251,17 @@ blurred backdrop.
   `OverlayMain`. Profiles and other true overlays ride this — don't rebuild a
   titlebar shell. Tasks/Cron is a workspace page and reuses the shared
   list/detail primitives without the `OverlayView` wrapper.
+- **Resizable master/detail pages:** `MasterDetail` responds to its actual
+  container width. Rail and wide splits both read the existing saved width;
+  below 40rem they stack. `MasterDetail` and `DetailPane` use a 4px pointer
+  dead-zone, local frame-coalesced previews and one preference write on release.
+  Escape, pointer cancellation, blur or unmount discard the preview. Stateful
+  children stay mounted. Do not add transitions to live resize geometry.
+- **Scroll edges:** `useScrollFade` decorates the existing native viewport in
+  `ListColumn` / `DetailColumn`; it does not own scrolling or focus. `ScrollArea`
+  opts in with `fadeEdges` (default false). The alpha mask tracks viewport and
+  content size, disappears at reached edges, and is disabled while focus is
+  inside or forced colors are active. The chat transcript is not opted in.
 - **Rows:** `ListRow` (settings `primitives.tsx`) for label/description/action
   rows. Flat, flush-left; no per-row indentation that fights flush headers.
 - **No dividers between rows** unless the list genuinely needs them; prefer

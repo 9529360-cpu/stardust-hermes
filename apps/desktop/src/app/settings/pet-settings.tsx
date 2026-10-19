@@ -271,6 +271,7 @@ export function PetSettings() {
             <div className="flex items-center justify-between gap-3">
               <span>{copy.chooseTitle}</span>
               <SegmentedControl
+                aria-label={copy.chooseTitle}
                 onChange={id => void toggle(id === 'on')}
                 options={[
                   { id: 'off', label: copy.off },
@@ -315,6 +316,7 @@ export function PetSettings() {
           <ListRow
             action={
               <SegmentedControl
+                aria-label={copy.roamTitle}
                 onChange={id => {
                   setPetRoam(id === 'on')
                   triggerHaptic('crisp')

@@ -1,3 +1,5 @@
+import './master-detail.css'
+
 import { useStore } from '@nanostores/react'
 import {
   Children,
@@ -15,6 +17,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { RowButton } from '@/components/ui/row-button'
 import { Switch } from '@/components/ui/switch'
 import { Tip } from '@/components/ui/tooltip'
+import { usePointerResize } from '@/hooks/use-pointer-resize'
+import { useScrollFade } from '@/hooks/use-scroll-fade'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 import {
@@ -79,6 +83,7 @@ export function MasterDetail({
   // Unconditional hook (rules of hooks) — the '' atom is inert when no id.
   const override = useStore($paneWidthOverride(resizeId ?? ''))
   const [dragging, setDragging] = useState(false)
+  const startResize = usePointerResize(resizeId)
 
   const startSplitDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
     const grid = gridRef.current
@@ -87,26 +92,31 @@ export function MasterDetail({
       return
     }
 
-    event.preventDefault()
-    const startX = event.clientX
     const startWidth = (grid.children[0] as HTMLElement).getBoundingClientRect().width
     const max = Math.max(SPLIT_MIN_LEFT_PX, grid.getBoundingClientRect().width - SPLIT_MIN_RIGHT_PX)
-    setDragging(true)
+    const rtl = grid.ownerDocument.defaultView?.getComputedStyle(grid).direction === 'rtl'
+    let previewWidth = Math.round(startWidth)
+    const clearPreview = () => grid.style.removeProperty('--md-drag-split')
 
-    const onMove = (move: globalThis.PointerEvent) => {
-      setPaneWidthOverride(
-        resizeId,
-        Math.round(Math.min(max, Math.max(SPLIT_MIN_LEFT_PX, startWidth + (move.clientX - startX))))
-      )
-    }
-
-    const onUp = () => {
-      window.removeEventListener('pointermove', onMove)
-      setDragging(false)
-    }
-
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp, { once: true })
+    startResize(event, {
+      axis: 'x',
+      onActiveChange: setDragging,
+      onPreview: delta => {
+        const logicalDelta = rtl ? -delta : delta
+        previewWidth = Math.round(Math.min(max, Math.max(SPLIT_MIN_LEFT_PX, startWidth + logicalDelta)))
+        grid.style.setProperty('--md-drag-split', `${previewWidth}px`)
+      },
+      onCommit: () => {
+        try {
+          if (previewWidth !== Math.round(startWidth)) {
+            setPaneWidthOverride(resizeId, previewWidth)
+          }
+        } finally {
+          clearPreview()
+        }
+      },
+      onCancel: clearPreview
+    })
   }
 
   // With a sash the detail side gets a relative wrapper so the seam handle can
@@ -114,21 +124,32 @@ export function MasterDetail({
   const [list, ...rest] = Children.toArray(children)
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className={cn('flex h-full min-h-0 flex-col', resizeId && 'stardust-master-detail-frame')}>
       <div
         className={cn(
-          'grid min-h-0 flex-1 grid-cols-1',
-          split === 'wide' ? MASTER_DETAIL_WIDE_COLS : 'sm:grid-cols-[14rem_minmax(0,1fr)]'
+          'grid min-h-0 min-w-0 flex-1 grid-cols-1',
+          resizeId
+            ? 'stardust-master-detail-grid'
+            : split === 'wide'
+              ? MASTER_DETAIL_WIDE_COLS
+              : 'sm:grid-cols-[14rem_minmax(0,1fr)]'
         )}
+        data-md-split={split}
         ref={gridRef}
-        style={override !== undefined ? ({ '--md-split': `${override}px` } as CSSProperties) : undefined}
+        style={
+          {
+            '--md-min-list': `${SPLIT_MIN_LEFT_PX}px`,
+            '--md-min-detail': `${SPLIT_MIN_RIGHT_PX}px`,
+            '--md-split': override !== undefined ? `${override}px` : undefined
+          } as CSSProperties
+        }
       >
         {resizeId ? (
           <>
             {list}
             <div className="relative grid min-h-0 min-w-0">
               <div
-                className="group/vsash absolute inset-y-0 left-0 z-10 hidden w-1 -translate-x-1/2 cursor-col-resize sm:block"
+                className="stardust-master-detail-sash group/vsash absolute inset-y-0 left-0 z-10 w-2 -translate-x-1/2 touch-none cursor-col-resize"
                 onDoubleClick={() => setPaneWidthOverride(resizeId, undefined)}
                 onPointerDown={startSplitDrag}
               >
@@ -152,10 +173,18 @@ export function MasterDetail({
 }
 
 export function ListColumn({ children, header }: { children: ReactNode; header?: ReactNode }) {
+  const viewportRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+  useScrollFade(viewportRef, contentRef)
+
   return (
     <aside className="flex min-h-0 flex-col p-2">
       {header}
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">{children}</div>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]" ref={viewportRef}>
+        <div className="flow-root min-h-full" ref={contentRef}>
+          {children}
+        </div>
+      </div>
     </aside>
   )
 }
@@ -172,10 +201,16 @@ export function DetailColumn({
   children: ReactNode
   footer?: ReactNode
 }) {
+  const viewportRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+  useScrollFade(viewportRef, contentRef)
+
   return (
     <main className="flex min-h-0 flex-col overflow-hidden">
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
-        <div className="mx-auto max-w-2xl space-y-5 px-5 py-4">{children}</div>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]" ref={viewportRef}>
+        <div className="mx-auto max-w-2xl space-y-5 px-5 py-4" ref={contentRef}>
+          {children}
+        </div>
       </div>
       {footer && (
         <div className="mx-auto w-full max-w-2xl shrink-0 px-5 pb-3 pt-1.5 text-right text-[0.65rem] text-muted-foreground/50">
@@ -234,6 +269,8 @@ export function DetailPane({
 }) {
   const { t } = useI18n()
   const override = useStore($paneHeightOverride(id))
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const startResize = usePointerResize(id)
 
   useEffect(() => {
     if (defaultCollapsed && $paneState(id).get() === undefined) {
@@ -248,29 +285,42 @@ export function DetailPane({
   const [dragging, setDragging] = useState(false)
 
   const startDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
-    event.preventDefault()
-    const startY = event.clientY
-    const startHeight = height
-    const max = Math.round(window.innerHeight * DETAIL_PANE_MAX_VH)
-    setDragging(true)
+    const body = bodyRef.current
 
-    const onMove = (move: globalThis.PointerEvent) => {
-      setPaneHeightOverride(id, Math.min(max, Math.max(0, Math.round(startHeight + (startY - move.clientY)))))
+    if (!body || event.button !== 0) {
+      return
     }
+    const max = Math.round(body.ownerDocument.defaultView!.innerHeight * DETAIL_PANE_MAX_VH)
+    let previewHeight = height
+    const clearPreview = () => body.style.removeProperty('--detail-pane-preview-height')
 
-    const onUp = () => {
-      window.removeEventListener('pointermove', onMove)
-      setDragging(false)
-    }
-
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp, { once: true })
+    startResize(event, {
+      axis: 'y',
+      onActiveChange: setDragging,
+      onPreview: delta => {
+        previewHeight = Math.min(max, Math.max(0, Math.round(height - delta)))
+        body.style.setProperty(
+          '--detail-pane-preview-height',
+          `${previewHeight <= DETAIL_PANE_COLLAPSED_PX ? 0 : previewHeight}px`
+        )
+      },
+      onCommit: () => {
+        try {
+          if (previewHeight !== height) {
+            setPaneHeightOverride(id, previewHeight)
+          }
+        } finally {
+          clearPreview()
+        }
+      },
+      onCancel: clearPreview
+    })
   }
 
   return (
     <section className="relative flex shrink-0 flex-col border-t border-(--ui-stroke-tertiary) bg-(--ui-chat-surface-background)">
       <div
-        className="group/sash absolute inset-x-0 top-0 z-10 h-1 -translate-y-1/2 cursor-row-resize"
+        className="group/sash absolute inset-x-0 top-0 z-10 h-2 -translate-y-1/2 touch-none cursor-row-resize"
         onDoubleClick={() => setPaneHeightOverride(id, undefined)}
         onPointerDown={startDrag}
       >
@@ -304,7 +354,11 @@ export function DetailPane({
           )}
         </div>
       </header>
-      <div className="min-h-0 overflow-hidden" style={{ height: collapsed ? 0 : height }}>
+      <div
+        className="min-h-0 overflow-hidden"
+        ref={bodyRef}
+        style={{ height: `var(--detail-pane-preview-height, ${collapsed ? 0 : height}px)` }}
+      >
         {children}
       </div>
     </section>

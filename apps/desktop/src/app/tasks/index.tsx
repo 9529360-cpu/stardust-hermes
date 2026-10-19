@@ -218,6 +218,7 @@ export function TaskCenterView({ onOpenSession }: { onOpenSession?: (sessionId: 
           </p>
         </div>
         <SegmentedControl
+          aria-label={title}
           onChange={setTab}
           options={[
             { id: 'activity', label: activity },

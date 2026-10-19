@@ -109,6 +109,7 @@ export function MemoryNotes() {
           }}
         >
           <SegmentedControl<MemoryTarget>
+            aria-label={c.memoryTitle}
             onChange={setTarget}
             options={[
               { id: 'user', label: c.memoryAboutYou },
