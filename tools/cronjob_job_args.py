@@ -88,11 +88,15 @@ def _mode_guidance_notes(job: Dict[str, Any], user_deliver: Optional[str]) -> Li
             "there is nothing to report). Non-zero exit or timeout sends an "
             "error alert. prompt/skills are ignored.")
     if job.get("stop_when_done"):
+        completion_check = (
+            " A configured completion_script must also pass before the job can complete."
+            if job.get("completion_script") else ""
+        )
         notes.append(
             "Goal-task mode: this recurring job keeps running until the requested "
             "goal is actually satisfied. A successful run that emits the runtime "
             "[DONE] marker delivers its final summary, then the existing job record "
-            "enters state=completed and stops future fires.")
+            "enters state=completed and stops future fires." + completion_check)
     _deliver = (user_deliver or "").strip().lower()
     if _deliver:
         if "all" in _deliver.split(","):
@@ -348,8 +352,8 @@ def _validate_context_from_refs(refs: List[Any]) -> Optional[str]:
 
 # Optional fields echoed by _format_job only when truthy (order = JSON key order).
 _FORMAT_JOB_OPTIONAL_KEYS = (
-    "script", "reasoning_effort", "monitor_script", "monitor_url",
-    "monitor_state", "no_agent", "stop_when_done", "enabled_toolsets", "workdir")
+    "script", "reasoning_effort", "monitor_script", "monitor_url", "completion_script",
+    "monitor_state", "no_agent", "stop_when_done", "memory_scope", "enabled_toolsets", "workdir")
 
 
 def _format_job(job: Dict[str, Any]) -> Dict[str, Any]:
