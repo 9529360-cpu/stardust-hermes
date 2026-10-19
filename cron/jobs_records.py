@@ -140,6 +140,18 @@ def _normalize_job_approval_mode(value: Any) -> Optional[str]:
             f"Invalid approval_mode {value!r}. Valid values: inherit, approve, deny.")
     return text
 
+def _normalize_memory_scope(value: Any) -> Optional[str]:
+    """Normalize per-job access to the profile's persistent personal memory."""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("memory_scope must be 'profile' or 'none'.")
+    text = value.strip().lower()
+    if text not in {"profile", "none"}:
+        raise ValueError("memory_scope must be 'profile' or 'none'.")
+    return text
+
+
 def _normalize_reasoning_effort(value: Any) -> Optional[str]:
     """Spelling-only validation via the shared parser (cron knob never stricter/looser than
     config.yaml); model capability is deliberately NOT checked (model unknowable at create time,
@@ -177,10 +189,12 @@ _CREATE_FIELD_NORMALIZERS: Dict[str, Callable[[Any], Any]] = {
     "failure_deliver": _normalize_failure_deliver,
     "handoff_context": _normalize_job_optional_text,
     "approval_mode": _normalize_job_approval_mode,
+    "memory_scope": _normalize_memory_scope,
     "stop_when_done": _normalize_optional_bool,
 }
 _UPDATE_FIELD_NORMALIZERS: Dict[str, Callable[[Any], Any]] = {
     "approval_mode": _normalize_job_approval_mode,
+    "memory_scope": _normalize_memory_scope,
     "stop_when_done": _normalize_optional_bool,
     "handoff_context": _normalize_job_optional_text,
     "workdir": lambda v: None if v in {None, "", False} else _normalize_workdir(v),
@@ -309,6 +323,7 @@ def create_job(
     paused: bool = False,
     paused_reason: Optional[str] = None,
     approval_mode: Optional[str] = None,
+    memory_scope: Optional[str] = None,
     dry_run: bool = False,
     trigger: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
@@ -427,6 +442,7 @@ def create_job(
         ("attach_to_session", normalized_attach), ("reasoning_effort", normalized_reasoning_effort),
         ("failure_deliver", f["failure_deliver"]), ("local_session_origin", local_session_origin),
         ("source_suggestion_id", source_suggestion_id), ("approval_mode", f["approval_mode"]),
+        ("memory_scope", f["memory_scope"]),
         ("handoff_context", f["handoff_context"] if normalized_attach is True else None),
         ("stop_when_done", True if f["stop_when_done"] else None),
     ):
