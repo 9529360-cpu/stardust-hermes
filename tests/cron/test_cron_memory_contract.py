@@ -21,12 +21,19 @@ CURRENT INTENDED MATRIX (as of PR #91447, pinned here):
                                False.
   config.yaml
   agent.disabled_toolsets:
-    [memory]                -> the ONLY off-switch: ``memory`` lands in the
+    [memory]                -> ``memory`` lands in the
                                cron agent's disabled_toolsets (tool denied,
                                and agent_init treats a denylisted toolset as
                                not-requested). skip_memory itself is NOT a
-                               per-job/config toggle — the scheduler always
-                               passes False.
+                               supported job field.
+  memory_scope: none        -> explicit task-level opt-out: skip_memory=True
+                               AND the memory toolset is denied, even when
+                               enabled_toolsets requests it.
+
+The October 2026 resident-task contract adds the explicit memory_scope opt-out
+without changing the #91447 compatibility default. See the resident-task
+contract in website/docs/developer-guide/resident-tasks.md. This scope covers
+memory loading and tools; it is not a filesystem or project-context sandbox.
 
 ANY future flip of this behavior MUST consciously edit this test and cite
 the issue/PR that decided the flip in the module docstring above, extending
@@ -38,13 +45,15 @@ kwargs the scheduler passes to AIAgent (patched at ``run_agent.AIAgent``,
 matching tests/cron/test_scheduler.py's pattern). The ON direction (default
 skip_memory=False, memory not denylisted, per-job memory toolset kept) is
 already pinned by tests/cron/test_scheduler.py::test_run_job_*memory*; this
-module pins the OFF direction and the "no per-job knob" rule.
+module pins the OFF direction and rejects the unsupported skip_memory field.
 """
 
 from __future__ import annotations
 
 import contextlib
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from cron.scheduler import run_job
 
@@ -127,7 +136,7 @@ class TestCronMemoryContractOff:
         )
 
     def test_skip_memory_is_not_a_per_job_knob(self, tmp_path):
-        """No per-job field flips skip_memory: the scheduler always passes False.
+        """The legacy skip_memory field remains unsupported.
 
         Guards against a partial re-flip where some job shape quietly gets
         #91384 behavior back. A field named skip_memory on the job dict is
@@ -143,3 +152,34 @@ class TestCronMemoryContractOff:
             run_job(job)
         kwargs = agent_cls.call_args.kwargs
         assert kwargs["skip_memory"] is False
+
+    @pytest.mark.parametrize("approval_mode", ["inherit", "approve"])
+    def test_task_opt_out_cannot_be_widened_by_toolset_or_approval(self, tmp_path, approval_mode):
+        job = {
+            "id": "memory-scope-none",
+            "name": "Capacity monitor",
+            "prompt": "Inspect only the supplied capacity result.",
+            "memory_scope": "none",
+            "enabled_toolsets": ["memory", "file"],
+            "approval_mode": approval_mode,
+        }
+        with _run_job_patches(tmp_path) as (_db, agent_cls):
+            run_job(job)
+        kwargs = agent_cls.call_args.kwargs
+        assert kwargs["skip_memory"] is True
+        assert "memory" in kwargs["disabled_toolsets"]
+
+    def test_explicit_profile_scope_preserves_memory_loading(self, tmp_path):
+        job = {"id": "memory-scope-profile", "prompt": "hi", "memory_scope": "profile"}
+        with _run_job_patches(tmp_path) as (_db, agent_cls):
+            run_job(job)
+        kwargs = agent_cls.call_args.kwargs
+        assert kwargs["skip_memory"] is False
+        assert "memory" not in kwargs["disabled_toolsets"]
+
+    @pytest.mark.parametrize("invalid_scope", ["typo", "", False, 0, [], {}])
+    def test_invalid_persisted_scope_does_not_widen_to_profile_memory(self, invalid_scope):
+        from cron.scheduler_job_runtime import _resolve_cron_disabled_toolsets
+
+        with pytest.raises(ValueError, match="memory_scope"):
+            _resolve_cron_disabled_toolsets({}, {"memory_scope": invalid_scope})
