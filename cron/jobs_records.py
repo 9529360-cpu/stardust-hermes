@@ -288,7 +288,11 @@ def _validate_durable_reminder_job(job: Dict[str, Any]) -> None:
     if repeat.get("times") != 1:
         raise ValueError("reminder=True requires exactly one occurrence (repeat=1).")
     origin = job.get("local_session_origin")
-    if not isinstance(origin, dict) or origin.get("source") not in {"desktop", "tui"} or not origin.get("session_id"):
+    if (
+        not isinstance(origin, dict)
+        or origin.get("source") not in {"desktop", "tui"}
+        or not origin.get("session_id")
+    ):
         raise ValueError("reminder=True requires a durable Desktop/TUI conversation origin.")
     if not str(job.get("prompt") or "").strip():
         raise ValueError("reminder=True requires non-empty reminder text in prompt.")
