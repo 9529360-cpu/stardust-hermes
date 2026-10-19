@@ -102,7 +102,28 @@ def test_pending_reminder_does_not_drop_after_delivery_attempt_budget(tmp_path, 
     assert receipt["delivery_attempts"] == ad._MAX_DELIVERY_ATTEMPTS + 3
 
 
-def test_delivered_reminder_returns_to_normal_retention_policy(tmp_path, monkeypatch):
+def test_delivered_unsettled_reminder_keeps_dedupe_receipt(tmp_path, monkeypatch):
+    from tools import async_delegation as ad
+
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
+    monkeypatch.setenv("_HERMES_CRON_EXTERNAL_WORKER", "test-worker")
+    assert _publish(ad, "reminder-unsettled") is True
+
+    claim = "consumer"
+    assert ad.claim_completion_delivery("reminder-unsettled", claim) is True
+    assert ad.complete_completion_delivery("reminder-unsettled", claim) is True
+    _age_row(
+        ad,
+        "reminder-unsettled",
+        seconds=ad._DURABLE_RETENTION_SECONDS + 3600,
+    )
+
+    ad._prune_durable_records()
+
+    assert ad.get_durable_delegation("reminder-unsettled") is not None
+
+
+def test_delivered_settled_reminder_returns_to_normal_retention_policy(tmp_path, monkeypatch):
     from tools import async_delegation as ad
 
     monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
@@ -112,6 +133,7 @@ def test_delivered_reminder_returns_to_normal_retention_policy(tmp_path, monkeyp
     claim = "consumer"
     assert ad.claim_completion_delivery("reminder-delivered", claim) is True
     assert ad.complete_completion_delivery("reminder-delivered", claim) is True
+    assert ad.mark_durable_completion_source_settled("reminder-delivered") is True
     _age_row(
         ad,
         "reminder-delivered",
