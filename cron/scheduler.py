@@ -1299,6 +1299,7 @@ def _publish_durable_reminder(job: dict, fence: Any) -> str:
         )
     return delivery_id
 
+
 def _run_one_job_body(
     job: dict, *, adapters=None, loop=None, verbose: bool = False,
     extra_prompt: Optional[str] = None, fire_claim_lost: Optional[_CancelEventLike] = None,
