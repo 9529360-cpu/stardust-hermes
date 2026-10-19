@@ -285,6 +285,41 @@ def _maybe_fire_tui_loop_tick(sid: str, session: dict) -> None:
             mgr.abandon_tick()
 
 
+def _notif_persist_reminder_event(sid: str, session: dict, evt: dict, text: str) -> bool:
+    """Persist one reminder timeline row and ACK it without starting an agent turn.
+
+    ``append_delegation_delivery`` owns lineage-aware idempotency. Its active-turn guard
+    refuses a write that races a real user/model turn; in that case the durable delivery
+    claim is released and the poller retries later.
+    """
+    from tools.async_delegation import (
+        claim_event_delivery, complete_event_delivery, release_event_delivery)
+
+    if (claim := claim_event_delivery(evt, "tui-reminder")) is None:
+        return True
+    try:
+        session_key = str(session.get("session_key") or "").strip()
+        if not session_key:
+            raise RuntimeError("reminder target session has no durable session key")
+        with _session_db(session) as db:
+            if db is None:
+                raise RuntimeError("reminder target SessionDB is unavailable")
+            resolver = getattr(db, "resolve_resume_session_id", None)
+            if callable(resolver):
+                resolved = resolver(session_key)
+                if resolved:
+                    session_key = str(resolved)
+            db.append_delegation_delivery(
+                session_key, text, _async_delegation_display_metadata(evt))
+    except Exception:
+        release_event_delivery(evt, claim)
+        logger.debug(
+            "Reminder delivery for session %s could not persist yet; retrying",
+            sid, exc_info=True)
+        return False
+    complete_event_delivery(evt, claim)
+    return True
+
 def _notif_dispatch_event(sid: str, session: dict, evt: dict, text: str) -> bool:
     """Run one claimed notification turn; False means the durable event should be requeued."""
     from tools.async_delegation import claim_event_delivery, complete_event_delivery, release_event_delivery
@@ -343,6 +378,29 @@ def _notif_handle_event(sid, session, evt, emitted, registry, fmt, deferred, com
         emitted.add(dedup_key)
     if evt_type == "completion" and completions is not None:
         completions.append((evt, text))
+        return True
+    if is_delegation and evt.get("role") == "reminder":
+        # Immediate out-of-band reminder while the durable timeline row waits for an idle
+        # transcript boundary. This does not create a user/model turn.
+        if dedup_key in emitted:
+            # The status line above was emitted on first sight. The keyed notice is safe to
+            # repeat only once per process, so use a sibling marker in the same set.
+            notice_key = ("reminder-notice", dedup_key)
+            if notice_key not in emitted:
+                reminder_text = str(evt.get("summary") or "").strip() or "Reminder"
+                _emit("notification.show", sid, {
+                    "text": reminder_text, "level": "info", "kind": "ttl",
+                    "ttl_ms": 30000, "key": f"reminder:{evt.get('delegation_id', '')}",
+                    "id": f"reminder:{evt.get('delegation_id', '')}",
+                })
+                emitted.add(notice_key)
+        with session["history_lock"]:
+            busy = bool(session.get("running"))
+        if busy or not _notif_persist_reminder_event(sid, session, evt, text):
+            queue.put(evt)
+            if deferred is not None:
+                return False
+            time.sleep(0.25)
         return True
     if not _notif_claim_turn(session):
         queue.put(evt)
@@ -537,9 +595,13 @@ def _async_delegation_display_metadata(evt: dict) -> dict:
     completed_count = sum(1 for r in results if r.get("status") in {"completed", "success"})
     failed_count = sum(1 for r in results if r.get("status") in {"failed", "error"})
     duration = evt.get("total_duration_seconds") or evt.get("duration_seconds")
-    return {"display_text": async_delegation_display_text(evt),
+    is_reminder = evt.get("role") == "reminder"
+    reminder_text = str(evt.get("summary") or "").strip()
+    return {"display_text": reminder_text if is_reminder and reminder_text else async_delegation_display_text(evt),
             "delegation_id": str(evt.get("delegation_id") or ""), "task_count": task_count,
             "completed_count": completed_count or task_count - failed_count, "failed_count": failed_count,
+            **({"reminder": True} if is_reminder else {}),
+            **({"reminder_due_at": evt.get("reminder_due_at")} if is_reminder and evt.get("reminder_due_at") else {}),
             **({"duration_seconds": duration} if isinstance(duration, (int, float)) else {})}
 
 
