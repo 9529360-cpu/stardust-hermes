@@ -1,4 +1,5 @@
 """Completion notices stay human-facing while the parent retains full results."""
+import contextlib
 import copy
 import queue
 import threading
@@ -124,6 +125,7 @@ def test_completion_display_keeps_payload_separate_across_surfaces(monkeypatch, 
     assert "not a new user instruction" in reminder_payload
     assert "去办护照。" in reminder_payload
     assert async_delegation_display_text(reminder_event) == "Reminder: Passport"
+    assert server._async_delegation_display_metadata(reminder_event)["display_text"] == "去办护照。"
     grouped = {"group": "Review", "goals": ["First", "Second"],
                "results": [{"task_index": 0, "status": "completed"}, {"task_index": 1, "status": "failed"}]}
     assert async_delegation_display_text(grouped) == "Subagent Tasks Finished with Issues: Review (2 tasks)"
@@ -135,3 +137,125 @@ def test_completion_display_keeps_payload_separate_across_surfaces(monkeypatch, 
     assert "Failed" in async_delegation_display_text({"results": [], "error": "Worker crashed"})
     cli._print_user_message_preview("[ASYNC DELEGATION BATCH COMPLETE — user-authored]")
     assert "[ASYNC DELEGATION BATCH COMPLETE — user-authored]" in capsys.readouterr().out
+
+
+def test_tui_reminder_persists_and_notifies_without_agent_turn(monkeypatch, tmp_path):
+    from hermes_state import SessionDB
+
+    event = {
+        "type": "async_delegation",
+        "role": "reminder",
+        "delegation_id": "cron_reminder_direct",
+        "session_key": "reminder-session",
+        "cron_job_id": "reminder-job",
+        "cron_job_name": "Passport",
+        "goal": "Passport",
+        "status": "completed",
+        "summary": "去办护照。",
+        "reminder_due_at": "2026-10-20T09:00:00+08:00",
+    }
+    payload = format_process_notification(event)
+    registry = SimpleNamespace(
+        completion_queue=queue.Queue(),
+        is_completion_consumed=lambda _sid: False,
+    )
+    emitted = []
+    completed = []
+    released = []
+    dispatched = []
+    db = SessionDB(tmp_path / "state.db")
+    db.create_session("reminder-session", source="desktop")
+
+    @contextlib.contextmanager
+    def session_db(_session):
+        yield db
+
+    monkeypatch.setattr(server, "_session_db", session_db)
+    monkeypatch.setattr(server, "_emit", lambda *args: emitted.append(args) or True)
+    monkeypatch.setattr(server, "_notif_dispatch_event", lambda *args: dispatched.append(args) or True)
+    monkeypatch.setattr("tools.async_delegation.claim_event_delivery", lambda *_args: "claim-1")
+    monkeypatch.setattr(
+        "tools.async_delegation.complete_event_delivery",
+        lambda evt, claim: completed.append((evt["delegation_id"], claim)),
+    )
+    monkeypatch.setattr(
+        "tools.async_delegation.release_event_delivery",
+        lambda evt, claim: released.append((evt["delegation_id"], claim)),
+    )
+    session = {
+        "session_key": "reminder-session",
+        "history_lock": threading.RLock(),
+        "running": False,
+    }
+
+    try:
+        assert server._notif_handle_event(
+            "ui-reminder",
+            session,
+            event,
+            set(),
+            registry,
+            format_process_notification,
+            None,
+        ) is True
+
+        rows = db.get_messages("reminder-session")
+    finally:
+        db.close()
+
+    assert dispatched == []
+    assert released == []
+    assert completed == [("cron_reminder_direct", "claim-1")]
+    assert len(rows) == 1
+    assert rows[0]["display_kind"] == "async_delegation_complete"
+    assert rows[0]["display_metadata"]["delegation_id"] == "cron_reminder_direct"
+    assert rows[0]["display_metadata"]["display_text"] == "去办护照。"
+    assert rows[0]["content"] == payload
+    notices = [args for args in emitted if args[0] == "notification.show"]
+    assert len(notices) == 1
+    assert notices[0][2]["text"] == "去办护照。"
+
+
+def test_busy_tui_reminder_notifies_now_but_defers_durable_ack(monkeypatch):
+    event = {
+        "type": "async_delegation",
+        "role": "reminder",
+        "delegation_id": "cron_reminder_busy",
+        "session_key": "busy-session",
+        "cron_job_name": "Water",
+        "status": "completed",
+        "summary": "喝水。",
+    }
+    registry = SimpleNamespace(
+        completion_queue=queue.Queue(),
+        is_completion_consumed=lambda _sid: False,
+    )
+    emitted = []
+    persisted = []
+    monkeypatch.setattr(server, "_emit", lambda *args: emitted.append(args) or True)
+    monkeypatch.setattr(
+        server,
+        "_notif_persist_reminder_event",
+        lambda *args: persisted.append(args) or True,
+    )
+    session = {
+        "session_key": "busy-session",
+        "history_lock": threading.RLock(),
+        "running": True,
+    }
+
+    assert server._notif_handle_event(
+        "ui-busy",
+        session,
+        event,
+        set(),
+        registry,
+        format_process_notification,
+        None,
+    ) is True
+
+    assert persisted == []
+    assert registry.completion_queue.get_nowait() is event
+    notices = [args for args in emitted if args[0] == "notification.show"]
+    assert len(notices) == 1
+    assert notices[0][2]["text"] == "喝水。"
