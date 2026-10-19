@@ -27,6 +27,7 @@ import { useStatusbarItems } from '../shell/hooks/use-statusbar-items'
 import { ModelMenuPanel } from '../shell/model-menu-panel'
 import { ReasoningMenuPanel } from '../shell/reasoning-menu-panel'
 import { StatusbarControls } from '../shell/statusbar-controls'
+import { TaskCenterView } from '../tasks'
 
 import { latestChatActions, latestSidebarActions } from './latest-actions'
 import { setStatusbarItemGroup, useStatusbarContributions } from './panes'
@@ -205,6 +206,7 @@ export const ChatRoutesSurface = memo(function ChatRoutesSurface({
       <Route element={page(<MessagingView setStatusbarItemGroup={setStatusbarItemGroup} />)} path="messaging" />
       <Route element={page(<ArtifactsView setStatusbarItemGroup={setStatusbarItemGroup} />)} path="artifacts" />
       <Route element={page(<CronView onOpenSession={actions.onResumeSession} />)} path="cron" />
+      <Route element={page(<TaskCenterView onOpenSession={actions.onResumeSession} />)} path="tasks" />
       <Route element={chatView} path="workspace" />
       <Route element={null} path="agents" />
       <Route element={null} path="command-center" />
