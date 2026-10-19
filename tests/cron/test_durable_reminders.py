@@ -33,6 +33,8 @@ def test_reminder_job_is_one_shot_local_and_deterministic(tmp_cron_store):
     assert job["reminder"] is True
     assert job["repeat"]["times"] == 1
     assert job["local_session_origin"] == _origin()
+    assert job["provider_snapshot"] is None
+    assert job["model_snapshot"] is None
 
 
 @pytest.mark.parametrize(
@@ -239,3 +241,35 @@ def test_overdue_consumed_reminder_flows_to_dispatch_limit_guard():
     due = jobs_due._DueJob(job, scan, run_at, run_dt, run_dt)
 
     assert jobs_due._retire_expired_oneshot(due) is False
+
+
+def test_reminder_rejects_persistent_memory_scope(tmp_cron_store):
+    jobs = tmp_cron_store
+
+    with pytest.raises(ValueError, match="deterministic"):
+        jobs.create_job(
+            prompt="Private reminder.",
+            schedule="2099-01-01T09:00:00+00:00",
+            local_session_origin=_origin(),
+            reminder=True,
+            memory_scope="none",
+        )
+
+
+def test_reminder_execution_mode_cannot_be_toggled_by_update(tmp_cron_store):
+    jobs = tmp_cron_store
+    reminder = jobs.create_job(
+        prompt="Reminder.",
+        schedule="2099-01-01T09:00:00+00:00",
+        local_session_origin=_origin(),
+        reminder=True,
+    )
+    ordinary = jobs.create_job(
+        prompt="Ordinary task.",
+        schedule="2099-01-01T10:00:00+00:00",
+    )
+
+    with pytest.raises(ValueError, match="fixed at creation"):
+        jobs.update_job(reminder["id"], {"reminder": False})
+    with pytest.raises(ValueError, match="fixed at creation"):
+        jobs.update_job(ordinary["id"], {"reminder": True})
