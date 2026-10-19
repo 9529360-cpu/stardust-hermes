@@ -360,6 +360,60 @@ class TestRunJob:
                 )
 
     @pytest.mark.asyncio
+    async def test_run_job_forwards_expected_snapshot(self, adapter):
+        """A reviewed job snapshot is forwarded to the atomic trigger fence."""
+        app = _create_app(adapter)
+        expected = dict(SAMPLE_JOB)
+        mock_trigger = MagicMock(return_value=SAMPLE_JOB)
+        async with TestClient(TestServer(app)) as cli:
+            with patch(f"{_MOD}._CRON_AVAILABLE", True), patch(
+                f"{_MOD}._cron_trigger", mock_trigger
+            ):
+                resp = await cli.post(
+                    f"/api/jobs/{VALID_JOB_ID}/run",
+                    json={"expected": expected, "prompt": "approved focus"},
+                )
+                assert resp.status == 200
+                mock_trigger.assert_called_once_with(
+                    VALID_JOB_ID, extra_prompt="approved focus", expected=expected
+                )
+
+    @pytest.mark.asyncio
+    async def test_run_job_rejects_stale_expected_snapshot(self, adapter):
+        """A stale reviewed snapshot returns 409 and does not silently queue another job shape."""
+        app = _create_app(adapter)
+        mock_trigger = MagicMock(return_value=None)
+        changed = {**SAMPLE_JOB, "prompt": "changed after approval"}
+        async with TestClient(TestServer(app)) as cli:
+            with patch(f"{_MOD}._CRON_AVAILABLE", True), patch(
+                f"{_MOD}._cron_trigger", mock_trigger
+            ), patch(
+                f"{_MOD}._cron_get", return_value=changed
+            ):
+                resp = await cli.post(
+                    f"/api/jobs/{VALID_JOB_ID}/run",
+                    json={"expected": SAMPLE_JOB},
+                )
+                assert resp.status == 409
+                data = await resp.json()
+                assert "changed" in data["error"].lower()
+
+    @pytest.mark.asyncio
+    async def test_run_job_expected_must_be_object(self, adapter):
+        app = _create_app(adapter)
+        mock_trigger = MagicMock(return_value=SAMPLE_JOB)
+        async with TestClient(TestServer(app)) as cli:
+            with patch(f"{_MOD}._CRON_AVAILABLE", True), patch(
+                f"{_MOD}._cron_trigger", mock_trigger
+            ):
+                resp = await cli.post(
+                    f"/api/jobs/{VALID_JOB_ID}/run",
+                    json={"expected": "stale"},
+                )
+                assert resp.status == 400
+                mock_trigger.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_run_job_prompt_too_long_rejected(self, adapter):
         """Transient run prompt honors the same length cap as stored prompts."""
         app = _create_app(adapter)
