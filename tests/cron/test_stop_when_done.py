@@ -224,6 +224,11 @@ def test_run_body_strips_done_before_delivery_and_marks_terminal(monkeypatch):
         "_publish_local_session_completion",
         lambda *_args, **_kwargs: None,
     )
+    monkeypatch.setattr(
+        scheduler,
+        "_run_job_script_with_claim_heartbeat",
+        lambda *_args, **_kwargs: (True, "verified"),
+    )
 
     def fake_finish(delivery, _owner, execution_id):
         observed["terminal_complete"] = delivery.terminal_complete
@@ -237,6 +242,7 @@ def test_run_body_strips_done_before_delivery_and_marks_terminal(monkeypatch):
         "name": "Track package",
         "execution_id": "exec-goal-run",
         "stop_when_done": True,
+        "completion_script": "verify.py",
     }
     assert scheduler._run_one_job_body(job) is True
 
@@ -245,3 +251,76 @@ def test_run_body_strips_done_before_delivery_and_marks_terminal(monkeypatch):
     assert observed["execution_id"] == "exec-goal-run"
     assert observed["secret_reset"] == "secret-token"
     assert observed["terminal_reset"] == "terminal-token"
+
+
+def test_goal_hint_mentions_configured_independent_completion_check():
+    from cron.scheduler_prompt import _build_job_prompt
+
+    prompt = _build_job_prompt({
+        "id": "goal",
+        "prompt": "Track package.",
+        "stop_when_done": True,
+        "completion_script": "package_delivered.py",
+    })
+
+    assert "configured completion script must also pass" in prompt
+
+
+def test_terminal_completion_verifier_failure_keeps_goal_active(monkeypatch):
+    import cron.scheduler as scheduler
+
+    monkeypatch.setattr(
+        scheduler,
+        "_run_job_script_with_claim_heartbeat",
+        lambda *_args, **_kwargs: (False, "package status is still IN_TRANSIT"),
+    )
+    monkeypatch.setattr(scheduler, "_resolve_job_workdir", lambda _job, _job_id: None)
+
+    response, done = scheduler._verify_terminal_completion(
+        {"id": "goal-verify", "completion_script": "verify.py"},
+        "Package delivered.",
+        True,
+    )
+
+    assert done is False
+    assert "remains active" in response
+    assert "IN_TRANSIT" in response
+
+
+def test_terminal_completion_verifier_passes_workdir_and_cancel_event(monkeypatch):
+    import cron.scheduler as scheduler
+
+    seen = {}
+
+    def verify(job, script_path, *, workdir=None, cancel_event=None):
+        seen.update(job=job, script_path=script_path, workdir=workdir, cancel_event=cancel_event)
+        return True, "verified"
+
+    monkeypatch.setattr(scheduler, "_run_job_script_with_claim_heartbeat", verify)
+    monkeypatch.setattr(scheduler, "_resolve_job_workdir", lambda _job, _job_id: "/tmp/project")
+
+    cancel = object()
+    job = {"id": "goal-verify", "completion_script": "verify.py"}
+    response, done = scheduler._verify_terminal_completion(
+        job, "Package delivered.", True, cancel_event=cancel)
+
+    assert response == "Package delivered."
+    assert done is True
+    assert seen["script_path"] == "verify.py"
+    assert seen["workdir"] == "/tmp/project"
+    assert seen["cancel_event"] is cancel
+
+
+def test_terminal_completion_verifier_is_noop_without_done_or_script(monkeypatch):
+    import cron.scheduler as scheduler
+
+    monkeypatch.setattr(
+        scheduler,
+        "_run_job_script_with_claim_heartbeat",
+        lambda *_args, **_kwargs: pytest.fail("verifier should not run"),
+    )
+
+    assert scheduler._verify_terminal_completion(
+        {"id": "goal"}, "still working", False) == ("still working", False)
+    assert scheduler._verify_terminal_completion(
+        {"id": "goal"}, "done summary", True) == ("done summary", True)
