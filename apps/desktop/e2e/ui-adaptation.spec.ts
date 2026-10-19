@@ -1,12 +1,15 @@
 import * as fs from 'node:fs'
+import * as os from 'node:os'
 import * as path from 'node:path'
 
 import { expect, test } from './test'
 
 import { type MockBackendFixture, setupMockBackend, waitForAppReady } from './fixtures'
 
-const TASK_ROOT = process.env.STARDUST_UI_ADAPTATION_TASK_ROOT
-if (!TASK_ROOT) throw new Error('Set STARDUST_UI_ADAPTATION_TASK_ROOT to a task-isolated D: directory')
+const TASK_ROOT = process.env.STARDUST_UI_ADAPTATION_TASK_ROOT ?? path.join(
+  os.tmpdir(),
+  `stardust-ui-adaptation-${process.pid}-${Date.now()}`,
+)
 fs.mkdirSync(TASK_ROOT, { recursive: true })
 
 let fixture: MockBackendFixture | null = null
