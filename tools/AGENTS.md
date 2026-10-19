@@ -80,6 +80,13 @@ client (`mcp_tool_*.py`: config, discovery, transport, registration, content, er
 never an `elif` on a backend name (root shape rules). Remote-backend file visibility problems are
 fixed at the mount, not by adding a tool.
 
+**Windows terminal commands:** Git Bash runs a command through fork+exec emulation, so the program that finally
+runs can outlive every ancestor in the Windows process tree, and `taskkill /T` / psutil (both follow parent links)
+cannot find it. `LocalEnvironment._run_bash` and `ProcessRegistry.spawn_local` therefore spawn into a job object
+(`tools/environments/windows_job.py`). End a command with `terminate_contained(proc)` first and fall back to the
+tree kill only for a process that was never contained (for example a session recovered after a restart). The job
+deliberately has no kill-on-close: `cmd &` must outlive a command that finished normally, as it does on POSIX.
+
 **Browser transaction interactions:** `browser_interact` is one compact surface for advanced
 state-preserving form actions (hover/select/check/uncheck/drag/scroll-into-view) plus safe
 condition waits. It maps to the existing agent-browser session; do not emulate these actions in a

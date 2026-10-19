@@ -25,6 +25,7 @@ _IS_WINDOWS = platform.system() == "Windows"
 # See #70716.
 _IS_LINUX = platform.system() == "Linux"
 from tools.environments.local import _find_shell, _resolve_safe_cwd, _sanitize_subprocess_env
+from tools.environments.windows_job import spawn_contained, terminate_contained
 from hermes_cli._subprocess_compat import windows_hide_flags
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Literal, NamedTuple, Optional
@@ -1062,7 +1063,7 @@ class ProcessRegistry(ProcessCheckpointMixin):
         # share the foreground process group and background spawns would stop the whole
         # session (observed as dead TUIs in state T). Cgroup isolation is unaffected —
         # the scope attaches to the invoked process, not the spawning session.
-        proc = subprocess.Popen(
+        proc = (spawn_contained if _IS_WINDOWS else subprocess.Popen)(
             spawn_argv, text=True, cwd=session.cwd, env=spawn_env, encoding="utf-8",
             errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
             start_new_session=True, **_popen_kwargs)
@@ -1094,7 +1095,7 @@ class ProcessRegistry(ProcessCheckpointMixin):
                     os.killpg(os.getpgid(proc.pid), kill_signal)  # windows-footgun: ok - guarded by _IS_WINDOWS above
                 except (ProcessLookupError, PermissionError, OSError):
                     proc.kill()
-            else:
+            elif not terminate_contained(proc):
                 proc.kill()
         with suppress(Exception):
             proc.wait(timeout=5)
@@ -2062,8 +2063,10 @@ class ProcessRegistry(ProcessCheckpointMixin):
                     os.kill(session.pid, signal.SIGTERM)
         elif session.process:
             # Tree kill: on Windows Popen.terminate() only kills the shell wrapper and
-            # leaves Git Bash descendants behind.
-            self._terminate_host_pid(session.process.pid, session.host_start_time)
+            # leaves Git Bash descendants behind, and so does taskkill /T once an exec'd
+            # descendant has lost its parent; the job the process was spawned into ends them all.
+            if not terminate_contained(session.process):
+                self._terminate_host_pid(session.process.pid, session.host_start_time)
         elif session.env_ref and session.pid:
             session.env_ref.execute(f"kill {session.pid} 2>/dev/null", timeout=5)
         elif session.detached and session.pid_scope == "host" and session.pid:
