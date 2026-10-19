@@ -320,6 +320,7 @@ def _notif_persist_reminder_event(sid: str, session: dict, evt: dict, text: str)
     complete_event_delivery(evt, claim)
     return True
 
+
 def _notif_dispatch_event(sid: str, session: dict, evt: dict, text: str) -> bool:
     """Run one claimed notification turn; False means the durable event should be requeued."""
     from tools.async_delegation import claim_event_delivery, complete_event_delivery, release_event_delivery
