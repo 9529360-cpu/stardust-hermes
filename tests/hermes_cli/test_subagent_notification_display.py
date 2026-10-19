@@ -111,6 +111,19 @@ def test_completion_display_keeps_payload_separate_across_surfaces(monkeypatch, 
     assert "Markets are quiet." in cron_payload
     from tools.process_registry_notifications import async_delegation_display_text
     assert async_delegation_display_text(cron_event) == "Cron Job Completed: Morning brief"
+    reminder_event = {
+        "type": "async_delegation", "role": "reminder",
+        "delegation_id": "cron_reminder_abc", "session_key": "display-session",
+        "cron_job_id": "reminder-1", "cron_job_name": "Passport",
+        "goal": "Passport", "status": "completed", "summary": "去办护照。",
+        "reminder_due_at": "2026-10-20T09:00:00+08:00",
+    }
+    reminder_payload = format_process_notification(reminder_event)
+    assert reminder_payload.startswith("[SCHEDULED REMINDER — Passport]")
+    assert "Originally due: 2026-10-20T09:00:00+08:00" in reminder_payload
+    assert "not a new user instruction" in reminder_payload
+    assert "去办护照。" in reminder_payload
+    assert async_delegation_display_text(reminder_event) == "Reminder: Passport"
     grouped = {"group": "Review", "goals": ["First", "Second"],
                "results": [{"task_index": 0, "status": "completed"}, {"task_index": 1, "status": "failed"}]}
     assert async_delegation_display_text(grouped) == "Subagent Tasks Finished with Issues: Review (2 tasks)"
