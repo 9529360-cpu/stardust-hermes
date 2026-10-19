@@ -40,6 +40,7 @@ import { isSecondaryWindow } from '@/store/windows'
 
 import { MessageRenderBoundary } from '../message-render-boundary'
 
+import { resolveScrollAnchor, type ScrollAnchor } from './scroll-anchor'
 import { resolveShowEarlierAction, shouldAutoShowEarlier, useTranscriptWindow } from './transcript-window'
 import { useMessagesBelow } from './use-messages-below'
 import { useStickyPromptClip } from './use-sticky-prompt-clip'
@@ -494,9 +495,11 @@ const ThreadMessageListInner: FC<ThreadMessageListProps> = ({
     }
   }
 
-  // Where to land after a prepend, in distance-from-bottom (survives the
-  // height change). Shared by "Show earlier" and the budget backfill below.
-  const restoreFromBottomRef = useRef<number | null>(null)
+  // Where to land after content above the viewport changes height, in
+  // distance-from-bottom (survives the height change). Shared by "Show earlier",
+  // the budget backfill below and the settle loop's parked offset. Only the
+  // parked one outlives the commit that follows it — see ScrollAnchor.
+  const restoreAnchorRef = useRef<ScrollAnchor | null>(null)
   // False from a session switch until the settle loop below parks the
   // transcript at its true bottom. While false, scrollTop is a way-point of a
   // load in progress, not a reading position anyone chose — never anchor to it.
@@ -522,7 +525,7 @@ const ThreadMessageListInner: FC<ThreadMessageListProps> = ({
       return
     }
 
-    restoreFromBottomRef.current = el.scrollHeight - el.scrollTop
+    restoreAnchorRef.current = { fromBottom: el.scrollHeight - el.scrollTop, parked: false }
   }, [scrollRef])
 
   // Backfill from FIRST_PAINT_BUDGET to the full budget after the small
@@ -795,7 +798,7 @@ const ThreadMessageListInner: FC<ThreadMessageListProps> = ({
 
       if (settleKeyRef.current !== sessionKey) {
         settleKeyRef.current = sessionKey
-        restoreFromBottomRef.current = null
+        restoreAnchorRef.current = null
       }
 
       return record
@@ -822,7 +825,7 @@ const ThreadMessageListInner: FC<ThreadMessageListProps> = ({
     // re-arm is the SAME load, whose in-flight anchor is still correct.
     if (sessionSwitched) {
       settleKeyRef.current = sessionKey
-      restoreFromBottomRef.current = null
+      restoreAnchorRef.current = null
     }
 
     let frame = 0
@@ -863,8 +866,9 @@ const ThreadMessageListInner: FC<ThreadMessageListProps> = ({
           // view is stranded at the clamped position. Keep loadSettled false:
           // anchorBeforePrepend skips while unsettled, so the parked offset
           // can't be overwritten by a mid-load anchor measurement. The restore
-          // effect flips settled once it consumes the parked value.
-          restoreFromBottomRef.current = target.fromBottom + node.clientHeight
+          // effect flips settled once it consumes the parked value. This is the
+          // one anchor that stays armed through commits too short to hold it.
+          restoreAnchorRef.current = { fromBottom: target.fromBottom + node.clientHeight, parked: true }
         } else {
           loadSettledRef.current = true
         }
@@ -903,7 +907,7 @@ const ThreadMessageListInner: FC<ThreadMessageListProps> = ({
       stopScroll()
       loadSettledRef.current = true
       liveScrollStateRef.current = threadScrollStateFromMetrics(el)
-      restoreFromBottomRef.current = el.scrollHeight - el.scrollTop
+      restoreAnchorRef.current = { fromBottom: el.scrollHeight - el.scrollTop, parked: false }
     }
 
     cancelRestoreRef.current = target.kind === 'offset' ? cancelRestore : () => resizeObserver.disconnect()
@@ -978,7 +982,7 @@ const ThreadMessageListInner: FC<ThreadMessageListProps> = ({
           action: resolveShowEarlierAction(hiddenCount, olderAvailable),
           isAtBottom,
           loadSettled: loadSettledRef.current,
-          restorePending: restoreFromBottomRef.current != null,
+          restorePending: restoreAnchorRef.current != null,
           scrollTop: el.scrollTop,
           wheelDeltaY
         })
@@ -999,16 +1003,30 @@ const ThreadMessageListInner: FC<ThreadMessageListProps> = ({
     }
   }, [hiddenCount, isAtBottom, olderAvailable, scrollRef, showEarlier])
 
+  // Every commit that can change the height above the viewport settles the
+  // pending anchor. A prepend anchor is single-use: when this commit cannot
+  // honor it (the rows re-measured shorter than when it was taken) it is
+  // dropped, not left to fire at a later, unrelated commit — a new turn
+  // starting — and throw the view to a position nobody chose.
   useLayoutEffect(() => {
     const el = scrollRef.current
-    const restoreFromBottom = restoreFromBottomRef.current
+    const anchor = restoreAnchorRef.current
 
-    if (el && restoreFromBottom != null && el.scrollHeight >= restoreFromBottom) {
-      el.scrollTop = el.scrollHeight - restoreFromBottom
-      restoreFromBottomRef.current = null
+    if (!el || !anchor) {
+      return
+    }
+
+    const { keep, scrollTop } = resolveScrollAnchor(anchor, el.scrollHeight)
+
+    if (scrollTop != null) {
+      el.scrollTop = scrollTop
       // Consuming a parked offset (clamped-exit) means the view just landed at
       // its real reading position — the load is settled from here on.
       loadSettledRef.current = true
+    }
+
+    if (!keep) {
+      restoreAnchorRef.current = null
     }
     // renderBudget covers DOM pages; groups.length covers store-window expands.
   }, [scrollRef, renderBudget, groups.length])
