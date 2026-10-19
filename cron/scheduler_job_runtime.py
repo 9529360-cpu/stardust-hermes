@@ -32,6 +32,13 @@ def _resolve_cron_disabled_toolsets(cfg: dict, job: Optional[dict] = None) -> li
     See #25752.
     """
     cron_cfg = (cfg or {}).get("cron") or {}
+    raw_memory_scope = (job or {}).get("memory_scope")
+    if raw_memory_scope is not None:
+        if not isinstance(raw_memory_scope, str) or raw_memory_scope.strip().lower() not in {"profile", "none"}:
+            raise ValueError("Invalid persisted memory_scope; expected 'profile' or 'none'.")
+        memory_scope = raw_memory_scope.strip().lower()
+    else:
+        memory_scope = "profile"
     delegated_scheduling = (job or {}).get("approval_mode") == "approve"
     if cron_cfg.get("allow_agent_scheduling") or delegated_scheduling:
         disabled = ["messaging", "clarify"]
@@ -45,6 +52,8 @@ def _resolve_cron_disabled_toolsets(cfg: dict, job: Optional[dict] = None) -> li
         name = str(name).strip()
         if name and name not in disabled:
             disabled.append(name)
+    if memory_scope == "none" and "memory" not in disabled:
+        disabled.append("memory")
     return disabled
 
 def _merge_mcp_into_per_job_toolsets(per_job: list[str], cfg: dict) -> list[str]:
@@ -502,7 +511,7 @@ def _construct_cron_agent(AIAgent, job: dict, _cfg: dict, setup: _CronAgentSetup
         # Project context files only with a configured workdir; SOUL.md always.
         skip_context_files=not bool(workdir),
         load_soul_identity=True,
-        skip_memory=False,
+        skip_memory=(job.get("memory_scope") == "none"),
         skip_background_review=True,  # Cron has no human-in-the-loop need for skill/memory review forks (~30K tok/event)
         platform="cron",
         session_id=session_id,
