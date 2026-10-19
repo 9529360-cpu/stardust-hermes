@@ -1136,6 +1136,8 @@ def cronjob(
     no_agent: Optional[bool] = None,
     attach_to_session: Optional[bool] = None,
     stop_when_done: Optional[bool] = None,
+    completion_script: Optional[str] = None,
+    memory_scope: Optional[str] = None,
     monitor_script: Optional[str] = None,
     monitor_url: Optional[str] = None,
     reasoning_effort: Optional[str] = None,
@@ -1172,19 +1174,24 @@ def cronjob(
 
 
 def _script_description(home: str) -> str:
-    return (f"Optional script run each tick; stdout is injected into the agent's prompt as context (with no_agent=True "
+    return (f"Optional script run each tick; stdout is injected into the agent\'s prompt as context (with no_agent=True "
             f"the script IS the job). Relative paths resolve under {home}/scripts/; .sh/.bash via bash, else Python. "
-            "On update, '' clears.")
+            "On update, \'\' clears.")
+
+
+def _completion_script_description(home: str) -> str:
+    return (f"Optional independent completion verifier for stop_when_done jobs. It runs only after the agent emits "
+            f"[DONE]; exit code 0 accepts completion, any failure keeps the job active. Relative paths resolve under "
+            f"{home}/scripts/ using the same containment rules as script. On update, \'\' clears.")
 
 
 def _cronjob_schema_overrides() -> dict:
-    """Rebuild the ``script`` path hint from the ACTIVE profile at every get_definitions(): the
-    static schema is built once per process, but the multiplexed gateway serves every profile from
-    that process, so a path baked in at import would name the launch profile's home (#95685)."""
+    """Rebuild profile-sensitive script path hints for the active profile."""
     params = copy.deepcopy(CRONJOB_SCHEMA["parameters"])
-    params["properties"]["script"]["description"] = _script_description(display_hermes_home())
+    home = display_hermes_home()
+    params["properties"]["script"]["description"] = _script_description(home)
+    params["properties"]["completion_script"]["description"] = _completion_script_description(home)
     return {"parameters": params}
-
 
 CRONJOB_SCHEMA = {
     "name": "cronjob_manage",
@@ -1274,6 +1281,15 @@ Jobs run in a fresh session. Normally they have no current-chat context, so prom
             "stop_when_done": {
                 "type": "boolean",
                 "description": "Optional goal-task mode for bounded recurring follow-ups. True means the job should keep checking/working until its real-world goal is actually satisfied, then emit the runtime [DONE] marker and automatically enter the existing completed terminal state after delivering the final result. Use for bounded follow-ups such as 'track this package until delivered' or 'watch this refund until received', not perpetual reports/briefings. On update, false turns it off. Incompatible with no_agent."
+            },
+            "completion_script": {
+                "type": "string",
+                "description": _completion_script_description("the profile STARDUST_HOME")
+            },
+            "memory_scope": {
+                "type": "string",
+                "enum": ["profile", "none"],
+                "description": "Optional persistent-memory scope for this autonomous job. Omit/profile loads profile memory normally. none skips persistent personal memory and denies the memory tool for this job, even if enabled_toolsets requests it."
             },
             "enabled_toolsets": {
                 "type": "array",
