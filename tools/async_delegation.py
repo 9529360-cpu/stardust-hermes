@@ -162,30 +162,67 @@ def _persist_dispatch(record: Dict[str, Any]) -> None:
         logger.warning("Async delegation retention pruning failed after dispatch", exc_info=True)
 
 
+def _durable_payload_role(payload: Optional[str]) -> str:
+    """Best-effort role from one persisted JSON payload."""
+    if not payload:
+        return ""
+    try:
+        decoded = json.loads(payload)
+    except Exception:
+        return ""
+    return str(decoded.get("role") or "") if isinstance(decoded, dict) else ""
+
+
+def _is_pending_reminder_payload(task_json: Optional[str], event_json: Optional[str]) -> bool:
+    """Pending reminders are outstanding user obligations, not disposable history."""
+    return (
+        _durable_payload_role(task_json) == "reminder"
+        or _durable_payload_role(event_json) == "reminder"
+    )
+
 def _prune_durable_records() -> None:
-    """Bound terminal history, preferring delivered records for deletion."""
+    """Bound ordinary completion history without deleting undelivered reminders.
+
+    A pending reminder is still an outstanding user obligation. It is excluded from
+    generic terminal-history and pending-result caps until delivery is acknowledged.
+    Delivered reminders immediately return to the ordinary retention policy.
+    """
     cutoff = time.time() - _DURABLE_RETENTION_SECONDS
     with _DB_LOCK, _transaction() as conn:
         conn.execute(
-            "DELETE FROM async_delegations WHERE delivery_state='delivered' AND updated_at < ?", (cutoff,))
-        terminal_count = conn.execute(
-            "SELECT COUNT(*) FROM async_delegations WHERE state NOT IN ('running','finalizing')").fetchone()[0]
-        if terminal_count > _MAX_RETAINED_COMPLETED:
-            conn.execute("""DELETE FROM async_delegations WHERE delegation_id IN (
-                     SELECT delegation_id FROM async_delegations
-                     WHERE state NOT IN ('running','finalizing')
-                     ORDER BY CASE delivery_state WHEN 'delivered' THEN 0 ELSE 1 END,
-                              updated_at ASC LIMIT ?
-                   )""", (terminal_count - _MAX_RETAINED_COMPLETED,))
-        pending_count = conn.execute("""SELECT COUNT(*) FROM async_delegations
-               WHERE state NOT IN ('running','finalizing') AND delivery_state='pending'""").fetchone()[0]
-        if pending_count > _MAX_DURABLE_PENDING:
-            conn.execute("""DELETE FROM async_delegations WHERE delegation_id IN (
-                     SELECT delegation_id FROM async_delegations
-                     WHERE state NOT IN ('running','finalizing') AND delivery_state='pending'
-                     ORDER BY updated_at ASC LIMIT ?
-                   )""", (pending_count - _MAX_DURABLE_PENDING,))
+            "DELETE FROM async_delegations WHERE delivery_state=\'delivered\' AND updated_at < ?",
+            (cutoff,),
+        )
 
+        terminal_rows = conn.execute("""SELECT delegation_id, delivery_state, task_json, event_json
+               FROM async_delegations
+               WHERE state NOT IN (\'running\',\'finalizing\')
+               ORDER BY CASE delivery_state WHEN \'delivered\' THEN 0 ELSE 1 END, updated_at ASC""").fetchall()
+        generic_terminal = [
+            row for row in terminal_rows
+            if not (row[1] == "pending" and _is_pending_reminder_payload(row[2], row[3]))
+        ]
+        overflow = len(generic_terminal) - _MAX_RETAINED_COMPLETED
+        if overflow > 0:
+            conn.executemany(
+                "DELETE FROM async_delegations WHERE delegation_id=?",
+                [(row[0],) for row in generic_terminal[:overflow]],
+            )
+
+        pending_rows = conn.execute("""SELECT delegation_id, task_json, event_json
+               FROM async_delegations
+               WHERE state NOT IN (\'running\',\'finalizing\') AND delivery_state=\'pending\'
+               ORDER BY updated_at ASC""").fetchall()
+        generic_pending = [
+            row for row in pending_rows
+            if not _is_pending_reminder_payload(row[1], row[2])
+        ]
+        overflow = len(generic_pending) - _MAX_DURABLE_PENDING
+        if overflow > 0:
+            conn.executemany(
+                "DELETE FROM async_delegations WHERE delegation_id=?",
+                [(row[0],) for row in generic_pending[:overflow]],
+            )
 
 def _persist_completion(event: Dict[str, Any], result: Dict[str, Any]) -> None:
     now = time.time()
@@ -345,57 +382,54 @@ def recover_abandoned_delegations() -> int:
 
 def restore_undelivered_completions(target_queue) -> int:
     """Enqueue durable pending completions as fresh turns after process start.
-    Restored events are stamped ``restored=True`` in memory only: they came from a PREVIOUS
-    process, so drains without an ownership filter must leave them for a consumer that can
-    prove ownership. Rows older than ``_MAX_COMPLETION_REPLAY_AGE_S`` are terminally dropped
-    instead of replaying a turn nobody is waiting on.
 
-    Every restored event is stamped ``restored=True`` (in-memory only — the stamp is added after the durable
-    payload is deserialized and is never persisted). Restored events originate from a *previous* process, so
-    no consumer in THIS process implicitly owns them: drain paths that run without an ownership filter (the
-    legacy single-session behavior) must leave them queued for a consumer that can positively prove
-    ownership, otherwise a brand-new session adopts a dead session's delegation results seconds after boot
-    (#64484).
+    Ordinary background completions older than the replay cap are dropped. Pending reminders
+    are exempt: they remain a user obligation until a consumer acknowledges delivery.
     """
     recover_abandoned_delegations()
     now, restored = time.time(), 0
     with _DB_LOCK, _transaction() as conn:
         rows = conn.execute("""SELECT delegation_id, event_json, completed_at, dispatched_at
                FROM async_delegations
-               WHERE state != 'running' AND delivery_state='pending' AND event_json IS NOT NULL
+               WHERE state != \'running\' AND delivery_state=\'pending\' AND event_json IS NOT NULL
                ORDER BY completed_at, delegation_id""").fetchall()
         for delegation_id, payload, completed_at, dispatched_at in rows:
-            age_basis = completed_at or dispatched_at
-            if age_basis and (now - age_basis) > _MAX_COMPLETION_REPLAY_AGE_S:
-                conn.execute("""UPDATE async_delegations SET delivery_state='dropped',
-                              delivery_claim=NULL, delivery_claimed_at=NULL,
-                              updated_at=?
-                       WHERE delegation_id=? AND delivery_state='pending'""", (now, delegation_id))
-                logger.warning("Async delegation %s: pending completion is %.1fh old "
-                               "(cap %.1fh); terminally dropping the replay (result remains queryable).",
-                               delegation_id, (now - age_basis) / 3600.0, _MAX_COMPLETION_REPLAY_AGE_S / 3600.0)
-                continue
             evt = json.loads(payload)
+            is_reminder = isinstance(evt, dict) and evt.get("role") == "reminder"
+            age_basis = completed_at or dispatched_at
+            if (
+                not is_reminder
+                and age_basis
+                and (now - age_basis) > _MAX_COMPLETION_REPLAY_AGE_S
+            ):
+                conn.execute("""UPDATE async_delegations SET delivery_state=\'dropped\',
+                              delivery_claim=NULL, delivery_claimed_at=NULL, updated_at=?
+                       WHERE delegation_id=? AND delivery_state=\'pending\'""", (now, delegation_id))
+                logger.warning(
+                    "Async delegation %s: pending completion is %.1fh old (cap %.1fh); "
+                    "terminally dropping the replay (result remains queryable).",
+                    delegation_id, (now - age_basis) / 3600.0,
+                    _MAX_COMPLETION_REPLAY_AGE_S / 3600.0)
+                continue
             if isinstance(evt, dict):
                 evt["restored"] = True
             target_queue.put(evt)
             restored += 1
     return restored
 
+def restore_matching_undelivered_completions(
+    target_queue, owns_event: Callable[[Dict[str, Any]], bool]
+) -> int:
+    """Requeue pending completions owned by one newly-live session.
 
-def restore_matching_undelivered_completions(target_queue, owns_event: Callable[[Dict[str, Any]], bool]) -> int:
-    """Requeue pending terminal completions owned by one newly-live session.
-
-    The process-wide queue may have discarded an in-memory copy while no matching session was
-    live; the durable row stays pending. A session poller calls this once at startup with its
-    existing lineage-aware ownership predicate, so reopening the conversation recovers results
-    without requiring a process restart. Unrelated rows are left untouched.
+    Ordinary background results retain the replay-age cap. A matching reminder stays pending
+    until acknowledged, even when the user reopens the conversation days later.
     """
     now, restored = time.time(), 0
     with _DB_LOCK, _transaction() as conn:
         rows = conn.execute("""SELECT delegation_id, event_json, completed_at, dispatched_at
                FROM async_delegations
-               WHERE state != 'running' AND delivery_state='pending' AND event_json IS NOT NULL
+               WHERE state != \'running\' AND delivery_state=\'pending\' AND event_json IS NOT NULL
                ORDER BY completed_at, delegation_id""").fetchall()
         for delegation_id, payload, completed_at, dispatched_at in rows:
             try:
@@ -404,14 +438,20 @@ def restore_matching_undelivered_completions(target_queue, owns_event: Callable[
                 continue
             if not isinstance(evt, dict) or not owns_event(evt):
                 continue
+            is_reminder = evt.get("role") == "reminder"
             age_basis = completed_at or dispatched_at
-            if age_basis and (now - age_basis) > _MAX_COMPLETION_REPLAY_AGE_S:
-                conn.execute("""UPDATE async_delegations SET delivery_state='dropped',
+            if (
+                not is_reminder
+                and age_basis
+                and (now - age_basis) > _MAX_COMPLETION_REPLAY_AGE_S
+            ):
+                conn.execute("""UPDATE async_delegations SET delivery_state=\'dropped\',
                               delivery_claim=NULL, delivery_claimed_at=NULL, updated_at=?
-                       WHERE delegation_id=? AND delivery_state='pending'""", (now, delegation_id))
+                       WHERE delegation_id=? AND delivery_state=\'pending\'""", (now, delegation_id))
                 logger.warning(
                     "Async completion %s for resumed session is %.1fh old; dropping replay at the %.1fh cap.",
-                    delegation_id, (now - age_basis) / 3600.0, _MAX_COMPLETION_REPLAY_AGE_S / 3600.0)
+                    delegation_id, (now - age_basis) / 3600.0,
+                    _MAX_COMPLETION_REPLAY_AGE_S / 3600.0)
                 continue
             evt["restored"] = True
             target_queue.put(evt)
@@ -467,48 +507,40 @@ def claim_event_delivery(evt: Dict[str, Any], consumer: str) -> Optional[str]:
 
 
 def release_completion_delivery(delegation_id: str, claim_id: str) -> bool:
-    """Release a failed delivery claim so another consumer may retry. Attempts are
-    counted at claim time; once the budget is exhausted the row converges to
-    terminal ``dropped`` (only pending rows replay on restart)."""
+    """Release a failed delivery claim so another consumer may retry.
+
+    Generic background results converge to ``dropped`` after the retry budget. A pending
+    reminder is an outstanding user obligation and therefore keeps retrying until acknowledged.
+    """
     now = time.time()
     with _DB_LOCK, _transaction() as conn:
-        capped = conn.execute("""UPDATE async_delegations SET delivery_state='dropped',
+        row = conn.execute(
+            """SELECT task_json, event_json FROM async_delegations
+               WHERE delegation_id=? AND delivery_state=\'pending\' AND delivery_claim=?""",
+            (delegation_id, claim_id),
+        ).fetchone()
+        if row is None:
+            return False
+        if _is_pending_reminder_payload(row[0], row[1]):
+            return conn.execute("""UPDATE async_delegations SET delivery_claim=NULL,
+                          delivery_claimed_at=NULL, updated_at=?
+                   WHERE delegation_id=? AND delivery_state=\'pending\' AND delivery_claim=?""",
+                (now, delegation_id, claim_id)).rowcount == 1
+        capped = conn.execute("""UPDATE async_delegations SET delivery_state=\'dropped\',
                       delivery_claim=NULL, delivery_claimed_at=NULL, updated_at=?
-               WHERE delegation_id=? AND delivery_state='pending'
+               WHERE delegation_id=? AND delivery_state=\'pending\'
                  AND delivery_claim=? AND delivery_attempts>=?""",
             (now, delegation_id, claim_id, _MAX_DELIVERY_ATTEMPTS))
         if capped.rowcount == 1:
-            logger.warning("Async delegation %s exhausted its %d delivery attempts; "
-                           "marking terminally dropped (result remains queryable).",
-                           delegation_id, _MAX_DELIVERY_ATTEMPTS)
+            logger.warning(
+                "Async delegation %s exhausted its %d delivery attempts; "
+                "marking terminally dropped (result remains queryable).",
+                delegation_id, _MAX_DELIVERY_ATTEMPTS)
             return True
-        cur = conn.execute("""UPDATE async_delegations SET delivery_claim=NULL,
+        return conn.execute("""UPDATE async_delegations SET delivery_claim=NULL,
                       delivery_claimed_at=NULL, updated_at=?
-               WHERE delegation_id=? AND delivery_state='pending'
-                 AND delivery_claim=?""", (now, delegation_id, claim_id))
-        return cur.rowcount == 1
-
-
-def defer_completion_delivery(delegation_id: str, claim_id: str) -> bool:
-    """Return an unadmitted completion to pending without spending a delivery attempt."""
-    return _update_delivery("""UPDATE async_delegations SET delivery_claim=NULL,
-                  delivery_claimed_at=NULL, delivery_attempts=MAX(0, delivery_attempts-1),
-                  updated_at=?
-           WHERE delegation_id=? AND delivery_state='pending' AND delivery_claim=?""",
-        (time.time(), delegation_id, claim_id))
-
-
-def drop_completion_delivery(delegation_id: str, claim_id: str) -> bool:
-    """Terminally drop a claimed completion whose target is permanently gone (the
-    spawning session ended at an explicit user boundary such as /new or reset).
-    ``dropped`` — not ``delivered`` — keeps the ack honest; not ``pending`` keeps
-    restart recovery from replaying it into a fail-closed drop forever."""
-    return _update_delivery("""UPDATE async_delegations SET delivery_state='dropped',
-                  updated_at=?, delivery_claim=NULL,
-                  delivery_claimed_at=NULL
-           WHERE delegation_id=? AND delivery_state='pending'
-             AND delivery_claim=?""", (time.time(), delegation_id, claim_id))
-
+               WHERE delegation_id=? AND delivery_state=\'pending\' AND delivery_claim=?""",
+            (now, delegation_id, claim_id)).rowcount == 1
 
 def complete_completion_delivery(delegation_id: str, claim_id: str) -> bool:
     """Acknowledge acceptance for the consumer holding this claim."""
