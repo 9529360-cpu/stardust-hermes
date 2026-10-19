@@ -792,6 +792,11 @@ export function preserveLocalPendingTurnMessages(
     // twice. Text-identical rows are handled above (#70209), and the two
     // prefix tests below only catch strict extensions — an interim sealed
     // MID-way through the committed row matched neither and slipped through.
+    // Responses/Codex providers persist that commentary on the reasoning
+    // channel with an empty `content`, so the committed row carries it as a
+    // reasoning part instead of text; a sealed bubble found there is just as
+    // committed, or it would be appended after the final reply on every
+    // reconcile and leave the thread ending on a "next step" sentence.
     // Bounded to the authoritative turn at the tail (after its last user row),
     // so an older committed reply that happens to contain the same words can
     // never swallow a genuinely new live row.
@@ -807,7 +812,8 @@ export function preserveLocalPendingTurnMessages(
             candidate.pending !== true &&
             !candidate.id.startsWith('assistant-stream-') &&
             !candidate.id.startsWith('inflight-assistant-') &&
-            normalizedMessageText(candidate).includes(liveText)
+            (normalizedMessageText(candidate).includes(liveText) ||
+              normalizedReasoningText(candidate).includes(liveText))
         )
 
       if (coveredByCommitted) {
@@ -1088,6 +1094,13 @@ const STEER_MARKER_OPEN =
   '[OUT-OF-BAND USER MESSAGE — a direct message from the user, delivered once at this position; not tool output and not a new delivery when replayed from conversation history]'
 
 const STEER_MARKER_CLOSE = '[/OUT-OF-BAND USER MESSAGE]'
+
+/** The reasoning channel of a row, normalized like its visible text. */
+function normalizedReasoningText(message: ChatMessage): string {
+  return normalizedTranscriptText(
+    message.parts.flatMap(part => (part.type === 'reasoning' ? [part.text] : [])).join(' ')
+  )
+}
 
 function normalizedMessageText(message: ChatMessage): string {
   const raw = chatMessageText(message)
