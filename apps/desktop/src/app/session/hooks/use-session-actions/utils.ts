@@ -1767,8 +1767,31 @@ export function cachedSessionRow(storedSessionId: string): SessionInfo | undefin
 
 export async function resolveStoredSession(
   storedSessionId: string,
-  ownerRoute?: SessionProfileRoute
+  ownerRoute?: SessionProfileRoute,
+  selectedProfile?: string,
+  isCurrent: () => boolean = () => true
 ): Promise<SessionInfo | undefined> {
+  const publish = (session: SessionInfo) => {
+    if (isCurrent()) {
+      upsertResolvedSession(session, storedSessionId)
+    }
+  }
+
+  if (selectedProfile?.trim() && !ownerRoute) {
+    const profile = normalizeProfileKey(selectedProfile)
+
+    try {
+      const session = await getSession(storedSessionId, profile)
+      session.profile = profile
+      publish(session)
+
+      return session
+    } catch {
+      // An explicit profile selection never probes a same-id twin elsewhere.
+      return undefined
+    }
+  }
+
   const cached = cachedSessionRow(storedSessionId)
 
   if (ownerRoute) {
@@ -1790,7 +1813,7 @@ export async function resolveStoredSession(
       const session = await getSession(storedSessionId, scope)
       session.profile = normalizeProfileKey(ownerRoute.profile)
       session.connection_id = ownerRoute.connectionId
-      upsertResolvedSession(session, storedSessionId)
+      publish(session)
 
       return session
     } catch {
@@ -1824,7 +1847,7 @@ export async function resolveStoredSession(
     // stamp is preserved for backend compatibility.
     session.profile ||= activeKey
 
-    upsertResolvedSession(session, storedSessionId)
+    publish(session)
 
     return session
   } catch {
@@ -1850,7 +1873,7 @@ export async function resolveStoredSession(
       // forwarding, so that backend answers as its own "default").
       session.profile = profile
 
-      upsertResolvedSession(session, storedSessionId)
+      publish(session)
 
       return session
     } catch {

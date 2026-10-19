@@ -1175,6 +1175,39 @@ class TestCJKSearchFallback:
 
 
 
+    @pytest.mark.parametrize("use_trigram", [True, False])
+    @pytest.mark.parametrize("query", [
+        "海风灯塔*", "海风*", "海*", "Agent通信*", '"海风灯塔"*',
+    ])
+    def test_cjk_prefix_syntax_is_not_literal_content(self, db, monkeypatch, use_trigram, query):
+        if use_trigram and not db._trigram_available:
+            pytest.skip("trigram tokenizer unavailable in this SQLite build")
+        monkeypatch.setattr(db, "_fts_cjk_available", False)
+        if not use_trigram:
+            monkeypatch.setattr(db, "_trigram_available", False)
+        db.create_session("personal", source="desktop")
+        db.create_session("scheduled", source="cron")
+        for session_id in ("personal", "scheduled"):
+            db.append_message(
+                session_id, role="assistant", content="之前讨论的海风灯塔路线与Agent通信协议已经确认。")
+
+        rows = db.search_messages(query, exclude_sources=["cron"])
+
+        assert [row["session_id"] for row in rows] == ["personal"]
+        assert "海风" in rows[0]["snippet"] or "Agent" in rows[0]["snippet"]
+
+    def test_cjk_quoted_asterisk_remains_literal_in_like_route(self, db, monkeypatch):
+        monkeypatch.setattr(db, "_fts_cjk_available", False)
+        monkeypatch.setattr(db, "_trigram_available", False)
+        db.create_session("plain", source="desktop")
+        db.create_session("literal", source="desktop")
+        db.append_message("plain", role="user", content="海风路线")
+        db.append_message("literal", role="user", content="海风*路线")
+
+        rows = db.search_messages('"海风*"')
+
+        assert [row["session_id"] for row in rows] == ["literal"]
+
     def test_cjk_like_escapes_wildcards(self, db):
         """Special characters (%, _) in CJK queries are treated as literals."""
         db.create_session(session_id="s1", source="cli")
@@ -2864,6 +2897,16 @@ class TestListSessionsRich:
         db.create_session(
             "legacy_null_key", "telegram", user_id="lane-user", chat_id="lane"
         )
+        # Creation calls can share one Windows clock tick. Define chronology
+        # explicitly so this tests filtering before LIMIT, not clock precision.
+        t0 = 1700000000.0
+        db._conn.executemany(
+            "UPDATE sessions SET started_at = ? WHERE id = ?",
+            [(t0, "lane_oldest"), (t0 + 1, "lane_newest")]
+            + [(t0 + 2 + i, f"foreign_{i}") for i in range(60)]
+            + [(t0 + 62, "legacy_null_key")],
+        )
+        db._conn.commit()
 
         sessions = db.list_sessions_rich(
             source="telegram", session_key=lane_key, limit=2

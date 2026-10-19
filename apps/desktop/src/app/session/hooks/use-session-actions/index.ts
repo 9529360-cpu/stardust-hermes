@@ -928,7 +928,7 @@ export function useSessionActions({
   }, [navigate, selectedStoredSessionId])
 
   const resumeSession = useCallback(
-    async (storedSessionId: string, replaceRoute = false, capturedOwner?: SessionProfileRoute) => {
+    async (storedSessionId: string, replaceRoute = false, capturedOwner?: SessionProfileRoute, selectedProfile?: string) => {
       // Delete/archive tombstones the durable id before the route flips, and
       // requestSessionResume already refuses to queue for a doomed id. This is
       // the actuator-side half of the same rule: a resume that was queued
@@ -938,9 +938,10 @@ export function useSessionActions({
         return
       }
 
+      const explicitProfile = capturedOwner ? undefined : selectedProfile?.trim() || undefined
       const requestId = resumeRequestRef.current + 1
       resumeRequestRef.current = requestId
-      const resumedSameSelectedSession = selectedStoredSessionIdRef.current === storedSessionId
+      const resumedSameSelectedSession = !explicitProfile && selectedStoredSessionIdRef.current === storedSessionId
       const resumeStartMessages = resumedSameSelectedSession ? $messages.get() : []
 
       const isCurrentResume = () =>
@@ -993,6 +994,12 @@ export function useSessionActions({
       // mismatch the mapping is cross-wired: purge both sides and report a miss
       // so the caller falls through to a full resume that rebinds a correct id.
       const takeWarmCache = (): { runtimeId: string; state: ClientSessionState } | null => {
+        // Legacy profile-only search selections have no exact owner key for
+        // this id-keyed runtime cache. Re-read the selected profile instead.
+        if (explicitProfile) {
+          return null
+        }
+
         const runtimeId = runtimeIdByStoredSessionIdRef.current.get(storedSessionId)
         const state = runtimeId ? sessionStateByRuntimeIdRef.current.get(runtimeId) : undefined
 
@@ -1028,7 +1035,7 @@ export function useSessionActions({
       // gateway call (no-op when it's already on that profile / single-profile).
       // resolveStoredSession finds the row by id (cheap), so an uncached pasted
       // id loads as fast as a sidebar click instead of hanging on a list scan.
-      const ownerRoute = capturedOwner || getSessionOwnerHint(storedSessionId)
+      const ownerRoute = capturedOwner || (explicitProfile ? undefined : getSessionOwnerHint(storedSessionId))
       // A connection switch clears/reloads the session rows before this path
       // runs, so an untagged row belongs to the connection that supplied the
       // current list. Capture that source before the async metadata lookup. If
@@ -1040,14 +1047,17 @@ export function useSessionActions({
       const ambientConnectionId =
         ambientConnection?.mode === 'remote' ? ambientConnection.connectionId?.trim() || '' : ''
 
-      const storedForProfile = await resolveStoredSession(storedSessionId, ownerRoute)
-      const sessionProfile = storedForProfile?.profile
+      const storedForProfile = await resolveStoredSession(
+        storedSessionId, ownerRoute, explicitProfile,
+        () => resumeRequestRef.current === requestId
+      )
+      const sessionProfile = explicitProfile || storedForProfile?.profile
 
       if (resumeRequestRef.current !== requestId) {
         return
       }
 
-      const resolvedConnectionId = ownerRoute?.connectionId || storedForProfile?.connection_id || ambientConnectionId
+      const resolvedConnectionId = explicitProfile ? '' : ownerRoute?.connectionId || storedForProfile?.connection_id || ambientConnectionId
 
       // A row spliced from a CONNECTED registry gateway (#88880) carries its
       // owning connection. A row fetched directly after activating a registry
@@ -1055,6 +1065,7 @@ export function useSessionActions({
       // Either way, route by the composite (connection, profile), never by a
       // same-named profile alone.
       const sessionOwner: SessionOwnerScope =
+        explicitProfile ||
         ownerRoute ||
         (resolvedConnectionId
           ? {
@@ -1094,7 +1105,7 @@ export function useSessionActions({
       const requestForSession = <T>(method: string, params: Record<string, unknown> = {}): Promise<T> =>
         requestForSessionProfile<T>(sessionOwner, requestGateway, method, params)
 
-      const sessionRestScope = resolvedConnectionId
+      const sessionRestScope = explicitProfile || (resolvedConnectionId
         ? {
             connectionId: resolvedConnectionId,
             profile: ownerRoute?.targetProfile || ownerRoute?.profile || sessionProfile || 'default'
@@ -1104,7 +1115,7 @@ export function useSessionActions({
               connectionId: storedForProfile.connection_id,
               profile: sessionProfile || 'default'
             }
-          : sessionProfile
+          : sessionProfile)
 
       // Re-check after the profile-resolve / gateway-swap awaits above: the
       // cache may have changed, and takeWarmCache re-validates belongs-to and
@@ -1116,7 +1127,7 @@ export function useSessionActions({
         const cachedState = warmHit.state
 
         const stored =
-          $sessions.get().find(session => sessionMatchesStoredId(session, storedSessionId)) ?? storedForProfile
+          explicitProfile ? storedForProfile : $sessions.get().find(session => sessionMatchesStoredId(session, storedSessionId)) ?? storedForProfile
 
         let cachedViewState =
           !cachedState.model && stored?.model != null
@@ -1589,7 +1600,7 @@ export function useSessionActions({
       setSessionStartedAt(Date.now())
 
       const stored =
-        $sessions.get().find(session => sessionMatchesStoredId(session, storedSessionId)) ?? storedForProfile
+        explicitProfile ? storedForProfile : $sessions.get().find(session => sessionMatchesStoredId(session, storedSessionId)) ?? storedForProfile
 
       applyStoredSessionPreviewRuntimeInfo(stored, storedSessionId)
 
@@ -1624,8 +1635,19 @@ export function useSessionActions({
         let resumeRuntimeBaselineMessages: ChatMessage[] = []
         const resumeStartedAt = Date.now() / 1000
 
-        const resumePromise = singleFlightSessionResume(storedSessionId, () =>
-          requestForSession<SessionResumeResult>('session.resume', {
+        const resumeFlightScopeKey = capturedOwner
+          ? JSON.stringify([
+              'owner',
+              capturedOwner.connectionId,
+              capturedOwner.profile,
+              capturedOwner.targetProfile ?? null
+            ])
+          : explicitProfile
+            ? JSON.stringify(['profile', explicitProfile])
+            : undefined
+
+        const resumePromise = singleFlightSessionResume(storedSessionId, () => {
+          return requestForSession<SessionResumeResult>('session.resume', {
             session_id: storedSessionId,
             cols: 96,
             source: 'desktop',
@@ -1640,7 +1662,7 @@ export function useSessionActions({
             ...(watchWindow ? { lazy: true } : { omit_messages: true }),
             ...(sessionProfile ? { profile: sessionProfile } : {})
           })
-        ).then(resumed => {
+        }, resumeFlightScopeKey).then(resumed => {
           resumeRuntimeBaselineMessages =
             sessionStateByRuntimeIdRef.current.get(resumed.session_id)?.messages ?? resumeRuntimeBaselineMessages
 

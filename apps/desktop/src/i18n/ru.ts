@@ -1874,6 +1874,12 @@ export const ru = defineLocale({
     refresh: 'Обновить',
     refreshing: 'Обновление...',
     noResults: 'Совпадающие результаты не найдены.',
+    sessionSearchPlaceholder: 'Поиск по названиям и содержимому бесед…',
+    sessionSearchHint: 'Поиск по названиям и сообщениям текущего профиля. Выберите результат, чтобы открыть чат.',
+    sessionSearchCount: count => `Найдено чатов: ${count}`,
+    sessionSearchPending: 'Поиск в сообщениях…',
+    sessionSearchFailed:
+      'Полнотекстовый поиск не завершён. Показаны только совпадения в загруженных чатах. Повторите попытку.',
     pinSession: 'Закрепить чат',
     unpinSession: 'Открепить чат',
     exportSession: 'Экспортировать чат',

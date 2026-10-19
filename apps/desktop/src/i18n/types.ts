@@ -1954,6 +1954,11 @@ export interface Translations {
     refresh: string
     refreshing: string
     noResults: string
+    sessionSearchPlaceholder: string
+    sessionSearchHint: string
+    sessionSearchCount: (count: number) => string
+    sessionSearchPending: string
+    sessionSearchFailed: string
     pinSession: string
     unpinSession: string
     exportSession: string

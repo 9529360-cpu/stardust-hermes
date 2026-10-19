@@ -22,51 +22,110 @@ export function sessionMatchesSearch(session: SessionInfo, query: string): boole
   ].some(value => value.toLowerCase().includes(needle))
 }
 
-// The backend's FTS layer wraps matched terms in literal '>>>' / '<<<'
-// highlight markers (sqlite snippet() delimiters — see hermes_state_search.py).
-// Session lists render the snippet as plain text, so the markers must be
-// stripped or a search for "foo" paints rows titled ">>>foo<<<".
 export function stripFtsMarkers(snippet: string): string {
   return snippet.replaceAll('>>>', '').replaceAll('<<<', '')
 }
 
-// FTS results cover sessions that aren't in the loaded page; synthesize a
-// minimal SessionInfo so they render in the same row component (opening works
-// by id; the snippet stands in for the preview).
+export interface SearchTextPart {
+  text: string
+  highlighted: boolean
+}
+
+/** Parse only the index's plain-text delimiters. Never interpret snippets as
+ * HTML. CJK/literal fallback searches have no delimiters, so highlight their
+ * literal query instead. The same fallback works for local title matches. */
+export function sessionSearchTextParts(text: string, query: string): SearchTextPart[] {
+  const marked = [...text.matchAll(/>>>(.*?)<<</gs)]
+
+  if (marked.length > 0) {
+    const parts: SearchTextPart[] = []
+    let cursor = 0
+
+    for (const match of marked) {
+      if (match.index > cursor) {
+        parts.push({ text: stripFtsMarkers(text.slice(cursor, match.index)), highlighted: false })
+      }
+
+      parts.push({ text: match[1], highlighted: true })
+      cursor = match.index + match[0].length
+    }
+
+    if (cursor < text.length) {
+      parts.push({ text: stripFtsMarkers(text.slice(cursor)), highlighted: false })
+    }
+
+    return parts
+  }
+
+  const plain = stripFtsMarkers(text)
+  const needle = query.trim().toLowerCase()
+
+  if (!needle) {
+    return [{ text: plain, highlighted: false }]
+  }
+
+  const parts: SearchTextPart[] = []
+  const lower = plain.toLowerCase()
+  let cursor = 0
+  let index = lower.indexOf(needle)
+
+  while (index !== -1) {
+    if (index > cursor) {
+      parts.push({ text: plain.slice(cursor, index), highlighted: false })
+    }
+
+    parts.push({ text: plain.slice(index, index + needle.length), highlighted: true })
+    cursor = index + needle.length
+    index = lower.indexOf(needle, cursor)
+  }
+
+  if (cursor < plain.length) {
+    parts.push({ text: plain.slice(cursor), highlighted: false })
+  }
+
+  return parts
+}
+
 export function searchResultToSession(result: SessionSearchResult): SessionInfo {
-  const ts = result.session_started ?? Date.now() / 1000
+  const ts = result.started_at ?? result.session_started ?? 0
 
   return {
-    archived: false,
+    archived: result.archived ?? false,
+    profile: result.profile,
+    connection_id: result.connection_id,
+    parent_session_id: result.parent_session_id,
     cwd: null,
-    ended_at: null,
+    ended_at: result.ended_at ?? null,
     id: result.session_id,
     _lineage_root_id: result.lineage_root ?? null,
-    input_tokens: 0,
-    is_active: false,
-    last_active: ts,
-    message_count: 0,
+    input_tokens: result.input_tokens ?? 0,
+    is_active: result.is_active ?? false,
+    last_active: result.last_active ?? ts,
+    message_count: result.message_count ?? 0,
     model: result.model ?? null,
-    output_tokens: 0,
-    preview: stripFtsMarkers(result.snippet ?? '').trim() || null,
+    output_tokens: result.output_tokens ?? 0,
+    preview: result.preview ?? (stripFtsMarkers(result.snippet ?? '').trim() || null),
     source: result.source ?? null,
     started_at: ts,
-    title: null,
-    tool_call_count: 0
+    title: result.title ?? null,
+    tool_call_count: result.tool_call_count ?? 0
   }
 }
 
-/** Loaded sessions matching `query` (instant, client-side) followed by the
- *  backend's full-text hits that are not already listed. A hit for a loaded
- *  conversation reuses its loaded row — found by live id or lineage root — so
- *  one conversation never paints twice; a hit outside the loaded page gets a
- *  synthesized row. */
+/** Search-only annotation, never written back into the session cache. */
+export interface SessionSearchRow extends SessionInfo {
+  searchSnippet?: string
+}
+
+/** Keep loaded titles and navigation identities, attaching the actual body
+ * hit even when the loaded preview is unrelated. Deduplicate both loaded and
+ * unloaded compression chains using their durable lineage identity. */
 export function mergeSessionSearchResults(
   loaded: readonly SessionInfo[],
   query: string,
   serverMatches: readonly SessionSearchResult[]
-): SessionInfo[] {
-  const out = new Map<string, SessionInfo>()
+): SessionSearchRow[] {
+  const out = new Map<string, SessionSearchRow>()
   const byAnyId = new Map<string, SessionInfo>()
 
   for (const session of loaded) {
@@ -74,13 +133,12 @@ export function mergeSessionSearchResults(
   }
 
   for (const session of loaded) {
-    // A live id wins over another row's lineage root.
     if (session._lineage_root_id && !byAnyId.has(session._lineage_root_id)) {
       byAnyId.set(session._lineage_root_id, session)
     }
 
     if (sessionMatchesSearch(session, query)) {
-      out.set(session.id, session)
+      out.set(session._lineage_root_id || session.id, session)
     }
   }
 
@@ -90,8 +148,11 @@ export function mergeSessionSearchResults(
       (match.lineage_root ? byAnyId.get(match.lineage_root) : undefined) ??
       searchResultToSession(match)
 
-    if (!out.has(row.id)) {
-      out.set(row.id, row)
+    const key = row._lineage_root_id || match.lineage_root || row.id
+    const existing = out.get(key)
+
+    if (!existing?.searchSnippet) {
+      out.set(key, { ...(existing ?? row), searchSnippet: match.snippet || undefined })
     }
   }
 

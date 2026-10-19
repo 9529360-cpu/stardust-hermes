@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest'
 
 import type { SessionInfo, SessionSearchResult } from '@/types/hermes'
 
-import { mergeSessionSearchResults, sessionMatchesSearch, stripFtsMarkers } from './session-search'
+import {
+  mergeSessionSearchResults,
+  searchResultToSession,
+  sessionMatchesSearch,
+  sessionSearchTextParts,
+  stripFtsMarkers
+} from './session-search'
 
 function makeSession(overrides: Partial<SessionInfo> = {}): SessionInfo {
   return {
@@ -108,6 +114,44 @@ function makeMatch(overrides: Partial<SessionSearchResult> = {}): SessionSearchR
   }
 }
 
+describe('session search display data', () => {
+  it('uses real metadata for unloaded results and preserves the independent body snippet', () => {
+    const row = searchResultToSession(
+      makeMatch({ title: 'Trip plan', preview: 'Opening note', archived: true, last_active: 1234 })
+    )
+
+    expect(row).toMatchObject({ title: 'Trip plan', preview: 'Opening note', archived: true, last_active: 1234 })
+  })
+
+  it('deduplicates unloaded hits by compression lineage', () => {
+    const rows = mergeSessionSearchResults([], 'harbor', [
+      makeMatch({ session_id: 'tip', lineage_root: 'root' }),
+      makeMatch({ session_id: 'old', lineage_root: 'root', snippet: 'another hit' })
+    ])
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0].id).toBe('tip')
+    expect(rows[0].searchSnippet).toBe('we chose the >>>harbor<<< route')
+  })
+
+  it('highlights literal Chinese text and title-only local matches without FTS markers', () => {
+    expect(sessionSearchTextParts('上次聊的旅行计划', '旅行')).toEqual([
+      { text: '上次聊的', highlighted: false },
+      { text: '旅行', highlighted: true },
+      { text: '计划', highlighted: false }
+    ])
+    expect(sessionSearchTextParts('Harbor plan', 'harbor')[0]).toEqual({ text: 'Harbor', highlighted: true })
+  })
+
+  it('parses FTS markers as text while preserving HTML-looking strings', () => {
+    expect(sessionSearchTextParts('<img> >>>harbor<<< <script>', 'harbor')).toEqual([
+      { text: '<img> ', highlighted: false },
+      { text: 'harbor', highlighted: true },
+      { text: ' <script>', highlighted: false }
+    ])
+  })
+})
+
 describe('mergeSessionSearchResults', () => {
   it('lists client matches first, then full-text hits outside the loaded page', () => {
     const loaded = makeSession({ id: 'loaded-hit', title: 'Harbor planning' })
@@ -130,12 +174,14 @@ describe('mergeSessionSearchResults', () => {
       makeMatch({ lineage_root: 'root-1', session_id: 'pre-compression-id' })
     ])
 
-    expect(rows).toEqual([tip])
+    expect(rows).toEqual([{ ...tip, searchSnippet: 'we chose the >>>harbor<<< route' }])
   })
 
   it('never lists one conversation twice when the client and the server both match it', () => {
     const loaded = makeSession({ id: 'both', title: 'Harbor notes' })
 
-    expect(mergeSessionSearchResults([loaded], 'harbor', [makeMatch({ session_id: 'both' })])).toEqual([loaded])
+    expect(mergeSessionSearchResults([loaded], 'harbor', [makeMatch({ session_id: 'both' })])).toEqual([
+      { ...loaded, searchSnippet: 'we chose the >>>harbor<<< route' }
+    ])
   })
 })

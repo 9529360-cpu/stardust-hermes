@@ -1,4 +1,4 @@
-import { cleanup, render } from '@testing-library/react'
+import { act, cleanup, render } from '@testing-library/react'
 import type { MutableRefObject } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -24,7 +24,12 @@ interface HarnessProps {
   resumeSession: (sessionId: string, focus: boolean, ownerRoute?: SessionProfileRoute) => Promise<unknown>
   resumeFailedSessionId?: null | string
   resumeExhaustedSessionId?: null | string
-  sessionResumeRequest?: null | { ownerRoute?: SessionProfileRoute; sequence: number; sessionId: string }
+  sessionResumeRequest?: null | {
+    ownerRoute?: SessionProfileRoute
+    selectedProfile?: string
+    sequence: number
+    sessionId: string
+  }
   routedSessionId: null | string
   runtimeIdByStoredSessionIdRef: MutableRefObject<Map<string, string>>
   selectedStoredSessionId: null | string
@@ -47,6 +52,48 @@ describe('useRouteResume', () => {
   afterEach(() => {
     cleanup()
     vi.restoreAllMocks()
+  })
+
+  it('keeps the explicit profile on automatic retry without borrowing a different request scope', () => {
+    vi.useFakeTimers()
+
+    try {
+      const resumeSession = vi.fn(async () => undefined)
+
+      const props: HarnessProps = {
+        activeSessionId: null,
+        activeSessionIdRef: { current: null },
+        creatingSessionRef: { current: false },
+        currentView: 'chat',
+        freshDraftReady: false,
+        gatewayState: 'open',
+        locationPathname: '/same-id',
+        resumeSession,
+        resumeFailedSessionId: 'same-id',
+        sessionResumeRequest: { sequence: 1, sessionId: 'same-id', selectedProfile: 'work' },
+        routedSessionId: 'same-id',
+        runtimeIdByStoredSessionIdRef: { current: new Map() },
+        selectedStoredSessionId: 'same-id',
+        selectedStoredSessionIdRef: { current: 'same-id' },
+        startFreshSessionDraft: () => {}
+      }
+
+      const { rerender } = render(<RouteResumeHarness {...props} />)
+      resumeSession.mockClear()
+      act(() => vi.advanceTimersByTime(1000))
+      expect(resumeSession).toHaveBeenLastCalledWith('same-id', true, undefined, 'work')
+      rerender(
+        <RouteResumeHarness
+          {...props}
+          sessionResumeRequest={{ sequence: 2, sessionId: 'other-id', selectedProfile: 'default' }}
+        />
+      )
+      resumeSession.mockClear()
+      act(() => vi.advanceTimersByTime(2000))
+      expect(resumeSession).toHaveBeenLastCalledWith('same-id', true)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('does not re-resume the old session during a /:sid -> /new transition', () => {

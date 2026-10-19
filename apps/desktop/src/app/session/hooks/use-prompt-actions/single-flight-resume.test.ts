@@ -35,6 +35,44 @@ describe('singleFlightSessionResume', () => {
     expect(requestGateway).toHaveBeenCalledTimes(1)
   })
 
+  it.each([
+    ['default-first', undefined],
+    ['work-first', undefined],
+    ['default-first', JSON.stringify(['owner', 'local', 'default', null])],
+    ['work-first', JSON.stringify(['owner', 'local', 'default', null])]
+  ] as const)(
+    'separates owner flights while deduplicating the same owner (%s completion, default scope %s)',
+    async (first, defaultScope) => {
+      let resolveDefault!: (value: { session_id: string }) => void
+      let resolveWork!: (value: { session_id: string }) => void
+      const defaultRun = vi.fn(() => new Promise<{ session_id: string }>(resolve => { resolveDefault = resolve }))
+      const workRun = vi.fn(() => new Promise<{ session_id: string }>(resolve => { resolveWork = resolve }))
+      const workScope = JSON.stringify(['owner', 'local', 'work', null])
+      const defaultFlight = singleFlightSessionResume('shared-id', defaultRun, defaultScope)
+      const workFlight = singleFlightSessionResume('shared-id', workRun, workScope)
+      const sameWorkFlight = singleFlightSessionResume('shared-id', workRun, workScope)
+
+      // Flights schedule run() on a microtask so synchronous throws are safe.
+      await Promise.resolve()
+      expect(defaultRun).toHaveBeenCalledTimes(1)
+      expect(workRun).toHaveBeenCalledTimes(1)
+
+      if (first === 'work-first') {
+        resolveWork({ session_id: 'work-runtime' })
+        await expect(workFlight).resolves.toEqual({ session_id: 'work-runtime' })
+        resolveDefault({ session_id: 'default-runtime' })
+      } else {
+        resolveDefault({ session_id: 'default-runtime' })
+        await expect(defaultFlight).resolves.toEqual({ session_id: 'default-runtime' })
+        resolveWork({ session_id: 'work-runtime' })
+      }
+
+      await expect(defaultFlight).resolves.toEqual({ session_id: 'default-runtime' })
+      await expect(sameWorkFlight).resolves.toEqual({ session_id: 'work-runtime' })
+      expect(defaultScope).not.toBe(workScope)
+    }
+  )
+
   it('different stored ids still resume independently', async () => {
     const requestGateway = vi.fn(async (_method: string, params?: Record<string, unknown>) => {
       await new Promise(resolve => setTimeout(resolve, 5))

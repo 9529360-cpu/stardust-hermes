@@ -13,7 +13,7 @@ interface RouteResumeOptions {
   freshDraftReady: boolean
   gatewayState: string | undefined
   locationPathname: string
-  resumeSession: (sessionId: string, focus: boolean, ownerRoute?: SessionProfileRoute) => Promise<unknown>
+  resumeSession: (sessionId: string, focus: boolean, ownerRoute?: SessionProfileRoute, selectedProfile?: string) => Promise<unknown>
   // Stored-session id whose most recent resume failed terminally (set by
   // useSessionActions, mirrored from $resumeFailedSessionId). While this equals
   // routedSessionId the window would otherwise latch on the loader forever, so
@@ -185,6 +185,8 @@ export function useRouteResume({
 
         if (ownerRoute) {
           void resumeSession(routedSessionId, true, ownerRoute)
+        } else if (sessionResumeRequest?.sessionId === routedSessionId && sessionResumeRequest.selectedProfile) {
+          void resumeSession(routedSessionId, true, undefined, sessionResumeRequest.selectedProfile)
         } else {
           void resumeSession(routedSessionId, true)
         }
@@ -311,7 +313,15 @@ export function useRouteResume({
       // having fired. A flapping backend could then hit MAX in a couple of
       // re-renders with far fewer than MAX real attempts. (Point 3)
       retryAttemptRef.current += 1
-      void resumeSession(sessionId, true)
+      const request = sessionResumeRequest?.sessionId === sessionId ? sessionResumeRequest : undefined
+
+      if (request?.ownerRoute) {
+        void resumeSession(sessionId, true, request.ownerRoute)
+      } else if (request?.selectedProfile) {
+        void resumeSession(sessionId, true, undefined, request.selectedProfile)
+      } else {
+        void resumeSession(sessionId, true)
+      }
     }, resumeRetryDelayMs(attempt))
 
     return () => clearTimeout(timer)
@@ -321,6 +331,7 @@ export function useRouteResume({
     currentView,
     gatewayState,
     resumeSession,
+    sessionResumeRequest,
     resumeFailedSessionId,
     resumeExhaustedSessionId,
     routedSessionId,

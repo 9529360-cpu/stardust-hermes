@@ -26,8 +26,9 @@ import * as path from 'node:path'
 
 import { _electron, type ElectronApplication, type Page } from '@playwright/test'
 
+import { type MockServerOptions, startMockServer } from '../../../tests-js/scripts/mock-server'
+
 import { resolveElectronBinary } from './electron-binary'
-import { startMockServer, type MockServerOptions } from '../../../tests-js/scripts/mock-server'
 import { installErrorBannerGuard } from './test'
 
 const DESKTOP_ROOT = path.resolve(import.meta.dirname, '..')
@@ -272,6 +273,8 @@ export function buildAppEnv(sandbox: Sandbox, extra: Record<string, string> = {}
     // The dev-server check in main.ts looks for this env var; if it's set,
     // it loads from the vite URL instead of the local file.
     ...extra,
+    // userData isolation alone does not isolate OS protocols or global chords.
+    STARDUST_DESKTOP_ISOLATED: '1',
   }
 }
 
@@ -380,6 +383,9 @@ export interface MockBackendOptions {
   extraConfig?: string
   /** Override the mock model's context window for compression scenarios. */
   modelContextLength?: number
+  mockServer?: MockServerOptions
+  /** Runs before the app launches, so a scenario can seed the sandbox's Hermes home (cron jobs, past runs). */
+  seedSandbox?: (sandbox: Sandbox) => void
 }
 
 /**
@@ -389,12 +395,6 @@ export interface MockBackendOptions {
  *   3. Launch the desktop app
  *   4. Return handles for test interaction
  */
-export interface MockBackendOptions {
-  mockServer?: MockServerOptions
-  /** Runs before the app launches, so a scenario can seed the sandbox's Hermes home (cron jobs, past runs). */
-  seedSandbox?: (sandbox: Sandbox) => void
-}
-
 export async function setupMockBackend(options: MockBackendOptions = {}): Promise<MockBackendFixture> {
   // 1. Start mock server
   const mock = await startMockServer(options.mockServer)
