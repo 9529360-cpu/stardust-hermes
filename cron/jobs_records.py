@@ -789,29 +789,49 @@ def resume_job(job_id: str) -> Optional[Dict[str, Any]]:
     })
 
 
-def trigger_job(job_id: str, extra_prompt: Optional[str] = None) -> Optional[Dict[str, Any]]:
-    """Schedule a job for the next tick (ID or name). ``extra_prompt`` is stamped as
-    ``manual_run_prompt`` for that single fire only; ``mark_job_run`` clears it."""
-    job = _jobs.resolve_job_ref(job_id)
-    if not job:
+def trigger_job(
+    job_id: str,
+    extra_prompt: Optional[str] = None,
+    expected: Optional[Dict[str, Any]] = None,
+) -> Optional[Dict[str, Any]]:
+    """Schedule a job for the next tick (ID or name).
+
+    ``extra_prompt`` is stamped as ``manual_run_prompt`` for that single fire only;
+    ``mark_job_run`` clears it. When ``expected`` is supplied, queue the fire only if the
+    current normalized job still exactly matches that reviewed snapshot. The comparison and
+    mutation share the jobs write lock so a concurrent edit/pause/revocation cannot reuse stale
+    authorization.
+    """
+    resolved = _jobs.resolve_job_ref(job_id)
+    if not resolved:
         return None
-    if _jobs.is_terminal_job(job):
-        name = job.get("name", job_id)
-        raise ValueError(
-            f"Cannot run: job '{name}' is {job.get('state')} (terminal). "
-            f"Create a new occurrence with 'stardust cron resume {name} "
-            "--run-now' or '--at <ISO-8601>'.")
-    manual_run_at = _jobs._hermes_now().isoformat()
-    return _jobs.update_job(job["id"], {
-        "enabled": True,
-        "state": "scheduled",
-        "paused_at": None,
-        "paused_reason": None,
-        "next_run_at": manual_run_at,
-        # Run-now intent, so cron expression/TZ repair guards don't treat it as stale state.
-        "manual_run_at": manual_run_at,
-        "manual_run_prompt": (extra_prompt or None),
-    })
+    canonical_id = resolved["id"]
+
+    def apply(jobs, _i, job):
+        current = _jobs._normalize_job_record(job)
+        if expected is not None and current != expected:
+            return None
+        if _jobs.is_terminal_job(current):
+            name = current.get("name", job_id)
+            raise ValueError(
+                f"Cannot run: job '{name}' is {current.get('state')} (terminal). "
+                f"Create a new occurrence with 'stardust cron resume {name} "
+                "--run-now' or '--at <ISO-8601>'.")
+        manual_run_at = _jobs._hermes_now().isoformat()
+        job.update({
+            "enabled": True,
+            "state": "scheduled",
+            "paused_at": None,
+            "paused_reason": None,
+            "next_run_at": manual_run_at,
+            # Run-now intent, so cron expression/TZ repair guards don't treat it as stale state.
+            "manual_run_at": manual_run_at,
+            "manual_run_prompt": (extra_prompt or None),
+        })
+        _jobs.save_jobs(jobs)
+        return _jobs._normalize_job_record(job)
+
+    return _jobs._with_job(canonical_id, apply, None)
 
 
 _REARM_RECURRING_ERROR = (
