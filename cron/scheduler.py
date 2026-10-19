@@ -222,6 +222,48 @@ def _extract_cron_done_response(text: str) -> tuple[str, bool]:
     return cleaned or "Task completed.", True
 
 
+def _verify_terminal_completion(
+    job: dict,
+    final_response: str,
+    terminal_complete: bool,
+    *,
+    cancel_event: Any = None,
+) -> tuple[str, bool]:
+    """Require an optional independent script before accepting model-declared completion.
+
+    The script is evaluated only after an opt-in goal job emits the standalone DONE marker.
+    A failing, cancelled, invalid, or otherwise unsuccessful verifier keeps the job scheduled
+    and makes that fact user-visible instead of silently trusting the model.
+    """
+    script_path = str(job.get("completion_script") or "").strip()
+    if not terminal_complete or not script_path:
+        return final_response, terminal_complete
+
+    job_id = str(job.get("id") or "unknown")
+    workdir = _resolve_job_workdir(job, job_id)
+    try:
+        verified, detail = _run_job_script_with_claim_heartbeat(
+            job, script_path, workdir=workdir, cancel_event=cancel_event)
+    except Exception as exc:
+        logger.exception("Job %r: completion verification script raised unexpectedly", job_id)
+        verified, detail = False, f"Completion verification failed: {exc}"
+
+    if verified:
+        logger.info("Job %r: independent completion verification passed", job_id)
+        return final_response, True
+
+    detail = str(detail or "completion verification did not pass").strip()
+    if len(detail) > 1200:
+        detail = detail[:1200].rstrip() + "..."
+    logger.info("Job %r: independent completion verification did not pass", job_id)
+    notice = (
+        "Independent completion verification did not pass; this task remains active."
+        + (f"\n\n{detail}" if detail else "")
+    )
+    cleaned = str(final_response or "").strip()
+    return f"{cleaned}\n\n{notice}".strip(), False
+
+
 def _is_cron_silence_response(text: str) -> bool:
     """True when a cron final response should suppress delivery: ``[SILENT]`` (or SILENT /
     NO_REPLY / NO REPLY) as the whole response OR its own first/last line — NOT mid-sentence.
@@ -1352,6 +1394,8 @@ def _run_one_job_body(
         terminal_complete = False
         if success and job.get("stop_when_done"):
             final_response, terminal_complete = _extract_cron_done_response(final_response)
+            final_response, terminal_complete = _verify_terminal_completion(
+                job, final_response, terminal_complete, cancel_event=fire_claim_lost)
 
         # Agent is still live through delivery; wrap ALL of save/compose/deliver in try/finally so a
         # raise anywhere still tears the deferred agent down.
