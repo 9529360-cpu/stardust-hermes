@@ -566,6 +566,24 @@ def release_completion_delivery(delegation_id: str, claim_id: str) -> bool:
             (now, delegation_id, claim_id)).rowcount == 1
 
 
+def defer_completion_delivery(delegation_id: str, claim_id: str) -> bool:
+    """Return an unadmitted completion to pending without spending a delivery attempt."""
+    return _update_delivery("""UPDATE async_delegations SET delivery_claim=NULL,
+                  delivery_claimed_at=NULL, delivery_attempts=MAX(0, delivery_attempts-1),
+                  updated_at=?
+           WHERE delegation_id=? AND delivery_state='pending' AND delivery_claim=?""",
+        (time.time(), delegation_id, claim_id))
+
+
+def drop_completion_delivery(delegation_id: str, claim_id: str) -> bool:
+    """Terminally drop a claimed completion whose target is permanently gone."""
+    return _update_delivery("""UPDATE async_delegations SET delivery_state='dropped',
+                  updated_at=?, delivery_claim=NULL,
+                  delivery_claimed_at=NULL
+           WHERE delegation_id=? AND delivery_state='pending' AND delivery_claim=?""",
+        (time.time(), delegation_id, claim_id))
+
+
 def mark_durable_completion_source_settled(delegation_id: str) -> bool:
     """Mark a reminder receipt safe for ordinary retention after its source job settles."""
     now = time.time()
