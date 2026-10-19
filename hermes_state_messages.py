@@ -305,16 +305,22 @@ class SessionMessagesMixin:
         # holding the lock for seconds (VACUUM, checkpoint) can't kill it.
         return self._execute_write(_do, patience_s=self._TRANSCRIPT_WRITE_PATIENCE_S)
 
-    def append_delegation_delivery(self, session_id: str, content: str, metadata: Dict[str, Any]) -> int:
+    def append_delegation_delivery(
+        self, session_id: str, content: str, metadata: Dict[str, Any], *, api_content: Optional[str] = None,
+    ) -> int:
         """Record a detached API result once, between client turns, including replay after rotation.
 
         The event's unit id, not its text or active flag, is the identity. Check and insert
         share the writer transaction, so independent gateway processes cannot duplicate it.
+        Optional API source context is committed with the original display body in the existing
+        sidecar column, so a crash cannot leave a model-facing notice without its provenance.
         """
         delegation_id = metadata.get("delegation_id")
         if not delegation_id:
             raise ValueError("Delegation delivery requires a stable delegation_id")
         msg = {"content": content, "display_kind": "async_delegation_complete", "display_metadata": metadata}
+        if api_content is not None:
+            msg["api_content"] = api_content
         params = self._message_row_params(session_id, "user", msg, None, time.time(), keep_reasoning=True)
 
         def _do(conn):
