@@ -29,6 +29,7 @@ from tools.environments.local_gitbash_probe import (
     _looks_like_msys_spawn_failure, _mandatory_aslr_enabled)
 from tools.environments.local_pythonpath import (
     _build_hermes_repo_root_aliases, _strip_hermes_owned_pythonpath_and_runtime_markers)
+from tools.environments.windows_job import spawn_contained, terminate_contained
 
 
 _IS_WINDOWS = platform.system() == "Windows"
@@ -722,7 +723,12 @@ def _kill_process_group_posix(proc) -> None:
 
 
 def _kill_process_windows(proc) -> None:
-    """Identity-checked terminate (start time guards against PID reuse), else kill."""
+    """End the command's whole job (every descendant, even ones whose parent already exited); a process that is not
+    in one gets an identity-checked terminate (start time guards against PID reuse), else kill."""
+    if terminate_contained(proc):
+        with contextlib.suppress(subprocess.TimeoutExpired, OSError):
+            proc.wait(timeout=2.0)
+        return
     try:
         from gateway.status import get_process_start_time, terminate_pid
         terminate_pid(proc.pid, force=True, expected_start_time=get_process_start_time(proc.pid))
@@ -830,7 +836,7 @@ class LocalEnvironment(BaseEnvironment):
             cmd_string = _prepend_shell_init(cmd_string, _resolve_shell_init_files())
         args = [bash, *(["-l"] if login else []), "-c", cmd_string]
         self._recover_cwd()
-        proc = subprocess.Popen(
+        proc = (spawn_contained if _IS_WINDOWS else subprocess.Popen)(
             args, text=True, env=_make_run_env(self.env), encoding="utf-8", errors="replace",
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             stdin=subprocess.PIPE if stdin_data is not None else subprocess.DEVNULL,
