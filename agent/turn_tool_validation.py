@@ -193,10 +193,12 @@ def validate_tool_calls(
                 json.loads(raw)
                 return False
             except json.JSONDecodeError as exc:
-                return exc.pos >= len(raw) and exc.msg in {
+                return exc.msg in {
                     "Expecting value", "Unterminated string starting at", "Expecting ',' delimiter",
                     "Expecting property name enclosed in double quotes",
-                }
+                } and (
+                    exc.pos >= len(raw) or exc.msg == "Unterminated string starting at"
+                )
 
         _truncated = any(
             _looks_truncated(tc) for tc in tool_calls if coalesce_tool_call_id(tc) in invalid_call_ids
