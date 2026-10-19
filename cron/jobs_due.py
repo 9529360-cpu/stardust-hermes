@@ -352,8 +352,10 @@ def _retire_expired_oneshot(d: _DueJob) -> bool:
             return False
         run_live = _jobs._claim_is_live(
             d.job.get("run_claim"), d.scan.now, _jobs._oneshot_run_claim_ttl_seconds())
+        from cron.jobs_runs import FIRE_CLAIM_TTL_SECONDS
+
         fire_live = _jobs._claim_is_live(
-            d.job.get("fire_claim"), d.scan.now, _jobs.FIRE_CLAIM_TTL_SECONDS)
+            d.job.get("fire_claim"), d.scan.now, FIRE_CLAIM_TTL_SECONDS)
         if run_live or fire_live:
             return True
         if d.job.get("run_claim") is not None or d.job.get("fire_claim") is not None:
