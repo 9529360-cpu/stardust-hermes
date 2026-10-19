@@ -244,6 +244,7 @@ def _prune_durable_records() -> None:
                 [(row[0],) for row in generic_pending[:overflow]],
             )
 
+
 def _persist_completion(event: Dict[str, Any], result: Dict[str, Any]) -> None:
     now = time.time()
     with _DB_LOCK, _transaction() as conn:
@@ -543,7 +544,7 @@ def release_completion_delivery(delegation_id: str, claim_id: str) -> bool:
         ).fetchone()
         if row is None:
             return False
-        if _is_pending_reminder_payload(row[0], row[1]):
+        if _is_protected_reminder_receipt("pending", row[0], row[1]):
             return conn.execute("""UPDATE async_delegations SET delivery_claim=NULL,
                           delivery_claimed_at=NULL, updated_at=?
                    WHERE delegation_id=? AND delivery_state=\'pending\' AND delivery_claim=?""",
@@ -563,6 +564,7 @@ def release_completion_delivery(delegation_id: str, claim_id: str) -> bool:
                       delivery_claimed_at=NULL, updated_at=?
                WHERE delegation_id=? AND delivery_state=\'pending\' AND delivery_claim=?""",
             (now, delegation_id, claim_id)).rowcount == 1
+
 
 def mark_durable_completion_source_settled(delegation_id: str) -> bool:
     """Mark a reminder receipt safe for ordinary retention after its source job settles."""
