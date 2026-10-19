@@ -182,6 +182,7 @@ _CREATE_FIELD_NORMALIZERS: Dict[str, Callable[[Any], Any]] = {
     "script": _normalize_job_optional_text,
     "monitor_script": _normalize_job_optional_text,
     "monitor_url": _normalize_job_optional_text,
+    "completion_script": _normalize_job_optional_text,
     "enabled_toolsets": lambda v: _normalize_str_list(v) if v else None,
     "workdir": _normalize_workdir,
     "no_agent": bool,
@@ -200,6 +201,7 @@ _UPDATE_FIELD_NORMALIZERS: Dict[str, Callable[[Any], Any]] = {
     "workdir": lambda v: None if v in {None, "", False} else _normalize_workdir(v),
     "monitor_script": _normalize_job_optional_text,
     "monitor_url": _normalize_job_optional_text,
+    "completion_script": _normalize_job_optional_text,
     "reasoning_effort": _normalize_reasoning_effort,
 }
 
@@ -254,6 +256,7 @@ def _validate_job_mode_invariants(
     no_agent: bool,
     script: Optional[str],
     stop_when_done: bool = False,
+    completion_script: Optional[str] = None,
 ) -> None:
     """Execution-mode invariants shared by create_job and update_job (no bypass via the update
     door)."""
@@ -271,6 +274,8 @@ def _validate_job_mode_invariants(
     if no_agent and stop_when_done:
         raise ValueError(
             "stop_when_done requires an agent run; it cannot be combined with no_agent=True.")
+    if completion_script and not stop_when_done:
+        raise ValueError("completion_script requires stop_when_done=True.")
 
 
 def _oneshot_past_grace_error(run_at: Any) -> ValueError:
@@ -316,6 +321,7 @@ def create_job(
     attach_to_session: Optional[bool] = None,
     handoff_context: Optional[str] = None,
     stop_when_done: Optional[bool] = None,
+    completion_script: Optional[str] = None,
     monitor_script: Optional[str] = None,
     monitor_url: Optional[str] = None,
     reasoning_effort: Optional[str] = None,
@@ -377,7 +383,7 @@ def create_job(
 
     _validate_job_mode_invariants(
         f["monitor_script"], f["monitor_url"], f["no_agent"], f["script"],
-        bool(f["stop_when_done"]))
+        bool(f["stop_when_done"]), f["completion_script"])
     prompt_text = _jobs._coerce_job_text(prompt).strip()
     if not prompt_text and not f["script"] and not normalized_skills:
         raise ValueError(_jobs.EMPTY_PAYLOAD_ERROR)
@@ -445,6 +451,7 @@ def create_job(
         ("memory_scope", f["memory_scope"]),
         ("handoff_context", f["handoff_context"] if normalized_attach is True else None),
         ("stop_when_done", True if f["stop_when_done"] else None),
+        ("completion_script", f["completion_script"] if f["stop_when_done"] else None),
     ):
         if value is not None:
             job[key] = value
@@ -659,19 +666,22 @@ def update_job(job_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]
             updated.pop("approval_mode", None)
         if not updated.get("stop_when_done"):
             updated.pop("stop_when_done", None)
+        if updated.get("completion_script") is None:
+            updated.pop("completion_script", None)
         # Hidden session handoff belongs only to explicitly attached jobs. A failed
         # explicit refresh stores no stale transcript snapshot.
         if updated.get("attach_to_session") is not True or updated.get("handoff_context") is None:
             updated.pop("handoff_context", None)
         _reject_terminal_activation(job, updated, job_id)
         # Re-check on the MERGED record; scoped to changed fields so legacy records keep loading.
-        if {"monitor_script", "monitor_url", "no_agent", "script", "stop_when_done"}.intersection(updates):
+        if {"monitor_script", "monitor_url", "no_agent", "script", "stop_when_done", "completion_script"}.intersection(updates):
             _validate_job_mode_invariants(
                 updated.get("monitor_script") or None,
                 updated.get("monitor_url") or None,
                 bool(updated.get("no_agent")),
                 _normalize_job_optional_text(updated.get("script")),
-                bool(updated.get("stop_when_done")))
+                bool(updated.get("stop_when_done")),
+                _normalize_job_optional_text(updated.get("completion_script")))
         if any(k in updates for k in _jobs._PAYLOAD_FIELDS) and _jobs.job_payload_is_empty(updated):
             raise ValueError(_jobs.EMPTY_PAYLOAD_ERROR)
         inference_fields_changed = bool(
