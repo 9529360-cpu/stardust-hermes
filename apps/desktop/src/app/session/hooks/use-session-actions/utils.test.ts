@@ -13,7 +13,7 @@ import {
   setSelectedStoredSessionId,
   workspaceCwdBelongsToSelectedSession
 } from '@/store/session'
-import type { SessionInfo, SessionResumeResult } from '@/types/hermes'
+import type { SessionInfo, SessionMessage, SessionResumeResult } from '@/types/hermes'
 
 import {
   appendLiveSessionProjection,
@@ -812,6 +812,120 @@ describe('preserveLocalPendingTurnMessages', () => {
       'user-old-stored',
       'assistant-old-stored',
       'user-current-stored',
+      'assistant-stream-interim'
+    ])
+  })
+
+  // Responses/Codex providers persist mid-turn commentary on the reasoning
+  // channel and leave the assistant row's `content` empty, so the committed
+  // turn carries each live interim's text as a reasoning part, never as text.
+  // The sealed live bubbles used to look uncommitted and were appended AFTER the
+  // final reply on every reconcile, leaving the thread to end on a "next step"
+  // sentence with nothing after it.
+  const codexCommentaryTurn = () => {
+    const commentary = [
+      'Step one: I will read the system clock.',
+      'Step two: I will check the free space on the system drive.',
+      'Step three: I will count the files in the working directory.'
+    ]
+
+    const finalText = 'The clock reads 04:47, the drive has 61 GiB free and the directory holds 78 files.'
+
+    const rows: SessionMessage[] = [
+      { id: 1, role: 'user', content: 'run the three checks', timestamp: 1 },
+      ...commentary.flatMap((text, index): SessionMessage[] => [
+        {
+          id: 10 + index * 2,
+          role: 'assistant',
+          content: '',
+          reasoning: text,
+          codex_message_items: [
+            { type: 'message', role: 'assistant', phase: 'commentary', content: [{ type: 'output_text', text }] }
+          ],
+          tool_calls: [{ id: `call-${index}`, function: { name: 'terminal', arguments: '{}' } }],
+          timestamp: 2 + index * 2
+        },
+        { id: 11 + index * 2, role: 'tool', tool_call_id: `call-${index}`, content: 'ok', timestamp: 3 + index * 2 }
+      ]),
+      { id: 30, role: 'assistant', content: finalText, timestamp: 9 }
+    ]
+
+    const live = [
+      msg('user-live', 'user', 'run the three checks'),
+      ...commentary.map(
+        (text, index) =>
+          ({
+            id: `assistant-stream-${index}`,
+            role: 'assistant',
+            parts: [
+              { type: 'text', text },
+              { type: 'tool-call', toolCallId: `call-${index}`, toolName: 'terminal', result: 'ok' }
+            ],
+            interim: true,
+            pending: false
+          }) as ChatMessage
+      ),
+      msg('assistant-stream-final', 'assistant', finalText, { pending: false })
+    ]
+
+    return { commentary, finalText, live, stored: toChatMessages(rows) }
+  }
+
+  it('drops sealed interims whose commentary the committed turn carries on the reasoning channel', () => {
+    const { live, stored } = codexCommentaryTurn()
+
+    expect(stored.map(message => message.role)).toEqual(['user', 'assistant'])
+    expect(preserveLocalPendingTurnMessages(stored, live)).toBe(stored)
+  })
+
+  it('never leaves a settled turn ending on interim commentary after its final reply', () => {
+    const { finalText, live, stored } = codexCommentaryTurn()
+
+    const reconciled = preserveLocalPendingTurnMessages(stored, live)
+    const lastAssistant = [...reconciled].reverse().find(message => message.role === 'assistant')
+
+    expect(chatMessageText(lastAssistant as ChatMessage)).toBe(finalText)
+  })
+
+  it('keeps a sealed interim the committed turn does not carry, even as reasoning', () => {
+    const { live, stored } = codexCommentaryTurn()
+
+    const uncommitted = msg('assistant-stream-extra', 'assistant', 'Step four: a sentence the stored turn never saw.', {
+      interim: true,
+      pending: false
+    })
+
+    expect(preserveLocalPendingTurnMessages(stored, [...live, uncommitted]).map(message => message.id)).toEqual([
+      ...stored.map(message => message.id),
+      'assistant-stream-extra'
+    ])
+  })
+
+  it('does not let an earlier turn’s reasoning swallow a new live interim', () => {
+    const { commentary, finalText } = codexCommentaryTurn()
+
+    const stored = toChatMessages([
+      { id: 1, role: 'user', content: 'older prompt', timestamp: 1 },
+      {
+        id: 2,
+        role: 'assistant',
+        content: '',
+        reasoning: commentary[0],
+        tool_calls: [{ id: 'old-call', function: { name: 'terminal', arguments: '{}' } }],
+        timestamp: 2
+      },
+      { id: 3, role: 'tool', tool_call_id: 'old-call', content: 'ok', timestamp: 3 },
+      { id: 4, role: 'assistant', content: finalText, timestamp: 4 },
+      { id: 5, role: 'user', content: 'current prompt', timestamp: 5 }
+    ])
+
+    const previous = [
+      ...stored,
+      msg('assistant-stream-interim', 'assistant', commentary[0], { interim: true, pending: false })
+    ]
+
+    expect(preserveLocalPendingTurnMessages(stored, previous).map(message => message.id)).toEqual([
+      ...stored.map(message => message.id),
       'assistant-stream-interim'
     ])
   })
