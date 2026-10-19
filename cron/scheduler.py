@@ -1245,6 +1245,60 @@ def run_one_job(
                     _running_fire_owners.pop(job["id"], None)
 
 
+def _durable_reminder_identity(job: dict) -> tuple[str, str]:
+    """Stable id + occurrence string for a deterministic reminder delivery."""
+    import hashlib
+
+    schedule = job.get("schedule") or {}
+    occurrence = (
+        job.get("_scheduled_instant")
+        or job.get("manual_run_at")
+        or (schedule.get("run_at") if isinstance(schedule, dict) else None)
+        or job.get("next_run_at")
+    )
+    occurrence = str(occurrence or "").strip()
+    if not occurrence:
+        raise ValueError("Durable reminder is missing its occurrence identity.")
+    raw = f"{job.get('id', '')}\0{occurrence}".encode("utf-8")
+    return f"cron_reminder_{hashlib.sha256(raw).hexdigest()[:32]}", occurrence
+
+
+def _publish_durable_reminder(job: dict, fence: Any) -> str:
+    """Commit one local reminder before consuming its one-shot dispatch budget.
+
+    The durable completion ledger uses the stable occurrence id as its idempotency key.
+    Re-entering after a crash therefore republishes the same logical reminder, never a second one.
+    """
+    origin = job.get("local_session_origin")
+    if not isinstance(origin, dict):
+        raise ValueError("Durable reminder has no local session origin.")
+    session_id = str(origin.get("session_id") or "").strip()
+    source = str(origin.get("source") or "").strip().lower()
+    if source not in {"desktop", "tui"} or not session_id:
+        raise ValueError("Durable reminder has an invalid local session origin.")
+    delivery_id, occurrence = _durable_reminder_identity(job)
+    with fence.side_effect_fence() as owns_delivery:
+        if not owns_delivery:
+            raise _FireClaimLostDuringSideEffect
+        from tools.async_delegation import publish_durable_completion
+
+        publish_durable_completion(
+            delegation_id=delivery_id,
+            session_key=session_id,
+            parent_session_id=session_id,
+            goal=str(job.get("name") or "Reminder"),
+            summary=str(job.get("prompt") or "").strip(),
+            status="completed",
+            role="reminder",
+            context=f"Scheduled reminder due at {occurrence}.",
+            event_metadata={
+                "cron_job_id": str(job.get("id") or ""),
+                "cron_job_name": str(job.get("name") or "Reminder"),
+                "reminder_due_at": occurrence,
+            },
+        )
+    return delivery_id
+
 def _run_one_job_body(
     job: dict, *, adapters=None, loop=None, verbose: bool = False,
     extra_prompt: Optional[str] = None, fire_claim_lost: Optional[_CancelEventLike] = None,
@@ -1259,6 +1313,63 @@ def _run_one_job_body(
     if not execution_id:
         execution_id = create_execution(
             job["id"], source="direct", scheduled_instant=job.get("_scheduled_instant"))["id"]
+
+    # Deterministic reminders deliberately invert the generic one-shot ordering: commit the
+    # idempotent local notification BEFORE consuming dispatch. A crash before commit retries;
+    # a crash after commit reuses the same stable delivery id and cannot duplicate the reminder.
+    if job.get("reminder"):
+        external_owner = os.environ.get("_HERMES_CRON_EXTERNAL_WORKER") == execution_id
+        if not external_owner and mark_execution_running(execution_id) is None:
+            logger.warning("Reminder job %s lost execution ownership before start; skipping", job["id"])
+            return True
+        published = False
+        try:
+            delivery_id = _publish_durable_reminder(job, fence)
+            published = True
+            if _fire_claim_ownership_lost():
+                _record_fire_ownership_lost(job["id"], fire_owner, execution_id)
+                return True
+            if not claim_dispatch(job["id"]):
+                # Another attempt already consumed this one-shot. The stable delivery id means
+                # the reminder itself is already represented exactly once in the durable ledger.
+                finish_execution(
+                    execution_id, success=True, delivery_outcome="delivered")
+                logger.info(
+                    "Reminder job %s reused durable delivery %s after dispatch was already consumed",
+                    job["id"], delivery_id)
+                return True
+            mark_kwargs = {}
+            if fire_owner is not None:
+                mark_kwargs["expected_fire_owner"] = fire_owner
+            if not mark_job_run(job["id"], True, None, **mark_kwargs):
+                finish_execution(
+                    execution_id, success=False,
+                    error="Reminder was durably published but fire ownership changed before bookkeeping.",
+                    delivery_outcome="delivered")
+                return True
+            finish_execution(execution_id, success=True, delivery_outcome="delivered")
+            return True
+        except _FireClaimLostDuringSideEffect:
+            _record_fire_ownership_lost(job["id"], fire_owner, execution_id)
+            return True
+        except Exception as exc:
+            # Before persistence succeeds, release this attempt so the same due occurrence can
+            # retry. After persistence succeeds, leave claim state untouched: dispatch may have
+            # committed before a later bookkeeping failure, and the stable delivery id makes the
+            # next recovery attempt safe either way.
+            if not published:
+                try:
+                    from cron.jobs_runs import release_pre_dispatch_claims
+                    release_pre_dispatch_claims(job["id"], expected_fire_owner=fire_owner)
+                except Exception:
+                    logger.warning(
+                        "Reminder job %s could not release pre-dispatch claims after persistence failure",
+                        job["id"], exc_info=True)
+            err = str(exc) or type(exc).__name__
+            logger.error("Durable reminder job %s failed: %s", job["id"], err, exc_info=True)
+            finish_execution(execution_id, success=False, error=err, delivery_outcome="failed")
+            return False
+
     delivery_attempted = False
     delivery_error = None
     from agent.secret_scope import (
