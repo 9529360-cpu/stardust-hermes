@@ -192,11 +192,13 @@ _CREATE_FIELD_NORMALIZERS: Dict[str, Callable[[Any], Any]] = {
     "approval_mode": _normalize_job_approval_mode,
     "memory_scope": _normalize_memory_scope,
     "stop_when_done": _normalize_optional_bool,
+    "reminder": _normalize_optional_bool,
 }
 _UPDATE_FIELD_NORMALIZERS: Dict[str, Callable[[Any], Any]] = {
     "approval_mode": _normalize_job_approval_mode,
     "memory_scope": _normalize_memory_scope,
     "stop_when_done": _normalize_optional_bool,
+    "reminder": _normalize_optional_bool,
     "handoff_context": _normalize_job_optional_text,
     "workdir": lambda v: None if v in {None, "", False} else _normalize_workdir(v),
     "monitor_script": _normalize_job_optional_text,
@@ -278,6 +280,52 @@ def _validate_job_mode_invariants(
         raise ValueError("completion_script requires stop_when_done=True.")
 
 
+def _validate_durable_reminder_job(job: Dict[str, Any]) -> None:
+    """Deterministic local reminders: one-shot, no model/tools, durable Desktop/TUI return only."""
+    if not job.get("reminder"):
+        return
+    schedule = job.get("schedule") or {}
+    if isinstance(schedule, str):
+        schedule = _jobs.parse_schedule(schedule)
+    if schedule.get("kind") != "once":
+        raise ValueError("reminder=True requires a one-shot schedule.")
+    repeat = job.get("repeat") or {}
+    if repeat.get("times") != 1:
+        raise ValueError("reminder=True requires exactly one occurrence (repeat=1).")
+    origin = job.get("local_session_origin")
+    if (
+        not isinstance(origin, dict)
+        or origin.get("source") not in {"desktop", "tui"}
+        or not origin.get("session_id")
+    ):
+        raise ValueError("reminder=True requires a durable Desktop/TUI conversation origin.")
+    if not str(job.get("prompt") or "").strip():
+        raise ValueError("reminder=True requires non-empty reminder text in prompt.")
+    deliver = str(job.get("deliver") or "").strip().lower()
+    if deliver not in {"local", "origin"}:
+        raise ValueError("reminder=True only supports local/origin delivery.")
+    incompatible = []
+    for key in (
+        "script", "completion_script", "monitor_script", "monitor_url", "context_from",
+        "enabled_toolsets", "workdir", "handoff_context", "model", "provider", "base_url",
+        "reasoning_effort", "approval_mode", "memory_scope", "failure_deliver",
+    ):
+        if job.get(key):
+            incompatible.append(key)
+    if job.get("skills") or job.get("skill"):
+        incompatible.append("skills")
+    if job.get("attach_to_session"):
+        incompatible.append("attach_to_session")
+    if job.get("no_agent"):
+        incompatible.append("no_agent")
+    if job.get("stop_when_done"):
+        incompatible.append("stop_when_done")
+    if incompatible:
+        raise ValueError(
+            "reminder=True is deterministic and cannot be combined with: "
+            + ", ".join(sorted(set(incompatible))))
+
+
 def _oneshot_past_grace_error(run_at: Any) -> ValueError:
     return ValueError(
         f"Requested one-shot time {run_at} is more than "
@@ -330,6 +378,7 @@ def create_job(
     paused_reason: Optional[str] = None,
     approval_mode: Optional[str] = None,
     memory_scope: Optional[str] = None,
+    reminder: Optional[bool] = None,
     dry_run: bool = False,
     trigger: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
@@ -398,8 +447,11 @@ def create_job(
         or "cron job"
     )
     name = name or label_source[:50].strip()
-    provider_snapshot, model_snapshot = _compute_provider_model_snapshots(
-        provider=f["provider"], model=f["model"], base_url=f["base_url"], no_agent=f["no_agent"])
+    if f["reminder"]:
+        provider_snapshot, model_snapshot = None, None
+    else:
+        provider_snapshot, model_snapshot = _compute_provider_model_snapshots(
+            provider=f["provider"], model=f["model"], base_url=f["base_url"], no_agent=f["no_agent"])
     next_run_at = None if trigger_spec is not None else _next_run_or_reject_past_oneshot(
         parsed_schedule, name, schedule, "")
 
@@ -448,7 +500,7 @@ def create_job(
         ("attach_to_session", normalized_attach), ("reasoning_effort", normalized_reasoning_effort),
         ("failure_deliver", f["failure_deliver"]), ("local_session_origin", local_session_origin),
         ("source_suggestion_id", source_suggestion_id), ("approval_mode", f["approval_mode"]),
-        ("memory_scope", f["memory_scope"]),
+        ("memory_scope", f["memory_scope"]), ("reminder", True if f["reminder"] else None),
         ("handoff_context", f["handoff_context"] if normalized_attach is True else None),
         ("stop_when_done", True if f["stop_when_done"] else None),
         ("completion_script", f["completion_script"] if f["stop_when_done"] else None),
@@ -458,6 +510,8 @@ def create_job(
     if trigger_spec is not None:
         job["trigger"] = trigger_spec
         job["trigger_state"] = _triggers.initial_trigger_state(trigger_spec, _triggers.now_epoch())
+
+    _validate_durable_reminder_job(job)
 
     if dry_run:
         return job
@@ -656,6 +710,9 @@ def update_job(job_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]
         _apply_trigger_update(job, updates)
         _rederive_repeat_for_schedule_change(job, updates)
         _normalize_job_updates(job, updates)
+        if "reminder" in updates and bool(updates.get("reminder")) != bool(job.get("reminder")):
+            raise ValueError(
+                "reminder execution mode is fixed at creation; create a new job to change modes.")
         previous_inference_axes = _normalized_inference_axes(job)
         updated = _jobs._apply_skill_fields({**job, **updates})
         if updated.get("local_session_origin") is None:
@@ -666,6 +723,8 @@ def update_job(job_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]
             updated.pop("approval_mode", None)
         if not updated.get("stop_when_done"):
             updated.pop("stop_when_done", None)
+        if not updated.get("reminder"):
+            updated.pop("reminder", None)
         if updated.get("completion_script") is None:
             updated.pop("completion_script", None)
         # Hidden session handoff belongs only to explicitly attached jobs. A failed
@@ -702,6 +761,7 @@ def update_job(job_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]
                 no_agent=updated.get("no_agent"))
             updated["provider_snapshot"], updated["model_snapshot"] = snapshots
         _fill_missing_next_run(updated)
+        _validate_durable_reminder_job(updated)
         _reject_terminal_activation(job, updated, job_id)
         jobs[i] = updated
         _jobs.save_jobs(jobs)

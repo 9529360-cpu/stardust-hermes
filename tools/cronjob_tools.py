@@ -619,7 +619,7 @@ def _with_guidance(result: Dict[str, Any], job: Dict[str, Any], deliver: Optiona
 
 
 def _preview_create(a: Dict[str, Any], *, prompt, deliver, canonical_skills, context_from,
-                    requested_approval_mode) -> str:
+                    requested_approval_mode, local_session_origin=None) -> str:
     """Dry run for create: every check of the real create runs, nothing is saved, and no trigger
     is registered with the scheduler. The handoff capture is skipped: it does not change the preview."""
     from cron.jobs import create_job
@@ -628,7 +628,7 @@ def _preview_create(a: Dict[str, Any], *, prompt, deliver, canonical_skills, con
         job = create_job(
             prompt=prompt or "", schedule=a["schedule"], name=a["name"], repeat=a["repeat"],
             deliver=_resolve_cron_context_deliver(deliver), origin=_origin_from_env(),
-            skills=canonical_skills,
+            local_session_origin=local_session_origin, skills=canonical_skills,
             model=_normalize_optional_job_value(a["model"]), provider=_normalize_optional_job_value(a["provider"]),
             base_url=_normalize_optional_job_value(a["base_url"], strip_trailing_slash=True),
             script=_normalize_optional_job_value(a["script"]), context_from=context_from,
@@ -636,7 +636,7 @@ def _preview_create(a: Dict[str, Any], *, prompt, deliver, canonical_skills, con
             no_agent=bool(a["no_agent"]), attach_to_session=a["attach_to_session"],
             stop_when_done=a["stop_when_done"],
             completion_script=_normalize_optional_job_value(a["completion_script"]),
-            memory_scope=a["memory_scope"],
+            memory_scope=a["memory_scope"], reminder=a["reminder"],
             monitor_script=_normalize_optional_job_value(a["monitor_script"]),
             monitor_url=_normalize_optional_job_value(a["monitor_url"]),
             reasoning_effort=a["reasoning_effort"],
@@ -714,18 +714,30 @@ def _action_create(a: Dict[str, Any]) -> str:
     if approval_error:
         return tool_error(approval_error, success=False)
 
+    local_session_origin = None
+    if a["reminder"]:
+        from cron.session_return import capture_local_session_origin
+        local_session_origin = capture_local_session_origin(deliver, a.get("session_id"))
+        if local_session_origin is None:
+            return tool_error(
+                "reminder=True requires a persisted Desktop/TUI conversation and implicit/origin delivery.",
+                success=False)
+
     if a["dry_run"]:
-        return _preview_create(a, prompt=prompt, deliver=deliver, canonical_skills=canonical_skills,
-                               context_from=context_from, requested_approval_mode=requested_approval_mode)
+        return _preview_create(
+            a, prompt=prompt, deliver=deliver, canonical_skills=canonical_skills,
+            context_from=context_from, requested_approval_mode=requested_approval_mode,
+            local_session_origin=local_session_origin)
 
     handoff_context = None
-    if a["attach_to_session"] is True and not _no_agent:
+    if a["attach_to_session"] is True and not _no_agent and not a["reminder"]:
         from cron.session_handoff import capture_session_handoff
         handoff_context = capture_session_handoff(a.get("session_id"))
 
     from cron.scheduler import CronSchedulerRegistrationError, create_job_with_scheduler_registration
-    from cron.session_return import capture_local_session_origin
-    local_session_origin = capture_local_session_origin(deliver, a.get("session_id"))
+    if local_session_origin is None:
+        from cron.session_return import capture_local_session_origin
+        local_session_origin = capture_local_session_origin(deliver, a.get("session_id"))
     try:
         job = create_job_with_scheduler_registration(
             prompt=prompt or "", schedule=a["schedule"], name=a["name"], repeat=a["repeat"],
@@ -738,7 +750,7 @@ def _action_create(a: Dict[str, Any]) -> str:
             no_agent=_no_agent, attach_to_session=a["attach_to_session"],
             handoff_context=handoff_context, stop_when_done=a["stop_when_done"],
             completion_script=_normalize_optional_job_value(a["completion_script"]),
-            memory_scope=a["memory_scope"],
+            memory_scope=a["memory_scope"], reminder=a["reminder"],
             monitor_script=_normalize_optional_job_value(a["monitor_script"]),
             monitor_url=_normalize_optional_job_value(a["monitor_url"]),
             # CLI-only lane: absent from CRONJOB_SCHEMA and the model dispatch (models don't pick models).
@@ -963,6 +975,8 @@ def _update_run_fields(job: Dict[str, Any], a: Dict[str, Any], updates: Dict[str
         updates["stop_when_done"] = bool(a["stop_when_done"])
     if a["memory_scope"] is not None:
         updates["memory_scope"] = a["memory_scope"]
+    if a["reminder"] is not None:
+        updates["reminder"] = bool(a["reminder"])
     if a["workdir"] is not None:
         # Empty string clears; otherwise update_job() validates/normalizes.
         updates["workdir"] = _normalize_optional_job_value(a["workdir"]) or None
@@ -1146,6 +1160,7 @@ def cronjob(
     stop_when_done: Optional[bool] = None,
     completion_script: Optional[str] = None,
     memory_scope: Optional[str] = None,
+    reminder: Optional[bool] = None,
     monitor_script: Optional[str] = None,
     monitor_url: Optional[str] = None,
     reasoning_effort: Optional[str] = None,
@@ -1300,6 +1315,10 @@ Jobs run in a fresh session. Normally they have no current-chat context, so prom
                 "enum": ["profile", "none"],
                 "description": "Optional persistent-memory scope for this autonomous job. Omit/profile loads profile memory normally. none skips persistent personal memory and denies the memory tool for this job, even if enabled_toolsets requests it."
             },
+            "reminder": {
+                "type": "boolean",
+                "description": "Deterministic one-shot reminder mode for the creating Desktop/TUI conversation. The stored prompt is the exact reminder text; no model, memory, tool, or script run occurs at fire time. The reminder is durably persisted under a stable occurrence id before the one-shot dispatch is consumed, so restart recovery cannot create a second logical reminder. This execution mode is fixed at creation; edit its time/text normally, but create a new job to switch between reminder and agent-task modes. Requires a one-shot schedule and implicit/origin local delivery. Do not use for tasks that need checking, browsing, tools, or external side effects."
+            },
             "enabled_toolsets": {
                 "type": "array",
                 "items": {"type": "string"},
@@ -1342,7 +1361,7 @@ _HANDLER_FORWARDED_ARGS = (
     "job_id", "prompt", "schedule", "name", "repeat", "deliver", "failure_deliver",
     "skill", "skills", "reason", "script", "completion_script", "context_from",
     "continuity", "enabled_toolsets", "workdir", "no_agent", "attach_to_session",
-    "stop_when_done", "memory_scope", "approval_mode", "paused_reason", "all",
+    "stop_when_done", "memory_scope", "reminder", "approval_mode", "paused_reason", "all",
 )
 
 
