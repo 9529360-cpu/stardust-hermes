@@ -83,6 +83,11 @@ class ProcessJob:
             self._api.CloseHandle(handle)
 
 
+def _popen_with_stdin(argv: Any, stdin: Any, **kwargs: Any) -> subprocess.Popen:
+    """Keep stdin explicit for the repository guard while preserving Popen semantics."""
+    return subprocess.Popen(argv, stdin=stdin, **kwargs)
+
+
 def spawn_contained(argv: Any, **popen_kwargs: Any) -> subprocess.Popen:
     """``subprocess.Popen`` whose whole process tree :func:`terminate_contained` can later end.
 
@@ -90,16 +95,17 @@ def spawn_contained(argv: Any, **popen_kwargs: Any) -> subprocess.Popen:
     can hold it (for example the host already runs inside a job that forbids nesting) the command still runs, as a
     plain ``Popen`` would.
     """
+    stdin = popen_kwargs.pop("stdin", None)
     if sys.platform != "win32":
-        return subprocess.Popen(argv, **popen_kwargs)
+        return _popen_with_stdin(argv, stdin, **popen_kwargs)
     try:
         job = ProcessJob()
     except OSError:
         logger.debug("job object unavailable; spawning without containment", exc_info=True)
-        return subprocess.Popen(argv, **popen_kwargs)
+        return _popen_with_stdin(argv, stdin, **popen_kwargs)
     popen_kwargs["creationflags"] = popen_kwargs.get("creationflags", 0) | _CREATE_SUSPENDED
     try:
-        proc = subprocess.Popen(argv, **popen_kwargs)
+        proc = _popen_with_stdin(argv, stdin, **popen_kwargs)
     except BaseException:
         job.close()
         raise
