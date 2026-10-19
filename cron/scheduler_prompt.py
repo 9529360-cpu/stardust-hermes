@@ -248,6 +248,8 @@ def _goal_completion_hint(job: dict) -> str:
         + " The scheduler will preserve the final run and retire the existing job automatically; do not "
         "remove, pause, create, or update cron jobs yourself to stop it.]\n\n"
     )
+
+
 def _build_job_prompt(
     job: dict, prerun_script: Optional[tuple] = None, extra_prompt: Optional[str] = None) -> str:
     """Build the effective prompt for a cron job, optionally loading skills first.
