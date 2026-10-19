@@ -3715,6 +3715,24 @@
       }
     },
     {
+      "name": "tasks.list",
+      "summary": "Read allowlisted task rows from one profile home. The profile resolves as in cron.manage list (unknown or deleted: 4064); limit per task rail is clamped to 1..50; the response includes `degraded` rails and a `scoped` profile name so clients can reject a mismatched slice. This method is read-only and grants no task control authority.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/TasksListParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/TasksListResult"
+        }
+      }
+    },
+    {
       "name": "terminal.resize",
       "summary": "Record the client's column width for server-side rendering.",
       "params": [
@@ -31450,6 +31468,293 @@
           "task_id"
         ],
         "title": "TaskIdResult",
+        "type": "object"
+      },
+      "TaskRow": {
+        "additionalProperties": false,
+        "properties": {
+          "task_id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Task Id",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 500,
+            "title": "Title",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "queued",
+              "paused",
+              "running",
+              "waiting_for_user",
+              "blocked",
+              "completed",
+              "failed",
+              "cancelled",
+              "interrupted"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "rail": {
+            "enum": [
+              "delegation",
+              "process",
+              "cron",
+              "goal"
+            ],
+            "title": "Rail",
+            "type": "string"
+          },
+          "durability": {
+            "enum": [
+              "process_local",
+              "restart_durable",
+              "session_bound"
+            ],
+            "title": "Durability",
+            "type": "string"
+          },
+          "background": {
+            "title": "Background",
+            "type": "boolean"
+          },
+          "phase": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Phase"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Started At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Updated At"
+          },
+          "next_run_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Next Run At"
+          },
+          "progress_current": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Progress Current"
+          },
+          "progress_total": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Progress Total"
+          },
+          "parent_session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Parent Session Id"
+          },
+          "parent_task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Parent Task Id"
+          },
+          "requires_approval": {
+            "title": "Requires Approval",
+            "type": "boolean"
+          },
+          "recoverable": {
+            "title": "Recoverable",
+            "type": "boolean"
+          },
+          "recovery_action": {
+            "anyOf": [
+              {
+                "enum": [
+                  "retry",
+                  "review_or_retry",
+                  "resume"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Recovery Action"
+          },
+          "summary": {
+            "maxLength": 160,
+            "title": "Summary",
+            "type": "string"
+          },
+          "detail": {
+            "maxLength": 500,
+            "title": "Detail",
+            "type": "string"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 8,
+            "title": "Files",
+            "type": "array"
+          },
+          "needs_attention": {
+            "title": "Needs Attention",
+            "type": "boolean"
+          },
+          "terminal": {
+            "title": "Terminal",
+            "type": "boolean"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile"
+          }
+        },
+        "required": [
+          "task_id",
+          "title",
+          "state",
+          "rail",
+          "durability",
+          "background",
+          "requires_approval",
+          "recoverable",
+          "summary",
+          "detail",
+          "files",
+          "needs_attention",
+          "terminal"
+        ],
+        "title": "TaskRow",
+        "type": "object"
+      },
+      "TasksListParams": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "default": "",
+            "title": "Profile",
+            "type": "string"
+          },
+          "limit": {
+            "default": 20,
+            "maximum": 50,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "title": "TasksListParams",
+        "type": "object"
+      },
+      "TasksListResult": {
+        "additionalProperties": false,
+        "properties": {
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/TaskRow"
+            },
+            "title": "Tasks",
+            "type": "array"
+          },
+          "degraded": {
+            "items": {
+              "enum": [
+                "delegation",
+                "cron",
+                "goal"
+              ],
+              "type": "string"
+            },
+            "title": "Degraded",
+            "type": "array"
+          },
+          "scoped": {
+            "default": "",
+            "title": "Scoped",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tasks",
+          "degraded"
+        ],
+        "title": "TasksListResult",
         "type": "object"
       },
       "TerminalClosePayload": {

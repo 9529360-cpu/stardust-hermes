@@ -7,13 +7,21 @@ remain authoritative in their existing runtimes.
 
 from __future__ import annotations
 
+import math
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 from typing import Any, Literal
 
 
-Durability = Literal["turn", "process_local", "restart_durable"]
+# ``session_bound`` is the standing-goal durability: the goal text and its progress are saved with the
+# conversation (state.db), but nothing advances it at process start. It continues only when that
+# conversation is re-attached (``session.resume``), and only while the auto-continue checkpoint is
+# fresh (``desktop.auto_continue.freshness_minutes``, default 15) and no wait barrier or turn budget
+# stops it; otherwise the user's next message in that conversation continues it.
+Durability = Literal["turn", "process_local", "restart_durable", "session_bound"]
 
 
 class AssistantExecutionMode(str, Enum):
@@ -33,6 +41,8 @@ class AssistantExecutionRail(str, Enum):
     PROCESS = "process"
     DELEGATION = "delegation"
     CRON = "cron"
+    # Read-model only: a standing ``/goal`` advances inside its own conversation, so no execution mode maps to it.
+    GOAL = "goal"
 
 
 class AssistantTaskState(str, Enum):
@@ -73,6 +83,7 @@ _RAIL_DURABILITY: dict[AssistantExecutionRail, Durability] = {
     AssistantExecutionRail.PROCESS: "process_local",
     AssistantExecutionRail.DELEGATION: "process_local",
     AssistantExecutionRail.CRON: "restart_durable",
+    AssistantExecutionRail.GOAL: "session_bound",
 }
 _RAILS_BY_MODE = {
     AssistantExecutionMode.RESPOND: frozenset({AssistantExecutionRail.NONE}),
@@ -100,6 +111,42 @@ _PROCESS_EXIT_STATES = frozenset({"exited", "already_exited", "completed"})
 
 _CRON_QUEUED_STATES = frozenset({"scheduled", "queued"})
 _CRON_FAILED_STATES = frozenset({"error", "failed"})
+_CRON_RUN_ACTIVE_STATES = frozenset({"claimed", "running"})
+# ``delivery_failed``: the run finished but its output never reached the user.
+_CRON_LAST_RUN_FAILED = frozenset({"error", "failed", "delivery_failed"})
+_CRON_JOB_PHASES = {
+    AssistantTaskState.RUNNING: "running",
+    AssistantTaskState.PAUSED: "paused",
+    AssistantTaskState.COMPLETED: "completed",
+    AssistantTaskState.FAILED: "error",
+}
+_GOAL_PHASES = {
+    AssistantTaskState.BLOCKED: "blocked",
+    AssistantTaskState.PAUSED: "paused",
+    AssistantTaskState.COMPLETED: "done",
+}
+
+# ``phase`` is a short structured token the renderer localizes; the sets are deliberately open. These
+# tables name only what this module produces today, and a consumer must keep a default branch.
+_DELEGATION_PHASES = {
+    **dict.fromkeys(("dispatched", "pending", "queued", "running"), "running"),
+    "stalling": "stalling",
+    "finalizing": "finalizing",
+    **dict.fromkeys(_DELEGATION_COMPLETED_STATES, "completed"),
+    **dict.fromkeys(("failed", "error", "rejected"), "failed"),
+    "timeout": "timeout",
+    "stalled": "stalled",
+    **dict.fromkeys(_DELEGATION_CANCELLED_STATES, "cancelled"),
+    "interrupted": "interrupted",
+    "unknown": "unknown",
+}
+
+# Wire text bounds shared by the projections and the RPC row builder.
+SUMMARY_LIMIT = 160
+MAX_FILES = 8
+_REDACT_INPUT_LIMIT = 8_000
+_MAX_EPOCH_SECONDS = 4_102_444_800  # 2100-01-01: larger numbers are milliseconds or garbage
+_WHITESPACE_RUN = re.compile(r"\s+")
 
 
 
@@ -172,6 +219,15 @@ def assistant_task_id(rail: AssistantExecutionRail, owner_id: Any) -> str:
     return f"{rail.value}:{native}"
 
 
+def assistant_cron_run_task_id(execution_id: Any) -> str:
+    """Id of ONE cron execution attempt. ``cron:<job_id>`` names the job; the two never collide."""
+
+    native = str(execution_id or "").strip()
+    if not native:
+        raise ValueError("assistant task ids require an owner id")
+    return f"cron-run:{native}"
+
+
 @dataclass(frozen=True)
 class AssistantTaskProjection:
     """Read-only task metadata projected from an existing authoritative owner."""
@@ -194,6 +250,17 @@ class AssistantTaskProjection:
     detail: str = ""
     recoverable: bool = False
     recovery_action: str | None = None
+    # Added for the task center. Times are Unix seconds; ``summary`` is already short and redacted;
+    # ``files`` lists only files the work reported writing (never logs or summary paths).
+    started_at: float | None = None
+    updated_at: float | None = None
+    next_run_at: float | None = None
+    phase: str | None = None
+    summary: str = ""
+    parent_task_id: str | None = None
+    progress_current: int | None = None
+    progress_total: int | None = None
+    files: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.task_id.strip():
@@ -212,6 +279,7 @@ class AssistantTaskProjection:
         if self.rail in {
             AssistantExecutionRail.PROCESS,
             AssistantExecutionRail.CRON,
+            AssistantExecutionRail.GOAL,
         } and not self.background:
             raise ValueError(f"{self.rail.value} task projections are background work")
 
@@ -323,6 +391,76 @@ def _child_refs(records: tuple[Mapping[str, Any], ...]) -> tuple[str, ...]:
     return tuple(values)
 
 
+def epoch_seconds(value: Any) -> float | None:
+    """Unix seconds from a number or an ISO-8601 string (naive means local time).
+
+    ``None`` for anything missing, non-finite or implausible, so a bad stored value drops one field
+    instead of failing a whole projection."""
+
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        seconds = float(value)
+    elif isinstance(value, str) and value.strip():
+        try:
+            seconds = datetime.fromisoformat(value.strip()).timestamp()
+        except (ValueError, OverflowError, OSError):
+            return None
+    else:
+        return None
+    return seconds if math.isfinite(seconds) and 0 < seconds < _MAX_EPOCH_SECONDS else None
+
+
+def summarize_line(value: Any, limit: int) -> str:
+    """One redacted line of at most ``limit`` characters (``…`` marks a cut).
+
+    Redaction runs before the cut so a secret straddling the limit cannot leave a readable fragment."""
+
+    if value is None:
+        return ""
+    from agent.redact import redact_sensitive_text
+    from tools.ansi_strip import sanitize_display_text
+
+    text = redact_sensitive_text(
+        str(value)[:_REDACT_INPUT_LIMIT], force=True, redact_url_credentials=True
+    )
+    text = _WHITESPACE_RUN.sub(" ", sanitize_display_text(text)).strip()
+    if len(text) > limit:
+        text = text[: max(0, limit - 1)].rstrip() + "…"
+    return text
+
+
+def _first_epoch(records: tuple[Mapping[str, Any], ...], *keys: str) -> float | None:
+    for record in records:
+        for key in keys:
+            seconds = epoch_seconds(record.get(key))
+            if seconds is not None:
+                return seconds
+    return None
+
+
+def _count(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number >= 0 else None
+
+
+def _written_files(records: tuple[Mapping[str, Any], ...]) -> tuple[str, ...]:
+    """Files the work reported writing: ``files_written`` / ``artifacts`` of each record and of every
+    per-task row under ``results``. Log and summary paths are not files the user asked for."""
+
+    rows: list[Mapping[str, Any]] = list(records)
+    for record in records:
+        nested = record.get("results")
+        if isinstance(nested, (list, tuple)):
+            rows.extend(row for row in nested if isinstance(row, Mapping))
+    return _refs_from(tuple(rows), "files_written", "artifacts")[:MAX_FILES]
+
+
 def _owner_state(value: Any, owner: str) -> str:
     state = _text(value).lower()
     if not state:
@@ -388,6 +526,37 @@ def cron_job_lifecycle_state(
     raise ValueError(f"unknown cron state: {state}")
 
 
+def cron_run_lifecycle_state(owner_state: Any, *, owner_lost: bool = False) -> AssistantTaskState:
+    """One execution attempt from the cron ledger. ``owner_lost`` is the reader's proof that the
+    process holding a claimed/running attempt is gone (the ledger row itself is left untouched)."""
+
+    state = _owner_state(owner_state, "cron run")
+    if state in _CRON_RUN_ACTIVE_STATES:
+        return AssistantTaskState.INTERRUPTED if owner_lost else AssistantTaskState.RUNNING
+    if state == "completed":
+        return AssistantTaskState.COMPLETED
+    if state == "failed":
+        return AssistantTaskState.FAILED
+    if state == "unknown":
+        return AssistantTaskState.INTERRUPTED
+    raise ValueError(f"unknown cron run state: {state}")
+
+
+def goal_lifecycle_state(status: Any, *, last_verdict: Any = None) -> AssistantTaskState:
+    """A standing goal. The judge's ``blocked`` verdict pauses the goal, so blocked is read from the
+    verdict, not from ``status``. ``cleared`` goals are not tasks and are rejected."""
+
+    state = _owner_state(status, "goal")
+    blocked = _text(last_verdict).lower() == "blocked"
+    if state == "done":
+        return AssistantTaskState.COMPLETED
+    if state in {"active", "paused"}:
+        if blocked:
+            return AssistantTaskState.BLOCKED
+        return AssistantTaskState.RUNNING if state == "active" else AssistantTaskState.PAUSED
+    raise ValueError(f"unknown goal state: {state}")
+
+
 def project_delegation(record: Mapping[str, Any]) -> AssistantTaskProjection:
     """Project live, completion-event, or durable-ledger delegation data."""
 
@@ -398,6 +567,12 @@ def project_delegation(record: Mapping[str, Any]) -> AssistantTaskProjection:
 
     owner_id = _first_text(records, "delegation_id")
     owner_state = _first_text((event, record), "status", "state")
+    known_states = (
+        _DELEGATION_RUNNING_STATES | _DELEGATION_COMPLETED_STATES | _DELEGATION_FAILED_STATES
+        | _DELEGATION_CANCELLED_STATES | _DELEGATION_INTERRUPTED_STATES
+    )
+    if owner_state.lower() == "unknown" or owner_state.lower() not in known_states:
+        owner_state = "interrupted"  # forward/owner-loss states stay compatible at the read boundary
     state = delegation_lifecycle_state(owner_state)
     goal = _first_text(records, "goal")
     if not goal:
@@ -421,6 +596,7 @@ def project_delegation(record: Mapping[str, Any]) -> AssistantTaskProjection:
         "full_summary_path",
     )
     interrupted = state is AssistantTaskState.INTERRUPTED
+    started_at = _first_epoch((record, event, task), "dispatched_at")
 
     return AssistantTaskProjection(
         task_id=assistant_task_id(AssistantExecutionRail.DELEGATION, owner_id),
@@ -445,6 +621,11 @@ def project_delegation(record: Mapping[str, Any]) -> AssistantTaskProjection:
         detail=detail,
         recoverable=interrupted,
         recovery_action="retry" if interrupted else None,
+        started_at=started_at,
+        updated_at=_first_epoch((record, event, result), "updated_at", "completed_at") or started_at,
+        phase=_DELEGATION_PHASES.get(owner_state.lower()),
+        summary=summarize_line(final_report, SUMMARY_LIMIT),
+        files=_written_files((result, event, record)),
     )
 
 
@@ -493,6 +674,9 @@ def project_cron_job(
         running=running,
     )
     failed = state is AssistantTaskState.FAILED
+    last_failed = _text(job.get("last_status")).lower() in _CRON_LAST_RUN_FAILED
+    final_report = _first_text((job,), "final_report", "last_report") or None
+    started_at = epoch_seconds(job.get("created_at"))
 
     return AssistantTaskProjection(
         task_id=assistant_task_id(AssistantExecutionRail.CRON, owner_id),
@@ -508,7 +692,7 @@ def project_cron_job(
         requires_approval=bool(job.get("requires_approval")),
         approval_refs=_refs_from((job,), "approval_id", "approval_ids", "approval_refs"),
         artifact_refs=_refs_from((job,), "artifacts", "artifact_refs"),
-        final_report=_first_text((job,), "final_report", "last_report") or None,
+        final_report=final_report,
         detail=_first_text(
             (job,),
             "last_error",
@@ -519,6 +703,80 @@ def project_cron_job(
         ),
         recoverable=failed,
         recovery_action="review_or_retry" if failed else None,
+        started_at=started_at,
+        updated_at=epoch_seconds(job.get("last_run_at")) or started_at,
+        next_run_at=epoch_seconds(job.get("next_run_at")),
+        phase=_CRON_JOB_PHASES.get(state) or ("last_failed" if last_failed else "scheduled"),
+        summary=summarize_line(final_report, SUMMARY_LIMIT),
+    )
+
+
+def project_cron_run(
+    execution: Mapping[str, Any], *, job_name: str = "", owner_lost: bool = False
+) -> AssistantTaskProjection:
+    """One execution attempt from the cron ledger, as its own row under its job.
+
+    ``owner_lost`` is the reader's in-memory proof that a claimed/running attempt's process is gone;
+    the ledger row is never rewritten by a read."""
+
+    execution_id = _text(execution.get("id"))
+    job_id = _text(execution.get("job_id"))
+    status = _text(execution.get("status")).lower()
+    state = cron_run_lifecycle_state(status, owner_lost=owner_lost)
+    claimed_at = epoch_seconds(execution.get("claimed_at"))
+    started_at = epoch_seconds(execution.get("started_at")) or claimed_at
+    in_flight = status in _CRON_RUN_ACTIVE_STATES
+
+    return AssistantTaskProjection(
+        task_id=assistant_cron_run_task_id(execution_id),
+        title=_text(job_name) or f"Cron job {job_id or 'run'}",
+        state=state,
+        rail=AssistantExecutionRail.CRON,
+        durability="restart_durable",
+        background=True,
+        owner_id=execution_id,
+        detail=_text(execution.get("error")),
+        started_at=started_at,
+        updated_at=epoch_seconds(execution.get("finished_at")) or started_at,
+        phase="unknown" if in_flight and owner_lost else status,
+        parent_task_id=assistant_task_id(AssistantExecutionRail.CRON, job_id) if job_id else None,
+    )
+
+
+def project_goal(
+    session_id: str, goal: Mapping[str, Any], *, waiting: bool = False
+) -> AssistantTaskProjection:
+    """A standing ``/goal``. ``goal`` is the stored ``GoalState`` as a mapping; ``waiting`` is the
+    reader's verdict that a wait barrier is still holding the goal (the stored barrier is lazily cleared
+    by the goal loop, so the reader decides)."""
+
+    owner_id = _text(session_id)
+    state = goal_lifecycle_state(goal.get("status"), last_verdict=goal.get("last_verdict"))
+    if waiting and state is AssistantTaskState.RUNNING:
+        state = AssistantTaskState.QUEUED
+    phase = _GOAL_PHASES.get(state) or ("waiting" if waiting else "active")
+    created_at = epoch_seconds(goal.get("created_at"))
+    recoverable = state in {AssistantTaskState.PAUSED, AssistantTaskState.BLOCKED}
+
+    return AssistantTaskProjection(
+        task_id=assistant_task_id(AssistantExecutionRail.GOAL, owner_id),
+        title=next((line.strip() for line in _text(goal.get("goal")).splitlines() if line.strip()), "")
+        or "Standing goal",
+        state=state,
+        rail=AssistantExecutionRail.GOAL,
+        durability="session_bound",
+        background=True,
+        owner_id=owner_id,
+        parent_session_id=owner_id or None,
+        detail=_first_text((goal,), "paused_reason", "waiting_reason"),
+        recoverable=recoverable,
+        recovery_action="resume" if recoverable else None,
+        started_at=created_at,
+        updated_at=epoch_seconds(goal.get("last_turn_at")) or created_at,
+        phase=phase,
+        summary=summarize_line(goal.get("last_reason"), SUMMARY_LIMIT),
+        progress_current=_count(goal.get("turns_used")),
+        progress_total=_count(goal.get("max_turns")),
     )
 
 

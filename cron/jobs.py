@@ -829,6 +829,50 @@ def load_jobs() -> List[Dict[str, Any]]:
     return jobs
 
 
+def peek_jobs(include_disabled: bool = True) -> List[Dict[str, Any]]:
+    """Read cron jobs without creating directories, locks, or repairing the store.
+
+    The jobs file is replaced atomically by writers, so a reader can safely parse the current
+    generation without taking ``_jobs_lock``. Corrupt or unreadable stores raise instead of being
+    repaired as a side effect of viewing them.
+    """
+    jobs_file = _current_cron_store().jobs_file
+    try:
+        data, _strict_retry = _parse_jobs_file(jobs_file)
+    except FileNotFoundError:
+        return []
+    except OSError as exc:
+        if not jobs_file.exists():
+            return []
+        raise RuntimeError(f"Failed to read cron database: {exc}") from exc
+    except Exception as exc:
+        raise RuntimeError(f"Failed to read cron database: {exc}") from exc
+
+    if isinstance(data, dict):
+        jobs = data.get("jobs", [])
+        if isinstance(jobs, dict):
+            jobs = [
+                {**record, "id": record.get("id") or key}
+                for key, record in jobs.items()
+                if isinstance(record, dict)
+            ]
+        if not isinstance(jobs, list):
+            raise RuntimeError("Cron database corrupted: expected a jobs list or ID-keyed map")
+    elif isinstance(data, list):
+        jobs = data
+    else:
+        raise RuntimeError(
+            f"Cron database corrupted: expected {{'jobs': [...]}}, got {type(data).__name__}"
+        )
+
+    normalized = [
+        _normalize_job_record(job)
+        for job in jobs
+        if isinstance(job, dict)
+    ]
+    return normalized if include_disabled else [job for job in normalized if job.get("enabled", True)]
+
+
 def _peek_jobs_unlocked() -> Optional[List[Dict[str, Any]]]:
     """Repair-free read under ``_jobs_lock()``: ``[]`` if missing, ``None`` if corrupt (never
     shrink-merge against an unknown baseline). Never saves — that would recurse."""

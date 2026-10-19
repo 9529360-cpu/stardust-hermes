@@ -75,6 +75,10 @@ def test_modes_map_only_to_existing_runtime_owners():
 
 
 def test_task_lifecycle_covers_attention_and_terminal_outcomes():
+    with pytest.raises(ValueError, match="unknown delegation state"):
+        delegation_lifecycle_state("future-owner-state")
+    with pytest.raises(ValueError, match="delegation state is required"):
+        delegation_lifecycle_state(None)
     assert [state.value for state in AssistantTaskState] == [
         "queued",
         "paused",
@@ -147,6 +151,16 @@ def test_delegation_states_keep_owner_loss_distinct_from_failure():
 
     with pytest.raises(ValueError, match="unknown delegation state"):
         delegation_lifecycle_state("future-state")
+
+
+def test_delegation_projection_maps_forward_and_owner_loss_states_at_view_boundary():
+    for status in ("unknown", "future-owner-state", "owner_lost"):
+        projection = project_delegation({
+            "delegation_id": f"d-{status}",
+            "status": status,
+            "event": {"goal": "A task"},
+        })
+        assert projection.state is AssistantTaskState.INTERRUPTED
 
 
 def test_process_states_preserve_exit_reason_and_code():
