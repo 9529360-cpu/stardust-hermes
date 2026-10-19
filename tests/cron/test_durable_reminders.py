@@ -133,6 +133,9 @@ def test_run_body_publishes_reminder_before_consuming_dispatch(monkeypatch):
         scheduler, "mark_job_run",
         lambda *_args, **_kwargs: order.append("mark_job_run") or True)
     monkeypatch.setattr(
+        scheduler, "_settle_durable_reminder_receipt",
+        lambda *_args, **_kwargs: order.append("settle"))
+    monkeypatch.setattr(
         scheduler, "finish_execution",
         lambda *_args, **_kwargs: order.append("finish_execution") or {})
     job = {
@@ -147,7 +150,7 @@ def test_run_body_publishes_reminder_before_consuming_dispatch(monkeypatch):
     }
 
     assert scheduler._run_one_job_body(job) is True
-    assert order[:3] == ["publish", "claim_dispatch", "mark_job_run"]
+    assert order[:4] == ["publish", "claim_dispatch", "mark_job_run", "settle"]
     assert order[-1] == "finish_execution"
 
 
