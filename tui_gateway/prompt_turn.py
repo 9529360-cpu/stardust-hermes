@@ -302,7 +302,8 @@ def _turn_outcome(result: Any, error_surface: dict | None = None) -> tuple[Any, 
 
 
 def _goal_followup_after_turn(
-    sid: str, session: dict, result: Any, status: str, raw: Any) -> str | None:
+    sid: str, session: dict, result: Any, status: str, raw: Any, *, checkpoint_allowed: bool = True,
+    interrupted_goal=None) -> str | None:
     """/goal continuation (mirrors gateway/run._post_turn_goal_continuation): the prompt to
     chain once ``running`` is released, or None.  Compression failures are never judge
     input: the error text is not work toward the goal, and judging it spends a turn."""
@@ -310,11 +311,12 @@ def _goal_followup_after_turn(
     compression_exhausted = bool(isinstance(result, dict) and result.get("compression_exhausted"))
     if status == "interrupted":
         try:
-            if session.get("session_key") and (goal_mgr := _active_goal_manager(session)) is not None:
-                goal_mgr.pause(reason="turn-interrupted")
-                _emit("status.update", sid, {"kind": "goal", "text": (
-                    "⏸ Goal paused — turn was interrupted. "
-                    "Use /goal resume to continue, or /goal clear to stop.")})
+            if session.get("session_key") and interrupted_goal is not None:
+                with _goal_recovery_manager(session, session["session_key"]) as goal_mgr:
+                    if goal_mgr is not None and goal_mgr.pause_if_current(expected=interrupted_goal):
+                        _emit("status.update", sid, {"kind": "goal", "text": (
+                            "⏸ Goal paused — turn was interrupted. "
+                            "Use /goal resume to continue, or /goal clear to stop.")})
         except Exception as _goal_interrupt_exc:
             _hook_failure("goal pause-on-interrupt", _goal_interrupt_exc)
         return None
@@ -339,8 +341,17 @@ def _goal_followup_after_turn(
                 _active_deleg = count_active_delegations(getattr(session.get("agent"), "session_id", None))
             except Exception:
                 _bg_procs = None
+            completed_message_id = None
+            if checkpoint_allowed:
+                with _session_db(session) as db:
+                    tail = db.get_messages(session["session_key"], latest=True, limit=1) if db is not None else []
+                    if (tail and tail[0].get("role") == "assistant" and not tail[0].get("tool_calls")
+                            and not tail[0].get("_compressed_summary")
+                            and _coerce_message_text(tail[0].get("content")).strip() == raw.strip()):
+                        completed_message_id = tail[0]["id"]
             decision = goal_mgr.evaluate_after_turn(
-                raw, user_initiated=True, background_processes=_bg_procs, active_delegations=_active_deleg)
+                raw, user_initiated=True, background_processes=_bg_procs, active_delegations=_active_deleg,
+                completed_message_id=completed_message_id)
             if verdict_msg := decision.get("message") or "":
                 _emit("status.update", sid, {"kind": "goal", "text": verdict_msg})
             if decision.get("should_continue") and (
@@ -410,7 +421,7 @@ def _after_complete_turn(sid: str, session: dict, st: _TurnRun, raw: Any) -> Non
 
 
 def _dispatch_followup_turn(rid, sid: str, session: dict, prompt: Any, what: str, *,
-                            on_done=None, on_error=None) -> None:
+                            on_done=None, on_error=None, queued_prompt_generation: int | None = None) -> None:
     """Chain one follow-up turn (caller set ``running``); on failure run ``on_error``, log,
     release ``running``."""
     try:
@@ -420,6 +431,7 @@ def _dispatch_followup_turn(rid, sid: str, session: dict, prompt: Any, what: str
         _run_prompt_submit(
             rid, sid, session, prompt,
             display_kind=INTERNAL_NOTIFICATION_DISPLAY_KIND,
+            **({"queued_prompt_generation": queued_prompt_generation} if queued_prompt_generation is not None else {}),
         )
         if on_done is not None:
             on_done()
@@ -432,7 +444,8 @@ def _dispatch_followup_turn(rid, sid: str, session: dict, prompt: Any, what: str
 
 
 def _run_post_turn_followups(
-    rid, sid: str, session: dict, result: Any, goal_followup: str | None) -> None:
+    rid, sid: str, session: dict, result: Any, goal_followup: str | None, *,
+    queued_prompt_generation: int | None = None) -> None:
     """Chain whatever should run after ``running`` was released.  Order: a mid-turn user
     prompt wins over every auto follow-up (drain it, skip the rest); a leftover /steer is
     requeued first so it isn't dropped; then goal continuation, then completion
@@ -445,10 +458,13 @@ def _run_post_turn_followups(
         return
     if goal_followup:
         with session["history_lock"]:
-            if session.get("running"):
+            if session.get("running") or (
+                    queued_prompt_generation is not None
+                    and int(session.get("_queued_prompt_generation", 0)) != queued_prompt_generation):
                 return  # user already sent something — their turn wins
             session["running"] = True
-        _dispatch_followup_turn(rid, sid, session, goal_followup, "goal continuation dispatch")
+        _dispatch_followup_turn(rid, sid, session, goal_followup, "goal continuation dispatch",
+                                queued_prompt_generation=queued_prompt_generation)
     # Safety net for completion events that arrived mid-turn.  Ownership is positive-proof
     # and compression-chain aware (same fail-closed gate as the poller): session B must
     # not consume session A's event.  Unclaimable events are requeued for the poller.
@@ -867,6 +883,8 @@ def _run_prompt_submit(
     queued_prompt_generation: int | None = None,
     terminal_callback: Callable[[dict[str, Any]], None] | None = None,
     turn_author: dict | None = None) -> bool:
+    with session["history_lock"]:
+        turn_generation = int(session.get("_queued_prompt_generation", 0))
     admitted = _admit_prompt_turn(sid, session, text, image_paths, queued_prompt_generation)
     if admitted is None:
         return False
@@ -907,6 +925,9 @@ def _run_prompt_submit(
                     st.receipt_committed = True
                 return
             prompt, run_message, cols, streamer = prepared
+            goal_at_start = None
+            if goal_mgr := _active_goal_manager(session):
+                goal_at_start = goal_mgr.state
             _invoke_agent(
                 sid, session, st, prompt, run_message, streamer, images, display_kind,
                 display_metadata, turn_author)
@@ -914,7 +935,9 @@ def _run_prompt_submit(
                 sid, session, st, text, display_kind, display_metadata)
             payload, raw, status = _complete_turn_payload(session, st, status_note, cols)
             _emit("message.complete", sid, payload)
-            goal_followup = _goal_followup_after_turn(sid, session, st.result, status, raw)
+            goal_followup = _goal_followup_after_turn(
+                sid, session, st.result, status, raw, checkpoint_allowed=st.terminal_callback is None,
+                interrupted_goal=goal_at_start)
             _settle_loop_tick_after_turn(sid, session, status, raw)
             if status == "complete":
                 _after_complete_turn(sid, session, st, raw)
@@ -958,7 +981,8 @@ def _run_prompt_submit(
                     session.pop("_hosted_room_task", None)
             session.pop("_auto_continue_scheduled", None)
             _emit_settled_session_info(sid, session, st.agent)
-        _run_post_turn_followups(rid, sid, session, st.result, goal_followup)
+        _run_post_turn_followups(rid, sid, session, st.result, goal_followup,
+                                 queued_prompt_generation=turn_generation)
     run_thread = threading.Thread(target=run, daemon=True)
     # The handle is resolved BEFORE _sessions_lock: a profile session opens its own SessionDB through the
     # state registry, and _sessions_lock gates every create/close/prompt on this backend.

@@ -111,6 +111,7 @@ CONTINUATION_PROMPT_WITH_SUBGOALS_TEMPLATE = (
 CONTINUATION_PROMPT_GATE_FAILED_TEMPLATE = (
     "[Continuing toward your standing goal — a quality gate failed]\n"
     "Goal: {goal}\n\n"
+    "{criteria}"
     "The quality gate command below must pass before this goal can be "
     "declared done, and it just failed (attempt {attempt}/{max_retries}):\n"
     "  $ {command}\n"
@@ -436,6 +437,10 @@ class GoalState:
     contract: GoalContract = field(default_factory=GoalContract)
     # /goal gate add <cmd>: ALL must pass before the judge may declare done.
     gates: List[GoalGate] = field(default_factory=list)
+    # A completed turn's positive continuation decision, distinct from a live-turn
+    # crash marker. Message ids (not clocks) prevent replay after later work.
+    continuation_after_message_id: int = 0
+    continuation_attempts: int = 0
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), ensure_ascii=False)
@@ -445,6 +450,8 @@ class GoalState:
         data = json.loads(raw)
         raw_subgoals = data.get("subgoals") or []
         ints = {k: int(data.get(k) or 0) for k in ("turns_used", "consecutive_parse_failures", "consecutive_transport_failures", "waiting_on_delegations")}
+        ints.update({k: max(0, int(data.get(k) or 0)) for k in (
+            "continuation_after_message_id", "continuation_attempts")})
         floats = {k: float(data.get(k) or 0.0) for k in ("created_at", "last_turn_at", "waiting_until", "waiting_since")}
         return cls(
             goal=data.get("goal", ""),
@@ -479,6 +486,10 @@ class GoalState:
         self.waiting_on_delegations = 0
         self.waiting_reason = None
         self.waiting_since = 0.0
+
+    def clear_continuation(self) -> None:
+        self.continuation_after_message_id = 0
+        self.continuation_attempts = 0
 
 
 # ── Persistence (SessionDB state_meta) ────────────────────────────────
@@ -618,11 +629,11 @@ def _warn_dropped_write(manager: str, kind: str, session_id: str) -> None:
     )
 
 
-def load_goal(session_id: str) -> Optional[GoalState]:
+def load_goal(session_id: str, *, session_db=None) -> Optional[GoalState]:
     """Load the goal for a session, or None if none exists."""
     if not session_id:
         return None
-    db = _get_session_db()
+    db = session_db if session_db is not None else _get_session_db()
     if db is None:
         return None
     try:
@@ -1065,6 +1076,10 @@ _JUDGE_CONFIG_HINT = (
 )
 
 
+class _GoalChangedDuringEvaluation(Exception):
+    """A control or transcript change superseded an anchored goal decision."""
+
+
 class GoalManager:
     """Per-session goal state + continuation decisions.
 
@@ -1073,10 +1088,18 @@ class GoalManager:
     canonical user-role message to feed back into ``run_conversation``.
     """
 
-    def __init__(self, session_id: str, *, default_max_turns: int = DEFAULT_MAX_TURNS):
+    def __init__(self, session_id: str, *, default_max_turns: int = DEFAULT_MAX_TURNS, session_db=None):
         self.session_id = session_id
         self.default_max_turns = int(default_max_turns or DEFAULT_MAX_TURNS)
-        self._state: Optional[GoalState] = load_goal(session_id)
+        self._db = session_db
+        if session_db is None:
+            self._state: Optional[GoalState] = load_goal(session_id)
+        else:
+            # Recovery and confirmed Stop must distinguish missing state from a
+            # failed read. The older interactive API retains its best-effort load.
+            raw = session_db.get_meta(_meta_key(session_id))
+            self._state = GoalState.from_json(raw) if raw else None
+        self._evaluation_snapshot = None
 
     # --- introspection ------------------------------------------------
 
@@ -1122,8 +1145,91 @@ class GoalManager:
     # --- mutation -----------------------------------------------------
 
     def _save(self) -> Optional[GoalState]:
-        save_goal(self.session_id, self._state)
+        if self._evaluation_snapshot is not None:
+            db, expected, message_id = self._evaluation_snapshot
+            raw = self._state.to_json()
+            if not db.compare_and_set_meta(
+                _meta_key(self.session_id), expected, raw,
+                session_id=self.session_id, message_watermark=message_id,
+            ):
+                raise _GoalChangedDuringEvaluation
+            self._evaluation_snapshot = (db, raw, message_id)
+        elif self._db is not None:
+            self._state.clear_continuation()
+            self._db.set_meta(_meta_key(self.session_id), self._state.to_json())
+        else:
+            self._state.clear_continuation()
+            save_goal(self.session_id, self._state)
         return self._state
+
+    def pending_continuation(self, *, freshness_seconds: float, max_attempts: int) -> Optional[Dict[str, Any]]:
+        """Read a recoverable, positively recorded decision without spending a turn.
+
+        Legacy active goals and partially evaluated turns have no checkpoint. A
+        changed transcript, wait barrier, exhausted budget or old decision cannot
+        start work merely because its goal still says active.
+        """
+        db = self._db if self._db is not None else _get_session_db()
+        if db is None or not (raw := db.get_meta(_meta_key(self.session_id))):
+            return None
+        state = GoalState.from_json(raw)
+        if (state.status != "active" or state.continuation_after_message_id <= 0
+                or state.turns_used >= state.max_turns or state.continuation_attempts >= max_attempts
+                or state.waiting_on_pid or state.waiting_on_session or state.waiting_until
+                or state.waiting_on_delegations
+                or not 0 <= time.time() - state.last_turn_at <= freshness_seconds
+                or db.get_active_message_watermark(self.session_id) != state.continuation_after_message_id):
+            return None
+        self._state = state
+        return {"snapshot": raw, "prompt": self.next_continuation_prompt(),
+                "started_at": state.last_turn_at, "attempts": state.continuation_attempts}
+
+    def claim_continuation(self, pending: Dict[str, Any], *, freshness_seconds: float, max_attempts: int) -> bool:
+        """Spend a durable recovery attempt before dispatch, without resetting goal budget."""
+        current = self.pending_continuation(freshness_seconds=freshness_seconds, max_attempts=max_attempts)
+        if current is None or current["snapshot"] != pending["snapshot"]:
+            return False
+        self._state.continuation_attempts += 1
+        db = self._db if self._db is not None else _get_session_db()
+        return db.compare_and_set_meta(
+            _meta_key(self.session_id), current["snapshot"], self._state.to_json(),
+            session_id=self.session_id, message_watermark=self._state.continuation_after_message_id)
+
+    def discard_continuation(self) -> None:
+        """A live-turn marker has taken over recovery; its attempts must not get a second budget."""
+        db = self._db if self._db is not None else _get_session_db()
+        if db is None:
+            raise RuntimeError("session database is unavailable")
+        for _ in range(4):
+            raw = db.get_meta(_meta_key(self.session_id))
+            if not raw or not (state := GoalState.from_json(raw)).continuation_after_message_id:
+                return
+            state.clear_continuation()
+            if db.compare_and_set_meta(_meta_key(self.session_id), raw, state.to_json()):
+                return
+        raise RuntimeError("goal changed while retiring its continuation")
+
+    def pause_if_current(self, reason: str = "turn-interrupted", *, expected: Optional[GoalState] = None) -> bool:
+        """Confirm Stop durably without pausing a replacement goal or overwriting an evaluation."""
+        original = expected if expected is not None else self._state
+        if original is None or original.status != "active":
+            return False
+        db = self._db if self._db is not None else _get_session_db()
+        if db is None:
+            raise RuntimeError("session database is unavailable")
+        for _ in range(4):
+            raw = db.get_meta(_meta_key(self.session_id))
+            if not raw:
+                return False
+            state = GoalState.from_json(raw)
+            if state.status != "active" or (state.goal, state.created_at) != (original.goal, original.created_at):
+                return False
+            state.status, state.paused_reason = "paused", reason
+            state.clear_wait()
+            state.clear_continuation()
+            if db.compare_and_set_meta(_meta_key(self.session_id), raw, state.to_json()):
+                return True
+        raise RuntimeError("goal changed while confirming its pause")
 
     def _require_goal(self) -> GoalState:
         if self._state is None or not self.has_goal():
@@ -1138,6 +1244,7 @@ class GoalManager:
     def _pause_state(self, reason: str) -> None:
         self._state.status = "paused"
         self._state.paused_reason = reason
+        self._state.clear_continuation()
         self._save()
 
     def _pause_decision(self, paused_reason: str, verdict: str, reason: str, message: str) -> Dict[str, Any]:
@@ -1160,6 +1267,7 @@ class GoalManager:
         if self._state is None:
             return None
         self._state.contract = contract or GoalContract()
+        self._state.clear_continuation()
         return self._save()
 
     def pause(self, reason: str = "user-paused") -> Optional[GoalState]:
@@ -1168,6 +1276,7 @@ class GoalManager:
         self._state.status = "paused"
         self._state.paused_reason = reason
         self._state.clear_wait()   # a wait barrier is meaningless once paused
+        self._state.clear_continuation()
         return self._save()
 
     def resume(self, *, reset_budget: bool = True) -> Optional[GoalState]:
@@ -1176,6 +1285,7 @@ class GoalManager:
         self._state.status = "active"
         self._state.paused_reason = None
         self._state.clear_wait()   # resuming starts fresh
+        self._state.clear_continuation()
         if reset_budget:
             self._state.turns_used = 0
         return self._save()
@@ -1184,6 +1294,7 @@ class GoalManager:
         if self._state is None:
             return
         self._state.status = "cleared"
+        self._state.clear_continuation()
         self._save()
         self._state = None
 
@@ -1193,6 +1304,7 @@ class GoalManager:
         self._state.status = "done"
         self._state.last_verdict = "done"
         self._state.last_reason = reason
+        self._state.clear_continuation()
         self._save()
 
     # --- /subgoal user controls ---------------------------------------
@@ -1300,6 +1412,8 @@ class GoalManager:
                 continue
 
             gate.attempts += 1
+            state.last_verdict = "gate_failed"
+            state.last_reason = f"gate failed (exit {exit_code}): $ {gate.command}"
 
             if gate.attempts > gate.max_retries:
                 return self._pause_decision(
@@ -1311,19 +1425,12 @@ class GoalManager:
                     f"then /goal resume.",
                 )
 
-            self._save()
-            prompt = CONTINUATION_PROMPT_GATE_FAILED_TEMPLATE.format(
-                goal=state.goal, command=gate.command, exit_code=exit_code, attempt=gate.attempts,
-                max_retries=gate.max_retries, output=tail or "(no output)",
-            )
             return _decision(
-                "active", True, prompt, "gate_failed",
-                f"gate failed (exit {exit_code}): $ {gate.command}",
+                "active", True, self.next_continuation_prompt(), "gate_failed", state.last_reason,
                 f"✗ Quality gate failed ({state.turns_used}/{state.max_turns} turns, "
                 f"attempt {gate.attempts}/{gate.max_retries}): $ {gate.command}",
             )
 
-        self._save()
         return None
 
     # --- /goal wait barrier -------------------------------------------
@@ -1453,6 +1560,30 @@ class GoalManager:
         self, last_response: str, *, user_initiated: bool = True,
         background_processes: Optional[List[Dict[str, Any]]] = None,
         active_delegations: int = 0,
+        completed_message_id: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Evaluate a turn, optionally fencing every save to its durable transcript and goal snapshot."""
+        try:
+            if completed_message_id is not None:
+                db = self._db if self._db is not None else _get_session_db()
+                raw = db.get_meta(_meta_key(self.session_id)) if db is not None else None
+                if not raw or completed_message_id <= 0 or GoalState.from_json(raw) != self._state:
+                    raise _GoalChangedDuringEvaluation
+                self._evaluation_snapshot = (db, raw, completed_message_id)
+            return self._evaluate_after_turn(
+                last_response, user_initiated=user_initiated, background_processes=background_processes,
+                active_delegations=active_delegations, completed_message_id=completed_message_id or 0)
+        except _GoalChangedDuringEvaluation:
+            self._state = load_goal(self.session_id, session_db=self._db)
+            return _decision(self._state.status if self._state else None, False, None, "superseded",
+                             "goal or transcript changed during evaluation", "")
+        finally:
+            self._evaluation_snapshot = None
+
+    def _evaluate_after_turn(
+        self, last_response: str, *, user_initiated: bool,
+        background_processes: Optional[List[Dict[str, Any]]], active_delegations: int,
+        completed_message_id: int,
     ) -> Dict[str, Any]:
         """Run gates + judge and update state. Return a decision dict (``status``, ``should_continue``,
         ``continuation_prompt``, ``verdict``, ``reason``, ``message``). Both real user prompts and our
@@ -1467,6 +1598,12 @@ class GoalManager:
 
         state.turns_used += 1
         state.last_turn_at = time.time()
+        state.last_verdict = state.last_reason = None
+        state.clear_continuation()
+        if completed_message_id:
+            # Persist consumption of this real turn before slow gates/judging.
+            # An old continuation must not survive a crash during this evaluation.
+            self._save()
 
         # Gates run BEFORE the judge: a failing gate is deterministic evidence the goal is not done,
         # so the judge is skipped and the gate's output drives the next turn (same turn budget).
@@ -1474,6 +1611,9 @@ class GoalManager:
         if gate_decision is not None:
             if gate_decision.get("should_continue") and state.turns_used >= state.max_turns:
                 return self._budget_pause(state, "gate_failed", gate_decision.get("reason", ""), note=" (a quality gate is still failing)")
+            if gate_decision.get("should_continue"):
+                state.continuation_after_message_id = completed_message_id
+                self._save()
             return gate_decision
 
         verdict, reason, parse_failed, wait_directive, transport_failed = judge_goal(
@@ -1529,6 +1669,7 @@ class GoalManager:
         if state.turns_used >= state.max_turns:
             return self._budget_pause(state, "continue", reason)
 
+        state.continuation_after_message_id = completed_message_id
         self._save()
         return _decision(
             "active", True, self.next_continuation_prompt(), "continue", reason,
@@ -1539,6 +1680,16 @@ class GoalManager:
         s = self._state
         if not s or s.status != "active":
             return None
+        if s.last_verdict == "gate_failed":
+            gate = next((g for g in s.gates if g.last_exit_code not in (None, 0) and g.attempts), None)
+            if gate is not None:
+                criteria = f"Completion contract:\n{s.contract.render_block()}\n\n" if s.has_contract() else ""
+                if s.subgoals:
+                    criteria += f"{_render_extra_criteria(s.subgoals)}\n\n"
+                return CONTINUATION_PROMPT_GATE_FAILED_TEMPLATE.format(
+                    goal=s.goal, criteria=criteria, command=gate.command, exit_code=gate.last_exit_code,
+                    attempt=gate.attempts, max_retries=gate.max_retries,
+                    output=gate.last_output_tail or "(no output)")
         # Contract first (it carries the verification surface); subgoals fold in as extra criteria.
         if s.has_contract():
             contract_block = s.contract.render_block()

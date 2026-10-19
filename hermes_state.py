@@ -1538,6 +1538,26 @@ class SessionDB(
         else:
             self._write_sql(sql, (key, value))
 
+    def compare_and_set_meta(
+        self, key: str, expected: str, value: str, *,
+        session_id: Optional[str] = None, message_watermark: Optional[int] = None,
+    ) -> bool:
+        """Replace an existing value only while its raw snapshot still matches.
+
+        An optional active-message watermark fences decisions made about a completed
+        conversation turn. Both predicates are checked by the same SQLite write;
+        a concurrent control change or newer transcript cannot be overwritten.
+        Database failures propagate; a predicate mismatch returns False.
+        """
+        if (session_id is None) != (message_watermark is None):
+            raise ValueError("session_id and message_watermark must be supplied together")
+        sql = "UPDATE state_meta SET value = ? WHERE key = ? AND value = ?"
+        params = [value, key, expected]
+        if session_id is not None:
+            sql += " AND (SELECT COALESCE(MAX(id), 0) FROM messages WHERE session_id = ? AND active = 1) = ?"
+            params.extend((session_id, message_watermark))
+        return self._write_rowcount(sql, params) == 1
+
 
     def list_meta_prefix(self, prefix: str) -> List[Tuple[str, str]]:
         """``[(key, value), ...]`` for state_meta keys starting with the literal

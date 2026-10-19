@@ -98,6 +98,14 @@ def _history_proves_marker_settled(session: dict, marker: dict) -> bool:
     return False
 
 
+@contextlib.contextmanager
+def _goal_recovery_manager(session: dict, session_key: str):
+    """Use the owning profile's DB and configuration, including on hydration/build threads."""
+    from hermes_cli.goals import GoalManager
+    with _session_profile_runtime_scope(session), _session_db(session) as db:
+        yield GoalManager(session_key, session_db=db) if db is not None else None
+
+
 def _maybe_schedule_auto_continue(sid: str, session: dict, session_key: str) -> dict | None:
     """Kick off a continuation turn for a crash-interrupted session (session.resume cold paths). Returns a descriptor
     for the resume payload when scheduled, else None. The turn runs on a background thread after the deferred agent
@@ -107,27 +115,49 @@ def _maybe_schedule_auto_continue(sid: str, session: dict, session_key: str) -> 
     if session.get("source") == "bot_room":
         return None
     home = _session_home(session)
-    if (marker := read_turn_marker(home, session_key)) is None:
-        return None
-    if not marker.get("auto_continue", True):
+    marker = read_turn_marker(home, session_key)
+    if marker is not None and not marker.get("auto_continue", True):
         # The mailbox/hosted driver owns recovery and receipt identity for imported turns.
         # Generic resume must neither replay nor retire its marker based on local chat history.
         return None
-    if _history_proves_marker_settled(session, marker):
+    if marker is not None and _history_proves_marker_settled(session, marker):
         # The terminal transcript won but best-effort sidecar cleanup lost. Treat durable conversation state
         # as authoritative and retire the stale marker instead of replaying side effects.
         clear_turn_marker(home, session_key)
         logger.info("discarded stale auto-continue marker for settled session %s", session_key)
+        marker = None
+    goal_pending = None
+    try:
+        with _goal_recovery_manager(session, session_key) as goal_mgr:
+            enabled, freshness_secs, max_attempts = _auto_continue_config()
+            if marker is not None and goal_mgr is not None:
+                # Once a live-turn marker exists, that turn owns recovery and its
+                # retry budget. An older goal checkpoint must not reopen the budget
+                # after this marker is retired for exceeding max_attempts.
+                goal_mgr.discard_continuation()
+            if marker is None and enabled and goal_mgr is not None:
+                goal_pending = goal_mgr.pending_continuation(
+                    freshness_seconds=freshness_secs, max_attempts=max_attempts)
+                marker = goal_pending
+    except Exception:
+        logger.warning("could not read goal continuation for %s", session_key, exc_info=True)
         return None
-    enabled, freshness_secs, max_attempts = _auto_continue_config()
+    if marker is None:
+        return None
     age = time.time() - marker["started_at"]
     if not enabled or age > freshness_secs or marker["attempts"] >= max_attempts:
         clear_turn_marker(home, session_key)  # stale/disabled/crash-looping: a manual message continues
         return None
-    if session.get("_auto_continue_scheduled"):
-        return None
-    session["_auto_continue_scheduled"] = True
-    attempt, text = marker["attempts"] + 1, _auto_continue_note(marker["prompt"])
+    with session["history_lock"]:
+        if session.get("_auto_continue_scheduled"):
+            return None
+        session["_auto_continue_scheduled"] = True
+        queue_generation = int(session.get("_queued_prompt_generation", 0))
+    attempt = marker["attempts"] + 1
+    text = (
+        "[System note: Resuming your standing goal after the backend stopped. "
+        "The previous turn finished; inspect the current state and continue from its verification result.]\n\n"
+        + marker["prompt"] if goal_pending is not None else _auto_continue_note(marker["prompt"]))
 
     def kickoff() -> None:
         rid = f"__auto_continue__{int(time.time() * 1000)}"
@@ -141,7 +171,8 @@ def _maybe_schedule_auto_continue(sid: str, session: dict, session_key: str) -> 
             session["_auto_continue_scheduled"] = False
             return
         with session["history_lock"]:
-            if session.get("running") or session.get("_turn_cancel_requested") or session.get("_finalized"):
+            if (session.get("running") or session.get("_turn_cancel_requested") or session.get("_finalized")
+                    or int(session.get("_queued_prompt_generation", 0)) != queue_generation):
                 session["_auto_continue_scheduled"] = False  # a real user prompt beat us; it clears the marker
                 return
             session["running"] = True
@@ -156,14 +187,29 @@ def _maybe_schedule_auto_continue(sid: str, session: dict, session_key: str) -> 
                 session["running"] = False
                 session["_auto_continue_scheduled"] = False
             return
-        with session["history_lock"]:
-            # Marker inputs read back by _run_prompt_submit: attempt count (crash breaker) and the ORIGINAL prompt (no
-            # nested notes). Set here, not at schedule time, so a bail above leaves nothing for a racing user turn.
-            session["_auto_continue_attempt"], session["_auto_continue_prompt"] = attempt, marker["prompt"]
         try:
-            _emit("status.update", sid, {"kind": "process", "text": "Resuming interrupted turn…"})
+            if goal_pending is not None:
+                with _goal_recovery_manager(session, session_key) as goal_mgr:
+                    enabled, fresh, limit = _auto_continue_config()
+                    claimed = bool(enabled and goal_mgr is not None and goal_mgr.claim_continuation(
+                        goal_pending, freshness_seconds=fresh, max_attempts=limit))
+                if not claimed:
+                    with session["history_lock"]:
+                        session["running"] = session["_auto_continue_scheduled"] = False
+                    return
+            with session["history_lock"]:
+                if (session.get("_turn_cancel_requested") or session.get("_finalized")
+                        or int(session.get("_queued_prompt_generation", 0)) != queue_generation):
+                    session["running"] = session["_auto_continue_scheduled"] = False
+                    return
+                # Only publish marker inputs after ownership and the durable claim;
+                # a rejected recovery must not contaminate a racing user turn.
+                session["_auto_continue_attempt"], session["_auto_continue_prompt"] = attempt, marker["prompt"]
+            _emit("status.update", sid, {"kind": "process", "text": (
+                "Resuming standing goal…" if goal_pending is not None else "Resuming interrupted turn…")})
             _emit("message.start", sid)
-            _run_prompt_submit(rid, sid, session, text, display_kind="auto_continue")
+            _run_prompt_submit(rid, sid, session, text, display_kind="auto_continue",
+                               queued_prompt_generation=queue_generation)
         except Exception as exc:
             _notif_log_failure("auto-continue dispatch failed", exc)
             _notif_release_turn(session)  # rebound from session_notifications
