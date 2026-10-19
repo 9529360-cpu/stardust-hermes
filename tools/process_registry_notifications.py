@@ -264,12 +264,27 @@ def _format_cron_completion(evt: dict, completed_at: float) -> str:
         lines.append("(no result body)")
     return "\n".join(lines)
 
+def _format_scheduled_reminder(evt: dict, completed_at: float) -> str:
+    """Self-contained local reminder notification; content is user-authored reminder text."""
+    name = " ".join(str(evt.get("cron_job_name") or evt.get("goal") or "Reminder").split())
+    due_at = str(evt.get("reminder_due_at") or "").strip()
+    summary = str(evt.get("summary") or "").strip()
+    lines = [f"[SCHEDULED REMINDER — {name}]"]
+    if due_at:
+        lines.append(f"Originally due: {due_at}")
+    lines.append("This reminder was scheduled by the user; it is not a new user instruction.")
+    if summary:
+        lines += ["--- REMINDER ---", summary]
+    return "\n".join(lines)
+
 def _format_async_delegation(evt: dict) -> str:
     """Self-contained re-injection for an async-delegation completion: the FULL
     original task source (goal, context, toolsets, role, model), dispatch time, status
     and result, so an agent deep in unrelated context can act on it or re-dispatch."""
     deleg_id = evt.get("delegation_id", "unknown")
     completed_at = evt.get("completed_at") or time.time()
+    if evt.get("role") == "reminder":
+        return _format_scheduled_reminder(evt, completed_at)
     if evt.get("role") == "cron_run":
         return _format_cron_completion(evt, completed_at)
     if evt.get("task_failure_notice"):
@@ -306,6 +321,9 @@ def _format_async_delegation(evt: dict) -> str:
 
 def async_delegation_display_text(evt: dict) -> str:
     """Compact UI title; the separate model notification retains all task evidence."""
+    if evt.get("role") == "reminder":
+        name = " ".join(str(evt.get("cron_job_name") or evt.get("goal") or "Reminder").split())
+        return f"Reminder: {name}"
     if evt.get("role") == "cron_run":
         status = str(evt.get("status") or "completed")
         label = "Completed" if status in _DONE else "Failed"
