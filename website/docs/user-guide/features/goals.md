@@ -199,6 +199,10 @@ While an agent is already running, `/goal status`, `/goal pause`, `/goal clear`,
 
 Goal state lives in `SessionDB.state_meta` keyed by `goal:<session_id>`. That means `/resume` picks up right where you left off — set a goal, close your laptop, come back tomorrow, `/resume`, and the goal is still standing exactly as you left it (active, paused, or done).
 
+In Desktop and the TUI backend, a completed turn that decides to continue also saves a pending continuation. If the backend exits before the next turn starts, reopening that conversation can resume the pending work, including the failed gate's command, exit code and output, the completion contract, and subgoals. Recovery preserves the goal's used-turn count and gate retry count; it does not perform `/goal resume` or replay the completed user request.
+
+This uses `desktop.auto_continue` (`enabled: true`, `freshness_minutes: 15`, `max_attempts: 2` by default). The saved decision must still match the latest persisted message, with an active goal, remaining budget, and no wait barrier. Paused, completed, replaced, expired, or superseded goals do not start automatically. A confirmed **Stop** persists the goal's pause immediately. Older saved goals without a pending continuation retain their state but do not gain an automatic restart trigger.
+
 ### Prompt cache
 
 The continuation prompt is a plain user-role message appended to history. It does **not** mutate the system prompt, swap toolsets, or touch the conversation in any way that invalidates Hermes' prompt cache. Running a 20-turn goal costs the same cache-wise as 20 turns of normal conversation.
