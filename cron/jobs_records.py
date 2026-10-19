@@ -308,7 +308,7 @@ def _validate_durable_reminder_job(job: Dict[str, Any]) -> None:
     for key in (
         "script", "completion_script", "monitor_script", "monitor_url", "context_from",
         "enabled_toolsets", "workdir", "handoff_context", "model", "provider", "base_url",
-        "reasoning_effort", "approval_mode",
+        "reasoning_effort", "approval_mode", "memory_scope", "failure_deliver",
     ):
         if job.get(key):
             incompatible.append(key)
@@ -447,8 +447,11 @@ def create_job(
         or "cron job"
     )
     name = name or label_source[:50].strip()
-    provider_snapshot, model_snapshot = _compute_provider_model_snapshots(
-        provider=f["provider"], model=f["model"], base_url=f["base_url"], no_agent=f["no_agent"])
+    if f["reminder"]:
+        provider_snapshot, model_snapshot = None, None
+    else:
+        provider_snapshot, model_snapshot = _compute_provider_model_snapshots(
+            provider=f["provider"], model=f["model"], base_url=f["base_url"], no_agent=f["no_agent"])
     next_run_at = None if trigger_spec is not None else _next_run_or_reject_past_oneshot(
         parsed_schedule, name, schedule, "")
 
@@ -707,6 +710,9 @@ def update_job(job_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]
         _apply_trigger_update(job, updates)
         _rederive_repeat_for_schedule_change(job, updates)
         _normalize_job_updates(job, updates)
+        if "reminder" in updates and bool(updates.get("reminder")) != bool(job.get("reminder")):
+            raise ValueError(
+                "reminder execution mode is fixed at creation; create a new job to change modes.")
         previous_inference_axes = _normalized_inference_axes(job)
         updated = _jobs._apply_skill_fields({**job, **updates})
         if updated.get("local_session_origin") is None:
