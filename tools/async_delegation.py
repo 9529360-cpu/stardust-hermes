@@ -586,6 +586,7 @@ def mark_durable_completion_source_settled(delegation_id: str) -> bool:
             (json.dumps(task), now, delegation_id),
         ).rowcount == 1
 
+
 def complete_completion_delivery(delegation_id: str, claim_id: str) -> bool:
     """Acknowledge acceptance for the consumer holding this claim."""
     now = time.time()
