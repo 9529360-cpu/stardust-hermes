@@ -93,6 +93,12 @@ def _mode_guidance_notes(job: Dict[str, Any], user_deliver: Optional[str]) -> Li
             "goal is actually satisfied. A successful run that emits the runtime "
             "[DONE] marker delivers its final summary, then the existing job record "
             "enters state=completed and stops future fires.")
+    if job.get("reminder"):
+        notes.append(
+            "Durable reminder mode: the stored prompt is the exact reminder text. "
+            "It is delivered to the creating Desktop/TUI conversation without a model/tool run, "
+            "uses a stable occurrence id for deduplication, and remains recoverable after downtime "
+            "until its one-shot occurrence is durably published.")
     _deliver = (user_deliver or "").strip().lower()
     if _deliver:
         if "all" in _deliver.split(","):
@@ -349,7 +355,7 @@ def _validate_context_from_refs(refs: List[Any]) -> Optional[str]:
 # Optional fields echoed by _format_job only when truthy (order = JSON key order).
 _FORMAT_JOB_OPTIONAL_KEYS = (
     "script", "reasoning_effort", "monitor_script", "monitor_url",
-    "monitor_state", "no_agent", "stop_when_done", "enabled_toolsets", "workdir")
+    "monitor_state", "no_agent", "stop_when_done", "reminder", "enabled_toolsets", "workdir")
 
 
 def _format_job(job: Dict[str, Any]) -> Dict[str, Any]:
