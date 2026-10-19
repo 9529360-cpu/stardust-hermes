@@ -1201,6 +1201,7 @@ def _cronjob_schema_overrides() -> dict:
     params["properties"]["completion_script"]["description"] = _completion_script_description(home)
     return {"parameters": params}
 
+
 CRONJOB_SCHEMA = {
     "name": "cronjob_manage",
     "description": """Manage scheduled cron jobs: action='create' schedules a job from a prompt and/or skills; 'list' inspects jobs; 'update'/'pause'/'resume'/'remove' manage one by job_id (always list first — never guess job IDs); 'run' fires a job immediately in the BACKGROUND (returns a handle at once, outcome re-enters the conversation when done — do not wait or poll; optional 'prompt' adds transient context for that fire only).
@@ -1338,9 +1339,11 @@ def check_cronjob_requirements() -> bool:
 # create/edit --model`, hand-edited jobs) — the agent must not point unattended spend at a
 # different model. Programmatic callers of cronjob() itself retain the parameters.
 _HANDLER_FORWARDED_ARGS = (
-    "job_id", "prompt", "schedule", "name", "repeat", "deliver", "failure_deliver", "skill", "skills", "reason",
-    "script", "completion_script", "context_from", "continuity", "enabled_toolsets", "workdir", "no_agent", "attach_to_session",
-    "stop_when_done", "memory_scope", "approval_mode", "paused_reason", "all")
+    "job_id", "prompt", "schedule", "name", "repeat", "deliver", "failure_deliver",
+    "skill", "skills", "reason", "script", "completion_script", "context_from",
+    "continuity", "enabled_toolsets", "workdir", "no_agent", "attach_to_session",
+    "stop_when_done", "memory_scope", "approval_mode", "paused_reason", "all",
+)
 
 
 def _cronjob_handler(args, **kw):
