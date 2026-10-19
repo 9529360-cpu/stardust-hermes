@@ -1342,6 +1342,23 @@ def _publish_durable_reminder(job: dict, fence: Any) -> str:
     return delivery_id
 
 
+def _settle_durable_reminder_receipt(delivery_id: str, job_id: str) -> None:
+    """Best-effort release of a reminder dedupe receipt into ordinary retention."""
+    try:
+        from tools.async_delegation import mark_durable_completion_source_settled
+
+        if not mark_durable_completion_source_settled(delivery_id):
+            logger.warning(
+                "Reminder job %s could not mark durable delivery %s source-settled; "
+                "keeping the receipt protected from pruning.",
+                job_id, delivery_id)
+    except Exception:
+        # The source job is already settled at callers below. Failing closed here means the
+        # receipt is retained longer; it must never turn into a duplicate reminder.
+        logger.warning(
+            "Reminder job %s failed to settle durable delivery %s; retaining dedupe receipt.",
+            job_id, delivery_id, exc_info=True)
+
 def _run_one_job_body(
     job: dict, *, adapters=None, loop=None, verbose: bool = False,
     extra_prompt: Optional[str] = None, fire_claim_lost: Optional[_CancelEventLike] = None,
@@ -1371,6 +1388,7 @@ def _run_one_job_body(
             if not claim_dispatch(job["id"]):
                 # Another attempt already consumed this one-shot. The stable delivery id means
                 # the reminder itself is already represented exactly once in the durable ledger.
+                _settle_durable_reminder_receipt(delivery_id, job["id"])
                 finish_execution(
                     execution_id, success=True, delivery_outcome="delivered")
                 logger.info(
@@ -1386,6 +1404,7 @@ def _run_one_job_body(
                     error="Reminder was durably published but fire ownership changed before bookkeeping.",
                     delivery_outcome="delivered")
                 return True
+            _settle_durable_reminder_receipt(delivery_id, job["id"])
             finish_execution(execution_id, success=True, delivery_outcome="delivered")
             return True
         except _FireClaimLostDuringSideEffect:
