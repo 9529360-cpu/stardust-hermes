@@ -379,6 +379,7 @@ def _retire_expired_oneshot(d: _DueJob) -> bool:
         d.scan.retire(d.job["id"])
     return True
 
+
 def _oneshot_dispatch_limit_reached(job: Dict[str, Any], scan: _DueScan) -> bool:
     """One-shot dispatch-limit guard; True when the job must not fire this tick.
 
