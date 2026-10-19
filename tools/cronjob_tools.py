@@ -635,6 +635,8 @@ def _preview_create(a: Dict[str, Any], *, prompt, deliver, canonical_skills, con
             enabled_toolsets=a["enabled_toolsets"] or None, workdir=_normalize_optional_job_value(a["workdir"]),
             no_agent=bool(a["no_agent"]), attach_to_session=a["attach_to_session"],
             stop_when_done=a["stop_when_done"],
+            completion_script=_normalize_optional_job_value(a["completion_script"]),
+            memory_scope=a["memory_scope"],
             monitor_script=_normalize_optional_job_value(a["monitor_script"]),
             monitor_url=_normalize_optional_job_value(a["monitor_url"]),
             reasoning_effort=a["reasoning_effort"],
@@ -684,6 +686,7 @@ def _action_create(a: Dict[str, Any]) -> str:
     error = (
         (prompt and _scan_cron_prompt(prompt))
         or (script and _validate_cron_script_path(script))
+        or (a["completion_script"] and _validate_cron_script_path(a["completion_script"]))
         or (a["monitor_script"] and _validate_cron_script_path(a["monitor_script"]))
         # A model-supplied base_url must not route a named provider's stored credential
         # to an attacker endpoint.
@@ -734,6 +737,8 @@ def _action_create(a: Dict[str, Any]) -> str:
             enabled_toolsets=a["enabled_toolsets"] or None, workdir=_normalize_optional_job_value(a["workdir"]),
             no_agent=_no_agent, attach_to_session=a["attach_to_session"],
             handoff_context=handoff_context, stop_when_done=a["stop_when_done"],
+            completion_script=_normalize_optional_job_value(a["completion_script"]),
+            memory_scope=a["memory_scope"],
             monitor_script=_normalize_optional_job_value(a["monitor_script"]),
             monitor_url=_normalize_optional_job_value(a["monitor_url"]),
             # CLI-only lane: absent from CRONJOB_SCHEMA and the model dispatch (models don't pick models).
@@ -898,9 +903,10 @@ def _update_core_fields(job: Dict[str, Any], a: Dict[str, Any], updates: Dict[st
 
 
 def _update_script_fields(job: Dict[str, Any], a: Dict[str, Any], updates: Dict[str, Any]) -> Optional[str]:
-    """script / monitor_script / monitor_url (empty string clears); returns an error string or None."""
+    """script / completion_script / monitor_script / monitor_url (empty string clears)."""
     monitor_script, monitor_url = a["monitor_script"], a["monitor_url"]
-    for field, value in (("script", a["script"]), ("monitor_script", monitor_script)):
+    for field, value in (("script", a["script"]), ("completion_script", a["completion_script"]),
+                         ("monitor_script", monitor_script)):
         if value is not None:
             if value:
                 path_error = _validate_cron_script_path(value)
@@ -955,6 +961,8 @@ def _update_run_fields(job: Dict[str, Any], a: Dict[str, Any], updates: Dict[str
                 updates["handoff_context"] = capture_session_handoff(a.get("session_id"))
     if a["stop_when_done"] is not None:
         updates["stop_when_done"] = bool(a["stop_when_done"])
+    if a["memory_scope"] is not None:
+        updates["memory_scope"] = a["memory_scope"]
     if a["workdir"] is not None:
         # Empty string clears; otherwise update_job() validates/normalizes.
         updates["workdir"] = _normalize_optional_job_value(a["workdir"]) or None
@@ -1136,6 +1144,8 @@ def cronjob(
     no_agent: Optional[bool] = None,
     attach_to_session: Optional[bool] = None,
     stop_when_done: Optional[bool] = None,
+    completion_script: Optional[str] = None,
+    memory_scope: Optional[str] = None,
     monitor_script: Optional[str] = None,
     monitor_url: Optional[str] = None,
     reasoning_effort: Optional[str] = None,
@@ -1172,17 +1182,23 @@ def cronjob(
 
 
 def _script_description(home: str) -> str:
-    return (f"Optional script run each tick; stdout is injected into the agent's prompt as context (with no_agent=True "
+    return (f"Optional script run each tick; stdout is injected into the agent\'s prompt as context (with no_agent=True "
             f"the script IS the job). Relative paths resolve under {home}/scripts/; .sh/.bash via bash, else Python. "
-            "On update, '' clears.")
+            "On update, \'\' clears.")
+
+
+def _completion_script_description(home: str) -> str:
+    return (f"Optional independent completion verifier for stop_when_done jobs. It runs only after the agent emits "
+            f"[DONE]; exit code 0 accepts completion, any failure keeps the job active. Relative paths resolve under "
+            f"{home}/scripts/ using the same containment rules as script. On update, \'\' clears.")
 
 
 def _cronjob_schema_overrides() -> dict:
-    """Rebuild the ``script`` path hint from the ACTIVE profile at every get_definitions(): the
-    static schema is built once per process, but the multiplexed gateway serves every profile from
-    that process, so a path baked in at import would name the launch profile's home (#95685)."""
+    """Rebuild profile-sensitive script path hints for the active profile."""
     params = copy.deepcopy(CRONJOB_SCHEMA["parameters"])
-    params["properties"]["script"]["description"] = _script_description(display_hermes_home())
+    home = display_hermes_home()
+    params["properties"]["script"]["description"] = _script_description(home)
+    params["properties"]["completion_script"]["description"] = _completion_script_description(home)
     return {"parameters": params}
 
 
@@ -1275,6 +1291,15 @@ Jobs run in a fresh session. Normally they have no current-chat context, so prom
                 "type": "boolean",
                 "description": "Optional goal-task mode for bounded recurring follow-ups. True means the job should keep checking/working until its real-world goal is actually satisfied, then emit the runtime [DONE] marker and automatically enter the existing completed terminal state after delivering the final result. Use for bounded follow-ups such as 'track this package until delivered' or 'watch this refund until received', not perpetual reports/briefings. On update, false turns it off. Incompatible with no_agent."
             },
+            "completion_script": {
+                "type": "string",
+                "description": _completion_script_description("the profile STARDUST_HOME")
+            },
+            "memory_scope": {
+                "type": "string",
+                "enum": ["profile", "none"],
+                "description": "Optional persistent-memory scope for this autonomous job. Omit/profile loads profile memory normally. none skips persistent personal memory and denies the memory tool for this job, even if enabled_toolsets requests it."
+            },
             "enabled_toolsets": {
                 "type": "array",
                 "items": {"type": "string"},
@@ -1314,9 +1339,11 @@ def check_cronjob_requirements() -> bool:
 # create/edit --model`, hand-edited jobs) — the agent must not point unattended spend at a
 # different model. Programmatic callers of cronjob() itself retain the parameters.
 _HANDLER_FORWARDED_ARGS = (
-    "job_id", "prompt", "schedule", "name", "repeat", "deliver", "failure_deliver", "skill", "skills", "reason",
-    "script", "context_from", "continuity", "enabled_toolsets", "workdir", "no_agent", "attach_to_session",
-    "stop_when_done", "approval_mode", "paused_reason", "all")
+    "job_id", "prompt", "schedule", "name", "repeat", "deliver", "failure_deliver",
+    "skill", "skills", "reason", "script", "completion_script", "context_from",
+    "continuity", "enabled_toolsets", "workdir", "no_agent", "attach_to_session",
+    "stop_when_done", "memory_scope", "approval_mode", "paused_reason", "all",
+)
 
 
 def _cronjob_handler(args, **kw):
