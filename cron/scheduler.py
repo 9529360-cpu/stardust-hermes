@@ -1359,6 +1359,7 @@ def _settle_durable_reminder_receipt(delivery_id: str, job_id: str) -> None:
             "Reminder job %s failed to settle durable delivery %s; retaining dedupe receipt.",
             job_id, delivery_id, exc_info=True)
 
+
 def _run_one_job_body(
     job: dict, *, adapters=None, loop=None, verbose: bool = False,
     extra_prompt: Optional[str] = None, fire_claim_lost: Optional[_CancelEventLike] = None,
