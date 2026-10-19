@@ -91,3 +91,46 @@ def test_job_view_surfaces_completion_verifier_and_memory_scope():
 
     assert view["completion_script"] == "verify_done.py"
     assert view["memory_scope"] == "none"
+
+
+def test_create_wires_completion_verifier_and_memory_scope_to_store(monkeypatch):
+    import cron.scheduler as scheduler
+    import tools.cronjob_tools as tools
+
+    captured = {}
+
+    def fake_create(**kwargs):
+        captured.update(kwargs)
+        return {
+            "id": "goal-3",
+            "name": "Private verified task",
+            "prompt": kwargs["prompt"],
+            "skills": [],
+            "schedule_display": "every 1h",
+            "repeat": {"times": None, "completed": 0},
+            "deliver": "local",
+            "next_run_at": "2026-10-20T00:00:00+00:00",
+            "enabled": True,
+            "stop_when_done": kwargs["stop_when_done"],
+            "completion_script": kwargs["completion_script"],
+            "memory_scope": kwargs["memory_scope"],
+        }
+
+    monkeypatch.setattr(scheduler, "create_job_with_scheduler_registration", fake_create)
+    monkeypatch.setattr(tools, "_validate_cron_script_path", lambda _path: None)
+    monkeypatch.setattr(tools, "_gateway_liveness_notice", lambda **_kwargs: {})
+
+    result = json.loads(tools.cronjob(
+        action="create",
+        prompt="Track this private task until verified.",
+        schedule="every 1h",
+        deliver="local",
+        stop_when_done=True,
+        completion_script="verify_done.py",
+        memory_scope="none",
+    ))
+
+    assert result["success"] is True
+    assert captured["completion_script"] == "verify_done.py"
+    assert captured["memory_scope"] == "none"
+    assert captured["stop_when_done"] is True
