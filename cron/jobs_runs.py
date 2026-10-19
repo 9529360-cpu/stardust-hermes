@@ -385,6 +385,7 @@ def release_pre_dispatch_claims(job_id: str, *, expected_fire_owner: Optional[st
 
     return _jobs._with_job(job_id, apply, False)
 
+
 def advance_next_runs(job_ids) -> int:
     """Batch form of :func:`advance_next_run`: one load + at most one save for the whole due set;
     one-shot/unknown ids are skipped. Returns the count advanced. Persisted once at the end, so a
