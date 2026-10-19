@@ -635,6 +635,8 @@ def _preview_create(a: Dict[str, Any], *, prompt, deliver, canonical_skills, con
             enabled_toolsets=a["enabled_toolsets"] or None, workdir=_normalize_optional_job_value(a["workdir"]),
             no_agent=bool(a["no_agent"]), attach_to_session=a["attach_to_session"],
             stop_when_done=a["stop_when_done"],
+            completion_script=_normalize_optional_job_value(a["completion_script"]),
+            memory_scope=a["memory_scope"],
             monitor_script=_normalize_optional_job_value(a["monitor_script"]),
             monitor_url=_normalize_optional_job_value(a["monitor_url"]),
             reasoning_effort=a["reasoning_effort"],
@@ -684,6 +686,7 @@ def _action_create(a: Dict[str, Any]) -> str:
     error = (
         (prompt and _scan_cron_prompt(prompt))
         or (script and _validate_cron_script_path(script))
+        or (a["completion_script"] and _validate_cron_script_path(a["completion_script"]))
         or (a["monitor_script"] and _validate_cron_script_path(a["monitor_script"]))
         # A model-supplied base_url must not route a named provider's stored credential
         # to an attacker endpoint.
@@ -734,6 +737,8 @@ def _action_create(a: Dict[str, Any]) -> str:
             enabled_toolsets=a["enabled_toolsets"] or None, workdir=_normalize_optional_job_value(a["workdir"]),
             no_agent=_no_agent, attach_to_session=a["attach_to_session"],
             handoff_context=handoff_context, stop_when_done=a["stop_when_done"],
+            completion_script=_normalize_optional_job_value(a["completion_script"]),
+            memory_scope=a["memory_scope"],
             monitor_script=_normalize_optional_job_value(a["monitor_script"]),
             monitor_url=_normalize_optional_job_value(a["monitor_url"]),
             # CLI-only lane: absent from CRONJOB_SCHEMA and the model dispatch (models don't pick models).
@@ -898,9 +903,10 @@ def _update_core_fields(job: Dict[str, Any], a: Dict[str, Any], updates: Dict[st
 
 
 def _update_script_fields(job: Dict[str, Any], a: Dict[str, Any], updates: Dict[str, Any]) -> Optional[str]:
-    """script / monitor_script / monitor_url (empty string clears); returns an error string or None."""
+    """script / completion_script / monitor_script / monitor_url (empty string clears)."""
     monitor_script, monitor_url = a["monitor_script"], a["monitor_url"]
-    for field, value in (("script", a["script"]), ("monitor_script", monitor_script)):
+    for field, value in (("script", a["script"]), ("completion_script", a["completion_script"]),
+                         ("monitor_script", monitor_script)):
         if value is not None:
             if value:
                 path_error = _validate_cron_script_path(value)
@@ -955,6 +961,8 @@ def _update_run_fields(job: Dict[str, Any], a: Dict[str, Any], updates: Dict[str
                 updates["handoff_context"] = capture_session_handoff(a.get("session_id"))
     if a["stop_when_done"] is not None:
         updates["stop_when_done"] = bool(a["stop_when_done"])
+    if a["memory_scope"] is not None:
+        updates["memory_scope"] = a["memory_scope"]
     if a["workdir"] is not None:
         # Empty string clears; otherwise update_job() validates/normalizes.
         updates["workdir"] = _normalize_optional_job_value(a["workdir"]) or None
@@ -1331,8 +1339,8 @@ def check_cronjob_requirements() -> bool:
 # different model. Programmatic callers of cronjob() itself retain the parameters.
 _HANDLER_FORWARDED_ARGS = (
     "job_id", "prompt", "schedule", "name", "repeat", "deliver", "failure_deliver", "skill", "skills", "reason",
-    "script", "context_from", "continuity", "enabled_toolsets", "workdir", "no_agent", "attach_to_session",
-    "stop_when_done", "approval_mode", "paused_reason", "all")
+    "script", "completion_script", "context_from", "continuity", "enabled_toolsets", "workdir", "no_agent", "attach_to_session",
+    "stop_when_done", "memory_scope", "approval_mode", "paused_reason", "all")
 
 
 def _cronjob_handler(args, **kw):
