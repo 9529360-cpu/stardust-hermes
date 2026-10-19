@@ -70,6 +70,7 @@ _STATIC_FEATURE_FLAGS = {
     "session_resources": True, "model_options": True, "session_chat": True,
     "session_chat_streaming": True, "session_fork": True, "session_model_lock": True,
     "admin_config_rw": False, "jobs_admin": False, "memory_write_api": False,
+    "cron_run_expected": True,
     "skills_api": True, "audio_api": False, "realtime_voice": False,
     "session_continuity_header": "X-Hermes-Session-Id",
     "session_key_header": "X-Hermes-Session-Key"}
@@ -3467,10 +3468,14 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
             return err
         # Optional transient per-run context (standalone `stardust cron run` /
         # cronjob(action='run', prompt=...)) — same cap + scan as a stored prompt.
-        extra_prompt = body = None
+        extra_prompt = body = expected = None
         with suppress(Exception):
             body = await request.json()
         if isinstance(body, dict):
+            if "expected" in body:
+                expected = body["expected"]
+                if not isinstance(expected, dict):
+                    return web.json_response({"error": "Expected job snapshot must be an object"}, status=400)
             raw_prompt = body.get("prompt")
             if raw_prompt is not None:
                 extra_prompt = str(raw_prompt)
@@ -3478,6 +3483,21 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
                 if prompt_err:
                     return prompt_err
                 extra_prompt = extra_prompt or None
+        if expected is not None:
+            # The stored snapshot was reviewed before an optional run prompt was approved.
+            # Keep the comparison in the jobs owner's write lock; a fresh read alone races
+            # an operator edit, pause or revocation before the manual fire is queued.
+            try:
+                job = _cron_trigger(job_id, extra_prompt=extra_prompt, expected=expected)
+                if job:
+                    return web.json_response({"job": job})
+                if _cron_get(job_id) is None:
+                    return web.json_response({"error": "Job not found"}, status=404)
+                return web.json_response({
+                    "error": "Job changed while this run was being authorized; the stale run was not queued.",
+                }, status=409)
+            except Exception as exc:
+                return self._cron_error_response(exc)
         return self._job_response(
             lambda jid: _cron_trigger(jid, extra_prompt=extra_prompt), job_id, notify=False)
 
