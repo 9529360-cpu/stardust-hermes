@@ -43,6 +43,9 @@ def test_reminder_job_is_one_shot_local_and_deterministic(tmp_cron_store):
         ({"schedule": "2099-01-01T09:00:00+00:00", "local_session_origin": None}, "Desktop/TUI"),
         ({"schedule": "2099-01-01T09:00:00+00:00", "script": "collect.py"}, "deterministic"),
         ({"schedule": "2099-01-01T09:00:00+00:00", "skills": ["research"]}, "deterministic"),
+        ({"schedule": "2099-01-01T09:00:00+00:00", "attach_to_session": True}, "deterministic"),
+        ({"schedule": "2099-01-01T09:00:00+00:00", "enabled_toolsets": ["web"]}, "deterministic"),
+        ({"schedule": "2099-01-01T09:00:00+00:00", "deliver": "slack:alerts"}, "local/origin"),
     ],
 )
 def test_reminder_job_rejects_ambiguous_execution_modes(tmp_cron_store, kwargs, message):
