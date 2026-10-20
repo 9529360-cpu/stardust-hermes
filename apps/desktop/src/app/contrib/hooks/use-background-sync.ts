@@ -26,6 +26,7 @@ import {
   $sessionTiles,
   publishSessionState,
   SESSION_WATCHDOG_TIMEOUT_MS,
+  sessionTileDelegate,
   setSessionStalled
 } from '@/store/session-states'
 
@@ -374,12 +375,31 @@ export function resetTypingActivityTracking(): void {
  * `running: false` edge, so the row keeps spinning and the busy→idle transition
  * that paints the green "your turn" dot never fires. Reaping runtimes that
  * vanish between polls restores both. */
+function holdsTurnClaim(state: ClientSessionState | undefined): boolean {
+  return Boolean(state?.busy || state?.awaitingResponse)
+}
+
+/** Retire a recovered runtime's busy claim through the wiring cache first
+ *  (#93059 pattern): a mirror-only publish leaves the cache, `$busy` and
+ *  `busyRef` claiming busy, and every transcript reconcile bails on busy — so
+ *  the persisted reply never reaches the view until restart. Returns the
+ *  (possibly republished) mirror entry. */
+function retireRecoveredBusyClaim(runtimeSessionId: string): ClientSessionState | undefined {
+  sessionTileDelegate()?.retireBusyClaim?.(runtimeSessionId)
+
+  return $sessionStates.get()[runtimeSessionId]
+}
+
+/** Returns the runtime ids this snapshot settled busy -> idle. Their final
+ *  reply arrived without a completion event, so the caller must reconcile
+ *  the persisted transcript for them. */
 export function rehydrateLiveSessionStatuses(
   response: LiveSessionStatusResponse,
   nowMs = Date.now(),
   profileKey = 'default'
-): void {
+): string[] {
   const seen = new Set<string>()
+  const settled: string[] = []
 
   for (const session of response.sessions ?? []) {
     const runtimeSessionId = session.id?.trim()
@@ -393,7 +413,7 @@ export function rehydrateLiveSessionStatuses(
 
     seen.add(runtimeSessionId)
 
-    const existing = $sessionStates.get()[runtimeSessionId]
+    let existing: ClientSessionState | undefined = $sessionStates.get()[runtimeSessionId]
 
     // A turn we just submitted is not yet running as far as the backend is
     // concerned, so the snapshot honestly reports it idle — but the local
@@ -402,6 +422,11 @@ export function rehydrateLiveSessionStatuses(
     // (`awaitingResponse && !sawAssistantPayload`); without the same refusal
     // here a poll lands between submit and first token and darkens the row.
     const busy = working || Boolean(existing?.awaitingResponse && !existing.sawAssistantPayload)
+
+    if (!busy && holdsTurnClaim(existing)) {
+      existing = retireRecoveredBusyClaim(runtimeSessionId)
+      settled.push(runtimeSessionId)
+    }
 
     // Avoid re-arming the watchdog on every poll. Publish only when the
     // authoritative live snapshot differs from the renderer mirror; normal
@@ -451,7 +476,12 @@ export function rehydrateLiveSessionStatuses(
         continue
       }
 
-      const existing = $sessionStates.get()[runtimeSessionId]
+      let existing: ClientSessionState | undefined = $sessionStates.get()[runtimeSessionId]
+
+      if (holdsTurnClaim(existing)) {
+        existing = retireRecoveredBusyClaim(runtimeSessionId)
+        settled.push(runtimeSessionId)
+      }
 
       if (existing?.busy || existing?.needsInput || existing?.awaitingResponse) {
         publishSessionState(runtimeSessionId, {
@@ -473,6 +503,8 @@ export function rehydrateLiveSessionStatuses(
   }
 
   liveRuntimeIdsByProfile.set(profileKey, seen)
+
+  return settled
 }
 
 /** Forget every profile's live-runtime bookkeeping. A gateway wipe already
@@ -629,6 +661,26 @@ export function useBackgroundSync({
     [activeSessionId, activeStoredSessionId, refreshActiveTranscript]
   )
 
+  // A turn settled by the active_list snapshot (completion event lost) has its
+  // final reply only in the DB. Pull it through the normal reconcile paths —
+  // the busy->idle effect below only consumes a refresh some sessions.changed
+  // tick already queued, and none may have arrived.
+  const reconcileRecoveredTranscriptsRef = useRef<(runtimeIds: string[]) => void>(() => undefined)
+
+  reconcileRecoveredTranscriptsRef.current = runtimeIds => {
+    if (activeSessionId && runtimeIds.includes(activeSessionId)) {
+      requestActiveTranscriptRefresh(true)
+    }
+
+    if ($sessionTiles.get().some(tile => tile.runtimeId && runtimeIds.includes(tile.runtimeId))) {
+      void reconcileTileTranscripts({
+        requestSequenceRef: tileRequestSequenceRef,
+        signatureRef: tileSignatureRef,
+        updateSessionState
+      })
+    }
+  }
+
   useEffect(() => {
     if (gatewayState !== 'open') {
       return
@@ -699,7 +751,11 @@ export function useBackgroundSync({
         const response = await requestGateway<LiveSessionStatusResponse>('session.active_list', {})
 
         if (!cancelled) {
-          rehydrateLiveSessionStatuses(response, Date.now(), activeGatewayProfile)
+          const settled = rehydrateLiveSessionStatuses(response, Date.now(), activeGatewayProfile)
+
+          if (settled.length) {
+            reconcileRecoveredTranscriptsRef.current(settled)
+          }
         }
       } catch {
         // Older gateways may not expose session.active_list. Live stream events
