@@ -2,26 +2,30 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 
-import { expect, test } from './test'
-
 import { type MockBackendFixture, setupMockBackend, waitForAppReady } from './fixtures'
+import { expect, test } from './test'
 
 const TASK_ROOT = process.env.STARDUST_UI_ADAPTATION_TASK_ROOT ?? path.join(
   os.tmpdir(),
   `stardust-ui-adaptation-${process.pid}-${Date.now()}`,
 )
+
 fs.mkdirSync(TASK_ROOT, { recursive: true })
 
 let fixture: MockBackendFixture | null = null
 
 function appPage() {
-  if (!fixture) throw new Error('Electron fixture is not ready')
+  if (!fixture) {
+    throw new Error('Electron fixture is not ready')
+  }
+
   return fixture.page
 }
 
 async function paneState(id: string) {
   return appPage().evaluate(key => {
     const raw = localStorage.getItem('hermes.desktop.paneStates.v1')
+
     return raw ? (JSON.parse(raw) as Record<string, unknown>)[key] : undefined
   }, id)
 }
@@ -76,6 +80,8 @@ test('MasterDetail sash commits, resets, cancels, and clears on a real window re
   await page.mouse.down()
   await page.mouse.move(sx + 76, sy, { steps: 5 })
   await expect.poll(async () => grid.evaluate(el => getComputedStyle(el).gridTemplateColumns)).not.toBe('')
+  const previewColumns = await grid.evaluate(el => getComputedStyle(el).gridTemplateColumns)
+  expect(parseFloat(previewColumns)).toBeGreaterThan(initialWidth)
   expect(await paneState('capabilities-split')).toBeUndefined()
   await page.mouse.up()
   await expect.poll(async () => (await paneState('capabilities-split') as { widthOverride?: number } | undefined)?.widthOverride).toBeGreaterThan(initialWidth)
@@ -127,8 +133,10 @@ test('MasterDetail sash commits, resets, cancels, and clears on a real window re
     await expect(page).toHaveURL(/tab=mcp/)
     const pane = page.locator('section').filter({ has: page.locator('.cursor-row-resize') }).last()
     await expect(pane.locator('.cursor-row-resize')).toBeVisible({ timeout: 30_000 })
+
     return { page, pane }
   }
+
   const { page: mcpPage, pane } = await paneResize()
   const paneBody = pane.locator(':scope > div').last()
   const paneBodyHeight = await paneBody.evaluate(el => el.getBoundingClientRect().height)
@@ -138,8 +146,11 @@ test('MasterDetail sash commits, resets, cancels, and clears on a real window re
   await page.mouse.move(paneSashBox!.x + 15, paneSashBox!.y + 3)
   await page.mouse.down()
   await page.mouse.move(paneSashBox!.x + 15, paneSashBox!.y - 64, { steps: 4 })
-  await page.mouse.up()
   await expect.poll(() => paneBody.evaluate(el => el.getBoundingClientRect().height)).toBeGreaterThan(paneBodyHeight)
+  const previewHeight = await paneBody.evaluate(el => el.getBoundingClientRect().height)
+  expect(previewHeight).toBeGreaterThan(paneBodyHeight)
+  await page.mouse.up()
+  await expect.poll(() => paneBody.evaluate(el => el.getBoundingClientRect().height)).toBe(previewHeight)
   const resizedBodyHeight = await paneBody.evaluate(el => el.getBoundingClientRect().height)
   await expect.poll(async () => (await paneState('mcp-logs') as { heightOverride?: number } | undefined)?.heightOverride).toBeGreaterThan(paneBodyHeight)
   expect(Math.abs(resizedBodyHeight - (await paneState('mcp-logs') as { heightOverride: number }).heightOverride)).toBeLessThanOrEqual(2)
@@ -180,6 +191,7 @@ test('scroll fades track top, middle, and bottom on real list content', async ()
   await page.evaluate(() => { window.location.hash = '#/skills' })
   const viewport = page.locator('.stardust-master-detail-grid [data-scroll-fade]').first()
   await expect(viewport).toBeVisible({ timeout: 30_000 })
+
   const fadeState = async () => viewport.evaluate(el => ({
     top: el.scrollTop,
     max: el.scrollHeight - el.clientHeight,
@@ -187,6 +199,7 @@ test('scroll fades track top, middle, and bottom on real list content', async ()
     fadeBottom: getComputedStyle(el).getPropertyValue('--scroll-fade-bottom'),
     mask: getComputedStyle(el).maskImage || getComputedStyle(el).webkitMaskImage,
   }))
+
   const initialFade = await fadeState()
   expect(initialFade.max).toBeGreaterThan(0)
   expect(initialFade.fadeTop).toBe('0px')
