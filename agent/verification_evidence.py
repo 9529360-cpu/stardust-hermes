@@ -15,7 +15,9 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-from agent.terminal_writers import command_words, conditional_write, executable_name, interpreter_kind
+from agent.terminal_writers import (
+    command_words, conditional_write, executable_name, interpreter_kind, node_verifier_writes,
+)
 from hermes_constants import get_hermes_home
 
 
@@ -48,6 +50,13 @@ _PACKAGE_MANAGER_READS = frozenset({
     "audit", "config", "help", "info", "list", "ls", "outdated", "search", "show", "tree", "view", "why",
 })
 _SAFE_SCRIPT_RUNS = frozenset({"build", "check", "dev", "lint", "preview", "serve", "start", "test", "tests", "typecheck"})
+# Script names that verify or build, as opposed to the servers (`dev`, `serve`, `start`, `preview`) above.
+_VERIFICATION_SCRIPT_VERBS = frozenset({"build", "check", "lint", "test", "tests", "typecheck"})
+# A script name that says it rewrites files makes `test:update` / `lint:fix` / `format:all` a writer whatever else it says.
+_WRITING_SCRIPT_WORDS = frozenset({
+    "fix", "write", "update", "snapshot", "snapshots", "format", "fmt", "approve", "accept", "generate", "gen",
+    "bless", "rewrite", "autofix", "migrate",
+})
 _MUTATING_VERIFY_FLAGS = frozenset({"--accept", "--fix", "--fix-only", "--update", "--update-snapshots", "--write"})
 _INLINE_MUTATION_RE = re.compile(
     r"(?:\bopen\s*\([^)]*,\s*['\"](?:w|a|x|\+)|\.write(?:_text|_bytes)?\s*\(|"
@@ -66,9 +75,14 @@ _INLINE_PROGRAM_FLAGS = {
 _SHELL_COMMAND_FLAG_RE = re.compile(r"-[a-z]*c")  # bash -c, bash -lc, sh -ec, ...
 _SCRIPT_FILE_SUFFIXES = {".py", ".js", ".mjs", ".cjs", ".ts", ".sh", ".bash", ".rb", ".pl", ".php", ".ps1"}
 _HEREDOC_DELIMITER_RE = re.compile(r"""'([^'\n]+)'|"([^"\n]+)"|([^\s;&|()<>'"]+)""")
+# Git subcommands that leave every file of the working tree alone (they read, or only touch refs and the object store).
+# `worktree` depends on its operand (see _git_changes_workspace); `commit` is absent on purpose: a pre-commit hook may
+# reformat files.
 _READ_ONLY_GIT_COMMANDS = frozenset({
     "add", "branch", "config", "diff", "fetch", "grep", "log", "ls-files", "push", "remote", "rev-parse", "show",
     "status", "tag",
+    "blame", "cat-file", "check-ignore", "cherry", "count-objects", "describe", "for-each-ref", "hash-object",
+    "help", "ls-remote", "ls-tree", "merge-base", "name-rev", "rev-list", "shortlog", "show-ref", "version",
 })
 # Commands that write on every use, matched by base name. PowerShell cmdlets and cmd built-ins sit beside
 # the POSIX tools because the terminal tool runs whichever shell the host has.
@@ -400,6 +414,29 @@ def _equivalent_needles(needle: list[str]) -> list[list[str]]:
     return candidates
 
 
+def _command_key(word: str) -> str:
+    """What a command word runs, whatever launcher spelling reached it: ``C:/x/bash.exe`` is ``bash``, ``pnpm.cmd``
+    is ``pnpm``, ``python3.11`` / ``py`` / ``python.exe`` are ``python``."""
+    name = executable_name(word)
+    return "python" if interpreter_kind(name) == "python" else name
+
+
+def _segment_command_word(segment: _ShellSegment) -> str:
+    """The segment's command word as typed (a Windows path keeps its backslashes), after harmless prefixes."""
+    words = _strip_command_prefix(command_words(segment.raw)) if segment.raw else []
+    return words[0] if words else (_strip_command_prefix(segment.tokens) or [""])[0]
+
+
+def _runs_command(tokens: list[str], command_word: str, needle: list[str]) -> bool:
+    """Whether the prefix-stripped ``tokens`` start with ``needle``. A bare command name is judged by what it runs,
+    not by how it is launched; a script path (``scripts/run_tests.sh``) must match exactly."""
+    if len(tokens) < len(needle):
+        return False
+    head = needle[0]
+    same_head = tokens[0] == head if ("/" in head or "\\" in head) else _command_key(command_word) == _command_key(head)
+    return same_head and tokens[1:len(needle)] == needle[1:]
+
+
 def _find_canonical_match(command: str, canonical_commands: list[str], exit_code: int) -> Optional[tuple[str, list[str]]]:
     """Return ``(canonical, trailing_args)`` for the first detected command."""
     segments = _split_shell_segments(command)
@@ -409,8 +446,11 @@ def _find_canonical_match(command: str, canonical_commands: list[str], exit_code
             continue
         for index, segment in enumerate(segments):
             candidate_tokens = _strip_command_prefix(segment.tokens)
+            command_word = _segment_command_word(segment)
             for candidate in _equivalent_needles(needle):
-                if candidate_tokens[:len(candidate)] == candidate and _exit_status_is_attributable(segments, index, exit_code):
+                if _runs_command(candidate_tokens, command_word, candidate) and _exit_status_is_attributable(
+                    segments, index, exit_code
+                ):
                     return canonical, candidate_tokens[len(candidate):]
     return None
 
@@ -426,12 +466,13 @@ def _canonical_match_for_segment(
 ) -> Optional[tuple[str, list[str]]]:
     """Return the canonical verifier and trailing args for one shell segment."""
     candidate_tokens = _strip_command_prefix(segment.tokens)
+    command_word = _segment_command_word(segment)
     for canonical in canonical_commands:
         needle = _canonical_tokens(canonical)
         if not needle:
             continue
         for candidate in _equivalent_needles(needle):
-            if candidate_tokens[:len(candidate)] == candidate:
+            if _runs_command(candidate_tokens, command_word, candidate):
                 return canonical, candidate_tokens[len(candidate):]
     return None
 
@@ -504,6 +545,10 @@ def _interpreter_may_modify(
         operand = arg
         break
     if operand and operand != "-":
+        if kind == "node":
+            known_verifier_writes = node_verifier_writes(operand, args[position:])
+            if known_verifier_writes is not None:
+                return known_verifier_writes
         return _script_path_may_modify(operand, root=root)
     # No script operand: the program comes from stdin (`python -`, `python <<EOF`, `curl ... | sh`).
     if stdin.heredocs:
@@ -580,7 +625,7 @@ def _segment_may_modify_workspace(
     from agent.tool_dispatch_helpers import _DESTRUCTIVE_PATTERNS
 
     raw = segment.raw or shlex.join(segment.tokens)
-    if _redirect_write_targets(raw):
+    if any(not _redirect_leaves_workspace(target, root) for target in _redirect_write_targets(raw)):
         return True
     format_verdict = _formatter_verdict(tokens)
     if format_verdict is not None:
@@ -606,13 +651,10 @@ def _segment_may_modify_workspace(
         if subcommand in _SAFE_SCRIPT_RUNS:
             return False
         if subcommand == "run" and len(tokens) > 2:
-            script_name = tokens[2].lower().split(":")[-1]
-            return script_name not in _SAFE_SCRIPT_RUNS
+            return not _is_verification_script(tokens[2])
         return subcommand not in {"help"}
     if base == "git":
-        subcommand = _git_subcommand(tokens)
-        # No subcommand at all (`git --version`, `git --help`) only prints.
-        return bool(subcommand) and subcommand not in _READ_ONLY_GIT_COMMANDS
+        return _git_changes_workspace(tokens)
     kind = interpreter_kind(base)
     if kind is not None and _interpreter_may_modify(
         kind, tokens[1:], canonical_commands=canonical_commands, root=root, stdin=stdin,
@@ -689,8 +731,8 @@ def _is_verifier_output_capture(
     )
 
 
-def _git_subcommand(tokens: list[str]) -> str:
-    """Find git's subcommand after global options that take values."""
+def _git_subcommand_index(tokens: list[str]) -> int:
+    """Index of git's subcommand after global options that take values, -1 when there is none."""
     value_options = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env"}
     index = 1
     while index < len(tokens):
@@ -701,8 +743,49 @@ def _git_subcommand(tokens: list[str]) -> str:
         if token.startswith("-"):
             index += 1
             continue
-        return token.lower()
-    return ""
+        return index
+    return -1
+
+
+def _git_subcommand(tokens: list[str]) -> str:
+    """Find git's subcommand after global options that take values."""
+    index = _git_subcommand_index(tokens)
+    return tokens[index].lower() if index >= 0 else ""
+
+
+def _git_changes_workspace(tokens: list[str]) -> bool:
+    """Whether a git command may change a file of the working tree.
+
+    No subcommand at all (`git --version`, `git --help`) only prints; `git worktree` depends on its operand
+    (`list` reads, `add` / `remove` / `prune` write)."""
+    index = _git_subcommand_index(tokens)
+    if index < 0:
+        return False
+    subcommand = tokens[index].lower()
+    if subcommand in _READ_ONLY_GIT_COMMANDS:
+        return False
+    if subcommand == "worktree":
+        return next((t.lower() for t in tokens[index + 1:] if not t.startswith("-")), "") != "list"
+    return True
+
+
+def _is_verification_script(name: str) -> bool:
+    """``test``, ``check:lint``, ``test:ui``, ``ui:test``: a package script that verifies (or builds, serves), unless a
+    word of its name says it rewrites files (``test:update``, ``lint:fix``, ``format:all``). A verification verb may lead
+    the name (``test:ui``); a server verb (`dev:seed-db`) only counts as the name's last word, as before."""
+    parts = [part for part in re.split(r"[:\-_.]", name.lower()) if part]
+    if not parts or any(part in _WRITING_SCRIPT_WORDS for part in parts):
+        return False
+    return parts[-1] in _SAFE_SCRIPT_RUNS or parts[0] in _VERIFICATION_SCRIPT_VERBS
+
+
+def _redirect_leaves_workspace(target: str, root: str | Path | None) -> bool:
+    """Whether a redirect target is provably outside the project, so the file it writes cannot be one the proof covers.
+
+    Only an absolute path can be shown to be: a relative one, an unexpanded variable or a glob may land on a project file."""
+    if not root or not target or any(char in target for char in "$%`*?[~"):
+        return False
+    return Path(target).is_absolute() and not _is_under(target, root)
 
 
 def _looks_like_target(arg: str) -> bool:
@@ -1068,3 +1151,23 @@ def verification_status(*, session_id: str | None, cwd: str | Path | None) -> di
     evidence = dict(event)
     stale = bool(state["last_edit_at"]) and state["last_edit_at"] > evidence["created_at"]
     return {"status": "stale" if stale else evidence["status"], **result, "evidence": evidence}
+
+
+def verification_state_marker(*, session_id: str | None, cwd: str | Path | None) -> Optional[tuple[str, str, Optional[int]]]:
+    """``(root, last_edit_at, last_event_id)`` of a workspace's ledger row.
+
+    What a caller compares to tell one unverified state from the next: a new edit moves ``last_edit_at``, a new
+    verification run moves ``last_event_id``. ``None`` when the ledger is off, ``cwd`` is no project, or nothing
+    was recorded for it."""
+    if not _ledger_enabled():
+        return None
+    facts = _project_facts(cwd)
+    if not facts:
+        return None
+    root = _root_for(facts, cwd)
+    with _DB_LOCK, _transaction() as conn:
+        row = conn.execute(
+            "SELECT last_event_id, last_edit_at FROM verification_state WHERE session_id = ? AND root = ?",
+            (str(session_id or "default"), root),
+        ).fetchone()
+    return None if row is None else (root, row["last_edit_at"] or "", row["last_event_id"])

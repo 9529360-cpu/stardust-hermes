@@ -39,10 +39,16 @@ def _verify_on_stop_nudge(agent) -> Optional[str]:
         )
 
         if verify_on_stop_enabled():
+            # Per conversation, not per turn: the per-turn counter restarts with every user message and every
+            # background-task notice, so it alone cannot stop the same nudge from repeating.
+            told = getattr(agent, "_verification_nudged_states", None)
+            if not isinstance(told, set):
+                told = agent._verification_nudged_states = set()
             return build_verify_on_stop_nudge(
                 session_id=getattr(agent, "session_id", None),
                 changed_paths=getattr(agent, "_turn_file_mutation_paths", set()),
                 attempts=getattr(agent, "_verification_stop_nudges", 0),
+                nudged_states=told,
             )
     except Exception:
         logger.debug("verification stop-loop check failed", exc_info=True)
