@@ -142,3 +142,45 @@ def conditional_write(name: str, args: list[str]) -> Optional[bool]:
     """True/False when ``name`` is a known conditional writer, None when it is not in the table."""
     predicate = CONDITIONAL_WRITERS.get(name)
     return None if predicate is None else bool(predicate(args))
+
+
+def _updates_snapshots(args: list[str]) -> bool:
+    return _has_any(args, "-u", "--update", "--updateSnapshot", "--update-snapshots")
+
+
+# Test runners, linters and format checkers that only read the workspace, by tool name -> does THIS invocation
+# write (a snapshot update, ``eslint --fix``, ``prettier --write``)? Started through ``node`` their entry point is
+# a script file (``vitest.mjs``, ``eslint.js``, ``cli.js``), which would otherwise count as a custom script.
+VERIFIER_TOOLS: dict[str, Callable[[list[str]], bool]] = {
+    "vitest": _updates_snapshots, "jest": _updates_snapshots, "playwright": _updates_snapshots,
+    "mocha": lambda a: False,
+    "eslint": lambda a: _has_any(a, "--fix"),
+    "prettier": lambda a: _has_any(a, "--write", "-w"),
+}
+
+# npm package -> tool, for the script a ``node`` command runs from ``node_modules``.
+_NODE_PACKAGE_TOOLS = {
+    "vitest": "vitest", "jest": "jest", "jest-cli": "jest", "mocha": "mocha", "eslint": "eslint",
+    "prettier": "prettier", "playwright": "playwright", "@playwright/test": "playwright",
+}
+
+
+def _node_verifier(script: str) -> Optional[str]:
+    """Known tool a ``node`` script belongs to: ``node_modules/vitest/vitest.mjs`` is vitest,
+    ``node_modules/@playwright/test/cli.js`` is playwright, ``node_modules/.bin/eslint`` is eslint. A script of the
+    project itself is never a known tool, however it is named."""
+    parts = [p for p in script.replace("\\", "/").lower().split("/") if p and p != "."]
+    if "node_modules" not in parts:
+        return None
+    tail = parts[len(parts) - parts[::-1].index("node_modules"):]  # what follows the LAST node_modules
+    if not tail:
+        return None
+    if tail[0] == ".bin":
+        return _NODE_PACKAGE_TOOLS.get(executable_name(tail[1])) if len(tail) > 1 else None
+    return _NODE_PACKAGE_TOOLS.get("/".join(tail[:2]) if tail[0].startswith("@") else tail[0])
+
+
+def node_verifier_writes(script: str, args: list[str]) -> Optional[bool]:
+    """True/False when ``script`` is a known verifier's entry point (does this invocation write?), None otherwise."""
+    tool = _node_verifier(script)
+    return None if tool is None else bool(VERIFIER_TOOLS[tool](args))

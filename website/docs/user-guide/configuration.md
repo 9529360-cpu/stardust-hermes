@@ -1236,7 +1236,7 @@ agent:
   coding_instructions: ""      # Standing project-wide coding rules appended to the coding brief
 ```
 
-`verify_on_stop` accepts `true` (on everywhere), `false` (explicit opt-out), or `"auto"` (the default: on for interactive coding surfaces — CLI, TUI, desktop — and programmatic callers; off for messaging surfaces like Telegram/Discord). The gate runs only after code edits in a recognized workspace, and it is bounded so it cannot trap a turn. Existing explicit `false` settings remain off; configs without an explicit choice inherit `auto`. The `STARDUST_VERIFY_ON_STOP` env var overrides the config value when set.
+`verify_on_stop` accepts `true` (on everywhere), `false` (explicit opt-out), or `"auto"` (the default: on for interactive coding surfaces — CLI, TUI, desktop — and programmatic callers; off for messaging surfaces like Telegram/Discord). The gate runs only after code edits in a recognized workspace, and it is bounded so it cannot trap a turn: besides the per-turn cap, the agent is told about an unverified workspace state only once — it asks again only after a new edit or a new verification run changes that state. Existing explicit `false` settings remain off; configs without an explicit choice inherit `auto`. The `STARDUST_VERIFY_ON_STOP` env var overrides the config value when set.
 
 The evidence that feeds this guard (which test/lint/build commands ran, which files were edited since) lives in `~/.hermes/verification_evidence.db`. The ledger is written only while the guard is enabled; messaging sessions with the default `auto` setting do not create it.
 

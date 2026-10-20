@@ -323,6 +323,16 @@ def test_read_only_test_and_build_terminal_commands_do_not_stale_evidence(tmp_pa
     assert terminal_workspace_mutation_root(command=command, cwd=tmp_path, exit_code=0) is None
 
 
+def test_nohup_background_verifier_with_external_log_does_not_stale_evidence(tmp_path, monkeypatch):
+    """A verifier launched via nohup remains read-only when it logs outside the project."""
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+    _node_project(tmp_path)
+    outside_log = (tmp_path.parent / "nohup-test.log").resolve().as_posix()
+    command = f"nohup python -m pytest tests/test_example.py > '{outside_log}' 2>&1 &"
+
+    assert terminal_workspace_mutation_root(command=command, cwd=tmp_path, exit_code=0) is None
+
+
 def test_inline_python_file_write_invalidates_workspace(tmp_path, monkeypatch):
     monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
     _node_project(tmp_path)
@@ -716,3 +726,170 @@ def test_unterminated_heredoc_and_here_strings_do_not_swallow_the_rest_of_the_co
     assert [s.raw for s in _split_shell_segments("echo $((1<<3))\n3\nrm -rf build")] == [
         "echo $((1<<3))", "3", "rm -rf build",
     ]
+
+
+# ── what a command does, not how it is spelled ──────────────────────────────────────────────────────────────
+# On a Windows host agents launch everything by full path (`'C:/Program Files/Git/usr/bin/bash.exe' scripts/...`,
+# `node .../vitest.mjs`). Recognising only the bare spelling made every passing run invisible as proof, while
+# ordinary reads and test runs were judged as edits, so the verify-on-stop gate could never be satisfied.
+
+@pytest.mark.parametrize("command, canonical", [
+    ("bash scripts/run_tests.sh tests/test_widget.py", "scripts/run_tests.sh"),
+    ("bash.exe scripts/run_tests.sh tests/test_widget.py", "scripts/run_tests.sh"),
+    ("/usr/bin/bash scripts/run_tests.sh tests/test_widget.py", "scripts/run_tests.sh"),
+    ("'C:/Program Files/Git/usr/bin/bash.exe' scripts/run_tests.sh -j1 tests/test_widget.py", "scripts/run_tests.sh"),
+    ("\"C:\\Program Files\\Git\\bin\\bash.exe\" scripts/run_tests.sh tests/test_widget.py", "scripts/run_tests.sh"),
+    ("STARDUST_PYTHON='C:/venv/Scripts/python.exe' 'C:/Program Files/Git/usr/bin/bash.exe' scripts/run_tests.sh -j1 tests/test_widget.py",
+     "scripts/run_tests.sh"),
+    ("pnpm.cmd run test tests/button.test.tsx", "pnpm run test"),
+    ("'C:/Program Files/nodejs/pnpm.cmd' run test", "pnpm run test"),
+])
+def test_a_canonical_verifier_is_recognised_by_what_it_runs_not_by_how_its_launcher_is_spelled(
+    tmp_path, monkeypatch, command, canonical,
+):
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+    _node_project(tmp_path)
+
+    evidence = classify_verification_command(command, cwd=tmp_path, session_id="s1", exit_code=0)
+
+    assert evidence is not None
+    assert evidence.canonical_command == canonical
+
+
+@pytest.mark.parametrize("command", [
+    "pytest tests/test_a.py",
+    ".venv/Scripts/pytest.exe tests/test_a.py",
+    "C:/work/.venv/Scripts/python.exe -m pytest tests/test_a.py",
+    ".venv\\Scripts\\python.exe -m pytest tests/test_a.py",
+    "python3.11 -m pytest tests/test_a.py",
+    "python.exe -m pytest tests/test_a.py",
+    "py -m pytest tests/test_a.py",
+    "/usr/bin/python3 -m pytest -q",
+])
+def test_pytest_is_recognised_through_every_interpreter_spelling(tmp_path, monkeypatch, command):
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+    _python_project(tmp_path)
+
+    evidence = classify_verification_command(command, cwd=tmp_path, session_id="s1", exit_code=0)
+
+    assert evidence is not None
+    assert evidence.canonical_command == "pytest"
+
+
+@pytest.mark.parametrize("command", [
+    "echo 'C:/Program Files/Git/usr/bin/bash.exe' scripts/run_tests.sh",
+    "'C:/Program Files/Git/usr/bin/bash.exe' scripts/other.sh",
+    "'C:/tools/not-bash.exe' scripts/run_tests.sh",
+    "'C:/Program Files/Git/usr/bin/bash.exe' -c 'echo scripts/run_tests.sh'",
+    "cat scripts/run_tests.sh",
+    "pnpm.cmd run dev",
+])
+def test_a_look_alike_of_a_canonical_verifier_is_not_evidence(tmp_path, monkeypatch, command):
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+    _node_project(tmp_path)
+
+    assert classify_verification_command(command, cwd=tmp_path, session_id="s1", exit_code=0) is None
+
+
+@pytest.mark.parametrize("command", [
+    "python -m pip install pytest",
+    "C:/work/.venv/Scripts/python.exe -m pip install pytest",
+    "echo C:/work/.venv/Scripts/python.exe -m pytest",
+])
+def test_a_look_alike_of_pytest_is_not_evidence(tmp_path, monkeypatch, command):
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+    _python_project(tmp_path)
+
+    assert classify_verification_command(command, cwd=tmp_path, session_id="s1", exit_code=0) is None
+
+
+@pytest.mark.parametrize("command", [
+    # test / lint / typecheck scripts carry a namespace: test:ui, check:lint, typecheck:ci, lint:css
+    "npm run test:ui -- src/app/routes.test.ts",
+    "npm run check:lint",
+    "pnpm run test:unit",
+    "yarn run lint:css",
+    "npm run typecheck:ci",
+    "npm run ui:test",
+    "npm run test-ui",
+    "npm run start:dev",
+    # git operations that cannot change a file in the working tree
+    "git worktree list",
+    "git -C /srv/repo worktree list --porcelain",
+    "git rev-list --left-right --count HEAD...origin/main",
+    "git ls-remote --heads origin",
+    "git cat-file -e abc123",
+    "git hash-object --stdin",
+    # test runners, linters without --fix and prettier --check started through node
+    "node node_modules/vitest/vitest.mjs run --project ui src/a.test.ts",
+    "node ./node_modules/@playwright/test/cli.js test e2e/a.spec.ts",
+    "'C:/Program Files/nodejs/node.exe' node_modules/eslint/bin/eslint.js src/a.ts",
+    "node node_modules/prettier/bin/prettier.cjs --check src/a.ts",
+    "node node_modules/jest/bin/jest.js --ci",
+    "npx vitest run src/a.test.ts",
+])
+def test_commands_that_provably_leave_the_workspace_alone_keep_evidence_fresh(tmp_path, monkeypatch, command):
+    _expect_fresh(tmp_path, monkeypatch, command)
+
+
+@pytest.mark.parametrize("command", [
+    "npm run lint:fix",
+    "npm run test:update",
+    "npm run test:ui:update-snapshots",
+    "pnpm run format:all",
+    "npm run dev:seed-db",
+    "npm run dev:electron",
+    "git worktree add ../scratch",
+    "git worktree remove old",
+    "git worktree prune",
+    "git cherry-pick abc123",
+    "git checkout main",
+    "git reset --hard HEAD~1",
+    "git stash",
+    "git merge topic",
+    "git pull",
+    "node node_modules/eslint/bin/eslint.js --fix src/a.ts",
+    "node node_modules/prettier/bin/prettier.cjs --write src/a.ts",
+    "node node_modules/vitest/vitest.mjs run -u",
+    "node node_modules/vitest/vitest.mjs run --update",
+    "node node_modules/@playwright/test/cli.js test --update-snapshots",
+    "node scripts/bundle-main.mjs",
+    "node build.js",
+])
+def test_the_read_only_twins_above_still_invalidate_evidence_when_they_do_write(tmp_path, monkeypatch, command):
+    _expect_stale(tmp_path, monkeypatch, command)
+
+
+def test_output_captured_outside_the_workspace_keeps_evidence_fresh(tmp_path, monkeypatch):
+    """A log file elsewhere cannot make earlier proof about the project stale (a verifier's own redirect never did)."""
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+    project = tmp_path / "project"
+    project.mkdir()
+    _python_project(project)
+    log = tmp_path / "logs" / "run.log"
+    posix = log.as_posix()  # an unquoted backslash path is not what a shell would read as this location
+
+    for command in (
+        f"npm run check:lint > '{log}' 2>&1",
+        f"npm run test:ui >> {posix} 2>&1",
+        f"gh pr checks 481 > {posix}",
+        f"git log --oneline > \"{posix}\"",
+    ):
+        assert terminal_workspace_mutation_root(command=command, cwd=project, exit_code=0) is None, command
+
+
+def test_output_that_may_land_inside_the_workspace_still_invalidates_evidence(tmp_path, monkeypatch):
+    """Only an absolute path that is provably outside the project is exempt; anything else may be a project file."""
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+    project = tmp_path / "project"
+    project.mkdir()
+    _python_project(project)
+
+    for command in (
+        f"gh pr checks 481 > {project.as_posix()}/out.log",
+        f"git log --oneline > '{project / 'sub' / 'out.log'}' 2>&1",
+        "gh pr checks 481 > out.log",
+        "gh pr checks 481 > ../escape.log",
+        "gh pr checks 481 > $LOG_DIR/out.log",
+    ):
+        assert terminal_workspace_mutation_root(command=command, cwd=project, exit_code=0) == str(project.resolve()), command
