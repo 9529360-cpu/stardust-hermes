@@ -1,6 +1,6 @@
 # Open UI interaction adaptation - first candidate
 
-Status: **uncommitted, not released, native Windows acceptance pending**.
+Status: **native Windows Electron acceptance passed on the PR #481 integration candidate; not merged or released**.
 
 Target: `9529360-cpu/stardust-hermes` at `9173f9a62f9b4781c58bec902dfabcb9b511548b`.
 Reference: `Caho1/open-claude-ui` at `4045ce76afdcb7dccef1b7e6417b04c4c6046e9c`.
@@ -55,48 +55,50 @@ Attribution and the reference MIT notice are in
   hit testing, keyboard/RTL, reduced motion, scroll edges and observer cleanup.
 - Node assertions: 20 directed pure-function cases, 2,541 scroll geometry inputs
   and 272 keyboard navigation round-trips passed.
-- Four repository Vitest regression suites are included for the intended runtime.
-  **Those suites have not been run here**, because workspace dependencies cannot
-  be installed in this environment.
+- Full workspace checks on the conflict-resolved candidate: `npm run typecheck`,
+  `npm run lint`, and `npm run test:ui` passed; the UI project ran 9,076 tests
+  across 893 files. `npm run build` passed.
+- Native Windows Electron Playwright: five tests passed against the built
+  candidate. They exercised task navigation at wide/narrow sizes, pending
+  clarify navigation/return, background completion after route remount, split
+  resize commit/reset/cancel/window resize, and scroll fades at real list edges.
+  The E2E fixtures used isolated task `TEMP/TMP`, Hermes home and Electron
+  user-data directories; they used a local mock gateway and touched no installed
+  user instance.
+- `npm run test:desktop:platforms` had two Windows failures outside this patch:
+  the symlink-mode contract and the POSIX `sun_path` length assumption. The same
+  two exact tests fail on current `main` (`ce65f332`); their implementation and
+  test files are unchanged by this PR. The remaining platform test cases passed.
 
-The browser fixture uses the actual stateless selector TSX and production DOM
-controllers / extracted handler bodies, but has test-double preference callbacks,
-fixture data and fixture theme values. Its locally available React 16.0 and
-Tailwind 4.1 differ from the repository's React 19.2.7 and Tailwind 4.3.3.
-It does not mount the full React application or verify nanostore persistence,
-Electron IPC, a native WebView, actual model streaming, or real conversation load.
-Screenshots are explicitly labeled as component fixtures, not product screenshots.
+## Acceptance record
 
-## Required acceptance before commit or push
-
-Install dependencies using the repository-root workspace/lockfile policy, then
-run from `apps/desktop`:
+Validated on native Windows 11 against the conflict-resolved PR #481 source tree
+`91fb2428f5e53b47591b6468fd7d616fec6050d4` (the only later change here is this
+verification-document update):
 
 ```sh
-npx vitest run src/components/ui/segmented-control-navigation.test.ts src/components/ui/segmented-control.test.tsx src/lib/scroll-fade.test.ts src/lib/pointer-resize.test.ts
 npm run typecheck
 npm run lint
+npm run test:ui
+npm run build
+npm exec -- playwright test --workers=1 --output <task-temp>/playwright-results-final3 ui-adaptation.spec.ts task-center.spec.ts
 ```
 
-These commands are the **remaining acceptance plan**, not claims of execution.
-Also run the affected existing tests and the full appropriate UI test lane.
+- Typecheck, lint, build, and the complete UI project passed (9,076 tests across
+  893 files).
+- Five native Electron scenarios passed: task navigation at wide/narrow sizes,
+  clarify-task return to its owner, background completion after route remount,
+  split resizing/cancel/window resize, and scroll fades at real content edges.
+- E2E data lived under `D:\GPTcodex\Temp\Stardust\task-center-pr481-20261020`; the
+  Electron fixture used isolated `HERMES_HOME` and `STARDUST_DESKTOP_USER_DATA_DIR`.
+  Screenshots and the test log are retained in
+  `Reports/Stardust/handoff-bugs-20261020/pr481-final-acceptance/`.
+- `npm run test:desktop:platforms` had two failing Windows-only baseline assertions
+  in `electron/hardening.test.ts` (POSIX symlink-mode return value) and
+  `electron/ssh-connection.test.ts` (POSIX `sun_path` length). Both exact tests
+  fail on current main `ce65f332`; these files are unchanged by PR #481. The other
+  desktop-platform cases passed.
 
-Launch the candidate as a **native Windows Electron development instance** using
-an isolated task `TEMP/TMP`, `HERMES_HOME` and `STARDUST_DESKTOP_USER_DATA_DIR`.
-Do not use, overwrite or restart the installed personal instance. Record the
-candidate hash, data directories, process identity, disk bounds and final evidence.
-Validate actual Capabilities/Messaging pages and settings controls, including:
-
-- Ordinary and wide column resize, double-click reset, small movement, Escape,
-  missing pointerup, resize during drag, page close/unmount and rapid repetitions.
-  Cancel must not persist; release must survive a restart under the same scope.
-- Container widths around 40rem, changed UI scale, both themes, long translated
-  labels, keyboard focus, reduced motion and forced colors.
-- Dynamic list/detail content, focus at a faded edge, images/disclosures and
-  native embedded content under the resize shield.
-- Existing chatting, IME entry, streaming, approvals, long conversation scroll,
-  project navigation, browser and multi-agent behavior as regression checks.
-
-Root `AGENTS.md` makes native acceptance mandatory before commit/push. This
-candidate is not permitted to bypass that gate via mock tests, a browser preview,
-a CI run, a different host platform, or a visual-only screenshot.
+This is native Electron acceptance, not a browser-only preview. The installed
+personal client and its data were not started, overwritten, or restarted. The
+updated PR still needs its post-merge CI checks to finish before it can be merged.
