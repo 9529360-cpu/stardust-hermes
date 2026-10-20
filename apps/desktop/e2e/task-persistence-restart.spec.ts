@@ -1,18 +1,25 @@
+import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import { execFileSync } from 'node:child_process'
 
 import { BATCH_CLARIFY_QUESTIONS, BATCH_CLARIFY_TRIGGER } from '../../../tests-js/scripts/mock-server'
-import { buildAppEnv, launchDesktop, setupMockBackend, waitForAppReady, type MockBackendFixture } from './fixtures'
+
+import { buildAppEnv, launchDesktop, type MockBackendFixture, setupMockBackend, waitForAppReady } from './fixtures'
 import { collectErrorBanners, expect, test } from './test'
 
-const evidence = process.env.TASK_CENTER_SCREENSHOT_DIR!
+let evidence: string
 const python = process.env.STARDUST_DESKTOP_PYTHON!
 let fixture: MockBackendFixture | undefined
+let backendEnv: Record<string, string>
 
-function seed(sandbox: { hermesHome: string }) {
-  process.env.HERMES_HOME = sandbox.hermesHome
-  process.env.HERMES_SHARED_AUTH_DIR = path.join(sandbox.hermesHome, 'shared')
+function seed(sandbox: Parameters<typeof buildAppEnv>[0]) {
+  backendEnv = {
+    ...buildAppEnv(sandbox),
+    HERMES_HOME: sandbox.hermesHome,
+    HERMES_SHARED_AUTH_DIR: path.join(sandbox.hermesHome, 'shared'),
+    PYTHONIOENCODING: 'utf-8'
+  }
+
   const output = execFileSync(python, ['-c', `
 import json,time
 from hermes_state import SessionDB
@@ -35,17 +42,21 @@ for label,success in [('完成',True),('失败',False)]:
     assert finish_execution(execution['id'],success=success,error=None if success else '隔离验收失败证据')
 _persist_dispatch({'delegation_id':'acceptance-owner-lost','goal':'持久化委派-owner-lost','dispatched_at':now,'parent_session_id':'acceptance-running'})
 db.close()
-`], { encoding: 'utf8', env: { ...process.env, PYTHONIOENCODING: 'utf-8' } })
+`], { encoding: 'utf8', env: backendEnv })
+
   fs.writeFileSync(path.join(evidence, 'seed-output.txt'), output)
   baseline('backend-before-launch')
 }
 
 function baseline(name: string) {
-  const output = execFileSync(python, ['-c', 'import json; from tools.task_projection import list_task_rows; print(json.dumps(list_task_rows(limit=50),ensure_ascii=False))'], { encoding: 'utf8', env: { ...process.env, PYTHONIOENCODING: 'utf-8' } })
+  const output = execFileSync(python, ['-c', 'import json; from tools.task_projection import list_task_rows; print(json.dumps(list_task_rows(limit=50),ensure_ascii=False))'], { encoding: 'utf8', env: backendEnv })
   fs.writeFileSync(path.join(evidence, name + '.json'), output)
+
   return JSON.parse(output)
 }
 
+// Playwright requires destructuring even when this hook uses no fixtures.
+// eslint-disable-next-line no-empty-pattern
 test.afterEach(async ({}, info) => {
   if (info.status !== info.expectedStatus && fixture) {
     await fixture.page.screenshot({ path: path.join(evidence, 'failure.png') }).catch(() => undefined)
@@ -60,8 +71,11 @@ test.afterAll(async () => {
   fixture?.sandbox.cleanup()
 })
 
-test('持久化任务在真实桌面交互及两次冷重启后恢复', async () => {
+// eslint-disable-next-line no-empty-pattern
+test('持久化任务在真实桌面交互及两次冷重启后恢复', async ({}, testInfo) => {
   test.setTimeout(240_000)
+  evidence = testInfo.outputPath('evidence')
+  fs.mkdirSync(evidence, { recursive: true })
   fixture = await setupMockBackend({ extraDisplayConfig: '  language: zh', seedSandbox: seed })
   const initial = baseline('backend-baseline')
   expect(initial.degraded).toEqual([])
@@ -74,17 +88,21 @@ test('持久化任务在真实桌面交互及两次冷重启后恢复', async ()
     const { page } = fixture
     await page.getByRole('button', { name: '任务', exact: true }).click()
     const center = page.locator('[data-task-center]')
+
     for (const [group, title] of [['running', '持久化目标-running'], ['attention', '持久化目标-blocked'], ['upcoming', '持久化目标-paused'], ['recent', '持久化目标-done'], ['attention', '持久化委派-owner-lost']] as const) {
       await expect(page.locator(`[data-task-group="${group}"]`).getByRole('button').filter({ hasText: title })).toBeVisible({ timeout: 20_000 })
     }
+
     for (const status of ['执行中', '受阻', '已暂停', '已完成', '已中断', '失败']) {
       await expect(center.getByRole('button').filter({ hasText: status }).first()).toBeVisible()
     }
+
     await expect(page.locator('[data-task-group="attention"]').getByRole('button').filter({ hasText: '持久化自动化-失败' }).first()).toBeVisible()
     await page.screenshot({ path: path.join(evidence, `persistent-round-${round}.png`) })
     await page.locator('[data-task-group="running"]').getByRole('button').filter({ hasText: '持久化目标-running' }).click()
     await expect(center).toHaveCount(0)
     await expect(page.getByText('验收会话-running', { exact: true }).first()).toBeVisible()
+
     if (round === 0) {
       await page.locator('[data-personal-product-nav]').getByRole('button', { name: '新建对话', exact: true }).click()
       const composer = page.locator('[contenteditable="true"]').first()
@@ -104,13 +122,16 @@ test('持久化任务在真实桌面交互及两次冷重启后恢复', async ()
       await page.getByRole('button', { name: '任务', exact: true }).click()
       await expect(clarify).toHaveCount(0)
     }
+
     expect(await collectErrorBanners(page)).toEqual([])
+
     if (round < 2) {
       await fixture.app.close()
       const restarted = await launchDesktop(buildAppEnv(fixture.sandbox))
       fixture = { ...fixture, ...restarted }
     }
   }
+
   baseline('backend-after-two-restarts')
   await fixture.app.close()
 })
