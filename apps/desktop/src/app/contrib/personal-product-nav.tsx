@@ -35,10 +35,10 @@ import {
   type AppView,
   BOTS_ROUTE,
   COMMAND_CENTER_ROUTE,
-  CRON_ROUTE,
   MESSAGING_ROUTE,
   routePathname,
-  SKILLS_ROUTE
+  SKILLS_ROUTE,
+  TASKS_ROUTE
 } from '../routes'
 import type { SidebarNavItem } from '../types'
 
@@ -49,26 +49,26 @@ const PRODUCT_NAV_COPY = {
     agentSpace: 'مساحة الوكلاء',
     newChat: 'محادثة جديدة',
     project: 'المشروع',
-    tasks: 'الأتمتة',
+    tasks: 'المهام',
     tools: 'الأدوات'
   },
-  en: { agentSpace: 'Agent space', newChat: 'New chat', project: 'Project', tasks: 'Automations', tools: 'Tools' },
+  en: { agentSpace: 'Agent space', newChat: 'New chat', project: 'Project', tasks: 'Tasks', tools: 'Tools' },
   ja: {
     agentSpace: 'エージェント空間',
     newChat: '新しいチャット',
     project: 'プロジェクト',
-    tasks: 'オートメーション',
+    tasks: 'タスク',
     tools: 'ツール'
   },
   ru: {
     agentSpace: 'Пространство агентов',
     newChat: 'Новый чат',
     project: 'Проект',
-    tasks: 'Автоматизация',
+    tasks: 'Задачи',
     tools: 'Инструменты'
   },
-  zh: { agentSpace: '智能体空间', newChat: '新建对话', project: '项目', tasks: '自动化', tools: '工具' },
-  'zh-hant': { agentSpace: '智能體空間', newChat: '新增對話', project: '專案', tasks: '自動化', tools: '工具' }
+  zh: { agentSpace: '智能体空间', newChat: '新建对话', project: '项目', tasks: '任务', tools: '工具' },
+  'zh-hant': { agentSpace: '智能體空間', newChat: '新增對話', project: '專案', tasks: '任務', tools: '工具' }
 } as const
 
 const NULL_ICON: SidebarNavItem['icon'] = () => null
@@ -237,10 +237,10 @@ export function PersonalProductNav({
 
   const openTasks = () =>
     pick({
-      id: 'cron',
+      id: 'tasks',
       label: copy.tasks,
       icon: NULL_ICON,
-      route: CRON_ROUTE
+      route: TASKS_ROUTE
     })
 
   const openTools = () =>
@@ -326,7 +326,7 @@ export function PersonalProductNav({
         />
         <ProductNavButton active={agentSpaceShowing} icon="hubot" label={copy.agentSpace} onClick={openAgentSpace} />
         <ProductNavButton
-          active={currentView === 'cron'}
+          active={currentView === 'tasks' || currentView === 'cron'}
           icon="checklist"
           label={copy.tasks}
           onClick={openTasks}

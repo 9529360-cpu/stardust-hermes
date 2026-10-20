@@ -16,6 +16,7 @@ export const MESSAGING_ROUTE = '/messaging'
 export const WEBHOOKS_ROUTE = '/webhooks'
 export const ARTIFACTS_ROUTE = '/artifacts'
 export const CRON_ROUTE = '/cron'
+export const TASKS_ROUTE = '/tasks'
 export const PROFILES_ROUTE = '/profiles'
 export const AGENTS_ROUTE = '/agents'
 // Bot Mode's roster page: a plugin route (ROUTES_AREA), not a core APP_ROUTES entry.
@@ -30,6 +31,7 @@ export type AppView =
   | 'chat'
   | 'command-center'
   | 'cron'
+  | 'tasks'
   // A contributed (plugin) full page at its own route — NOT chat. Without this
   // distinction contributed paths fell through appViewForPath's 'chat' default,
   // so the sidebar kept a session highlighted and the titlebar kept the
@@ -49,6 +51,7 @@ export type AppRouteId =
   | 'artifacts'
   | 'command-center'
   | 'cron'
+  | 'tasks'
   | 'messaging'
   | 'new'
   | 'profiles'
@@ -74,6 +77,7 @@ export const APP_ROUTES = [
   { id: 'webhooks', path: WEBHOOKS_ROUTE, view: 'webhooks' },
   { id: 'artifacts', path: ARTIFACTS_ROUTE, view: 'artifacts' },
   { id: 'cron', path: CRON_ROUTE, view: 'cron' },
+  { id: 'tasks', path: TASKS_ROUTE, view: 'tasks' },
   { id: 'profiles', path: PROFILES_ROUTE, view: 'profiles' },
   { id: 'agents', path: AGENTS_ROUTE, view: 'agents' },
   { id: 'starmap', path: STARMAP_ROUTE, view: 'starmap' },

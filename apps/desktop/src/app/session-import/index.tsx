@@ -156,6 +156,7 @@ export function SessionImportView({ owner, onClose, onOpenSession }: SessionImpo
           >
             <div className="flex flex-col gap-5 px-6 pb-4 pt-6">
               <SegmentedControl
+                aria-label={copy.subtitle}
                 onChange={value => {
                   setSource(value)
                   setSelected(null)

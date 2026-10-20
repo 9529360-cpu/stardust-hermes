@@ -353,6 +353,7 @@ export function CommandCenterView({ initialSection, onClose, onDeleteSession, on
               )}
               {section === 'usage' && (
                 <SegmentedControl
+                  aria-label={cc.sectionDescriptions.usage}
                   onChange={id => setUsagePeriod(Number(id) as UsagePeriod)}
                   options={USAGE_PERIODS.map(value => ({ id: String(value), label: cc.days(value) }))}
                   value={String(usagePeriod)}

@@ -1,0 +1,31 @@
+/* A resizable page responds to its actual pane width, not the whole window.
+ * Dragging changes only --md-drag-split; the persisted preference is separate. */
+.stardust-master-detail-frame {
+  container: stardust-master-detail / inline-size;
+}
+
+.stardust-master-detail-grid {
+  --md-default-split: 14rem;
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: minmax(0, 1fr);
+}
+
+.stardust-master-detail-grid[data-md-split='wide'] {
+  --md-default-split: 42.857142857%;
+}
+
+.stardust-master-detail-sash {
+  display: none;
+  touch-action: none;
+}
+
+@container stardust-master-detail (min-width: 40rem) {
+  .stardust-master-detail-grid {
+    grid-template-columns:
+      minmax(0, clamp(var(--md-min-list), var(--md-drag-split, var(--md-split, var(--md-default-split))), calc(100% - var(--md-min-detail))))
+      minmax(0, 1fr);
+  }
+  .stardust-master-detail-sash {
+    display: block;
+  }
+}

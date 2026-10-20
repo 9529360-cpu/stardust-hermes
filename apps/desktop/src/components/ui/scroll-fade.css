@@ -1,0 +1,37 @@
+/* Non-linear alpha ramp adapted from open-claude-ui (MIT).
+ * Mask colors encode opacity, not a foreign theme. No painted gradient layer.
+ * See apps/desktop/THIRD_PARTY_NOTICES/open-claude-ui.txt. */
+[data-scroll-fade][data-scroll-fade-active] {
+  --scroll-fade-mask: linear-gradient(to bottom,
+    transparent,
+    #0000000d calc(var(--scroll-fade-top) * 0.15),
+    #00000026 calc(var(--scroll-fade-top) * 0.3),
+    #0000004d calc(var(--scroll-fade-top) * 0.45),
+    #00000080 calc(var(--scroll-fade-top) * 0.6),
+    #000000b3 calc(var(--scroll-fade-top) * 0.75),
+    #000000d9 calc(var(--scroll-fade-top) * 0.87),
+    #000 var(--scroll-fade-top),
+    #000 calc(100% - var(--scroll-fade-bottom)),
+    #000000d9 calc(100% - var(--scroll-fade-bottom) * 0.87),
+    #000000b3 calc(100% - var(--scroll-fade-bottom) * 0.75),
+    #00000080 calc(100% - var(--scroll-fade-bottom) * 0.6),
+    #0000004d calc(100% - var(--scroll-fade-bottom) * 0.45),
+    #00000026 calc(100% - var(--scroll-fade-bottom) * 0.3),
+    #0000000d calc(100% - var(--scroll-fade-bottom) * 0.15),
+    transparent);
+  -webkit-mask-image: var(--scroll-fade-mask);
+  mask-image: var(--scroll-fade-mask);
+}
+
+/* Keep focused controls and their focus rings unmasked at either edge. */
+[data-scroll-fade]:focus-within {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+@media (forced-colors: active) {
+  [data-scroll-fade][data-scroll-fade-active] {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+}

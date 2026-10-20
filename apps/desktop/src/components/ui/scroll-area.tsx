@@ -1,12 +1,21 @@
 import { ScrollArea as ScrollAreaPrimitive } from 'radix-ui'
 import * as React from 'react'
 
+import { useScrollFade } from '@/hooks/use-scroll-fade'
 import { cn } from '@/lib/utils'
 
-function ScrollArea({ className, children, ...props }: React.ComponentProps<typeof ScrollAreaPrimitive.Root>) {
+function ScrollArea({
+  className,
+  children,
+  fadeEdges = false,
+  ...props
+}: React.ComponentProps<typeof ScrollAreaPrimitive.Root> & { fadeEdges?: boolean }) {
+  const viewportRef = React.useRef<HTMLDivElement>(null)
+  useScrollFade(viewportRef, undefined, fadeEdges)
+
   return (
     <ScrollAreaPrimitive.Root className={cn('relative overflow-hidden', className)} data-slot="scroll-area" {...props}>
-      <ScrollAreaPrimitive.Viewport className="size-full outline-none" data-slot="scroll-area-viewport">
+      <ScrollAreaPrimitive.Viewport className="size-full outline-none" data-slot="scroll-area-viewport" ref={viewportRef}>
         {children}
       </ScrollAreaPrimitive.Viewport>
       <ScrollBar />

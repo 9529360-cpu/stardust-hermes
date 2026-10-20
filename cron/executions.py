@@ -44,9 +44,39 @@ def _connect() -> sqlite3.Connection:
     return open_db(path, db_label="cron/executions.db", synchronous_full=True, initialize=_initialize_schema)
 
 
+def _execution_db_path() -> Path:
+    return Path(EXECUTIONS_FILE or (get_hermes_home().resolve() / "cron" / "executions.db"))
+
+
 def executions_db_exists() -> bool:
     """Whether the ledger file exists. Read-only callers check this first, because ``_connect`` creates it."""
-    return (EXECUTIONS_FILE or (get_hermes_home().resolve() / "cron" / "executions.db")).exists()
+    return _execution_db_path().exists()
+
+
+def peek_executions(*, limit: int = 50) -> List[Dict[str, Any]]:
+    """Read execution history without creating a ledger or reconciling its schema."""
+    path = _execution_db_path()
+    if not path.exists():
+        return []
+
+    from hermes_state_dbfile import _connect_tracked_db
+    from hermes_state_holders import read_only_db_uri
+
+    conn = _connect_tracked_db(read_only_db_uri(path), tracking_path=path, uri=True, timeout=1.0)
+    conn.row_factory = sqlite3.Row
+    try:
+        table = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='executions'"
+        ).fetchone()
+        if table is None:
+            return []
+        rows = conn.execute(
+            "SELECT * FROM executions ORDER BY claimed_at DESC, id DESC LIMIT ?",
+            (max(1, min(int(limit), 500)),),
+        ).fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
 
 
 def _initialize_schema(conn: sqlite3.Connection) -> None:
@@ -137,6 +167,22 @@ def _owner_is_live(pid: int, started_at: Optional[int]) -> bool:
         return pid == os.getpid()
     current = _process_start_time(pid)
     return current is not None and current == started_at
+
+
+def execution_owner_abandoned(record: Dict[str, Any]) -> bool:
+    """Whether an active execution has a provably dead owner, without changing its ledger row."""
+    if record.get("status") not in {"claimed", "running"}:
+        return False
+    if record.get("process_id") == _PROCESS_ID:
+        return False
+    if record.get("handoff_pending"):
+        started = record.get("handoff_started_at")
+        try:
+            if started is not None and time.time() - float(started) < HANDOFF_ADOPTION_GRACE_SECONDS:
+                return False
+        except (TypeError, ValueError):
+            pass
+    return not _owner_is_live(int(record.get("pid") or 0), record.get("process_started_at"))
 
 
 def _prune_unlocked(conn: sqlite3.Connection) -> None:

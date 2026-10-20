@@ -35,7 +35,7 @@ async function toComposer(page: MockBackendFixture['page']): Promise<void> {
 }
 
 async function openTasks(page: MockBackendFixture['page'], narrow: boolean): Promise<void> {
-  const tasks = page.getByRole('button', { name: /^(自动化|Automations)$/ }).first()
+  const tasks = page.getByRole('button', { name: /^(任务|Tasks)$/ }).first()
 
   if (narrow && !(await tasks.isVisible().catch(() => false))) {
     await page.keyboard.press('Control+b')
@@ -43,6 +43,9 @@ async function openTasks(page: MockBackendFixture['page'], narrow: boolean): Pro
   }
 
   await tasks.click()
+  const taskCenter = page.locator('[data-task-center]')
+  await expect(taskCenter).toBeVisible({ timeout: 20_000 })
+  await taskCenter.getByRole('button', { name: /^(自动化|Automation)$/ }).click()
   await expect(page.locator('[data-cron-page]')).toBeVisible({ timeout: 20_000 })
 }
 

@@ -874,6 +874,7 @@ export function CreateAgentDialog({ open, onClose, roster, userFriendly = false 
           {!userFriendly && advanced ? (
             <div className="grid gap-3 rounded-md border border-(--ui-stroke-secondary) p-3">
               <SegmentedControl
+                aria-label={b.bot.advanced}
                 onChange={id => {
                   setAdvTab(id)
                   setCapFilter('')

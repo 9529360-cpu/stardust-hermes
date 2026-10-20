@@ -885,6 +885,7 @@ export function WorkspaceOverview() {
               <div className="flex items-center justify-between gap-2" data-task-center-view={taskCenterView}>
                 <span className={META_CLASS}>{copy.taskCenterView}</span>
                 <SegmentedControl
+                  aria-label={copy.taskCenterView}
                   onChange={setTaskCenterView}
                   options={[
                     { id: 'all', label: copy.taskCenterAll },

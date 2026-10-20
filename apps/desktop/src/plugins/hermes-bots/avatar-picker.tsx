@@ -122,6 +122,7 @@ export function AvatarPicker({ shape, color, image, onShape, onColor, onImage, g
   return (
     <div className="grid justify-items-center gap-3">
       <SegmentedControl
+        aria-label={b.avatar.tabBot}
         onChange={goTab}
         options={[
           { id: 'bot', label: b.avatar.tabBot },

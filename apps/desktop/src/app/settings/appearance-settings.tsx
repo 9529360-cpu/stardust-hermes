@@ -650,6 +650,7 @@ export function AppearanceSettings() {
               <div className="flex items-center justify-between gap-3">
                 <span>{a.themeTitle}</span>
                 <SegmentedControl
+                aria-label={a.themeTitle}
                   onChange={id => {
                     triggerHaptic('crisp')
                     setMode(id)
@@ -665,6 +666,7 @@ export function AppearanceSettings() {
           <ListRow
             action={
               <SegmentedControl
+              aria-label={a.uiScaleTitle}
                 onChange={id => {
                   triggerHaptic('selection')
                   setZoomPercent(Number(id))
@@ -685,6 +687,7 @@ export function AppearanceSettings() {
           <ListRow
             action={
               <SegmentedControl
+              aria-label={a.sessionDensityTitle}
                 onChange={id => {
                   triggerHaptic('selection')
                   setSessionListDensity(id)
@@ -700,6 +703,7 @@ export function AppearanceSettings() {
           <ListRow
             action={
               <SegmentedControl
+              aria-label={a.tabStripTitle}
                 onChange={id => {
                   triggerHaptic('selection')
                   setTabStripDefault(id)
@@ -715,6 +719,7 @@ export function AppearanceSettings() {
           <ListRow
             action={
               <SegmentedControl
+              aria-label={a.appActionsTitle}
                 onChange={id => {
                   triggerHaptic('selection')
                   setTitlebarAppActionsSide(id)
@@ -742,6 +747,7 @@ export function AppearanceSettings() {
                 >
                   {GLASS_SUPPORTED && (
                     <SegmentedControl
+                    aria-label={a.translucencyTitle}
                       onChange={pickTranslucency(setTranslucencyMode)}
                       options={[
                         { id: 'clear' as const, label: a.translucencyModeClear },
@@ -782,6 +788,7 @@ export function AppearanceSettings() {
                     </GlassRow>
                     <GlassRow label={a.translucencyFrostTitle}>
                       <SegmentedControl
+                      aria-label={a.translucencyFrostTitle}
                         onChange={pickTranslucency(setTranslucencyMaterial)}
                         // Windows renders four rungs as three backdrops, so it
                         // is offered three; a frost saved on a Mac highlights
@@ -795,6 +802,7 @@ export function AppearanceSettings() {
                     </GlassRow>
                     <GlassRow label={a.translucencyScopeTitle}>
                       <SegmentedControl
+                      aria-label={a.translucencyScopeTitle}
                         onChange={pickTranslucency(setTranslucencyScope)}
                         options={GLASS_SCOPES.map(scope => ({
                           id: scope,
@@ -833,6 +841,7 @@ export function AppearanceSettings() {
           <ListRow
             action={
               <SegmentedControl
+              aria-label={a.backdropTitle}
                 onChange={id => {
                   triggerHaptic('selection')
                   setBackdrop(id === 'on')
@@ -872,6 +881,7 @@ export function AppearanceSettings() {
           <ListRow
             action={
               <SegmentedControl
+              aria-label={a.introSplashTitle}
                 onChange={id => {
                   triggerHaptic('selection')
                   setIntroSplash(id === 'on')
@@ -900,6 +910,7 @@ export function AppearanceSettings() {
           <ListRow
             action={
               <SegmentedControl
+              aria-label={a.autoShowFilesTitle}
                 onChange={id => {
                   triggerHaptic('selection')
                   setAutoShowGeneratedFiles(id === 'on')
@@ -918,6 +929,7 @@ export function AppearanceSettings() {
           <ListRow
             action={
               <SegmentedControl
+              aria-label={a.reactionsTitle}
                 onChange={id => {
                   triggerHaptic('selection')
                   setReactionsEnabled(id === 'on')
@@ -937,6 +949,7 @@ export function AppearanceSettings() {
             action={
               <div className="flex flex-col items-end gap-1.5">
                 <SegmentedControl
+                aria-label={a.tipsTitle}
                   onChange={id => {
                     triggerHaptic('selection')
                     setTipsEnabled(id === 'on')
@@ -970,6 +983,7 @@ export function AppearanceSettings() {
           <ListRow
             action={
               <SegmentedControl
+              aria-label={a.toursTitle}
                 onChange={id => {
                   triggerHaptic('selection')
                   setToursEnabled(id === 'on')
@@ -988,6 +1002,7 @@ export function AppearanceSettings() {
           <ListRow
             action={
               <SegmentedControl
+              aria-label={a.vibeHeartsTitle}
                 onChange={id => {
                   triggerHaptic('selection')
                   setVibeHeartsEnabled(id === 'on')
@@ -1006,6 +1021,7 @@ export function AppearanceSettings() {
           <ListRow
             action={
               <SegmentedControl
+              aria-label={a.toolViewTitle}
                 onChange={id => {
                   triggerHaptic('selection')
                   setToolViewMode(id)
@@ -1022,6 +1038,7 @@ export function AppearanceSettings() {
           <ListRow
             action={
               <SegmentedControl
+              aria-label={a.reasoningCollapsedTitle}
                 onChange={id => {
                   triggerHaptic('selection')
                   setReasoningCollapsedByDefault(id === 'on')
@@ -1041,6 +1058,7 @@ export function AppearanceSettings() {
             action={
               <div className="flex flex-col items-end gap-1.5">
                 <SegmentedControl
+                aria-label={a.embedsTitle}
                   onChange={id => {
                     triggerHaptic('selection')
                     setEmbedMode(id)

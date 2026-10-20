@@ -16,11 +16,14 @@ test.afterAll(async () => {
 test('retiring the board preserves cron navigation and a usable conversation', async ({}, testInfo) => {
   const page = fixture!.page
   const nav = page.locator('[data-personal-product-nav]')
-  const tasks = nav.getByRole('button', { name: '自动化', exact: true })
+  const tasks = nav.getByRole('button', { name: '任务', exact: true })
   const newChat = nav.getByRole('button', { name: '新建对话', exact: true })
 
   await tasks.click()
-  await expect.poll(() => page.evaluate(() => location.hash)).toContain('/cron')
+  const taskCenter = page.locator('[data-task-center]')
+  await expect(taskCenter).toBeVisible()
+  await taskCenter.getByRole('button', { name: '自动化', exact: true }).click()
+  await expect(page.locator('[data-cron-page]')).toBeVisible()
   await expect(tasks).toHaveAttribute('aria-current', 'page')
   await expect(page.getByRole('button', { name: /kanban|看板/i })).toHaveCount(0)
 

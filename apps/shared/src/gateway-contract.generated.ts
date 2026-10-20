@@ -3858,6 +3858,40 @@ export interface WorkCancelResult {
   status: 'not_found' | 'already_finished' | 'cancelled' | 'interrupt_requested' | 'unavailable' | 'error'
   message: string
 }
+export interface TasksListParams {
+  profile?: string
+  limit?: number
+}
+export interface TasksListResult {
+  tasks: TaskRow[]
+  degraded: ('delegation' | 'cron' | 'goal')[]
+  scoped?: string
+}
+export interface TaskRow {
+  task_id: string
+  title: string
+  state: 'queued' | 'paused' | 'running' | 'waiting_for_user' | 'blocked' | 'completed' | 'failed' | 'cancelled' | 'interrupted'
+  rail: 'delegation' | 'process' | 'cron' | 'goal'
+  durability: 'process_local' | 'restart_durable' | 'session_bound'
+  background: boolean
+  phase?: string | null
+  started_at?: number | null
+  updated_at?: number | null
+  next_run_at?: number | null
+  progress_current?: number | null
+  progress_total?: number | null
+  parent_session_id?: string | null
+  parent_task_id?: string | null
+  requires_approval: boolean
+  recoverable: boolean
+  recovery_action?: 'retry' | 'review_or_retry' | 'resume' | null
+  summary: string
+  detail: string
+  files: string[]
+  needs_attention: boolean
+  terminal: boolean
+  profile?: string | null
+}
 /** Single question: ``question`` / ``choices`` (/ ``multi_select``); batch: ``questions``. ``answers`` rides only on a reconnect replay (locks the server already accepted). */
 export interface ClarifyRequestParams {
   session_id: string
@@ -4768,6 +4802,8 @@ export interface RpcMethods {
   'subscription.upgrade': { params: SubscriptionUpgradeParams; result: SubscriptionUpgradeResult }
   /** Host battery for the status bar; always resolves, ``available: false`` when unreadable. */
   'system.battery': { params: SystemBatteryParams; result: SystemBatteryResult }
+  /** Read allowlisted task rows from one profile home. The profile resolves as in cron.manage list (unknown or deleted: 4064); limit per task rail is clamped to 1..50; the response includes `degraded` rails and a `scoped` profile name so clients can reject a mismatched slice. This method is read-only and grants no task control authority. */
+  'tasks.list': { params: TasksListParams; result: TasksListResult }
   /** Record the client's column width for server-side rendering. */
   'terminal.resize': { params: TerminalResizeParams; result: TerminalResizeResult }
   /** Persist a toolset / MCP enable-disable change and rebuild the session agent so it takes effect now. */
@@ -5027,6 +5063,7 @@ export const RPC_METHODS = [
   'subscription.state',
   'subscription.upgrade',
   'system.battery',
+  'tasks.list',
   'terminal.resize',
   'tools.configure',
   'tools.list',

@@ -79,7 +79,7 @@ def run_tool_round(
     )
     if _tvv.action == "return":
         return _verdict("return", _tvv.result)
-    if _tvv.action == "continue":
+    if _tvv.action == "continue" and not getattr(agent, "_json_error_results_this_round", {}):
         return _verdict("continue")
 
     # Post-call guardrails.
@@ -87,30 +87,42 @@ def run_tool_round(
         agent._cap_delegate_task_calls(assistant_message.tool_calls)
     )
 
-    # Mixed batch: the assistant message keeps EVERY emitted call (each tool_call needs a
-    # matching result) while only valid ones dispatch.
+    # The assistant row keeps every emitted call. Validation decides which calls can
+    # execute and which need immediate error results; the round owns transcript staging.
     _invalid_batch_calls = [
         tc for tc in assistant_message.tool_calls if tc.function.name not in agent.valid_tool_names
     ] if _tvv.mixed_invalid_batch else []
+    _json_error_results = getattr(agent, "_json_error_results_this_round", {})
 
     assistant_msg, duplicate_previous_interim = stage_tool_call_message(
         agent, assistant_message=assistant_message, finish_reason=finish_reason, messages=messages
     )
     append_message(messages, assistant_msg)
 
-    # Mixed batch: error-result invalid calls and drop them from execution.
-    if _invalid_batch_calls:
-        for tc in _invalid_batch_calls:
+    # Stage validation errors with the assistant batch before any valid sibling runs.
+    if _invalid_batch_calls or _json_error_results:
+        for tc in assistant_message.tool_calls:
+            call_id = coalesce_tool_call_id(tc)
+            if call_id in _json_error_results:
+                content = _json_error_results[call_id]
+            elif tc in _invalid_batch_calls:
+                content = (
+                    "Skipped: this invalid tool name reached its retry limit; valid sibling calls may still run."
+                    if tc.function.name in getattr(agent, "_invalid_tool_names_exhausted_this_round", set())
+                    else _invalid_tool_name_error_content(tc.function.name, agent.valid_tool_names)
+                )
+            else:
+                continue
             append_message(messages, {
                 "role": "tool",
                 "name": tc.function.name,
-                "tool_call_id": coalesce_tool_call_id(tc),
-                "content": _invalid_tool_name_error_content(
-                    tc.function.name, agent.valid_tool_names
-                ),
+                "tool_call_id": call_id,
+                "content": content,
             })
+        # Filter the post-cap/dedup list; never restore pre-guardrail calls.
         assistant_message.tool_calls = [
-            tc for tc in assistant_message.tool_calls if tc.function.name in agent.valid_tool_names
+            tc for tc in assistant_message.tool_calls
+            if tc.function.name in agent.valid_tool_names and coalesce_tool_call_id(tc) not in _json_error_results
         ]
 
     # Persist the tool-call turn before any tool side effects so resume sees the executed
@@ -137,6 +149,16 @@ def run_tool_round(
         final_response = ""
         failed = True
         return _verdict("break")
+
+    if not assistant_message.tool_calls:
+        if getattr(agent, "_invalid_json_halt_after_execution", False):
+            agent._invalid_json_halt_after_execution = False
+            from agent.turn_tool_validation import _partial_exit
+            return _verdict("return", _partial_exit(
+                agent, messages, conversation_history, api_call_count,
+                "Model generated invalid JSON tool arguments three times.",
+            ))
+        return _verdict("continue")
 
     # A UI must never observe an assistant/tool-call row that is only an in-memory
     # projection: emit interim commentary after the DB append.
@@ -174,6 +196,15 @@ def run_tool_round(
                     agent.stream_delta_callback(final_response)
                     agent.stream_delta_callback(None)
         return _verdict("break")
+
+    if getattr(agent, "_invalid_json_halt_after_execution", False):
+        agent._invalid_json_halt_after_execution = False
+        from agent.turn_tool_validation import _partial_exit
+        result = _partial_exit(
+            agent, messages, conversation_history, api_call_count,
+            "Model generated invalid JSON tool arguments three times.",
+        )
+        return _verdict("return", result)
 
     # Reset per-turn retry counters so one truncation can't poison the turn.
     truncated_tool_call_retries = 0

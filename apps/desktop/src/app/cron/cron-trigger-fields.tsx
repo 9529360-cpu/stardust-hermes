@@ -32,7 +32,7 @@ export function CronWhenChoice({
     { id: 'folder', label: c.trigger.whenFolder }
   ]
 
-  return <SegmentedControl onChange={onChange} options={options} value={value} />
+  return <SegmentedControl aria-label={c.trigger.whenSchedule} onChange={onChange} options={options} value={value} />
 }
 
 /** A folder path with the desktop picker beside it. The field stays editable, so a path can be typed. */

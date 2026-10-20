@@ -3100,6 +3100,30 @@ class TestRunConversation:
         agent.compression_enabled = False
         agent.save_trajectories = False
 
+    def test_historical_bad_args_with_result_do_not_replay_handler(self, agent):
+        self._setup_agent(agent)
+        historical = _mock_tool_call(name="web_search", arguments='{"q":,}', call_id="history-call")
+        agent.conversation_history = [
+            {"role": "user", "content": "earlier"},
+            _mock_assistant_msg(content="", tool_calls=[historical]),
+            {"role": "tool", "tool_call_id": "history-call", "name": "web_search", "content": "already done"},
+        ]
+        new_call = _mock_tool_call(name="web_search", arguments='{"q":"new"}', call_id="new-call")
+        agent.client.chat.completions.create.side_effect = [
+            _mock_response(content="", finish_reason="tool_calls", tool_calls=[new_call]),
+            _mock_response(content="Finished", finish_reason="stop"),
+        ]
+        with (
+            patch("model_tools.handle_function_call", return_value="new result") as handler,
+            patch.object(agent, "_persist_session"),
+            patch.object(agent, "_save_trajectory"),
+            patch.object(agent, "_cleanup_task_resources"),
+        ):
+            result = agent.run_conversation("continue")
+        assert result["completed"] is True
+        handler.assert_called_once()
+        assert handler.call_args.args[1] == {"q": "new"}
+
     def test_task_start_failure_closes_relay_turn_and_lease(self, agent):
         relay_lease = SimpleNamespace(
             parent_session_id="",
