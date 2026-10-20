@@ -11736,6 +11736,34 @@ def test_file_attach_errors_when_unresolvable_and_no_bytes(monkeypatch, tmp_path
         server._sessions.pop("sid", None)
 
 
+def test_file_attach_workspace_storage_falls_back_when_profile_policy_unavailable(monkeypatch, tmp_path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    home = tmp_path / "profile"
+    home.mkdir()
+    (home / "config.yaml").write_text("attachments:\n  storage: typo\n", encoding="utf-8")
+
+    fake_cli = types.ModuleType("cli")
+    fake_cli._detect_file_drop = lambda raw: None
+    fake_cli._split_path_input = lambda raw: (raw, "")
+    fake_cli._resolve_attachment_path = lambda raw: None
+    monkeypatch.setitem(sys.modules, "cli", fake_cli)
+    server._sessions["sid"] = _session(cwd=str(workspace), profile_home=str(home))
+
+    try:
+        resp = server.handle_request({
+            "id": "1", "method": "file.attach",
+            "params": {"session_id": "sid", "name": "report.txt",
+                       "data_url": "data:text/plain;base64,aGVsbG8="},
+        })
+        stored = home / "attachments" / "report.txt"
+        assert resp["result"]["path"] == str(stored)
+        assert stored.read_text(encoding="utf-8") == "hello"
+        assert not (workspace / ".hermes").exists()
+    finally:
+        server._sessions.pop("sid", None)
+
+
 def test_file_attach_quotes_ref_with_spaces(monkeypatch, tmp_path):
     """Staged names with spaces must be backtick-quoted so the @file: ref parses."""
     workspace = tmp_path / "workspace"

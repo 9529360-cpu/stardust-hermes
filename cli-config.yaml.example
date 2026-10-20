@@ -34,7 +34,7 @@ database:
 # Read per profile, so a multiplexed gateway keeps each profile's policy.
 #   hermes-home (default) <profile home>/attachments. Keeps compatibility with
 #               container/remote mount and sync behavior.
-#   workspace   <session workspace>/.stardust/attachments. Keeps @file refs
+#   workspace   <session workspace>/.hermes/attachments. Keeps @file refs
 #               inside the workspace boundary. SSH workspaces fall back to
 #               hermes-home because their cwd lives on another host.
 attachments:

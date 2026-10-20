@@ -89,36 +89,50 @@ def _session_home_dir(session: dict, name: str) -> Path:
     if name == "attachments" and _profile_attachments_storage(profile_home) == "workspace":
         workspace = _session_attachments_workspace(session)
         if workspace is not None:
+            # Preserve the existing compatibility directory spelling; the policy changes
+            # the owner root, never the public on-disk name beneath a workspace.
             return workspace / ".stardust" / "attachments"
     return (Path(profile_home) if profile_home else _hermes_home) / name
 
 
 def _profile_attachments_storage(profile_home) -> str:
-    """Read attachments.storage from the session owner's profile config.
+    """Read attachments.storage from the profile that owns this session.
 
-    file.attach can run before prompt.submit binds the profile runtime scope, so
-    process-global config is not authoritative for a multiplexed secondary profile.
-    Only the exact workspace value opts in; unreadable/unknown values fail safe to
-    the established profile-home staging behavior.
+    ``file.attach`` may run before prompt.submit binds profile runtime scope, so
+    the process-wide config is not authoritative for multiplexed sessions. Unknown
+    or unreadable policy fails closed to the existing profile-home staging behavior.
     """
-    import contextlib as _contextlib
     home = Path(profile_home) if profile_home else _hermes_home
-    with _contextlib.suppress(Exception):
+    try:
         from hermes_cli.config_effective import load_user_config_effective
+
         cfg_path = home / "config.yaml"
         if cfg_path.exists():
             attachments_cfg = load_user_config_effective(cfg_path).get("attachments")
             if isinstance(attachments_cfg, dict):
                 return str(attachments_cfg.get("storage") or "").strip().lower()
+    except Exception:
+        logger.warning("Could not read attachment storage policy for profile %s; using profile home", home, exc_info=True)
     return ""
 
 
 def _session_attachments_workspace(session: dict) -> Path | None:
-    """Return a host-local existing workspace that can safely receive staging."""
+    """Return the existing host-local workspace that may safely receive staging."""
     import contextlib as _contextlib
-    if _cwd_is_remote(session.get("profile_home")):
-        return None
+
     with _contextlib.suppress(Exception):
+        profile_home = session.get("profile_home")
+        from tools.terminal_scope import TerminalPolicyUnavailable, build_profile_terminal_scope
+
+        backend = ""
+        if profile_home:
+            try:
+                policy = build_profile_terminal_scope(Path(profile_home))
+            except TerminalPolicyUnavailable:
+                return None
+            backend = str(policy.get("TERMINAL_ENV") or "").strip().lower()
+        if backend == "ssh" or (not profile_home and _effective_terminal_backend() == "ssh"):
+            return None
         workspace = Path(_session_cwd(session)).resolve()
         if workspace.is_dir():
             return workspace
