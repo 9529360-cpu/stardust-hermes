@@ -393,11 +393,11 @@ def _canonical_tokens(canonical: str) -> list[str]:
 
 
 def _strip_command_prefix(tokens: list[str]) -> list[str]:
-    """Remove harmless command prefixes (env, VAR=x, command/time/noglob)."""
+    """Remove harmless command prefixes (env, VAR=x, command/time/noglob/nohup)."""
     i = 1 if tokens and tokens[0] == "env" else 0
     while i < len(tokens) and "=" in tokens[i] and not tokens[i].startswith("-"):
         i += 1
-    while i < len(tokens) and tokens[i] in {"command", "time", "noglob"}:
+    while i < len(tokens) and tokens[i] in {"command", "time", "noglob", "nohup"}:
         i += 1
     return list(tokens[i:])
 

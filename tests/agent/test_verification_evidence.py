@@ -323,6 +323,16 @@ def test_read_only_test_and_build_terminal_commands_do_not_stale_evidence(tmp_pa
     assert terminal_workspace_mutation_root(command=command, cwd=tmp_path, exit_code=0) is None
 
 
+def test_nohup_background_verifier_with_external_log_does_not_stale_evidence(tmp_path, monkeypatch):
+    """A verifier launched via nohup remains read-only when it logs outside the project."""
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+    _node_project(tmp_path)
+    outside_log = (tmp_path.parent / "nohup-test.log").resolve().as_posix()
+    command = f"nohup python -m pytest tests/test_example.py > '{outside_log}' 2>&1 &"
+
+    assert terminal_workspace_mutation_root(command=command, cwd=tmp_path, exit_code=0) is None
+
+
 def test_inline_python_file_write_invalidates_workspace(tmp_path, monkeypatch):
     monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
     _node_project(tmp_path)
