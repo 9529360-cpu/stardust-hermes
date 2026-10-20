@@ -413,6 +413,7 @@ async function main() {
       tags: { type: 'string', default: '[]' },
       format: { type: 'string', default: 'json' },
       artifacts: { type: 'string' },
+      'allow-empty': { type: 'boolean', default: false },
     },
   });
   if (values.format === 'results') {
@@ -435,13 +436,27 @@ async function main() {
     process.stdout.write(report);
     return;
   }
-  const tags = /** @type {TagAnnotation[]} */ (JSON.parse(values.tags.trim() || '[]'));
+  const tagsValue = values.tags?.trim() || '[]';
+  const tags = /** @type {TagAnnotation[]} */ (JSON.parse(tagsValue));
+  const envs = generateEnvironments(SPEC);
+  if (tags.length === 0 && values['allow-empty']) {
+    if (values.format === 'markdown') {
+      process.stdout.write([
+        '### Install & Update E2E plan',
+        '',
+        'No released versions are available to update from; upgrade coverage is not applicable.',
+        '',
+      ].join('\n'));
+      return;
+    }
+    process.stdout.write(`${JSON.stringify(buildMatrices(envs, tags), null, 2)}\n`);
+    return;
+  }
   if (tags.length === 0) {
-    process.stderr.write('Error: no upgrade tags selected; check tag selection and matrix.\n');
+    process.stderr.write('Error: no upgrade tags selected; check tag selection and matrix input.\n');
     process.exitCode = 1;
     return;
   }
-  const envs = generateEnvironments(SPEC);
   if (values.format === 'markdown') {
     process.stdout.write(renderMarkdownPlan(envs, tags));
     return;
