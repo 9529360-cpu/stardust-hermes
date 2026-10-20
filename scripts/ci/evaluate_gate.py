@@ -2,8 +2,9 @@
 """Evaluate the ``all-checks-pass`` gate job in ``.github/workflows/ci.yaml``.
 
 A ``needs.<job>.result`` is one of ``success``, ``failure``, ``cancelled``, or ``skipped``.
-``skipped`` passes the gate — most lanes are conditioned on ``needs.detect.outputs.*`` and
-legitimately have nothing to do for a PR that didn't touch their area.
+``skipped`` passes the gate — lanes can be irrelevant to a diff or intentionally
+skipped on Draft PRs. Drafts waive desktop runtime proof only when the trusted
+detect job explicitly returns ``full=false``; unknown tiers still fail closed.
 
 ``HARD_DISABLED_LANES`` is a different case: these jobs are unconditionally ``if: false`` in
 ci.yaml regardless of what changed, so every single run reports them ``skipped`` — treating
@@ -34,6 +35,7 @@ HARD_DISABLED_LANES: dict[str, str] = {}
 # Desktop E2E is report-only: it is not in all-checks-pass in ci.yaml (owner decision, Oct 2026).
 DESKTOP_RUNTIME_PROOF_LANE = "stardust-visual-smoke"
 DESKTOP_RUNTIME_PROOF_OUTPUTS = ("python_prod", "frontend")
+NIX_PROOF_LANE = "nix"
 
 
 def _desktop_runtime_proof_required(needs: dict) -> bool:
@@ -46,6 +48,9 @@ def _desktop_runtime_proof_required(needs: dict) -> bool:
     """
     detect = needs.get("detect") or {}
     outputs = detect.get("outputs") or {}
+    if str(outputs.get("full", "")).strip().lower() == "false":
+        # Draft PRs defer runtime proof until the PR is Ready for review.
+        return False
     values = [
         str(outputs.get(name, "")).strip().lower()
         for name in DESKTOP_RUNTIME_PROOF_OUTPUTS
@@ -57,11 +62,26 @@ def _desktop_runtime_proof_required(needs: dict) -> bool:
     return DESKTOP_RUNTIME_PROOF_LANE in needs
 
 
+def _nix_proof_required(needs: dict) -> bool:
+    """Require Nix when an eligible run may affect the Nix build inputs.
+
+    Missing classifier outputs fail closed so the job cannot silently skip
+    due to an orchestrator output-wiring error. Draft PRs defer this lane.
+    """
+    if NIX_PROOF_LANE not in needs:
+        return False
+    detect = needs.get("detect") or {}
+    outputs = detect.get("outputs") or {}
+    if str(outputs.get("full", "")).strip().lower() == "false":
+        return False
+    return str(outputs.get("nix", "")).strip().lower() != "false"
+
+
 def evaluate(needs: dict) -> tuple[dict[str, str], list[str], list[str]]:
     """Return ``(compact result-map, blocking job names, hard-disabled job names)``.
 
     ``blocking`` = failed/cancelled required jobs, plus conditionally required proof lanes
-    that were skipped or absent.
+    that were skipped or absent (desktop runtime smoke and Nix build check).
     ``disabled`` = jobs in ``HARD_DISABLED_LANES`` whose result is ``skipped`` this run —
     i.e. reported as passing but never actually executed, by design rather than by relevance.
     """
@@ -77,6 +97,11 @@ def evaluate(needs: dict) -> tuple[dict[str, str], list[str], list[str]]:
     )
     if proof_missing and DESKTOP_RUNTIME_PROOF_LANE not in blocking:
         blocking.append(DESKTOP_RUNTIME_PROOF_LANE)
+
+    # An affected Nix lane must genuinely run, not silently pass as skipped.
+    if _nix_proof_required(needs) and compact.get(NIX_PROOF_LANE) != "success":
+        if NIX_PROOF_LANE not in blocking:
+            blocking.append(NIX_PROOF_LANE)
 
     disabled = [name for name in HARD_DISABLED_LANES if compact.get(name) == "skipped"]
     return compact, blocking, disabled

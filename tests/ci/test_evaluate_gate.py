@@ -66,6 +66,28 @@ def test_legitimately_skipped_job_is_not_blocking_and_not_flagged_disabled():
     assert disabled == []
 
 
+def test_draft_pr_can_skip_desktop_runtime_proof():
+    needs = _desktop_needs(frontend="true", smoke="skipped")
+    needs["detect"]["outputs"]["full"] = "false"
+    _compact, blocking, _disabled = evaluate(needs)
+    assert blocking == []
+
+
+def test_ready_pr_cannot_skip_desktop_runtime_proof():
+    needs = _desktop_needs(frontend="true", smoke="skipped")
+    needs["detect"]["outputs"]["full"] = "true"
+    _compact, blocking, _disabled = evaluate(needs)
+    assert blocking == [DESKTOP_RUNTIME_PROOF_LANE]
+
+
+def test_draft_pr_still_blocks_on_failed_quick_check():
+    needs = _desktop_needs(frontend="true", smoke="skipped")
+    needs["detect"]["outputs"]["full"] = "false"
+    needs["case-collision-check"] = {"result": "failure", "outputs": {}}
+    _compact, blocking, _disabled = evaluate(needs)
+    assert blocking == ["case-collision-check"]
+
+
 def test_frontend_change_requires_successful_desktop_runtime_proof():
     compact, blocking, disabled = evaluate(
         _desktop_needs(frontend="true", smoke="skipped")
@@ -135,6 +157,39 @@ def test_hard_disabled_lane_that_actually_ran_is_not_flagged(monkeypatch):
     )
     assert blocking == []
     assert disabled == []
+
+
+def _nix_needs(*, full="true", affected="true", result="skipped"):
+    needs = _needs(detect="success", nix=result)
+    needs["detect"]["outputs"].update({"full": full, "nix": affected})
+    return needs
+
+
+def test_nix_affected_skip_is_blocking():
+    _compact, blocking, _disabled = evaluate(_nix_needs())
+    assert blocking == ["nix"]
+
+
+def test_nix_affected_success_passes():
+    _compact, blocking, _disabled = evaluate(_nix_needs(result="success"))
+    assert blocking == []
+
+
+def test_nix_unaffected_can_skip():
+    _compact, blocking, _disabled = evaluate(_nix_needs(affected="false"))
+    assert blocking == []
+
+
+def test_nix_draft_can_skip():
+    _compact, blocking, _disabled = evaluate(_nix_needs(full="false"))
+    assert blocking == []
+
+
+def test_nix_missing_classifier_output_fails_closed():
+    needs = _nix_needs()
+    del needs["detect"]["outputs"]["nix"]
+    _compact, blocking, _disabled = evaluate(needs)
+    assert blocking == ["nix"]
 
 
 def test_failure_blocks_the_gate():

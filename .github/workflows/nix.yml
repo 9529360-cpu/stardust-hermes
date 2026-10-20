@@ -1,9 +1,11 @@
 name: Nix flake check
 
+# Reusable lane; shared change classification and merge gate live in ci.yaml.
+# Manual dispatch remains available for targeted Nix diagnostics.
+
 on:
-  pull_request:
-  push:
-    branches: [main]
+  workflow_call:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -13,24 +15,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  detect:
-    name: Detect affected areas
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    outputs:
-      nix: ${{ steps.classify.outputs.nix }}
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Detect affected areas
-        id: classify
-        uses: ./.github/actions/detect-changes
-        with:
-          github-token: ${{ github.token }}
-
   flake-check:
     name: nix flake check
-    needs: [detect]
-    if: needs.detect.outputs.nix == 'true'
     # The upstream organization used a private 32-core runner. Standardize on
     # the public GitHub-hosted fleet for this independently maintained repo.
     runs-on: ubuntu-latest
