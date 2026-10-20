@@ -1407,6 +1407,7 @@ def _adopt_live_compression_child(
     confirmed = resolver(session_db, parent_session_id)
     if not confirmed or str(confirmed) != child_session_id:
         return None
+    _carry_verification_ledger(parent_session_id, child_session_id)
     agent.session_id = child_session_id
     _rebind_session_context(child_session_id)
     agent._session_db_created = True
@@ -2912,6 +2913,14 @@ def _parent_deliberately_ended(session_db: Any, session_id: str) -> bool:
         return False
 
 
+def _carry_verification_ledger(old_session_id: Any, new_session_id: Any) -> None:
+    """Keep verification evidence across a session-id rotation; else the verify-on-stop gate re-nudges for checks
+    that already passed under the parent id."""
+    with _swallow('Could not carry verification ledger on compression: %s'):
+        from agent.verification_evidence import carry_verification_state
+        carry_verification_state(from_session_id=old_session_id, to_session_id=new_session_id)
+
+
 def _carry_session_state_to_child(agent: Any, old_session_id: str, old_title: Any) -> None:
     """Migrate /goal, /heartbeat, /loop state and the title from the parent to the child.
     Each lookup is a flat per-session read with no parent walk, so state would silently die at the boundary. The title
@@ -2930,6 +2939,7 @@ def _carry_session_state_to_child(agent: Any, old_session_id: str, old_title: An
     with _swallow('Could not migrate loop on compression: %s'):
         from hermes_cli.loops import migrate_loop_to_session
         migrate_loop_to_session(old_session_id, agent.session_id, reason="compression")
+    _carry_verification_ledger(old_session_id, agent.session_id)
     if not old_title:
         return
     _src = None

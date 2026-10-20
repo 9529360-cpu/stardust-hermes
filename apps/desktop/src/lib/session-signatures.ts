@@ -35,7 +35,7 @@ export function sameCronSignature(a: SessionInfo[], b: SessionInfo[]): boolean {
   })
 }
 
-// FNV-1a over role/timestamp/content.
+// FNV-1a over every field transcript hydration (toChatMessages) renders from.
 function hashString(hash: number, value: string): number {
   let next = hash
 
@@ -47,14 +47,51 @@ function hashString(hash: number, value: string): number {
   return next >>> 0
 }
 
+// Every SessionMessage field that changes what chat-messages/hydration.ts
+// paints. Hashing only role/timestamp/content let a row whose visible text
+// lives in `display_content` or the `codex_message_items` sidecar (or whose
+// reasoning/tool calls landed in a later write) read as "unchanged", so the
+// poll skipped it and the reply only appeared after a restart.
+const DISPLAY_FIELDS = [
+  'role',
+  'timestamp',
+  'id',
+  'row_id',
+  'content',
+  'display_content',
+  'display_kind',
+  'display_metadata',
+  'text',
+  'context',
+  'name',
+  'reasoning',
+  'reasoning_content',
+  'reasoning_details',
+  'codex_message_items',
+  'tool_calls',
+  'tool_call_id',
+  'tool_name',
+  'args'
+] as const satisfies readonly (keyof SessionMessage)[]
+
+function fieldText(value: unknown): string {
+  if (value === undefined) {
+    return '\u0000u'
+  }
+
+  return typeof value === 'string' ? value : (JSON.stringify(value) ?? '')
+}
+
 /** Transcript fingerprint for the active-messaging-session poll. */
 export function sessionMessagesSignature(messages: SessionMessage[]): string {
   let hash = 2166136261
 
   for (const m of messages) {
-    hash = hashString(hash, m.role)
-    hash = hashString(hash, String(m.timestamp ?? ''))
-    hash = hashString(hash, typeof m.content === 'string' ? m.content : (JSON.stringify(m.content) ?? ''))
+    for (const field of DISPLAY_FIELDS) {
+      hash = hashString(hash, fieldText(m[field]))
+      // Field separator so shifting text between adjacent fields still changes the hash.
+      hash = hashString(hash, '\u0001')
+    }
   }
 
   return `${messages.length}:${hash}`
