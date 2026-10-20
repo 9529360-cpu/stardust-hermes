@@ -78,11 +78,15 @@ export function recordTaskHistory(scope: TaskHistoryScope, incoming: readonly Ta
 }
 
 /** Pure read; safe during render, and never writes a store from a React render. */
-export function readTaskHistory(scope: TaskHistoryScope, now = Date.now()): readonly TrackedTaskRow[] {
+export function readTaskHistory(
+  scope: TaskHistoryScope,
+  now = Date.now(),
+  history: Readonly<Record<string, readonly TrackedTaskRow[]>> = $taskHistoryByScope.get()
+): readonly TrackedTaskRow[] {
   if (scope.sessionId !== '*') {
-    return retained($taskHistoryByScope.get()[scopeKey(scope)] ?? [], now)
+    return retained(history[scopeKey(scope)] ?? [], now)
   }
-  const rows = Object.entries($taskHistoryByScope.get())
+  const rows = Object.entries(history)
     .filter(([key]) => {
       const [connectionId, profileId] = JSON.parse(key) as string[]
       return connectionId === scope.connectionId && profileId === scope.profileId
