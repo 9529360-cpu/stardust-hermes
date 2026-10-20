@@ -11835,10 +11835,10 @@ def test_file_attach_workspace_storage_follows_owning_profile_config(monkeypatch
     try:
         server._sessions["sid-a"] = _session(cwd=str(workspace_a), profile_home=str(home_a))
         result_a = attach("sid-a")["result"]
-        staged_a = workspace_a / ".hermes" / "attachments" / "report.txt"
+        staged_a = workspace_a / ".stardust" / "attachments" / "report.txt"
         assert result_a["attached"] is True
         assert result_a["path"] == str(staged_a)
-        assert result_a["ref_text"] == "@file:.hermes/attachments/report.txt"
+        assert result_a["ref_text"] == "@file:.stardust/attachments/report.txt"
         assert staged_a.read_text(encoding="utf-8") == "hello"
         assert not (home_a / "attachments").exists()
 
@@ -11847,7 +11847,7 @@ def test_file_attach_workspace_storage_follows_owning_profile_config(monkeypatch
         staged_b = home_b / "attachments" / "report.txt"
         assert result_b["path"] == str(staged_b)
         assert staged_b.read_text(encoding="utf-8") == "hello"
-        assert not (workspace_b / ".hermes").exists()
+        assert not (workspace_b / ".stardust").exists()
     finally:
         server._sessions.pop("sid-a", None)
         server._sessions.pop("sid-b", None)

@@ -91,7 +91,7 @@ def _session_home_dir(session: dict, name: str) -> Path:
         if workspace is not None:
             # Preserve the existing compatibility directory spelling; the policy changes
             # the owner root, never the public on-disk name beneath a workspace.
-            return workspace / ".hermes" / "attachments"
+            return workspace / ".stardust" / "attachments"
     return (Path(profile_home) if profile_home else _hermes_home) / name
 
 
@@ -102,10 +102,8 @@ def _profile_attachments_storage(profile_home) -> str:
     the process-wide config is not authoritative for multiplexed sessions. Unknown
     or unreadable policy fails closed to the existing profile-home staging behavior.
     """
-    import contextlib as _contextlib
-
     home = Path(profile_home) if profile_home else _hermes_home
-    with _contextlib.suppress(Exception):
+    try:
         from hermes_cli.config_effective import load_user_config_effective
 
         cfg_path = home / "config.yaml"
@@ -113,6 +111,8 @@ def _profile_attachments_storage(profile_home) -> str:
             attachments_cfg = load_user_config_effective(cfg_path).get("attachments")
             if isinstance(attachments_cfg, dict):
                 return str(attachments_cfg.get("storage") or "").strip().lower()
+    except Exception:
+        logger.warning("Could not read attachment storage policy for profile %s; using profile home", home, exc_info=True)
     return ""
 
 
