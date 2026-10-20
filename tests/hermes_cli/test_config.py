@@ -2043,6 +2043,9 @@ def test_gateway_multiplex_keys_are_recognized_config_keys():
     assert _validate_config_key("gateway.multiplex_profiles") == (True, None)
     assert _validate_config_key("gateway.profile_routes") == (True, None)
     assert _validate_config_key("gateway.auto_multiplex_migration") == (True, None)
+    assert _validate_config_key("attachments.storage") == (True, None)
+    from hermes_cli.web_server_config import _CATEGORY_MERGE
+    assert _CATEGORY_MERGE["attachments"] == "agent"
     known, suggestion = _validate_config_key("gateway.auto_migrate")
     assert known is False
     assert suggestion == "gateway.auto_multiplex_migration"
