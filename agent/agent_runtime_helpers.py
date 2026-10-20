@@ -260,23 +260,6 @@ def sanitize_tool_call_arguments(
             with contextlib.suppress(json.JSONDecodeError):
                 json.loads(arguments)
                 continue
-            # Preserve an unfinished JSON tail until turn_tool_validation can classify it as
-            # truncation and stop the turn. Rewriting it to ``{}`` here would erase the only
-            # evidence and could dispatch an empty-argument tool call on the next iteration.
-            stripped_arguments = arguments.rstrip()
-            try:
-                json.loads(stripped_arguments)
-            except json.JSONDecodeError as exc:
-                if (
-                    not stripped_arguments.endswith(("}", "]"))
-                    and _find_tool_result(messages, message_index + 1, tool_call) is None
-                ):
-                    log.warning(
-                        "Preserving truncated tool_call arguments for turn validation "
-                        "(session=%s, message_index=%s, function=%s)",
-                        session_id or "-", message_index, function.get("name", "?"),
-                    )
-                    continue
             # Canonical ``call_id || id`` precedence so scan and stub share the id the pipeline
             # uses; bare ``id`` misses Codex call_id results and orphans a stub.
             # Keying on bare ``id`` here would fail to find a result built with ``call_id`` (Codex Responses

@@ -83,3 +83,56 @@ def test_multiple_missing_ids_have_distinct_json_error_results():
     assert all(tc.id for tc in calls)
     assert len({tc.id for tc in calls}) == 2
     assert len(a._json_error_results_this_round) == 2
+
+
+def test_unterminated_json_string_at_eof_is_classified_as_truncation():
+    a = make_agent()
+    a._cleanup_task_resources.return_value = None
+    a._persist_session.return_value = None
+    # An escaped quote inside the string must not act as a closing quote.
+    partial = call("partial", '{"command":"echo \\\"unfinished')
+    verdict = validate_tool_calls(
+        a, SimpleNamespace(tool_calls=[partial]), "tool_calls", messages=[],
+        conversation_history=[], api_call_count=1, effective_task_id=None,
+    )
+    assert verdict.action == "return"
+    assert verdict.result["failure_reason"] == "truncated"
+
+
+def test_complete_malformed_json_is_recovery_not_truncation():
+    a = make_agent()
+    malformed = call("malformed", '{"command":,}')
+    verdict = validate_tool_calls(
+        a, SimpleNamespace(tool_calls=[malformed]), "tool_calls", messages=[],
+        conversation_history=[], api_call_count=1, effective_task_id=None,
+    )
+    assert verdict.action == "continue"
+    assert set(a._json_error_results_this_round) == {"malformed"}
+
+
+def test_truncated_call_classification_keeps_valid_sibling_executable():
+    a = make_agent()
+    a._cleanup_task_resources.return_value = None
+    a._persist_session.return_value = None
+    partial = call("partial", '{"command":"unfinished')
+    valid = call("valid", '{"command":"echo ok"}')
+    verdict = validate_tool_calls(
+        a, SimpleNamespace(tool_calls=[partial, valid]), "tool_calls", messages=[],
+        conversation_history=[], api_call_count=1, effective_task_id=None,
+    )
+    assert verdict.action == "return"
+    assert a._executable_tool_calls_this_round is None
+
+
+def test_truncated_classification_stops_before_three_invalid_json_retries():
+    a = make_agent()
+    a._cleanup_task_resources.return_value = None
+    a._persist_session.return_value = None
+    a._invalid_json_retries = 2
+    partial = call("partial", '{"command":"unfinished')
+    verdict = validate_tool_calls(
+        a, SimpleNamespace(tool_calls=[partial]), "tool_calls", messages=[],
+        conversation_history=[], api_call_count=1, effective_task_id=None,
+    )
+    assert verdict.action == "return"
+    assert a._invalid_json_retries == 0

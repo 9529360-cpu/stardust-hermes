@@ -1,0 +1,19 @@
+截断JSON清洗/当前轮分类验证报告
+
+工作树：D:/项目/Stardust-Jarvis/.worktrees/subagent-sa-1-0dfd5bf2/.worktrees/subagent-sa-0-c8e73fd1/.worktrees/subagent-sa-0-f7de1038/.worktrees/subagent-sa-0-9fb607a2
+基线：5b6b15fbdf187f7d225cdbd3b41ec1d82c19a6a3
+
+修改：
+- 移除 sanitizer 对无结果截断 JSON 的全局保留分支，恢复原契约：畸形参数改写为 `{}` 并插入/标记对应结果。
+- 保留当前轮校验 EOF 识别（`JSONDecodeError`分类，不依赖原始引号计数）。
+- 添加EOF字符串、完整畸形JSON、合法兄弟调用、三次重试上限回归。
+- 添加真实 run_conversation 历史坏参数已有结果不重放 handler 的回归；handler 只调用新工具一次。
+
+验证：
+- `scripts/run_tests.sh`（STARDUST_PYTHON 指向任务专用venv），sanitizer + recovery identity + `TestRunConversation`：55 passed，0 failed。
+- `python -m pytest tests/agent/test_run_agent.py -q`：308 passed。
+- 工具恢复筛选（identity、empty-name loop dampening、recovery相关文件）：26 passed。
+- `git diff --check`：通过。
+- 完整文件首次运行曾因任务专用venv缺少 anthropic SDK 而报1错；仅在该专用venv安装 `anthropic>=0.39.0` 后重跑通过，运行venv未改动。
+
+未推送、未合并、未部署。
