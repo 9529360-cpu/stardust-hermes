@@ -53,6 +53,7 @@ def _checkpoint_path() -> Path:
     return CHECKPOINT_PATH if CHECKPOINT_PATH != _CHECKPOINT_PATH_AT_IMPORT else get_hermes_home() / "processes.json"
 
 _LONE_SURROGATES = re.compile("[\ud800-\udfff]")  # Python str has no surrogate pairs: every one is lone
+_CONPTY_POLL_SECONDS = 0.25  # how often a blocked ConPTY read wakes to ask whether its child is still alive
 
 MAX_OUTPUT_CHARS = 200_000      # rolling output buffer
 FINISHED_TTL_SECONDS = 1800     # keep finished processes 30 minutes
@@ -1391,6 +1392,8 @@ class ProcessRegistry(ProcessCheckpointMixin):
             from tools.pty_query_responder import PtyQueryResponder
             responder = PtyQueryResponder(rows=30, cols=120)
         try:
+            if _IS_WINDOWS:
+                self._read_conpty(session, pty)
             while pty.isalive():
                 try:
                     chunk = pty.read(4096)
@@ -1421,6 +1424,30 @@ class ProcessRegistry(ProcessCheckpointMixin):
         self._finish_reader(
             session, decoder, lambda t: self._ingest_output(session, t), "PTY",
             pty.wait, lambda: pty.exitstatus if hasattr(pty, 'exitstatus') else -1)
+
+    def _read_conpty(self, session: ProcessSession, pty) -> None:
+        """Read a ConPTY child's output until it is gone. The output pipe stays open after the child exits (it closes with
+        the pseudo console) and pywinpty's reader blocks on it, so a blocking ``read`` waits for output that never comes:
+        a child that exited quietly was never reported, and the last line a child wrote could still be on its way when
+        ``isalive()`` turned False. A timeout wakes the loop to ask ``isalive()``; once the child is seen gone, a whole
+        quiet interval is the end of its output, and the stream closing ends it sooner."""
+        stream = getattr(pty, "fileobj", None)
+        if stream is None:  # not pywinpty's PtyProcess: nothing to wake
+            return
+        stream.settimeout(_CONPTY_POLL_SECONDS)
+        leaving = False  # the child was seen gone: its last output gets one more quiet interval to arrive
+        while True:
+            try:
+                text = pty.read(4096)
+            except TimeoutError:
+                if leaving:
+                    return
+                leaving = not pty.isalive()
+                continue
+            except (EOFError, OSError):
+                return
+            if text:
+                self._ingest_output(session, text)
 
     def _ingest_output(self, session: ProcessSession, text: str) -> None:
         """Buffer a freshly-read chunk, then scan watch patterns and stream it live."""
