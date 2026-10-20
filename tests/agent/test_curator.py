@@ -28,7 +28,7 @@ def curator_env(tmp_path, monkeypatch):
     importlib.reload(curator)
 
     # Neutralize the real LLM pass by default — tests opt in per-case.
-    monkeypatch.setattr(curator, "_run_llm_review", lambda prompt: "llm-stub")
+    monkeypatch.setattr(curator, "_run_llm_review", lambda prompt, **_kwargs: "llm-stub")
 
     # Default: no config file → curator defaults. Tests can override.
     monkeypatch.setattr(curator, "_load_config", lambda: {})
@@ -470,10 +470,11 @@ def test_run_review_records_state(curator_env):
 
 
 def test_dry_run_injects_report_only_banner(curator_env, monkeypatch):
-    """The dry-run prompt must carry a banner instructing the LLM not to
-    call any mutating tool. This is defense in depth — the caller also
-    skips automatic transitions — but the LLM prompt is the only guard
-    against the model calling skill_manage directly."""
+    """The dry-run prompt keeps an explicit report-only banner as defense in depth.
+
+    The authoritative safety boundary is the tool-level dry-run write barrier;
+    the prompt still tells the model what behavior to plan and report.
+    """
     c = curator_env["curator"]
     u = curator_env["usage"]
     skills_dir = curator_env["home"] / "skills"
@@ -481,13 +482,15 @@ def test_dry_run_injects_report_only_banner(curator_env, monkeypatch):
     u.mark_agent_created("a")
 
     captured = {}
-    def _stub(prompt):
+    def _stub(prompt, **kwargs):
         captured["prompt"] = prompt
+        captured["dry_run"] = kwargs.get("dry_run")
         return {"final": "", "summary": "s", "model": "", "provider": "",
                 "tool_calls": [], "error": None}
     monkeypatch.setattr(c, "_run_llm_review", _stub)
 
     c.run_curator_review(synchronous=True, dry_run=True, consolidate=True)
+    assert captured["dry_run"] is True
     assert "DRY-RUN" in captured["prompt"]
     assert "DO NOT" in captured["prompt"]
 
@@ -502,7 +505,7 @@ def test_run_review_synchronous_invokes_llm_stub(curator_env, monkeypatch):
     u.mark_agent_created("a")
 
     calls = []
-    def _stub(prompt):
+    def _stub(prompt, **_kwargs):
         calls.append(prompt)
         return {
             "final": "stubbed-summary",
@@ -617,7 +620,7 @@ def test_review_prompt_tells_reviewer_to_read_before_writing(curator_env, monkey
     u.mark_agent_created("a")
 
     captured = {}
-    def _stub(prompt):
+    def _stub(prompt, **_kwargs):
         captured["prompt"] = prompt
         return {"final": "", "summary": "s", "model": "", "provider": "",
                 "tool_calls": [], "error": None}
@@ -874,13 +877,14 @@ def test_review_fork_forwards_runtime_pool_and_overrides(curator_env, monkeypatc
     )
     monkeypatch.setattr("run_agent.AIAgent", _StubAgent)
 
-    meta = curator._run_llm_review("review prompt")
+    meta = curator._run_llm_review("review prompt", dry_run=True)
 
     assert meta.get("error") is None, meta.get("error")
     assert captured["kwargs"]["credential_pool"] is fake_pool
     assert captured["kwargs"]["request_overrides"] == fake_overrides
     assert captured["agent"]._request_timeout_override == 600.0
     assert captured["agent"]._codex_event_stale_timeout_override == 600.0
+    assert captured["agent"]._review_dry_run is True
 
 
 def test_review_fork_uses_runtime_model_and_output_cap(curator_env, monkeypatch):
@@ -1051,7 +1055,7 @@ def test_curator_fork_runs_under_bounded_validation_context(curator_env, monkeyp
     usage.mark_agent_created("sample")
 
     seen = {}
-    def _stub(prompt):
+    def _stub(prompt, **_kwargs):
         seen["active"] = active_validation()
         return {"final": "", "summary": "no change", "model": "test", "provider": "test",
                 "tool_calls": [], "error": None}

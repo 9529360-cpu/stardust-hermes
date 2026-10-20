@@ -203,6 +203,28 @@ def _build(agent, **overrides):
     return build_turn_context(**kwargs)
 
 
+def test_turn_context_binds_curator_dry_run_policy():
+    import contextvars
+    from tools.skill_provenance import is_review_dry_run, set_current_write_origin
+
+    def consecutive_turns():
+        agent = _FakeAgent()
+        agent._memory_write_origin = "background_review"
+        agent._review_dry_run = True
+        _build(agent, set_current_write_origin=set_current_write_origin)
+        assert is_review_dry_run()
+        agent._review_dry_run = False
+        _build(agent, set_current_write_origin=set_current_write_origin)
+        assert not is_review_dry_run()
+        agent._review_dry_run = True
+        _build(agent, set_current_write_origin=set_current_write_origin)
+        assert is_review_dry_run()
+        _build(_FakeAgent(), set_current_write_origin=set_current_write_origin)
+        assert not is_review_dry_run()
+
+    contextvars.copy_context().run(consecutive_turns)
+
+
 class _RefreshStore:
     def __init__(self, *, stale: bool, before: str, after: str):
         self.stale = stale
