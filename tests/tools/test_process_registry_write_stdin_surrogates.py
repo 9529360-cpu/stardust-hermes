@@ -1,6 +1,7 @@
 """Sibling regression test for #79178: background-PTY stdin must round-trip
 surrogateescape content instead of crashing on the strict UTF-8 encode."""
 import shlex
+import sys
 import time
 
 import pytest
@@ -8,6 +9,9 @@ import pytest
 from tools.process_registry import ProcessRegistry
 
 
+@pytest.mark.skipif(sys.platform == "win32",
+                    reason="POSIX PTY bytes round-trip (python3 on PATH); a Windows console takes text, and the "
+                           "lone-surrogate case is covered in test_process_registry_windows_native.py")
 def test_write_stdin_pty_surrogateescape_roundtrip(tmp_path):
     registry = ProcessRegistry()
     out = tmp_path / "out.bin"

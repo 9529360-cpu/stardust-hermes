@@ -14,14 +14,27 @@ from __future__ import annotations
 import contextlib
 import subprocess
 import sys
+import textwrap
 import threading
 import time
 import uuid
+from pathlib import Path
 
 import psutil
 import pytest
 
 from tools.environments.local import LocalEnvironment
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _processes_mentioning(token: str) -> list[psutil.Process]:
+    found = []
+    for proc in psutil.process_iter(["cmdline"]):
+        with contextlib.suppress(psutil.Error):
+            if token in " ".join(proc.info["cmdline"] or []):
+                found.append(proc)
+    return found
 
 
 def _unique_seconds() -> str:
@@ -170,6 +183,63 @@ def test_a_process_outside_any_job_is_still_ended_by_the_fallback():
     finally:
         with contextlib.suppress(OSError):
             proc.kill()
+
+
+@pytest.mark.windows_only
+def test_a_real_process_is_resumed_when_containment_was_imported_under_another_popen():
+    """``tests/conftest.py`` swaps a fresh ``subprocess.Popen`` subclass in for every test, so a module first imported
+    mid-test sees a class that no later wrapper's processes are instances of. Those processes are still real ones. The
+    command is created suspended, so one that was not recognised stayed frozen: nothing ever ran it and its reader
+    waited on the pipe for good (the live registry test sat out its whole 60 s deadline).
+
+    A fresh interpreter reproduces the import order exactly, whatever ran before in this one."""
+    script = textwrap.dedent(
+        """
+        import subprocess, sys
+        real = subprocess.Popen
+        class Earlier(real):
+            pass
+        subprocess.Popen = Earlier  # a per-test guard around the first import
+        from tools.environments import windows_job
+        subprocess.Popen = real
+        proc = windows_job.spawn_contained([sys.executable, "-c", "print('ran')"], stdout=subprocess.PIPE, text=True)
+        try:
+            out, _ = proc.communicate(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            sys.exit("the process was never resumed")
+        print(out.strip(), hasattr(proc, "_hermes_job"))
+        """
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-c", script], cwd=_REPO_ROOT, capture_output=True, text=True, timeout=60)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "ran True"
+
+
+@pytest.mark.windows_only
+def test_a_failure_while_joining_the_job_leaves_no_suspended_process(monkeypatch):
+    """Every way out of ``spawn_contained`` either returns a running process or leaves none behind: the process exists,
+    suspended, from the moment it is created until it is resumed."""
+    from tools.environments import windows_job
+
+    token = f"suspended-{uuid.uuid4().hex}"
+
+    def explode(self, proc):
+        raise RuntimeError("unexpected failure while joining the job")
+
+    monkeypatch.setattr(windows_job.ProcessJob, "assign", explode)
+    try:
+        with pytest.raises(RuntimeError, match="joining the job"):
+            windows_job.spawn_contained([sys.executable, "-c", f"import time; time.sleep(60)  # {token}"])
+
+        assert _wait_until(lambda: not _processes_mentioning(token), 10), "the failed spawn left a frozen process"
+    finally:
+        for proc in _processes_mentioning(token):
+            with contextlib.suppress(psutil.Error):
+                proc.kill()
 
 
 def test_a_popen_double_is_returned_untouched(monkeypatch):
