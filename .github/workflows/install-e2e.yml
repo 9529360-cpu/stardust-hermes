@@ -289,7 +289,7 @@ jobs:
           TAG_PICK_RESULT: ${{ needs.pick-releases.result }}
         run: |
           set -euo pipefail
-          node --test tests/scripts/sandbox/pick-release-tags.test.mjs
+          node --test tests/scripts/sandbox/test_pick_release_tags.mjs
           tags="${{ needs.pick-releases.outputs.tags || '[]' }}"
           if [[ "$tags" == '[]' ]]; then
             echo 'No published release versions yet; upgrade coverage is not applicable.' >> "$GITHUB_STEP_SUMMARY"
