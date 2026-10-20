@@ -4,6 +4,8 @@ when the model tries to finish right after editing code without fresh evidence."
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import tempfile
 from pathlib import Path
@@ -110,6 +112,30 @@ def _verification_snapshot(
     return first_snapshot
 
 
+def _unverified_state_key(*, session_id: str | None, changed_paths: list[str]) -> str | None:
+    """Identity of the unverified state the model is being told about, ``None`` when nothing needs proof.
+
+    Every edited workspace still lacking proof, each with its last edit and last verification run: another edit or
+    another run changes the key, time passing and a repeated turn do not."""
+    try:
+        from agent.coding_context import project_facts_for
+        from agent.verification_evidence import verification_state_marker, verification_status
+    except Exception:
+        return None
+
+    markers: list[list[Any]] = []
+    for cwd in _candidate_cwds(changed_paths):
+        if not project_facts_for(cwd):
+            continue
+        if str(verification_status(session_id=session_id, cwd=cwd).get("status") or "unverified") == "passed":
+            continue
+        marker = verification_state_marker(session_id=session_id, cwd=cwd)
+        markers.append(list(marker) if marker is not None else [str(cwd)])
+    if not markers:
+        return None
+    return hashlib.sha1(json.dumps(sorted(markers), default=str).encode("utf-8")).hexdigest()
+
+
 def _format_changed_paths(paths: list[str]) -> str:
     lines = [f"- `{path}`" for path in paths[:_MAX_CHANGED_PATHS_IN_NUDGE]]
     if len(paths) > _MAX_CHANGED_PATHS_IN_NUDGE:
@@ -156,8 +182,14 @@ def _status_detail(status: dict[str, Any]) -> str:
 
 def build_verify_on_stop_nudge(
     *, session_id: str | None, changed_paths: Iterable[str], attempts: int=0, max_attempts: int=2,
+    nudged_states: set[str] | None = None,
 ) -> str | None:
-    """Return a synthetic follow-up when edited code lacks fresh verification."""
+    """Return a synthetic follow-up when edited code lacks fresh verification.
+
+    ``attempts`` / ``max_attempts`` bound the follow-ups within one turn. ``nudged_states`` (a set the caller keeps for
+    the life of the conversation) bounds them across turns: a state the model was already told about is not told
+    again until an edit or a verification run changes it. Without that, every short turn (a user message, a
+    background-task notice) restarts the per-turn count and re-asks for proof nothing has changed."""
     # Prose-only turns (markdown, skills, README, LICENSE, ...) have nothing to verify.
     paths = sorted({str(p) for p in changed_paths if p and not _is_non_code_path(p)})
     if not paths or attempts >= max_attempts:
@@ -169,6 +201,12 @@ def build_verify_on_stop_nudge(
     status, facts = snapshot
     if str(status.get("status") or "unverified") == "passed":
         return None
+    if nudged_states is not None:
+        state_key = _unverified_state_key(session_id=session_id, changed_paths=paths)
+        if state_key is not None:
+            if state_key in nudged_states:
+                return None
+            nudged_states.add(state_key)
     verify_commands = [str(cmd).strip() for cmd in (facts.get("verifyCommands") or []) if str(cmd).strip()]
     has_recipe = _workspace_has_runnable_recipe(facts.get("root"))
 

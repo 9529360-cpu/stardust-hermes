@@ -125,6 +125,19 @@ arguments). The tokenizer (`_split_shell_segments`) keeps heredoc bodies out of 
 blank lines, and must leave Windows backslash paths intact for the command word; extend the parametrized command lists
 in `tests/agent/test_verification_evidence.py` for every new writer or spelling, with a read-only twin for each.
 
+A verifier is recognised by what it runs, not by how it is launched: `_command_key` makes `C:/Program Files/Git/usr/bin/bash.exe
+scripts/run_tests.sh`, `pnpm.cmd run test` and `python3.11 -m pytest` match their canonical commands, and the test, lint and
+format-check runners of `node_modules` (`vitest.mjs`, `eslint.js`, `@playwright/test/cli.js`, ...) are a table
+(`VERIFIER_TOOLS`, with the flags that make them write) instead of "a custom script". A redirect only counts as a write when its
+target can be inside the project. Both matter because a gate that cannot be satisfied is worse than no gate: on a Windows host
+agents launch everything by full path, so a spelling gap turns every passing run into "still unverified".
+
+The nudge is also told **once per unverified state**: `build_verify_on_stop_nudge(nudged_states=...)` keeps a per-agent memo keyed
+by each unverified workspace's last edit and last verification run. The per-turn counter (`_verification_stop_nudges`) restarts on
+every user message and every background-task notice, so on its own it lets one unchanged state ask again on every turn, each
+time costing a full-context round and leaving another near-identical candidate answer in the transcript. A new edit or a new
+verification run changes the key and re-arms the gate.
+
 ## Tests
 
 Loop/phase tests go in `tests/agent/`; patch the binding the phase actually reads (siblings often

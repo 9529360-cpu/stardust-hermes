@@ -8,6 +8,7 @@ from agent.terminal_writers import (
     conditional_write,
     executable_name,
     interpreter_kind,
+    node_verifier_writes,
 )
 
 
@@ -93,3 +94,49 @@ def test_unknown_commands_are_not_decided_here():
     assert conditional_write("ls", ["-la"]) is None
     assert conditional_write("pytest", []) is None
     assert set(CONDITIONAL_WRITERS) >= {"tar", "unzip", "curl", "wget", "rsync", "clang-format", "terraform"}
+
+
+@pytest.mark.parametrize(("script", "args"), [
+    ("node_modules/vitest/vitest.mjs", ["run", "src/a.test.ts"]),
+    ("./node_modules/vitest/vitest.mjs", ["run"]),
+    ("D:\\proj\\node_modules\\vitest\\vitest.mjs", ["run", "--project", "ui"]),
+    ("C:/proj/node_modules/.pnpm/vitest@3.0.0/node_modules/vitest/vitest.mjs", ["run"]),
+    ("node_modules/.bin/vitest", ["run"]),
+    ("node_modules/.bin/vitest.cmd", ["run"]),
+    ("node_modules/@playwright/test/cli.js", ["test", "e2e/a.spec.ts"]),
+    ("node_modules/playwright/cli.js", ["test"]),
+    ("node_modules/jest/bin/jest.js", ["--ci"]),
+    ("node_modules/jest-cli/bin/jest.js", []),
+    ("node_modules/mocha/bin/mocha.js", ["spec/"]),
+    ("node_modules/eslint/bin/eslint.js", ["src/"]),
+    ("node_modules/prettier/bin/prettier.cjs", ["--check", "src/"]),
+])
+def test_known_verifiers_started_through_node_only_read(script, args):
+    assert node_verifier_writes(script, args) is False
+
+
+@pytest.mark.parametrize(("script", "args"), [
+    ("node_modules/vitest/vitest.mjs", ["run", "-u"]),
+    ("node_modules/vitest/vitest.mjs", ["run", "--update"]),
+    ("node_modules/jest/bin/jest.js", ["--updateSnapshot"]),
+    ("node_modules/jest/bin/jest.js", ["-u"]),
+    ("node_modules/@playwright/test/cli.js", ["test", "--update-snapshots"]),
+    ("node_modules/eslint/bin/eslint.js", ["--fix", "src/"]),
+    ("node_modules/prettier/bin/prettier.cjs", ["--write", "src/"]),
+    ("node_modules/prettier/bin/prettier.cjs", ["-w", "src/"]),
+])
+def test_known_verifiers_started_through_node_write_when_asked_to(script, args):
+    assert node_verifier_writes(script, args) is True
+
+
+@pytest.mark.parametrize("script", [
+    "scripts/vitest.mjs",  # a script of the project that only borrows the name
+    "vitest.mjs",
+    "node_modules/left-pad/index.js",
+    "node_modules/.bin/some-tool",
+    "node_modules/@playwright/other/cli.js",
+    "node_modules",
+    "build.js",
+])
+def test_scripts_that_are_not_known_verifiers_are_not_decided_here(script):
+    assert node_verifier_writes(script, ["run"]) is None
