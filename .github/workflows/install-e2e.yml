@@ -276,7 +276,7 @@ jobs:
             scripts/sandbox/generate-e2e-matrix.mjs
             scripts/sandbox/pick-release-tags.sh
             tests/install/e2e-assets/known-failures.json
-            tests/scripts/sandbox/pick-release-tags.test.mjs
+            tests/scripts/sandbox/test_pick_release_tags.mjs
           sparse-checkout-cone-mode: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
