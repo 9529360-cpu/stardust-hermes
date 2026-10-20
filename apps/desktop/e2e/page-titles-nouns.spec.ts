@@ -90,9 +90,13 @@ test('Tools and Plugins share the Tasks title row, and the Projects list names t
 
   const nav = page.getByRole('navigation', { name: 'Product navigation' })
 
-  // Tasks is the reference: its title row sits at the top of the page body.
-  await nav.getByRole('button', { name: '自动化', exact: true }).click()
-  const tasksTitle = page.getByRole('heading', { name: '定时任务', exact: true })
+  // The automation tab in Task Center contains the Cron page title row.
+  await nav.getByRole('button', { name: '任务', exact: true }).click()
+  const taskCenter = page.locator('[data-task-center]')
+  await expect(taskCenter).toBeVisible()
+  await taskCenter.getByRole('button', { name: '自动化', exact: true }).click()
+  await expect(page.locator('[data-cron-page]')).toBeVisible()
+  const tasksTitle = page.getByRole('heading', { name: 'Tasks', exact: true })
   await expect(tasksTitle).toBeVisible({ timeout: 20_000 })
   const tasksBox = await tasksTitle.boundingBox()
   expect(tasksBox).not.toBeNull()

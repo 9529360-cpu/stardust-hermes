@@ -61,10 +61,11 @@ test('the agent space is a page beside the nav, and a nav item leaves it', async
   // Any nav item leaves the page for its own page, like Tools and Plugins.
   await navAgentSpace.click()
   await expect(roster).toBeVisible({ timeout: 20_000 })
-  await page
-    .getByRole('button', { name: /^(自动化|Automations)$/ })
-    .first()
-    .click()
+  await page.getByRole('button', { name: /^(任务|Tasks)$/ }).click()
+  const taskCenter = page.locator('[data-task-center]')
+  await expect(taskCenter).toBeVisible()
+  await taskCenter.getByRole('button', { name: /^(自动化|Automation)$/ }).click()
+  await expect(page.locator('[data-cron-page]')).toBeVisible()
   await expect(roster).toBeHidden({ timeout: 10_000 })
   await expect(navNewChat).toBeVisible()
 })

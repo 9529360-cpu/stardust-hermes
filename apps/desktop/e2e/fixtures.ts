@@ -710,25 +710,22 @@ export async function waitForOnboarding(page: Page, timeoutMs = 60_000): Promise
 export async function waitForBootFailure(page: Page, timeoutMs = 60_000): Promise<void> {
   await page.waitForFunction(
     () => {
-      // Boot failure is terminal: the backend gave up. The renderer shows
-      // either BootFailureOverlay (z-1400, with Retry/Repair buttons) or
-      // falls back to the onboarding picker (z-1300) as a recovery path.
-      // We wait for the failure dialog itself — the Preparing component may
-      // still paint its progress bar (recolored red) underneath the overlay,
-      // which is harmless.
-      const text = document.body.textContent ?? ''
+      // A failed backend connection leaves the first-run progress card under
+      // the notification. Require that real failure presentation: the current
+      // notification title, the actionable 8% resolve state, and the injected
+      // connection error detail. A generic toast or boot panel alone is not it.
+      const text = document.body.innerText ?? ''
+      const hasErrorTitle = text.includes("Stardust couldn't start") || text.includes('桌面启动失败')
+      const hasBackendError = text.includes('connection refused') || text.includes('连接被拒绝')
+      const hasResolveProgress = text.includes('Resolving Stardust backend') || text.includes('正在解析 Stardust 后端')
+      const hasBootProgress = text.includes('Starting Stardust') || text.includes('正在启动 Stardust')
+      const hasEightPercent = Array.from(document.querySelectorAll('[role="progressbar"]')).some(element => {
+        const label = element.getAttribute('aria-label') ?? ''
+        const progress = element.getAttribute('aria-valuenow') ?? ''
+        return label.includes('8%') || progress === '8'
+      }) || text.includes('8%')
 
-      // BootFailureOverlay buttons.
-      const hasFailureUI =
-        text.includes('Retry') ||
-        text.includes('Repair') ||
-        text.includes('Use local gateway') ||
-        text.includes('Connection settings')
-
-      // The error toast / notification that fires on failDesktopBoot().
-      const hasErrorToast = text.includes('Desktop boot failed')
-
-      return hasFailureUI || hasErrorToast
+      return hasErrorTitle && hasBackendError && hasBootProgress && hasResolveProgress && hasEightPercent
     },
     undefined,
     { timeout: timeoutMs },

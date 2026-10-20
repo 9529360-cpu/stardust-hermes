@@ -53,9 +53,11 @@ test.afterAll(async () => {
 
 test('pending automation is localized, consent-gated, and dismissible from Scheduled jobs', async () => {
   const page = fixture!.page
-  const tasksButton = page.locator('[data-personal-product-nav]').getByRole('button', { name: '自动化' })
-
-  await tasksButton.click()
+  await page.locator('[data-personal-product-nav]').getByRole('button', { name: '任务', exact: true }).click()
+  const taskCenter = page.locator('[data-task-center]')
+  await expect(taskCenter).toBeVisible()
+  await taskCenter.getByRole('button', { name: '自动化', exact: true }).click()
+  await expect(page.locator('[data-cron-page]')).toBeVisible()
 
   await expect(page.getByText('建议的自动化', { exact: true })).toBeVisible()
   const suggestionRow = page.getByText('重要邮件监控', { exact: true }).first()

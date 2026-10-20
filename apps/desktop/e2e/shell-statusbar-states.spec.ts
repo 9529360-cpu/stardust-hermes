@@ -84,7 +84,11 @@ async function expectStatusBarAcrossPages(page: MockBackendFixture['page'], widt
   await expect(page.locator('[data-statusbar-item="gateway-health"]')).toBeVisible()
   await capture(page, `${widthName}-agent-space`)
 
-  await goTo(page, /^(自动化|Automations)$/, narrow)
+  await goTo(page, /^(任务|Tasks)$/, narrow)
+  const taskCenter = page.locator('[data-task-center]')
+  await expect(taskCenter).toBeVisible()
+  await taskCenter.getByRole('button', { name: /^(自动化|Automation)$/ }).click()
+  await expect(page.locator('[data-cron-page]')).toBeVisible()
   await expect.poll(() => approvalText(page)).toMatch(CONFIGURED_MODE)
   expect(await dashItemCount(page)).toBe(0)
   await capture(page, `${widthName}-tasks`)
