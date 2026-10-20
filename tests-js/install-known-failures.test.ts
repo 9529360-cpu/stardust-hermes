@@ -110,6 +110,21 @@ describe('install E2E matrix CLI', () => {
     expect(result.stdout).toBe('')
   })
 
+  it.each([['json', 'json'], ['markdown', 'markdown']])('allows an explicit empty release set in %s mode', (format) => {
+    const result = run(['--allow-empty', '--format', format, '--tags', '[]'])
+    expect(result.status).toBe(0)
+    expect(result.stderr).toBe('')
+    if (format === 'json') {
+      const matrices = JSON.parse(result.stdout)
+      expect(matrices.linux.include).toEqual([])
+      expect(matrices.windows.include).toEqual([])
+      expect(matrices.macos.include).toEqual([])
+    } else {
+      expect(result.stdout).toContain('No released versions are available to update from')
+      expect(result.stdout).toContain('upgrade coverage is not applicable')
+    }
+  })
+
   it('retains tagged matrix generation and pass/fail result counts', () => {
     const tags = JSON.stringify([{ ref: 'v2026.8.3', desktop: true }])
     const matrix = run(['--tags', tags])

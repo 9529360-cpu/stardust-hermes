@@ -169,7 +169,7 @@ jobs:
       - id: gen
         run: |
           set -euo pipefail
-          matrices="$(node scripts/sandbox/generate-e2e-matrix.mjs \
+          matrices="$(node scripts/sandbox/generate-e2e-matrix.mjs --allow-empty \
             --tags '${{ needs.pick-releases.outputs.tags }}')"
           echo "$matrices"
           for key in linux windows macos; do
@@ -177,7 +177,7 @@ jobs:
           done
           # The plan, human-readable: a combination x starting-tag chart on
           # the run's summary page.
-          node scripts/sandbox/generate-e2e-matrix.mjs \
+          node scripts/sandbox/generate-e2e-matrix.mjs --allow-empty \
             --tags '${{ needs.pick-releases.outputs.tags }}' \
             --format markdown >> "$GITHUB_STEP_SUMMARY"
 
@@ -309,7 +309,7 @@ jobs:
               --paginate --jq '.artifacts[] | {name, id}' > /tmp/e2e-artifacts.ndjson
             echo 'Legend: ✅ upgrade passed · known [n] = exact historical failure, see footnote · ❌ unexpected failure · pre-desktop / TODO = why a leg skipped · 📼 opens the leg player (recording + synced logs)'
             echo
-            node scripts/sandbox/generate-e2e-matrix.mjs --format results \
+            node scripts/sandbox/generate-e2e-matrix.mjs --allow-empty --format results \
               --tags "$TAG_ANNOTATIONS" \
               --artifacts /tmp/e2e-artifacts.ndjson < /tmp/e2e-jobs.ndjson
           } >> "$GITHUB_STEP_SUMMARY"

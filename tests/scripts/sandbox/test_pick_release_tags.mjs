@@ -55,9 +55,13 @@ test('release picker distinguishes a pre-release empty tag set from normal stric
   assert.deepEqual(JSON.parse(selected.stdout), ['v2026.9.24']);
 });
 
-test('empty tag matrix is valid JSON for every OS and says upgrade coverage is not applicable', t => {
+test('empty tag matrix is valid only when explicitly allowed', t => {
   createFixtureRepositories(t);
-  const generated = spawnSync('node', [matrix, '--tags', '[]'], { encoding: 'utf8' });
+  const strict = spawnSync('node', [matrix, '--tags', '[]'], { encoding: 'utf8' });
+  assert.equal(strict.status, 1);
+  assert.match(strict.stderr, /no upgrade tags selected/);
+
+  const generated = spawnSync('node', [matrix, '--allow-empty', '--tags', '[]'], { encoding: 'utf8' });
   assert.equal(generated.status, 0, generated.stderr);
   assert.deepEqual(JSON.parse(generated.stdout), {
     linux: { include: [] },
@@ -65,7 +69,7 @@ test('empty tag matrix is valid JSON for every OS and says upgrade coverage is n
     macos: { include: [] }
   });
 
-  const plan = spawnSync('node', [matrix, '--tags', '[]', '--format', 'markdown'], { encoding: 'utf8' });
+  const plan = spawnSync('node', [matrix, '--allow-empty', '--tags', '[]', '--format', 'markdown'], { encoding: 'utf8' });
   assert.equal(plan.status, 0, plan.stderr);
   assert.match(plan.stdout, /No released versions are available/);
   assert.match(plan.stdout, /not applicable/);
