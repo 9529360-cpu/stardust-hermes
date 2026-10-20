@@ -1117,6 +1117,30 @@ def mark_workspace_edited(
     return {"session_id": sid, "root": root, "last_edit_at": edited_at, "changed_paths": changed_paths}
 
 
+def carry_verification_state(*, from_session_id: str | None, to_session_id: str | None) -> int:
+    """Copy the parent's per-workspace ledger rows onto a continuation session.
+
+    Context compression (and resume onto a rotated tip) re-points ``agent.session_id`` at a fresh child id, while
+    every ledger lookup is a flat ``(session_id, root)`` read. Without this the child reads ``unverified`` for a
+    workspace the parent already verified, and the verify-on-stop gate asks the model to re-run checks it just ran.
+    Rows the child already holds win (they are newer). Returns the number of rows copied."""
+    if not _ledger_enabled():
+        return 0
+    src, dst = str(from_session_id or ""), str(to_session_id or "")
+    if not src or not dst or src == dst:
+        return 0
+    with _DB_LOCK, _transaction() as conn:
+        cur = conn.execute(
+            "INSERT OR IGNORE INTO verification_state("
+            " session_id, root, last_event_id, last_edit_at, changed_paths_json"
+            ") SELECT ?, root, last_event_id, last_edit_at, changed_paths_json"
+            " FROM verification_state WHERE session_id = ?",
+            (dst, src),
+        )
+        conn.commit()
+        return int(cur.rowcount or 0)
+
+
 def verification_status(*, session_id: str | None, cwd: str | Path | None) -> dict[str, Any]:
     """Return the best known verification state for a session/workspace.
 
