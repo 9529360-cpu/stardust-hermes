@@ -2,8 +2,9 @@
 """Evaluate the ``all-checks-pass`` gate job in ``.github/workflows/ci.yaml``.
 
 A ``needs.<job>.result`` is one of ``success``, ``failure``, ``cancelled``, or ``skipped``.
-``skipped`` passes the gate — most lanes are conditioned on ``needs.detect.outputs.*`` and
-legitimately have nothing to do for a PR that didn't touch their area.
+``skipped`` passes the gate — lanes can be irrelevant to a diff or intentionally
+skipped on Draft PRs. Drafts waive desktop runtime proof only when the trusted
+detect job explicitly returns ``full=false``; unknown tiers still fail closed.
 
 ``HARD_DISABLED_LANES`` is a different case: these jobs are unconditionally ``if: false`` in
 ci.yaml regardless of what changed, so every single run reports them ``skipped`` — treating
@@ -46,6 +47,9 @@ def _desktop_runtime_proof_required(needs: dict) -> bool:
     """
     detect = needs.get("detect") or {}
     outputs = detect.get("outputs") or {}
+    if str(outputs.get("full", "")).strip().lower() == "false":
+        # Draft PRs defer runtime proof until the PR is Ready for review.
+        return False
     values = [
         str(outputs.get(name, "")).strip().lower()
         for name in DESKTOP_RUNTIME_PROOF_OUTPUTS

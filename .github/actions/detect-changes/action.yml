@@ -1,9 +1,8 @@
 name: Detect affected areas
 description: >-
-  Classify a PR's changed files into CI work lanes (python, frontend, site,
-  scan, deps, mcp_catalog) so the orchestrator can conditionally call only
-  the sub-workflows a PR can affect. Outputs are always "true" on push/dispatch
-  events and fail open (everything "true") when the diff cannot be computed.
+  Classify changed files from PRs and main pushes into CI work lanes (python,
+  frontend, site, scan, deps, mcp_catalog). Schedule/manual events and failed
+  or empty compares fail open (all lanes true).
 
 inputs:
   github-token:
@@ -79,19 +78,16 @@ runs:
         GH_TOKEN: ${{ inputs.github-token || github.token }}
         REPO: ${{ github.repository }}
         EVENT_NAME: ${{ github.event_name }}
-        BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       run: |
         set -euo pipefail
 
-        # Only pull_request events are gated. Other events (push, release,
-        # dispatch) leave CHANGED empty, so the classifier fails open and every
-        # lane runs. Post-merge / on-demand validation is never weakened.
-        if [ "$EVENT_NAME" = "pull_request" ]; then
-          # Use the compare endpoint with the pinned base/head SHAs from the
-          # event payload instead of the "current PR files" endpoint. The SHAs
-          # are frozen at trigger time, so the file list is deterministic even
-          # if the PR receives a new push between trigger and detect.
+        # Diff PR base/head or main push before/after; schedule/manual runs
+        # deliberately validate all lanes. Missing/failed compares fail open.
+        if [ "$EVENT_NAME" = "pull_request" ] || [ "$EVENT_NAME" = "push" ]; then
+          # Use event-frozen SHAs instead of the mutable PR branch tip. Main
+          # pushes can now skip suites unrelated to the new commit(s).
           #
           # Retried: a rate-limit blip or eventual-consistency 404 on a
           # freshly-pushed HEAD would otherwise silently fall open (all lanes
@@ -119,6 +115,12 @@ runs:
             echo "::warning::compare API failed (attempt $i); retrying in 10s"
             sleep 10
           done
+          # GitHub compare caps the returned list at 300 paths; a capped
+          # response cannot safely justify skipping any validation lane.
+          if [ -n "$CHANGED" ] && [ "$(printf '%s\n' "$CHANGED" | wc -l)" -ge 300 ]; then
+            echo "::warning::compare hit 300-file cap — failing open to full CI"
+            CHANGED=""
+          fi
         fi
 
         echo "Changed files:"

@@ -66,6 +66,28 @@ def test_legitimately_skipped_job_is_not_blocking_and_not_flagged_disabled():
     assert disabled == []
 
 
+def test_draft_pr_can_skip_desktop_runtime_proof():
+    needs = _desktop_needs(frontend="true", smoke="skipped")
+    needs["detect"]["outputs"]["full"] = "false"
+    _compact, blocking, _disabled = evaluate(needs)
+    assert blocking == []
+
+
+def test_ready_pr_cannot_skip_desktop_runtime_proof():
+    needs = _desktop_needs(frontend="true", smoke="skipped")
+    needs["detect"]["outputs"]["full"] = "true"
+    _compact, blocking, _disabled = evaluate(needs)
+    assert blocking == [DESKTOP_RUNTIME_PROOF_LANE]
+
+
+def test_draft_pr_still_blocks_on_failed_quick_check():
+    needs = _desktop_needs(frontend="true", smoke="skipped")
+    needs["detect"]["outputs"]["full"] = "false"
+    needs["case-collision-check"] = {"result": "failure", "outputs": {}}
+    _compact, blocking, _disabled = evaluate(needs)
+    assert blocking == ["case-collision-check"]
+
+
 def test_frontend_change_requires_successful_desktop_runtime_proof():
     compact, blocking, disabled = evaluate(
         _desktop_needs(frontend="true", smoke="skipped")

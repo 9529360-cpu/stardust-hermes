@@ -345,6 +345,28 @@ def _iter_if_expressions(job: object):
             yield cond
 
 
+def test_tiered_ci_keeps_required_gate_and_nix_validation():
+    ci = _yaml(".github/workflows/ci.yaml")
+    jobs = ci["jobs"]
+    assert "full" in jobs["detect"]["outputs"]
+    assert jobs["nix"]["uses"] == "./.github/workflows/nix.yml"
+    assert "nix" in jobs["all-checks-pass"]["needs"]
+    for name in ("tests", "tests-os", "lint", "js-tests", "e2e-desktop", "stardust-visual-smoke", "nix", "osv-scanner"):
+        assert "needs.detect.outputs.full == 'true'" in jobs[name]["if"], name
+    for name in ("case-collision-check", "profile-artifact-check", "infographic-check"):
+        assert "needs.detect.outputs.full" not in str(jobs[name].get("if", "")), name
+    nix = (_REPO / ".github/workflows/nix.yml").read_text(encoding="utf-8")
+    assert "  workflow_call:" in nix
+    assert "  pull_request:" not in nix
+
+
+def test_push_classifier_compares_before_after_instead_of_full_suite():
+    action = (_REPO / ".github/actions/detect-changes/action.yml").read_text(encoding="utf-8")
+    assert "github.event.before" in action
+    assert "github.sha" in action
+    assert 'if [ "$EVENT_NAME" = "pull_request" ] || [ "$EVENT_NAME" = "push" ]; then' in action
+
+
 def test_ci_review_files_returns_only_sensitive_paths_sorted_and_unique():
     assert ci_review_files([
         "apps/desktop/src/app.tsx",
