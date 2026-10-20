@@ -104,6 +104,10 @@ def test_method_is_registered_as_long_handler_and_contract(server):
 
 def test_dispatch_returns_allowlisted_cron_and_goal_rows_without_writes(server, home):
     execution = _seed(home)
+    from hermes_cli.goals import GoalState, save_goal
+
+    save_goal("session-done", GoalState(goal="Completed goal", status="done", last_turn_at=1_800_000_000))
+    save_goal("session-cleared", GoalState(goal="Cleared goal", status="cleared"))
     before_files = {path.relative_to(home): path.read_bytes() for path in home.rglob("*") if path.is_file()}
     before_dirs = {path.relative_to(home) for path in home.rglob("*") if path.is_dir()}
 
@@ -133,6 +137,10 @@ def test_dispatch_returns_allowlisted_cron_and_goal_rows_without_writes(server, 
     assert by_id[f"cron-run:{execution['id']}"]["parent_task_id"] == f"cron:{job_id}"
     assert by_id["goal:session-1"]["progress_current"] == 2
     assert by_id["goal:session-1"]["durability"] == "session_bound"
+    assert by_id["goal:session-done"]["state"] == "completed"
+    assert by_id["goal:session-done"]["terminal"] is True
+    assert by_id["goal:session-done"]["updated_at"] == 1_800_000_000
+    assert "goal:session-cleared" not in by_id
     assert set(by_id[f"cron:{job_id}"]) == {
         "task_id", "title", "state", "rail", "durability", "background", "phase",
         "started_at", "updated_at", "next_run_at", "progress_current", "progress_total",

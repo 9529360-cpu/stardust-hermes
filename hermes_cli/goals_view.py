@@ -99,7 +99,7 @@ def list_goal_states(*, limit: int = 50) -> list[dict[str, Any]]:
             state = json.loads(raw)
         except (TypeError, ValueError):
             continue
-        if not isinstance(state, dict) or state.get("status") in {"cleared", "done"}:
+        if not isinstance(state, dict) or state.get("status") == "cleared":
             continue
         goals.append(
             {

@@ -150,8 +150,13 @@ export interface TaskChild {
 
 export interface TaskRow {
   children?: readonly TaskChild[]
+  detail?: string
   durability?: TaskDurability
   files?: readonly string[]
+  recoverable?: boolean
+  recoveryAction?: string
+  requiresApproval?: boolean
+  progress?: { current: number; total: number } | null
   id: string
   phase: TaskPhase
   /** The profile that owns the row. Set by profile-scoped sources; session rows leave it empty. */
