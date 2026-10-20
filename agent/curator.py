@@ -887,7 +887,7 @@ def _consolidation_pass(prefix: str, auto_summary: str, dry_run: bool, before_na
                 prompt = f"{CURATOR_DRY_RUN_BANNER}\n\n{prompt}"
             from tools.skill_consolidation_validation import curator_validation_pass
             with curator_validation_pass(candidates) as validation:
-                llm_meta = _run_llm_review(prompt)
+                llm_meta = _run_llm_review(prompt, dry_run=dry_run)
                 # The model may edit a target again after archiving earlier sources.
                 # Restore originals if the final target fails the same cases.
                 if not dry_run:
@@ -1073,7 +1073,7 @@ def _resolve_review_provider() -> tuple:
     return rp, model_name, provider, overrides, timeout
 
 
-def _run_llm_review(prompt: str) -> Dict[str, Any]:
+def _run_llm_review(prompt: str, *, dry_run: bool = False) -> Dict[str, Any]:
     """Spawn an AIAgent fork on the review prompt. Returns ``final`` (untruncated response), ``summary`` (240-char cap),
     ``model``/``provider`` (what ran), ``tool_calls`` ([{name, arguments}], truncated) and ``error``. Never raises."""
     result_meta: Dict[str, Any] = _llm_meta("")
@@ -1116,6 +1116,7 @@ def _run_llm_review(prompt: str) -> Dict[str, Any]:
         # write guards (external/bundled/hub) fire; turn_context binds this onto
         # the write-origin ContextVar at turn start.
         review_agent._memory_write_origin = "background_review"
+        review_agent._review_dry_run = bool(dry_run)
         # Silence the fork's tool-call chatter (CLI synchronous foreground runs).
         with open(os.devnull, "w", encoding="utf-8") as devnull, \
              contextlib.redirect_stdout(devnull), contextlib.redirect_stderr(devnull):

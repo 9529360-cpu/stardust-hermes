@@ -30,6 +30,61 @@ def test_empty_origin_falls_back_to_foreground():
         reset_current_write_origin(token)
 
 
+def test_review_dry_run_only_applies_to_background_review():
+    from tools.skill_provenance import (
+        BACKGROUND_REVIEW,
+        is_review_dry_run,
+        reset_current_write_origin,
+        reset_review_dry_run,
+        set_current_write_origin,
+        set_review_dry_run,
+    )
+
+    dry = set_review_dry_run(True)
+    try:
+        assert is_review_dry_run() is False
+        origin = set_current_write_origin(BACKGROUND_REVIEW)
+        try:
+            assert is_review_dry_run() is True
+        finally:
+            reset_current_write_origin(origin)
+        assert is_review_dry_run() is False
+    finally:
+        reset_review_dry_run(dry)
+
+
+def test_dry_run_async_tasks_are_isolated():
+    import asyncio
+    from tools.skill_provenance import (
+        BACKGROUND_REVIEW, is_review_dry_run, reset_current_write_origin,
+        reset_review_dry_run, set_current_write_origin, set_review_dry_run,
+    )
+
+    async def check():
+        ready = asyncio.Event()
+
+        async def review():
+            origin = set_current_write_origin(BACKGROUND_REVIEW)
+            dry = set_review_dry_run(True)
+            try:
+                ready.set()
+                await asyncio.sleep(0)
+                assert is_review_dry_run()
+                set_review_dry_run(False)
+                assert not is_review_dry_run()
+            finally:
+                reset_review_dry_run(dry)
+                reset_current_write_origin(origin)
+
+        async def foreground():
+            await ready.wait()
+            assert not is_review_dry_run()
+
+        await asyncio.gather(review(), foreground())
+
+    contextvars.Context().run(asyncio.run, check())
+
+
 def test_context_isolation_between_copies():
     """ContextVar scoping: modifications in one copy do not leak out."""
     from tools.skill_provenance import (

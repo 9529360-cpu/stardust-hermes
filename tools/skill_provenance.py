@@ -42,3 +42,22 @@ def reset_review_attended(token: contextvars.Token[bool]) -> None:
 
 def is_unattended_review() -> bool:
     return is_background_review() and not _review_attended.get()
+
+
+# Curator dry-run is a hard execution policy, not merely prompt text. It is bound
+# per review turn and only has meaning together with BACKGROUND_REVIEW.
+_review_dry_run: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "review_dry_run", default=False
+)
+
+
+def set_review_dry_run(dry_run: bool) -> contextvars.Token[bool]:
+    return _review_dry_run.set(bool(dry_run))
+
+
+def reset_review_dry_run(token: contextvars.Token[bool]) -> None:
+    _review_dry_run.reset(token)
+
+
+def is_review_dry_run() -> bool:
+    return is_background_review() and _review_dry_run.get()
