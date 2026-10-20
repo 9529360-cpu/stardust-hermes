@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import platform
+import re
 import shlex
 import signal
 import stat
@@ -50,6 +51,9 @@ def _checkpoint_path() -> Path:
     profile from one process, so the import-time constant would pin every profile's process
     checkpoint to the launch home."""
     return CHECKPOINT_PATH if CHECKPOINT_PATH != _CHECKPOINT_PATH_AT_IMPORT else get_hermes_home() / "processes.json"
+
+_LONE_SURROGATES = re.compile("[\ud800-\udfff]")  # Python str has no surrogate pairs: every one is lone
+_CONPTY_POLL_SECONDS = 0.25  # how often a blocked ConPTY read wakes to ask whether its child is still alive
 
 MAX_OUTPUT_CHARS = 200_000      # rolling output buffer
 FINISHED_TTL_SECONDS = 1800     # keep finished processes 30 minutes
@@ -1175,7 +1179,7 @@ class ProcessRegistry(ProcessCheckpointMixin):
         Windows pipes don't support select(); the blocking path is kept there and the lazy reconcile in
         poll()/wait() remains the safety net. See #68915, #8340.
         """
-        first_chunk = True
+        leading = True
         # A split multibyte UTF-8 char would become U+FFFD with stateless decoding; the
         # incremental decoder holds the partial sequence until the rest arrives (and on
         # Windows decodes console-code-page lines, e.g. PowerShell's GBK, as such).
@@ -1189,11 +1193,14 @@ class ProcessRegistry(ProcessCheckpointMixin):
         # same treatment the foreground path already has in
         # ``tools/environments/base.py::_wait_for_process``. (Ported from openclaw/openclaw#112325.)
         def _append_chunk(chunk: str):
-            nonlocal first_chunk
-            if first_chunk:
+            nonlocal leading
+            if leading:
+                # bash writes its start-up warnings one at a time, and on a pipe they can arrive as separate reads:
+                # keep stripping until the command's own output begins.
                 chunk = self._clean_shell_noise(chunk)
-                first_chunk = False
-            self._ingest_output(session, chunk)
+                leading = not chunk
+            if chunk:
+                self._ingest_output(session, chunk)
         try:
             proc = session.process
             if proc is None or proc.stdout is None:
@@ -1385,6 +1392,8 @@ class ProcessRegistry(ProcessCheckpointMixin):
             from tools.pty_query_responder import PtyQueryResponder
             responder = PtyQueryResponder(rows=30, cols=120)
         try:
+            if _IS_WINDOWS:
+                self._read_conpty(session, pty)
             while pty.isalive():
                 try:
                     chunk = pty.read(4096)
@@ -1415,6 +1424,30 @@ class ProcessRegistry(ProcessCheckpointMixin):
         self._finish_reader(
             session, decoder, lambda t: self._ingest_output(session, t), "PTY",
             pty.wait, lambda: pty.exitstatus if hasattr(pty, 'exitstatus') else -1)
+
+    def _read_conpty(self, session: ProcessSession, pty) -> None:
+        """Read a ConPTY child's output until it is gone. The output pipe stays open after the child exits (it closes with
+        the pseudo console) and pywinpty's reader blocks on it, so a blocking ``read`` waits for output that never comes:
+        a child that exited quietly was never reported, and the last line a child wrote could still be on its way when
+        ``isalive()`` turned False. A timeout wakes the loop to ask ``isalive()``; once the child is seen gone, a whole
+        quiet interval is the end of its output, and the stream closing ends it sooner."""
+        stream = getattr(pty, "fileobj", None)
+        if stream is None:  # not pywinpty's PtyProcess: nothing to wake
+            return
+        stream.settimeout(_CONPTY_POLL_SECONDS)
+        leaving = False  # the child was seen gone: its last output gets one more quiet interval to arrive
+        while True:
+            try:
+                text = pty.read(4096)
+            except TimeoutError:
+                if leaving:
+                    return
+                leaving = not pty.isalive()
+                continue
+            except (EOFError, OSError):
+                return
+            if text:
+                self._ingest_output(session, text)
 
     def _ingest_output(self, session: ProcessSession, text: str) -> None:
         """Buffer a freshly-read chunk, then scan watch patterns and stream it live."""
@@ -2125,7 +2158,10 @@ class ProcessRegistry(ProcessCheckpointMixin):
         def via_pty(pty):
             # pywinpty expects str on Windows; ptyprocess expects bytes on POSIX.
             if _IS_WINDOWS:
-                pty.write(data.decode("utf-8") if isinstance(data, bytes) else str(data))
+                text = data.decode("utf-8") if isinstance(data, bytes) else str(data)
+                # Undecodable input bytes travel as lone surrogates. They panic pywinpty with an exception that
+                # ``except Exception`` does not stop, and a console cannot hold one, so each becomes U+FFFD.
+                pty.write(_LONE_SURROGATES.sub("\N{REPLACEMENT CHARACTER}", text))
             else:
                 # surrogateescape: a PTY is a byte stream — round-trip the original
                 # bytes instead of crashing on surrogate content.
@@ -2167,8 +2203,17 @@ class ProcessRegistry(ProcessCheckpointMixin):
         """Close a running process's stdin / send EOF without killing the process."""
         session = self.get(session_id)
         msg = "EOF sent" if session is not None and session._pty else "stdin closed"
+        def via_pty(pty):
+            if _IS_WINDOWS:
+                # A Windows console receives EOF as Ctrl+Z followed by Enter. pywinpty.sendeof()
+                # sends Ctrl+D, which is only a terminal EOF convention on POSIX and is ignored by
+                # console applications reading stdin.
+                pty.sendcontrol("z")
+                pty.write("\r")
+            else:
+                pty.sendeof()
         return self._stdin_op(
-            session_id, lambda pty: pty.sendeof(), lambda stdin: stdin.close(), {"status": "ok", "message": msg})
+            session_id, via_pty, lambda stdin: stdin.close(), {"status": "ok", "message": msg})
 
     def count_running(self) -> int:
         """O(1) running count for status-bar polling; dict ``len()`` is atomic, no lock."""

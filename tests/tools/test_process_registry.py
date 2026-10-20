@@ -523,6 +523,23 @@ def test_reader_loop_still_replaces_genuinely_invalid_bytes(registry, monkeypatc
     assert session.output_buffer == "ok\ufffddone\n"
 
 
+def test_reader_loop_drops_shell_warnings_that_arrive_in_separate_reads(registry, monkeypatch):
+    """bash writes its two interactive-shell warnings one at a time, and on a pipe they can arrive as separate reads.
+    Cleaning only the first read left the second one at the top of every command's output."""
+    session = _run_reader(registry, monkeypatch, [
+        b"bash: cannot set terminal process group (-1): Inappropriate ioctl for device\n",
+        b"bash: no job control in this shell\n",
+        b"hi\n",
+    ])
+    assert session.output_buffer == "hi\n"
+
+
+def test_reader_loop_keeps_warning_text_the_command_itself_prints(registry, monkeypatch):
+    """Only the shell's start-up warnings are noise: the same words after real output are the command's own."""
+    session = _run_reader(registry, monkeypatch, [b"hi\n", b"bash: no job control in this shell\n"])
+    assert session.output_buffer == "hi\nbash: no job control in this shell\n"
+
+
 def test_pty_reader_loop_reassembles_multibyte_char_split_across_chunks(registry, monkeypatch):
     """The PTY reader gets the same incremental-decode treatment."""
 
@@ -710,6 +727,9 @@ class TestStdinHelpers:
         proc.stdin.close.assert_called_once()
         assert result["status"] == "ok"
 
+    @pytest.mark.skipif(sys.platform == "win32",
+                        reason="POSIX PTY: needs python3 on PATH and Ctrl+D as end of input; the ConPTY twin "
+                               "is in test_process_registry_windows_native.py")
     def test_close_stdin_allows_eof_driven_process_to_finish(self, registry, tmp_path):
         """PTY mode: writing data + sending EOF lets an EOF-driven child finish.
 
@@ -1256,6 +1276,9 @@ class TestEnvPollerIncrementalRead:
 class TestPopenLeakOnSetupFailure:
     """Regression for issue #2749: subprocess orphaned when post-Popen setup raises."""
 
+    @pytest.mark.skipif(sys.platform == "win32",
+                        reason="POSIX process groups (os.getpgid/killpg); the Windows twin is "
+                               "test_a_failed_tracker_start_leaves_no_process_behind")
     def test_popen_killed_when_thread_creation_fails(self, registry):
         """If Thread() raises after Popen, proc must be killed — not orphaned."""
         killed = []
@@ -1368,8 +1391,9 @@ class TestSpawnRewriteCompoundBackground:
         fake_thread = MagicMock()
         fake_thread.daemon = False
 
+        # The PTY backend is ptyprocess on POSIX and pywinpty on Windows; stub whichever this host imports.
         with patch("tools.process_registry._find_shell", return_value="/bin/bash"), \
-             patch.dict("sys.modules", {"ptyprocess": mock_pty_module}), \
+             patch.dict("sys.modules", {"ptyprocess": mock_pty_module, "winpty": mock_pty_module}), \
              patch("threading.Thread", return_value=fake_thread), \
              patch.object(registry, "_write_checkpoint"):
             session = registry.spawn_local(
@@ -1527,6 +1551,9 @@ class TestKillProcess:
         assert result["status"] == "already_exited"
 
 
+    @pytest.mark.skipif(sys.platform == "win32",
+                        reason="POSIX kills through psutil; the Windows twin is TestRecoveredSession in "
+                               "test_process_registry_windows_native.py")
     def test_kill_detached_session_uses_host_pid(self, registry):
         s = _make_session(sid="proc_detached", command="sleep 999")
         s.pid = 424242
@@ -1749,6 +1776,7 @@ class TestTerminateHostPidWindows:
         assert "/T" in captured["args"], "Tree flag required to reach descendants"
         assert "/F" in captured["args"], "Force flag required for headless Chromium"
 
+@pytest.mark.skipif(sys.platform == "win32", reason="the POSIX branch; Windows takes taskkill /T /F instead")
 class TestTerminateHostPidPosix:
     """POSIX branch walks the tree via psutil and SIGTERMs children first."""
 

@@ -28,7 +28,6 @@ import psutil
 
 logger = logging.getLogger(__name__)
 
-_REAL_POPEN = subprocess.Popen  # captured at import, before any per-test wrapper or double replaces it
 _CREATE_SUSPENDED = 0x00000004
 _TERMINATED_EXIT_CODE = 1
 
@@ -88,12 +87,24 @@ def _popen_with_stdin(argv: Any, stdin: Any, **kwargs: Any) -> subprocess.Popen:
     return subprocess.Popen(argv, stdin=stdin, **kwargs)
 
 
+def _owns_process_handle(proc: Any) -> bool:
+    """True for a ``Popen`` that started a real Windows process, False for the doubles tests swap in for one.
+
+    ``subprocess`` gives every process it creates a ``Handle``. A class check against ``subprocess.Popen`` cannot tell the
+    two apart: the class a wrapper installs changes (``tests/conftest.py`` guards every test with a new subclass), and a
+    process made by one wrapper is no instance of the class an earlier import saw.
+    """
+    if sys.platform != "win32":
+        return False
+    return isinstance(getattr(proc, "_handle", None), subprocess.Handle)
+
+
 def spawn_contained(argv: Any, **popen_kwargs: Any) -> subprocess.Popen:
     """``subprocess.Popen`` whose whole process tree :func:`terminate_contained` can later end.
 
     The process is created suspended, put in its job, then resumed, so nothing it starts can escape the job. If no job
     can hold it (for example the host already runs inside a job that forbids nesting) the command still runs, as a
-    plain ``Popen`` would.
+    plain ``Popen`` would. Every way out either returns a running process or leaves none behind.
     """
     stdin = popen_kwargs.pop("stdin", None)
     if sys.platform != "win32":
@@ -109,22 +120,24 @@ def spawn_contained(argv: Any, **popen_kwargs: Any) -> subprocess.Popen:
     except BaseException:
         job.close()
         raise
-    if not isinstance(proc, _REAL_POPEN):
+    if not _owns_process_handle(proc):
         # A test double standing in for subprocess.Popen: it made no real process, so there is nothing to put in
         # a job or to resume. Keep the long-standing subprocess.Popen monkeypatch seam usable on Windows too.
         job.close()
         return proc
     try:
-        job.assign(proc)
-    except OSError:
-        logger.debug("process could not join its job; running without containment", exc_info=True)
-        job.close()
-        job = None
-    try:
-        psutil.Process(proc.pid).resume()
-    except psutil.NoSuchProcess:
-        pass  # it already ended; the caller sees the exit status
+        try:
+            job.assign(proc)
+        except OSError:
+            logger.debug("process could not join its job; running without containment", exc_info=True)
+            job.close()
+            job = None
+        try:
+            psutil.Process(proc.pid).resume()
+        except psutil.NoSuchProcess:
+            pass  # it already ended; the caller sees the exit status
     except BaseException:
+        # It was created suspended: end it rather than leave a frozen process nobody holds a reference to.
         with contextlib.suppress(OSError):
             proc.kill()
         if job is not None:
