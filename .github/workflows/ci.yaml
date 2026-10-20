@@ -59,6 +59,7 @@ jobs:
       installer: ${{ steps.classify.outputs.installer }}
       desktop_updater: ${{ steps.classify.outputs.desktop_updater }}
       rust: ${{ steps.classify.outputs.rust }}
+      nix: ${{ steps.classify.outputs.nix }}
       docker_meta: ${{ steps.classify.outputs.docker_meta }}
       mcp_catalog: ${{ steps.classify.outputs.mcp_catalog }}
       ci_review: ${{ steps.classify.outputs.ci_review }}
@@ -71,8 +72,6 @@ jobs:
         id: classify
         uses: ./.github/actions/detect-changes
         with:
-          sparse-checkout: scripts/ci/classify_changes.py
-          sparse-checkout-cone-mode: false
           github-token: ${{ github.token }}
 
   # ─────────────────────────────────────────────────────────────────────

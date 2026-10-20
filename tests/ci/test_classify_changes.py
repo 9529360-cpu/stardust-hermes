@@ -349,8 +349,12 @@ def test_tiered_ci_keeps_required_gate_and_nix_validation():
     ci = _yaml(".github/workflows/ci.yaml")
     jobs = ci["jobs"]
     assert "full" in jobs["detect"]["outputs"]
+    assert "nix" in jobs["detect"]["outputs"], "Nix output must reach the orchestrator"
     assert jobs["nix"]["uses"] == "./.github/workflows/nix.yml"
     assert "nix" in jobs["all-checks-pass"]["needs"]
+    classifier_step = next(step for step in jobs["detect"]["steps"] if step.get("id") == "classify")
+    assert "sparse-checkout" not in classifier_step.get("with", {})
+    assert "sparse-checkout-cone-mode" not in classifier_step.get("with", {})
     for name in ("tests", "tests-os", "lint", "js-tests", "e2e-desktop", "stardust-visual-smoke", "nix", "osv-scanner"):
         assert "needs.detect.outputs.full == 'true'" in jobs[name]["if"], name
     for name in ("case-collision-check", "profile-artifact-check", "infographic-check"):

@@ -35,6 +35,7 @@ HARD_DISABLED_LANES: dict[str, str] = {}
 # Desktop E2E is report-only: it is not in all-checks-pass in ci.yaml (owner decision, Oct 2026).
 DESKTOP_RUNTIME_PROOF_LANE = "stardust-visual-smoke"
 DESKTOP_RUNTIME_PROOF_OUTPUTS = ("python_prod", "frontend")
+NIX_PROOF_LANE = "nix"
 
 
 def _desktop_runtime_proof_required(needs: dict) -> bool:
@@ -61,11 +62,26 @@ def _desktop_runtime_proof_required(needs: dict) -> bool:
     return DESKTOP_RUNTIME_PROOF_LANE in needs
 
 
+def _nix_proof_required(needs: dict) -> bool:
+    """Require Nix when an eligible run may affect the Nix build inputs.
+
+    Missing classifier outputs fail closed so the job cannot silently skip
+    due to an orchestrator output-wiring error. Draft PRs defer this lane.
+    """
+    if NIX_PROOF_LANE not in needs:
+        return False
+    detect = needs.get("detect") or {}
+    outputs = detect.get("outputs") or {}
+    if str(outputs.get("full", "")).strip().lower() == "false":
+        return False
+    return str(outputs.get("nix", "")).strip().lower() != "false"
+
+
 def evaluate(needs: dict) -> tuple[dict[str, str], list[str], list[str]]:
     """Return ``(compact result-map, blocking job names, hard-disabled job names)``.
 
     ``blocking`` = failed/cancelled required jobs, plus conditionally required proof lanes
-    that were skipped or absent.
+    that were skipped or absent (desktop runtime smoke and Nix build check).
     ``disabled`` = jobs in ``HARD_DISABLED_LANES`` whose result is ``skipped`` this run —
     i.e. reported as passing but never actually executed, by design rather than by relevance.
     """
@@ -81,6 +97,11 @@ def evaluate(needs: dict) -> tuple[dict[str, str], list[str], list[str]]:
     )
     if proof_missing and DESKTOP_RUNTIME_PROOF_LANE not in blocking:
         blocking.append(DESKTOP_RUNTIME_PROOF_LANE)
+
+    # An affected Nix lane must genuinely run, not silently pass as skipped.
+    if _nix_proof_required(needs) and compact.get(NIX_PROOF_LANE) != "success":
+        if NIX_PROOF_LANE not in blocking:
+            blocking.append(NIX_PROOF_LANE)
 
     disabled = [name for name in HARD_DISABLED_LANES if compact.get(name) == "skipped"]
     return compact, blocking, disabled

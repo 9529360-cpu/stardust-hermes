@@ -159,6 +159,39 @@ def test_hard_disabled_lane_that_actually_ran_is_not_flagged(monkeypatch):
     assert disabled == []
 
 
+def _nix_needs(*, full="true", affected="true", result="skipped"):
+    needs = _needs(detect="success", nix=result)
+    needs["detect"]["outputs"].update({"full": full, "nix": affected})
+    return needs
+
+
+def test_nix_affected_skip_is_blocking():
+    _compact, blocking, _disabled = evaluate(_nix_needs())
+    assert blocking == ["nix"]
+
+
+def test_nix_affected_success_passes():
+    _compact, blocking, _disabled = evaluate(_nix_needs(result="success"))
+    assert blocking == []
+
+
+def test_nix_unaffected_can_skip():
+    _compact, blocking, _disabled = evaluate(_nix_needs(affected="false"))
+    assert blocking == []
+
+
+def test_nix_draft_can_skip():
+    _compact, blocking, _disabled = evaluate(_nix_needs(full="false"))
+    assert blocking == []
+
+
+def test_nix_missing_classifier_output_fails_closed():
+    needs = _nix_needs()
+    del needs["detect"]["outputs"]["nix"]
+    _compact, blocking, _disabled = evaluate(needs)
+    assert blocking == ["nix"]
+
+
 def test_failure_blocks_the_gate():
     compact, blocking, disabled = evaluate(_needs(detect="success", tests="failure"))
     assert blocking == ["tests"]
