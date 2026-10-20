@@ -138,6 +138,23 @@ CONDITIONAL_WRITERS: dict[str, Callable[[list[str]], bool]] = {
 }
 
 
+def python_module_writes(module: str, args: list[str]) -> bool:
+    """Classify known ``python -m`` checkers; unknown modules remain effect-capable."""
+    if module in {"pytest", "unittest", "nose", "nose2", "mypy", "pyright"}:
+        return False
+    if module == "ruff":
+        subcommand = _first_operand(args)
+        if subcommand == "check":
+            return _has_any(args, "--fix", "--fix-only", "--output-file")
+        if subcommand == "format":
+            return not _has_any(args, "--check", "--diff")
+    if module == "black":
+        return not _has_any(args, "--check", "--diff")
+    if module == "isort":
+        return not _has_any(args, "--check", "--check-only", "--diff")
+    return True
+
+
 def conditional_write(name: str, args: list[str]) -> Optional[bool]:
     """True/False when ``name`` is a known conditional writer, None when it is not in the table."""
     predicate = CONDITIONAL_WRITERS.get(name)
