@@ -63,7 +63,10 @@ def test_persistence_failure_default_copy_is_actionable_and_profile_aware(monkey
     monkeypatch.setenv("STARDUST_HOME", "/srv/hermes-profile")
     text = TurnExplainersMixin._format_turn_completion_explanation("session_persistence_failed", "replaced")
     assert "stardust gateway stop" in text and "stardust doctor" in text
-    assert "~/.stardust" not in text and "/srv/hermes-profile" in text
+    from hermes_constants import display_hermes_home
+
+    shown = display_hermes_home()  # the profile dir in the host's own spelling (\srv\hermes-profile on Windows)
+    assert shown.endswith("hermes-profile") and shown in text and "~/.stardust" not in text
     assert "manifest" not in text  # the runbook stays in logger.error at hermes_state
 
 

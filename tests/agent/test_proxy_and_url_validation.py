@@ -28,7 +28,8 @@ from agent.auxiliary_client import _validate_base_url, _validate_proxy_env_urls
 ])
 def test_proxy_env_rejects_malformed_port(monkeypatch, key):
     monkeypatch.setenv(key, "http://127.0.0.1:6153export")
-    with pytest.raises(RuntimeError, match=rf"Malformed proxy environment variable {key}=.*6153export"):
+    # (?i): Windows folds environment names to upper case, so the message names HTTP_PROXY for http_proxy.
+    with pytest.raises(RuntimeError, match=rf"(?i)Malformed proxy environment variable {key}=.*6153export"):
         _validate_proxy_env_urls()
 
 

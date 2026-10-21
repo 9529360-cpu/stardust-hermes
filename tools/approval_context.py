@@ -8,6 +8,7 @@ gate in :mod:`tools.approval`.
 import contextvars
 import logging
 import os
+import threading
 from hermes_cli.config import cfg_get
 from utils import env_var_enabled, is_truthy_value
 
@@ -256,7 +257,9 @@ def _get_approval_timeout() -> int:
         from agent.deadline import MAX_SAFE_TIMEOUT_S
         safe_cap = int(MAX_SAFE_TIMEOUT_S)
     except Exception:
-        safe_cap = 365 * 24 * 3600  # fail CLOSED: the raw value would re-open the overflow
+        # fail CLOSED: the raw value would re-open the overflow. agent.deadline is what just failed to
+        # import, so spell its bound out here: a year, held below the host's own limit (Windows: 49.7 days).
+        safe_cap = int(min(365 * 24 * 3600, threading.TIMEOUT_MAX - 3600))
     if raw > safe_cap:
         logger.warning("approvals.timeout=%s exceeds the platform-safe maximum; clamping to %ss", raw, safe_cap)
     return min(raw, safe_cap)

@@ -41,10 +41,11 @@ class TestClassifySandboxMirrorTarget:
         result = classify_sandbox_mirror_target(str(target))
         assert result is not None
         assert result["target_path"] == str(target.resolve())
-        assert result["mirror_root"].endswith(
-            "sandboxes/docker/default/home/.stardust"
+        # Both paths use the host filesystem spelling.
+        assert Path(result["mirror_root"]).parts[-5:] == (
+            "sandboxes", "docker", "default", "home", ".stardust"
         )
-        assert result["inner_path"] == "profiles/group1/SOUL.md"
+        assert Path(result["inner_path"]) == Path("profiles/group1/SOUL.md")
 
     @pytest.mark.parametrize(
         "backend,inner",
@@ -68,7 +69,7 @@ class TestClassifySandboxMirrorTarget:
 
         result = classify_sandbox_mirror_target(str(target))
         assert result is not None
-        assert result["inner_path"] == inner
+        assert Path(result["inner_path"]) == Path(inner)
         assert backend in result["mirror_root"]
 
 
@@ -106,10 +107,14 @@ class TestGetSandboxMirrorWarning:
 
         warn = get_sandbox_mirror_warning(str(target))
         assert warn is not None
-        # Must name the mirror root so the user can locate the sandbox.
-        assert "sandboxes/docker/default/home/.stardust" in warn
+        # Must name the mirror root so the user can locate the sandbox (quoted with !r: native separators).
+        from agent.file_safety import classify_sandbox_mirror_target
+
+        mirror_root = classify_sandbox_mirror_target(str(target))["mirror_root"]
+        assert repr(mirror_root) in warn
+        assert Path(mirror_root).parts[-5:] == ("sandboxes", "docker", "default", "home", ".stardust")
         # Must hint at what the agent likely meant.
-        assert "profiles/group1/SOUL.md" in warn
+        assert repr(str(Path("profiles/group1/SOUL.md"))) in warn
         # Must name the bypass kwarg shared with the cross-profile guard.
         assert "cross_profile=True" in warn
 

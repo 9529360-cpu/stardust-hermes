@@ -106,7 +106,7 @@ def test_compression_latency_records_delayed_first_provider_chunk():
 
     class _DelayedSemaphore:
         def acquire(self):
-            time.sleep(0.01)
+            time.sleep(0.05)  # exceed Windows' pre-3.13 monotonic clock tick (~15 ms)
 
         def release(self):
             pass

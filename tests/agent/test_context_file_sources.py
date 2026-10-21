@@ -4,6 +4,7 @@ The manifest and ``build_context_files_prompt`` share one discovery walk, so the
 parity: a file is reported ``loaded`` iff its content appears in the built prompt.
 """
 
+import os
 from pathlib import Path
 
 import pytest
@@ -41,9 +42,10 @@ def test_manifest_matches_what_the_prompt_actually_loads(project, tmp_path_facto
     sources = list_context_file_sources(cwd=str(sub), home_override=home)
     prompt = build_context_files_prompt(cwd=str(sub), home_override=home)
 
+    parent_agents = os.path.join("..", "AGENTS.md")  # the label is a relpath: ..\AGENTS.md on Windows
     statuses = {s["label"]: s["status"] for s in sources}
     assert statuses == {
-        ".hermes.md": "loaded", "../AGENTS.md": "shadowed", "AGENTS.override.md": "empty", "AGENTS.md": "shadowed",
+        ".hermes.md": "loaded", parent_agents: "shadowed", "AGENTS.override.md": "empty", "AGENTS.md": "shadowed",
         "CLAUDE.md": "shadowed", ".cursorrules": "shadowed", ".cursor/rules/a.mdc": "shadowed", "SOUL.md": "loaded",
     }
     for src in sources:
@@ -55,7 +57,7 @@ def test_manifest_matches_what_the_prompt_actually_loads(project, tmp_path_facto
     (project / ".hermes.md").unlink()
     statuses = {s["label"]: s["status"] for s in list_context_file_sources(cwd=str(sub), home_override=home)}
     prompt = build_context_files_prompt(cwd=str(sub), home_override=home)
-    assert statuses["../AGENTS.md"] == statuses["AGENTS.md"] == "loaded" and "root agents rules" in prompt
+    assert statuses[parent_agents] == statuses["AGENTS.md"] == "loaded" and "root agents rules" in prompt
     assert statuses["CLAUDE.md"] == "shadowed" and "claude rules" not in prompt
 
 

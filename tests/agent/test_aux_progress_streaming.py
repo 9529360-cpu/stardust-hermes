@@ -476,13 +476,16 @@ class TestContentBearingProgress:
         accumulator = _ChatStreamAccumulator()
         keepalive = SimpleNamespace(id=None, model=None, choices=[], usage=None)
         empty_role_chunk = _chunk(content="", reasoning="")
+        # Let the fence age first: time.monotonic() ticks every ~15 ms on Windows (CPython < 3.13), so
+        # a "> 0.0" check straight after construction cannot tell stale from just-touched there.
+        time.sleep(0.1)
 
         with aux_progress_hook(fence.touch_progress):
             for _ in range(5):
                 accumulator.feed(keepalive)
                 accumulator.feed(empty_role_chunk)
         # No substantive payload arrived: the fence must have stayed stale.
-        assert fence.seconds_since_progress() > 0.0
+        assert fence.seconds_since_progress() >= 0.05
 
         with aux_progress_hook(fence.touch_progress):
             accumulator.feed(_chunk(content="token"))

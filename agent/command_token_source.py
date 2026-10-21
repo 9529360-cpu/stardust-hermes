@@ -50,9 +50,13 @@ def _mint(command: str, label: str) -> tuple[str, Optional[float]]:
     from tools.environments.local import served_profile_child_env
 
     try:
+        # Explicit UTF-8 + replace: bare ``text=True`` decodes with the locale codec, and a helper that
+        # writes anything else (cmd.exe error text in the OEM/ANSI code page, a localized CLI warning)
+        # kills subprocess' reader thread with UnicodeDecodeError — the stream is lost and the thread
+        # traceback lands on the user's console. A token is ASCII; a stray byte must not cost the mint.
         completed = subprocess.run(
-            command, shell=True, capture_output=True, text=True, timeout=_MINT_TIMEOUT_SECONDS,
-            env=served_profile_child_env(inherit_credentials=True),
+            command, shell=True, capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=_MINT_TIMEOUT_SECONDS, env=served_profile_child_env(inherit_credentials=True),
         )
     except subprocess.TimeoutExpired as exc:
         raise CommandTokenError(

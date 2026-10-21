@@ -25,6 +25,13 @@ import pytest
 from agent.proxy_sources import iron_proxy as ip
 
 
+def _assert_mode(path: Path, expected: int) -> None:
+    """POSIX permission bits. Windows has none: stat() reports 0o666/0o777 whatever was asked for."""
+    if os.name != "nt":
+        mode = path.stat().st_mode & 0o777
+        assert mode == expected, f"{path.name} has perms {oct(mode)}, expected {oct(expected)}"
+
+
 # ---------------------------------------------------------------------------
 # Per-test isolation
 # ---------------------------------------------------------------------------
@@ -367,8 +374,7 @@ def test_ca_key_created_with_0o600(hermes_home, monkeypatch):
 
     ca_crt, ca_key = ip.ensure_ca_cert()
     assert ca_key.exists()
-    mode = ca_key.stat().st_mode & 0o777
-    assert mode == 0o600, f"CA key has perms {oct(mode)}, expected 0o600"
+    _assert_mode(ca_key, 0o600)
 
 
 # ---------------------------------------------------------------------------
@@ -376,12 +382,23 @@ def test_ca_key_created_with_0o600(hermes_home, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
+def test_private_append_without_posix_fchmod(tmp_path, monkeypatch):
+    """Windows has no os.fchmod; audit-log creation must still return a writable fd."""
+    monkeypatch.delattr(os, "fchmod", raising=False)
+    path = tmp_path / "audit.log"
+    fd = ip._open_private_append(path, strict_chmod=True)
+    try:
+        os.write(fd, b"audit-event\n")
+    finally:
+        os.close(fd)
+    assert path.read_text(encoding="utf-8") == "audit-event\n"
+
+
 def test_ensure_audit_log_creates_with_0o600(hermes_home, tmp_path):
     audit = tmp_path / "audit.log"
     ip.ensure_audit_log(audit)
     assert audit.exists()
-    mode = audit.stat().st_mode & 0o777
-    assert mode == 0o600
+    _assert_mode(audit, 0o600)
 
 
 def test_ensure_audit_log_tightens_existing_perms(hermes_home, tmp_path):
@@ -389,8 +406,7 @@ def test_ensure_audit_log_tightens_existing_perms(hermes_home, tmp_path):
     audit.write_text("preexisting content\n")
     os.chmod(audit, 0o644)
     ip.ensure_audit_log(audit)
-    mode = audit.stat().st_mode & 0o777
-    assert mode == 0o600
+    _assert_mode(audit, 0o600)
 
 
 # ---------------------------------------------------------------------------
@@ -400,8 +416,8 @@ def test_ensure_audit_log_tightens_existing_perms(hermes_home, tmp_path):
 
 def test_proxy_state_dir_is_0o700(hermes_home):
     state = ip._proxy_state_dir()
-    mode = state.stat().st_mode & 0o777
-    assert mode == 0o700
+    assert state.is_dir()
+    _assert_mode(state, 0o700)
 
 
 
@@ -492,7 +508,7 @@ def test_ensure_management_token_persists_and_is_stable(hermes_home):
     assert t1.startswith("hermes-mgmt-")
     p = ip._proxy_state_dir() / "management.token"
     assert p.exists()
-    assert (p.stat().st_mode & 0o777) == 0o600
+    _assert_mode(p, 0o600)
 
 
 
