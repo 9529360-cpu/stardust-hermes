@@ -1,0 +1,4 @@
+[workspace]
+members = ["crates/stardust-exec"]
+exclude = ["apps/bootstrap-installer/src-tauri"]
+resolver = "2"
