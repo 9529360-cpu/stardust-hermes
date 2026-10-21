@@ -84,6 +84,7 @@ function makeRefresh(resolveSession: ActiveTranscriptRefreshDeps['resolveSession
 
   const refresh = () =>
     reconcileActiveTranscript({
+      getSessionState: id => states.get(id),
       activeSessionIdRef,
       busyRef,
       requestSequenceRef,
@@ -95,6 +96,35 @@ function makeRefresh(resolveSession: ActiveTranscriptRefreshDeps['resolveSession
 
   return { activeSessionIdRef, busyRef, refresh, selectedStoredSessionIdRef, state, states, updateSessionState }
 }
+
+it('discards a history read when a complete reply arrives before the read returns', async () => {
+  const fixture = makeRefresh()
+  let resolveRead!: (value: ReturnType<typeof transcript>) => void
+  vi.mocked(getLatestSessionMessages).mockImplementationOnce(
+    () =>
+      new Promise(resolve => {
+        resolveRead = resolve
+      }) as never
+  )
+  const reading = fixture.refresh()
+
+  const reply = {
+    id: 'committed-reply',
+    role: 'assistant' as const,
+    parts: [{ type: 'text' as const, text: 'new reply must survive' }],
+    pending: false
+  }
+
+  fixture.states.set(ACTIVE_RUNTIME_ID, { ...fixture.state, messages: [reply] })
+  resolveRead(transcript('old snapshot'))
+  await reading
+  expect(fixture.states.get(ACTIVE_RUNTIME_ID)?.messages).toEqual([reply])
+  // A discarded snapshot must not poison the signature: the same read can be
+  // applied by a later refresh that starts after the local turn has settled.
+  vi.mocked(getLatestSessionMessages).mockResolvedValue(transcript('old snapshot') as never)
+  await fixture.refresh()
+  expect(fixture.states.get(ACTIVE_RUNTIME_ID)?.messages).not.toEqual([reply])
+})
 
 function useSyncHarness({
   activeIsMessaging = false,
@@ -303,6 +333,44 @@ describe('active transcript refresh', () => {
 
     expect(getLatestSessionMessages).toHaveBeenCalledWith(storedId, undefined, { passive: true })
     expect(updateSessionState).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps a tile reply completed while an older history read is in flight', async () => {
+    const runtimeId = 'runtime-tile-race'
+    const storedId = 'stored-tile-race'
+    let state = createClientSessionState(storedId)
+    publishSessionState(runtimeId, state)
+    let release!: (value: ReturnType<typeof transcript>) => void
+    vi.mocked(getLatestSessionMessages).mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          release = resolve
+        }) as never
+    )
+
+    const reading = reconcileTileTranscriptsForTest({
+      tiles: [{ runtimeId, storedSessionId: storedId }],
+      requestSequenceRef: { current: 0 },
+      signatureRef: { current: new Map() },
+      updateSessionState: (_id, updater) => {
+        state = updater(state)
+
+        return state
+      }
+    })
+
+    const reply = {
+      id: 'tile-answer',
+      role: 'assistant' as const,
+      parts: [{ type: 'text' as const, text: 'new tile reply' }],
+      pending: false
+    }
+
+    state = { ...state, messages: [reply] }
+    publishSessionState(runtimeId, state)
+    release(transcript('old tile snapshot', storedId))
+    await reading
+    expect(state.messages).toEqual([reply])
   })
 
   it('does not reconcile a busy tile when the main pane is idle', async () => {
