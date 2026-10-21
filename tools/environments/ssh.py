@@ -8,7 +8,7 @@ import shlex
 import shutil
 import subprocess
 import tempfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Iterable
 
 from tools.environments.base import BaseEnvironment, EnvironmentConnectionError
@@ -164,7 +164,7 @@ class SSHEnvironment(BaseEnvironment):
 
     def _scp_upload(self, host_path: str, remote_path: str) -> None:
         """Upload a single file via scp over ControlMaster."""
-        self._run_ssh(f"mkdir -p {shlex.quote(str(Path(remote_path).parent))}", timeout=10)
+        self._run_ssh(f"mkdir -p {shlex.quote(str(PurePosixPath(remote_path).parent))}", timeout=10)
         scp_cmd = ["scp"] + (["-o", f"ControlPath={self.control_socket}"] if _SSH_MULTIPLEX else [])
         scp_cmd += self._target_flags("-P") + [host_path, f"{self.user}@{self.host}:{remote_path}"]
         result = run_capture(scp_cmd, timeout=30)

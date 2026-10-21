@@ -31,9 +31,9 @@ class TestResolveSafeCwd:
         """If every ancestor except the filesystem root is gone, the root
         itself is still a valid recovery target — don't skip it just because
         ``os.path.dirname('/') == '/'`` is the loop's exit condition."""
-        sep = os.path.sep
-        monkeypatch.setattr(os.path, "isdir", lambda p: p == sep)
-        assert _resolve_safe_cwd("/no/such/deep/dir") == sep
+        root = os.path.abspath(os.path.sep)
+        monkeypatch.setattr(os.path, "isdir", lambda p: p == root)
+        assert _resolve_safe_cwd(os.path.join(root, "no", "such", "deep", "dir")) == root
 
 
 def _make_fake_popen(captured: dict, fds: list):

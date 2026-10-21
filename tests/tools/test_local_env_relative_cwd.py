@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+from tools.environments.local import _msys_to_windows_path
+
 from tools.environments.local import LocalEnvironment, _resolve_local_initial_cwd
 
 
@@ -25,4 +27,4 @@ def test_local_environment_keeps_existing_relative_child_cwd(tmp_path, monkeypat
         env.cleanup()
 
     assert result["returncode"] == 0
-    assert result["output"].strip() == str(project)
+    assert Path(_msys_to_windows_path(result["output"].strip())) == project

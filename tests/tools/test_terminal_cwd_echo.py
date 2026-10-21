@@ -13,6 +13,8 @@ import tempfile
 import pytest
 
 from tools.terminal_tool import terminal_tool
+from tools.environments.local import _msys_to_windows_path
+from tests.tools._shell_helpers import shell_path
 
 
 @pytest.fixture
@@ -25,7 +27,7 @@ class TestCwdEcho:
     def test_cd_reports_new_cwd(self, isolated_home, tmp_path):
         target = tmp_path / "projdir"
         target.mkdir()
-        r = json.loads(terminal_tool(f"cd {target}", task_id="t-cwd-1"))
+        r = json.loads(terminal_tool(f"cd {shell_path(target)}", task_id="t-cwd-1"))
         assert r["exit_code"] == 0
         assert "cwd" in r
         assert os.path.realpath(r["cwd"]) == os.path.realpath(str(target))
@@ -38,18 +40,18 @@ class TestCwdEcho:
     def test_cwd_persists_and_stops_reporting_when_stable(self, isolated_home, tmp_path):
         target = tmp_path / "stable"
         target.mkdir()
-        r1 = json.loads(terminal_tool(f"cd {target}", task_id="t-cwd-3"))
+        r1 = json.loads(terminal_tool(f"cd {shell_path(target)}", task_id="t-cwd-3"))
         assert "cwd" in r1
         # Next command runs IN the new cwd without changing it: no echo.
         r2 = json.loads(terminal_tool("pwd", task_id="t-cwd-3"))
         assert "cwd" not in r2
-        assert os.path.realpath(r2["output"].strip()) == os.path.realpath(str(target))
+        assert os.path.realpath(_msys_to_windows_path(r2["output"].strip())) == os.path.realpath(str(target))
 
     def test_cd_within_chain_reports_final_dir(self, isolated_home, tmp_path):
         a = tmp_path / "a"
         b = tmp_path / "b"
         a.mkdir(); b.mkdir()
-        r = json.loads(terminal_tool(f"cd {a} && cd {b} && echo done", task_id="t-cwd-4"))
+        r = json.loads(terminal_tool(f"cd {shell_path(a)} && cd {shell_path(b)} && echo done", task_id="t-cwd-4"))
         assert r["exit_code"] == 0
         assert os.path.realpath(r.get("cwd", "")) == os.path.realpath(str(b))
 
