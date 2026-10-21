@@ -525,7 +525,6 @@ def _interpreter_may_modify(
         if kind == "python" and arg == "-m":
             module = args[position].lower() if position < len(args) else ""
             from agent.terminal_writers import python_module_writes
-
             return bool(module) and python_module_writes(module, args[position + 1:])
         if kind == "shell" and arg == "-s":
             operand = "-"  # the shell reads its commands from stdin
