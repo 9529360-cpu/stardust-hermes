@@ -67,6 +67,11 @@ class TestClampTimeout:
         assert lock.acquire(timeout=big)
         lock.release()
 
+    def test_cap_leaves_headroom_below_the_host_timeout_limit(self):
+        # Windows' threading.TIMEOUT_MAX is 4_294_967 s (< one year), and callers add margins on top of
+        # the clamped value (approval human-wait: +60 s) before handing it to Lock.acquire / Thread.join.
+        assert MAX_SAFE_TIMEOUT_S + 60.0 <= threading.TIMEOUT_MAX
+
     def test_nan_and_junk_treated_as_unbounded(self):
         assert clamp_timeout(float("nan")) is None
         assert clamp_timeout("not-a-number") is None  # type: ignore[arg-type]

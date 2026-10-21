@@ -34,8 +34,13 @@ __all__ = [
     "run_bounded_async", "run_bounded_sync", "kill_process_tree",
 ]
 
-# One year: semantically "unbounded" yet far below any platform time_t limit (#83220).
-MAX_SAFE_TIMEOUT_S = 31_536_000.0
+# One year: semantically "unbounded" yet far below any platform time_t limit (#83220). Windows is the
+# tightest host: ``threading.TIMEOUT_MAX`` is 4_294_967 s there (49.7 days — a millisecond count that must
+# fit a 32-bit DWORD), so a one-year clamp still made ``Lock.acquire`` / ``Thread.join`` raise
+# OverflowError. Hold the cap below the host's own limit, with headroom for the margins callers add on top
+# (``tools.approval_human_wait.HUMAN_WAIT_MARGIN_S``).
+_TIMEOUT_HEADROOM_S = 3600.0
+MAX_SAFE_TIMEOUT_S = min(31_536_000.0, threading.TIMEOUT_MAX - _TIMEOUT_HEADROOM_S)
 
 # Grace after a deadline fires before concluding the loop thread is blocked and dumping stacks.
 _LOOP_BLOCKED_DUMP_GRACE_S = 5.0

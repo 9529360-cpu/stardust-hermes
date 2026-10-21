@@ -26,6 +26,7 @@ def fleet(tmp_path, monkeypatch):
     (tmp_path / "fakehome").mkdir()
     # Keep host ~/.claude and host auth.json out of the picture.
     monkeypatch.setenv("HOME", str(tmp_path / "fakehome"))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path / "fakehome"))  # Path.home() on Windows ignores HOME
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "fakehome"))
     for var in ("ANTHROPIC_TOKEN", "ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN"):
         monkeypatch.delenv(var, raising=False)
@@ -163,7 +164,7 @@ def test_strip_helper_is_a_noop_without_credentials(tmp_path):
 @pytest.mark.parametrize(
     "link",
     [
-        lambda target, alias: alias.symlink_to(target),
+        pytest.param(lambda target, alias: alias.symlink_to(target), marks=pytest.mark.require_symlinks),
         lambda target, alias: os.link(target, alias),
     ],
     ids=["symlink", "hardlink"],
@@ -183,6 +184,7 @@ def test_strip_helper_leaves_shared_root_auth_store_unchanged(fleet, link):
     assert (root / "auth.json").read_text() == before
 
 
+@pytest.mark.require_symlinks
 def test_strip_helper_fails_closed_when_root_store_cannot_be_resolved(fleet, monkeypatch):
     """Credential hygiene must not mutate auth when store identity is unknown."""
     from hermes_cli.auth import strip_cloned_single_use_oauth_grants
@@ -616,6 +618,7 @@ def _shared_profile(fleet, name, *, link):
     return pdir
 
 
+@pytest.mark.require_symlinks
 def test_heal_skips_profile_auth_json_symlinked_to_the_root_store(fleet):
     """#101356: `ln -s ~/.stardust/auth.json <profile>/auth.json` shares ONE store.
     Both sides of the consolidation read the same file, so every row looks like
@@ -655,6 +658,7 @@ def test_heal_skips_profile_auth_json_hardlinked_to_the_root_store(fleet):
     assert (shared / "auth.json").samefile(root / "auth.json")
 
 
+@pytest.mark.require_symlinks
 def test_heal_leaves_an_aliased_anthropic_singleton_alone(fleet):
     """Separate auth.jsons but a profile `.anthropic_oauth.json` symlinked to
     root's: one shared grant, not a fork. The heal must not self-compare it
@@ -678,6 +682,7 @@ def test_heal_leaves_an_aliased_anthropic_singleton_alone(fleet):
     assert (root / ".anthropic_oauth.json").read_text() == before
 
 
+@pytest.mark.require_symlinks
 def test_heal_same_store_skip_is_memoized_off_the_hot_path(fleet, monkeypatch):
     """The shared-store skip must record the clean mark so load_pool()'s
     per-call heal does not re-stat/resolve both paths every model call."""

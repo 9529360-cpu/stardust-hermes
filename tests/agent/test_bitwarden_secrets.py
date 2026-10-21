@@ -94,7 +94,7 @@ def test_platform_asset_name(system, machine, libc_text, expected):
 def _make_fake_zip(binary_bytes: bytes) -> bytes:
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
-        zf.writestr("bws", binary_bytes)
+        zf.writestr(bw._platform_binary_name(), binary_bytes)
     return buf.getvalue()
 
 
@@ -370,8 +370,9 @@ def test_encrypted_cache_writes_without_plaintext(monkeypatch, tmp_path):
     assert not bw._disk_cache_path(home).exists()
     cache_path = bw._encrypted_disk_cache_path(home)
     assert cache_path.exists()
-    mode = stat.S_IMODE(os.stat(cache_path).st_mode)
-    assert mode == 0o600, f"expected 0o600, got 0o{mode:o}"
+    if os.name != "nt":  # Windows has no POSIX mode bits: chmod(0o600) only toggles the read-only flag
+        mode = stat.S_IMODE(os.stat(cache_path).st_mode)
+        assert mode == 0o600, f"expected 0o600, got 0o{mode:o}"
     text = cache_path.read_text()
     assert "secret-value" not in text
     assert "0.t" not in text

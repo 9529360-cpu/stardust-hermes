@@ -380,11 +380,22 @@ class TestExtractImageRefs:
     def test_finds_home_relative_path(self, tmp_path: Path, monkeypatch):
         # Simulate ~/foo.png by pointing HOME at tmp_path and creating the file
         monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("USERPROFILE", str(tmp_path))  # ntpath.expanduser reads USERPROFILE, never HOME
         img = tmp_path / "foo.png"
         img.write_bytes(_png_bytes())
         paths, urls = extract_image_refs("see ~/foo.png please")
-        assert paths == [str(img)]
+        # Path equality, not str: ntpath.expanduser glues "/foo.png" onto the home as-is (``home/foo.png``)
+        assert [Path(p) for p in paths] == [img]
         assert urls == []
+
+    def test_finds_windows_drive_paths_in_both_slash_styles(self, monkeypatch):
+        """Same shape as the gateway's extract_local_files(): ``C:\\x.png`` and ``C:/x.png`` are candidates on
+        every OS (the file-exists check, not the pattern, decides whether one attaches) — and a URL is not."""
+        monkeypatch.setattr("agent.image_routing._existing_file", lambda candidate: candidate)
+        body = "a C:\\Users\\me\\shot.png and D:/work/pic.JPG, not https://x.example/y.png"
+        paths, urls = extract_image_refs(body)
+        assert paths == ["C:\\Users\\me\\shot.png", "D:/work/pic.JPG"]
+        assert urls == ["https://x.example/y.png"]
 
 
     def test_finds_http_image_url(self):

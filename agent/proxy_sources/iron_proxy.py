@@ -560,12 +560,14 @@ def _open_private_append(path: Path, *, strict_chmod: bool) -> int:
     """O_APPEND|O_CREAT 0o600 + O_NOFOLLOW (planted symlinks refused); fchmod tightens a pre-existing
     file (failure fatal iff ``strict_chmod``).  Raises OSError; caller owns the fd."""
     fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_APPEND | _O_NOFOLLOW, 0o600)
-    try:
-        os.fchmod(fd, 0o600)
-    except OSError:
-        if strict_chmod:
-            os.close(fd)
-            raise
+    fchmod = getattr(os, "fchmod", None)  # absent on Windows: no POSIX mode bits to tighten there
+    if fchmod is not None:
+        try:
+            fchmod(fd, 0o600)
+        except OSError:
+            if strict_chmod:
+                os.close(fd)
+                raise
     return fd
 
 

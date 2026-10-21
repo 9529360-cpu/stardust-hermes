@@ -9,6 +9,10 @@ covered in ``test_shell_hooks_consent.py``.
 from __future__ import annotations
 
 import json
+import os
+import shlex
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -19,11 +23,16 @@ from agent import shell_hooks
 # ── helpers ───────────────────────────────────────────────────────────────
 
 
-def _write_script(tmp_path: Path, name: str, body: str) -> Path:
+def _write_script(tmp_path: Path, name: str, body: str) -> str:
+    """Write the Python hook script *body* as ``tmp_path/name``; return the command line that runs it.
+
+    The spawner uses ``shell=False``, so a ``#!/usr/bin/env bash`` file is not runnable on Windows (no
+    shebang handling there): a hook is portable only as ``<interpreter> <script>``.
+    """
     path = tmp_path / name
-    path.write_text(body)
-    path.chmod(0o755)
-    return path
+    path.write_text(body, encoding="utf-8")
+    argv = [sys.executable, str(path)]
+    return subprocess.list2cmdline(argv) if os.name == "nt" else shlex.join(argv)
 
 
 def _allowlist_pair(monkeypatch, tmp_path, event: str, command: str) -> None:
@@ -154,9 +163,8 @@ class TestCallbackSubprocess:
         get_pre_tool_call_block_message() surfaces the block.
         """
         script = _write_script(
-            tmp_path, "blocker.sh",
-            "#!/usr/bin/env bash\n"
-            'printf \'{"decision": "block", "reason": "no terminal"}\\n\'\n',
+            tmp_path, "blocker.py",
+            'import json\nprint(json.dumps({"decision": "block", "reason": "no terminal"}))\n',
         )
         spec = shell_hooks.ShellHookSpec(
             event="pre_tool_call",
@@ -174,9 +182,8 @@ class TestCallbackSubprocess:
         from hermes_cli import plugins
 
         script = _write_script(
-            tmp_path, "block.sh",
-            "#!/usr/bin/env bash\n"
-            'printf \'{"decision": "block", "reason": "blocked-by-shell"}\\n\'\n',
+            tmp_path, "block.py",
+            'import json\nprint(json.dumps({"decision": "block", "reason": "blocked-by-shell"}))\n',
         )
 
         monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "home"))
@@ -205,10 +212,10 @@ class TestCallbackSubprocess:
         """A matcher set to 'terminal' must not fire for 'web_search'."""
         calls = tmp_path / "calls.log"
         script = _write_script(
-            tmp_path, "log.sh",
-            f"#!/usr/bin/env bash\n"
-            f"echo \"$(cat -)\" >> {calls}\n"
-            f"printf '{{}}\\n'\n",
+            tmp_path, "log.py",
+            "import sys\n"
+            f"open({str(calls)!r}, 'a').write(sys.stdin.read() + '\\n')\n"
+            "print('{}')\n",
         )
         spec = shell_hooks.ShellHookSpec(
             event="pre_tool_call",
@@ -226,8 +233,10 @@ class TestCallbackSubprocess:
     def test_payload_schema_delivered(self, tmp_path):
         capture = tmp_path / "payload.json"
         script = _write_script(
-            tmp_path, "capture.sh",
-            f"#!/usr/bin/env bash\ncat - > {capture}\nprintf '{{}}\\n'\n",
+            tmp_path, "capture.py",
+            "import sys\n"
+            f"open({str(capture)!r}, 'w').write(sys.stdin.read())\n"
+            "print('{}')\n",
         )
         spec = shell_hooks.ShellHookSpec(
             event="pre_tool_call", command=str(script),
@@ -254,9 +263,8 @@ class TestCallbackSubprocess:
     def test_modify_canonical_parsing(self, tmp_path):
         """Shell hook returning canonical modify is parsed correctly."""
         script = _write_script(
-            tmp_path, "mod_canon.sh",
-            "#!/usr/bin/env bash\n"
-            'printf \'{"action": "modify", "args": {"path": "/safe"}}\\n\'',
+            tmp_path, "mod_canon.py",
+            'import json\nprint(json.dumps({"action": "modify", "args": {"path": "/safe"}}))\n',
         )
         spec = shell_hooks.ShellHookSpec(
             event="pre_tool_call", command=str(script),
@@ -268,9 +276,8 @@ class TestCallbackSubprocess:
     def test_modify_claude_code_parsing(self, tmp_path):
         """Shell hook returning Claude-Code modify is normalised."""
         script = _write_script(
-            tmp_path, "mod_cc.sh",
-            "#!/usr/bin/env bash\n"
-            'printf \'{"decision": "modify", "tool_input": {"content": "safe"}}\\n\'',
+            tmp_path, "mod_cc.py",
+            'import json\nprint(json.dumps({"decision": "modify", "tool_input": {"content": "safe"}}))\n',
         )
         spec = shell_hooks.ShellHookSpec(
             event="pre_tool_call", command=str(script),
@@ -347,8 +354,7 @@ class TestIdempotentRegistration:
     def test_double_call_registers_once(self, tmp_path, monkeypatch):
         from hermes_cli import plugins
 
-        script = _write_script(tmp_path, "h.sh",
-                               "#!/usr/bin/env bash\nprintf '{}\\n'\n")
+        script = _write_script(tmp_path, "h.py", "print('{}')\n")
         monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "home"))
         monkeypatch.setenv("STARDUST_ACCEPT_HOOKS", "1")
 
@@ -371,8 +377,7 @@ class TestIdempotentRegistration:
         register both callbacks — dedupe keys on (event, matcher, command)."""
         from hermes_cli import plugins
 
-        script = _write_script(tmp_path, "h.sh",
-                               "#!/usr/bin/env bash\nprintf '{}\\n'\n")
+        script = _write_script(tmp_path, "h.py", "print('{}')\n")
         monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "home"))
         monkeypatch.setenv("STARDUST_ACCEPT_HOOKS", "1")
 
@@ -681,10 +686,10 @@ class TestEvaluateResult:
 class TestFailSemanticsEndToEnd:
     def test_exit_2_script_blocks(self, tmp_path):
         script = _write_script(
-            tmp_path, "exit2.sh",
-            "#!/usr/bin/env bash\n"
-            'echo "rm -rf is not permitted" >&2\n'
-            "exit 2\n",
+            tmp_path, "exit2.py",
+            "import sys\n"
+            "sys.stderr.write('rm -rf is not permitted\\n')\n"
+            "sys.exit(2)\n",
         )
         spec = shell_hooks.ShellHookSpec(
             event="pre_tool_call", command=str(script),
@@ -709,10 +714,10 @@ class TestFailSemanticsEndToEnd:
     def test_run_once_reflects_exit_2_block(self, tmp_path):
         """stardust hooks test must mirror production semantics."""
         script = _write_script(
-            tmp_path, "exit2.sh",
-            "#!/usr/bin/env bash\n"
-            'echo "denied" >&2\n'
-            "exit 2\n",
+            tmp_path, "exit2.py",
+            "import sys\n"
+            "sys.stderr.write('denied\\n')\n"
+            "sys.exit(2)\n",
         )
         spec = shell_hooks.ShellHookSpec(
             event="pre_tool_call", command=str(script),
@@ -725,8 +730,8 @@ class TestFailSemanticsEndToEnd:
 
     def test_run_once_reflects_fail_closed_timeout(self, tmp_path):
         script = _write_script(
-            tmp_path, "sleepy.sh",
-            "#!/usr/bin/env bash\nsleep 5\n",
+            tmp_path, "sleepy.py",
+            "import time\ntime.sleep(5)\n",
         )
         spec = shell_hooks.ShellHookSpec(
             event="pre_tool_call", command=str(script),
@@ -756,9 +761,10 @@ class TestRoutedProfileEnv:
         monkeypatch.setenv("OPENAI_API_KEY", "sk-default-profile")
         monkeypatch.setattr("agent.secret_scope.is_multiplex_active", lambda: True)
         script = _write_script(
-            tmp_path, "env_dump.sh",
-            "#!/usr/bin/env bash\ncat > /dev/null\n"
-            'printf \'{"home": "%s", "key": "%s"}\\n\' "$STARDUST_HOME" "${OPENAI_API_KEY:-}"\n',
+            tmp_path, "env_dump.py",
+            "import json, os, sys\n"
+            "sys.stdin.read()\n"
+            "print(json.dumps({'home': os.environ.get('STARDUST_HOME', ''), 'key': os.environ.get('OPENAI_API_KEY', '')}))\n",
         )
         spec = shell_hooks.ShellHookSpec(event="pre_tool_call", command=str(script))
         token = set_hermes_home_override(str(routed))
