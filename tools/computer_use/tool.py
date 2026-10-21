@@ -331,7 +331,13 @@ def handle_computer_use(args: Dict[str, Any], **kwargs) -> Any:
             return _dispatch(backend, action, args, session_id=session_id or None)
     except Exception as e:
         logger.exception("computer_use %s failed", action)
-        return json.dumps({"error": f"{action} failed: {e}"})
+        result = {"error": f"{action} failed: {e}"}
+        if action == "capture" and re.search(r"No window with window_id\b", str(e), re.I):
+            result["hint"] = (
+                "Refresh candidates with action='list_windows', then capture with both pid and "
+                "window_id from that result, or capture with app set to a listed app name. "
+                "Window handles can expire; do not reuse the failed handle or old element indices.")
+        return json.dumps(result)
 
 def _request_approval(action: str, args: Dict[str, Any]) -> Optional[str]:
     """None if approved, else a JSON error string.

@@ -273,6 +273,11 @@ def _finalize_child_env(env: dict) -> dict:
     _inject_session_context_env(env)
     _strip_hermes_owned_pythonpath_and_runtime_markers(env)
     _apply_windows_msys_bash_env_defaults(env)
+    if _IS_WINDOWS:
+        # Foreground, background and PTY Python children must agree with the
+        # UTF-8 output readers. Keep an explicitly configured codec authoritative.
+        env.setdefault("PYTHONUTF8", "1")
+        env.setdefault("PYTHONIOENCODING", "utf-8")
     from agent.delegation_context import delegated_child_subprocess_env
     return delegated_child_subprocess_env(env)
 
