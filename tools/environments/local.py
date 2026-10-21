@@ -836,6 +836,10 @@ class LocalEnvironment(BaseEnvironment):
             cmd_string = _prepend_shell_init(cmd_string, _resolve_shell_init_files())
         args = [bash, *(["-l"] if login else []), "-c", cmd_string]
         self._recover_cwd()
+        if os.environ.get("STARDUST_EXEC_BACKEND") == "rust":
+            from tools.environments.rust_exec import RustProcess
+            return RustProcess(args, cwd=self.cwd, env=_make_run_env(self.env),
+                               timeout=timeout, stdin_data=stdin_data)
         proc = (spawn_contained if _IS_WINDOWS else subprocess.Popen)(
             args, text=True, env=_make_run_env(self.env), encoding="utf-8", errors="replace",
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -852,6 +856,9 @@ class LocalEnvironment(BaseEnvironment):
     def _kill_process(self, proc):
         """Kill the entire process group (all children)."""
         try:
+            if getattr(proc, "_hermes_rust_exec", False) is True:
+                proc.kill()
+                return
             (_kill_process_windows if _IS_WINDOWS else _kill_process_group_posix)(proc)
         except OSError:  # ProcessLookupError / PermissionError included
             with contextlib.suppress(Exception):
