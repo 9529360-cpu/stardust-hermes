@@ -70,8 +70,9 @@ _PROPERTIES: Dict[str, Any] = {
     "window_id": {
         "type": "integer",
         "description": (
-            "Optional exact native window target for action='capture'. Pair with pid when an "
-            "external cua-driver list_windows lookup has already identified the window."
+            "Optional exact native window target for action='capture'. Pair with pid after an "
+            "action='list_windows' result has identified the window. Handles expire when windows close; "
+            "refresh the list after a missing-window error instead of retrying the old handle."
         ),
     },
     "element": {
