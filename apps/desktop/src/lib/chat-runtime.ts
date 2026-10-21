@@ -444,6 +444,7 @@ export function toRuntimeMessage(message: ChatMessage): ThreadMessage {
       // Carries ChatMessage.interim to AssistantMessage's footer gate.
       custom: {
         ...(message.interim ? { interim: true } : {}),
+        ...(message.finalCandidate ? { finalCandidate: true } : {}),
         ...timelineMeta,
         ...(message.completedAt !== undefined ? { timelineCompletedAt: message.completedAt } : {}),
         ...(message.durationS !== undefined ? { durationS: message.durationS } : {}),

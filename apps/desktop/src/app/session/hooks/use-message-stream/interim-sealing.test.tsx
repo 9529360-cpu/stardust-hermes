@@ -66,6 +66,31 @@ describe('useMessageStream interim text sealing', () => {
     vi.restoreAllMocks()
   })
 
+  it('keeps a verify-on-stop final candidate marked as a reply, not commentary', async () => {
+    mountStream()
+    await start()
+
+    await delta('All verified, ready to ship.')
+    await act(() =>
+      stream.handleEvent({
+        payload: { already_streamed: true, final_candidate: true, text: 'All verified, ready to ship.' },
+        session_id: SID,
+        type: 'message.interim'
+      })
+    )
+    const candidate = getState().messages.find(m => chatMessageText(m) === 'All verified, ready to ship.')
+    expect(candidate).toMatchObject({ finalCandidate: true, interim: true })
+  })
+
+  it('does not mark ordinary commentary interims as final candidates', async () => {
+    mountStream()
+    await start()
+    await delta('Let me check.')
+    await interim('Let me check.')
+
+    expect(getState().messages.find(m => chatMessageText(m) === 'Let me check.')?.finalCandidate).toBeUndefined()
+  })
+
   it('preserves interim text that the final response does not include', async () => {
     mountStream()
     await start()

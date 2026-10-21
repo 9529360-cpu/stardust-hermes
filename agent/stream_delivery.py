@@ -3,6 +3,7 @@
 Single-writer stream ownership, delta/reasoning hook fan-out, and interim assistant text dedup.
 Extracted from ``run_agent.py``; every method resolves through ``AIAgent``'s MRO unchanged.
 """
+import inspect
 import logging
 import re
 import threading
@@ -17,6 +18,18 @@ from agent.reasoning_timing import answer_event_stamp, event_stamped, reasoning_
 # Same logger name as the origin module so log records / caplog filters are unchanged.
 logger = logging.getLogger("run_agent")
 
+
+
+# finish_reason stamped by agent.turn_stop_gates on an answer it holds back for a verification follow-up.
+_STOP_GATE_FINISH_REASONS = frozenset({"verification_required", "verify_hook_continue"})
+
+
+def _accepts_keyword(fn: Any, name: str) -> bool:
+    try:
+        params = inspect.signature(fn).parameters.values()
+    except (TypeError, ValueError):
+        return False
+    return any(p.name == name or p.kind is inspect.Parameter.VAR_KEYWORD for p in params)
 
 class StreamDeliveryMixin:
     """Stream ownership, delta/reasoning hook fan-out and interim-text dedup (see module docstring)."""
@@ -162,13 +175,21 @@ class StreamDeliveryMixin:
                 self._delivered_interim_texts = set()
             self._delivered_interim_texts.add(normalized)
 
-    def _deliver_interim(self, visible: str, *, already_streamed: bool, record: List[str]) -> None:
-        """Hand ``visible`` to ``interim_assistant_callback`` and mark ``record`` delivered; swallows callback errors."""
+    def _deliver_interim(
+        self, visible: str, *, already_streamed: bool, record: List[str], final_candidate: bool = False,
+    ) -> None:
+        """Hand ``visible`` to ``interim_assistant_callback`` and mark ``record`` delivered; swallows callback errors.
+
+        ``final_candidate`` (the turn's attempted final answer, held back by a stop gate) is passed only to
+        callbacks that declare it, so older/platform callbacks keep their two-argument contract."""
         cb = getattr(self, "interim_assistant_callback", None)
         if cb is None:
             return
         try:
-            cb(visible, already_streamed=already_streamed)
+            if final_candidate and _accepts_keyword(cb, "final_candidate"):
+                cb(visible, already_streamed=already_streamed, final_candidate=True)
+            else:
+                cb(visible, already_streamed=already_streamed)
             for part in record:
                 self._record_delivered_interim_text(part)
             mark_user_updated(self)
@@ -203,7 +224,10 @@ class StreamDeliveryMixin:
             return
         already_streamed = self._interim_content_was_streamed(visible)
         self._enqueue_stream_hook("on_interim_message", text=visible, already_streamed=already_streamed)
-        self._deliver_interim(visible, already_streamed=already_streamed, record=undelivered_parts or [visible])
+        self._deliver_interim(
+            visible, already_streamed=already_streamed, record=undelivered_parts or [visible],
+            final_candidate=assistant_msg.get("finish_reason") in _STOP_GATE_FINISH_REASONS,
+        )
 
     def _ensure_stream_writer_state(self) -> None:
         """Lazily create the single-writer guard fields (#65991).
