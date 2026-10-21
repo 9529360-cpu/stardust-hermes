@@ -767,9 +767,13 @@ def _redact_assignments(text: str, *, mask_nonreusable: bool = False) -> str:
     truncated key and could write it back as a dead credential (#35519)."""
     mask = _mask_token_nonreusable if mask_nonreusable else _mask_token
     if "=" in text:
+        from stardust_native_support import assignment_candidate
+
+        candidate = assignment_candidate is None or not text.isascii() or assignment_candidate(text)
         _redact_env = _assignment_sub(lambda g: f"{g[0]}={g[1]}{mask(g[2])}{g[1]}", check_keyword=True)
-        text = _ENV_ASSIGN_RE.sub(_redact_env, text)
-        if "://" not in text:  # lowercase names would match URL params
+        if candidate:
+            text = _ENV_ASSIGN_RE.sub(_redact_env, text)
+        if candidate and "://" not in text:  # lowercase names would match URL params
             # Skip URLs — the query string may contain ``token=``/``key=`` params that are intentionally
             # passed through (see note near the bottom of this function; _redact_strict_url_credentials
             # handles the opt-in case). The uppercase regex above is all-caps-only, so it never matches URL
@@ -784,7 +788,7 @@ def _redact_assignments(text: str, *, mask_nonreusable: bool = False) -> str:
         # because _CFG_DOTTED_RE backtracks quadratically on long unbroken [A-Za-z0-9_.\-] runs (e.g.
         # base64/hex blobs in compaction payloads); the linear keyword scan prevents that pathological path
         # on secret-free text.
-        if "://" not in text and _CFG_SECRET_WORD_RE.search(text):
+        if candidate and "://" not in text and _CFG_SECRET_WORD_RE.search(text):
             text = _CFG_DOTTED_RE.sub(_redact_env, text)
             text = _CFG_ANCHORED_RE.sub(_redact_env, text)
 

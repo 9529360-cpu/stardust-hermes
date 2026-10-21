@@ -135,7 +135,7 @@ mod win {
     }
 }
 #[cfg(windows)]
-pub use win::{decode, spawn};
+pub use win::{decode, spawn, Containment};
 #[cfg(windows)]
 pub fn exit_code(status: ExitStatus) -> i32 {
     status.code().unwrap_or(1)

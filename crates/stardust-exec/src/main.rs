@@ -1,7 +1,7 @@
 //! Sequential UTF-8 JSONL requests; stdout is exclusively protocol events.
-mod platform;
 use serde::Deserialize;
 use serde_json::{json, Value};
+use stardust_exec::platform;
 use std::{
     collections::HashMap,
     io::{self, BufRead, Read, Write},

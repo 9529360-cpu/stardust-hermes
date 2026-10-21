@@ -1,4 +1,4 @@
 [workspace]
-members = ["crates/stardust-exec"]
+members = ["crates/stardust-exec", "crates/stardust-native"]
 exclude = ["apps/bootstrap-installer/src-tauri"]
 resolver = "2"

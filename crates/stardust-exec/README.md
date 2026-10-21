@@ -4,7 +4,10 @@ Build from the repository root: `cargo build --release --locked -p stardust-exec
 The bootstrap installer remains a separate workspace.
 
 Opt in with `STARDUST_EXEC_BACKEND=rust`. The default Python execution path is
-unchanged. The binary must be on PATH or in the checkout's `target/release`.
+unchanged. When the optional `stardust-native` PyO3 module is installed, the adapter
+uses the same Rust containment code in-process to avoid helper startup overhead
+(see `../stardust-native/README.md`). Otherwise the binary must be on PATH or in
+the checkout's `target/release`.
 An explicit opt-in with a missing helper fails with an actionable error.
 No runtime compilation, downloading, or silent retry of a command occurs.
 

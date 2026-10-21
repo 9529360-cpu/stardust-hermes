@@ -17,6 +17,14 @@ def enabled() -> bool:
 class RustProcess:
     """ProcessHandle exposing helper events as the existing raw UTF-8 output pipe."""
 
+    def __new__(cls, *args, **kwargs):
+        try:
+            from stardust_native import NativeChild  # noqa: F401
+        except ImportError:
+            return super().__new__(cls)
+        from tools.environments.native_process import NativeProcess
+        return NativeProcess(*args, **kwargs)
+
     def __init__(self, argv, *, cwd, env, timeout, stdin_data):
         name = 'stardust-exec.exe' if os.name == 'nt' else 'stardust-exec'
         binary = shutil.which(name)
@@ -103,7 +111,7 @@ class RustProcess:
                     os.killpg(self._child_pid, signal.SIGKILL)  # windows-footgun: ok — POSIX branch only
                 except ProcessLookupError:
                     pass
-            try:
-                os.killpg(self.pid, signal.SIGKILL)  # windows-footgun: ok — POSIX branch only
-            except ProcessLookupError:
-                pass
+            # The command owns a separate process group; after ending that group,
+            # terminate only our helper handle. macOS can reject killpg on the
+            # helper's session even while its Popen handle is valid.
+            self._proc.kill()
