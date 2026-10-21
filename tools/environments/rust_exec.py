@@ -17,6 +17,14 @@ def enabled() -> bool:
 class RustProcess:
     """ProcessHandle exposing helper events as the existing raw UTF-8 output pipe."""
 
+    def __new__(cls, *args, **kwargs):
+        try:
+            from stardust_native import NativeChild  # noqa: F401
+        except ImportError:
+            return super().__new__(cls)
+        from tools.environments.native_process import NativeProcess
+        return NativeProcess(*args, **kwargs)
+
     def __init__(self, argv, *, cwd, env, timeout, stdin_data):
         name = 'stardust-exec.exe' if os.name == 'nt' else 'stardust-exec'
         binary = shutil.which(name)

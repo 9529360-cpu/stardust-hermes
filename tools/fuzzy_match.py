@@ -557,8 +557,18 @@ def find_closest_lines(old_string: str, content: str, context_lines: int = 2, ma
     if not anchor:
         return ""
 
-    scored = sorted(((SequenceMatcher(None, anchor, line.strip()).ratio(), i)
-                     for i, line in enumerate(content_lines) if line.strip()), key=lambda x: -x[0])
+    from stardust_native_support import sequence_ratios
+
+    indexed = [(i, line.strip()) for i, line in enumerate(content_lines) if line.strip()]
+    try:
+        ratios = (sequence_ratios(anchor, [line for _, line in indexed]) if sequence_ratios is not None
+                  else None)
+    except UnicodeEncodeError:
+        # Python source reads may contain surrogateescaped bytes; Rust strings cannot.
+        ratios = None
+    if ratios is None:
+        ratios = [SequenceMatcher(None, anchor, line).ratio() for _, line in indexed]
+    scored = sorted(((score, i) for score, (i, _) in zip(ratios, indexed)), key=lambda x: -x[0])
     top = [s for s in scored if s[0] > 0.3][:max_results]
     if not top:
         return ""

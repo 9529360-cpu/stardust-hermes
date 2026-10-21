@@ -38,9 +38,18 @@ jobs:
           else
             .venv/bin/python -m pip install -e ".[dev]"
           fi
+      - name: Install optional native kernels
+        shell: bash
+        run: |
+          if [ -f .venv/Scripts/python.exe ]; then
+            PY=.venv/Scripts/python.exe
+          else
+            PY=.venv/bin/python
+          fi
+          "$PY" -m pip install ./crates/stardust-native
       - name: Test real helper integration
         shell: bash
-        run: scripts/run_tests.sh tests/tools/test_rust_exec.py
+        run: scripts/run_tests.sh tests/tools/test_rust_exec.py tests/tools/test_native_hotspots.py
 
   bootstrap-installer:
     name: cargo test (bootstrap installer)

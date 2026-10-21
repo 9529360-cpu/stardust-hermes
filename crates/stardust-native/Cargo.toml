@@ -1,0 +1,20 @@
+[package]
+name = "stardust-native"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[lib]
+name = "stardust_native"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+pyo3 = { version = "0.27", features = ["extension-module", "generate-import-lib"] }
+os_pipe = "1.2"
+stardust-exec = { path = "../stardust-exec" }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_System_Pipes"] }

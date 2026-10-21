@@ -11,6 +11,15 @@ ROOT = Path(__file__).resolve().parents[2]
 BINARY = ROOT / 'target' / 'release' / ('stardust-exec.exe' if os.name == 'nt' else 'stardust-exec')
 
 
+@pytest.fixture(params=['helper', 'native'])
+def execution_backend(request, monkeypatch):
+    if request.param == 'native':
+        pytest.importorskip('stardust_native')
+    else:
+        monkeypatch.setitem(sys.modules, 'stardust_native', None)
+    return request.param
+
+
 def test_opt_in_only(monkeypatch):
     from tools.environments.rust_exec import enabled
     monkeypatch.delenv('STARDUST_EXEC_BACKEND', raising=False)
@@ -36,7 +45,7 @@ def test_protocol(code, timeout, expected):
 
 
 @pytest.mark.skipif(not BINARY.exists(), reason='cargo build --release required')
-def test_local_real_session(monkeypatch, tmp_path):
+def test_local_real_session(monkeypatch, tmp_path, execution_backend):
     from tools.environments.local import LocalEnvironment
     monkeypatch.setenv('STARDUST_EXEC_BACKEND', 'rust')
     monkeypatch.setenv('STARDUST_HOME', str(tmp_path / 'home'))
@@ -56,7 +65,7 @@ def test_local_real_session(monkeypatch, tmp_path):
 
 
 @pytest.mark.skipif(not BINARY.exists(), reason='cargo build --release required')
-def test_adapter_cancel(tmp_path):
+def test_adapter_cancel(tmp_path, execution_backend):
     import time
     import psutil
     from tools.environments.rust_exec import RustProcess
