@@ -16,9 +16,13 @@ from agent.verification_evidence import (
 )
 
 @pytest.fixture(autouse=True)
-def _ledger_on(monkeypatch):
-    """The ledger is inert unless verify-on-stop is enabled; these tests exercise the ledger."""
+def _ledger_on(monkeypatch, tmp_path):
+    """Exercise the ledger in a project isolated from the checkout's Git root."""
     monkeypatch.setenv("STARDUST_VERIFY_ON_STOP", "1")
+    # The canonical runner places tmp_path below the checkout. Workspace
+    # discovery walks .git itself, so GIT_CEILING_DIRECTORIES cannot isolate
+    # these synthetic projects. A local marker gives each fixture its own root.
+    (tmp_path / ".git").mkdir()
 
 
 
@@ -893,6 +897,7 @@ def test_output_captured_outside_the_workspace_keeps_evidence_fresh(tmp_path, mo
     monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
     project = tmp_path / "project"
     project.mkdir()
+    (project / ".git").mkdir()
     _python_project(project)
     log = tmp_path / "logs" / "run.log"
     posix = log.as_posix()  # an unquoted backslash path is not what a shell would read as this location
@@ -911,6 +916,7 @@ def test_output_that_may_land_inside_the_workspace_still_invalidates_evidence(tm
     monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
     project = tmp_path / "project"
     project.mkdir()
+    (project / ".git").mkdir()
     _python_project(project)
 
     for command in (
