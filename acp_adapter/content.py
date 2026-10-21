@@ -13,6 +13,8 @@ from acp.schema import (
     ResourceContentBlock, TextContentBlock, TextResourceContents,
 )
 
+from hermes_constants import is_wsl
+
 logger = logging.getLogger("acp_adapter.server")
 
 PromptBlock = (
@@ -71,10 +73,15 @@ _IMAGE_SUFFIX_MIME = {
 
 def _path_from_file_uri(uri: str) -> Path | None:
     """Local file URI/path from an ACP client -> readable Path (None for non-file URIs).
-    Windows drive forms (Zed via wsl.exe) become ``/mnt/<drive>/...``."""
+    A Windows drive form is kept as sent, so a native Windows host opens it directly; only inside WSL
+    (Zed via wsl.exe) does it become the ``/mnt/<drive>/...`` DrvFS mount."""
     raw = (uri or "").strip()
     if not raw:
         return None
+
+    # urlparse treats a bare drive letter as a URI scheme ("c").
+    if len(raw) >= 3 and raw[0].isalpha() and raw[1] == ":" and raw[2] in "/\\":
+        return _path_from_file_uri("file:" + raw)
 
     parsed = urlparse(raw)
     if parsed.scheme and parsed.scheme != "file":
@@ -91,7 +98,8 @@ def _path_from_file_uri(uri: str) -> Path | None:
         drive, rest = path_text[0], path_text[2:]
     else:
         return Path(path_text)
-    return Path("/mnt") / drive.lower() / rest.lstrip("/\\").replace("\\", "/")
+    tail = rest.lstrip("/\\").replace("\\", "/")
+    return Path("/mnt") / drive.lower() / tail if is_wsl() else Path(f"{drive}:/{tail}")
 
 
 def _decode_text_bytes(data: bytes, mime_type: str | None) -> str | None:
