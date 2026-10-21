@@ -255,6 +255,34 @@ def test_terminal_script_after_passing_test_stales_evidence_and_stop_gate(tmp_pa
     assert "Verification status: stale" in nudge
 
 
+def test_python_config_command_does_not_invalidate_workspace_evidence(tmp_path, monkeypatch):
+    monkeypatch.setenv("STARDUST_VERIFY_ON_STOP", "1")
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+    _python_project(tmp_path)
+
+    command = (
+        "D:/Stardust/home/hermes-agent/venv/Scripts/python.exe "
+        "-m hermes_cli.main config set agent.verify_on_stop auto"
+    )
+
+    assert terminal_workspace_mutation_root(command=command, cwd=tmp_path, exit_code=0) is None
+
+
+@pytest.mark.parametrize(("command", "mutates"), [
+    ("python -m ruff check agent/verification_evidence.py", False),
+    ("python -m ruff check --fix agent/verification_evidence.py", True),
+    ("python -m project.migrate --write", True),
+])
+def test_python_module_read_write_classification(tmp_path, monkeypatch, command, mutates):
+    monkeypatch.setenv("STARDUST_VERIFY_ON_STOP", "1")
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
+    _python_project(tmp_path)
+
+    result = terminal_workspace_mutation_root(command=command, cwd=tmp_path, exit_code=0)
+
+    assert bool(result) is mutates
+
+
 def test_foreground_terminal_result_exposes_mutation_and_stales_ledger(tmp_path, monkeypatch):
     monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
     _node_project(tmp_path)

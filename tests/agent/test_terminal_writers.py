@@ -9,6 +9,7 @@ from agent.terminal_writers import (
     executable_name,
     interpreter_kind,
     node_verifier_writes,
+    python_module_writes,
 )
 
 
@@ -94,6 +95,13 @@ def test_unknown_commands_are_not_decided_here():
     assert conditional_write("ls", ["-la"]) is None
     assert conditional_write("pytest", []) is None
     assert set(CONDITIONAL_WRITERS) >= {"tar", "unzip", "curl", "wget", "rsync", "clang-format", "terraform"}
+
+
+def test_python_module_workspace_writes():
+    assert python_module_writes("hermes_cli.main", ["config", "set", "agent.verify_on_stop", "auto"]) is False
+    assert python_module_writes("ruff", ["check", "src"]) is False
+    assert python_module_writes("ruff", ["check", "--fix", "src"]) is True
+    assert python_module_writes("project.migrate", ["--write"]) is True
 
 
 @pytest.mark.parametrize(("script", "args"), [

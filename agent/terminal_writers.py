@@ -139,7 +139,11 @@ CONDITIONAL_WRITERS: dict[str, Callable[[list[str]], bool]] = {
 
 
 def python_module_writes(module: str, args: list[str]) -> bool:
-    """Classify known ``python -m`` checkers; unknown modules remain effect-capable."""
+    """Classify known ``python -m`` checkers and non-project configuration commands."""
+    if module == "hermes_cli.main" and args and args[0] == "config":
+        # `stardust config set` mutates profile configuration, not the project
+        # workspace whose verification evidence this classifier tracks.
+        return False
     if module in {"pytest", "unittest", "nose", "nose2", "mypy", "pyright"}:
         return False
     if module == "ruff":
