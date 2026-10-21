@@ -30,42 +30,24 @@ EXCLUDED_SKILL_DIRS = frozenset((
 # via skill_view(skill, file_path=...), never scanned as standalone skills.
 SKILL_SUPPORT_DIRS = frozenset(("references", "templates", "assets", "scripts"))
 
-# Org mirrors live under skills/_org/<org_id>/ and are TOKEN-GATED: the sync
-# client writes the marker after verifying the token; no marker => no org skills
-# load. The marker persists offline so already-pulled org skills keep working.
+# Older installs hold org mirrors under skills/_org/<org_id>/ (with ``.active_org`` and sidecar files)
+# written by the retired upstream Skill Sync. They stay on disk untouched but are never skills: no
+# walker, loader, mutator or curator may see them, or another party's shared set would reach the
+# prompt and become editable/deletable local skills.
 ORG_MIRROR_DIR_NAME = "_org"
-ORG_ACTIVE_MARKER = ".active_org"
-ORG_PROVENANCE_FILE = ".org-provenance.json"
-ORG_BASELINE_FILE = ".org-baseline.json"  # upstream fingerprint; detects local edits
-
-
-def read_active_org_id(skills_dir: Path) -> Optional[str]:
-    """The org id whose mirror may resolve, or None (no org skills load)."""
-    marker = skills_dir / ORG_MIRROR_DIR_NAME / ORG_ACTIVE_MARKER
-    try:
-        return (marker.read_text(encoding="utf-8").strip() or None) if marker.exists() else None
-    except OSError:
-        return None
-
-
-def _org_rel_parts(path, skills_dir: Path) -> Tuple[str, ...]:
-    """Path parts of *path* relative to *skills_dir* if it is under ``_org/``, else ``()``."""
-    try:
-        parts = Path(path).resolve().relative_to(Path(skills_dir).resolve()).parts
-    except (OSError, ValueError):
-        return ()
-    return parts if parts and parts[0] == ORG_MIRROR_DIR_NAME else ()
 
 
 def is_org_mirror_path(path, skills_dir: Path) -> bool:
-    """True when *path* is inside the org mirror (``_org/``)."""
-    return bool(_org_rel_parts(path, skills_dir))
-
-
-def org_id_of_path(path, skills_dir: Path) -> Optional[str]:
-    """The ``<org_id>`` segment for a path under ``_org/<org_id>/...``."""
-    parts = _org_rel_parts(path, skills_dir)
-    return parts[1] if len(parts) >= 2 else None
+    """True when *path* is inside the retired org mirror (``<skills_dir>/_org/``)."""
+    candidate, root = Path(path), Path(skills_dir)
+    try:
+        relative = candidate.relative_to(root)
+    except ValueError:
+        try:
+            relative = candidate.resolve().relative_to(root.resolve())
+        except (OSError, ValueError):
+            return False
+    return bool(relative.parts) and relative.parts[0] == ORG_MIRROR_DIR_NAME
 
 
 def is_excluded_skill_path(path, *, root: Optional[Path] = None) -> bool:
@@ -739,19 +721,14 @@ def is_skill_description_truncated_for_prompt(frontmatter: Dict[str, Any]) -> bo
 
 def iter_skill_index_files(skills_dir: Path, filename: str):
     """Walk skills_dir yielding sorted paths matching *filename*; prunes
-    EXCLUDED_SKILL_DIRS and support dirs of skill roots. Org mirrors are
-    TOKEN-GATED: only the active org's subdir is walked, so leaving an org
-    stops its skills resolving without manual cleanup."""
+    EXCLUDED_SKILL_DIRS, support dirs of skill roots and the retired org
+    mirror (``<skills_dir>/_org``), which is never walked."""
     skills_dir_str = str(skills_dir)
-    active_org = read_active_org_id(skills_dir)
-    org_root = os.path.join(skills_dir_str, ORG_MIRROR_DIR_NAME)
     matches: list[str] = []
     for root, dirs, files in os.walk(skills_dir_str, followlinks=True):
         has_skill_md = "SKILL.md" in files
-        if root == skills_dir_str and ORG_MIRROR_DIR_NAME in dirs and active_org is None:
+        if root == skills_dir_str and ORG_MIRROR_DIR_NAME in dirs:
             dirs.remove(ORG_MIRROR_DIR_NAME)
-        elif root == org_root:
-            dirs[:] = [d for d in dirs if d == active_org]
         dirs[:] = [d for d in dirs if d not in EXCLUDED_SKILL_DIRS and not (has_skill_md and d in SKILL_SUPPORT_DIRS)]
         if filename in files:
             matches.append(os.path.join(root, filename))

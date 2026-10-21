@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Optional
 
 from hermes_cli import profiles as profiles_mod
-from agent.skill_utils import is_excluded_skill_path
+from agent.skill_utils import is_excluded_skill_path, is_org_mirror_path
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +83,7 @@ def _collect_skills(profile_dir: Path) -> list[str]:
         return []
     names: list[str] = []
     for md in skills_dir.rglob("SKILL.md"):
-        if is_excluded_skill_path(md):
+        if is_excluded_skill_path(md) or is_org_mirror_path(md, skills_dir):
             continue
         try:
             parts = md.relative_to(skills_dir).parts[:-1]  # drop SKILL.md

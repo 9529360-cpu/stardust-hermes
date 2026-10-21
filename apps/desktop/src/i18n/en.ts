@@ -3395,6 +3395,11 @@ export const en: Translations = {
     stop: 'Stop',
     dismiss: 'Dismiss',
     exit: code => `exit ${code}`,
+    recoveryUnknown: count => `${count} Unknown subagent result${count === 1 ? '' : 's'}`,
+    recoveryNote:
+      "Their background worker stopped before reporting back, so it's unknown whether they finished. Nothing was re-run automatically.",
+    recoveryRowState: 'Result unknown',
+    recoveryGoalCount: count => `${count} goal${count === 1 ? '' : 's'} in batch`,
     control: {
       goalActiveTurns: (turn, maxTurns) => `Turn ${turn}/${maxTurns}`,
       goalDoneTurns: turns => `${turns} turn${turns === 1 ? '' : 's'}`,

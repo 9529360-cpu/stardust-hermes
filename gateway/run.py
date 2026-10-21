@@ -4508,18 +4508,6 @@ def _housekeeping_curator() -> None:
     maybe_run_curator(idle_for_seconds=float("inf"), on_summary=lambda msg: logger.info("curator: %s", msg))
 
 
-def _housekeeping_skill_sync() -> None:
-    """Inert unless the access gate is open and a sync base URL is configured."""
-    from tools.skills_sync_client import maybe_pull_skills
-    maybe_pull_skills()
-
-
-def _housekeeping_org_skill_sync() -> None:
-    """Gated on real org membership (the token must carry an org role): solo accounts never reach the network."""
-    from tools.skills_sync_client_org import maybe_pull_org_skills
-    maybe_pull_org_skills()
-
-
 def _housekeeping_auto_archive() -> None:
     """Stale-session auto-archive on a live timer (the startup hook fires once); maybe_auto_archive()
     is gated by sessions.min_interval_hours. Opens its own SessionDB — SQLite connections are thread-bound."""
@@ -4609,8 +4597,6 @@ def _start_gateway_housekeeping(
         chores.append((1, "Cron ticker supervisor", cron_thread.restart_if_dead))
     chores += [
         (60, "Curator tick", _housekeeping_curator),
-        (60, "Sync pull tick", _housekeeping_skill_sync),
-        (60, "Org sync pull tick", _housekeeping_org_skill_sync),
         (60, "Auto-archive tick", _housekeeping_auto_archive),
         (1, "Deferred FTS retry tick", _housekeeping_deferred_fts_retry),
         (1, "gateway housekeeping memory trim", _housekeeping_memory_trim),

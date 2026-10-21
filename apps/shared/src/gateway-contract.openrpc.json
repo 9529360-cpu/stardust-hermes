@@ -781,6 +781,24 @@
       }
     },
     {
+      "name": "delegation.recovery.list",
+      "summary": "Bounded, sanitized unknown-outcome receipts for this session's exited background owners.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/SessionParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/DelegationRecoveryListResult"
+        }
+      }
+    },
+    {
       "name": "delegation.status",
       "summary": "Running subagent tree plus the spawn pause flag and limits.",
       "params": [
@@ -10953,6 +10971,83 @@
         ],
         "title": "DelegationPauseResult",
         "type": "object"
+      },
+      "DelegationRecoveryListResult": {
+        "additionalProperties": false,
+        "properties": {
+          "receipts": {
+            "items": {
+              "$ref": "#/components/schemas/DelegationRecoveryReceipt"
+            },
+            "title": "Receipts",
+            "type": "array"
+          }
+        },
+        "title": "DelegationRecoveryListResult",
+        "type": "object"
+      },
+      "DelegationRecoveryReceipt": {
+        "additionalProperties": false,
+        "description": "``tools/async_delegation.py::list_unknown_delegation_receipts`` allowlist. ``unknown`` means the owner\nexited before a trustworthy result: the work may or may not have run, and is never re-dispatched\nautomatically. A batch reports only how many goals it held (``goal_count``), never child outcomes.",
+        "properties": {
+          "delegation_id": {
+            "title": "Delegation Id",
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/DelegationRecoveryState"
+          },
+          "dispatched_at": {
+            "title": "Dispatched At",
+            "type": "number"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Completed At"
+          },
+          "delivery_state": {
+            "title": "Delivery State",
+            "type": "string"
+          },
+          "goal": {
+            "title": "Goal",
+            "type": "string"
+          },
+          "is_batch": {
+            "default": false,
+            "title": "Is Batch",
+            "type": "boolean"
+          },
+          "goal_count": {
+            "default": 1,
+            "title": "Goal Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "delegation_id",
+          "state",
+          "dispatched_at",
+          "delivery_state",
+          "goal"
+        ],
+        "title": "DelegationRecoveryReceipt",
+        "type": "object"
+      },
+      "DelegationRecoveryState": {
+        "enum": [
+          "unknown"
+        ],
+        "title": "DelegationRecoveryState",
+        "type": "string"
       },
       "DelegationStatusResult": {
         "additionalProperties": false,

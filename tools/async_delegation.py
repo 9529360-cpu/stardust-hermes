@@ -360,6 +360,12 @@ def _recovered_results(task: Dict[str, Any], result_json: Optional[str], error: 
     return [recorded.get(i) or {"task_index": i, "status": "unknown", "summary": None, "error": error} for i in indexes]
 
 
+def _owner_generation_gone(pid: Any, started: Any, pid_exists: Callable[[int], bool],
+                           process_start_time: Callable[[int], Any]) -> bool:
+    """True when the process generation recorded at dispatch (pid + start time) no longer exists."""
+    return not (pid and pid_exists(int(pid)) and (started is None or process_start_time(int(pid)) == int(started)))
+
+
 def recover_abandoned_delegations() -> int:
     """Classify records whose owning process disappeared as outcome unknown; children a multi-child unit had already
     recorded (``record_unit_child``) are replayed with their real results."""
@@ -375,31 +381,35 @@ def recover_abandoned_delegations() -> int:
                FROM async_delegations WHERE state IN ('running','finalizing')""").fetchall()
         for row in rows:
             delegation_id, session_key, origin_ui, parent_id, dispatched_at, pid, started, task_json, origin_sid, result_json = row
-            if pid and _pid_exists(int(pid)) and (started is None or get_process_start_time(int(pid)) == int(started)):
+            try:
+                if not _owner_generation_gone(pid, started, _pid_exists, get_process_start_time):
+                    continue
+                task = _durable_payload_dict(task_json)
+                error = "Delegation owner exited before recording a terminal result; outcome unknown."
+                recovered_results = _recovered_results(task, result_json, error)
+                if recovered_results:
+                    done = sum(1 for r in recovered_results if r.get("status") != "unknown")
+                    error = (f"Delegation owner exited before the unit finished; {done}/{len(recovered_results)} child "
+                             "results were recorded and are included below, the rest are unknown.")
+                event = {
+                    "type": "async_delegation", "delegation_id": delegation_id, "session_key": session_key,
+                    "origin_ui_session_id": origin_ui, "origin_session_id": origin_sid or "",
+                    "parent_session_id": parent_id, "goal": task.get("goal", ""), "goals": task.get("goals"),
+                    "context": task.get("context"), "toolsets": task.get("toolsets"), "role": task.get("role"),
+                    "model": task.get("model"), "is_batch": bool(task.get("is_batch")),
+                    "status": "unknown", "summary": None, "error": error,
+                    **({"results": recovered_results} if recovered_results else {}),
+                    "dispatched_at": dispatched_at, "completed_at": now,
+                    **{k: task[k] for k in (*_ROUTING_KEYS, _OWNER_KEY) if task.get(k)}}
+                result = {"status": "unknown", "summary": None, "error": event["error"],
+                          **({"results": recovered_results} if recovered_results else {})}
+                conn.execute("""UPDATE async_delegations SET state='unknown', completed_at=?,
+                       updated_at=?, event_json=?, result_json=?, delivery_state='pending'
+                       WHERE delegation_id=?""", (now, now, json.dumps(event), json.dumps(result), delegation_id))
+                recovered += 1
+            except (TypeError, ValueError, OverflowError, json.JSONDecodeError) as exc:
+                logger.warning("Skipping corrupt async delegation recovery row %r: %s", delegation_id, exc)
                 continue
-            task = json.loads(task_json or "{}")
-            error = "Delegation owner exited before recording a terminal result; outcome unknown."
-            recovered_results = _recovered_results(task, result_json, error)
-            if recovered_results:
-                done = sum(1 for r in recovered_results if r.get("status") != "unknown")
-                error = (f"Delegation owner exited before the unit finished; {done}/{len(recovered_results)} child "
-                         "results were recorded and are included below, the rest are unknown.")
-            event = {
-                "type": "async_delegation", "delegation_id": delegation_id, "session_key": session_key,
-                "origin_ui_session_id": origin_ui, "origin_session_id": origin_sid or "",
-                "parent_session_id": parent_id, "goal": task.get("goal", ""), "goals": task.get("goals"),
-                "context": task.get("context"), "toolsets": task.get("toolsets"), "role": task.get("role"),
-                "model": task.get("model"), "is_batch": bool(task.get("is_batch")),
-                "status": "unknown", "summary": None, "error": error,
-                **({"results": recovered_results} if recovered_results else {}),
-                "dispatched_at": dispatched_at, "completed_at": now,
-                **{k: task[k] for k in (*_ROUTING_KEYS, _OWNER_KEY) if task.get(k)}}
-            result = {"status": "unknown", "summary": None, "error": event["error"],
-                      **({"results": recovered_results} if recovered_results else {})}
-            conn.execute("""UPDATE async_delegations SET state='unknown', completed_at=?,
-                   updated_at=?, event_json=?, result_json=?, delivery_state='pending'
-                   WHERE delegation_id=?""", (now, now, json.dumps(event), json.dumps(result), delegation_id))
-            recovered += 1
     return recovered
 
 
@@ -417,8 +427,14 @@ def restore_undelivered_completions(target_queue) -> int:
                WHERE state != \'running\' AND delivery_state=\'pending\' AND event_json IS NOT NULL
                ORDER BY completed_at, delegation_id""").fetchall()
         for delegation_id, payload, completed_at, dispatched_at in rows:
-            evt = json.loads(payload)
-            is_reminder = isinstance(evt, dict) and evt.get("role") == "reminder"
+            try:
+                evt = json.loads(payload)
+                if not isinstance(evt, dict):
+                    raise ValueError("completion event must be an object")
+            except (ValueError, TypeError):
+                logger.warning("Skipping malformed pending completion event: %s", delegation_id)
+                continue
+            is_reminder = evt.get("role") == "reminder"
             age_basis = completed_at or dispatched_at
             if (
                 not is_reminder
@@ -457,7 +473,9 @@ def restore_matching_undelivered_completions(
         for delegation_id, payload, completed_at, dispatched_at in rows:
             try:
                 evt = json.loads(payload)
-            except Exception:
+            except (json.JSONDecodeError, TypeError):
+                # This path is polled by each live session; startup replay already warns.
+                logger.debug("Skipping malformed session completion event: %s", delegation_id)
                 continue
             if not isinstance(evt, dict) or not owns_event(evt):
                 continue
@@ -644,6 +662,80 @@ def get_durable_delegation(delegation_id: str) -> Optional[Dict[str, Any]]:
         "completed_at": row[3], "result": json.loads(row[4]) if row[4] else None, "delivery_state": row[5],
         "delivery_attempts": row[6], "origin_session_id": row[7] or "", "parent_session_id": row[8],
         "task": json.loads(row[9]) if row[9] else None, "event": json.loads(row[10]) if row[10] else None}
+
+
+_RECEIPT_MAX_LIMIT = 20
+_RECEIPT_SCAN_ROWS = 100
+_RECEIPT_GOAL_CHARS = 200
+_RECEIPT_GOAL_COUNT_CAP = 1000
+
+
+def _receipt_goal(task: Dict[str, Any]) -> str:
+    goal = task.get("goal")
+    if not isinstance(goal, str) or not goal.strip():
+        goals = task.get("goals")
+        goal = next((g for g in goals if isinstance(g, str) and g.strip()), "") if isinstance(goals, list) else ""
+    goal = " ".join(goal.split())
+    return goal if len(goal) <= _RECEIPT_GOAL_CHARS else goal[:_RECEIPT_GOAL_CHARS - 1] + "…"
+
+
+def list_unknown_delegation_receipts(
+    *, session_key: str, profile_home: Optional[str] = None, compression_lineage: Optional[List[str]] = None,
+    limit: int = _RECEIPT_MAX_LIMIT,
+    max_age_seconds: float = _DURABLE_RETENTION_SECONDS,
+) -> List[Dict[str, Any]]:
+    """Display-only receipts for one authorized durable session and its compression lineage."""
+    key = str(session_key or "").strip()
+    if not key:
+        return []
+    from gateway.status import _pid_exists, get_process_start_time
+    from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+
+    now = time.time()
+    age = min(max(float(max_age_seconds), 1.0), _DURABLE_RETENTION_SECONDS)
+    cap = min(max(int(limit), 1), _RECEIPT_MAX_LIMIT)
+    # One scope decides both which state.db is read and which owner profile a row must carry.
+    token = set_hermes_home_override(profile_home) if profile_home else None
+    try:
+        home = hermes_home_key()
+        # Only server-resolved ancestry is accepted; clients cannot choose lineage ids.
+        lineage = compression_lineage or [key]
+        lineage_keys = tuple(sorted({str(value) for value in lineage if str(value)}) or {key})
+        marks = ",".join("?" for _ in lineage_keys)
+        with _DB_LOCK, _transaction() as conn:
+            rows = conn.execute(f"""SELECT delegation_id, dispatched_at, completed_at, delivery_state,
+                          task_json, owner_pid, owner_started_at
+                   FROM async_delegations
+                   WHERE state='unknown' AND origin_session IN ({marks})
+                     AND parent_session_id IN ({marks}) AND dispatched_at>=?
+                   ORDER BY dispatched_at DESC, delegation_id LIMIT ?""",
+                (*lineage_keys, *lineage_keys, now - age, _RECEIPT_SCAN_ROWS)).fetchall()
+    finally:
+        if token is not None:
+            reset_hermes_home_override(token)
+    receipts: List[Dict[str, Any]] = []
+    for delegation_id, dispatched_at, completed_at, delivery_state, task_json, pid, started in rows:
+        task = _durable_payload_dict(task_json)
+        if task.get(_OWNER_KEY) != home:
+            continue
+        try:
+            if not _owner_generation_gone(pid, started, _pid_exists, get_process_start_time):
+                continue
+            goals = task.get("goals")
+            is_batch = bool(task.get("is_batch"))
+            receipts.append({
+                "delegation_id": str(delegation_id), "state": "unknown",
+                "dispatched_at": float(dispatched_at),
+                "completed_at": float(completed_at) if completed_at is not None else None,
+                "delivery_state": str(delivery_state or "pending")[:24],
+                "goal": _receipt_goal(task), "is_batch": is_batch,
+                "goal_count": min(len(goals), _RECEIPT_GOAL_COUNT_CAP) if is_batch and isinstance(goals, list) else 1,
+            })
+        except (TypeError, ValueError, OverflowError):
+            continue  # a corrupt row is skipped, never surfaced
+        if len(receipts) >= cap:
+            break
+    return receipts
 
 
 # ── In-memory registry queries ──────────────────────────────────────────────
@@ -1275,15 +1367,25 @@ def list_async_delegations() -> List[Dict[str, Any]]:
 
 
 def list_durable_delegations() -> List[Dict[str, Any]]:
-    """Profile-scoped persisted snapshots, including results from previous processes."""
+    """Profile-scoped persisted snapshots; malformed rows are skipped without hiding healthy rows."""
     recover_abandoned_delegations()
     with _DB_LOCK, _transaction() as conn:
         rows = conn.execute("""SELECT delegation_id, state, dispatched_at, completed_at,
             updated_at, task_json, result_json FROM async_delegations""").fetchall()
-    return [{**json.loads(task or "{}"), "delegation_id": rid, "status": state,
-             "dispatched_at": started, "completed_at": completed, "updated_at": updated,
-             "result": json.loads(result or "{}")}
-            for rid, state, started, completed, updated, task, result in rows]
+    snapshots = []
+    for rid, state, started, completed, updated, task, result in rows:
+        try:
+            task_data = json.loads(task or "{}")
+            result_data = json.loads(result or "{}")
+            if not isinstance(task_data, dict) or not isinstance(result_data, dict):
+                raise ValueError("snapshot payload must be an object")
+        except (ValueError, TypeError):
+            logger.warning("Skipping async delegation snapshot with malformed payload: %s", rid)
+            continue
+        snapshots.append({**task_data, "delegation_id": rid, "status": state,
+                          "dispatched_at": started, "completed_at": completed, "updated_at": updated,
+                          "result": result_data})
+    return snapshots
 
 
 def interrupt_delegation(delegation_id: str) -> bool:

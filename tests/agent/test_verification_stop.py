@@ -27,6 +27,22 @@ def _node_project(root: Path) -> None:
     (root / "pnpm-lock.yaml").write_text("", encoding="utf-8")
 
 
+def test_possible_terminal_mutation_nudge_does_not_claim_proven_edit(tmp_path, monkeypatch):
+    from agent.verification_evidence import record_terminal_workspace_mutation
+
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "home"))
+    project = tmp_path / "project"
+    _make_project(project)
+    record_terminal_workspace_mutation(
+        command='python -c "import subprocess; subprocess.check_output([\'git\', \'diff\'])"',
+        cwd=project, session_id="possible-write", exit_code=0)
+    nudge = build_verify_on_stop_nudge(session_id="possible-write", changed_paths=[str(project)])
+    assert nudge is not None
+    assert "You edited code in this turn" not in nudge
+    assert "may have changed" in nudge
+    assert "not proof" in nudge
+
+
 def _make_project(root: Path) -> None:
     root.mkdir()
     _node_project(root)

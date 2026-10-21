@@ -602,6 +602,33 @@ method("subagent.list", params=SessionParams, result=SubagentListResult,
        doc="Live children owned by this session (other sessions' children never leak).")
 
 
+class DelegationRecoveryState(WireEnum):
+    unknown = "unknown"
+
+
+class DelegationRecoveryReceipt(Result):
+    """``tools/async_delegation.py::list_unknown_delegation_receipts`` allowlist. ``unknown`` means the owner
+    exited before a trustworthy result: the work may or may not have run, and is never re-dispatched
+    automatically. A batch reports only how many goals it held (``goal_count``), never child outcomes."""
+
+    delegation_id: str
+    state: DelegationRecoveryState
+    dispatched_at: float
+    completed_at: float | None = None
+    delivery_state: str
+    goal: str
+    is_batch: bool = False
+    goal_count: int = 1
+
+
+class DelegationRecoveryListResult(Result):
+    receipts: list[DelegationRecoveryReceipt] = Field(default_factory=list)
+
+
+method("delegation.recovery.list", params=SessionParams, result=DelegationRecoveryListResult,
+       doc="Bounded, sanitized unknown-outcome receipts for this session's exited background owners.")
+
+
 class SubagentIdParams(SessionParams):
     subagent_id: str
 
