@@ -44,6 +44,7 @@ def local_env(tmp_path):
 class TestBackgroundChildDoesNotHang:
     """Regression guard for issue #8340."""
 
+    @pytest.mark.live_system_guard_bypass
     def test_plain_background_returns_promptly(self, local_env, tmp_path):
         """``cmd &`` with no output redirection must not hang on pipe inherit."""
         marker = "hermes_8340_plain_bg"
@@ -65,6 +66,7 @@ class TestBackgroundChildDoesNotHang:
             _kill_owned_child(pid_file)
 
     @pytest.mark.skipif(os.name == "nt", reason="POSIX setsid/disown; native Windows job cleanup tested separately")
+    @pytest.mark.live_system_guard_bypass
     def test_setsid_disown_pattern_returns_promptly(self, local_env, tmp_path):
         """The exact pattern from the issue: setsid ... & disown."""
         pid_file = tmp_path / "child.pid"
