@@ -27,7 +27,7 @@ _MAX_EVIDENCE_AGE_DAYS = 30
 _MAX_EVENTS_PER_SESSION_ROOT = 100
 _MAX_TOTAL_UNREFERENCED_EVENTS = 10_000
 _AD_HOC_SCRIPT_NAME_PREFIXES = ("hermes-verify-", "hermes-ad-hoc-")
-_VERIFY_SCHEMA_VERSION = 1
+_VERIFY_SCHEMA_VERSION = 2
 
 _INTERPRETERS = {"python", "python3", "node", "bash", "sh", "ruby", "perl"}
 _TARGET_EXTENSIONS = (".py", ".js", ".jsx", ".ts", ".tsx", ".rs", ".go", ".java")
@@ -121,7 +121,8 @@ _SCHEMA_DDL = (
             scope TEXT NOT NULL,
             status TEXT NOT NULL,
             exit_code INTEGER NOT NULL,
-            output_summary TEXT NOT NULL
+            output_summary TEXT NOT NULL,
+            content_fingerprint TEXT
         )
         """,
     """
@@ -224,6 +225,10 @@ def _transaction():
 def _ensure_schema(conn: sqlite3.Connection) -> None:
     for ddl in _SCHEMA_DDL:
         conn.execute(ddl)
+    # Ledgers created before the column existed: add it in place (NULL = no fingerprint, old behavior).
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(verification_events)")}
+    if "content_fingerprint" not in columns:
+        conn.execute("ALTER TABLE verification_events ADD COLUMN content_fingerprint TEXT")
     conn.execute(
         "INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', ?)",
         (str(_VERIFY_SCHEMA_VERSION),),
@@ -1047,14 +1052,21 @@ def _insert_evidence(evidence: VerificationEvidence, *, observed_at: str | None 
     """Insert a classified evidence row and repoint the workspace state."""
     created_at = observed_at or _utc_now()
     e = evidence
+    # Only a pass observed now can vouch for the tree as it is now; a background run (observed_at) may have
+    # outlived edits made while it ran, so it records no fingerprint.
+    fingerprint = None
+    if e.status == "passed" and observed_at is None:
+        from agent.workspace_fingerprint import workspace_content_fingerprint
+
+        fingerprint = workspace_content_fingerprint(e.root)
     with _DB_LOCK, _transaction() as conn:
         cur = conn.execute(
             "INSERT INTO verification_events("
             " created_at, session_id, cwd, root, command, canonical_command,"
-            " kind, scope, status, exit_code, output_summary"
-            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " kind, scope, status, exit_code, output_summary, content_fingerprint"
+            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (created_at, e.session_id, e.cwd, e.root, e.command, e.canonical_command, e.kind, e.scope,
-             e.status, e.exit_code, e.output_summary),
+             e.status, e.exit_code, e.output_summary, fingerprint),
         )
         if cur.lastrowid is None:
             raise RuntimeError("verification event insert did not return an id")
@@ -1175,7 +1187,20 @@ def verification_status(*, session_id: str | None, cwd: str | Path | None) -> di
 
     evidence = dict(event)
     stale = bool(state["last_edit_at"]) and state["last_edit_at"] > evidence["created_at"]
+    if stale and evidence["status"] == "passed" and _tree_unchanged_since(evidence, root):
+        # The edit signal is intent-based (a custom script, an inline program that starts a process); the tree
+        # is byte-identical to the one the pass covered, so the pass still stands.
+        return {"status": "passed", **result, "evidence": evidence, "unchanged_since_evidence": True}
     return {"status": "stale" if stale else evidence["status"], **result, "evidence": evidence}
+
+
+def _tree_unchanged_since(evidence: dict[str, Any], root: str) -> bool:
+    recorded = evidence.get("content_fingerprint")
+    if not recorded:
+        return False
+    from agent.workspace_fingerprint import workspace_content_fingerprint
+
+    return workspace_content_fingerprint(root) == recorded
 
 
 def verification_state_marker(*, session_id: str | None, cwd: str | Path | None) -> Optional[tuple[str, str, Optional[int]]]:
