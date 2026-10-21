@@ -2,7 +2,24 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { test } from 'vitest'
+import { test, vi } from 'vitest'
+
+const fixture = vi.hoisted(() => ({ root: '' }))
+
+// TEMP can be inside a checkout with installed ancestor node_modules. Keep
+// real filesystem checks inside the fixture, but hide packages outside it.
+vi.mock('fs', async importOriginal => {
+  const actual = await importOriginal()
+  const { relative, isAbsolute, sep } = await import('node:path')
+  return {
+    ...actual,
+    existsSync(file) {
+      const rel = relative(fixture.root, String(file))
+      if (rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return false
+      return actual.existsSync(file)
+    }
+  }
+})
 
 import { BUILD_CRITICAL_PACKAGES as BUILD_CRITICAL, checkRootInstall, requiredPackages } from '../scripts/assert-root-install.mjs'
 
@@ -12,6 +29,7 @@ import { BUILD_CRITICAL_PACKAGES as BUILD_CRITICAL, checkRootInstall, requiredPa
 // dependencies the guard is expected to read.
 function makeTree({ rootPackages = BUILD_CRITICAL, react = '19.2.7', reactDom = '19.2.7', manifest = {} } = {}) {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-assert-root-'))
+  fixture.root = tempRoot
   const appDir = path.join(tempRoot, 'apps', 'desktop')
   fs.mkdirSync(appDir, { recursive: true })
   fs.writeFileSync(path.join(appDir, 'package.json'), JSON.stringify({ name: 'desktop', ...manifest }), 'utf8')
