@@ -32,6 +32,12 @@ class RustProcess:
         self._hermes_rust_exec = True
         self.pid = self._proc.pid
         self._hermes_job = getattr(self._proc, '_hermes_job', None)
+        if os.name == 'nt' and self._hermes_job is None:
+            self._proc.kill()
+            self._proc.wait()
+            self._proc.stdin.close()
+            self._proc.stdout.close()
+            raise OSError('Rust backend requires Windows job containment for cancellation')
         self.returncode = None
         self._child_pid = None
         self.elapsed_ms = None
