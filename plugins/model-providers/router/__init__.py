@@ -26,6 +26,8 @@ from providers.base import ProviderProfile, _profile_user_agent
 logger = logging.getLogger(__name__)
 
 ROUTER_DEFAULT_BASE_URL = "https://api.router.com/v1"
+# Serve the disk mirror immediately; refresh stale catalogs off the request path.
+_DISK_TTL_SECONDS = 24 * 60 * 60
 
 #: model id -> accepted effort levels. ``[]`` = model accepts NO reasoning
 #: fields; absent = unknown (callers keep their defaults).

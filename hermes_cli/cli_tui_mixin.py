@@ -14,6 +14,8 @@ import sys
 import threading
 import time
 
+from utils import file_signature
+
 from agent.interrupt_compat import request_hard_interrupt
 from hermes_cli.commands_completion import SlashCommandAutoSuggest, SlashCommandCompleter
 from pathlib import Path
