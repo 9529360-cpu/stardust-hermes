@@ -235,6 +235,7 @@ import { snapHudBounds } from './hud-snap'
 import { createHudSnapShortcut } from './hud-snap-shortcut'
 import { buildHudWindowUrl } from './hud-url'
 import { resolveHudWindowing } from './hud-windowing'
+import { downloadImage } from './image-download'
 import { createIntroRevealWindowController } from './intro-reveal-window'
 import { createDesktopInstancePolicy } from './isolated-instance'
 import { createLocalBackendLifecycle, waitForTeardown } from './local-backend-lifecycle'
@@ -5638,31 +5639,7 @@ async function resourceBufferFromUrl(rawUrl) {
     return { buffer, mimeType: mimeTypeForPath(resolvedPath) }
   }
 
-  const parsed = new URL(rawUrl)
-  const client = parsed.protocol === 'https:' ? https : http
-
-  return new Promise((resolve, reject) => {
-    const req = client.get(parsed, res => {
-      if ((res.statusCode || 500) >= 400) {
-        reject(new Error(`Failed to fetch ${rawUrl}: ${res.statusCode}`))
-        res.resume()
-
-        return
-      }
-
-      const chunks = []
-      res.on('error', reject)
-      res.on('data', chunk => chunks.push(chunk))
-      res.on('end', () => {
-        resolve({
-          buffer: Buffer.concat(chunks),
-          mimeType: res.headers['content-type'] || 'application/octet-stream'
-        })
-      })
-    })
-
-    req.on('error', reject)
-  })
+  return downloadImage(rawUrl)
 }
 
 async function saveImageFromUrl(rawUrl) {
@@ -16821,7 +16798,15 @@ function handleDeepLink(url) {
 
   // stardust://blueprint/<key>?slot=val  -> host="blueprint", path="/<key>"
   const kind = parsed.hostname || ''
-  const name = decodeURIComponent((parsed.pathname || '').replace(/^\//, ''))
+  let name
+
+  try {
+    name = decodeURIComponent((parsed.pathname || '').replace(/^\//, ''))
+  } catch {
+    rememberLog('[deeplink] ignoring malformed path encoding')
+
+    return
+  }
   const params = {}
   parsed.searchParams.forEach((v, k) => {
     params[k] = v
