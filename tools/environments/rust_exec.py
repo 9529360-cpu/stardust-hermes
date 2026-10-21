@@ -111,7 +111,7 @@ class RustProcess:
                     os.killpg(self._child_pid, signal.SIGKILL)  # windows-footgun: ok — POSIX branch only
                 except ProcessLookupError:
                     pass
-            try:
-                os.killpg(self.pid, signal.SIGKILL)  # windows-footgun: ok — POSIX branch only
-            except ProcessLookupError:
-                pass
+            # The command owns a separate process group; after ending that group,
+            # terminate only our helper handle. macOS can reject killpg on the
+            # helper's session even while its Popen handle is valid.
+            self._proc.kill()
