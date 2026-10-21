@@ -9,3 +9,4 @@ requires-python = ">=3.11,<3.14"
 
 [tool.maturin]
 module-name = "stardust_native"
+features = ["extension-module"]
