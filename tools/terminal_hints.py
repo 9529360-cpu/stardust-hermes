@@ -38,6 +38,12 @@ _MISSING_COMMAND_HINTS = {
 
 
 def _missing_command_hint(missing: str) -> str:
+    if re.fullmatch(r"(?:Get|Set|New|Remove|Select|Where|ForEach|Format|Write|Test|Start|Stop|Resolve|Join|Split|Out|ConvertTo|ConvertFrom)-[A-Za-z]+", missing, re.I):
+        return (
+            f"`{missing}` is a PowerShell cmdlet, but this command ran in a POSIX shell. "
+            "Invoke powershell.exe -NoProfile -NonInteractive -Command with the whole script "
+            "in single quotes (and double quotes inside); otherwise Bash expands $variables "
+            "and $_ before PowerShell sees them.")
     return _MISSING_COMMAND_HINTS.get(missing) or (
         f"`{missing}` is not installed or not on PATH. Verify with `which {missing}`; install it "
         "or use an absolute path instead of retrying the same command.")
@@ -45,6 +51,11 @@ def _missing_command_hint(missing: str) -> str:
 
 # Ordered by production frequency — first match wins.
 _OUTPUT_HINTS: list[Callable[[str, str], Optional[str]]] = [
+    _regex_hint(r"Unicode(?:Encode|Decode)Error:",
+                "Python encoding mismatch. For Python stdout use PYTHONUTF8=1 and "
+                "PYTHONIOENCODING=utf-8; when decoding subprocess output, specify the native "
+                "program's actual encoding (Windows PowerShell/cmd may use a legacy code page). "
+                "UTF-8 mode does not convert bytes emitted by non-Python programs."),
     # gh version drift; gh already prints the valid field list.
     _regex_hint(r'Unknown JSON field: "?(\w+)',
                 "The installed gh does not support the JSON field '{0}'. The valid field list is "
