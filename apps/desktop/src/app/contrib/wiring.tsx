@@ -529,9 +529,10 @@ export function ContribWiring({ children }: { children: ReactNode }) {
         resolveSession: resolveActiveTranscriptSession,
         selectedStoredSessionIdRef,
         signatureRef: activeTranscriptSignatureRef,
+        getSessionState: id => sessionStateByRuntimeIdRef.current.get(id),
         updateSessionState
       }),
-    [activeSessionIdRef, busyRef, selectedStoredSessionIdRef, updateSessionState]
+    [activeSessionIdRef, busyRef, selectedStoredSessionIdRef, sessionStateByRuntimeIdRef, updateSessionState]
   )
 
   const { handleGatewayEvent, handleServerRequest } = useMessageStream({

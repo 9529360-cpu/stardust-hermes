@@ -58,6 +58,7 @@ export interface ActiveTranscriptRefreshDeps {
   selectedStoredSessionIdRef: MutableRefObject<string | null>
   resolveSession: (storedSessionId: string) => ActiveTranscriptSession | null | undefined
   signatureRef: MutableRefObject<Map<string, string>>
+  getSessionState?: (sessionId: string) => ClientSessionState | undefined
   updateSessionState: (
     sessionId: string,
     updater: (state: ClientSessionState) => ClientSessionState,
@@ -159,6 +160,7 @@ export async function reconcileTileTranscripts({
       : undefined
 
     const signatureKey = tileTranscriptSignatureKey(tile)
+    const messagesAtRead = $sessionStates.get()[runtimeSessionId]?.messages
 
     try {
       // Passive: a hidden tile's refresh must never cold-start its owner
@@ -184,15 +186,19 @@ export async function reconcileTileTranscripts({
         continue
       }
 
-      signatureRef.current.set(signatureKey, signature)
       const messages = toChatMessages(latest.messages)
 
       updateSessionState(
         runtimeSessionId,
-        state => ({
-          ...state,
-          messages: reconcileRefreshedTranscriptTail(messages, state.messages)
-        }),
+        state => {
+          if (messagesAtRead && state.messages !== messagesAtRead) {
+            return state
+          }
+
+          signatureRef.current.set(signatureKey, signature)
+
+          return { ...state, messages: reconcileRefreshedTranscriptTail(messages, state.messages) }
+        },
         storedSessionId
       )
     } catch {
@@ -209,6 +215,7 @@ export async function reconcileActiveTranscript({
   resolveSession,
   selectedStoredSessionIdRef,
   signatureRef,
+  getSessionState = id => $sessionStates.get()[id],
   updateSessionState
 }: ActiveTranscriptRefreshDeps): Promise<void> {
   const storedSessionId = selectedStoredSessionIdRef.current
@@ -226,6 +233,7 @@ export async function reconcileActiveTranscript({
 
   const requestId = requestSequenceRef.current + 1
   requestSequenceRef.current = requestId
+  const messagesAtRead = getSessionState(runtimeSessionId)?.messages
 
   try {
     const profileScope: ProfileScope = stored.ownerRoute
@@ -262,18 +270,21 @@ export async function reconcileActiveTranscript({
       return
     }
 
-    signatureRef.current.set(signatureKey, signature)
     const messages = toChatMessages(latest.messages)
 
     updateSessionState(
       runtimeSessionId,
-      state => ({
-        ...state,
-        // The refresh re-reads only the newest tail page; graft it onto any
-        // older pages "Show earlier" already backfilled instead of clobbering
-        // them (see transcript-backfill).
-        messages: reconcileRefreshedTranscriptTail(messages, state.messages)
-      }),
+      state => {
+        // A whole turn can start AND finish during this read: busy is false
+        // again, but this older snapshot must not erase its completed reply.
+        if (messagesAtRead && state.messages !== messagesAtRead) {
+          return state
+        }
+
+        signatureRef.current.set(signatureKey, signature)
+
+        return { ...state, messages: reconcileRefreshedTranscriptTail(messages, state.messages) }
+      },
       storedSessionId
     )
   } catch {
