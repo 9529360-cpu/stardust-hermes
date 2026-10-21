@@ -56,6 +56,24 @@ def test_an_unterminated_ascii_prompt_is_not_held_back():
     assert decoder.decode(b"Password: ") == "Password: "
 
 
+def test_ascii_chunk_preserves_crlf_lines_and_unterminated_prompt():
+    from tools.environments.base_output import _ConsoleCodePageFallbackDecoder
+
+    decoder = _ConsoleCodePageFallbackDecoder("gbk")
+    raw = b"hi\r\n" * 1000 + b"prompt: "
+    assert decoder.decode(raw) == raw.decode("ascii")
+    assert decoder.decode(b"", final=True) == ""
+
+
+def test_ascii_chunk_after_pending_non_ascii_keeps_line_fallback():
+    from tools.environments.base_output import _ConsoleCodePageFallbackDecoder
+
+    decoder = _ConsoleCodePageFallbackDecoder("gbk")
+    assert decoder.decode("错误".encode("gbk")) == ""
+    assert decoder.decode(b" detail\nnext\n") == "错误 detail\nnext\n"
+    assert decoder.decode(b"done") == "done"
+
+
 @pytest.mark.windows_only
 def test_foreground_powershell_output_reaches_the_model_readable(tmp_path):
     from tools.environments.local import LocalEnvironment

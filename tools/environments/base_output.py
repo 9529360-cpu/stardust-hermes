@@ -352,6 +352,10 @@ class _ConsoleCodePageFallbackDecoder:
         self._pending = b""
 
     def decode(self, data: bytes, final: bool = False) -> str:
+        # ASCII is identical in UTF-8 and every fallback code page. With no
+        # pending multibyte line, avoid splitting and decoding each short line.
+        if not self._pending and data.isascii():
+            return data.decode("ascii")
         self._pending += data
         cut = len(self._pending) if final else self._pending.rfind(b"\n") + 1
         rest = self._pending[cut:]
