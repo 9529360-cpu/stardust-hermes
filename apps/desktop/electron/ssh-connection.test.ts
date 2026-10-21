@@ -96,7 +96,9 @@ test('controlSocketPath is stable, short, and host-distinct', () => {
   assert.match(path.basename(a), /^[0-9a-f]{16}\.sock$/)
 })
 
-test('controlSocketPath default base stays under sun_path even with the temp-listener suffix', () => {
+// Windows OpenSSH has no ControlMaster support and uses no-mux connections;
+// the Unix-domain listener path limit only applies to the POSIX mux path.
+test.skipIf(process.platform === 'win32')('controlSocketPath default base stays under sun_path even with the temp-listener suffix', () => {
   // OpenSSH binds a temporary listener at `<ControlPath>.<16 random chars>` (a
   // 17-byte suffix) while opening the master. The macOS regression was the
   // default base under os.tmpdir() (/var/folders/.../T/) pushing it over 104.
