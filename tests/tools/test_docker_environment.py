@@ -312,11 +312,12 @@ def test_runtime_exec_tracks_scope_and_clears_missing_value(monkeypatch):
 def test_wrapped_exec_scopes_explicit_forward_env_across_profiles(monkeypatch, tmp_path):
     """The shared snapshot must not resurrect an explicit forward-only value."""
     from agent import secret_scope as ss
+    from tools.environments.local import _find_bash
 
     env = _make_execute_only_env(forward_env=["EXPLICIT_TOKEN"])
-    env.cwd = str(tmp_path)
-    env._snapshot_path = str(tmp_path / "snapshot.sh")
-    env._cwd_file = str(tmp_path / "cwd.txt")
+    env.cwd = tmp_path.as_posix()
+    env._snapshot_path = (tmp_path / "snapshot.sh").as_posix()
+    env._cwd_file = (tmp_path / "cwd.txt").as_posix()
     env._snapshot_passthrough_names = set()
     (tmp_path / "snapshot.sh").write_text(
         "export EXPLICIT_TOKEN=stale-from-previous-profile\n",
@@ -341,7 +342,7 @@ def test_wrapped_exec_scopes_explicit_forward_env_across_profiles(monkeypatch, t
             index += 2
         assert cmd[container_index + 1 : container_index + 3] == ["bash", "-c"]
         return subprocess.Popen(
-            ["bash", "-c", cmd[container_index + 3]],
+            [_find_bash(), "-c", cmd[container_index + 3]],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             stdin=subprocess.PIPE if stdin_data is not None else subprocess.DEVNULL,
@@ -662,12 +663,12 @@ def test_persistent_bind_mounts_survive_a_session_key_task_id(monkeypatch, tmp_p
     assert len(mounts) == 2, f"expected /root and /workspace binds; got {specs}"
     for spec in mounts:
         source, _, target = spec.rpartition(":")
-        assert ":" not in source, (
+        assert ":" not in os.path.splitdrive(source)[1], (
             f"bind source still contains a colon, docker run would fail with "
             f"'too many colons': {spec}"
         )
         # Docker splits on ':' — a sane spec has exactly source:target.
-        assert spec.count(":") == 1, f"spec is not a two-field bind: {spec}"
+        assert spec.count(":") == 1 + bool(os.path.splitdrive(source)[0]), f"spec is not a two-field bind: {spec}"
         assert target in {"/root", "/workspace"}
 
 

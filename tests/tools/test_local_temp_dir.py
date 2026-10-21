@@ -7,6 +7,7 @@ logs/pid/exit files, code-execution sandboxes) at real storage.
 
 import os
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -20,12 +21,14 @@ def _make_local_env(env: dict) -> LocalEnvironment:
     return obj
 
 
+@pytest.mark.skipif(os.name == "nt", reason="Windows intentionally uses the managed bash-safe cache instead of POSIX temp overrides")
 def test_temp_dir_override_honored(tmp_path):
     target = str(tmp_path)
     env = _make_local_env({"TERMINAL_TEMP_DIR": target})
     assert env.get_temp_dir() == target
 
 
+@pytest.mark.skipif(os.name == "nt", reason="Windows intentionally uses the managed bash-safe cache instead of POSIX temp overrides")
 def test_temp_dir_from_process_env(tmp_path):
     target = str(tmp_path)
     env = _make_local_env({})
@@ -49,6 +52,7 @@ def test_temp_dir_non_existent_falls_through(tmp_path):
     assert env.get_temp_dir() != missing
 
 
+@pytest.mark.skipif(os.name == "nt", reason="Windows intentionally uses the managed bash-safe cache instead of POSIX temp overrides")
 def test_temp_dir_empty_falls_through(tmp_path, monkeypatch):
     """An empty/relative terminal.temp_dir must not redirect."""
     monkeypatch.setenv("TMPDIR", str(tmp_path))
@@ -66,10 +70,11 @@ def test_default_is_hermes_cache_not_tmp(tmp_path, monkeypatch):
     monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
     env = _make_local_env({})
     result = env.get_temp_dir()
-    assert result == str(tmp_path / ".stardust" / "cache" / "terminal")
+    assert Path(result) == tmp_path / ".stardust" / "cache" / "terminal"
     assert os.path.isdir(result)
 
 
+@pytest.mark.skipif(os.name == "nt", reason="Windows intentionally uses the managed bash-safe cache instead of POSIX temp overrides")
 def test_tmpdir_still_beats_default(tmp_path, monkeypatch):
     """An explicit TMPDIR keeps winning over the managed default."""
     monkeypatch.delenv("TERMINAL_TEMP_DIR", raising=False)

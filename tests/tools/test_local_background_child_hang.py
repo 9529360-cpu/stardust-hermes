@@ -10,21 +10,31 @@ of the backgrounded service (indefinitely for a uvicorn server).
 The fix switches ``_drain()`` to select()-based non-blocking reads and
 stops draining shortly after bash exits even if the pipe hasn't EOF'd.
 """
-import subprocess
+import os
+import shlex
 import time
 
 import pytest
+from tests.tools._shell_helpers import PYTHON
 
 from tools.environments.local import LocalEnvironment
 
 
-def _pkill(pattern: str) -> None:
-    subprocess.run(f"pkill -9 -f {pattern!r} 2>/dev/null", shell=True)
+def _kill_owned_child(pid_file):
+    if not pid_file.exists():
+        return
+    psutil = pytest.importorskip("psutil")
+    try:
+        child = psutil.Process(int(pid_file.read_text()))
+        child.kill()
+        child.wait(timeout=5)
+    except psutil.NoSuchProcess:
+        pass
 
 
 @pytest.fixture
-def local_env():
-    env = LocalEnvironment(cwd="/tmp")
+def local_env(tmp_path):
+    env = LocalEnvironment(cwd=str(tmp_path))
     try:
         yield env
     finally:
@@ -34,10 +44,13 @@ def local_env():
 class TestBackgroundChildDoesNotHang:
     """Regression guard for issue #8340."""
 
-    def test_plain_background_returns_promptly(self, local_env):
+    @pytest.mark.live_system_guard_bypass
+    def test_plain_background_returns_promptly(self, local_env, tmp_path):
         """``cmd &`` with no output redirection must not hang on pipe inherit."""
         marker = "hermes_8340_plain_bg"
-        cmd = f'python3 -c "import time; time.sleep(60)" & echo {marker}'
+        pid_file = tmp_path / "child.pid"
+        script = f"import os,time; open({str(pid_file)!r}, 'w').write(str(os.getpid())); time.sleep(60)"
+        cmd = f"{PYTHON} -c {shlex.quote(script)} & echo {marker}"
         try:
             t0 = time.monotonic()
             result = local_env.execute(cmd, timeout=15)
@@ -50,13 +63,17 @@ class TestBackgroundChildDoesNotHang:
             assert result["returncode"] == 0
             assert marker in result["output"]
         finally:
-            _pkill("time.sleep(60)")
+            _kill_owned_child(pid_file)
 
-    def test_setsid_disown_pattern_returns_promptly(self, local_env):
+    @pytest.mark.skipif(os.name == "nt", reason="POSIX setsid/disown; native Windows job cleanup tested separately")
+    @pytest.mark.live_system_guard_bypass
+    def test_setsid_disown_pattern_returns_promptly(self, local_env, tmp_path):
         """The exact pattern from the issue: setsid ... & disown."""
+        pid_file = tmp_path / "child.pid"
+        script = f"import os,time; open({str(pid_file)!r}, 'w').write(str(os.getpid())); time.sleep(60)"
         cmd = (
-            'setsid python3 -c "import time; time.sleep(60)" '
-            '> /dev/null 2>&1 < /dev/null & disown; echo started'
+            f"setsid {PYTHON} -c {shlex.quote(script)} "
+            "> /dev/null 2>&1 < /dev/null & disown; echo started"
         )
         try:
             t0 = time.monotonic()
@@ -67,7 +84,7 @@ class TestBackgroundChildDoesNotHang:
             assert result["returncode"] == 0
             assert "started" in result["output"]
         finally:
-            _pkill("time.sleep(60)")
+            _kill_owned_child(pid_file)
 
 
     def test_default_capture_is_full_fidelity_for_internal_consumers(
@@ -83,7 +100,7 @@ class TestBackgroundChildDoesNotHang:
         """
         # ~200 KB — four times the default 50 KB cap.
         command = (
-            "python3 -c \"import sys; "
+            PYTHON + " -c \"import sys; "
             "sys.stdout.write('START-MARK\\n' + ('y' * 200000) + '\\nEND-MARK')\""
         )
 
@@ -107,7 +124,7 @@ class TestBackgroundChildDoesNotHang:
         # read boundaries, and most boundaries will land in the middle of the
         # 3-byte UTF-8 encoding of U+65E5.
         cmd = (
-            'python3 -c \'import sys; '
+            PYTHON + ' -c \'import sys; '
             'sys.stdout.buffer.write(chr(0x65e5).encode("utf-8") * 10000); '
             'sys.stdout.buffer.write(b"\\n")\''
         )
@@ -128,7 +145,7 @@ class TestBackgroundChildDoesNotHang:
         """
         # Write a deliberate invalid UTF-8 lead byte sandwiched between valid ASCII
         cmd = (
-            'python3 -c \'import sys; '
+            PYTHON + ' -c \'import sys; '
             'sys.stdout.buffer.write(b"before "); '
             'sys.stdout.buffer.write(b"\\xff\\xfe"); '
             'sys.stdout.buffer.write(b" after\\n")\''

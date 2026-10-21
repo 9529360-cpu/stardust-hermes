@@ -20,6 +20,8 @@ from types import SimpleNamespace
 
 import pytest
 
+pytestmark = pytest.mark.skipif(os.name == "nt", reason="POSIX process groups/fork/setsid; Windows job-object cleanup has native live tests")
+
 from tools.environments import local as local_mod
 from tools.environments.local import LocalEnvironment
 

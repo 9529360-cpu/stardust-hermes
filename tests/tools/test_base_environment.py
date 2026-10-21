@@ -4,6 +4,7 @@ Tests _wrap_command(), _extract_cwd_from_output(), _embed_stdin_heredoc(),
 init_session() failure handling, and the CWD marker contract.
 """
 
+import os
 from unittest.mock import MagicMock
 
 import pytest
@@ -227,7 +228,8 @@ class TestAtomicSnapshotConcurrencyBehavioral:
 
     def _run(self, script):
         import subprocess
-        return subprocess.run(["/bin/bash", "-c", script], capture_output=True, text=True)
+        from tools.environments.local import _find_bash
+        return subprocess.run([_find_bash(), "-c", script], capture_output=True, text=True)
 
     def test_concurrent_writes_never_tear_the_snapshot(self, tmp_path):
         import shutil
@@ -235,7 +237,7 @@ class TestAtomicSnapshotConcurrencyBehavioral:
             import pytest
             pytest.skip("bash required")
         import shlex
-        snap = str(tmp_path / "hermes-snap-x.sh")
+        snap = (tmp_path / "hermes-snap-x.sh").as_posix()
         _q = shlex.quote
         _tmpl = _q(snap + ".tmp.XXXXXXXXXX")
         # One writer iteration = the exact atomic sequence _wrap_command emits.
@@ -274,7 +276,7 @@ class TestAtomicSnapshotConcurrencyBehavioral:
             import pytest
             pytest.skip("bash required")
         import shlex
-        snap = str(tmp_path / "snap.sh")
+        snap = (tmp_path / "snap.sh").as_posix()
         _q = shlex.quote
         self._run(f"echo 'export GOOD=1' > {_q(snap)}")  # seed good snapshot
         # Redirect export into an unwritable dir so the export side fails; mv
@@ -293,6 +295,7 @@ class TestAtomicSnapshotConcurrencyBehavioral:
 class TestSnapshotFileModes:
     """Snapshot metadata files are private without changing user command umask."""
 
+    @pytest.mark.skipif(os.name == "nt", reason="POSIX umask and mode bits; Windows uses ACLs")
     def test_snapshot_and_cwd_files_are_0600(self, tmp_path):
         import os
         from pathlib import Path

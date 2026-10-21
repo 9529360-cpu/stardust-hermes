@@ -70,6 +70,8 @@ def test_background_exit_reinvalidates_verification_after_a_later_pass(tmp_path,
     monkeypatch.setenv("STARDUST_VERIFY_ON_STOP", "1")
     (tmp_path / "package.json").write_text(json.dumps({"scripts": {"test": "vitest"}}))
     (tmp_path / "pnpm-lock.yaml").write_text("")
+    # Bound project discovery to this fixture, even inside a linked worktree.
+    (tmp_path / ".git").mkdir()
     from agent.verification_evidence import record_terminal_result, verification_status
 
     record_terminal_result(
@@ -92,6 +94,8 @@ def test_background_mutation_then_successful_test_finishes_fresh(tmp_path, monke
     monkeypatch.setenv("STARDUST_VERIFY_ON_STOP", "1")
     (tmp_path / "package.json").write_text(json.dumps({"scripts": {"test": "vitest"}}))
     (tmp_path / "pnpm-lock.yaml").write_text("")
+    # Bound project discovery to this fixture, even inside a linked worktree.
+    (tmp_path / ".git").mkdir()
     from agent.verification_evidence import record_terminal_workspace_mutation, verification_status
 
     provisional = record_terminal_workspace_mutation(
@@ -3291,6 +3295,8 @@ def _ledger_project(tmp_path, monkeypatch):
     monkeypatch.setenv("STARDUST_VERIFY_ON_STOP", "1")
     (tmp_path / "package.json").write_text(json.dumps({"scripts": {"test": "vitest"}}))
     (tmp_path / "pnpm-lock.yaml").write_text("")
+    # Bound project discovery to this fixture, even inside a linked worktree.
+    (tmp_path / ".git").mkdir()
 
 
 def _iso_offset(seconds: float) -> str:

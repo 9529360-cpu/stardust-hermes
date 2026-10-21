@@ -10,7 +10,7 @@ import math
 import os
 import shlex
 import threading
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from tools.environments.base import BaseEnvironment
 from tools.environments.base_output import _ThreadedProcessHandle
@@ -91,7 +91,7 @@ class DaytonaEnvironment(BaseEnvironment):
         self.init_session()
 
     def _daytona_upload(self, host_path: str, remote_path: str) -> None:
-        self._sandbox.process.exec(quoted_mkdir_command([str(Path(remote_path).parent)]))
+        self._sandbox.process.exec(quoted_mkdir_command([str(PurePosixPath(remote_path).parent)]))
         self._sandbox.fs.upload_file(host_path, remote_path)
 
     def _daytona_bulk_upload(self, files: list[tuple[str, str]]) -> None:

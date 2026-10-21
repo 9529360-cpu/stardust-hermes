@@ -24,15 +24,11 @@ def _load_guard():
 
 def test_all_tui_subprocess_calls_have_stdin():
     """Every subprocess.run/Popen in TUI-context code must set stdin=."""
-    result = subprocess.run(
-        [sys.executable, str(SCRIPT)],
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-    assert result.returncode == 0, (
-        f"subprocess stdin= check failed:\n{result.stdout}\n{result.stderr}"
-    )
+    guard = _load_guard()
+    # The scanner compares native relative paths to its slash-separated allowlist.
+    # Normalize the declared entries at the test boundary on each host.
+    guard.KNOWN_SAFE = {str(Path(path)) for path in guard.KNOWN_SAFE}
+    assert guard.main() == 0
 
 
 def test_oauth_setup_token_keeps_inherited_stdin():
