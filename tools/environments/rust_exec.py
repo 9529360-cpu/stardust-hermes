@@ -103,4 +103,7 @@ class RustProcess:
                     os.killpg(self._child_pid, signal.SIGKILL)  # windows-footgun: ok — POSIX branch only
                 except ProcessLookupError:
                     pass
-            os.killpg(self.pid, signal.SIGKILL)  # windows-footgun: ok — POSIX branch only
+            try:
+                os.killpg(self.pid, signal.SIGKILL)  # windows-footgun: ok — POSIX branch only
+            except ProcessLookupError:
+                pass
