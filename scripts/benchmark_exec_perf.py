@@ -45,7 +45,7 @@ def main():
             'python': sys.version,
             'platform': sys.platform,
             'baseline_ref': args.baseline_ref,
-            'head': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
+            'head': subprocess.check_output(['git', 'rev-parse', 'HEAD'], encoding='utf-8').strip(),
         },
     }
     profiler = cProfile.Profile()
@@ -54,7 +54,7 @@ def main():
     timeout_code = (
         'import json, os, pathlib, subprocess, sys, time; '
         'child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"]); '
-        f'pathlib.Path({timeout_pids.as_posix()!r}).write_text(json.dumps([os.getpid(), child.pid])); '
+        f'pathlib.Path({timeout_pids.as_posix()!r}).write_text(json.dumps([os.getpid(), child.pid]), encoding="utf-8"); '
         'time.sleep(30)'
     )
     cases = {
@@ -79,7 +79,7 @@ def main():
                 elif name == 'timeout':
                     import psutil
 
-                    pids = json.loads(timeout_pids.read_text())
+                    pids = json.loads(timeout_pids.read_text(encoding='utf-8'))
                     assert all(not psutil.pid_exists(pid) for pid in pids), pids
                     timeout_pids.unlink()
             results[name] = {'n': count, 'median_ms': statistics.median(elapsed) * 1000,
