@@ -611,8 +611,12 @@ def _invoke_agent(
 
     # Interim assistant text (commentary beside tool calls, pre-nudge final answer) is sealed
     # by the desktop as its own segment instead of being lost to message.complete.
-    def _interim_assistant_cb(text: str, *, already_streamed: bool = False) -> None:
-        _emit("message.interim", sid, {"text": text, "already_streamed": already_streamed})
+    def _interim_assistant_cb(text: str, *, already_streamed: bool = False, final_candidate: bool = False) -> None:
+        payload = {"text": text, "already_streamed": already_streamed}
+        if final_candidate:
+            # The turn's attempted final answer, held back by a stop gate: the desktop keeps it visible.
+            payload["final_candidate"] = True
+        _emit("message.interim", sid, payload)
     agent.interim_assistant_callback = (
         _interim_assistant_cb if _load_interim_assistant_messages() else None)
     # A synthesized turn is typed at turn START so a crash persist writes a timeline event,

@@ -169,6 +169,7 @@ const COMPARED_FIELDS = [
   'hidden',
   'branchGroupId',
   'interim',
+  'finalCandidate',
   'autoContinue',
   'reactions',
   'timestamp',
@@ -288,6 +289,7 @@ export function chatMessagesEquivalent(a: ChatMessage, b: ChatMessage): boolean 
     // Interim gates the action footer, so flipping it must repaint (e.g. a
     // previewed final settling onto a sealed interim bubble restores the bar).
     (a.interim ?? false) !== (b.interim ?? false) ||
+    (a.finalCandidate ?? false) !== (b.finalCandidate ?? false) ||
     !chatReactionsEquivalent(a.reactions, b.reactions)
   ) {
     return false

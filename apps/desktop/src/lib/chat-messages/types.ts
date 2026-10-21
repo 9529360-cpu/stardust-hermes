@@ -40,6 +40,11 @@ export type ChatMessage = {
    *  action footer so only the turn's final reply carries copy/refresh, and
    *  the live view matches rehydration (which merges the turn into one bubble). */
   interim?: boolean
+  /** A sealed interim that was the turn's attempted final answer, held back
+   *  by a verify-on-stop gate (`message.interim` with `final_candidate`). It
+   *  keeps rendering as a reply: folding it into the work-progress disclosure
+   *  made an already shown answer vanish while the turn kept running. */
+  finalCandidate?: boolean
   /** Whole-turn wall-clock seconds (message.start → message.complete),
    *  stamped by the desktop when it watched the turn run. Absent for
    *  messages hydrated from history — the backend doesn't persist it. */
@@ -57,6 +62,8 @@ export type GatewayEventPayload = {
    * its local receipt clock when older gateways omit it. */
   timestamp?: number
   text?: string
+  /** message.interim: this text is the turn's held-back final answer (verify-on-stop). */
+  final_candidate?: boolean
   rendered?: string
   status?: string
   message?: string

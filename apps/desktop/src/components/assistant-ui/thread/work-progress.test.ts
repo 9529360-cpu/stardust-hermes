@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { workProgressItems } from './work-progress'
+import { isFoldableProgressMessage, workProgressItems } from './work-progress'
 
 describe('workProgressItems', () => {
   it('groups only adjacent eligible updates and leaves other messages in place', () => {
@@ -11,5 +11,22 @@ describe('workProgressItems', () => {
       { kind: 'progress', indices: [4] },
       { kind: 'message', index: 5 }
     ])
+  })
+})
+
+describe('isFoldableProgressMessage', () => {
+  const sealed = (custom: Record<string, unknown>) => ({
+    content: [{ type: 'text' }],
+    metadata: { custom },
+    role: 'assistant',
+    status: { type: 'complete' }
+  })
+
+  it('folds sealed commentary', () => {
+    expect(isFoldableProgressMessage(sealed({ interim: true }))).toBe(true)
+  })
+
+  it('never folds a verify-on-stop final candidate the user already saw', () => {
+    expect(isFoldableProgressMessage(sealed({ finalCandidate: true, interim: true }))).toBe(false)
   })
 })

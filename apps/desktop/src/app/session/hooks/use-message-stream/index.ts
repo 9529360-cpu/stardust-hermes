@@ -494,7 +494,7 @@ export function useMessageStream({
   )
 
   const finalizeInterimAssistantMessage = useCallback(
-    (sessionId: string, text: string, occurredAt = Date.now() / 1000) => {
+    (sessionId: string, text: string, occurredAt = Date.now() / 1000, finalCandidate = false) => {
       updateSessionState(sessionId, state => {
         if (state.interrupted) {
           return state
@@ -526,7 +526,8 @@ export function useMessageStream({
                   parts: completeOpenTimelineParts(replaceTextPart(m.parts), occurredAt),
                   completedAt: occurredAt,
                   pending: false,
-                  interim: true
+                  interim: true,
+                  ...(finalCandidate ? { finalCandidate: true } : {})
                 }
               : m
           )
@@ -542,6 +543,7 @@ export function useMessageStream({
               completedAt: occurredAt,
               pending: false,
               interim: true,
+              ...(finalCandidate ? { finalCandidate: true } : {}),
               branchGroupId: state.pendingBranchGroup ?? undefined
             }
           ]

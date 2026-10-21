@@ -29,7 +29,12 @@ export interface GatewayEventDeps {
     surface?: ErrorSurface | null
   ) => void
   flushQueuedDeltas: (sessionId?: string) => void
-  finalizeInterimAssistantMessage: (sessionId: string, text: string, occurredAt?: number) => void
+  finalizeInterimAssistantMessage: (
+    sessionId: string,
+    text: string,
+    occurredAt?: number,
+    finalCandidate?: boolean
+  ) => void
   hydrateFromStoredSession: (
     attempts?: number,
     storedSessionId?: string | null,

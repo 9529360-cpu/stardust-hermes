@@ -34,6 +34,26 @@ export function workProgressItems(
   return items
 }
 
+interface FoldCandidate {
+  content: readonly { type: string }[]
+  metadata?: { custom?: Record<string, unknown> }
+  role: string
+  status?: { type: string }
+}
+
+/** Sealed, text-only commentary. A held-back final answer (verify-on-stop
+ *  `finalCandidate`) is a reply the user already read, never scaffolding. */
+export function isFoldableProgressMessage(message: FoldCandidate | undefined): boolean {
+  return Boolean(
+    message?.role === 'assistant' &&
+    message.metadata?.custom?.interim === true &&
+    message.metadata?.custom?.finalCandidate !== true &&
+    message.status?.type === 'complete' &&
+    message.content.length > 0 &&
+    message.content.every(part => part.type === 'text')
+  )
+}
+
 export const WorkProgressMessages: FC<{ components: MessageComponents; indices: readonly number[] }> = ({
   components,
   indices
@@ -63,13 +83,7 @@ export const WorkProgressMessages: FC<{ components: MessageComponents; indices: 
 
         const message = state.thread.messages[index]
 
-        return (
-          message?.role === 'assistant' &&
-          message.metadata?.custom?.interim === true &&
-          message.status?.type === 'complete' &&
-          message.content.length > 0 &&
-          message.content.every(part => part.type === 'text')
-        )
+        return isFoldableProgressMessage(message)
       })
       .join(',')
   })

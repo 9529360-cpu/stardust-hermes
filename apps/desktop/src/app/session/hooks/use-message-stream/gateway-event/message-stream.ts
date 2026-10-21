@@ -171,7 +171,9 @@ export function handleMessageStreamEvent(ctx: GatewayEventContext): boolean {
       const text = coerceGatewayText(payload?.text)
 
       if (text) {
-        finalizeInterimAssistantMessage(sessionId, text, occurredAt)
+        // `final_candidate`: the turn's attempted final answer, held back by a
+        // verify-on-stop gate. It stays a visible reply, never folded away.
+        finalizeInterimAssistantMessage(sessionId, text, occurredAt, payload?.final_candidate === true)
       }
     }
 
