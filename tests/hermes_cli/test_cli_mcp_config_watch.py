@@ -3,7 +3,7 @@ import time
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from utils import file_signature
+from utils import path_signature
 
 
 def _make_cli(tmp_path, mcp_servers=None, extra_config=None):
@@ -20,7 +20,7 @@ def _make_cli(tmp_path, mcp_servers=None, extra_config=None):
 
     cfg_file = tmp_path / "config.yaml"
     cfg_file.write_text("mcp_servers: {}\n")
-    obj._config_sig = file_signature(cfg_file.stat())
+    obj._config_sig = path_signature(cfg_file)
 
     obj._reload_mcp = MagicMock()
     obj._busy_command = MagicMock()
@@ -202,7 +202,7 @@ def test_pinned_mtime_same_size_replacement_triggers_reload(tmp_path):
 
     obj, cfg_file = _make_cli(tmp_path, mcp_servers={"bb": {"command": "b"}})
     cfg_file.write_text("mcp_servers:\n  bb: {command: b}\n")
-    obj._config_sig = file_signature(cfg_file.stat())
+    obj._config_sig = path_signature(cfg_file)
     other = tmp_path / "other.yaml"
     other.write_text("mcp_servers:\n  aa: {command: a}\n")
     shutil.copy2(other, cfg_file)

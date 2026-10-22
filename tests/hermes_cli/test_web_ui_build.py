@@ -286,6 +286,7 @@ class TestBuildWebUIFlock:
 
 
 
+    @pytest.mark.skipif(__import__("os").name == "nt", reason="POSIX-only interface")
     def test_contended_lock_without_dist_waits_then_skips_fresh_build(self, tmp_path):
         """First-ever build race: the waiter blocks, and once it acquires the
         lock the callee's own staleness check (running under the lock) sees

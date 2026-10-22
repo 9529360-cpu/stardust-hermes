@@ -920,7 +920,8 @@ def test_shared_store_write_and_read_roundtrip(shared_store_env):
 
     # Permissions should be 0600 where the platform supports it.
     mode = path.stat().st_mode & 0o777
-    assert mode == 0o600 or mode == 0o644  # 0o644 on platforms without chmod
+    if __import__("os").name != "nt":
+        assert mode == 0o600
 
     loaded = _read_shared_nous_state()
     assert loaded is not None

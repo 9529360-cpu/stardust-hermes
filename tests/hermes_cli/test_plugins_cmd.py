@@ -103,6 +103,7 @@ class TestResolveSubdirWithin:
 
 
 
+    @pytest.mark.require_symlinks
     def test_rejects_symlink_escape(self, tmp_path):
         clone = tmp_path / "clone"
         clone.mkdir()
@@ -201,6 +202,7 @@ class TestGitPullPluginDirAutostash:
         git(origin, "init", "-q", "-b", "main")
         git(origin, "config", "user.email", "t@t")
         git(origin, "config", "user.name", "t")
+        git(origin, "config", "core.autocrlf", "false")
         pad = "\n".join(f"# pad {i}" for i in range(12))
         (origin / "plugin.py").write_text(
             f"VALUE = 1\n{pad}\nOTHER = 'a'\n", encoding="utf-8"
@@ -212,6 +214,7 @@ class TestGitPullPluginDirAutostash:
         git(tmp_path, "clone", "-q", str(origin), str(checkout))
         git(checkout, "config", "user.email", "t@t")
         git(checkout, "config", "user.name", "t")
+        git(checkout, "config", "core.autocrlf", "false")
         return origin, checkout, git
 
     @staticmethod
@@ -460,7 +463,12 @@ class TestCmdRemove:
 
         cmd_remove("test-plugin")
 
-        mock_rmtree.assert_called_once_with(mock_target)
+        mock_rmtree.assert_called_once()
+        assert mock_rmtree.call_args.args == (mock_target,)
+        if os.name == "nt":
+            assert callable(mock_rmtree.call_args.kwargs["onerror"])
+        else:
+            assert mock_rmtree.call_args.kwargs == {}
 
     @patch("hermes_cli.plugins_cmd._sanitize_plugin_name")
     @patch("hermes_cli.plugins_cmd._plugins_dir")

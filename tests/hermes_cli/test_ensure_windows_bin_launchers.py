@@ -181,6 +181,7 @@ def test_noop_when_console_scripts_missing(tmp_path, monkeypatch):
     root = home / "hermes-agent"
     (root / "venv" / "Scripts").mkdir(parents=True)
     monkeypatch.setenv("STARDUST_HOME", str(home))
+    monkeypatch.setenv("VIRTUAL_ENV", str(root / "venv"))
 
     assert ensure_windows_bin_launchers(root, windows=True, user_path_entries=[]) == []
 
@@ -278,6 +279,7 @@ def test_migration_never_strips_path_when_staging_fails(tmp_path, monkeypatch):
     home = tmp_path / "hermes"
     root = home / "hermes-agent"
     (root / "venv" / "Scripts").mkdir(parents=True)  # no launcher exes inside
+    monkeypatch.setenv("VIRTUAL_ENV", str(root / "venv"))
     monkeypatch.setenv("STARDUST_HOME", str(home))
     legacy_bin = str(root / "bin")
     state, read, write = _fake_registry([legacy_bin])

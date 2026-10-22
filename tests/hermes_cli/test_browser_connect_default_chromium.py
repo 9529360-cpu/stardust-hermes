@@ -144,9 +144,11 @@ class TestDetectDefaultLinux:
             assert bc._detect_default_linux() is None
 
 
+@pytest.mark.linux_only
 class TestLinuxProfileDir:
     def _env(self, monkeypatch, home):
         monkeypatch.setenv("HOME", str(home))
+        monkeypatch.setenv("USERPROFILE", str(home))
         monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
 
     def test_native_path_when_nothing_exists(self, tmp_path, monkeypatch):

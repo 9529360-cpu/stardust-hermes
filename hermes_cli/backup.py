@@ -512,13 +512,12 @@ def _safe_restore_db(src: Path, dst: Path) -> bool:
     (``False``) and the caller reports the file as skipped.
     """
     try:
-        dst_conn = sqlite3.connect(str(dst))
-        # Checkpoint first so the backup starts clean rather than writing on top of a deep WAL.
-        with suppress(Exception):
-            dst_conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-        with closing(sqlite3.connect(f"file:{src}?mode=ro", uri=True)) as src_conn:
-            src_conn.backup(dst_conn)
-        dst_conn.close()
+        with closing(sqlite3.connect(str(dst))) as dst_conn:
+            # Close the destination before fallback, including when backup() raises.
+            with suppress(Exception):
+                dst_conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            with closing(sqlite3.connect(f"file:{src}?mode=ro", uri=True)) as src_conn:
+                src_conn.backup(dst_conn)
         with suppress(Exception):
             dst.chmod(src.stat().st_mode)
         return True

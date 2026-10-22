@@ -513,6 +513,7 @@ def test_every_installed_unit_of_a_secondary_is_removed_and_restored(fleet, caps
     assert "more than one installed service" in capsys.readouterr().out and fleet.ops == []
 
 
+@pytest.mark.linux_only
 def test_unresolvable_system_unit_user_is_unknown_principal_not_directory_owner(fleet, tmp_path, monkeypatch, capsys):
     """A system unit pinned to a User= this host cannot resolve: the principal is unknown, never the
     profile directory's owner, and unknown blocks the unattended path."""

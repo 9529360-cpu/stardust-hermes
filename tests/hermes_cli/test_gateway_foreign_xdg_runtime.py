@@ -38,6 +38,7 @@ class TestPathExistsSafe:
         assert gateway_cli._path_exists_safe(Path("/run/user/1001/bus")) is False
 
 
+@pytest.mark.linux_only
 class TestRuntimeDirIsOurs:
     """_runtime_dir_is_ours() separates our runtime dir from a leaked foreign one."""
 
@@ -62,6 +63,7 @@ class TestRuntimeDirIsOurs:
         assert gateway_cli._runtime_dir_is_ours(str(tmp_path / "nope")) is False
 
 
+@pytest.mark.linux_only
 class TestUserSystemdSocketReadyForeignRuntime:
     """The readiness probe must not crash on an unreadable foreign XDG_RUNTIME_DIR."""
 
@@ -73,6 +75,7 @@ class TestUserSystemdSocketReadyForeignRuntime:
         assert gateway_cli._user_systemd_socket_ready() is False
 
 
+@pytest.mark.linux_only
 class TestEnsureUserSystemdEnvForeignRuntime:
     """_ensure_user_systemd_env() drops a leaked foreign XDG_RUNTIME_DIR."""
 
@@ -119,6 +122,7 @@ class TestEnsureUserSystemdEnvForeignRuntime:
         assert "DBUS_SESSION_BUS_ADDRESS" not in os.environ
 
 
+@pytest.mark.linux_only
 class TestPreflightForeignRuntimeNoLeak:
     """#86558: preflight surfaces a remediable error, not a raw PermissionError."""
 

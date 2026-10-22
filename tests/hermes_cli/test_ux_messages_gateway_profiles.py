@@ -36,6 +36,7 @@ def test_systemctl_failure_is_explained_not_tracebacked(monkeypatch, capsys):
     assert "Details:" in out
 
 
+@pytest.mark.linux_only
 def test_missing_systemctl_points_at_foreground_run(monkeypatch, capsys):
     def fake_run(cmd, **kwargs):
         raise FileNotFoundError("systemctl")

@@ -7,6 +7,7 @@ import pytest
 import hermes_cli.gateway as gateway
 
 
+@pytest.mark.linux_only
 class TestEnsureLingerEnabled:
     def test_linger_already_enabled_via_file(self, monkeypatch, capsys):
         monkeypatch.setattr(gateway, "is_linux", lambda: True)
@@ -105,6 +106,7 @@ class TestEnsureLingerEnabled:
         assert "systemctl --user" not in out
 
 
+@pytest.mark.linux_only
 class TestEnsureSystemServiceLinger:
     @pytest.mark.parametrize("running", [True, False])
     def test_fresh_enable_waits_on_target_uid_and_hints_restart_only_when_running(
@@ -134,6 +136,7 @@ class TestEnsureSystemServiceLinger:
         gateway._ensure_system_service_linger("alice")
 
 
+@pytest.mark.linux_only
 def test_systemd_install_calls_linger_helper(monkeypatch, tmp_path, capsys):
     unit_path = tmp_path / "systemd" / "user" / "hermes-gateway.service"
 

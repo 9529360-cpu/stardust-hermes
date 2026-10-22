@@ -7,6 +7,31 @@ import pytest
 from cli import HermesCLI
 from hermes_cli import terminal_notify
 
+
+@pytest.mark.windows_only
+def test_windows_tty_writes_stdout_without_opening_a_posix_device(monkeypatch, capsys):
+    def unexpected_open(*args, **kwargs):
+        pytest.fail("Windows must not open /dev/tty as a regular file")
+
+    monkeypatch.setattr("builtins.open", unexpected_open)
+    terminal_notify.write_tty("notification")
+    assert capsys.readouterr().out == "notification"
+
+
+@pytest.mark.windows_only
+def test_windows_redirected_terminal_cleanup_does_not_open_a_posix_device(monkeypatch):
+    import cli
+    import io
+
+    monkeypatch.setattr(cli, "_tui_input_modes_active", True)
+    monkeypatch.setattr(cli.sys, "stdout", io.StringIO())
+    def unexpected_open(*args, **kwargs):
+        pytest.fail("Windows cleanup must not open /dev/tty")
+    monkeypatch.setattr("builtins.open", unexpected_open)
+    cli._reset_terminal_input_modes_on_exit()
+    assert cli._tui_input_modes_active is False
+
+
 _WARP_OK = {
     "TERM_PROGRAM": "WarpTerminal",
     "WARP_CLI_AGENT_PROTOCOL_VERSION": "1",

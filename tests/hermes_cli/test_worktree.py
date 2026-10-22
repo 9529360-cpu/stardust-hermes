@@ -1379,11 +1379,14 @@ class TestPrMergedEscapeHatch:
 
     @staticmethod
     def _stub_gh(tmp_path, monkeypatch, stdout='[{"number": 1}]', exit_code=0):
-        gh = tmp_path / "bin" / "gh"
+        gh = tmp_path / "bin" / ("gh.cmd" if os.name == "nt" else "gh")
         gh.parent.mkdir(parents=True, exist_ok=True)
-        gh.write_text(f"#!/bin/sh\nprintf '%s' '{stdout}'\nexit {exit_code}\n")
+        if os.name == "nt":
+            gh.write_text(f"@echo off\necho {stdout}\nexit /b {exit_code}\n")
+        else:
+            gh.write_text(f"#!/bin/sh\nprintf '%s' '{stdout}'\nexit {exit_code}\n")
         gh.chmod(0o755)
-        monkeypatch.setenv("PATH", f"{gh.parent}:{os.environ['PATH']}")
+        monkeypatch.setenv("PATH", f"{gh.parent}{os.pathsep}{os.environ['PATH']}")
 
     def test_merged_pr_tree_is_reaped(self, git_repo, tmp_path, monkeypatch):
         import cli

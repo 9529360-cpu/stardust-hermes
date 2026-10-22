@@ -293,6 +293,9 @@ class TestResumeVerificationLive:
 
         # Peripheral only: don't regenerate launcher scripts into the temp home.
         monkeypatch.setattr(hm, "_refresh_windows_gateway_launchers", lambda: None)
+        # This test launches an immediately exiting Python process, never a gateway.
+        # The all-profile poll must not accept an unrelated gateway on the host.
+        monkeypatch.setattr(gateway, "find_gateway_pids", lambda **kwargs: [])
 
         # Real relaunch chain, real watcher, real spawn — but the respawned
         # "gateway" exits immediately, standing in for the Job-Object

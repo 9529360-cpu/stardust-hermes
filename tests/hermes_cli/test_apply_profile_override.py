@@ -16,6 +16,8 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 
 def _run_apply_profile_override(
     tmp_path, monkeypatch, *, hermes_home: str | None, active_profile: str | None,
@@ -36,6 +38,7 @@ def _run_apply_profile_override(
         (hermes_root / "profiles" / active_profile).mkdir(parents=True, exist_ok=True)
 
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    monkeypatch.setattr("hermes_constants._get_platform_default_hermes_home", lambda: hermes_root)
     if hermes_home is not None:
         monkeypatch.setenv("STARDUST_HOME", hermes_home)
     else:
@@ -99,6 +102,7 @@ class TestApplyProfileOverrideHermesHomeGuard:
         )
 
 
+    @pytest.mark.linux_only
     def test_sudo_explicit_profile_resolves_invoking_users_profile(self, tmp_path, monkeypatch):
         """sudo elias ... should resolve `-p elias` under SUDO_USER, not root."""
         root_home = tmp_path / "root"
@@ -166,6 +170,7 @@ class TestSupervisedChildIgnoresStickyProfile:
         (hermes_root / "profiles" / "coder").mkdir(parents=True, exist_ok=True)
 
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        monkeypatch.setattr("hermes_constants._get_platform_default_hermes_home", lambda: hermes_root)
         monkeypatch.delenv("STARDUST_HOME", raising=False)
         monkeypatch.setenv("STARDUST_S6_SUPERVISED_CHILD", "1")
         monkeypatch.setattr(sys, "argv", ["hermes", "-p", "coder", "gateway", "run"])

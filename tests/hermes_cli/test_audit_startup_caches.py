@@ -11,7 +11,7 @@ import pytest
 @pytest.mark.parametrize("config_exists", [True, False])
 def test_classic_cli_initializes_config_watcher(tmp_path, monkeypatch, config_exists):
     from hermes_cli.cli_tui_mixin import CLITuiMixin
-    from utils import file_signature
+    from utils import path_signature
 
     config = tmp_path / "config.yaml"
     if config_exists:
@@ -20,7 +20,7 @@ def test_classic_cli_initializes_config_watcher(tmp_path, monkeypatch, config_ex
     monkeypatch.setenv("STARDUST_DEFER_AGENT_STARTUP", "1")
     state = SimpleNamespace(config={})
     CLITuiMixin._tui_init_run_state(state)
-    assert state._config_sig == (file_signature(config.stat()) if config_exists else None)
+    assert state._config_sig == (path_signature(config) if config_exists else None)
     assert state._pending_input.empty()
     assert state._should_exit is False
 

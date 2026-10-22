@@ -99,6 +99,7 @@ class TestBuildRelaunchArgv:
 
 
 class TestRelaunch:
+    @pytest.mark.skipif(__import__("os").name == "nt", reason="POSIX-only interface")
     def test_calls_execvp(self, monkeypatch):
         calls = []
 

@@ -66,10 +66,10 @@ def test_run_gate_pass():
 
 
 def test_run_gate_fail_captures_output():
-    passed, code, out = run_gate(GoalGate(command="echo broken >&2; exit 3"))
+    passed, code, out = run_gate(GoalGate(command=f'"{sys.executable}" -c "import sys; print(123, file=sys.stderr); sys.exit(3)"'))
     assert passed is False
     assert code == 3
-    assert "broken" in out
+    assert "123" in out
 
 
 def test_run_gate_timeout():

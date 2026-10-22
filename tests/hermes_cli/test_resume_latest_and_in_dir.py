@@ -220,6 +220,7 @@ def test_in_dir_expands_user_home(main_mod, launched, monkeypatch, tmp_path):
     home = tmp_path / "home"
     (home / "proj").mkdir(parents=True)
     monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
     start = os.getcwd()
 
     try:

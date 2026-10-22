@@ -12,6 +12,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+pytestmark = pytest.mark.linux_only
+
 
 @pytest.fixture
 def unprivileged(monkeypatch):

@@ -24,8 +24,9 @@ from hermes_cli.auth import (
 
 
 @pytest.fixture()
-def _clean_copilot_env(monkeypatch):
+def _clean_copilot_env(monkeypatch, tmp_path):
     """Neutralize host state so tests pin behaviour, not this machine."""
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
     for var in (
         "COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN",
         "STARDUST_COPILOT_ACP_COMMAND", "COPILOT_CLI_PATH",

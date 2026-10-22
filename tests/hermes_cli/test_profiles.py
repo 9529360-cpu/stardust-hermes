@@ -140,7 +140,8 @@ class TestCreateProfile:
             for line in content.splitlines()
         )
         mode = stat.S_IMODE(env_path.stat().st_mode)
-        assert mode == 0o600
+        if os.name != "nt":
+            assert mode == 0o600
 
 
     def test_fresh_profile_inherits_a_usable_model(self, profile_env):
@@ -346,7 +347,8 @@ class TestBackfillProfileEnvs:
         assert sorted(backfilled) == ["old1", "old2"]
         for p in (p1, p2):
             assert (p / ".env").read_text() == "OPENROUTER_API_KEY=root-key\n"
-            assert stat.S_IMODE((p / ".env").stat().st_mode) == 0o600
+            if os.name != "nt":
+                assert stat.S_IMODE((p / ".env").stat().st_mode) == 0o600
 
 
     def test_placeholder_when_default_has_no_env(self, profile_env):
@@ -684,6 +686,7 @@ class TestAliasCollision:
 class TestWrapperScript:
     """Tests for create_wrapper_script() and remove_wrapper_script()."""
 
+    @pytest.mark.skipif(__import__("os").name == "nt", reason="POSIX-only interface")
     def test_creates_sh_on_posix(self, profile_env, monkeypatch):
         monkeypatch.setattr("hermes_cli.profiles.shutil.which", lambda name: "/opt/hermes/bin/stardust")
         from hermes_cli.profiles import create_wrapper_script
@@ -769,7 +772,7 @@ class TestFindAliasForProfile:
         info = next(p for p in list_profiles() if p.name == "steve")
         assert info.alias_name == "qiaobusi"
         assert info.alias_path is not None
-        assert info.alias_path.name == "qiaobusi"
+        assert info.alias_path.name == ("qiaobusi.bat" if sys.platform == "win32" else "qiaobusi")
 
 
 # ===================================================================
@@ -911,6 +914,7 @@ class TestExportImport:
         assert "default/memories/MEMORY.md" in names
 
 
+    @pytest.mark.require_symlinks
     def test_export_default_handles_broken_symlinks(self, profile_env, tmp_path):
         """Broken symlinks inside allowed artifacts are preserved, not crashed (#58394).
 
@@ -1116,6 +1120,7 @@ class TestWriteProfileMetaDurability:
         assert "🧙" in raw
         assert profiles.read_profile_meta(profile_dir)["description"] == "Code wizard 🧙 ✨"
 
+    @pytest.mark.require_symlinks
     def test_symlinked_profile_yaml_survives_the_write(self, tmp_path):
         """Guard on the conversion, not a behavior change.
 
