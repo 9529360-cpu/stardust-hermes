@@ -69,6 +69,20 @@ def handle_api_error(
             _provider_overflow_recovery_pending=_provider_overflow_recovery_pending, result=result,
         )
 
+    from agent.request_input_budget import RequestInputBudgetExceeded
+    if isinstance(api_error, RequestInputBudgetExceeded):
+        if thinking_spinner:
+            thinking_spinner.stop("")
+        agent.iteration_budget.refund()
+        agent._api_call_count = max(0, api_call_count - 1)
+        agent._persist_session(messages, conversation_history)
+        return _verdict("return", {
+            "final_response": str(api_error), "messages": messages,
+            "api_calls": agent._api_call_count, "completed": False, "failed": True,
+            "error": str(api_error), "failure_reason": "request_input_budget_exceeded",
+            "failure_retryable": False,
+        })
+
     # Stop spinner silently — retry status is buffered and only flushed when every
     # retry+fallback is exhausted.
     if thinking_spinner:

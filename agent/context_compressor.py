@@ -3255,6 +3255,12 @@ Summary generation was unavailable, so this is a best-effort deterministic fallb
             # NO max_tokens: Anthropic/NIM wires forward it and a hard cap truncates summaries
             # (thinking models burn it on reasoning). Timeout comes from call_llm config.
         }
+        budget = getattr(self, "request_input_budget_tokens", 0)
+        if isinstance(budget, int) and budget > 0:
+            from agent.model_metadata import estimate_request_tokens_rough
+            estimated = estimate_request_tokens_rough(call_kwargs["messages"])
+            if estimated > budget:
+                raise ValueError(f"Compression input budget exceeded: {estimated} > {budget}")
         if self.summary_model:
             call_kwargs["model"] = self.summary_model
         # Pinned route (stall fallback) overrides task routing so the retry leaves the stalled backend.
@@ -3361,6 +3367,9 @@ Summary generation was unavailable, so this is a best-effort deterministic fallb
             summary = self._ground_historical_task_snapshot(summary, turns_to_summarize)
             summary = self._augment_summary_lean(summary, turns_to_summarize)
             self._validate_summary_user_provenance(summary, has_user_turn)
+            if getattr(self, "require_continuity_fields", False):
+                from agent.context_compressor_summary import validate_continuity_summary
+                validate_continuity_summary(summary)
             self._previous_summary = summary
             self._clear_compression_failure_cooldown()
             self._summary_model_fallen_back = False
@@ -3448,11 +3457,15 @@ This compaction should PRIORITISE preserving all information related to the focu
     def _summary_template_sections(cls, _section: Dict[str, str], summary_budget: int, _session_log_section: str) -> str:
         """The ``## ...`` section template shared by the fresh and iterative-update prompts."""
         _temporal_anchoring_rule = cls._temporal_anchoring_rule()
+        from agent.context_compressor_summary import continuity_summary_template
+        _continuity = continuity_summary_template()
         return f"""{HISTORICAL_TASK_HEADING}
 {_section["historical_task"]}
 
 ## Goal
 {_section["goal"]}
+
+{_continuity}
 
 ## Constraints & Preferences
 {_section["constraints"]}
