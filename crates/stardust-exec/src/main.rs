@@ -82,6 +82,7 @@ fn run(r: Request) -> io::Result<()> {
     let mut status = None;
     let mut exit_at = None;
     let mut timed_out = false;
+    let mut last_flush = Instant::now();
     loop {
         if status.is_none() {
             status = child.try_wait()?;
@@ -97,9 +98,6 @@ fn run(r: Request) -> io::Result<()> {
         }
         match rx.recv_timeout(Duration::from_millis(5)) {
             Ok(bytes) => {
-                if status.is_some() {
-                    exit_at = Some(Instant::now());
-                }
                 pending.extend(bytes);
                 let cut = pending
                     .iter()
@@ -109,22 +107,27 @@ fn run(r: Request) -> io::Result<()> {
                 if cut > 0 {
                     emit(json!({"output": platform::decode(&pending[..cut])}))?;
                     pending.drain(..cut);
-                }
-                // Flush long lines only at a valid UTF-8 boundary; retain partial sequences.
-                if pending.len() >= 65536 {
-                    let cut = match std::str::from_utf8(&pending) {
-                        Ok(_) => pending.len(),
-                        Err(e) if e.error_len().is_none() => e.valid_up_to(),
-                        Err(_) => pending.len(),
-                    };
-                    if cut > 0 {
-                        emit(json!({"output": platform::decode(&pending[..cut])}))?;
-                        pending.drain(..cut);
-                    }
+                    last_flush = Instant::now();
                 }
             }
             Err(mpsc::RecvTimeoutError::Disconnected) if status.is_some() => break,
             Err(_) => {}
+        }
+        // Check outside the receive branch: silence and continuous chunks must
+        // both flush promptly. Keep incomplete UTF-8 for the next read.
+        if !pending.is_empty()
+            && (pending.len() >= 65536 || last_flush.elapsed() >= Duration::from_millis(50))
+        {
+            let cut = match std::str::from_utf8(&pending) {
+                Ok(_) => pending.len(),
+                Err(e) if e.error_len().is_none() => e.valid_up_to(),
+                Err(_) => pending.len(),
+            };
+            if cut > 0 {
+                emit(json!({"output": platform::decode(&pending[..cut])}))?;
+                pending.drain(..cut);
+                last_flush = Instant::now();
+            }
         }
         // Detached descendants may retain stdout. Never wait for their lifetime.
         if exit_at.is_some_and(|t| t.elapsed() >= Duration::from_millis(300)) {
