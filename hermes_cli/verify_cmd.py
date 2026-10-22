@@ -100,6 +100,7 @@ def _record_evidence(root: Path, recipe, result, *, partial: bool) -> None:
             command="stardust verify",
             scope="targeted" if partial else "full",
             output="\n".join(tails),
+            result=result,
         )
     except Exception:
         pass
