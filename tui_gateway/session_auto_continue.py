@@ -347,6 +347,11 @@ def _handle_busy_submit(rid, sid: str, session: dict, text: Any, transport: Any,
         if not session.get("running"):
             return None  # turn ended since prompt.submit's busy check; caller retries on the idle session
         image_paths = list(session.get("attached_images", []))
+        # A replay of the live input is already being handled. Check before redirect/steer
+        # and interrupt: the queue's self-copy filter runs too late to protect the task.
+        if (not image_paths and not turn_author and isinstance(text, str)
+                and text.strip() == _ac_inflight_original(session) != ""):
+            return _ok(rid, {"status": "streaming"})
         if image_paths:
             session["attached_images"] = []  # claim now so a later paste isn't consumed when the turn yields
     plain_text = _coerce_message_text(text).strip() if not image_paths and _is_text_only_busy_payload(text) else ""
