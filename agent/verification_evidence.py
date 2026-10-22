@@ -225,6 +225,10 @@ def _transaction():
 def _ensure_schema(conn: sqlite3.Connection) -> None:
     for ddl in _SCHEMA_DDL:
         conn.execute(ddl)
+    # Evidence tiers remain distinct even when the legacy workspace gate is passed.
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(verification_events)")}
+    if "evidence_tier" not in columns:
+        conn.execute("ALTER TABLE verification_events ADD COLUMN evidence_tier TEXT")
     # Ledgers created before the column existed: add it in place (NULL = no fingerprint, old behavior).
     columns = {row[1] for row in conn.execute("PRAGMA table_info(verification_events)")}
     if "content_fingerprint" not in columns:
@@ -1071,6 +1075,8 @@ def _insert_evidence(evidence: VerificationEvidence, *, observed_at: str | None 
         if cur.lastrowid is None:
             raise RuntimeError("verification event insert did not return an id")
         event_id = int(cur.lastrowid)
+        tier = "build" if e.kind == "build" else "test"
+        conn.execute("UPDATE verification_events SET evidence_tier=? WHERE id=?", (tier, event_id))
         # A run dated before an edit did not cover that edit: leave it pending rather than clearing it.
         pending = conn.execute(
             "SELECT last_edit_at FROM verification_state WHERE session_id = ? AND root = ?",
@@ -1090,7 +1096,7 @@ def _insert_evidence(evidence: VerificationEvidence, *, observed_at: str | None 
         _prune_old_events(conn, session_id=e.session_id, root=e.root)
         conn.commit()
 
-    return {"id": event_id, **e.__dict__, "created_at": created_at}
+    return {"id": event_id, **e.__dict__, "created_at": created_at, "evidence_tier": tier}
 
 
 def mark_workspace_edited(
@@ -1137,6 +1143,8 @@ def carry_verification_state(*, from_session_id: str | None, to_session_id: str 
     every ledger lookup is a flat ``(session_id, root)`` read. Without this the child reads ``unverified`` for a
     workspace the parent already verified, and the verify-on-stop gate asks the model to re-run checks it just ran.
     Rows the child already holds win (they are newer). Returns the number of rows copied."""
+    from agent.task_acceptance import carry as carry_acceptance
+    carry_acceptance(from_session_id, to_session_id)
     if not _ledger_enabled():
         return 0
     src, dst = str(from_session_id or ""), str(to_session_id or "")
