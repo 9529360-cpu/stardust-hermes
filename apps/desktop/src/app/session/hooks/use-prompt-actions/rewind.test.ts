@@ -648,3 +648,33 @@ describe('optimistic rewind/reload turn-clock seeding (#86795)', () => {
     expect(next.turnStartedAt).toBeGreaterThanOrEqual(before)
   })
 })
+
+describe('runRewindSubmit message identity', () => {
+  it('resends a recovered rewind under the same client_message_id; the next rewind gets its own', async () => {
+    const submits: Record<string, unknown>[] = []
+    let attempts = 0
+
+    const gateway = (async (method: string, params?: Record<string, unknown>) => {
+      if (method === 'prompt.submit') {
+        submits.push(params ?? {})
+        attempts += 1
+
+        if (attempts === 1) {
+          throw new Error('session not found')
+        }
+
+        return { status: 'streaming' }
+      }
+
+      return method === 'session.resume' ? { session_id: 'recovered' } : {}
+    }) as <T>(method: string, params?: Record<string, unknown>, timeoutMs?: number) => Promise<T>
+
+    await runRewindSubmit(gateway, 'sid', 'fixed prompt', undefined, undefined, false, { storedSessionId: 'stored-1' })
+    await runRewindSubmit(gateway, 'recovered', 'fixed prompt', undefined, undefined, false)
+
+    expect(submits.map(submit => submit.session_id)).toEqual(['sid', 'recovered', 'recovered'])
+    expect(submits[0]?.client_message_id).toMatch(/^[0-9a-f-]{36}$/)
+    expect(submits[1]?.client_message_id).toBe(submits[0]?.client_message_id)
+    expect(submits[2]?.client_message_id).not.toBe(submits[0]?.client_message_id)
+  })
+})

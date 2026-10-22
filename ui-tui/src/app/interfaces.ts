@@ -382,8 +382,8 @@ export interface ComposerActions {
   /** Attach an image by path in as a token. */
   attachImagePath: (path: string) => void
   clearIn: () => void
-  dequeue: () => string | undefined
-  enqueue: (text: string, display?: string) => void
+  dequeue: () => QueueItem | undefined
+  enqueue: (text: string, display?: string, clientMessageId?: string) => void
   handleTextPaste: (event: PasteEvent) => MaybePromise<ComposerPasteResult | null>
   openEditor: () => Promise<void>
   prependQueue: (item: QueueItem) => void
@@ -437,7 +437,7 @@ export interface InputHandlerActions {
   answerClarify: (answer: string) => void
   appendMessage: (msg: Msg) => void
   die: () => void
-  dispatchSubmission: (full: string) => void
+  dispatchSubmission: (full: string, clientMessageId?: string) => void
   guardBusySessionSwitch: (what?: string) => boolean
   newSession: (msg?: string, title?: string) => void
   sys: (text: string) => void
@@ -521,7 +521,7 @@ export interface SlashHandlerContext {
   composer: {
     attachClipboardImage: () => void
     attachImagePath: (path: string) => void
-    enqueue: (text: string, display?: string) => void
+    enqueue: (text: string, display?: string, clientMessageId?: string) => void
     hasSelection: boolean
     openEditor: () => Promise<void>
     queueRef: MutableRefObject<QueueItem[]>

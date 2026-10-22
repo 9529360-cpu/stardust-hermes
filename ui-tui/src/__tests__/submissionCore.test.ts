@@ -1,3 +1,4 @@
+import { JsonRpcGatewayError } from '@stardust/shared/json-rpc-channel'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { isSessionBusyError, markSubmitting, submitPrompt, type SubmitPromptDeps } from '../app/submissionCore.js'
@@ -166,5 +167,99 @@ describe('submissionCore.isSessionBusyError', () => {
     expect(isSessionBusyError(new Error('waiting for model response'))).toBe(true)
     expect(isSessionBusyError(new Error('some other failure'))).toBe(false)
     expect(isSessionBusyError('not an error')).toBe(false)
+  })
+})
+
+describe('submissionCore.submitPrompt — message identity', () => {
+  beforeEach(() => {
+    resetUiState()
+    patchUiState({ sid: 'sess-1' })
+  })
+
+  const submittedParams = (gw: GatewayClient) =>
+    vi
+      .mocked(gw.request)
+      .mock.calls.filter(([method]) => method === 'prompt.submit')
+      .map(([, params]) => params as Record<string, unknown>)
+
+  const submitted = (gw: GatewayClient) => submittedParams(gw).map(params => params.client_message_id)
+
+  it('gives every deliberate send its own UUID, even for identical text', () => {
+    const { gw } = makeDeferredGateway()
+    const deps = makeDeps(gw)
+
+    submitPrompt('same', deps, true, undefined, { skipDetectDrop: true })
+    submitPrompt('same', deps, true, undefined, { skipDetectDrop: true })
+
+    const [first, second] = submitted(gw)
+
+    expect(first).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+    expect(second).toMatch(/^[0-9a-f-]{36}$/)
+    expect(second).not.toBe(first)
+  })
+
+  it('reuses the identity a retry supplies', () => {
+    const { gw } = makeDeferredGateway()
+
+    submitPrompt('same', makeDeps(gw), false, undefined, { clientMessageId: 'retry-id', skipDetectDrop: true })
+
+    expect(submitted(gw)).toEqual(['retry-id'])
+  })
+
+  it('carries the same identity through file-drop detection', async () => {
+    const { gw, resolveDrop } = makeDeferredGateway()
+
+    submitPrompt('look at this', makeDeps(gw))
+    resolveDrop()
+    await vi.waitFor(() => expect(submitted(gw)).toHaveLength(1))
+
+    expect(submitted(gw)[0]).toMatch(/^[0-9a-f-]{36}$/)
+  })
+
+  it('re-queues a refused send under the identity it already used', async () => {
+    const gw = {
+      request: vi.fn((method: string) =>
+        method === 'prompt.submit' ? Promise.reject(new Error('session busy')) : Promise.resolve({})
+      )
+    } as unknown as GatewayClient
+
+    const deps = makeDeps(gw)
+
+    submitPrompt('queued words', deps, true, undefined, { skipDetectDrop: true })
+    await vi.waitFor(() => expect(deps.enqueue).toHaveBeenCalledTimes(1))
+
+    const [id] = submitted(gw)
+
+    expect(id).toMatch(/^[0-9a-f-]{36}$/)
+    expect(deps.enqueue).toHaveBeenCalledWith('queued words', undefined, id)
+  })
+
+  it('resends without the identity when an older backend rejects the unknown param', async () => {
+    // Verbatim refusal from a real `hermes serve` on the previous release.
+    const refusal = new JsonRpcGatewayError(
+      'invalid params for prompt.submit: client_message_id: Extra inputs are not permitted — the client and the Hermes backend are out of sync (different versions); run `stardust update` and restart both',
+      { code: 4000 }
+    )
+
+    const gw = {
+      request: vi.fn((method: string, params?: Record<string, unknown>) =>
+        method === 'prompt.submit' && params && 'client_message_id' in params
+          ? Promise.reject(refusal)
+          : Promise.resolve({ status: 'streaming' })
+      )
+    } as unknown as GatewayClient
+
+    const deps = makeDeps(gw)
+
+    submitPrompt('to an older backend', deps, true, undefined, { skipDetectDrop: true })
+    await vi.waitFor(() => expect(submittedParams(gw)).toHaveLength(2))
+
+    const [first, second] = submittedParams(gw)
+
+    expect(first?.client_message_id).toMatch(/^[0-9a-f-]{36}$/)
+    expect(second).toEqual({ session_id: 'sess-1', text: 'to an older backend' })
+    expect(deps.sys).not.toHaveBeenCalled()
+    expect(deps.enqueue).not.toHaveBeenCalled()
+    expect(getUiState().busy).toBe(true)
   })
 })

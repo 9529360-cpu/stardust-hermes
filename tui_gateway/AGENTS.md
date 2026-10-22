@@ -46,6 +46,18 @@ New question for the user = `_ask("<method>", sid, params, timeout)` in the emit
 and a `server_request(...)` in `contracts/server_requests.py`.
 New event = `event("<type>", Payload)` in `contracts/events.py`; the emitter is checked against it.
 
+## Submission identity (`prompt.submit`)
+
+Every user submission from Desktop and the TUI carries a client-generated `client_message_id` (UUID, at most 128
+characters). A resend of the same submission — busy retry, session recovery, a queue-drain retry — reuses it; a
+deliberate new send, even of identical text, mints a new one. Each live session keeps a bounded receipt store
+(`message_idempotency.SubmissionReceipts`: 1024 ids for one hour, process-local, errors are not receipts), and a
+repeated id is answered with the first result plus `already_received: true` **before** the busy path: it is never
+queued, steered, redirected, or used to interrupt the running turn. Clients that send no id keep the content check in
+`_handle_busy_submit`; the `display.busy_input_mode` semantics for new ids are unchanged. Receipts do not survive
+session eviction or a backend restart. The contract rejects undeclared keys (4000), so a newer client talking to an
+older backend resends once without the id (`@stardust/shared` `retryWithoutRejectedParam`) and gets the content check.
+
 ## Key surfaces
 
 | Surface | Ink component | Gateway method / event |

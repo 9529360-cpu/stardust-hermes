@@ -1,3 +1,7 @@
+import { randomUUID } from 'node:crypto'
+
+import { retryWithoutRejectedParam } from '@stardust/shared/optional-param'
+
 import type { GatewayClient } from '../gatewayClient.js'
 import type { InputDetectDropResponse, PromptSubmitResponse } from '../gatewayTypes.js'
 import type { Msg } from '../types.js'
@@ -11,7 +15,7 @@ export const isSessionBusyError = (e: unknown) => e instanceof Error && SESSION_
 
 export interface SubmitPromptDeps {
   appendMessage: (msg: Msg) => void
-  enqueue: (text: string) => void
+  enqueue: (text: string, display?: string, clientMessageId?: string) => void
   expand: (text: string) => string
   gw: GatewayClient
   setLastUserMsg: (value: string) => void
@@ -50,8 +54,9 @@ export function submitPrompt(
   deps: SubmitPromptDeps,
   showUserMessage = true,
   displayOverride?: string,
-  opts: { skipDetectDrop?: boolean } = {}
+  opts: { skipDetectDrop?: boolean; clientMessageId?: string } = {}
 ): void {
+  const clientMessageId = opts.clientMessageId ?? randomUUID()
   const sid = getUiState().sid
 
   if (!sid) {
@@ -79,8 +84,14 @@ export function submitPrompt(
     turnController.bufRef = ''
     turnController.interrupted = false
 
-    deps.gw
-      .request<PromptSubmitResponse>('prompt.submit', { session_id: liveSid, text: submitText })
+    // A backend that predates client_message_id (a remote attach not yet
+    // updated) rejects it as an unknown param; resend without it so the UI
+    // can still send. Those backends keep the content-based replay guard.
+    retryWithoutRejectedParam(
+      params => deps.gw.request<PromptSubmitResponse>('prompt.submit', params),
+      { session_id: liveSid, text: submitText, client_message_id: clientMessageId },
+      'client_message_id'
+    )
       .then(r => {
         // The gateway consumed a typed voice stop phrase server-side (voice
         // chat ended, no turn started) — release the busy latch; the
@@ -95,7 +106,7 @@ export function submitPrompt(
         // the re-queue path as a safety net for any future/legacy gateway that
         // still errors, so a message is never silently dropped.
         if (isSessionBusyError(e)) {
-          deps.enqueue(submitText)
+          deps.enqueue(submitText, undefined, clientMessageId)
           patchUiState({ busy: true, status: 'queued for next turn' })
 
           return deps.sys(`queued: "${submitText.slice(0, 50)}${submitText.length > 50 ? '…' : ''}"`)

@@ -122,6 +122,62 @@ describe('composer queue store', () => {
   })
 })
 
+describe('queued entry message identity', () => {
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+
+  beforeEach(() => {
+    window.localStorage.removeItem(QUEUE_STORAGE_KEY)
+    $queuedPromptsBySession.set({})
+  })
+
+  it('mints a distinct UUID per entry, even for identical words', () => {
+    const first = enqueueQueuedPrompt(SESSION_KEY, { attachments: [], text: 'same words' })!
+    const second = enqueueQueuedPrompt(SESSION_KEY, { attachments: [], text: 'same words' })!
+
+    expect(first.clientMessageId).toMatch(UUID)
+    expect(second.clientMessageId).toMatch(UUID)
+    expect(second.clientMessageId).not.toBe(first.clientMessageId)
+  })
+
+  it('keeps the identity through promotion, a no-op save and persistence', () => {
+    const first = enqueueQueuedPrompt(SESSION_KEY, { attachments: [], text: 'first' })!
+    const second = enqueueQueuedPrompt(SESSION_KEY, { attachments: [], text: 'second' })!
+
+    expect(promoteQueuedPrompt(SESSION_KEY, second.id)).toBe(true)
+    expect(updateQueuedPromptText(SESSION_KEY, first.id, 'first')).toBe(false)
+
+    const byText = Object.fromEntries(getQueuedPrompts(SESSION_KEY).map(e => [e.text, e.clientMessageId]))
+    expect(byText).toEqual({ first: first.clientMessageId, second: second.clientMessageId })
+
+    const persisted = JSON.parse(String(window.localStorage.getItem(QUEUE_STORAGE_KEY))) as Record<
+      string,
+      { clientMessageId?: string; text: string }[]
+    >
+
+    expect(persisted[SESSION_KEY]?.map(e => e.clientMessageId)).toEqual([second.clientMessageId, first.clientMessageId])
+  })
+
+  it('gives rewritten words a new identity while the entry keeps its id', () => {
+    const entry = enqueueQueuedPrompt(SESSION_KEY, { attachments: [], text: 'draft' })!
+
+    expect(updateQueuedPromptText(SESSION_KEY, entry.id, 'draft, rewritten')).toBe(true)
+
+    const [edited] = getQueuedPrompts(SESSION_KEY)
+    expect(edited?.id).toBe(entry.id)
+    expect(edited?.clientMessageId).toMatch(UUID)
+    expect(edited?.clientMessageId).not.toBe(entry.clientMessageId)
+  })
+
+  it('gives a changed attachment set a new identity too', () => {
+    const entry = enqueueQueuedPrompt(SESSION_KEY, { attachments: [], text: 'look at this' })!
+
+    expect(updateQueuedPrompt(SESSION_KEY, entry.id, { attachments: [attachment('f-1')], text: 'look at this' })).toBe(
+      true
+    )
+    expect(getQueuedPrompts(SESSION_KEY)[0]?.clientMessageId).not.toBe(entry.clientMessageId)
+  })
+})
+
 describe('migrateQueuedPrompts', () => {
   beforeEach(() => {
     window.localStorage.removeItem(QUEUE_STORAGE_KEY)

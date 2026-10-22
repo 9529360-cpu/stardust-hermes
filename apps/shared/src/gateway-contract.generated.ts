@@ -2209,6 +2209,7 @@ export interface PetScaleResult {
 export interface PromptSubmitParams {
   session_id: string
   profile?: string | null
+  client_message_id?: string | null
   text?: unknown
   display_kind?: string | null
   interrupted?: boolean | null
@@ -2225,6 +2226,7 @@ export interface PromptSubmitParams {
 /** ``status`` is absent only on the typed-stop-phrase reply (``voice_stopped``). After a truncation the survivor row ids let the client rebind its cached ``rowId``s (``None`` map entries: drop the cached id). ``turn_isolation`` marks a compute-host dispatch. */
 export interface PromptSubmitResult {
   status?: PromptSubmitStatus | null
+  already_received?: boolean | null
   voice_stopped?: boolean | null
   survivor_user_row_ids?: (number | null)[] | null
   survivor_row_id_map?: Record<string, number | null> | null

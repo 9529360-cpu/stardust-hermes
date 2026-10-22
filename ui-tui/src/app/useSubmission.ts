@@ -103,7 +103,7 @@ export function useSubmission(opts: UseSubmissionOptions) {
       showUserMessage = true,
       displayText?: string,
       expandOverride?: (value: string) => string,
-      submitOpts: { skipDetectDrop?: boolean } = {}
+      submitOpts: { skipDetectDrop?: boolean; clientMessageId?: string } = {}
     ) => {
       // Read tokens off the ref, not render state: a paste immediately followed
       // by Enter submits before React has re-rendered with the new token.
@@ -178,7 +178,9 @@ export function useSubmission(opts: UseSubmissionOptions) {
   )
 
   const sendQueued = useCallback(
-    (text: string) => {
+    ({ clientMessageId, text }: QueueItem) => {
+      const sendItem = (resolved: string) => send(resolved, true, undefined, undefined, { clientMessageId })
+
       if (text.startsWith('!')) {
         return shellExec(text.slice(1).trim())
       }
@@ -186,10 +188,10 @@ export function useSubmission(opts: UseSubmissionOptions) {
       if (hasInterpolation(text)) {
         patchUiState({ busy: true })
 
-        return interpolate(text, send)
+        return interpolate(text, sendItem)
       }
 
-      send(text)
+      sendItem(text)
     },
     [interpolate, send, shellExec]
   )
@@ -214,7 +216,7 @@ export function useSubmission(opts: UseSubmissionOptions) {
         if (opts.fallbackToFront) {
           composerActions.prependQueue(item)
         } else {
-          composerActions.enqueue(item.text, item.display)
+          composerActions.enqueue(item.text, item.display, item.clientMessageId)
         }
       }
 
@@ -245,13 +247,13 @@ export function useSubmission(opts: UseSubmissionOptions) {
       // the agent is in model generation, tool execution, or an older runtime.
       // Reuse the normal submit pipeline so the correction gets its user bubble
       // and file-drop interpolation exactly once.
-      send(item.text)
+      send(item.text, true, undefined, undefined, { clientMessageId: item.clientMessageId })
     },
     [composerActions, gw, send, sys]
   )
 
   const dispatchSubmission = useCallback(
-    (full: string) => {
+    (full: string, clientMessageId?: string) => {
       if (!full.trim()) {
         return
       }
@@ -326,24 +328,24 @@ export function useSubmission(opts: UseSubmissionOptions) {
           return handleBusyInput(picked, { fallbackToFront: true })
         }
 
-        return sendQueued(picked.text)
+        return sendQueued(picked)
       }
 
       composerActions.pushHistory(toHistory)
 
       if (getUiState().busy) {
-        return handleBusyInput(queueItem(full))
+        return handleBusyInput(queueItem(full, full, clientMessageId))
       }
 
       if (shouldInterpolateSubmission(full)) {
         patchUiState({ busy: true })
 
         return interpolate(full, text =>
-          send(prepareSubmission(text, submissionTokens).text, true, text, value => value)
+          send(prepareSubmission(text, submissionTokens).text, true, text, value => value, { clientMessageId })
         )
       }
 
-      send(submission.text, true, submission.display, value => value)
+      send(submission.text, true, submission.display, value => value, { clientMessageId })
     },
     [
       appendMessage,
@@ -389,7 +391,7 @@ export function useSubmission(opts: UseSubmissionOptions) {
 
           if (next) {
             composerActions.setQueueEdit(null)
-            dispatchSubmission(next)
+            dispatchSubmission(next.text, next.clientMessageId)
           }
         }
 

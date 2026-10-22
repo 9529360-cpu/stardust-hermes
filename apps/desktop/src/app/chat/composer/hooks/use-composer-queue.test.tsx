@@ -8,7 +8,8 @@ import {
   getQueuedPrompts,
   isQueueParked,
   MAX_AUTO_DRAIN_ATTEMPTS,
-  parkQueuedPrompts
+  parkQueuedPrompts,
+  updateQueuedPromptText
 } from '@/store/composer-queue'
 import { setSessionsLoading } from '@/store/session'
 
@@ -99,6 +100,43 @@ describe('useComposerQueue park integration', () => {
         await hook.result.current.sendQueuedNow(entry.id)
       })
       expect(getQueuedPrompts(SESSION_KEY)).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('retries a rejected drain under the entry identity; rewriting the entry mints a new one', async () => {
+    vi.useFakeTimers()
+
+    try {
+      const entry = enqueueQueuedPrompt(SESSION_KEY, { attachments: [], text: 'recoverable' })!
+      const { hook, onSubmit } = renderQueueHook({ busy: true })
+      onSubmit.mockResolvedValue(false)
+      hook.rerender({ busy: false })
+      await act(async () => {
+        await Promise.resolve()
+      })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000)
+      })
+
+      // The backend may have received an attempt whose answer never arrived,
+      // so every retry of the same words must carry the same identity.
+      expect(onSubmit.mock.calls.length).toBeGreaterThanOrEqual(2)
+      expect(new Set(onSubmit.mock.calls.map(([, options]) => options?.clientMessageId))).toEqual(
+        new Set([entry.clientMessageId])
+      )
+
+      // Rewritten words are a new message, never a duplicate of the old one.
+      updateQueuedPromptText(SESSION_KEY, entry.id, 'rewritten')
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000)
+      })
+
+      const [text, options] = onSubmit.mock.calls.at(-1)!
+      expect(text).toBe('rewritten')
+      expect(options?.clientMessageId).toBe(getQueuedPrompts(SESSION_KEY)[0]?.clientMessageId)
+      expect(options?.clientMessageId).not.toBe(entry.clientMessageId)
     } finally {
       vi.useRealTimers()
     }

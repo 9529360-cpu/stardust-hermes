@@ -588,6 +588,36 @@ _CLIENT_SURFACES = frozenset({"hud", "voice-live"})
 
 @method("prompt.submit")
 def _(rid, params: dict) -> dict:
+    """A repeated ``client_message_id`` is a resend of a submission this session already accepted: answer it
+    with the first result (``already_received``) before it can reach the busy path, where it would steer,
+    redirect or interrupt the running turn. Clients that send no id keep the content check in
+    ``_handle_busy_submit``."""
+    message_id = params.get("client_message_id")
+    if message_id is None:
+        return _accept_prompt_submit(rid, params)
+    if not isinstance(message_id, str) or not 0 < len(message_id) <= 128:
+        return _err(rid, 4015, "client_message_id must be a non-empty string of at most 128 characters")
+    from tui_gateway.message_idempotency import SubmissionReceipts
+
+    session, err = _sess_nowait(params, rid)
+    if err:
+        return err
+    # A receipt hit never reaches _accept_prompt_submit, so it must pass the same reattach gate here.
+    with _session_resume_lock:
+        if (refusal := _reattach_refusal(rid, params.get("session_id", ""), session)) is not None:
+            return refusal
+    with session["history_lock"]:
+        receipts = session.setdefault("submission_receipts", SubmissionReceipts())
+    response = receipts.submit(message_id, lambda: _accept_prompt_submit(rid, params))
+    if "result" not in response:
+        return response
+    if response["result"].get("already_received"):
+        logger.info("prompt.submit: ignored resend of client_message_id=%s for session %s",
+                    message_id, params.get("session_id"))
+    return _ok(rid, response["result"])  # a replay carries the first call's result under THIS request id
+
+
+def _accept_prompt_submit(rid, params: dict) -> dict:
     from hermes_cli.input_sanitize import sanitize_user_prompt_text
     sid = params.get("session_id", "")
     raw_text = params.get("text", "")
@@ -660,7 +690,8 @@ def _(rid, params: dict) -> dict:
                 return _err(rid, 4091, "hosted room member session is busy")
             busy_transport = t or session.get("transport")
         busy_response = _handle_busy_submit(
-            rid, sid, session, text, busy_transport, queued=bool(params.get("queued")), turn_author=turn_author)
+            rid, sid, session, text, busy_transport, queued=bool(params.get("queued")), turn_author=turn_author,
+            client_message_id=params.get("client_message_id"))
         if busy_response is not None:
             return busy_response
     raw_rebind_ids = params.get("rebind_survivor_row_ids")

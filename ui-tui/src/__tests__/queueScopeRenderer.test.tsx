@@ -40,9 +40,13 @@ describe('pending input destination', () => {
     })
 
     try {
-      queue.enqueue('startup payload')
+      queue.enqueue('startup payload', undefined, 'startup-id')
       patchUiState({ info: info('alpha'), sid: 'same-session' })
-      expect(queue.dequeue()).toBe('startup payload')
+      expect(queue.dequeue()).toEqual({
+        clientMessageId: 'startup-id',
+        display: 'startup payload',
+        text: 'startup payload'
+      })
       queue.enqueue('private payload', 'private preview')
       queue.setQueueEdit(0)
       patchUiState({ info: info(destination.profile), sid: destination.sid })
@@ -57,7 +61,7 @@ describe('pending input destination', () => {
       expect(queue.queueEditRef.current).toBe(0)
       expect(queue.takeQ(0)).toEqual({ display: 'private preview', text: 'private payload' })
       patchUiState({ info: info(destination.profile), sid: destination.sid })
-      expect(queue.dequeue()).toBe('destination payload')
+      expect(queue.dequeue()?.text).toBe('destination payload')
       expect(queue.dequeue()).toBeUndefined()
     } finally {
       instance.unmount()

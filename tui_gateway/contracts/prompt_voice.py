@@ -31,6 +31,7 @@ class PromptSubmitParams(SessionParams):
     consent: ``confirm_truncate`` plus one durable target (``truncate_before_row_id`` preferred,
     ``truncate_before_message_id``, or the legacy ``truncate_before_user_ordinal``)."""
 
+    client_message_id: str | None = Field(default=None, min_length=1, max_length=128)
     text: JsonValue = ""
     display_kind: str | None = None  # only "hidden" is honoured; anything else renders as a user row
     interrupted: bool | None = None  # client-side barge-in: the turn's model message carries the note
@@ -64,6 +65,7 @@ class PromptSubmitResult(Result):
     entries: drop the cached id). ``turn_isolation`` marks a compute-host dispatch."""
 
     status: PromptSubmitStatus | None = None
+    already_received: bool | None = None
     voice_stopped: bool | None = None
     survivor_user_row_ids: list[int | None] | None = None
     survivor_row_id_map: dict[str, int | None] | None = None
