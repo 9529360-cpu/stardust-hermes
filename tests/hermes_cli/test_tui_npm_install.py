@@ -6,6 +6,12 @@ import types
 from pathlib import Path
 
 import pytest
+
+@pytest.fixture(autouse=True)
+def _isolate_node_resolution(monkeypatch):
+    """Keep managed host Node installs out of tests that stub PATH lookup."""
+    import shutil
+    monkeypatch.setattr("hermes_constants.find_node_executable", lambda name: shutil.which(name))
 from hermes_cli import main_tui_launch
 
 

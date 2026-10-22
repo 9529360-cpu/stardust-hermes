@@ -64,6 +64,7 @@ def test_foreign_owned_dist_info_child_detected(tmp_path, monkeypatch):
     assert foreign == [(installer, 0)]
 
 
+@pytest.mark.skipif(__import__("os").name == "nt", reason="POSIX-only interface")
 def test_foreign_owned_refuses_with_chown_hint(tmp_path, monkeypatch, capsys):
     venv = _make_fake_venv(tmp_path)
     python = str(venv / "bin" / "python")

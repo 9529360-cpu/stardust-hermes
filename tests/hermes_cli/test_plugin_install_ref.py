@@ -358,7 +358,8 @@ def test_reinstall_after_manual_directory_removal_retains_pin(monkeypatch, tmp_p
     target, _manifest, _name = _install_plugin_core(
         repo.as_uri(), force=False, ref=old_sha
     )
-    shutil.rmtree(target)
+    from hermes_cli.plugins_cmd import _remove_plugin_tree
+    _remove_plugin_tree(target)
 
     target, _manifest, _name = _install_plugin_core(repo.as_uri(), force=False)
 

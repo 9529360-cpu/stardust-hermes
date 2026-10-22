@@ -125,6 +125,7 @@ def test_strip_env_file_keeps_comments_and_unknown_keys_verbatim(tmp_path):
 # --- post-merge review of #109502 (gaoanze888): clone safety + ownership-based inventory ---------
 
 
+@pytest.mark.require_symlinks
 def test_clone_all_never_writes_through_a_symlinked_source_env(home, tmp_path):
     """A source whose ``.env`` is a symlink (shared secrets file) must keep its bot token: the clone
     materializes the link before stripping instead of editing the target through it."""

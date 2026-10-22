@@ -91,7 +91,7 @@ class TestGenerateBash:
             f.write(out)
             path = f.name
         try:
-            result = subprocess.run(["bash", "-n", path], capture_output=True)
+            result = subprocess.run(["bash", "-n"], input=out.encode("utf-8"), capture_output=True)
             assert result.returncode == 0, result.stderr.decode()
         finally:
             os.unlink(path)

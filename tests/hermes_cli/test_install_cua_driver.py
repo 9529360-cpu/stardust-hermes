@@ -149,7 +149,7 @@ class TestInstallCuaDriverUpgrade:
 
         with patch.object(tools_config.shutil, "which",
                           side_effect=lambda n: "/usr/local/bin/" + n
-                                                 if n in {"cua-driver", "curl"} else None), \
+                                                 if n in {"cua-driver", "curl", "powershell"} else None), \
              patch.object(
                  tools_config,
                  "_cua_driver_contract_status",
@@ -167,7 +167,7 @@ class TestInstallCuaDriverUpgrade:
         from hermes_cli import tools_config_cua as tools_config
 
         with patch.object(tools_config.shutil, "which",
-                          side_effect=lambda n: "/usr/bin/curl" if n == "curl" else None), \
+                          side_effect=lambda n: "/usr/bin/" + n if n in {"curl", "powershell"} else None), \
              patch.object(tools_config, "_run_cua_driver_installer",
                           return_value=True) as runner:
             assert tools_config.install_cua_driver(upgrade=True) is True
@@ -291,7 +291,7 @@ class TestInstallCuaDriverUpgrade:
                  "which",
                  side_effect=lambda name: (
                      f"/usr/local/bin/{name}"
-                     if name in {"cua-driver", "curl"}
+                     if name in {"cua-driver", "curl", "powershell"}
                      else None
                  ),
              ), \
@@ -318,7 +318,7 @@ class TestInstallCuaDriverUpgrade:
 
         with patch.object(tools_config.shutil, "which",
                           side_effect=lambda n: "/usr/local/bin/" + n
-                                                 if n in {"cua-driver", "curl"} else None), \
+                                                 if n in {"cua-driver", "curl", "powershell"} else None), \
              patch.object(tools_config, "_cua_install_target_writable",
                           return_value=False), \
              patch.object(tools_config, "_run_cua_driver_installer") as runner, \
@@ -334,7 +334,7 @@ class TestInstallCuaDriverUpgrade:
         from hermes_cli import tools_config_cua as tools_config
 
         with patch.object(tools_config.shutil, "which",
-                          side_effect=lambda n: "/usr/bin/curl" if n == "curl" else None), \
+                          side_effect=lambda n: "/usr/bin/" + n if n in {"curl", "powershell"} else None), \
              patch.object(tools_config, "_cua_install_target_writable",
                           return_value=False), \
              patch.object(tools_config, "_run_cua_driver_installer") as runner, \
@@ -370,7 +370,7 @@ class TestInstallCuaDriverUpgrade:
 
         with patch.object(tools_config.shutil, "which",
                           side_effect=lambda n: "/usr/local/bin/" + n
-                                                 if n in {"cua-driver", "curl"} else None), \
+                                                 if n in {"cua-driver", "curl", "powershell"} else None), \
              patch.object(tools_config, "_run_cua_driver_installer") as runner, \
              patch.object(
                  tools_config,
@@ -464,7 +464,7 @@ class TestInstallCuaDriverUpgrade:
         from hermes_cli import tools_config_cua as tools_config
 
         with patch.object(tools_config.shutil, "which",
-                          side_effect=lambda n: "/usr/bin/curl" if n == "curl" else None), \
+                          side_effect=lambda n: "/usr/bin/" + n if n in {"curl", "powershell"} else None), \
              patch.object(tools_config, "_run_cua_driver_installer",
                           return_value=True) as runner:
             assert tools_config.install_cua_driver(upgrade=False) is True
@@ -718,6 +718,7 @@ class TestUpdateCheckTimeoutDefaults:
         """
         assert self._captured_timeout() == 25.0
 
+    @pytest.mark.skipif(__import__("os").name == "nt", reason="POSIX-only interface")
     def test_posix_default_unchanged(self):
         # Unmarked: the POSIX default is what this (Linux) host already picks,
         # so no platform faking is involved.

@@ -86,6 +86,7 @@ def test_live_supervised_serve_suppresses_cold_start(sleeper, monkeypatch, tmp_p
     monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
     (tmp_path / ".stardust").mkdir()
 
+    monkeypatch.setattr("hermes_cli.main._detect_venv_python_processes", lambda: [])
     serve = sleeper()
     _write_ledger([_entry(serve)])
 

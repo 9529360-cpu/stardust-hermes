@@ -80,14 +80,14 @@ class TestWrapCommandAdvertisesHarness:
         clean_env = {k: v for k, v in os.environ.items()
                      if k not in ("AI_AGENT", "STARDUST_AGENT")}
         out = subprocess.run(
-            ["bash", "-c", wrapped], capture_output=True, text=True,
-            env=clean_env, timeout=30,
+            [__import__("tools.environments.local", fromlist=["_find_bash"])._find_bash(), "-s"], capture_output=True, text=True,
+            env=clean_env, timeout=30, input=wrapped,
         )
         assert f"AI={HARNESS_ID} HERMES=true" in out.stdout
 
         outer_env = dict(clean_env, AI_AGENT="pi", STARDUST_AGENT="false")
         out = subprocess.run(
-            ["bash", "-c", wrapped], capture_output=True, text=True,
-            env=outer_env, timeout=30,
+            [__import__("tools.environments.local", fromlist=["_find_bash"])._find_bash(), "-s"], capture_output=True, text=True,
+            env=outer_env, timeout=30, input=wrapped,
         )
         assert "AI=pi HERMES=false" in out.stdout

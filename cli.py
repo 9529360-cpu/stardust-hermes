@@ -1035,9 +1035,10 @@ def _reset_terminal_input_modes_on_exit() -> None:
             return
     except Exception:
         pass
-    with suppress(Exception), open("/dev/tty", "w", encoding="ascii") as tty:
-        tty.write(_TERMINAL_INPUT_MODE_RESET_SEQ)
-        tty.flush()
+    if os.name != "nt":
+        with suppress(Exception), open("/dev/tty", "w", encoding="ascii") as tty:
+            tty.write(_TERMINAL_INPUT_MODE_RESET_SEQ)
+            tty.flush()
 
 
 from hermes_cli.worktree_ops import (

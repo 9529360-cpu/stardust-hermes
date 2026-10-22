@@ -27,12 +27,13 @@ _WARP_LAST_BROKEN = {"stable": "v0.2026.03.25.08.24.stable_05", "preview": "v0.2
 
 def write_tty(seq: str) -> None:
     """Write raw escapes to /dev/tty, falling back to sys.stdout. Never raises."""
-    try:
-        with open("/dev/tty", "w", encoding="utf-8") as tty:
-            tty.write(seq)
-        return
-    except OSError:
-        pass
+    if os.name != "nt":
+        try:
+            with open("/dev/tty", "w", encoding="utf-8") as tty:
+                tty.write(seq)
+            return
+        except OSError:
+            pass
     try:
         sys.stdout.write(seq)
         sys.stdout.flush()

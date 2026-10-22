@@ -611,6 +611,22 @@ def _read_manifest_for_install(plugin_dir: Path) -> dict:
     return manifest
 
 
+def _remove_plugin_tree(target: Path) -> None:
+    """Remove a cloned tree, including read-only Git objects on Windows."""
+    def retry_readonly(function, path, exc_info):
+        error = exc_info[1]
+        if os.name != "nt" or not isinstance(error, PermissionError):
+            raise error
+        import stat
+        os.chmod(path, os.stat(path).st_mode | stat.S_IWRITE)
+        function(path)
+
+    if os.name == "nt":
+        shutil.rmtree(target, onerror=retry_readonly)
+    else:
+        shutil.rmtree(target)
+
+
 def _swap_in_plugin(tmp_target: Path, target: Path, backup: Path, old_metadata: dict, new_metadata: dict) -> None:
     """Move the validated clone into place and persist metadata; on any failure restore the
     previous tree (if one was replaced) and the previous metadata sidecar, then re-raise."""
@@ -622,7 +638,7 @@ def _swap_in_plugin(tmp_target: Path, target: Path, backup: Path, old_metadata: 
         _write_install_metadata(new_metadata)
     except Exception:
         if target.exists():
-            shutil.rmtree(target)
+            _remove_plugin_tree(target)
         if replaced_existing and backup.exists():
             os.replace(backup, target)
         if old_metadata:
@@ -882,7 +898,7 @@ def _remove_plugin_core(target: Path) -> None:
     """Remove one plugin and its metadata without splitting their state."""
     metadata = _read_install_metadata()
     if target.name not in metadata:
-        shutil.rmtree(target)
+        _remove_plugin_tree(target)
         return
     updated = {k: v for k, v in metadata.items() if k != target.name}
     staging = Path(tempfile.mkdtemp(prefix=f".{target.name}.remove-", dir=target.parent))
@@ -900,7 +916,7 @@ def _remove_plugin_core(target: Path) -> None:
             ) from restore_exc
         shutil.rmtree(staging, ignore_errors=True)
         raise
-    shutil.rmtree(staging)
+    _remove_plugin_tree(staging)
 
 
 def cmd_remove(name: str) -> None:

@@ -459,23 +459,24 @@ def test_the_scope_is_entered_for_the_preconditions_and_the_persist_but_never_ar
 
     @contextlib.contextmanager
     def _scope():
-        events.append(("enter", time.monotonic(), threading.get_ident()))
+        events.append(("enter", len(events), threading.get_ident()))
         try:
             yield None
         finally:
-            events.append(("exit", time.monotonic(), threading.get_ident()))
+            events.append(("exit", len(events), threading.get_ident()))
 
     def _wait(client, portal_base_url, claim_code, *, expires_in, interval, cancelled=None):
-        events.append(("wait-start", time.monotonic(), threading.get_ident()))
+        events.append(("wait-start", len(events), threading.get_ident()))
         time.sleep(0.2)
-        events.append(("wait-end", time.monotonic(), threading.get_ident()))
+        events.append(("wait-end", len(events), threading.get_ident()))
         return {"status": "completed", "account_email": EMAIL}
     monkeypatch.setattr(anon_auth, "wait_for_promotion", _wait)
 
     states = []
     yields = []
     for state in anon_auth.run_sign_in(scope=_scope):
-        yields.append(time.monotonic())
+        yields.append(len(events))
+        events.append(("yield", len(events), threading.get_ident()))
         states.append(state)
 
     assert states[-1].kind == "completed"
@@ -488,7 +489,7 @@ def test_the_scope_is_entered_for_the_preconditions_and_the_persist_but_never_ar
     for first, second in (pairs[0:2], pairs[2:4]):
         assert not (first[1] <= wait_start and wait_end <= second[1])
         # and never held across a yield, which would hand the scope to the consumer's thread
-        assert not any(first[1] <= at <= second[1] for at in yields)
+        assert not any(first[1] < at < second[1] for at in yields)
 
 
 def test_wait_for_promotion_without_a_cancel_hook_is_unchanged(portal):

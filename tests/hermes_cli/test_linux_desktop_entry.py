@@ -13,6 +13,8 @@ import pytest
 
 from hermes_cli import linux_desktop_entry as lde
 
+pytestmark = pytest.mark.skipif(sys.platform != "linux", reason="Linux XDG desktop integration")
+
 
 @pytest.fixture
 def xdg_home(tmp_path, monkeypatch) -> Path:

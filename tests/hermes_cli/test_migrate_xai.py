@@ -195,6 +195,9 @@ class TestUnreadableExistingConfig:
         the original bytes must survive."""
         import os
 
+        if os.name == "nt" or (hasattr(os, "geteuid") and os.geteuid() == 0):
+            pytest.skip("chmod cannot make this file unreadable on Windows or as root")
+
         issues = find_retired_xai_refs(_parse(trap_config))
         assert issues  # sanity: trap_config has retired refs
         original = trap_config.read_bytes()
@@ -248,6 +251,7 @@ class TestCrashDurability:
         # ...and the aborted write must not leave a temp file behind.
         assert list(trap_config.parent.glob("*.tmp")) == []
 
+    @pytest.mark.require_symlinks
     def test_symlinked_config_is_replaced_in_place(self, tmp_path: Path):
         """A config.yaml symlinked into a dotfiles repo must stay a symlink."""
         real_dir = tmp_path / "dotfiles"

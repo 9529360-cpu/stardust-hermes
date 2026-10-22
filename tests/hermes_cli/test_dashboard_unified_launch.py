@@ -43,6 +43,9 @@ class TestUnifiedDashboardRouting:
             raise SystemExit(0)  # execvpe never returns
 
         monkeypatch.setattr(main_mod.os, "execvpe", fake_exec)
+        def fake_popen(argv, **kwargs):
+            fake_exec(argv[0], argv, kwargs["env"])
+        monkeypatch.setattr(main_dashboard.subprocess, "Popen", fake_popen)
 
         with pytest.raises(SystemExit):
             main_mod.cmd_dashboard(_args())

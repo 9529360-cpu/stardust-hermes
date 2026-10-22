@@ -42,11 +42,11 @@ def no_terminal_env(monkeypatch):
 
 
 def _fake_no_tty(monkeypatch):
-    monkeypatch.setattr(tb.os, "ttyname", lambda fd: (_ for _ in ()).throw(OSError()))
+    monkeypatch.setattr(tb.os, "ttyname", lambda fd: (_ for _ in ()).throw(OSError()), raising=False)
 
 
 def _fake_tty(monkeypatch, name="/dev/pts/7"):
-    monkeypatch.setattr(tb.os, "ttyname", lambda fd: name)
+    monkeypatch.setattr(tb.os, "ttyname", lambda fd: name, raising=False)
 
 
 # ---------------------------------------------------------------- identity

@@ -180,6 +180,7 @@ class TestPsFallbackBsdCompat:
 class TestGetServicePidsAllProfiles:
     """_get_service_pids(all_profiles=...) discovery across profiles."""
 
+    @pytest.mark.macos_only
     def test_default_scope_uses_current_profile_label(self):
         """Without all_profiles, only the current profile's launchd agent is
         located (per-label domain-explicit probe, #73627)."""
@@ -215,6 +216,7 @@ class TestGetServicePidsAllProfiles:
         ]
         assert launchctl_calls == []
 
+    @pytest.mark.macos_only
     def test_all_profiles_enumerates_all_gateway_labels(self):
         """With all_profiles=True, every install-derived gateway label is
         located (#73627), and the bare ``launchctl list`` prefix scan still
@@ -272,6 +274,7 @@ class TestGetServicePidsAllProfiles:
         ]
         assert launchctl_calls == [["launchctl", "list"]]
 
+    @pytest.mark.macos_only
     def test_all_profiles_empty_when_no_gateway_labels(self):
         """When no ai.hermes.gateway* labels exist, all_profiles returns empty."""
         with (
@@ -288,6 +291,7 @@ class TestGetServicePidsAllProfiles:
 
         assert pids == set()
 
+    @pytest.mark.macos_only
     def test_all_profiles_handles_broken_pid_column(self):
         """Non-integer PID entries are silently skipped."""
         with (

@@ -27,6 +27,7 @@ import pytest
 
 
 class TestResolveHermesUidGid:
+    @pytest.mark.skipif(__import__("os").name == "nt", reason="POSIX-only interface")
     def test_returns_parsed_values_when_both_set(self, monkeypatch):
         monkeypatch.setenv("STARDUST_UID", "1000")
         monkeypatch.setenv("STARDUST_GID", "911")
@@ -56,6 +57,7 @@ class TestResolveHermesUidGid:
 
 
 class TestChownToHermesUid:
+    @pytest.mark.skipif(__import__("os").name == "nt", reason="POSIX-only interface")
     def test_calls_os_chown_when_both_set(self, tmp_path, monkeypatch):
         monkeypatch.setenv("STARDUST_UID", "1000")
         monkeypatch.setenv("STARDUST_GID", "911")
@@ -69,6 +71,7 @@ class TestChownToHermesUid:
         mock_chown.assert_called_once_with(d, 1000, 911)
 
 
+    @pytest.mark.skipif(__import__("os").name == "nt", reason="POSIX-only interface")
     def test_eperm_is_silently_swallowed(self, tmp_path, monkeypatch):
         """When running as non-root, os.chown raises EPERM. That's fine —
         the entrypoint's startup chown -R will pick it up on restart, and
@@ -98,7 +101,7 @@ class TestChownToHermesUid:
         d = tmp_path / "subdir"
         d.mkdir()
 
-        with patch.object(cfg.os, "chown", side_effect=AttributeError("no chown on this platform")):
+        with patch.object(cfg.os, "chown", side_effect=AttributeError("no chown on this platform"), create=True):
             cfg._chown_to_hermes_uid(d)  # must not raise
 
 

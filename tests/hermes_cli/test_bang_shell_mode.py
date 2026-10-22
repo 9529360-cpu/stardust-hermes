@@ -8,6 +8,7 @@ byte-identical because it never becomes a turn.
 import copy
 import json
 import os
+import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -89,16 +90,20 @@ class TestBangContextGating:
 # ── execution ──────────────────────────────────────────────────────────────
 
 class TestBangExecution:
-    def test_output_is_streamed_to_writer(self):
+    def test_output_is_streamed_to_writer(self, tmp_path):
+        script = tmp_path / "output.py"
+        script.write_text("print('bang-one')\nprint('bang-two')\n", encoding="utf-8")
         lines = []
-        code = run_bang_command("echo bang-one; echo bang-two", writer=lines.append)
+        code = run_bang_command(f'"{sys.executable}" "{script}"', writer=lines.append)
         assert code == 0
         assert "bang-one" in lines
         assert "bang-two" in lines
 
-    def test_stderr_is_merged_into_output(self):
+    def test_stderr_is_merged_into_output(self, tmp_path):
+        script = tmp_path / "stderr.py"
+        script.write_text("import sys\nprint('to-stderr', file=sys.stderr)\n", encoding="utf-8")
         lines = []
-        run_bang_command("echo to-stderr >&2", writer=lines.append)
+        run_bang_command(f'"{sys.executable}" "{script}"', writer=lines.append)
         assert "to-stderr" in lines
 
     def test_nonzero_exit_code_is_returned(self):
@@ -108,7 +113,7 @@ class TestBangExecution:
 
     def test_runs_in_requested_cwd(self, tmp_path):
         lines = []
-        code = run_bang_command("pwd", cwd=str(tmp_path), writer=lines.append)
+        code = run_bang_command(f'"{sys.executable}" -c "import os; print(os.getcwd())"', cwd=str(tmp_path), writer=lines.append)
         assert code == 0
         # macOS resolves /tmp through /private, so compare realpaths.
         assert os.path.realpath(lines[-1].strip()) == os.path.realpath(str(tmp_path))
