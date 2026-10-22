@@ -2190,7 +2190,7 @@ def handle_max_iterations(agent, messages: list, api_call_count: int) -> str:
     return final_response
 
 
-def cleanup_task_resources(agent, task_id: str) -> None:
+def cleanup_task_resources(agent, task_id: str) -> dict:
     """Per-turn VM + browser cleanup for a task. Skips ``cleanup_vm`` for persistent
     terminal envs (``_cleanup_inactive_envs`` reaps them after ``terminal.lifetime_seconds``)
     and ``cleanup_browser`` in headed mode (the inactivity reaper handles idle sessions)."""
@@ -2201,6 +2201,11 @@ def cleanup_task_resources(agent, task_id: str) -> None:
         except Exception:
             return bool(os.environ.get("AGENT_BROWSER_HEADED"))
 
+    from tools.task_resources import cleanup_task, register_browser, record_cleanup_outcome
+    from tools.browser_tool import _active_sessions, _registry_session_key
+    if not _headed() and _registry_session_key(task_id) in _active_sessions:
+        register_browser(task_id, lambda: _ra().cleanup_browser(task_id))
+    receipt = cleanup_task(task_id)
     for label, skip, skip_what, cleanup in (
         ("VM", is_persistent_env, "cleanup_vm for persistent env", lambda: _ra().cleanup_vm(task_id)),
         ("browser", lambda _tid: _headed(), "cleanup_browser for headed session", lambda: _ra().cleanup_browser(task_id)),
@@ -2212,8 +2217,12 @@ def cleanup_task_resources(agent, task_id: str) -> None:
             else:
                 cleanup()
         except Exception as e:
-            if agent.verbose_logging:
-                logger.warning("Failed to cleanup %s for task %s: %s", label, task_id, e)
+            from agent.redact import redact_sensitive_text
+            record_cleanup_outcome(task_id, receipt, 'failed',
+                                   dict(kind=label, id=label, reason=redact_sensitive_text(str(e))))
+            logger.warning("Failed to cleanup %s for task %s: %s", label, task_id, e)
+    agent._task_cleanup_receipt = receipt
+    return receipt
 
 
 def _build_partial_stream_stub(role, full_content, full_reasoning, model_name, usage_obj, *,

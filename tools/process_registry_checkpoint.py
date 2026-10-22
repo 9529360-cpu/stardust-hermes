@@ -134,6 +134,8 @@ class ProcessCheckpointMixin:
             session = ProcessSession(id=entry["session_id"], detached=True, **fields)
             with self._lock:
                 self._running[session.id] = session
+            from tools.task_resources import register_process
+            register_process(session, lifetime=session.resource_lifetime, registry=self)
             recovered += 1
             logger.info("Recovered detached process: %s (pid=%d)", session.command[:60], pid)
             # Re-enqueue watcher so gateway can resume notifications

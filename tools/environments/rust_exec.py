@@ -98,7 +98,14 @@ class RustProcess:
     def kill(self):
         if os.name == 'nt':
             import psutil
-            descendants = psutil.Process(self.pid).children(recursive=True)
+            try:
+                descendants = psutil.Process(self.pid).children(recursive=True)
+            except psutil.NoSuchProcess:
+                # The helper can exit between timeout and finalization. Its job
+                # still owns any surviving descendants, so terminate it below.
+                if self._proc.poll() is None:
+                    raise
+                descendants = []
             if not terminate_contained(self._proc):
                 self._proc.kill()
             _, alive = psutil.wait_procs(descendants, timeout=2)

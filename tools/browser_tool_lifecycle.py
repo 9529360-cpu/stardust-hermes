@@ -653,6 +653,13 @@ def cleanup_browser(task_id: Optional[str] = None) -> None:
         task_id = "default"
 
     registry_key = _bt._registry_session_key(task_id)
+    # Serialize explicit close against janitor/timeout/finalizer on this task.
+    from tools.task_resources import _owner
+    with _owner(str(task_id)).lock:
+        _cleanup_browser_locked(task_id, registry_key)
+
+
+def _cleanup_browser_locked(task_id, registry_key):
     session_keys = [registry_key]
     sidecar_key = _bt._sidecar_registry_key(registry_key)
     with _bt._cleanup_lock:
@@ -727,6 +734,12 @@ def _force_reap_browser_session(task_id: str) -> None:
 
 def _cleanup_single_browser_session(task_id: str) -> None:
     """Reap a single browser session by its exact session key."""
+    from tools.task_resources import _owner
+    with _owner(str(task_id)).lock:
+        _cleanup_single_browser_session_locked(task_id)
+
+
+def _cleanup_single_browser_session_locked(task_id: str) -> None:
     raw_task_id = _bt._raw_session_key(task_id)
     _cdp._stop_cdp_supervisor(raw_task_id)  # close our WebSocket BEFORE the backend tears down the endpoint
 
