@@ -424,6 +424,9 @@ def finalize_turn(
         "cleanup_task_resources", lambda: agent._cleanup_task_resources(effective_task_id),
         _cleanup_errors, logger,
     )
+    from tools.task_resources import receipt_text
+    cleanup_receipt = getattr(agent, '_task_cleanup_receipt', None)
+    footer = receipt_text(cleanup_receipt) if isinstance(cleanup_receipt, dict) else ''
     # Persist only after the transcript tail is shaped and scaffolding removed. Each
     # sub-step runs in the same order as the original inline block, and the
     # stream-recovered ``final_response`` is rebound the moment it is computed — BEFORE
@@ -504,12 +507,12 @@ def finalize_turn(
     if isinstance(final_response, str):
         final_response = _sanitize_surrogates(final_response)
 
-    from tools.task_resources import receipt_text
-    cleanup_receipt = getattr(agent, '_task_cleanup_receipt', None)
-    footer = receipt_text(cleanup_receipt) if isinstance(cleanup_receipt, dict) else ''
     if footer:
-        final_response = (final_response or '') + '\n\n' + footer
-        agent._response_was_previewed = False
+        if callable(getattr(agent, 'stream_delta_callback', None)):
+            agent._emit_status(footer)
+        else:
+            final_response = (final_response or '') + '\n\n' + footer
+            agent._response_was_previewed = False
         append_message(messages, {"role": "assistant", "content": footer})
         _guarded_cleanup("persist_cleanup_receipt",
                          lambda: agent._persist_session(messages, conversation_history),
