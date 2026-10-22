@@ -1087,6 +1087,8 @@ def _run_foreground(
         from tools.interrupt import clear_current_thread_interrupt
         clear_current_thread_interrupt()
 
+    from tools import terminal_env_recall
+    recall_observation = terminal_env_recall.Observation()
     for retry_count in range(max_retries + 1):
         try:
             command_cwd = _resolve_command_cwd(
@@ -1095,6 +1097,10 @@ def _run_foreground(
             # bounded_capture: model-facing output keeps a head/tail window
             # while streaming so a verbose command can't OOM the gateway;
             # internal env.execute() consumers stay unbounded.
+            if retry_count == 0:
+                recall_observation = terminal_env_recall.before(
+                    command, env, env_type, session_id or session_key or task_id or "", command_cwd,
+                )
             result = env.execute(
                 command, timeout=effective_timeout, cwd=command_cwd, bounded_capture=True,
                 **_yield_kwargs(command, env_type=env_type, cwd=command_cwd, effective_task_id=eff,
@@ -1121,11 +1127,17 @@ def _run_foreground(
             "status": "yielded_to_background", "session_id": result["yielded_session_id"],
             "pid": result.get("pid"), "notify_on_complete": True, "note": _YIELDED_NOTE,
         }, ensure_ascii=False)
-    return finalize_foreground_result(
+    terminal_env_recall.after(recall_observation, result)
+    finalized = finalize_foreground_result(
         command=command, result=result, env=env, env_type=env_type, effective_task_id=eff,
         task_id=task_id, session_id=session_id, session_key=session_key, workdir=workdir,
         command_cwd=command_cwd, approval_note=approval_note,
     )
+    if recall_observation.hint:
+        payload = json.loads(finalized)
+        payload["environment_hint"] = recall_observation.hint
+        return json.dumps(payload, ensure_ascii=False)
+    return finalized
 
 
 def _pre_exec_block(
