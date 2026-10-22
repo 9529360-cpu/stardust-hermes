@@ -20,9 +20,14 @@ struct Request {
     timeout_ms: u64,
 }
 fn emit(value: Value) -> io::Result<()> {
-    let mut out = io::stdout().lock();
-    serde_json::to_writer(&mut out, &value)?;
-    writeln!(out)?;
+    emit_to(&mut io::stdout().lock(), &value)
+}
+fn emit_to(out: &mut impl Write, value: &Value) -> io::Result<()> {
+    // Serialize before touching stdout: JSON escaping otherwise issues many tiny
+    // writes to the protocol pipe (including for the initial started event).
+    let mut line = serde_json::to_vec(value)?;
+    line.push(b'\n');
+    out.write_all(&line)?;
     out.flush()
 }
 fn run(r: Request) -> io::Result<()> {
@@ -149,4 +154,40 @@ fn main() -> io::Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn protocol_event_uses_one_write_and_flush() {
+        #[derive(Default)]
+        struct Sink {
+            bytes: Vec<u8>,
+            writes: usize,
+            flushes: usize,
+        }
+        impl Write for Sink {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                self.writes += 1;
+                self.bytes.extend_from_slice(bytes);
+                Ok(bytes.len())
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                self.flushes += 1;
+                Ok(())
+            }
+        }
+        let value = json!({"output": "中文\n\"quoted\"".repeat(1000)});
+        let mut sink = Sink::default();
+        emit_to(&mut sink, &value).unwrap();
+        assert_eq!(serde_json::from_slice::<Value>(&sink.bytes).unwrap(), value);
+        assert_eq!(sink.bytes.last(), Some(&b'\n'));
+        assert_eq!(sink.flushes, 1);
+        assert_eq!(
+            sink.writes, 1,
+            "serialize in memory before writing the protocol event"
+        );
+    }
 }
