@@ -211,7 +211,8 @@ def test_same_tool_failure_warning_tells_model_to_recover_with_tools():
     assert "same_tool_failure_warning" in content
     assert "Do not switch to text-only replies" in content
     assert "keep using tools" in content
-    assert "pwd && ls -la" in content
+    assert "PowerShell: Get-Location/Get-Command" in content
+    assert "Bash: pwd/command -v" in content
     assert "absolute path" in content
     assert "different tool" in content
 
