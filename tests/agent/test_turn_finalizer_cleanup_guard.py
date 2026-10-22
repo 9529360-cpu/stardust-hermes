@@ -170,6 +170,18 @@ def test_cleanup_receipt_does_not_repeat_final_body_in_transcript():
     assert result['final_response'].count('TASK_HISTORY_STARTED') == 1
 
 
+def test_streaming_cleanup_receipt_preserves_final_body_and_emits_status():
+    agent = _StubAgent(raise_in=())
+    agent._task_cleanup_receipt = dict(cleared=[dict(id='proc-owned', result='killed')], retained=[], failed=[])
+    agent.stream_delta_callback = lambda text: None
+    statuses = []
+    agent._emit_status = statuses.append
+    result = _run(agent, final_response='TASK_HISTORY_STARTED', api_call_count=1, turn_exit_reason='text_response')
+    assert result['final_response'] == 'TASK_HISTORY_STARTED'
+    assert len(statuses) == 1 and '资源收尾' in statuses[0]
+    assert sum(str(m.get('content', '')).count('TASK_HISTORY_STARTED') for m in result['messages']) == 1
+
+
 def test_clean_turn_has_no_cleanup_errors_key():
     agent = _StubAgent(raise_in=())
     result = _run(agent)
