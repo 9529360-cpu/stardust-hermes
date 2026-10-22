@@ -466,6 +466,20 @@ def finalize_turn(
             turn_id=turn_id, original_user_message=original_user_message, messages=messages,
         )
 
+    from agent.task_acceptance import finalize as finalize_acceptance, refresh_current_goal
+    if not interrupted:
+        refresh_current_goal(agent, messages)
+        checked_response = finalize_acceptance(agent, final_response)
+        if checked_response != final_response:
+            final_response = checked_response
+            completed = False
+            agent._response_was_previewed = False
+            # Persist the authoritative receipt after transforms, not just the candidate.
+            append_message(messages, {"role": "assistant", "content": final_response})
+            _guarded_cleanup("persist_acceptance_receipt",
+                             lambda: agent._persist_session(messages, conversation_history),
+                             _cleanup_errors, logger)
+
     # Context engine observation hook: the turn finished with the finalized transcript.
     # Fail-open. ``_last_turn_usage`` is the last response's canonical usage dict, or
     # ``None`` on turns that never reached a provider response — by contract.

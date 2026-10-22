@@ -87,6 +87,25 @@ class _LimitAgent:
         pass
 
 
+def test_acceptance_budget_fallback_is_authoritative_and_persisted(tmp_path, monkeypatch):
+    from agent import task_acceptance as acceptance
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "home"))
+    monkeypatch.setattr("hermes_cli.plugins.invoke_hook", lambda *_a, **_kw: [])
+    root = tmp_path / "app"
+    root.mkdir()
+    (root / "app.js").write_text("broken", encoding="utf-8")
+    acceptance.begin("sess-test", "Acceptance criteria:\n- Click button shows result", root)
+    agent = _LimitAgent()
+    agent._task_acceptance_active = True
+    result = _finalize(agent, final_response=None, exit_reason="unknown",
+                       pending_verification_response="Done, all tests green.")
+    assert "NOT COMPLETE" in result["final_response"]
+    assert "C1: Click button shows result" in result["final_response"]
+    assert result["completed"] is False
+    assert agent.persisted_messages[-1]["content"] == result["final_response"]
+
+
 def _finalize(
     agent,
     *,

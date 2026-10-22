@@ -137,6 +137,17 @@ def apply_stop_gates(
             ),
         )
 
+    from agent.task_acceptance import nudge as acceptance_nudge, refresh_current_goal
+    refresh_current_goal(agent, messages)
+    _acceptance_nudge = acceptance_nudge(agent)
+    if _acceptance_nudge:
+        final_msg["finish_reason"] = "acceptance_required"
+        if not persist_interim_answer(
+            agent, final_msg, messages, conversation_history, "acceptance interim flush failed"
+        ):
+            return StopGateVerdict(False, "", None, False, persistence_failed=True)
+        return _continue(_acceptance_nudge, "_verification_stop_synthetic")
+
     _verify_nudge = _verify_on_stop_nudge(agent)
     if _verify_nudge:
         final_msg["finish_reason"] = "verification_required"

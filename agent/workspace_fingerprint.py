@@ -34,6 +34,9 @@ def workspace_content_fingerprint(root: str | Path | None) -> Optional[str]:
     if not root:
         return None
     path = Path(root)
+    top = _git(path, "rev-parse", "--show-toplevel")
+    if top is None or Path(top.decode("utf-8").strip()).resolve() != path.resolve():
+        return None
     head = _git(path, "rev-parse", "--verify", "-q", "HEAD")
     diff = _git(path, "diff", "HEAD", "--binary", "--no-ext-diff", "--no-color")
     untracked = _git(path, "ls-files", "--others", "--exclude-standard", "-z")

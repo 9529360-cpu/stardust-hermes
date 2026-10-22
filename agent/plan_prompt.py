@@ -38,6 +38,10 @@ Structure (include the sections that are relevant):
   names exact file paths (`src/models/user.py`, not "the model file"),
   includes complete copy-pasteable code where code is needed, and exact
   commands with expected output for verification.
+- Acceptance contract — list the user-required done criteria and the applicable
+  evidence tier for each: test, build, runtime launch, user-flow, or document review.
+  Keep blockers, todos and cleanup explicit. A passing test cannot satisfy a UI
+  criterion; verify the real interaction. Current user goals supersede old plans.
 - Tests / validation — for code tasks, follow the TDD cycle per task: write
   the failing test, run it to verify failure, implement minimally, run to
   verify pass, commit.

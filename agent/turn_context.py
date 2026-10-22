@@ -1056,6 +1056,11 @@ def build_turn_context(
         original_user_message=original_user_message, messages=messages,
         conversation_history=conversation_history,
     )
+    from agent.task_acceptance import prepare as prepare_task_acceptance
+    acceptance_context = prepare_task_acceptance(agent, original_user_message)
+    if acceptance_context:
+        plugin_user_context = (plugin_user_context or "") + acceptance_context
+    agent._task_acceptance_nudges = 0
     plugin_user_context = _merge_gateway_notes(
         agent, messages, current_turn_user_idx, plugin_user_context
     )
