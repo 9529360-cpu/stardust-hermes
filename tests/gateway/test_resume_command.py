@@ -342,6 +342,9 @@ class TestHandleResumeCommand:
             user_id="12345", chat_id="67890",
         )
         db.set_session_title("lane_newer", "Lane Newer")
+        db._execute_write(lambda conn: conn.execute(
+            "UPDATE sessions SET started_at = CASE id WHEN 'lane_older' THEN 1 ELSE 2 END "
+            "WHERE id IN ('lane_older', 'lane_newer')"))
         for i in range(12):
             sid = f"foreign_{i}"
             db.create_session(

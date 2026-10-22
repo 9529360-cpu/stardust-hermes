@@ -8,6 +8,8 @@ import json
 from pathlib import Path
 from unittest.mock import patch, MagicMock, AsyncMock
 
+import os
+
 import pytest
 
 from gateway.config import Platform
@@ -138,6 +140,7 @@ class TestHandleUpdateCommand:
 
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(os.name == "nt", reason="POSIX setsid fallback")
     async def test_fallback_when_no_setsid(self, tmp_path):
         """Falls back to start_new_session=True when setsid is not available."""
         runner = _make_runner()

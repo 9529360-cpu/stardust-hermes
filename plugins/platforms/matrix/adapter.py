@@ -1554,7 +1554,7 @@ class MatrixAdapter(BasePlatformAdapter):
         human_delay: float = 0.0) -> SendResult:
         if not images:
             return SendResult(success=False, error="no images to send")
-        from urllib.parse import unquote as _unquote
+        from urllib.request import url2pathname as _unquote
         total = len(images)
         delivered = False
         for idx, (image_url, alt_text) in enumerate(images, start=1):

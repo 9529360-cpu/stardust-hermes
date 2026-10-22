@@ -211,12 +211,12 @@ class TestSetupFeishuAdapterIntegration:
         )
         return env
 
-    @patch.dict(os.environ, {}, clear=True)
+    @patch.dict(os.environ, {}, clear=False)
     def test_qr_env_produces_valid_adapter_settings(self):
         """QR setup → adapter initializes with websocket mode."""
         env = self._make_env_from_setup()
 
-        with patch.dict(os.environ, env, clear=True):
+        with patch.dict(os.environ, env, clear=False):
             from gateway.config import PlatformConfig
             from plugins.platforms.feishu.adapter import FeishuAdapter
             adapter = FeishuAdapter(PlatformConfig())

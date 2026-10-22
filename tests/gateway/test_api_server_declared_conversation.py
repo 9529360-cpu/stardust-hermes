@@ -130,9 +130,11 @@ class TestConversationBoundariesRotate:
         db.end_session("sess-old", reason)
         assert a._declared_conversation_session(KEY) is None
 
-    def test_boundary_cannot_be_reached_behind(self, adapter):
+    def test_boundary_cannot_be_reached_behind(self, adapter, monkeypatch):
         """A later row wins, and the retired one never comes back (no ABA)."""
         a, db = adapter
+        # Native Windows can assign every operation the same wall-clock tick.
+        monkeypatch.setattr("hermes_state_sessions.time.time", lambda: 1700000000.0)
         _seed(db, "sess-gen1")
         db.end_session("sess-gen1", "session_reset")
         _seed(db, "sess-gen2")

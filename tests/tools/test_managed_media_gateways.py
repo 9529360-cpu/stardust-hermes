@@ -193,6 +193,7 @@ def test_managed_fal_submit_uses_gateway_origin_and_nous_token(monkeypatch):
         "tools.image_generation_tool",
         "image_generation_tool.py",
     )
+    monkeypatch.setattr(image_generation_tool, "fal_client", sys.modules["fal_client"])
     monkeypatch.setattr(image_generation_tool.uuid, "uuid4", lambda: "fal-submit-123")
     
     image_generation_tool._submit_fal_request(

@@ -54,6 +54,9 @@ if sys.platform == "win32":
         ]:
             del sys.modules[_name]
 
+if sys.platform == "win32":
+    pytest.importorskip("telegram", reason="live transport probe requires messaging extra")
+
 pytestmark = [
     pytest.mark.asyncio,
     pytest.mark.skipif(

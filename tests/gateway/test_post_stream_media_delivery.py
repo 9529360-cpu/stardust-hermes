@@ -15,6 +15,8 @@ there. This file pins the asymmetry.
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
+from urllib.request import url2pathname
+
 import pytest
 
 from gateway.config import Platform
@@ -109,6 +111,6 @@ async def test_explicit_media_tag_still_delivers_post_stream(tmp_path, monkeypat
     adapter.send_multiple_images.assert_awaited_once()
     images_kwargs = adapter.send_multiple_images.await_args.kwargs
     assert images_kwargs["chat_id"] == "C123CHAN"
-    assert str(media_file) in images_kwargs["images"][0][0]
+    assert str(media_file) == url2pathname(images_kwargs["images"][0][0][7:])
 
 

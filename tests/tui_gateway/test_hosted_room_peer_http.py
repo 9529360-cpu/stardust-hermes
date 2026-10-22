@@ -632,6 +632,16 @@ def test_transport_timeout_after_deadline_is_classified_as_time_budget(monkeypat
     assert caught.value.retryable is True
 
 
+def test_socket_timeout_before_clock_deadline_is_still_time_budget(monkeypatch):
+    def timed_out(*_args, **_kwargs):
+        raise urllib.error.URLError(TimeoutError("timed out"))
+
+    monkeypatch.setattr("hermes_cli.urllib_security.open_credentialed_url", timed_out)
+    client = PeerRunsHTTPClient(base_url="https://peer.example.test", api_key="", timeout_seconds=30)
+    with pytest.raises(PeerRunsHTTPError, match="time budget"):
+        client._request("/drip")
+
+
 def test_real_http_drip_cannot_extend_the_whole_response_deadline():
     class DripPeer(BaseHTTPRequestHandler):
         def do_GET(self):

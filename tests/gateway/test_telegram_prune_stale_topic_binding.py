@@ -254,7 +254,10 @@ class TestRecoveryAfterPrune:
     longer steer future inbound messages to it.
     """
 
-    def test_recovery_no_longer_returns_pruned_topic(self, tmp_path):
+    def test_recovery_no_longer_returns_pruned_topic(self, tmp_path, monkeypatch):
+        import itertools
+        ticks = itertools.count(1700000000)
+        monkeypatch.setattr("hermes_state_telegram.time.time", lambda: next(ticks))
         # Build the same fixture used elsewhere: two topic bindings
         # for the same user, then prune the most-recent one.
         # ``_recover_telegram_topic_thread_id`` walks bindings

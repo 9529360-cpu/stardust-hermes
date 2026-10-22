@@ -98,6 +98,7 @@ class TestMemoryBudgetResolution:
         assert resolve_memory_high_mb("auto") is None
 
 
+@pytest.mark.linux_only
 class TestPressureSignalScope:
     """The budget is the unit's cgroup limit, so the signal must be the unit's anon charge:
     an execute_code kernel in the same cgroup counts even while the gateway itself is small (#110549)."""
@@ -106,7 +107,6 @@ class TestPressureSignalScope:
         import gateway.agent_cache_pressure as acp
         import gateway.cgroup_cleanup as cleanup
 
-        monkeypatch.setattr(acp.sys, "platform", "linux")
         monkeypatch.setattr(cleanup, "_own_cgroup_path", lambda: "/hermes.service")
         real_read_text = acp.Path.read_text
 

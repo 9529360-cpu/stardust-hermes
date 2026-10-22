@@ -28,6 +28,8 @@ import time
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
+from urllib.request import url2pathname
+
 import pytest
 
 from gateway.config import Platform, PlatformConfig
@@ -496,7 +498,7 @@ async def test_streamed_explicit_media_resend_is_delivered(tmp_path, monkeypatch
 
     adapter.send_multiple_images.assert_awaited_once()
     sent_paths = [p for p, _cap in adapter.send_multiple_images.await_args.kwargs["images"]]
-    assert str(img) in sent_paths[0]
+    assert str(img) == url2pathname(sent_paths[0][7:])
 
 
 def test_stream_rescan_accepts_no_history_dedup_input():

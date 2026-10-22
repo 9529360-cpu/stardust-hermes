@@ -55,8 +55,9 @@ _PEER_BY_KEY_SQL = f"""{_PEER_SELECT_HEAD}                WHERE s.session_key = 
                         AND b.source = s.source
                         AND b.ended_at IS NOT NULL
                         AND b.end_reason IN ({_RESET_END_REASONS_SQL})
-                        AND b.ended_at
-                            >= COALESCE(s.last_activity_at, s.started_at)
+                        AND (b.ended_at > COALESCE(s.last_activity_at, s.started_at)
+                             OR (b.ended_at = COALESCE(s.last_activity_at, s.started_at)
+                                 AND b.rowid >= s.rowid))
                   )
                 ORDER BY _has_messages DESC,
                          COALESCE(s.last_activity_at, s.started_at) DESC
@@ -81,8 +82,9 @@ _PEER_BY_TUPLE_SQL = f"""{_PEER_SELECT_HEAD}                WHERE s.source = ?
                         AND COALESCE(b.thread_id, '') = COALESCE(s.thread_id, '')
                         AND b.ended_at IS NOT NULL
                         AND b.end_reason IN ({_RESET_END_REASONS_SQL})
-                        AND b.ended_at
-                            >= COALESCE(s.last_activity_at, s.started_at)
+                        AND (b.ended_at > COALESCE(s.last_activity_at, s.started_at)
+                             OR (b.ended_at = COALESCE(s.last_activity_at, s.started_at)
+                                 AND b.rowid >= s.rowid))
                   )
                 ORDER BY COALESCE(s.last_activity_at, s.started_at) DESC
                 LIMIT 1

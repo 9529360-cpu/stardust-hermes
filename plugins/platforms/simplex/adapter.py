@@ -519,7 +519,8 @@ class SimplexAdapter(BasePlatformAdapter):
     async def send_image(self, chat_id: str, image_url: str, caption: Optional[str] = None, **kwargs) -> SendResult:
         """Send an image. Supports ``file://`` URLs and ``http(s)://`` URLs."""
         if image_url.startswith("file://"):
-            file_path = unquote(image_url[7:])
+            from urllib.request import url2pathname
+            file_path = url2pathname(image_url[7:])
         else:
             try:
                 file_path = await cache_image_from_url(image_url)

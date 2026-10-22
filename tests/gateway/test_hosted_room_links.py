@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import stat
+import os
 from concurrent.futures import ThreadPoolExecutor
 
 from gateway.hosted_room_links import (
@@ -35,7 +36,8 @@ def test_room_link_store_is_private_transactional_and_upserted(tmp_path):
         trace_id="trace-1",
     )
     save_room_link(path, first)
-    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+    if os.name != "nt":
+        assert stat.S_IMODE(path.stat().st_mode) == 0o600
     assert load_room_links(path) == (first,)
 
     replacement = make_stored_link(

@@ -21,6 +21,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import os
+
 import pytest
 
 from tui_gateway import server
@@ -223,6 +225,7 @@ def test_leading_slash_matches_the_bare_form(tmp_path, monkeypatch):
     assert slashed == bare
 
 
+@pytest.mark.skipif(os.name == "nt", reason="POSIX /etc absolute-path semantics")
 def test_leading_slash_prefers_a_real_absolute_path(tmp_path, monkeypatch):
     """When the absolute reading resolves, it wins — no silent rewrite.
 

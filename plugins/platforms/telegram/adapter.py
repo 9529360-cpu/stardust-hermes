@@ -4861,7 +4861,8 @@ class TelegramAdapter(BasePlatformAdapter):
                 for image_url, alt_text in chunk:
                     source: Any = image_url
                     if image_url.startswith("file://"):
-                        local_path = _unquote(image_url[7:])
+                        from urllib.request import url2pathname
+                        local_path = url2pathname(image_url[7:])
                         if not os.path.exists(local_path):
                             logger.warning("[%s] Skipping missing image in media group: %s", self.name, local_path)
                             continue

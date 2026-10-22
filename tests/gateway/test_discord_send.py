@@ -435,7 +435,7 @@ def _fake_getsize(monkeypatch, oversized: Path, size: int):
     original = os.path.getsize
     monkeypatch.setattr(
         os.path, "getsize",
-        lambda path: size if str(path) == str(oversized) else original(path),
+        lambda path: size if Path(path) == oversized else original(path),
     )
 
 

@@ -49,7 +49,7 @@ def test_mcp_config_reconciler_runs_only_when_config_changes(monkeypatch, tmp_pa
     assert calls == [False], "reconcile must run once per change, with interactive OAuth suppressed"
     tick()
     assert calls == [False]
-    cfg.write_text("model:\n  default: y\n")
+    cfg.write_text("model:\n  default: changed-value\n")
     pending.append("linear")  # dropped server was still mid-connect: retry next tick, unchanged file
     tick()
     pending.clear()

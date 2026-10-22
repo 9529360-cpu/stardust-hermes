@@ -7,11 +7,12 @@ ROOT = Path(sys.argv[1]).resolve()
 RECEIPT = Path(sys.argv[2]).resolve()
 HOME = Path(tempfile.mkdtemp(prefix="hermes-104653-state-"))
 # Discard inherited credentials/config, preserve only interpreter essentials.
-keep = {k: v for k, v in os.environ.items() if k in ("PATH", "LANG", "LC_ALL", "TZ")}
+keep = {k: v for k, v in os.environ.items() if k in ("PATH", "LANG", "LC_ALL", "TZ", "SYSTEMROOT", "TEMP", "TMP", "LOCALAPPDATA", "APPDATA")}
 os.environ.clear()
 os.environ.update(keep)
 os.environ.update(
     HOME=str(HOME),
+    USERPROFILE=str(HOME),
     STARDUST_HOME=str(HOME),
     STARDUST_DISABLE_PLUGINS="1",
     NO_PROXY="127.0.0.1,localhost",
