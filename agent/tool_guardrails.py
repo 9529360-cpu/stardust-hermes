@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from collections import deque
 from dataclasses import asdict, dataclass, field, fields
 from typing import Any, Mapping
@@ -353,6 +354,10 @@ class ToolCallGuardrailController:
         if message is None:
             message = _DECISION_MESSAGES[code].format(tool_name=tool_name, count=count, **fmt)
         decision = ToolGuardrailDecision(action, code, message, tool_name, count, signature)
+        logging.getLogger(__name__).info(
+            "tool_guardrail code=%s tool=%s count=%d args_hash=%s",
+            code, tool_name, count, signature.args_hash,
+        )
         if decision.should_halt:
             self._halt_decision = decision
         return decision
@@ -408,7 +413,12 @@ class ToolCallGuardrailController:
             ):
                 return self._decide("halt", "same_tool_failure_halt", tool_name, same_count, signature)
             if warnings and exact_count >= self.config.exact_failure_warn_after:
-                return self._decide("warn", "repeated_exact_failure_warning", tool_name, exact_count, signature)
+                data = safe_json_loads(result or "")
+                hint = data.get("hint") if isinstance(data, dict) else None
+                recovery = f" Latest recovery guidance: {hint[:1600]}" if isinstance(hint, str) else ""
+                return self._decide("warn", "repeated_exact_failure_warning", tool_name, exact_count, signature,
+                                    message=_DECISION_MESSAGES["repeated_exact_failure_warning"].format(
+                                        tool_name=tool_name, count=exact_count) + recovery)
             if warnings and same_count >= self.config.same_tool_failure_warn_after:
                 return self._decide(
                     "warn", "same_tool_failure_warning", tool_name, same_count, signature,
@@ -592,8 +602,9 @@ def _tool_failure_recovery_hint(tool_name: str, count: int) -> str:
     )
     if tool_name == "terminal":
         return common + (
-            "For terminal failures, run a small diagnostic such as `pwd && ls -la` "
-            "in the same tool, then try an absolute path, a simpler command, a different "
+            "For terminal failures, inspect the latest result's recovery hint and executing shell "
+            "before choosing a diagnostic (PowerShell: Get-Location/Get-Command; Bash: pwd/command -v). "
+            "Then try an absolute path, a simpler command, a different "
             "working directory, or a different tool such as read_file/write_file/patch."
         )
     return common + (

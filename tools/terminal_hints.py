@@ -157,11 +157,41 @@ def annotate_masked_success(command: str, output: str) -> Optional[str]:
     return next((note for rx, note in _MASKING_SHAPES if rx.search(cmd)), None)
 
 
-def annotate_failure(command: str, exit_code: int, output: str) -> Optional[str]:
+def _environment_recovery(output: str, environment: str) -> Optional[str]:
+    """Advisory checks only; environment is supplied by the executing backend."""
+    windows = "Windows" in environment
+    powershell = "shell=PowerShell" in environment
+    if re.search(r"is not recognized as (?:the name of a cmdlet|an internal or external command)|CommandNotFoundException", output, re.I):
+        return ("Missing command in PowerShell/cmd. Check `Get-Command <name>` in PowerShell "
+                "or `where.exe <name>` in cmd; use a verified executable's absolute path. "
+                "If this is Bash syntax, invoke the installed bash explicitly.")
+    if windows and re.search(r"Permission denied|EACCES|Access is denied|UnauthorizedAccessException", output, re.I):
+        return ("Permission denied on Windows. Inspect the target with PowerShell Get-Acl and "
+                "Test-Path; choose a task-owned writable location. Do not automatically elevate permissions.")
+    if re.search(r"No such file or directory|can't open file|cannot find (?:the )?path|cannot access.*does not exist", output, re.I):
+        return ("Path not found. Check the working directory and parent path, then quote an absolute path. "
+                + ("For native Windows executables use D:/... paths; /d/... is an MSYS shell path "
+                   "and may not be translated for native arguments. " if windows else "")
+                + ("Use Get-Location and Test-Path in PowerShell." if powershell
+                   else "Check the path in the executing shell before retrying."))
+    if windows and re.search(r"(?:[\w.+-]+): command not found", output):
+        return ("Command unavailable in this Bash session. Check `command -v <name>` and the "
+                "project interpreter's absolute path. Use the Python toolchain facts below if present; "
+                "verify its version before retrying. Do not assume python3/pip3 exist or install dependencies blindly.")
+    return None
+
+
+def annotate_failure(command: str, exit_code: int, output: str, *, environment: str = "") -> Optional[str]:
     """Return one short recovery hint for a failed command, or None (exit 0)."""
     if exit_code == 0:
         return None
     window = (output or "")[:_SCAN_CHARS]
+    # Keep W8's more specific cmdlet-in-Bash diagnosis ahead of generic missing-command advice.
+    cmdlet = re.search(r"((?:Get|Set|New|Remove|Select|Where|ForEach|Format|Write|Test|Start|Stop|Resolve|Join|Split|Out|ConvertTo|ConvertFrom)-[A-Za-z]+): command not found", window, re.I)
+    if cmdlet:
+        return _missing_command_hint(cmdlet.group(1))
+    if hint := _environment_recovery(window, environment):
+        return (f"Environment: {environment}. " if environment else "") + hint
     for fn in _OUTPUT_HINTS if window else ():
         try:
             if hint := fn(command or "", window):
