@@ -288,6 +288,8 @@ DEFAULT_CONFIG = {
         # "warn" = structured degraded tool result with reason + retry hint; "fail" = raise error +
         # traceback.
         "degraded_mode": "warn",
+        # Opt-in local missing-command recall; 24h TTL, one advisory per fact.
+        "environment_failure_recall": False,
         "cwd": ".",  # Use current directory
         # Root for terminal session temp files (background logs/pid/exit files, code-exec
         # sandboxes). Empty = TMPDIR/TMP/TEMP if set, else STARDUST_HOME/cache/terminal (auto-pruned
