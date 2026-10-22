@@ -82,7 +82,7 @@ describe('useBackgroundQueueDrain', () => {
     const runtimeMap = { current: new Map([['stored-session-a', 'rt-session-a']]) }
     const submitText = vi.fn(async () => true)
 
-    enqueueQueuedPrompt('stored-session-a', { text: 'continue in the background', attachments: [] })
+    const queued = enqueueQueuedPrompt('stored-session-a', { text: 'continue in the background', attachments: [] })!
     clearAllSessionStates()
 
     render(<Harness runtimeMap={runtimeMap} submitText={submitText} />)
@@ -90,6 +90,7 @@ describe('useBackgroundQueueDrain', () => {
     await waitFor(() => {
       expect(submitText).toHaveBeenCalledWith('continue in the background', {
         attachments: [],
+        clientMessageId: queued.clientMessageId,
         fromQueue: true,
         sessionId: 'rt-session-a',
         storedSessionId: 'stored-session-a'
@@ -187,15 +188,37 @@ describe('useBackgroundQueueDrain', () => {
     const runtimeMap = { current: new Map<string, string>() }
     const submitText = vi.fn(async () => true)
 
-    enqueueQueuedPrompt('stored-session-a', { text: 'resume then send', attachments: [] })
+    const queued = enqueueQueuedPrompt('stored-session-a', { text: 'resume then send', attachments: [] })!
 
     render(<Harness runtimeMap={runtimeMap} submitText={submitText} />)
 
     await waitFor(() => {
       expect(submitText).toHaveBeenCalledWith('resume then send', {
         attachments: [],
+        clientMessageId: queued.clientMessageId,
         fromQueue: true,
         sessionId: null,
+        storedSessionId: 'stored-session-a'
+      })
+    })
+  })
+
+  it('sends an entry persisted before message identities existed under its entry id', async () => {
+    const runtimeMap = { current: new Map([['stored-session-a', 'rt-session-a']]) }
+    const submitText = vi.fn(async () => true)
+
+    $queuedPromptsBySession.set({
+      'stored-session-a': [{ attachments: [], id: 'queued-legacy-1', queuedAt: 1, text: 'from an older build' }]
+    })
+
+    render(<Harness runtimeMap={runtimeMap} submitText={submitText} />)
+
+    await waitFor(() => {
+      expect(submitText).toHaveBeenCalledWith('from an older build', {
+        attachments: [],
+        clientMessageId: 'queued-legacy-1',
+        fromQueue: true,
+        sessionId: 'rt-session-a',
         storedSessionId: 'stored-session-a'
       })
     })
@@ -207,7 +230,7 @@ describe('useBackgroundQueueDrain', () => {
     const runtimeMap = { current: new Map([['stored-session-a', 'rt-session-a']]) }
     const submitText = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true)
 
-    enqueueQueuedPrompt('stored-session-a', { text: 'retry me', attachments: [] })
+    const queued = enqueueQueuedPrompt('stored-session-a', { text: 'retry me', attachments: [] })!
 
     render(<Harness runtimeMap={runtimeMap} submitText={submitText} />)
 
@@ -225,6 +248,11 @@ describe('useBackgroundQueueDrain', () => {
 
     expect(submitText).toHaveBeenCalledTimes(2)
     expect(getQueuedPrompts('stored-session-a')).toHaveLength(0)
+    // A retry of the same entry is the same submission: the backend dedupes it.
+    expect(submitText.mock.calls.map(call => call[1]?.clientMessageId)).toEqual([
+      queued.clientMessageId,
+      queued.clientMessageId
+    ])
   })
 
   it('does not drain restored queues while the session list is still loading', async () => {
@@ -254,7 +282,7 @@ describe('useBackgroundQueueDrain', () => {
     const runtimeMap = { current: new Map([['stored-session-a', 'rt-session-a']]) }
     const submitText = vi.fn(async () => true)
 
-    enqueueQueuedPrompt('stored-session-a', { text: 'send after load', attachments: [] })
+    const queued = enqueueQueuedPrompt('stored-session-a', { text: 'send after load', attachments: [] })!
 
     render(<Harness runtimeMap={runtimeMap} submitText={submitText} />)
 
@@ -266,6 +294,7 @@ describe('useBackgroundQueueDrain', () => {
     await waitFor(() => {
       expect(submitText).toHaveBeenCalledWith('send after load', {
         attachments: [],
+        clientMessageId: queued.clientMessageId,
         fromQueue: true,
         sessionId: 'rt-session-a',
         storedSessionId: 'stored-session-a'

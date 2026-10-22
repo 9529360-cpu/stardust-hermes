@@ -97,6 +97,7 @@ export {
   type WebSocketLike
 } from './json-rpc-gateway'
 export { modelSearchText } from './model-search-text'
+export { retryWithoutRejectedParam } from './optional-param'
 export {
   DEFAULT_REASONING_EFFORT,
   isReasoningEffort,

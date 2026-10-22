@@ -54,3 +54,18 @@ describe('queue items', () => {
     expect(takeQueueItem(queue, 0, 'replacement')).toEqual(queueItem('replacement'))
   })
 })
+
+describe('queue item identity', () => {
+  it('has none until an attempt gives it one', () => {
+    expect(queueItem('words')).toEqual({ display: 'words', text: 'words' })
+    expect(queueItem('words', 'words', 'id-1')).toEqual({ clientMessageId: 'id-1', display: 'words', text: 'words' })
+  })
+
+  it('keeps it when an item is taken out unchanged, and drops it when the words are edited', () => {
+    expect(takeQueueItem([queueItem('words', 'words', 'id-1')], 0)).toMatchObject({ clientMessageId: 'id-1' })
+    expect(takeQueueItem([queueItem('words', 'words', 'id-1')], 0, 'words, edited')).toEqual({
+      display: 'words, edited',
+      text: 'words, edited'
+    })
+  })
+})

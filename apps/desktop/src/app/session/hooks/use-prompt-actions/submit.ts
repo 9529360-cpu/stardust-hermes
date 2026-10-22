@@ -1,3 +1,4 @@
+import { retryWithoutRejectedParam } from '@stardust/shared'
 import { type MutableRefObject, useCallback } from 'react'
 
 import { PROMPT_SUBMIT_REQUEST_TIMEOUT_MS } from '@/hermes'
@@ -121,6 +122,7 @@ export function useSubmitPrompt(deps: SubmitPromptDeps) {
 
   return useCallback(
     async (rawText: string, options?: SubmitTextOptions) => {
+      const clientMessageId = options?.clientMessageId ?? crypto.randomUUID()
       const visibleText = sanitizeComposerInput(rawText).trim()
       const usingComposerAttachments = !options?.attachments
 
@@ -755,6 +757,7 @@ export function useSubmitPrompt(deps: SubmitPromptDeps) {
         const text = buildContextText(syncedAttachments)
 
         const submitParams = (targetId: string) => ({
+          client_message_id: clientMessageId,
           session_id: targetId,
           text,
           ...(interrupted && { interrupted }),
@@ -792,7 +795,14 @@ export function useSubmitPrompt(deps: SubmitPromptDeps) {
             recoverStoredSessionId,
             liveId =>
               withSessionBusyRetry(() =>
-                requestGateway('prompt.submit', submitParams(liveId), PROMPT_SUBMIT_REQUEST_TIMEOUT_MS)
+                // A runtime that predates client_message_id rejects it as an
+                // unknown param (4000); resend without it so a mid-upgrade
+                // app can still send. Those backends keep the content guard.
+                retryWithoutRejectedParam(
+                  params => requestGateway('prompt.submit', params, PROMPT_SUBMIT_REQUEST_TIMEOUT_MS),
+                  submitParams(liveId),
+                  'client_message_id'
+                )
               ),
             {
               requestGateway,

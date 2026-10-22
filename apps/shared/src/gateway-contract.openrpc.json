@@ -22951,6 +22951,20 @@
             "default": null,
             "title": "Profile"
           },
+          "client_message_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Client Message Id"
+          },
           "text": {
             "default": "",
             "title": "Text"
@@ -23111,6 +23125,18 @@
               }
             ],
             "default": null
+          },
+          "already_received": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Already Received"
           },
           "voice_stopped": {
             "anyOf": [

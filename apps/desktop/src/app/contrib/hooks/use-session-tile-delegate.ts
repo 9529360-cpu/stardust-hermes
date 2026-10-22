@@ -1,3 +1,4 @@
+import { retryWithoutRejectedParam } from '@stardust/shared'
 import { useEffect } from 'react'
 
 import { graftRefreshedTailOntoBackfill } from '@/app/chat/transcript-backfill'
@@ -429,10 +430,20 @@ export function useSessionTileDelegate({
               requestForStoredSession<T>(storedSessionId, method, params ?? {}, timeoutMs)
           : requestGateway
 
+        // The resume-and-retry below resends this same submission.
+        const clientMessageId = crypto.randomUUID()
+
         await withSessionNotFoundResume(
           runtimeId,
           storedSessionId,
-          liveId => routedRequest('prompt.submit', { session_id: liveId, text }, PROMPT_SUBMIT_REQUEST_TIMEOUT_MS),
+          liveId =>
+            // A runtime that predates client_message_id rejects it as an
+            // unknown param (4000); resend without it.
+            retryWithoutRejectedParam(
+              params => routedRequest('prompt.submit', params, PROMPT_SUBMIT_REQUEST_TIMEOUT_MS),
+              { client_message_id: clientMessageId, session_id: liveId, text },
+              'client_message_id'
+            ),
           { requestGateway: routedRequest, onRecovered: rebindTileRuntime(runtimeId) }
         )
       },

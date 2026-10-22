@@ -5,6 +5,11 @@ import type { ComposerAttachment } from './composer'
 
 export interface QueuedPromptEntry {
   id: string
+  /** The backend's idempotency key for this payload (`prompt.submit`'s
+   *  `client_message_id`). Minted with the entry and again whenever the user
+   *  rewrites it: a retry of the same words dedupes, an edit never does.
+   *  Entries persisted before this field existed fall back to `id`. */
+  clientMessageId?: string
   text: string
   /** What the queue panel and the sent bubble show, when it differs from the
    *  text the agent receives. A queued `/skill` invocation carries the whole
@@ -137,6 +142,7 @@ export const enqueueQueuedPrompt = (
 
   const entry: QueuedPromptEntry = {
     id: nextId(),
+    clientMessageId: crypto.randomUUID(),
     text: payload.text,
     ...(payload.displayText ? { displayText: payload.displayText } : {}),
     ...(payload.displayKind ? { displayKind: payload.displayKind } : {}),
@@ -239,10 +245,12 @@ export const updateQueuedPrompt = (
 
     // The user rewrote the text, so any display projection it carried (a
     // `/skill` invocation standing in for the expanded body) no longer
-    // describes it — what they typed is now what sends.
+    // describes it — what they typed is now what sends, under a new identity:
+    // an earlier attempt the backend may already have received must not
+    // swallow the edit.
     const { displayText: _dropped, ...rest } = entry
 
-    return { ...rest, text: update.text, attachments }
+    return { ...rest, clientMessageId: crypto.randomUUID(), text: update.text, attachments }
   })
 
   if (!changed) {

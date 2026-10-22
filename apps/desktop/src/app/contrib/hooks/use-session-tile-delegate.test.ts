@@ -531,3 +531,52 @@ describe('useSessionTileDelegate interruptSession', () => {
     expect(isSessionRecentlyInterrupted('runtime-tile-1')).toBe(true)
   })
 })
+
+describe('useSessionTileDelegate submitToSession', () => {
+  beforeEach(() => {
+    setSessions([row({ id: 'stored-tile-1' })])
+  })
+
+  afterEach(() => {
+    setSessions([])
+    vi.mocked(requestGatewayForProfile).mockReset()
+  })
+
+  it('resends a recovered submission under the same client_message_id', async () => {
+    const calls: { method: string; params?: Record<string, unknown> }[] = []
+    let attempts = 0
+
+    // A session with an owning profile is routed to that profile's socket.
+    vi.mocked(requestGatewayForProfile).mockImplementation((async (
+      _profile: string,
+      method: string,
+      params?: Record<string, unknown>
+    ) => {
+      calls.push({ method, params })
+
+      if (method === 'prompt.submit') {
+        attempts += 1
+
+        if (attempts === 1) {
+          throw new Error('session not found')
+        }
+
+        return {}
+      }
+
+      return method === 'session.resume' ? { session_id: 'runtime-recovered' } : {}
+    }) as never)
+
+    renderTile(
+      vi.fn(async () => ({}) as never),
+      { runtimeIdByStoredSessionIdRef: { current: new Map([['stored-tile-1', 'runtime-tile-1']]) } }
+    )
+    await sessionTileDelegate()!.submitToSession('runtime-tile-1', 'continue from the tile')
+
+    const submits = calls.filter(call => call.method === 'prompt.submit')
+
+    expect(submits.map(submit => submit.params?.session_id)).toEqual(['runtime-tile-1', 'runtime-recovered'])
+    expect(submits[0]?.params?.client_message_id).toMatch(/^[0-9a-f-]{36}$/)
+    expect(submits[1]?.params?.client_message_id).toBe(submits[0]?.params?.client_message_id)
+  })
+})

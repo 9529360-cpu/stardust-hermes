@@ -4,11 +4,19 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import { $uiState, getUiState } from '../app/uiStore.js'
 
 export interface QueueItem {
+  /** The `prompt.submit` idempotency key an earlier attempt already used. Set
+   *  only when a refused send is re-queued, so its retry keeps the same
+   *  identity; an edited item is new words and gets a fresh one when sent. */
+  clientMessageId?: string
   display: string
   text: string
 }
 
-export const queueItem = (text: string, display = text): QueueItem => ({ display, text })
+export const queueItem = (text: string, display = text, clientMessageId?: string): QueueItem => ({
+  display,
+  text,
+  ...(clientMessageId ? { clientMessageId } : {})
+})
 
 export function prependQueueItem(queue: QueueItem[], item: QueueItem): void {
   queue.unshift(item)
@@ -121,8 +129,8 @@ export function useQueue() {
   )
 
   const enqueue = useCallback(
-    (text: string, display = text) => {
-      queueRef.current.push(queueItem(text, display))
+    (text: string, display = text, clientMessageId?: string) => {
+      queueRef.current.push(queueItem(text, display, clientMessageId))
       syncQueue()
     },
     [queueRef, syncQueue]
@@ -137,7 +145,7 @@ export function useQueue() {
   )
 
   const dequeue = useCallback(() => {
-    const head = queueRef.current.shift()?.text
+    const head = queueRef.current.shift()
     syncQueue()
 
     return head

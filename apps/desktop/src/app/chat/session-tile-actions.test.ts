@@ -208,6 +208,9 @@ describe('useSessionTileActions sleep/wake session recovery', () => {
     expect(calls[0]?.params).toMatchObject({ session_id: RUNTIME_SESSION_ID })
     expect(calls[1]?.params).toMatchObject({ session_id: STORED_SESSION_ID, source: 'desktop', omit_messages: true })
     expect(calls[2]?.params).toMatchObject({ session_id: RECOVERED_SESSION_ID })
+    // The resend after recovery is the same submission, not a second message.
+    expect(calls[0]?.params?.client_message_id).toMatch(/^[0-9a-f-]{36}$/)
+    expect(calls[2]?.params?.client_message_id).toBe(calls[0]?.params?.client_message_id)
     expect($sessionTiles.get()[0]?.runtimeId).toBe(RECOVERED_SESSION_ID)
     expect($activeSessionId.get()).toBe('foreground-runtime')
   })

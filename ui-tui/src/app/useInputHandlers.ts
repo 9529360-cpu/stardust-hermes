@@ -800,7 +800,7 @@ export function useInputHandlers(ctx: InputHandlerContext): InputHandlerResult {
 
       if (next) {
         cActions.setQueueEdit(null)
-        actions.dispatchSubmission(next)
+        actions.dispatchSubmission(next.text, next.clientMessageId)
       }
     }
   })

@@ -10,6 +10,7 @@
  */
 
 import type { AppendMessage, ThreadMessage } from '@assistant-ui/react'
+import { retryWithoutRejectedParam } from '@stardust/shared'
 
 import type { ClientSessionState } from '@/app/types'
 import { PROMPT_SUBMIT_REQUEST_TIMEOUT_MS } from '@/hermes'
@@ -279,6 +280,10 @@ export async function runRewindSubmit(
   // follow it rather than pinning the dead one.
   let liveSessionId = sessionId
 
+  // One identity for every attempt of this rewrite (busy retry, session
+  // recovery): the backend must not apply a truncating submit twice.
+  const clientMessageId = crypto.randomUUID()
+
   // A truncation without a durable address is the #87059 shape: the gateway
   // fails it closed (4004) for any persisted session, so sending it can only
   // produce an error. Resolve the row id by content first (the durable row
@@ -333,9 +338,12 @@ export async function runRewindSubmit(
   }
 
   const submitFor = (targetId: string) =>
-    requestGateway<PromptSubmitResult>(
-      'prompt.submit',
+    // A runtime that predates client_message_id rejects it as an unknown param
+    // (4000); resend without it so a mid-upgrade app can still rewind.
+    retryWithoutRejectedParam(
+      params => requestGateway<PromptSubmitResult>('prompt.submit', params, PROMPT_SUBMIT_REQUEST_TIMEOUT_MS),
       {
+        client_message_id: clientMessageId,
         session_id: targetId,
         text,
         ...truncateSubmitParams(resolvedOrdinal, resolvedMessageId, resolvedRowId),
@@ -352,7 +360,7 @@ export async function runRewindSubmit(
           ? { rebind_survivor_row_ids: [...new Set(rebindRowIds.filter(Number.isInteger))] }
           : {})
       },
-      PROMPT_SUBMIT_REQUEST_TIMEOUT_MS
+      'client_message_id'
     )
 
   const submit = async () => {

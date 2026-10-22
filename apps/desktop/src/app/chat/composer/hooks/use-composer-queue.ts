@@ -223,6 +223,7 @@ export function useComposerQueue({
             attachments: entry.attachments,
             ...(entry.displayText ? { displayText: entry.displayText } : {}),
             ...(entry.displayKind ? { displayKind: entry.displayKind } : {}),
+            clientMessageId: entry.clientMessageId ?? entry.id,
             fromQueue: true,
             sessionId: drainRuntimeSessionId,
             storedSessionId: drainQueueSessionKey
