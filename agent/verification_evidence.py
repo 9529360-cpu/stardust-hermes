@@ -13,7 +13,10 @@ import threading
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
+
+if TYPE_CHECKING:
+    from agent.verify.runner import VerifyResult
 
 from agent.terminal_writers import (
     command_words, conditional_write, executable_name, interpreter_kind, node_verifier_writes,
@@ -27,7 +30,7 @@ _MAX_EVIDENCE_AGE_DAYS = 30
 _MAX_EVENTS_PER_SESSION_ROOT = 100
 _MAX_TOTAL_UNREFERENCED_EVENTS = 10_000
 _AD_HOC_SCRIPT_NAME_PREFIXES = ("hermes-verify-", "hermes-ad-hoc-")
-_VERIFY_SCHEMA_VERSION = 2
+_VERIFY_SCHEMA_VERSION = 3
 
 _INTERPRETERS = {"python", "python3", "node", "bash", "sh", "ruby", "perl"}
 _TARGET_EXTENSIONS = (".py", ".js", ".jsx", ".ts", ".tsx", ".rs", ".go", ".java")
@@ -229,6 +232,8 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     columns = {row[1] for row in conn.execute("PRAGMA table_info(verification_events)")}
     if "evidence_tier" not in columns:
         conn.execute("ALTER TABLE verification_events ADD COLUMN evidence_tier TEXT")
+    if "observations_json" not in columns:
+        conn.execute("ALTER TABLE verification_events ADD COLUMN observations_json TEXT")
     # Ledgers created before the column existed: add it in place (NULL = no fingerprint, old behavior).
     columns = {row[1] for row in conn.execute("PRAGMA table_info(verification_events)")}
     if "content_fingerprint" not in columns:
@@ -1032,7 +1037,7 @@ def record_terminal_workspace_mutation(
 
 def record_verify_run(
     *, root: str | Path, session_id: str | None = None, ok: bool, command: str = "stardust verify",
-    scope: str = "full", output: str = "",
+    scope: str = "full", output: str = "", result: VerifyResult | None = None,
 ) -> Optional[dict[str, Any]]:
     """Record a completed ``stardust verify`` run as verification evidence.
 
@@ -1049,10 +1054,13 @@ def record_verify_run(
         status="passed" if ok else "failed", exit_code=0 if ok else 1, cwd=resolved,
         root=str((_project_facts(root) or {}).get("root") or resolved),
         session_id=str(session_id or "default"), output_summary=_summarize_output(output),
-    ))
+    ), observations=result.observations() if result is not None else None)
 
 
-def _insert_evidence(evidence: VerificationEvidence, *, observed_at: str | None = None) -> dict[str, Any]:
+def _insert_evidence(
+    evidence: VerificationEvidence, *, observed_at: str | None = None,
+    observations: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     """Insert a classified evidence row and repoint the workspace state."""
     created_at = observed_at or _utc_now()
     e = evidence
@@ -1075,8 +1083,13 @@ def _insert_evidence(evidence: VerificationEvidence, *, observed_at: str | None 
         if cur.lastrowid is None:
             raise RuntimeError("verification event insert did not return an id")
         event_id = int(cur.lastrowid)
-        tier = "build" if e.kind == "build" else "test"
-        conn.execute("UPDATE verification_events SET evidence_tier=? WHERE id=?", (tier, event_id))
+        # An aggregate verify result has no single observation tier. Its actual
+        # phase tiers live in observations_json; missing facts stay unknown.
+        tier = {"build": "build", "test": "test"}.get(e.kind, "unknown")
+        conn.execute(
+            "UPDATE verification_events SET evidence_tier=?, observations_json=? WHERE id=?",
+            (tier, json.dumps(observations) if observations is not None else None, event_id),
+        )
         # A run dated before an edit did not cover that edit: leave it pending rather than clearing it.
         pending = conn.execute(
             "SELECT last_edit_at FROM verification_state WHERE session_id = ? AND root = ?",
@@ -1096,7 +1109,8 @@ def _insert_evidence(evidence: VerificationEvidence, *, observed_at: str | None 
         _prune_old_events(conn, session_id=e.session_id, root=e.root)
         conn.commit()
 
-    return {"id": event_id, **e.__dict__, "created_at": created_at, "evidence_tier": tier}
+    return {"id": event_id, **e.__dict__, "created_at": created_at,
+            "evidence_tier": tier, "observations": observations or []}
 
 
 def mark_workspace_edited(
@@ -1162,6 +1176,14 @@ def carry_verification_state(*, from_session_id: str | None, to_session_id: str 
         return int(cur.rowcount or 0)
 
 
+def _evidence_receipt(event) -> dict[str, Any]:
+    """Read metadata without inferring tiers for legacy rows."""
+    evidence = dict(event)
+    evidence["evidence_tier"] = evidence.get("evidence_tier") or "unknown"
+    evidence["observations"] = json.loads(evidence.get("observations_json") or "[]")
+    return evidence
+
+
 def verification_status(*, session_id: str | None, cwd: str | Path | None) -> dict[str, Any]:
     """Return the best known verification state for a session/workspace.
 
@@ -1193,7 +1215,7 @@ def verification_status(*, session_id: str | None, cwd: str | Path | None) -> di
     if event is None:
         return {"status": "unverified", **result}
 
-    evidence = dict(event)
+    evidence = _evidence_receipt(event)
     stale = bool(state["last_edit_at"]) and state["last_edit_at"] > evidence["created_at"]
     if stale and evidence["status"] == "passed" and _tree_unchanged_since(evidence, root):
         # The edit signal is intent-based (a custom script, an inline program that starts a process); the tree

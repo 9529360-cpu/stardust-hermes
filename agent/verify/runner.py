@@ -39,6 +39,7 @@ class PhaseResult:
     duration: float
     output_tail: str
     timed_out: bool = False
+    executed: bool = True
 
     @property
     def ok(self) -> bool:
@@ -77,6 +78,37 @@ class VerifyResult:
     @property
     def ok(self) -> bool:
         return all(p.ok for p in self.phases) and (self.readiness is None or self.readiness.ready)
+
+    def observations(self) -> list[dict[str, Any]]:
+        """Facts observed by this runner, never UI interaction or HTTP health.
+
+        A recipe's test command is test-tier evidence; it need not be a unit suite.
+        Bootstrap and the aggregate result establish no acceptance tier.
+        """
+        observations = [
+            {
+                "source": ("agent.verify.runner._run_phase_command" if p.executed
+                           else "agent.verify.runner._compose_live_state_reason"),
+                "recipe": self.recipe_name, "phase": p.phase, "index": index,
+                "tier": ({"test": "test", "build": "build"}.get(p.phase, "unknown")
+                         if p.executed else "unknown"),
+                "executed": p.executed,
+                "status": "passed" if p.ok else "failed",
+                "exit_code": p.exit_code, "timed_out": p.timed_out,
+                "duration": round(p.duration, 3),
+            }
+            for index, p in enumerate(self.phases)
+        ]
+        if self.readiness is not None:
+            r = self.readiness
+            observations.append({
+                "source": "agent.verify.runner._poll_readiness",
+                "recipe": self.recipe_name, "phase": "start", "tier": "runtime",
+                "status": "passed" if r.ready else "failed",
+                "observation": "http-reachability", "ready": r.ready,
+                "status_code": r.status_code, "duration": round(r.duration, 3),
+            })
+        return observations
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -232,7 +264,7 @@ def run_verify(
         if reason:
             result.phases.append(PhaseResult(
                 phase="build", command=recipe.build[0] if recipe.build else "docker compose build",
-                exit_code=1, duration=0.0, output_tail=(
+                exit_code=1, duration=0.0, executed=False, output_tail=(
                     f"Refusing to run: {reason}. `docker compose build` + `up` would replace "
                     "live containers on an image-hash change, destroying any container-local "
                     "state they carry. If you intend to rebuild this live deployment, run "
