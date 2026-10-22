@@ -2,7 +2,11 @@
 
 import json
 
+import pytest
+
+from agent.tool_result_classification import tool_result_outcome
 from agent.background_review_distillation import (
+    _tool_verdicts,
     build_conversation_distillation_brief,
     has_actionable_self_distillation_feedback,
 )
@@ -54,6 +58,55 @@ def test_tool_success_and_failure_are_only_readonly_observations():
     assert "terminal: 0 reported successes, 1 reported failures" in brief
     assert "skill_view: 1 reported successes, 0 reported failures" in brief
     assert "SECRET" not in brief and "PRIVATE" not in brief
+
+
+@pytest.mark.parametrize("payload,outcome,counts", [
+    ({"exit_code": 0}, "success", (1, 0)),
+    ({"exit_code": 7}, "failed", (0, 1)),
+    ({"exit_code": 124}, "timed_out", (0, 1)),
+    ({"exit_code": 7, "success": True}, "failed", (0, 1)),
+    ({"status": "timeout", "success": True}, "timed_out", (0, 1)),
+    ({"status": "cancelled", "success": True}, "cancelled", (0, 0)),
+    ({"status": "canceled", "exit_code": 130}, "cancelled", (0, 0)),
+    ({"status": "unknown", "success": True, "exit_code": 0}, "unknown", (0, 0)),
+    *[({"status": status, "success": True, "exit_code": 0}, "pending", (0, 0))
+      for status in ("pending", "running", "queued", "in_progress",
+                     "started", "background", "yielded_to_background")],
+    *[({"exit_code": code, "success": True}, "unknown", (0, 0))
+      for code in (None, "0", False)],
+    ({}, "unknown", (0, 0)),
+    ({"ok": True}, "success", (1, 0)),
+    ({"success": True, "ok": False}, "failed", (0, 1)),
+    ({"status": "completed"}, "success", (1, 0)),
+    ({"status": "error", "success": True}, "failed", (0, 1)),
+    ({"is_error": True, "exit_code": 0}, "failed", (0, 1)),
+])
+def test_terminal_outcomes_are_observations_without_review_triggers(payload, outcome, counts):
+    messages = [
+        {"role": "user", "content": "Run the command"},
+        {"role": "assistant", "tool_calls": [
+            {"id": "t", "function": {"name": "terminal"}},
+        ]},
+        {"role": "tool", "tool_call_id": "t", "content": json.dumps(payload)},
+    ]
+    assert tool_result_outcome("terminal", payload) == outcome
+    assert _tool_verdicts(messages)[:2] == counts
+    assert not has_actionable_self_distillation_feedback(messages)
+    brief = build_conversation_distillation_brief(messages)
+    if counts != (0, 0):
+        assert "Failures are OBSERVATIONS only, never automatic lessons or review triggers" in brief
+    else:
+        assert brief == ""
+
+
+def test_exit_codes_only_describe_terminal_and_message_errors_still_win():
+    assert tool_result_outcome("web_search", {"exit_code": 0}) == "unknown"
+    assert tool_result_outcome("web_search", {"exit_code": 7, "success": True}) == "success"
+    messages = [
+        {"role": "assistant", "tool_calls": [{"id": "t", "function": {"name": "terminal"}}]},
+        {"role": "tool", "tool_call_id": "t", "content": {"exit_code": 0}, "is_error": True},
+    ]
+    assert _tool_verdicts(messages)[:2] == (0, 1)
 
 
 def test_no_signals_no_extra_prompt():

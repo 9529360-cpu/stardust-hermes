@@ -37,6 +37,46 @@ def declared_tool_verdict(data: Any) -> Optional[bool]:
     return all(flags) if flags else None
 
 
+def tool_result_outcome(tool_name: str, data: Any) -> str:
+    """Classify declared envelope facts, never output text or task completion.
+
+    Non-final/unknown states cannot be upgraded by an optimistic success flag.
+    Terminal exit codes are command outcomes, including timeout's conventional 124.
+    """
+    if not isinstance(data, dict):
+        return "unknown"
+    status = data.get("status")
+    status = status.strip().lower() if isinstance(status, str) else ""
+    if status in {"cancelled", "canceled"}:
+        return "cancelled"
+    if status in {"timeout", "timed_out"}:
+        return "timed_out"
+    if data.get("is_error") is True or status in {"failed", "error", "blocked"}:
+        return "failed"
+    if status == "unknown":
+        return "unknown"
+    if status in {
+        "pending", "running", "queued", "in_progress",
+        "started", "background", "yielded_to_background",
+    }:
+        return "pending"
+    verdict = declared_tool_verdict(data)
+    if verdict is False:
+        return "failed"
+    if tool_name == "terminal":
+        exit_code = data.get("exit_code")
+        if type(exit_code) is int:
+            if exit_code == 124:
+                return "timed_out"
+            return "success" if exit_code == 0 else "failed"
+        # A present but missing/invalid exit code is not a completed command.
+        if "exit_code" in data:
+            return "unknown"
+    if verdict is True or status in {"success", "completed", "ok"}:
+        return "success"
+    return "unknown"
+
+
 def file_mutation_result_landed(tool_name: str, result: Any) -> bool:
     """Return True when a file mutation result proves the write landed."""
     if tool_name not in FILE_MUTATING_TOOL_NAMES or not isinstance(result, str):
