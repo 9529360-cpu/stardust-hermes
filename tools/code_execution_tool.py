@@ -72,6 +72,14 @@ def _truncate_stdout_text(stdout_text: str) -> Tuple[str, Dict[str, Any]]:
                            "narrower output if the omitted data is required.")
     spill_path = _spill_full_stdout(stdout_text)
     if spill_path:
+        try:
+            from pathlib import Path
+            from tools.tool_output_truncate import saved_output_preview
+            saved = Path(spill_path).read_text(encoding="utf-8", errors="replace")
+            text = saved_output_preview(saved, MAX_STDOUT_BYTES, fallback=text,
+                                        byte_budget=True, tail_source=text)
+        except Exception:
+            logger.debug("Key-line extraction failed; using existing stdout preview", exc_info=True)
         metadata["stdout_spill_path"] = spill_path
         metadata["warning"] = ("execute_code stdout was truncated (head/tail shown); the "
                                f"script did run. FULL output saved to {spill_path} — page it "

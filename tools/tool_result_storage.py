@@ -228,7 +228,7 @@ def _build_persisted_message(preview: str, has_more: bool, original_size: int,
         "Recovery: page through the saved file with read_file (offset/limit) or "
         "process it with execute_code — do NOT re-request the same data from the "
         "remote API; the full result is already on disk.\n\n"
-        f"Preview (first {len(preview)} chars):\n"
+        f"Preview ({len(preview)} chars; key-line numbers refer to saved file):\n"
         + preview + ("\n..." if has_more else "")
         + f"\n{PERSISTED_OUTPUT_CLOSING_TAG}")
 
@@ -260,7 +260,13 @@ def maybe_persist_tool_result(content: str, tool_name: str, tool_use_id: str, en
     def _persisted(path: str, host_suffix: str = "") -> str:
         logger.info("Persisted large tool result: %s (%s, %d chars -> %s%s)",
                     tool_name, tool_use_id, len(content), path, host_suffix)
-        return _build_persisted_message(preview, has_more, len(content), path)
+        from tools.tool_output_truncate import saved_output_preview
+        try:
+            saved_preview = saved_output_preview(content, config.preview_size, fallback=preview)
+        except Exception:
+            logger.debug("Key-line extraction failed; using existing preview", exc_info=True)
+            saved_preview = preview
+        return _build_persisted_message(saved_preview, has_more, len(content), path)
 
     # Always persist host-side first: cache/spillover is the single canonical home.
     host_path = _write_to_spillover(content, filename)

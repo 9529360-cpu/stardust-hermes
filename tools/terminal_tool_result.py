@@ -273,13 +273,20 @@ def finalize_foreground_result(
     if approval_note and returncode == 130 and "[Command interrupted]" in output:
         approval_note = approval_note.rstrip(".") + ", then interrupted."
 
+    spill_fields = _redact_spill_file(result.get("full_output_path"), result.get("output_total_chars"), command)
+    if spill_fields:
+        with _quiet("saved output key-line preview"):
+            from tools.tool_output_limits import get_max_bytes
+            from tools.tool_output_truncate import saved_output_preview
+            saved = Path(result["full_output_path"]).read_text(encoding="utf-8", errors="replace")
+            output = saved_output_preview(saved, get_max_bytes(), fallback=output, tail_source=output)
     result_dict = {"output": output, "exit_code": returncode, "error": None}
     # Optional fields in observable JSON key order; None means "omit". Spill
     # metadata is present only when output overflowed the capture window.
     optional_fields: list[tuple[str, Any]] = [
         ("cwd", changed_cwd),
         ("environment_recreated", _ENV_RECREATED_NOTE if result.get("environment_recreated") else None),
-        *_redact_spill_file(result.get("full_output_path"), result.get("output_total_chars"), command),
+        *spill_fields,
         ("verification_evidence", _verification_evidence(
             command, command_cwd, session_id or task_id or effective_task_id or "default",
             returncode, output)),
