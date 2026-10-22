@@ -3,6 +3,7 @@
 import http.server
 import json
 import subprocess
+import sys
 import threading
 import time
 from unittest.mock import MagicMock, patch
@@ -205,7 +206,7 @@ class TestReadiness:
         port = _free_port()
         recipe = Recipe(
             name="x",
-            start=f"python3 -m http.server {port} --bind 127.0.0.1",
+            start=f'"{sys.executable}" -m http.server {port} --bind 127.0.0.1',
             port=port,
         )
         result = run_verify(tmp_path, recipe, phases=("start",), ready_timeout=15)
