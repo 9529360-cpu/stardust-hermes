@@ -42,7 +42,7 @@ def main():
         'large_output': (py + ' -c ' + shlex.quote("import sys; sys.stdout.write('x' * (3 * 1024 * 1024))"), 10, payload, 0),
         'timeout': (py + ' -c ' + shlex.quote('import time; time.sleep(10)'), 0.2, None, 124),
     }
-    document = json.loads(args.output.read_text()) if args.output.exists() else {
+    document = json.loads(args.output.read_text(encoding='utf-8')) if args.output.exists() else {
         'platform': platform.platform(), 'python': platform.python_version(),
         'iterations': args.iterations, 'measurement': 'LocalEnvironment.execute wall ms; session initialized outside timing; alternating backend order; p95 nearest rank; timeout expected=124; 3 MiB exact output',
         'phases': {},
