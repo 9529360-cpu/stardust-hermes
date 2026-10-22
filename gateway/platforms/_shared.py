@@ -10,6 +10,8 @@ import contextlib
 import json
 import logging
 import os
+from urllib.parse import urlsplit
+from urllib.request import url2pathname
 from typing import Any, Callable, Iterable, Optional
 
 # Profile-scoped secret reader for multiplexing support (PR #50094)
@@ -17,6 +19,19 @@ from agent.secret_scope import UnscopedSecretError as _UnscopedSecretError
 from agent.secret_scope import get_secret as _scoped_get_secret
 
 logger = logging.getLogger(__name__)
+
+
+def file_uri_to_path(uri: str) -> str:
+    """Decode a file URI once, retaining its authority as a UNC host."""
+    raw = uri[len("file://"):]
+    # Keep legacy drive-form callers working alongside canonical Path.as_uri().
+    if len(raw) >= 2 and raw[0].isalpha() and raw[1] == ":":
+        return url2pathname(raw)
+    parsed = urlsplit(uri)
+    path = parsed.path
+    if parsed.netloc and parsed.netloc.lower() != "localhost":
+        path = "//" + parsed.netloc + path
+    return url2pathname(path)
 
 
 def get_scoped_secret(name: str, default: Any = None, *, external_fallback: bool = False) -> Any:

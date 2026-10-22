@@ -373,8 +373,8 @@ class MattermostAdapter(BasePlatformAdapter):
         """Read a file:// or remote image for a batch post → (data, filename, content_type), or None to skip."""
         import aiohttp
         if image_url.startswith("file://"):
-            from urllib.request import url2pathname
-            local_path = url2pathname(image_url[7:])
+            from gateway.platforms._shared import file_uri_to_path
+            local_path = file_uri_to_path(image_url)
             p = Path(local_path)
             if not p.exists():
                 logger.warning("Mattermost: skipping missing image %s", local_path)
