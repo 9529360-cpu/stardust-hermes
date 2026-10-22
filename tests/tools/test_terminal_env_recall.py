@@ -10,7 +10,7 @@ def _restricted_path(tmp_path):
         return "/usr/bin:/bin"
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
-    for name in ("grep", "mv", "rm"):
+    for name in ("grep", "mv", "rm", "mktemp"):
         (bin_dir / name).symlink_to(shutil.which(name))
     return str(bin_dir)
 
