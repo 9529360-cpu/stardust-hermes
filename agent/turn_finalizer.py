@@ -510,7 +510,7 @@ def finalize_turn(
     if footer:
         final_response = (final_response or '') + '\n\n' + footer
         agent._response_was_previewed = False
-        append_message(messages, {"role": "assistant", "content": final_response})
+        append_message(messages, {"role": "assistant", "content": footer})
         _guarded_cleanup("persist_cleanup_receipt",
                          lambda: agent._persist_session(messages, conversation_history),
                          _cleanup_errors, logger)

@@ -158,6 +158,18 @@ def test_single_cleanup_step_raises_does_not_skip_others(step):
     assert len(result["cleanup_errors"]) == 1
 
 
+def test_cleanup_receipt_does_not_repeat_final_body_in_transcript():
+    agent = _StubAgent(raise_in=())
+    agent._task_cleanup_receipt = dict(cleared=[dict(id='proc-owned', result='killed')],
+                                       retained=[], failed=[])
+    result = _run(agent, final_response='TASK_HISTORY_STARTED', api_call_count=1,
+                  turn_exit_reason='text_response')
+    text = '\n'.join(str(m.get('content', '')) for m in result['messages'])
+    assert text.count('TASK_HISTORY_STARTED') == 1
+    assert '资源收尾' in text
+    assert result['final_response'].count('TASK_HISTORY_STARTED') == 1
+
+
 def test_clean_turn_has_no_cleanup_errors_key():
     agent = _StubAgent(raise_in=())
     result = _run(agent)
