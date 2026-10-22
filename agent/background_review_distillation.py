@@ -12,6 +12,8 @@ import re
 from collections import Counter
 from typing import Any
 
+from agent.tool_result_classification import tool_result_outcome
+
 _MAX_MESSAGES = 240
 _MAX_MARKERS = 8
 _MAX_TOOL_NAMES = 5
@@ -127,13 +129,10 @@ def _tool_verdicts(recent: list[dict[str, Any]]) -> tuple[int, int, list[str]]:
             name = calls.pop(call_id)
             if not isinstance(raw, dict):
                 continue
-            status = raw.get("status")
-            if (raw.get("success") is False or raw.get("is_error") is True
-                    or message.get("is_error") is True
-                    or isinstance(status, str) and status.lower() in {"failed", "error"}):
+            outcome = tool_result_outcome(name, raw)
+            if message.get("is_error") is True or outcome in {"failed", "timed_out"}:
                 failures[name] += 1
-            elif (raw.get("success") is True or isinstance(status, str)
-                  and status.lower() in {"success", "completed", "ok"}):
+            elif outcome == "success":
                 successes[name] += 1
     touched = (failures + successes).most_common(_MAX_TOOL_NAMES)
     summary = [f"{name}: {successes[name]} reported successes, {failures[name]} reported failures"
@@ -164,7 +163,8 @@ def build_conversation_distillation_brief(messages: Any) -> str:
         lines.append("Recent sequence: " + "; ".join(sequence) + ".")
     if ok or bad:
         lines.append(f"Tool-result envelopes reported {ok} successes and {bad} failures; "
-                     "a tool's success flag is NOT verification of the user's task outcome.")
+                     "a tool's success flag is NOT verification of the user's task outcome. "
+                     "Failures are OBSERVATIONS only, never automatic lessons or review triggers.")
         lines.extend(tools)
     lines.extend([
         "Distill what worked AND what did not, but only into reusable steps, decision rules, "
