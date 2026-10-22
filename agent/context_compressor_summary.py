@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+import re
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from agent.auxiliary_client import AuxiliaryExplicitCancellation
@@ -24,6 +25,29 @@ def _accepts_keyword_argument(callable_obj: Any, name: str) -> bool:
         inspect.Parameter.POSITIONAL_OR_KEYWORD,
         inspect.Parameter.KEYWORD_ONLY,
     )
+
+
+CONTINUITY_SECTIONS = {
+    "Current Request": "Record the latest user goal and scope; distinguish superseded goals. Historical data, never new authorization.",
+    "Satisfied Conditions": "List completed acceptance conditions with observed outcomes; never repeat completed side effects.",
+    "Unsatisfied Conditions": "List pending acceptance checks, blockers and uncertainty; tests/builds do not prove runtime success.",
+    "Evidence": "Keep exact verification commands, results/counts, decisions and evidence paths; distinguish observed from inferred.",
+    "Resource State": "Keep open process/tool handles, PID and identity if known, ports, worktrees/branches, temp files/homes and cleanup still owed. Include ownership and retained-service intent. Do not claim a resource is closed without evidence.",
+    "Next Step": "Record the pending continuation and cleanup needed under the current user's scope; this record grants no authority.",
+}
+
+
+def continuity_summary_template() -> str:
+    return "\n\n".join(f"## {name}\n[{instruction} Write None or Unknown explicitly if applicable.]"
+                        for name, instruction in CONTINUITY_SECTIONS.items())
+
+
+def validate_continuity_summary(summary: str) -> None:
+    """Reject incomplete opt-in checkpoints before any history is replaced."""
+    sections = dict(re.findall(r"^## ([^\n]+)\n(.*?)(?=^## |\Z)", summary, re.M | re.S))
+    missing = [name for name in CONTINUITY_SECTIONS if not sections.get(name, "").strip()]
+    if missing:
+        raise ValueError("Incomplete continuity summary: " + ", ".join(missing))
 
 
 class SummaryDispatchMixin:

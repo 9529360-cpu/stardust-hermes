@@ -255,6 +255,15 @@ def assemble_api_request(
         request_pressure_tokens = _pressure_with_real_floor(
             agent.context_compressor, request_pressure_tokens
         )
+    budget = getattr(agent, "request_input_budget_tokens", 0)
+    if isinstance(budget, int) and not isinstance(budget, bool) and budget > 0:
+        # Budget policy uses the complete local request, even if a stale provider
+        # anchor is smaller. Provider usage remains separate, authoritative telemetry.
+        from agent.model_metadata import estimate_request_tokens_rough
+        request_pressure_tokens = max(request_pressure_tokens, estimate_request_tokens_rough(
+            api_messages, tools=tools_for_api or None,
+        ))
+        logger.info("Request input budget: estimated=%s budget=%s", request_pressure_tokens, budget)
     return AssembledRequest(
         "fallthrough", api_messages, tools_for_api, _moa_prepared_request,
         pending_moa_prepared_request, approx_tokens, request_pressure_tokens, approx_tokens * 4,

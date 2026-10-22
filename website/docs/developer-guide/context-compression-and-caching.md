@@ -7,6 +7,33 @@ Source files: `agent/context_engine.py` (ABC), `agent/context_compressor.py` (de
 `agent/prompt_caching.py`, `gateway/run_turn.py` (session hygiene), `agent/compression_facade.py` (search for `_compress_context`)
 
 
+## Per-request input budget (opt-in)
+
+Set `compression.request_input_budget_tokens` to a positive integer to bound each
+agent request by the local input-token estimate (system, history and tools). The
+default `0` preserves existing threshold policy. Unlike `threshold_tokens`, this
+is a send gate: it runs even when ordinary pressure estimates would be deferred.
+It reuses the existing bounded compression attempts and session persistence. If
+compression is disabled, blocked, ineffective, or cannot fit protected input,
+the turn stops explicitly with history retained instead of sending oversized input.
+Late middleware additions are checked again immediately before transport; these
+fail without provider retry. The summary-model request also has a budget gate.
+
+This is a local estimate ceiling, not a provider tokenizer guarantee or a price
+limit. Native opaque checkpoints, images and provider formatting can differ from
+local estimates. Actual provider usage and cache accounting remain authoritative
+when available. Choose a budget that accommodates the system prompt, tool schemas,
+protected tail and summary template; an undersized budget can intentionally stop a
+session. It does not forcibly open a separate session or silently truncate input.
+
+Compression prompts include Current Request, Satisfied Conditions, Unsatisfied
+Conditions, Evidence, Resource State and Next Step. Record resource ownership,
+handles/paths and outstanding cleanup, and distinguish verified results from
+inferences. With the budget enabled, incomplete/empty sections reject the summary
+and retain history through the existing summary-failure path. Field validation
+checks structure; summary factual fidelity still depends on the summarizer. A
+checkpoint remains historical data and grants no new authorization.
+
 ## Pluggable Context Engine
 
 Context management is built on the `ContextEngine` ABC (`agent/context_engine.py`). The built-in `ContextCompressor` is the default implementation, but plugins can replace it with alternative engines (e.g., Lossless Context Management).

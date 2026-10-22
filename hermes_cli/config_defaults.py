@@ -570,6 +570,9 @@ DEFAULT_CONFIG = {
         # threshold_tokens: absolute token cap — compression triggers at the lower of the ratio
         # threshold and this count. Clamped to the model's context length.
         "threshold_tokens": None,
+        # Opt-in per-request local input-token estimate ceiling (0 = legacy policy).
+        # Compress before sending; stop with history retained if it cannot fit.
+        "request_input_budget_tokens": 0,
         # "progress_notices": False,    # opt-in (#52995): when True, routine compression
         "target_ratio": 0.20,         # fraction of threshold to preserve as recent tail
         # tail_mode: "lean" = clamped 2.5%-of-window tail (10K floor / 25K cap) plus chunked

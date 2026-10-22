@@ -87,6 +87,44 @@ def run_preflight_gate(
             f"{_last_preflight_pressure:,}",
             f"{request_pressure_tokens:,}",
         )
+    # An explicit input budget is independent of model-window pressure. Never
+    # defer it to a provider response (that would already spend the oversized input).
+    budget = getattr(agent, "request_input_budget_tokens", 0)
+    if isinstance(budget, int) and not isinstance(budget, bool) and budget > 0 and request_pressure_tokens > budget:
+        from agent.turn_context_compaction import _refund_api_call, _reset_retry_state_after_compaction
+        from agent.conversation_compression import conversation_history_after_compression
+
+        if (agent.compression_enabled and not v._preflight_compression_blocked
+                and compression_attempts < max_compression_attempts
+                and not _compressor.get_active_compression_failure_cooldown()):
+            v.compression_attempts += 1
+            v._last_preflight_pressure = request_pressure_tokens
+            before = v.messages
+            v.messages, v.active_system_prompt = agent._compress_context(
+                before, system_message, approx_tokens=request_pressure_tokens,
+                task_id=effective_task_id,
+            )
+            if v.messages is not before:
+                v.conversation_history = conversation_history_after_compression(
+                    agent, v.messages, v.conversation_history,
+                )
+                _reset_retry_state_after_compaction(agent)
+                v.api_call_count = _refund_api_call(agent, v.api_call_count)
+                v.action = "continue"
+                return v
+        v.final_response = (
+            f"Request input budget exceeded: estimated {request_pressure_tokens} tokens > "
+            f"{budget} budget. Compression could not fit the request; no model request was sent. "
+            "History is retained. Reduce the current input/tool footprint or raise "
+            "compression.request_input_budget_tokens before continuing."
+        )
+        v.failed = True
+        v._turn_exit_reason = "request_input_budget_exceeded"
+        v.api_call_count = _refund_api_call(agent, v.api_call_count)
+        agent._emit_status(v.final_response)
+        v.action = "break"
+        return v
+
     return run_preflight_compression(
         agent, v, compressor=_compressor, request_pressure_tokens=request_pressure_tokens,
         provider_overflow_preflight=_provider_overflow_preflight,

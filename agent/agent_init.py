@@ -1512,6 +1512,7 @@ def _parse_compression_config(agent, _agent_cfg) -> CompressionSettings:
             if isinstance(v, (int, float)) and not isinstance(v, bool)
         },
         threshold_tokens=threshold_tokens,
+        request_input_budget_tokens=_positive_int(cfg.get("request_input_budget_tokens"), reject=(bool, float)) or 0,
         checkpoint_required=checkpoint_required,
         # In-place compaction: no session-id rotation. default=True MUST match DEFAULT_CONFIG
         # (a False default flipped agents into rotation mode when the key was omitted).
@@ -1885,6 +1886,11 @@ def _build_context_engine(agent, _agent_cfg, cs, _custom_providers, _effective_c
     if callable(_bind_session_state):
         with suppress(Exception):
             _bind_session_state(session_db=session_db, session_id=agent.session_id)
+    agent.request_input_budget_tokens = cs.request_input_budget_tokens
+    agent.context_compressor.require_continuity_fields = cs.request_input_budget_tokens > 0
+    agent.context_compressor.request_input_budget_tokens = cs.request_input_budget_tokens
+    if cs.request_input_budget_tokens > 0:
+        agent.context_compressor.abort_on_summary_failure = True
     agent.compression_enabled = cs.enabled
     agent.compression_in_place = cs.in_place
     _cc = agent.context_compressor
