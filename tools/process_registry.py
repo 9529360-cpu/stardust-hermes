@@ -472,6 +472,8 @@ class ProcessSession:
     pid_scope: str = "host"                     # "host" for local/PTY PIDs, "sandbox" for env-local PIDs
     systemd_unit: str = ""                      # transient scope unit name when spawned under systemd-run
     handoff_note: str = ""                      # why a subagent handed this process to its parent (rides the notice)
+    resource_lifetime: str = "session"          # task|service|session; explicit cleanup intent
+    _cleanup_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
     # Watcher/notification routing (persisted for crash recovery)
     # systemd_unit: str = ""                      # transient scope unit name when spawned under systemd-run
     # (#70716)
@@ -540,7 +542,7 @@ GATEWAY_WATCHER_INTERVAL_SECONDS = 5
 # ``session_id``; ``command`` is redacted and ``owner_task_id`` defaulted on write).
 _CHECKPOINT_FIELDS = (
     "command", "pid", "pid_scope", "host_start_time", "systemd_unit", "cwd",
-    "started_at", "task_id", "owner_task_id", "session_key", "owner_home", "handoff_note",
+    "started_at", "task_id", "owner_task_id", "session_key", "owner_home", "handoff_note", "resource_lifetime",
     *(f"watcher_{k}" for k in _WATCHER_ROUTE_KEYS), "watcher_interval",
     "parent_session_id", "verification_session_id", "workspace_mutation_root",
     "notify_on_complete", "watch_patterns")
@@ -992,6 +994,8 @@ class ProcessRegistry(ProcessCheckpointMixin):
             # ghost entry if the interpreter cannot start another thread.
             reader.start()
             self._running[session.id] = session
+        from tools.task_resources import register_process
+        register_process(session, registry=self)
         self._write_checkpoint()
 
     def _spawn_local_pty(self, session: ProcessSession, safe_command: str, env_vars: dict) -> ProcessSession:
@@ -2040,6 +2044,10 @@ class ProcessRegistry(ProcessCheckpointMixin):
         session = self.get(session_id)
         if session is None:
             return _not_found(session_id)
+        with session._cleanup_lock:
+            return self._kill_process_locked(session, session_id, source, consume_output)
+
+    def _kill_process_locked(self, session, session_id, source, consume_output):
         if session.exited:
             # A double-forked descendant may still be alive in the systemd scope even
             # though the main process exited — stop the scope to reap survivors.
@@ -2252,6 +2260,7 @@ class ProcessRegistry(ProcessCheckpointMixin):
                 "cwd": s.cwd,
                 "pid": s.pid,
                 "owner_task_id": s.owner_task_id or s.task_id,
+                "resource_lifetime": s.resource_lifetime,
                 "started_at": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(s.started_at)),
                 "uptime_seconds": int(time.time() - s.started_at),
                 "status": "exited" if s.exited else "running",
@@ -2324,7 +2333,10 @@ class ProcessRegistry(ProcessCheckpointMixin):
             session.task_id = to_task_id
             session.session_key = to_session_key
             session.handoff_note = note
-            return session
+        from tools.task_resources import register_process
+        register_process(session, lifetime=session.resource_lifetime, registry=self)
+        self._write_checkpoint()
+        return session
 
     def has_active_for_session(self, session_key: str, max_active_age: Optional[float] = None) -> bool:
         """Active processes for a gateway session key. Processes older than

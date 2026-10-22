@@ -1195,6 +1195,8 @@ def terminal_tool(
     notify_on_complete: bool = False,
     watch_patterns: Optional[List[str]] = None,
     _host_local: bool = False,
+    resource_lifetime: str = "session",
+    owned_paths: Optional[List[dict]] = None,
 ) -> str:
     """Execute *command* in the configured terminal environment; returns a JSON string.
 
@@ -1234,13 +1236,15 @@ def terminal_tool(
             # caller could not have meant for a foreground call, and the two are exclusive anyway.
             background, notify_on_complete, watch_patterns = True, True, None
         if background:
-            result = spawn_background_process(
-                command=command, env=env, env_type=env_type, effective_task_id=effective_task_id,
-                task_id=task_id, session_key=session_key, session_id=session_id, workdir=workdir, cwd=cwd,
-                effective_pty=pty and not pty_disabled, notify_on_complete=notify_on_complete,
-                watch_patterns=watch_patterns, approval_note=verdict.note,
-                pty_disabled_reason=_PTY_DISABLED_REASON if pty_disabled else None,
-            )
+            from tools.task_resources import resource_scope
+            with resource_scope(resource_lifetime, owned_paths or ()):
+                result = spawn_background_process(
+                    command=command, env=env, env_type=env_type, effective_task_id=effective_task_id,
+                    task_id=task_id, session_key=session_key, session_id=session_id, workdir=workdir, cwd=cwd,
+                    effective_pty=pty and not pty_disabled, notify_on_complete=notify_on_complete,
+                    watch_patterns=watch_patterns, approval_note=verdict.note,
+                    pty_disabled_reason=_PTY_DISABLED_REASON if pty_disabled else None,
+                )
             if plan.promoted_from_foreground_timeout is not None:
                 result = _with_promoted_note(result, plan.promoted_from_foreground_timeout)
             return result
@@ -1281,6 +1285,18 @@ TERMINAL_SCHEMA = {
             "command": {
                 "type": "string",
                 "description": "The shell command to execute"
+            },
+            "resource_lifetime": {
+                "type": "string", "enum": ["task", "service", "session"],
+                "description": "task: stop this temporary process tree at task completion/timeout; service: explicitly keep running; session: preserve existing across-turn background behavior.",
+                "default": "session"
+            },
+            "owned_paths": {
+                "type": "array", "description": "Disposable paths CREATED by this task, removed after task processes exit. Never register existing user data or source checkout.",
+                "items": {"type": "object", "properties": {
+                    "kind": {"type": "string", "enum": ["temp_dir", "worktree"]},
+                    "path": {"type": "string"}, "repository": {"type": "string"}
+                }, "required": ["kind", "path"], "additionalProperties": False}
             },
             "background": {
                 "type": "boolean",
@@ -1369,6 +1385,8 @@ def _handle_terminal(args, **kw):
         pty=args.get("pty", False),
         notify_on_complete=notify_on_complete,
         watch_patterns=watch_patterns,
+        resource_lifetime=args.get("resource_lifetime", "session"),
+        owned_paths=args.get("owned_paths"),
     )
 
 

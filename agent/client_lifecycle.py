@@ -114,6 +114,10 @@ class ClientLifecycleMixin:
         stopped = 0
         for process in process_registry.list_sessions():
             if process["owner_task_id"] in owners and process["status"] == "running":
+                session = process_registry.get(process["session_id"])
+                from agent.delegation_context import is_delegated_child_context
+                if session and session.resource_lifetime == 'service' and not is_delegated_child_context():
+                    continue
                 result = process_registry.kill_process(process["session_id"], source=source, consume_output=True)
                 stopped += result.get("status") in {"killed", "already_exited"}
         return stopped
