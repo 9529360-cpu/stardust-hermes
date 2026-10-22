@@ -762,7 +762,8 @@ class SignalAdapter(BasePlatformAdapter):
     async def _resolve_image_path(self, image_url: str) -> Tuple[Optional[str], Optional[str], Any]:
         """``(path, None, None)`` or ``(None, reason, detail)``: reason download (exc) / missing / oversize (size)."""
         if image_url.startswith("file://"):
-            file_path = unquote(image_url[7:])
+            from urllib.request import url2pathname
+            file_path = url2pathname(image_url[7:])
         else:
             try:
                 file_path = await cache_image_from_url(image_url)

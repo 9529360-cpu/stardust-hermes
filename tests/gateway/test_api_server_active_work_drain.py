@@ -132,7 +132,11 @@ class TestDrainWaitsForApiWork:
         task_started = asyncio.Event()
         allow_task = asyncio.Event()
 
-        def delayed_create_task(coro):
+        def delayed_create_task(coro, **kwargs):
+            # Delay only the admitted run, never aiohttp/Windows transport tasks.
+            if coro.cr_code.co_name != "_execute_run":
+                return original_create_task(coro, **kwargs)
+
             async def delayed():
                 task_started.set()
                 await allow_task.wait()
@@ -153,7 +157,7 @@ class TestDrainWaitsForApiWork:
             async with TestClient(TestServer(app)) as client:
                 response = await client.post("/v1/runs", json={"input": "hello"})
                 assert response.status == 202
-                await task_started.wait()
+                await asyncio.wait_for(task_started.wait(), timeout=5)
 
                 assert api._active_run_agents == {}
                 assert runner._active_api_run_count() == 1

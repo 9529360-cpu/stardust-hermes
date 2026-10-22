@@ -132,7 +132,7 @@ class DiscordMediaMixin:
         try:
             import discord as _discord_mod
             import io as _io
-            from urllib.parse import unquote as _unquote
+            from urllib.request import url2pathname as _unquote
         except Exception:  # pragma: no cover
             return await super().send_multiple_images(chat_id, images, metadata, human_delay)
         try:

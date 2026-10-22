@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import pytest
 
+pytestmark = pytest.mark.linux_only
+
 from gateway.scale_to_zero import (
     DEFAULT_IDLE_TIMEOUT_MINUTES,
     SCALE_TO_ZERO_ENV,

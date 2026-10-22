@@ -2838,7 +2838,8 @@ class SlackAdapter(BasePlatformAdapter):
                 if alt_text:
                     initial_comment_parts.append(alt_text)
                 if image_url.startswith("file://"):
-                    local_path = unquote_fn(image_url[7:])
+                    from urllib.request import url2pathname
+                    local_path = url2pathname(image_url[7:])
                     if not os.path.exists(local_path):
                         logger.warning("[Slack] Skipping missing image: %s", local_path)
                         continue

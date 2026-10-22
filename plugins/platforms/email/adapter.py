@@ -726,7 +726,7 @@ class EmailAdapter(BasePlatformAdapter):
         """One email per batch: local files attached, URL images linked in the body (no remote download); base-class fallback on failure."""
         if not images:
             return SendResult(success=False, error="no images to send")
-        from urllib.parse import unquote as _unquote
+        from urllib.request import url2pathname as _unquote
         body_parts, local_paths = [], []
         for image_url, alt_text in images:
             if alt_text:

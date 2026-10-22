@@ -78,7 +78,17 @@ class _ScriptedEnv(BaseEnvironment):
 
     def execute(self, command, cwd="", **kwargs):
         import subprocess
-        proc = subprocess.run(["bash", "-c", command], capture_output=True, text=True)
+        import os
+        import shutil
+        # Native Windows may resolve bash.exe to WSL; this fixture needs Git Bash
+        # to read the Windows tmp_path rather than a separate Linux filesystem.
+        shell = shutil.which("bash")
+        if os.name == "nt":
+            git = shutil.which("git")
+            shell = str(Path(git).parents[1] / "bin" / "bash.exe") if git else None
+            if not shell or not Path(shell).is_file():
+                pytest.skip("Git Bash is required for the POSIX sandbox transport probe")
+        proc = subprocess.run([shell, "-c", command], capture_output=True, text=True, encoding="utf-8", errors="replace")
         return {"output": "echo login-noise\n" + proc.stdout + proc.stderr, "returncode": proc.returncode}
 
 
@@ -88,10 +98,10 @@ def test_fetch_file_round_trips_bytes_and_enforces_the_in_sandbox_size_cap(tmp_p
     dest = tmp_path / "copy.bin"
     env = _ScriptedEnv()
 
-    env.fetch_file(str(src), dest, max_bytes=len(src.read_bytes()))
+    env.fetch_file(src.as_posix(), dest, max_bytes=len(src.read_bytes()))
     assert dest.read_bytes() == src.read_bytes()
 
     with pytest.raises(FileFetchError, match="exceeds"):
-        env.fetch_file(str(src), dest, max_bytes=100)
+        env.fetch_file(src.as_posix(), dest, max_bytes=100)
     with pytest.raises(FileFetchError, match="could not read"):
-        env.fetch_file(str(tmp_path), dest, max_bytes=100)  # a directory is not a regular file
+        env.fetch_file(tmp_path.as_posix(), dest, max_bytes=100)  # a directory is not a regular file

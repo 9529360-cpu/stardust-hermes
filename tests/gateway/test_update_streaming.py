@@ -155,9 +155,12 @@ class TestUpdateCommandGatewayFlag:
         call_args = mock_popen.call_args[0][0]
         cmd_string = call_args[-1] if isinstance(call_args, list) else str(call_args)
         assert "--gateway" in cmd_string
-        assert "PYTHONUNBUFFERED" in cmd_string
-        assert "rc=$?" in cmd_string
-        assert "status=$?" not in cmd_string
+        if os.name == "nt":
+            assert "PYTHONUNBUFFERED" in call_args[2]
+        else:
+            assert "PYTHONUNBUFFERED" in cmd_string
+            assert "rc=$?" in cmd_string
+            assert "status=$?" not in cmd_string
         assert "stream progress" in result
 
 

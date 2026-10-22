@@ -13,6 +13,7 @@ Signal's native implementation is covered by test_signal.py.
 """
 
 import asyncio
+import os
 import sys
 import types
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -85,7 +86,7 @@ class TestBaseDefaultLoop:
         assert len(a.sent_images) == 2
         assert len(a.sent_animations) == 1
         assert len(a.sent_files) == 1
-        assert a.sent_files[0][1] == "/tmp/foo.png"
+        assert os.path.normpath(a.sent_files[0][1]) == os.path.normpath("/tmp/foo.png")
 
 
 from plugins.platforms.telegram.adapter import TelegramAdapter  # noqa: E402

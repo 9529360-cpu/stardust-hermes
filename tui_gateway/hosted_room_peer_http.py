@@ -109,7 +109,7 @@ def _read_bounded_response(response: Any, *, max_bytes: int, deadline: float) ->
         try:
             chunk = reader(min(_PEER_RESPONSE_CHUNK_BYTES, max_bytes + 1 - len(body)))
         except Exception as exc:
-            if time.monotonic() >= deadline:
+            if isinstance(exc, TimeoutError) or time.monotonic() >= deadline:
                 raise _PeerResponseDeadlineExceeded from exc
             raise
         if not chunk:
@@ -299,7 +299,7 @@ class PeerRunsHTTPClient:
             self._raise_http_error(exc, method=method, path=path, deadline=deadline)
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             reason = exc.reason if isinstance(exc, urllib.error.URLError) else exc
-            if isinstance(reason, TimeoutError) and time.monotonic() >= deadline:
+            if isinstance(reason, TimeoutError):
                 raise PeerRunsHTTPError(
                     _BUDGET_MESSAGES["time"].format(kind=""), retryable=True,
                     ambiguous=ambiguous,

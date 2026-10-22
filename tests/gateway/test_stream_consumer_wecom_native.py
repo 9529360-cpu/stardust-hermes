@@ -626,7 +626,9 @@ class TestClarifyEagerReseed:
 
         # User answered → request an eager re-seed.  NO on_delta yet.
         consumer.request_reopen_seed()
-        await self._drain(consumer, 0.05)  # let run() process _REOPEN_SEED
+        assert await self._wait_until(lambda: len(
+            [f for f in adapter.frames if f["text"] == "" and not f["finalize"]]
+        ) == seeds_before + 1)
 
         seeds_after = len(
             [f for f in adapter.frames if f["text"] == "" and not f["finalize"]]

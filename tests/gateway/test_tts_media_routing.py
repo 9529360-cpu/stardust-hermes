@@ -13,6 +13,8 @@ import types
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
+from urllib.request import url2pathname
+
 import pytest
 
 from gateway.config import Platform, PlatformConfig
@@ -241,7 +243,7 @@ async def test_queued_followup_delivery_strips_media_tag_from_text_and_sends_ima
     )
     adapter.send_multiple_images.assert_awaited_once_with(
         chat_id="chat-1",
-        images=[(f"file://{media_file.as_posix()}", "")],
+        images=[(media_file.as_uri(), "")],
         metadata={"thread_id": "topic-1"},
     )
 
@@ -291,7 +293,7 @@ async def test_queued_followup_delivery_reuses_routing_metadata_for_media(
     )
     adapter.send_multiple_images.assert_awaited_once_with(
         chat_id="chat-1",
-        images=[(f"file://{media_file.as_posix()}", "")],
+        images=[(media_file.as_uri(), "")],
         metadata=routing_metadata,
     )
 
@@ -480,7 +482,7 @@ class _QueuedMediaCaptureAdapter(BasePlatformAdapter):
         for image_url, _alt in images:
             path = image_url
             if path.startswith("file://"):
-                path = path[len("file://"):]
+                path = url2pathname(path[len("file://"):])
             self.images.append({"chat_id": chat_id, "image_path": path, "metadata": metadata})
 
     async def get_chat_info(self, chat_id):
