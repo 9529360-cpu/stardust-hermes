@@ -81,15 +81,16 @@ def _path_from_file_uri(uri: str) -> Path | None:
 
     # urlparse treats a bare drive letter as a URI scheme ("c").
     if len(raw) >= 3 and raw[0].isalpha() and raw[1] == ":" and raw[2] in "/\\":
-        return _path_from_file_uri("file:" + raw)
+        path_text = raw
+    else:
+        parsed = urlparse(raw)
+        if parsed.scheme and parsed.scheme != "file":
+            return None
 
-    parsed = urlparse(raw)
-    if parsed.scheme and parsed.scheme != "file":
-        return None
-
-    if parsed.scheme == "file" and parsed.netloc and parsed.netloc not in {"", "localhost"}:
-        return None
-    path_text = unquote(parsed.path or "") if parsed.scheme == "file" else unquote(raw)
+        if parsed.scheme == "file" and parsed.netloc and parsed.netloc not in {"", "localhost"}:
+            return None
+        # Percent escapes belong to URIs; raw filesystem paths keep literal '%' and '#'.
+        path_text = unquote(parsed.path or "") if parsed.scheme == "file" else raw
 
     # file:///C:/Users/... or C:\Users\...
     if len(path_text) >= 3 and path_text[0] == "/" and path_text[2] == ":" and path_text[1].isalpha():

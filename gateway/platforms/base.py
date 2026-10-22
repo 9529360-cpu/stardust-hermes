@@ -2752,7 +2752,7 @@ class BasePlatformAdapter(ABC):
         (Signal). Returns success when at least one image was delivered — the outcome
         the turn-level delivery tracker records; every override must return the same
         aggregate, or a media-only turn on that platform reports FAILURE (#106153)."""
-        from urllib.request import url2pathname as _unquote
+        from gateway.platforms._shared import file_uri_to_path
         delivered = False
         for image_url, alt_text in images:
             if human_delay > 0:
@@ -2761,7 +2761,7 @@ class BasePlatformAdapter(ABC):
                 logger.info("[%s] Sending image: %s (alt=%s)", self.name,
                             safe_url_for_log(image_url), alt_text[:30] if alt_text else "")
                 if image_url.startswith("file://"):
-                    sender, url_kw = self.send_image_file, {"image_path": _unquote(image_url[7:])}
+                    sender, url_kw = self.send_image_file, {"image_path": file_uri_to_path(image_url)}
                 elif self._is_animation_url(image_url):
                     sender, url_kw = self.send_animation, {"animation_url": image_url}
                 else:
