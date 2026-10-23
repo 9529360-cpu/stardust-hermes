@@ -247,7 +247,8 @@ def prepare(agent, request):
     contract = begin(getattr(agent, "session_id", None), request, resolve_agent_cwd())
     agent._task_acceptance_active = bool(contract)
     agent._task_acceptance_request = request
-    return guidance(contract)
+    from agent.task_checkpoint import prepare as prepare_checkpoint
+    return guidance(contract) + prepare_checkpoint(agent, request)
 
 
 def active(agent):
