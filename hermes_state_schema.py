@@ -44,6 +44,26 @@ _FTS_STALE_RETRY_SECONDS = 60.0
 _FTS_STALE_RETRY_MAX_SECONDS = 3600.0
 
 
+def ensure_identity_schema(connection: sqlite3.Connection) -> None:
+    """Additive identity-store migration, called only by the opt-in owner.
+
+    Deliberately separate from SessionDB startup: disabled profiles create no
+    identity files, tables, or rows. DDL participates in the caller's transaction.
+    """
+    connection.execute("""CREATE TABLE IF NOT EXISTS individual_identity (
+        singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+        individual_id TEXT NOT NULL UNIQUE,
+        created_at TEXT NOT NULL,
+        identity_version INTEGER NOT NULL CHECK (identity_version > 0),
+        owner_fingerprint TEXT NOT NULL
+    )""")
+    connection.execute("""CREATE TABLE IF NOT EXISTS identity_history (
+        sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+        identity_version INTEGER NOT NULL CHECK (identity_version > 0),
+        changed_at TEXT NOT NULL
+    )""")
+
+
 def _holder_cmdline(pid: int) -> str:
     argv = _read_proc_argv(pid)
     return " ".join(argv)[:120] if argv else "<cmdline unavailable>"
