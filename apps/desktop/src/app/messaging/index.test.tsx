@@ -141,7 +141,7 @@ describe('MessagingView localized platform presentation', () => {
 
     await renderMessaging('zh')
 
-    expect(await screen.findByText('通过 Telegram 机器人随时与助理对话，并接收提醒和任务结果。')).toBeTruthy()
+    expect(await screen.findAllByText('通过 Telegram 机器人随时与助理对话，并接收提醒和任务结果。')).toHaveLength(2)
     expect(screen.queryByText('Backend English description.')).toBeNull()
   })
 

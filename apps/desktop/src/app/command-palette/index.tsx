@@ -94,6 +94,7 @@ import {
   AGENTS_ROUTE,
   ARTIFACTS_ROUTE,
   COMMAND_CENTER_ROUTE,
+  CONNECTORS_ROUTE,
   CRON_ROUTE,
   MESSAGING_ROUTE,
   navigateToWorkspacePage,
@@ -819,6 +820,7 @@ function CommandPaletteBody({ onExited }: { onExited: () => void }) {
             action: 'nav.messaging',
             icon: MessageCircle,
             id: 'nav-messaging',
+            keywords: ['email', 'messaging', 'channels', '邮件', '消息渠道'],
             label: cc.nav.messaging.title,
             run: go(MESSAGING_ROUTE)
           },
@@ -1100,9 +1102,9 @@ function CommandPaletteBody({ onExited }: { onExited: () => void }) {
         {
           icon: Layers3,
           id: 'cap-mcp',
-          keywords: ['mcp', 'servers', 'tools', 'capabilities', 'model context protocol'],
-          label: `${capLabel}: ${t.skills.tabMcp}`,
-          run: go(`${SKILLS_ROUTE}?tab=mcp`)
+          keywords: ['connectors', 'email', 'calendar', 'github', 'mcp', 'servers', '连接器', '邮箱', '日历', 'model context protocol'],
+          label: t.connectors.pageTitle,
+          run: go(CONNECTORS_ROUTE)
         },
         {
           icon: Package,
@@ -1216,7 +1218,7 @@ function CommandPaletteBody({ onExited }: { onExited: () => void }) {
           id: `mcp-${name}`,
           keywords: ['mcp', 'server', 'tool'],
           label: name,
-          run: go(`${SKILLS_ROUTE}?tab=mcp&server=${encodeURIComponent(name)}`)
+          run: go(`${CONNECTORS_ROUTE}?server=${encodeURIComponent(name)}`)
         }))
       })
     }

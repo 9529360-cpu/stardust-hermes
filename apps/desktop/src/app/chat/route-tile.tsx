@@ -14,16 +14,18 @@ import { useContributions } from '@/contrib/react/use-contributions'
 import { translateNow, useI18n } from '@/i18n'
 import { $routeTiles, closeRouteTile, type RouteTile } from '@/store/route-tiles'
 
-import { ARTIFACTS_ROUTE, contributedRoutes, MESSAGING_ROUTE, ROUTES_AREA, SKILLS_ROUTE } from '../routes'
+import { ARTIFACTS_ROUTE, CONNECTORS_ROUTE, contributedRoutes, MESSAGING_ROUTE, ROUTES_AREA, SKILLS_ROUTE } from '../routes'
 
 import { paneMirror } from './pane-mirror'
 
 const SkillsView = lazy(async () => ({ default: (await import('../skills')).SkillsView }))
+const ConnectorsView = lazy(async () => ({ default: (await import('../connectors')).ConnectorsView }))
 const MessagingView = lazy(async () => ({ default: (await import('../messaging')).MessagingView }))
 const ArtifactsView = lazy(async () => ({ default: (await import('../artifacts')).ArtifactsView }))
 
 // Built-in page views + their pane titles, keyed by route.
 const BUILTIN_PAGES: Record<string, { render: () => ReactNode; titleKey: string }> = {
+  [CONNECTORS_ROUTE]: { render: () => <ConnectorsView />, titleKey: 'connectors.pageTitle' },
   [ARTIFACTS_ROUTE]: { render: () => <ArtifactsView />, titleKey: 'sidebar.nav.artifacts' },
   [MESSAGING_ROUTE]: { render: () => <MessagingView />, titleKey: 'sidebar.nav.messaging' },
   [SKILLS_ROUTE]: { render: () => <SkillsView />, titleKey: 'sidebar.nav.skills' }

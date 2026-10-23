@@ -10,6 +10,22 @@ const english = TRANSLATIONS[DEFAULT_LOCALE]
 const translatedLocales = (Object.keys(TRANSLATIONS) as Locale[]).filter(locale => locale !== DEFAULT_LOCALE)
 
 describe('desktop locale bundles', () => {
+  for (const locale of ['en', 'zh', 'ja', 'zh-hant'] as const) {
+    it(`${locale} supplies the connectors and messaging page copy`, () => {
+      const copy = TRANSLATIONS[locale]
+      expect(copy.connectors.pageTitle).toBeTruthy()
+      expect(copy.connectors.pageDescription).toBeTruthy()
+      expect(copy.connectors.connectedCount(2)).toContain('2')
+      expect(copy.messaging.pageDescription).toBeTruthy()
+      expect(copy.messaging.defaultDescription('Email')).toContain('Email')
+
+      if (locale !== 'en') {
+        expect(copy.connectors.pageDescription).not.toBe(english.connectors.pageDescription)
+        expect(copy.messaging.pageDescription).not.toBe(english.messaging.pageDescription)
+      }
+    })
+  }
+
   for (const locale of translatedLocales) {
     it(`${locale} translates the Projects empty line and the Tools and Plugins page titles`, () => {
       const copy = TRANSLATIONS[locale]

@@ -1851,7 +1851,9 @@ export const ja = defineLocale({
   },
 
   messaging: {
-    pageTitle: 'メッセージング',
+    pageDescription: 'メールの送信など、これらのチャネルで Stardust と会話できます。',
+    defaultDescription: (name: string) => `${name} で Stardust とメッセージをやり取りします。`,
+    pageTitle: 'メッセージチャネル',
     search: 'メッセージングを検索...',
     loading: 'メッセージングプラットフォームを読み込み中...',
     loadFailed: 'メッセージングプラットフォームの読み込みに失敗しました',
@@ -2027,7 +2029,7 @@ export const ja = defineLocale({
         help: '推奨。カンマ区切りの電話番号または WhatsApp ID。'
       }
     },
-    platformDescriptions: {},
+    platformDescriptions: { email: 'メールで Stardust と会話し、返信や通知を受け取ります。' },
     platformIntro: {}
   },
 
@@ -4255,6 +4257,9 @@ export const ja = defineLocale({
     hatchingProgress: '孵化の進行状況'
   },
   connectors: {
+    pageTitle: 'コネクター',
+    pageDescription: 'メールの閲覧、カレンダーの確認、GitHub の参照など、Stardust がサービスを操作できるようにします。',
+    connectedCount: (count: number) => `接続済み ${count}`,
     skipThis: 'このステップをスキップ',
     search: 'アプリを検索',
     setupUnavailable: '現在、接続機能は利用できません。後から設定できます。',

@@ -3,7 +3,7 @@ import { compactNumber } from '@stardust/shared'
 import { useQuery } from '@tanstack/react-query'
 import type * as React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router'
+import { Navigate, useLocation, useNavigate } from 'react-router'
 
 import { ArchiveSkillConfirmDialog } from '@/app/learning/archive-skill-confirm-dialog'
 import { CodeEditor } from '@/components/chat/code-editor'
@@ -42,6 +42,7 @@ import { notify, notifyError } from '@/store/notifications'
 import { $activeGatewayProfile, normalizeProfileKey } from '@/store/profile'
 import type { OfficialSkillInfo, SkillInfo, ToolsetInfo } from '@/types/hermes'
 
+import { ConnectedSummary } from '../connectors'
 import { useOnProfileSwitch } from '../hooks/use-on-profile-switch'
 import { useRefreshHotkey } from '../hooks/use-refresh-hotkey'
 import { useRouteEnumParam } from '../hooks/use-route-enum-param'
@@ -59,7 +60,7 @@ import {
 } from '../master-detail'
 import { PanelEmpty, PanelPill } from '../overlays/panel'
 import { PageSearchShell } from '../page-search-shell'
-import { SETTINGS_ROUTE } from '../routes'
+import { legacyMcpRedirect, SETTINGS_ROUTE } from '../routes'
 import { BrowserHostControlPanel } from '../settings/browser-host-control-panel'
 import { BrowserRealProfilePanel } from '../settings/browser-real-profile-panel'
 import { ComputerUsePanel } from '../settings/computer-use-panel'
@@ -252,6 +253,7 @@ function filteredToolsets(
 const visibleToolsetCount = (toolsets: ToolsetInfo[]) => toolsets.filter(isDesktopToolsetRow).length
 
 interface SkillsViewProps extends React.ComponentProps<'section'> {
+  connectorsPage?: boolean
   setStatusbarItemGroup?: SetStatusbarItemGroup
   /** Embedded mode (plugin dialogs — e.g. Bot Mode's Advanced section): tab
    *  state lives in local React state instead of the route's `?tab=` param,
@@ -269,7 +271,15 @@ interface SkillsViewProps extends React.ComponentProps<'section'> {
   fixedConnection?: string
 }
 
-export function SkillsView({
+export function SkillsView(props: SkillsViewProps) {
+  const { search } = useLocation()
+  const redirect = !props.embedded ? legacyMcpRedirect(search) : null
+
+  return redirect ? <Navigate replace to={redirect} /> : <CapabilitiesView {...props} />
+}
+
+export function CapabilitiesView({
+  connectorsPage = false,
   embedded = false,
   fixedConnection,
   fixedProfile,
@@ -281,7 +291,8 @@ export function SkillsView({
   // one so tab clicks inside a dialog don't rewrite the page URL.
   const routeTab = useRouteEnumParam('tab', SKILLS_MODES, 'skills')
   const localTab = useState<(typeof SKILLS_MODES)[number]>('skills')
-  const [mode, setMode] = embedded ? localTab : routeTab
+  const [selectedMode, setMode] = embedded ? localTab : routeTab
+  const mode = connectorsPage ? 'mcp' : selectedMode
   // $gateway only feeds the MCP tab — gate the subscription so Skills/Toolsets
   // tabs don't re-render on connect/disconnect/reconnect.
   const gateway = useStoreSelector($gateway, g => (mode === 'mcp' ? g : null))
@@ -296,6 +307,8 @@ export function SkillsView({
   // profile (unchanged behavior). A `fixedProfile` (+ optional
   // `fixedConnection`) pins the scope outright (selector hidden).
   const activeProfile = useStore($activeGatewayProfile)
+  const { search } = useLocation()
+  const linkedProfile = connectorsPage ? new URLSearchParams(search).get('profile') : null
   const [scopeOverride, setScopeOverride] = useState<null | string | { connectionId: string; profile: string }>(null)
 
   const scopeProfile: ProfileScope = useMemo(
@@ -304,8 +317,8 @@ export function SkillsView({
         ? fixedConnection
           ? { connectionId: fixedConnection, profile: fixedProfile }
           : fixedProfile
-        : (scopeOverride ?? activeProfile ?? null),
-    [activeProfile, fixedConnection, fixedProfile, scopeOverride]
+        : (scopeOverride ?? linkedProfile ?? activeProfile ?? null),
+    [activeProfile, fixedConnection, fixedProfile, linkedProfile, scopeOverride]
   )
 
   const scopeKey = profileScopeKey(scopeProfile)
@@ -925,19 +938,28 @@ export function SkillsView({
       searchHints={searchHints}
       searchPlaceholder={mode === 'skills' ? t.skills.searchSkills : t.skills.searchToolsets}
       searchValue={query}
-      tabs={[
+      tabs={connectorsPage ? [] : [
         { id: 'skills', label: t.skills.tabSkills, meta: skills?.length ?? null },
         { id: 'toolsets', label: t.skills.tabToolsets, meta: toolsets ? visibleToolsetCount(toolsets) : null },
-        { id: 'mcp', label: t.skills.tabMcp },
+        ...(embedded ? [{ id: 'mcp', label: t.skills.tabMcp }] : []),
         { id: 'plugins', label: t.skills.tabPlugins }
       ]}
       // The routed page titles itself like Tasks; the embedded copy (Bot Mode dialogs) sits under the dialog's label.
-      title={embedded ? undefined : t.skills.pageTitles[mode]}
+      title={embedded || connectorsPage ? undefined : t.skills.pageTitles[mode]}
     >
       {/* One shared column: the scope selector sits above whichever tab is
           active, so Skills / Tools / MCP all read and write the SAME selected
           profile. */}
       <div className="flex h-full flex-col">
+        {connectorsPage && (
+          <header className="flex shrink-0 items-start justify-between gap-4 px-6 py-4">
+            <div className="min-w-0">
+              <h1 className="text-lg font-semibold text-(--ui-text-primary)">{t.connectors.pageTitle}</h1>
+              <p className="mt-1 text-sm text-(--ui-text-tertiary)">{t.connectors.pageDescription}</p>
+            </div>
+            <ConnectedSummary profile={scopeProfile} />
+          </header>
+        )}
         {/* Plugins renders the selector INSIDE its agent section: desktop
             plugins on that page belong to the app, not to any profile, and
             must not sit under a "Configuring: <profile>" header. */}
