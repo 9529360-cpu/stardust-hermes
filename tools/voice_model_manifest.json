@@ -1,0 +1,48 @@
+{
+  "chinese_kws": {
+    "model_id": "sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01",
+    "version": "2024-01-01",
+    "source_url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01.tar.bz2",
+    "archive_sha256": "b2f7c89690dc8ce4c6ed6afeab7cd800c36ad1421fb6b6302b4a4b194cf7f35f",
+    "tokens_type": "ppinyin",
+    "license_evidence": "README.md in official release archive, YAML license: Apache License 2.0",
+    "roles": {
+      "encoder": "encoder-epoch-12-avg-2-chunk-16-left-64.onnx",
+      "decoder": "decoder-epoch-12-avg-2-chunk-16-left-64.onnx",
+      "joiner": "joiner-epoch-12-avg-2-chunk-16-left-64.onnx",
+      "tokens": "tokens.txt"
+    },
+    "files": {
+      "decoder-epoch-12-avg-2-chunk-16-left-64.onnx": {
+        "sha256": "fb581d6734511676e246e0dff2fea01b31b0913176cb3ca64576dbab0a177774",
+        "source_url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01.tar.bz2",
+        "version": "2024-01-01",
+        "license": "Apache-2.0"
+      },
+      "encoder-epoch-12-avg-2-chunk-16-left-64.onnx": {
+        "sha256": "859cd6decc23f35e6ddb3a6ddb7172a57f6de7b54288728c2433ab94b7635c59",
+        "source_url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01.tar.bz2",
+        "version": "2024-01-01",
+        "license": "Apache-2.0"
+      },
+      "joiner-epoch-12-avg-2-chunk-16-left-64.onnx": {
+        "sha256": "fcf43a2edf687e2e1bc8a2b2cf53129d3b0d693d90dcc4202e2d53b43db6c43c",
+        "source_url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01.tar.bz2",
+        "version": "2024-01-01",
+        "license": "Apache-2.0"
+      },
+      "README.md": {
+        "sha256": "dd0ec68b5d9ee736f016fc982078bd3cdbccc69057e9910bdd45580992d13367",
+        "source_url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01.tar.bz2",
+        "version": "2024-01-01",
+        "license": "Apache-2.0"
+      },
+      "tokens.txt": {
+        "sha256": "72316508d9119696145abc6f1f8cdc46287535c34e5ce7e595f845cb1499cf2e",
+        "source_url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01.tar.bz2",
+        "version": "2024-01-01",
+        "license": "Apache-2.0"
+      }
+    }
+  }
+}

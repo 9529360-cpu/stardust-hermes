@@ -164,9 +164,76 @@ def _ensure_sherpa_model(root: Optional[Path] = None) -> Path:
     return target
 
 
+def _chinese_manifest() -> dict:
+    import json
+    return json.loads(Path(__file__).with_name("voice_model_manifest.json").read_text(encoding="utf-8"))["chinese_kws"]
+
+
+def _verify_chinese_model(directory: Path) -> None:
+    import hashlib
+    for name, entry in _chinese_manifest()["files"].items():
+        path = directory / name
+        if not path.is_file():
+            raise RuntimeError(f"Chinese KWS model missing file: {name} in {directory}")
+        with path.open("rb") as source:
+            digest = hashlib.file_digest(source, "sha256").hexdigest()
+        if digest != entry["sha256"]:
+            raise RuntimeError(f"Chinese KWS SHA256 mismatch: {name} in {directory}; remove the damaged package and retry")
+
+
+def _ensure_chinese_model() -> Path:
+    import hashlib
+    import tarfile
+    import tempfile
+    import urllib.request
+    spec = _chinese_manifest()
+    root = _sherpa_model_root()
+    root.mkdir(parents=True, exist_ok=True)
+    target = root / spec["model_id"]
+    if target.exists():
+        _verify_chinese_model(target)
+        return target
+    # Stage and authenticate before extraction; never expose a partial package.
+    with tempfile.TemporaryDirectory(prefix="chinese-kws-", dir=root) as staging:
+        stage = Path(staging)
+        archive = stage / "model.tar.bz2"
+        try:
+            with urllib.request.urlopen(spec["source_url"], timeout=60) as response, archive.open("wb") as output:
+                import shutil
+                shutil.copyfileobj(response, output)
+            with archive.open("rb") as source:
+                digest = hashlib.file_digest(source, "sha256").hexdigest()
+            if digest != spec["archive_sha256"]:
+                raise RuntimeError("Chinese KWS archive SHA256 mismatch; download refused")
+            with tarfile.open(archive, "r:bz2") as package:
+                package.extractall(stage, filter="data")
+            candidate = stage / spec["model_id"]
+            _verify_chinese_model(candidate)
+            try:
+                candidate.rename(target)
+            except OSError:
+                if not target.exists():
+                    raise
+                _verify_chinese_model(target)
+        except (OSError, tarfile.TarError) as exc:
+            raise RuntimeError(f"Chinese KWS model download failed: {exc}") from exc
+    return target
+
+
+def _chinese_tokens(phrases: list[str], directory: Path) -> list[list[str]]:
+    from sherpa_onnx import text2token
+    try:
+        result = text2token(phrases, tokens=str(directory / "tokens.txt"), tokens_type="ppinyin")
+    except (ImportError, AssertionError, KeyError, ValueError) as exc:
+        raise RuntimeError(f"Chinese KWS official ppinyin conversion failed (requires pypinyin and sentencepiece): {exc}") from exc
+    vocabulary = {line.split()[0] for line in (directory / "tokens.txt").read_text(encoding="utf-8").splitlines() if line.strip()}
+    if len(result) != len(phrases) or any(not row or any(token not in vocabulary for token in row) for row in result):
+        raise RuntimeError("Chinese KWS keyword contains tokens outside the model vocabulary")
+    return result
+
+
 class _SherpaKwsEngine(_Engine):
-    """sherpa-onnx open-vocabulary keyword spotting — any typed phrase, zero training. ``wake_word.phrase``
-    is BPE-tokenized at runtime against the model's vocabulary: DETECTION config, not a cosmetic label."""
+    """Local KWS with language-matched models and official runtime keyword conversion."""
 
     feature, section = "wake.sherpa", "sherpa"
     frame_length = 1280  # streaming zipformer accepts any chunk; match capture path.
@@ -176,8 +243,15 @@ class _SherpaKwsEngine(_Engine):
         import tempfile
         from sherpa_onnx import text2token
         model_dir = str(sub.get("model_dir") or "").strip()
-        d = Path(model_dir) if model_dir else _ensure_sherpa_model()
-        if not (d / "tokens.txt").exists():
+        model_id = str(sub.get("model_id") or "").strip()
+        phrase = str(ww._get(cfg, "phrase") or "hey hermes").strip()
+        chinese = model_id == "wenetspeech" or model_id.startswith("sherpa-onnx-kws-zipformer-wenetspeech-") or any("\u3400" <= c <= "\u9fff" for c in phrase)
+        if model_id and model_id not in ("wenetspeech", "gigaspeech", _chinese_manifest()["model_id"]):
+            raise RuntimeError(f"Unsupported sherpa KWS model_id: {model_id}")
+        d = Path(model_dir) if model_dir else (_ensure_chinese_model() if chinese else _ensure_sherpa_model())
+        if chinese:
+            _verify_chinese_model(d)
+        elif not (d / "tokens.txt").exists():
             raise RuntimeError(f"sherpa KWS model not found at {d}")
 
         # Phrase set: this profile's phrase plus — with profile routing on — every other
@@ -188,8 +262,16 @@ class _SherpaKwsEngine(_Engine):
             for prof, p in ww.enrolled_profile_phrases().items():
                 phrase_map.setdefault(p.strip(), prof)
         phrases = list(phrase_map)
-        tokens = text2token([p.upper() for p in phrases], tokens=str(d / "tokens.txt"), tokens_type="bpe",
-                            bpe_model=str(d / "bpe.model"))
+        if chinese:
+            tokens = _chinese_tokens(phrases, d)
+        else:
+            tokens = text2token([p.upper() for p in phrases], tokens=str(d / "tokens.txt"), tokens_type="bpe",
+                                bpe_model=str(d / "bpe.model"))
+        threshold = float(sub.get("keywords_threshold") if sub.get("keywords_threshold") is not None else 0.05 + 0.4 * ww._sensitivity(cfg))
+        score = float(sub.get("keywords_score", 1.0))
+        import math
+        if not math.isfinite(threshold) or not 0 <= threshold <= 1 or not math.isfinite(score) or score <= 0:
+            raise RuntimeError("sherpa KWS requires keywords_threshold in [0, 1] and finite keywords_score > 0")
         # sherpa keyword entries reject spaces in the @display-name; underscore them and
         # map display → profile for match routing.
         self._display_to_profile: Dict[str, str] = {}
@@ -202,23 +284,25 @@ class _SherpaKwsEngine(_Engine):
         kw.close()
         self._keywords_file = kw.name
 
-        # Shared 0..1 sensitivity → sherpa keywords_threshold. 0.5 lands on sherpa's
-        # recommended 0.25; a stricter 0.35 missed ~12% of true positives in live TTS
-        # matrix tests while 0.25 held zero false fires.
-        threshold = 0.05 + 0.4 * ww._sensitivity(cfg)
-
+        # Shared sensitivity remains the fallback unless explicit KWS tuning is configured.
         def _model_file(part: str) -> str:
+            if chinese:
+                return str(d / _chinese_manifest()["roles"][part])
             hits = sorted(d.glob(f"{part}-*[!8].onnx"))
             if not hits:
                 raise RuntimeError(f"sherpa KWS model file missing: {d}/{part}-*[!8].onnx")
             return str(hits[0])
 
-        self._spotter = sherpa_onnx.KeywordSpotter(
-            tokens=str(d / "tokens.txt"), encoder=_model_file("encoder"), decoder=_model_file("decoder"),
-            joiner=_model_file("joiner"), keywords_file=self._keywords_file, keywords_threshold=threshold,
-            num_threads=1,
-        )
-        self._stream = self._spotter.create_stream()
+        try:
+            self._spotter = sherpa_onnx.KeywordSpotter(
+                tokens=str(d / "tokens.txt"), encoder=_model_file("encoder"), decoder=_model_file("decoder"),
+                joiner=_model_file("joiner"), keywords_file=self._keywords_file, keywords_threshold=threshold,
+                num_threads=1, keywords_score=score,
+            )
+            self._stream = self._spotter.create_stream()
+        except Exception:
+            self.close()
+            raise
 
     def process(self, frame) -> bool:
         import numpy as np
