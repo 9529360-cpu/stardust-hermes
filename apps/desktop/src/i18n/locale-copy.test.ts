@@ -18,6 +18,7 @@ describe('desktop locale bundles', () => {
       expect(copy.connectors.connectedCount(2)).toContain('2')
       expect(copy.messaging.pageDescription).toBeTruthy()
       expect(copy.messaging.defaultDescription('Email')).toContain('Email')
+
       if (locale !== 'en') {
         expect(copy.connectors.pageDescription).not.toBe(english.connectors.pageDescription)
         expect(copy.messaging.pageDescription).not.toBe(english.messaging.pageDescription)

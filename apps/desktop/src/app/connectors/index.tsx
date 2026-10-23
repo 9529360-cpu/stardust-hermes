@@ -19,9 +19,11 @@ export function ConnectedSummary({ profile }: { profile: ProfileScope }) {
   const [, tick] = useState(0)
   useEffect(() => {
     const timer = window.setInterval(() => tick(value => value + 1), 1000)
+
     return () => window.clearInterval(timer)
   }, [])
   const scope = profile != null ? profileScopeKey(profile) : normalizeProfileKey(activeProfile)
+
   const count = Object.entries(getServers(data ?? null)).filter(
     ([name, server]) => server.enabled !== false && probeCache.get(probeKey(name, server, scope))?.result.ok
   ).length

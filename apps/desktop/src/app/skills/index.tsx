@@ -42,6 +42,7 @@ import { notify, notifyError } from '@/store/notifications'
 import { $activeGatewayProfile, normalizeProfileKey } from '@/store/profile'
 import type { OfficialSkillInfo, SkillInfo, ToolsetInfo } from '@/types/hermes'
 
+import { ConnectedSummary } from '../connectors'
 import { useOnProfileSwitch } from '../hooks/use-on-profile-switch'
 import { useRefreshHotkey } from '../hooks/use-refresh-hotkey'
 import { useRouteEnumParam } from '../hooks/use-route-enum-param'
@@ -60,7 +61,6 @@ import {
 import { PanelEmpty, PanelPill } from '../overlays/panel'
 import { PageSearchShell } from '../page-search-shell'
 import { legacyMcpRedirect, SETTINGS_ROUTE } from '../routes'
-import { ConnectedSummary } from '../connectors'
 import { BrowserHostControlPanel } from '../settings/browser-host-control-panel'
 import { BrowserRealProfilePanel } from '../settings/browser-real-profile-panel'
 import { ComputerUsePanel } from '../settings/computer-use-panel'
@@ -274,6 +274,7 @@ interface SkillsViewProps extends React.ComponentProps<'section'> {
 export function SkillsView(props: SkillsViewProps) {
   const { search } = useLocation()
   const redirect = !props.embedded ? legacyMcpRedirect(search) : null
+
   return redirect ? <Navigate replace to={redirect} /> : <CapabilitiesView {...props} />
 }
 

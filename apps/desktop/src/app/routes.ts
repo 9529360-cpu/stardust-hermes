@@ -14,11 +14,14 @@ export const SESSION_IMPORT_ROUTE = '/session-import'
 export const SKILLS_ROUTE = '/skills'
 export const CONNECTORS_ROUTE = '/connectors'
 export const MESSAGING_ROUTE = '/messaging'
+
 export function legacyMcpRedirect(search: string): string | null {
   const params = new URLSearchParams(search)
+
   if (params.get('tab') !== 'mcp') { return null }
   params.delete('tab')
   const query = params.toString()
+
   return `${CONNECTORS_ROUTE}${query ? `?${query}` : ''}`
 }
 

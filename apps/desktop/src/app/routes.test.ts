@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { CONNECTORS_ROUTE, legacyMcpRedirect, appViewForPath, CRON_ROUTE, NEW_CHAT_ROUTE, primaryRouteSelectedSessionId, routeSessionId, sessionRoute, SETTINGS_ROUTE, TASKS_ROUTE } from './routes'
+import { appViewForPath, CONNECTORS_ROUTE, CRON_ROUTE, legacyMcpRedirect, NEW_CHAT_ROUTE, primaryRouteSelectedSessionId, routeSessionId, sessionRoute, SETTINGS_ROUTE, TASKS_ROUTE } from './routes'
 
 const SESS_A = 'sess-a'
 const SESS_B = 'sess-b'
