@@ -7,9 +7,11 @@ import { coerceGatewayText, coerceThinkingText } from '@/lib/chat-runtime'
 import { playCompletionSound } from '@/lib/completion-sound'
 import { parseErrorSurface } from '@/lib/error-surface'
 import { triggerHaptic } from '@/lib/haptics'
+import { isProviderSetupErrorMessage } from '@/lib/provider-setup-errors'
 import { billingCtaLabel, clearBillingBlock, runBillingRecovery, setBillingBlock } from '@/store/billing-block'
 import { clearClarifyRequest } from '@/store/clarify'
 import { setSessionCompacting } from '@/store/compaction'
+import { showModelSetupNotice } from '@/store/model-setup-notice'
 import { notify } from '@/store/notifications'
 import { flashPetActivity, markPetUnread, setPetActivity } from '@/store/pet'
 import { clearAllPrompts } from '@/store/prompts'
@@ -186,7 +188,10 @@ export function handleMessageStreamEvent(ctx: GatewayEventContext): boolean {
     // emits them after prolonged silence, so name that wait in the existing
     // bottom-of-thread status row instead of leaving only an unlabeled timer.
     if (sessionId) {
-      setSessionProviderWait(sessionId, providerWaitText(coerceGatewayText(payload?.text), payload?.code, payload?.params))
+      setSessionProviderWait(
+        sessionId,
+        providerWaitText(coerceGatewayText(payload?.text), payload?.code, payload?.params)
+      )
     }
 
     return true
@@ -353,6 +358,18 @@ export function handleMessageStreamEvent(ctx: GatewayEventContext): boolean {
             surface: parseErrorSurface(payload.error_surface)
           }
         : undefined
+
+    if (failure && !failure.partial && isProviderSetupErrorMessage(failure.error)) {
+      completeAssistantMessage(sessionId, '', payload?.response_previewed, undefined, occurredAt)
+
+      if (isActiveEvent) {
+        setTurnStartedAt(null)
+        setPetActivity({ reasoning: false, toolRunning: false })
+        showModelSetupNotice()
+      }
+
+      return true
+    }
 
     completeAssistantMessage(sessionId, finalText, payload?.response_previewed, failure, occurredAt)
 

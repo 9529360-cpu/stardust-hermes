@@ -5,6 +5,7 @@ import { assistantTextPart, type ChatMessage, chatMessageText, textPart } from '
 import { normalizePersonalityValue } from '@/lib/chat-runtime'
 import { embeddedImageUrls, textWithoutEmbeddedImages } from '@/lib/embedded-images'
 import { parseErrorSurface } from '@/lib/error-surface'
+import { isProviderSetupErrorMessage } from '@/lib/provider-setup-errors'
 import { isMessagingSource, normalizeSessionSource } from '@/lib/session-source'
 import { reconcileApprovalModeForProfile } from '@/store/approval-mode'
 import { requestDesktopOnboardingForCredentialWarning } from '@/store/onboarding'
@@ -884,7 +885,8 @@ export function appendLiveSessionProjection(messages: ChatMessage[], projection:
   // A retained failed turn (the gateway keeps error snapshots replayable when
   // the terminal frame may have been lost to a disconnect) — surface the
   // failure on the projected row instead of rendering the partial as healthy.
-  const inflightError = projection.inflight?.error?.trim() ?? ''
+  const rawInflightError = projection.inflight?.error?.trim() ?? ''
+  const inflightError = !inflightAssistant && isProviderSetupErrorMessage(rawInflightError) ? '' : rawInflightError
   const inflightErrorSurface = parseErrorSurface(projection.inflight?.error_surface)
   const queuedUser = projection.queued?.user?.trim() ?? ''
 

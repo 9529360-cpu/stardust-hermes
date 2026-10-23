@@ -80,9 +80,11 @@ event("setup.ready", SetupReadyPayload,
 
 
 class ErrorPayload(Payload):
-    """Every ``_emit("error", …)`` site sets exactly ``message``."""
+    """Session failures may explicitly identify initialization outside a turn."""
 
     message: str
+    scope: str | None = None
+    code: str | None = None
 
 
 event("error", ErrorPayload, doc="A session-level failure outside a turn (agent init, model switch, compression, resume).")

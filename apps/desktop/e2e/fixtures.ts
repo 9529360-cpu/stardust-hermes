@@ -710,14 +710,11 @@ export async function waitForOnboarding(page: Page, timeoutMs = 60_000): Promise
 export async function waitForBootFailure(page: Page, timeoutMs = 60_000): Promise<void> {
   await page.waitForFunction(
     () => {
-      // A failed backend connection leaves the first-run progress card under
-      // the notification. Require that real failure presentation: the current
-      // notification title, the actionable 8% resolve state, and the injected
-      // connection error detail. A generic toast or boot panel alone is not it.
+      // Failed first-run boot shows the terminal failure label at the last
+      // reported progress. The resolving label is replaced by the error title.
       const text = document.body.innerText ?? ''
       const hasErrorTitle = text.includes("Stardust couldn't start") || text.includes('桌面启动失败')
       const hasBackendError = text.includes('connection refused') || text.includes('连接被拒绝')
-      const hasResolveProgress = text.includes('Resolving Stardust backend') || text.includes('正在解析 Stardust 后端')
       const hasBootProgress = text.includes('Starting Stardust') || text.includes('正在启动 Stardust')
       const hasEightPercent = Array.from(document.querySelectorAll('[role="progressbar"]')).some(element => {
         const label = element.getAttribute('aria-label') ?? ''
@@ -725,7 +722,7 @@ export async function waitForBootFailure(page: Page, timeoutMs = 60_000): Promis
         return label.includes('8%') || progress === '8'
       }) || text.includes('8%')
 
-      return hasErrorTitle && hasBackendError && hasBootProgress && hasResolveProgress && hasEightPercent
+      return hasErrorTitle && hasBackendError && hasBootProgress && hasEightPercent
     },
     undefined,
     { timeout: timeoutMs },

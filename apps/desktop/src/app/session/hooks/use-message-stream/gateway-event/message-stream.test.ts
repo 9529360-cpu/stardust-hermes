@@ -46,7 +46,28 @@ function context(type: GatewayEventName): GatewayEventContext {
 }
 
 describe('handleMessageStreamEvent session-control integration', () => {
+  it('settles missing-model failures without creating a reply error', () => {
+    const ctx = context('message.complete')
+    ctx.payload = { status: 'error', error: 'Stardust is not connected to any AI provider yet.' }
+    handleMessageStreamEvent(ctx)
+    expect(ctx.deps.completeAssistantMessage).toHaveBeenCalledWith('s1', '', undefined, undefined, ctx.occurredAt)
+  })
+
+  it('preserves real execution failures', () => {
+    const ctx = context('message.complete')
+    ctx.payload = { status: 'error', error: 'Connection interrupted' }
+    handleMessageStreamEvent(ctx)
+    expect(ctx.deps.completeAssistantMessage).toHaveBeenCalledWith(
+      's1',
+      '',
+      undefined,
+      expect.objectContaining({ error: 'Connection interrupted' }),
+      ctx.occurredAt
+    )
+  })
+
   it('refreshes only after message.complete, through the store seam', () => {
+    refreshSupportedSessionControlAfterTurn.mockClear()
     expect(handleMessageStreamEvent(context('message.delta'))).toBe(true)
     expect(refreshSupportedSessionControlAfterTurn).not.toHaveBeenCalled()
 

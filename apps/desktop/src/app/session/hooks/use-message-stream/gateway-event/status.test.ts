@@ -28,7 +28,7 @@ function errorContext(message: string) {
       flushQueuedDeltas: vi.fn(),
       hydrateFromStoredSession: vi.fn(),
       queryClient: { invalidateQueries: vi.fn() },
-      sessionStateByRuntimeIdRef: { current: new Map() },
+      sessionStateByRuntimeIdRef: { current: new Map([['sess-1', { busy: true, awaitingResponse: true }]]) },
       updateSessionState: vi.fn()
     } as unknown as GatewayEventContext['deps'],
     event: { payload, session_id: 'sess-1', type: 'error' },
@@ -49,6 +49,26 @@ afterEach(() => {
 })
 
 describe('gateway `error` event → error card + toast', () => {
+  it('keeps history-only errors out of the transcript and turn notifications', () => {
+    const { ctx, failAssistantMessage } = errorContext('agent initialization failed')
+    ctx.deps.sessionStateByRuntimeIdRef.current.clear()
+
+    handleStatusEvent(ctx)
+
+    expect(failAssistantMessage).not.toHaveBeenCalled()
+    expect($notifications.get().every(notice => notice.title !== "Stardust couldn't finish the reply")).toBe(true)
+  })
+
+  it('does not terminate an active turn for an explicitly non-turn initialization event', () => {
+    const { ctx, failAssistantMessage } = errorContext('agent initialization failed')
+    Object.assign(ctx.payload!, { scope: 'session', code: 'agent_init_failed' })
+
+    handleStatusEvent(ctx)
+
+    expect(failAssistantMessage).not.toHaveBeenCalled()
+    expect(ctx.deps.flushQueuedDeltas).not.toHaveBeenCalled()
+  })
+
   it('stamps SESSION_NOT_OWNED on a live-owner refusal so the card drops Retry', () => {
     const { ctx, failAssistantMessage } = errorContext(OWNED_REFUSAL)
 
@@ -76,7 +96,7 @@ describe('gateway `error` event → error card + toast', () => {
     expect(toast.action).toBeUndefined()
   })
 
-  it('keeps the server\'s own plain copy as the toast message when no code was recovered', () => {
+  it("keeps the server's own plain copy as the toast message when no code was recovered", () => {
     // tui_gateway/user_messages.py already writes actionable sentences for
     // pre-turn failures; the generic "couldn't finish" gloss must not bury them.
     const serverCopy = 'Hermes could not start the assistant for this chat. Check your model settings and try again.'

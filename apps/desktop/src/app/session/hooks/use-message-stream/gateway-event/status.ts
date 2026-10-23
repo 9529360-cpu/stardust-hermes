@@ -11,9 +11,9 @@ import { clearClarifyRequest } from '@/store/clarify'
 import { reconcileSessionCompacting, setSessionCompacting } from '@/store/compaction'
 import { refreshBackgroundProcesses } from '@/store/composer-status'
 import { applyGoalStatusText } from '@/store/goals'
+import { showModelSetupNotice } from '@/store/model-setup-notice'
 import { dispatchNativeNotification } from '@/store/native-notifications'
 import { isDiskFullErrorMessage, notify, notifyError } from '@/store/notifications'
-import { requestDesktopOnboarding } from '@/store/onboarding'
 import { flashPetActivity, setPetActivity } from '@/store/pet'
 import { clearAllPrompts } from '@/store/prompts'
 import { setTurnStartedAt } from '@/store/session'
@@ -173,6 +173,29 @@ export function handleStatusEvent(ctx: GatewayEventContext): boolean {
   if (event.type === 'error') {
     const errorMessage = payload?.message || 'Hermes reported an error'
     const looksLikeProviderSetup = isProviderSetupErrorMessage(errorMessage)
+    const state = sessionId ? sessionStateByRuntimeIdRef.current.get(sessionId) : undefined
+    const turnInFlight = Boolean(state && (state.busy || state.awaitingResponse || state.streamId))
+
+    // Cold-resume initialization may fail while the user only reads history.
+    // Explicit session scope also protects a turn that raced the warm-up.
+    if (payload?.scope === 'session' || !turnInFlight) {
+      return true
+    }
+
+    if (looksLikeProviderSetup) {
+      if (sessionId) {
+        updateSessionState(sessionId, current => ({ ...current, busy: false, awaitingResponse: false }))
+      }
+
+      if (isActiveEvent) {
+        setTurnStartedAt(null)
+        setPetActivity({ reasoning: false, toolRunning: false })
+      }
+
+      showModelSetupNotice()
+
+      return true
+    }
 
     // The gateway's `error` event carries no error_surface (prompt_turn.py
     // emits it for pre-turn refusals). Recover the two codes it CAN mean from
@@ -218,9 +241,7 @@ export function handleStatusEvent(ctx: GatewayEventContext): boolean {
       title: translateNow('notifications.native.turnErrorTitle')
     })
 
-    if (looksLikeProviderSetup) {
-      requestDesktopOnboarding(errorMessage)
-    } else if (surface?.code === 'disk_full') {
+    if (surface?.code === 'disk_full') {
       notifyError(new Error(errorMessage), translateNow('notifications.errors.diskFull'))
     } else {
       // Toast globally, not just when the failing thread is focused: a

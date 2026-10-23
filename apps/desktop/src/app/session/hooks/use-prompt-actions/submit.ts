@@ -20,8 +20,9 @@ import {
   terminalContextBlocksFromDraft
 } from '@/store/composer'
 import { $hudMode } from '@/store/hud'
+import { showModelSetupNotice } from '@/store/model-setup-notice'
 import { clearNotifications, notify, notifyError } from '@/store/notifications'
-import { consumePendingCredentialWarning, requestDesktopOnboarding } from '@/store/onboarding'
+import { consumePendingCredentialWarning } from '@/store/onboarding'
 import { isStoredTranscriptReadOnly } from '@/store/read-only-transcript'
 import {
   $sessions,
@@ -198,7 +199,7 @@ export function useSubmitPrompt(deps: SubmitPromptDeps) {
         const deferredCredentialWarning = consumePendingCredentialWarning()
 
         if (deferredCredentialWarning) {
-          requestDesktopOnboarding(deferredCredentialWarning)
+          showModelSetupNotice()
 
           return false
         }
@@ -868,6 +869,24 @@ export function useSubmitPrompt(deps: SubmitPromptDeps) {
           return false
         }
 
+        if (isProviderSetupError(err)) {
+          updateSessionState(
+            sessionId,
+            state => ({
+              ...state,
+              busy: false,
+              awaitingResponse: false,
+              pendingBranchGroup: null,
+              turnStartedAt: null
+            }),
+            targetStoredSessionId
+          )
+
+          if (targetIsCurrentView()) {showModelSetupNotice()}
+
+          return false
+        }
+
         const message = inlineErrorMessage(err, copy.promptFailed)
         const occurredAt = Date.now() / 1000
         // Another surface owns the session (#106217): a deterministic gateway
@@ -900,12 +919,6 @@ export function useSubmitPrompt(deps: SubmitPromptDeps) {
           }),
           targetStoredSessionId
         )
-
-        if (targetIsCurrentView() && isProviderSetupError(err)) {
-          requestDesktopOnboarding(copy.providerCredentialRequired)
-
-          return false
-        }
 
         if (targetIsCurrentView()) {
           notifyError(err, copy.promptFailed)
