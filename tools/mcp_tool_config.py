@@ -258,10 +258,15 @@ def _npx_cached_bin(args: list) -> Optional[tuple]:
 def _interpolate_env_vars(value):
     """Recursively resolve ``${VAR}`` / Cursor ``${env:VAR}`` placeholders and context vars. Env
     refs resolve from the active profile's secret scope when multiplexing (the routed profile's
-    value, not another profile's in ``os.environ``). Unset vars keep the literal placeholder."""
-    from agent.secret_scope import get_secret as _get_secret
+    value, not another profile's in ``os.environ``). ``${connector:<server>/<field>}`` refs
+    resolve from the opt-in OS-encrypted connector secret store (agent/connector_secrets.py).
+    Unset vars — and connector refs while the store is off — keep the literal placeholder."""
+    from agent.secret_scope import get_secret as _get_secret, resolve_connector_secret as _resolve_connector_secret
     if isinstance(value, str):
         def _replace(m):
+            resolved = _resolve_connector_secret(_env_ref_name(m.group(1)))
+            if resolved is not None:
+                return resolved
             resolver = _CONTEXT_VAR_RESOLVERS.get(m.group(1).strip())
             return resolver() if resolver is not None else (_get_secret(_env_ref_name(m.group(1)), m.group(0)) or m.group(0))
         return _ENV_VAR_PATTERN.sub(_replace, value)
