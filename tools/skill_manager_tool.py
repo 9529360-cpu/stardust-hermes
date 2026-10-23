@@ -340,6 +340,10 @@ def _guarded_write(name: str, skill_dir: Path, target: Path, action: str, label:
         if read_guard := _background_review_read_before_write_guard(name, target, action, label):
             return read_guard
         original = target.read_text(encoding="utf-8")
+    from agent.recovery_promotion import enabled_config, validate_committed_hint
+    if enabled_config():
+        if error := validate_committed_hint(name, original or "", content):
+            return _err(error)
     target.parent.mkdir(parents=True, exist_ok=True)
     atomic_write_text(target, content, preserve_mode=True, create_mode=0o644)
     scan_error = _security_scan_skill(skill_dir)

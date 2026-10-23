@@ -1326,6 +1326,11 @@ def spawn_background_review_thread(
         distillation = build_conversation_distillation_brief(messages_snapshot)
         if distillation:
             prompt = f"{prompt}\n\n{distillation}"
+        if task_cfg.get("promote_verified_recoveries") is True:
+            from agent.recovery_promotion import build_brief
+            recovery = build_brief(agent, task_cfg, messages_snapshot)
+            if recovery:
+                prompt = f"{prompt}\n\n{recovery}"
     if focus := (focus or "").strip():
         prompt = (
             f"{prompt}\n\nThe user explicitly requested this review with the following "

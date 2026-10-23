@@ -596,6 +596,9 @@ def skill_view(
             }
         else:
             readiness, readiness_extras = _skill_readiness(frontmatter, skill_name)
+        from agent.recovery_promotion import enabled_config, render_hints
+        if enabled_config():
+            content = render_hints(content, enabled=True)
         rendered_content = content if not preprocess else _preprocess_skill(
             content, skill_dir, task_id, "Could not preprocess skill content for %s", skill_name)
         org_provenance, header = None, ""
