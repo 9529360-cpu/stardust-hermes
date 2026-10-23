@@ -1310,7 +1310,8 @@ def _(rid, params: dict) -> dict:
 @_mcp_rpc("add")
 def _(rid, params: dict) -> dict:
     """Add ``name`` from ``preset`` (catalog id) and/or ``config`` (url/command/args/env/headers/auth/
-    tools); ``bearer_token`` goes to the profile's .env (only the header template persists). Dup → 4090."""
+    tools); ``bearer_token`` goes through the CX3 safe path (encrypted CX2 store when enabled, else
+    the profile's .env) — only the reference template persists in config. Dup → 4090."""
     mc = _tools_mod("hermes_cli.mcp_config")
     name, preset = _str_arg(params, "name"), _str_arg(params, "preset")
     if name in mc._get_mcp_servers():
@@ -1324,8 +1325,26 @@ def _(rid, params: dict) -> dict:
             cmd_args=list(server_config.get("args") or []), server_config=server_config)
     if not server_config.get("url") and not server_config.get("command"):
         return _err(rid, 4063, "config must specify a 'url' (http) or 'command' (stdio), or a valid 'preset'")
-    if bearer_token := params.get("bearer_token"):
-        server_config["headers"] = mc._save_bearer_auth_token(name, str(bearer_token))
+    # CX3: reject credentials embedded in url userinfo/query, argv, or a literal
+    # Authorization header before anything is persisted (also covers adds that
+    # carry no bearer_token of their own).
+    placement = mc._mcp_secret_placement_issues(name, server_config)
+    if placement:
+        return _err(rid, 4063, "; ".join(placement))
+    bearer_token = params.get("bearer_token")
+    if bearer_token is not None and str(bearer_token).strip():
+        try:
+            # CX3 safe path: validates placement, stores the credential, rolls it back if
+            # the config save fails; the response carries only the masked storage state.
+            storage, server_config = mc._commit_mcp_server_credential(
+                name, str(bearer_token), base_config=server_config)
+        except ValueError as exc:
+            return _err(rid, 4063, str(exc))
+        except Exception as exc:
+            return _err(rid, 5000, f"failed to save server '{name}': {exc}")
+        saved = mc._get_mcp_servers().get(name, server_config)
+        return _ok(rid, {"ok": True, "name": name, "credential_stored": storage,
+                         "server": _mcp_summarize_server(name, saved)})
     if not mc._save_mcp_server(name, server_config):
         return _err(rid, 4001, f"server '{name}' rejected: suspicious command/args configuration")
     saved = mc._get_mcp_servers().get(name, server_config)
@@ -1334,9 +1353,11 @@ def _(rid, params: dict) -> dict:
 
 @_mcp_rpc("set_api_key", (*_NAME, ("value", _nonempty)))
 def _(rid, params: dict) -> dict:
-    """Secret → profile .env under ``env_var`` (default ``MCP_<NAME>_API_KEY``); config.yaml gets only
-    a ``${ENV}`` reference (Bearer header for http, ``env`` entry for stdio)."""
-    hc, mc = _tools_mod("hermes_cli.config"), _tools_mod("hermes_cli.mcp_config")
+    """Secret → CX3 safe path (encrypted CX2 store when enabled, else profile ``.env`` under
+    ``env_var``); config.yaml gets only a reference (Bearer header for http, ``env`` entry for
+    stdio). Atomic: a failed config save rolls the credential back. The response never echoes
+    the value — ``credential_stored`` is the masked state."""
+    mc = _tools_mod("hermes_cli.mcp_config")
     name, servers, err = _mcp_named_server(rid, params)
     if err:
         return err
@@ -1345,23 +1366,15 @@ def _(rid, params: dict) -> dict:
     entry = servers[name]
     if not isinstance(entry, dict):
         return _err(rid, 4001, "malformed server config")
-    if entry.get("url"):
-        normalized = mc._strip_bearer_prefix(str(value))
-        if not normalized or normalized.lower() == "bearer":
-            return _err(rid, 4063, "value is not a valid credential")
-        hc.save_env_value(env_var, normalized)
-        is_default = env_var == mc._env_key_for_server(name)
-        entry["headers"] = (
-            mc._bearer_auth_headers(name) if is_default else {"Authorization": f"Bearer ${{{env_var}}}"})
-    else:
-        hc.save_env_value(env_var, str(value))
-        env_block = entry.get("env")
-        entry["env"] = env_block if isinstance(env_block, dict) else {}
-        entry["env"][env_var] = f"${{{env_var}}}"
-    cfg = hc.load_config()
-    cfg.setdefault("mcp_servers", {})[name] = entry
-    hc.save_config(cfg)
-    return _ok(rid, {"ok": True, "name": name, "env_var": env_var, "server": _mcp_summarize_server(name, entry)})
+    try:
+        storage, entry = mc._commit_mcp_server_credential(
+            name, str(value), env_var=env_var, existing=entry)
+    except ValueError as exc:
+        return _err(rid, 4063, str(exc))
+    except Exception as exc:
+        return _err(rid, 5000, f"failed to save the credential for '{name}': {exc}")
+    return _ok(rid, {"ok": True, "name": name, "env_var": env_var, "credential_stored": storage,
+                     "server": _mcp_summarize_server(name, entry)})
 
 
 @_mcp_rpc("test")

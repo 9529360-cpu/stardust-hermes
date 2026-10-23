@@ -1646,7 +1646,7 @@
     },
     {
       "name": "mcp.servers.set_api_key",
-      "summary": "Store a credential in the profile's .env and reference it from the server config (header or env).",
+      "summary": "Store a credential the safest available way (encrypted CX2 store when enabled, else the profile's .env) and reference it from the server config (header or env); a failed config save rolls the credential back, and the value is never echoed back.",
       "params": [
         {
           "name": "params",
@@ -15353,7 +15353,7 @@
       },
       "McpServersAddParams": {
         "additionalProperties": false,
-        "description": "``preset`` (catalog id) and/or ``config`` (url/command/args/env/headers/auth/tools); a\n``bearer_token`` is written to the profile's .env, only the header template persists.",
+        "description": "``preset`` (catalog id) and/or ``config`` (url/command/args/env/headers/auth/tools); a\n``bearer_token`` goes through the CX3 safe path \u2014 encrypted CX2 store when enabled, else\nthe profile's .env. Only a reference persists in config; the value is never echoed back\n(``credential_stored`` is the masked state: \"encrypted\" | \"env\").",
         "properties": {
           "profile": {
             "anyOf": [
@@ -15425,6 +15425,18 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "credential_stored": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Credential Stored"
           },
           "server": {
             "$ref": "#/components/schemas/McpServerSummary"
@@ -15532,6 +15544,10 @@
             "title": "Env Var",
             "type": "string"
           },
+          "credential_stored": {
+            "title": "Credential Stored",
+            "type": "string"
+          },
           "server": {
             "$ref": "#/components/schemas/McpServerSummary"
           }
@@ -15540,6 +15556,7 @@
           "ok",
           "name",
           "env_var",
+          "credential_stored",
           "server"
         ],
         "title": "McpServersSetApiKeyResult",

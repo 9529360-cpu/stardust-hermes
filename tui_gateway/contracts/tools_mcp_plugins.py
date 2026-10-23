@@ -410,7 +410,9 @@ class McpServerNameParams(ProfileParams):
 
 class McpServersAddParams(McpServerNameParams):
     """``preset`` (catalog id) and/or ``config`` (url/command/args/env/headers/auth/tools); a
-    ``bearer_token`` is written to the profile's .env, only the header template persists."""
+    ``bearer_token`` goes through the CX3 safe path — encrypted CX2 store when enabled, else
+    the profile's .env. Only a reference persists in config; the value is never echoed back
+    (``credential_stored`` is the masked state: "encrypted" | "env")."""
 
     preset: str | None = None
     config: dict[str, JsonValue] | None = None
@@ -420,6 +422,7 @@ class McpServersAddParams(McpServerNameParams):
 class McpServersAddResult(Result):
     ok: bool
     name: str
+    credential_stored: str | None = None
     server: McpServerSummary
 
 
@@ -436,11 +439,14 @@ class McpServersSetApiKeyResult(Result):
     ok: bool
     name: str
     env_var: str
+    credential_stored: str
     server: McpServerSummary
 
 
 method("mcp.servers.set_api_key", params=McpServersSetApiKeyParams, result=McpServersSetApiKeyResult,
-       doc="Store a credential in the profile's .env and reference it from the server config (header or env).")
+       doc="Store a credential the safest available way (encrypted CX2 store when enabled, else the "
+           "profile's .env) and reference it from the server config (header or env); a failed config "
+           "save rolls the credential back, and the value is never echoed back.")
 
 
 class McpProbeTool(Result):

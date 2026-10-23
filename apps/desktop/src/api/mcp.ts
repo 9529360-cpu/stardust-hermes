@@ -75,7 +75,12 @@ export function listMcpServers(): Promise<{ servers: McpServerSummary[] }> {
 }
 
 /** Add one server to `mcp_servers` (validated + name-collision-checked
- *  server-side — the same endpoint the dashboard's add form uses). */
+ *  server-side — the same endpoint the dashboard's add form uses).
+ *
+ *  CX3: with `auth: 'header'`, send the credential in `bearer_token` — the
+ *  backend stores it via the safe path (encrypted connector store when
+ *  enabled, else the profile's .env) and config keeps only a reference.
+ *  The credential value is never echoed back in any response. */
 export function addMcpServer(
   body: {
     name: string
@@ -83,7 +88,9 @@ export function addMcpServer(
     command?: string
     args?: string[]
     env?: Record<string, string>
-    auth?: string
+    auth?: 'none' | 'header' | 'oauth'
+    /** Write-only credential; masked/absent in every read path. */
+    bearer_token?: string
   },
   profile?: ProfileScope
 ): Promise<McpServerSummary> {

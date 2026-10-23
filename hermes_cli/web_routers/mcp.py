@@ -102,7 +102,7 @@ async def list_mcp_servers(profile: Optional[str] = None):
 
 @router.post("/api/mcp/servers")
 async def add_mcp_server(body: MCPServerCreate, profile: Optional[str] = None):
-    from hermes_cli.mcp_config import _get_mcp_servers, _save_bearer_auth_token, _save_mcp_server
+    from hermes_cli.mcp_config import _commit_mcp_server_credential, _get_mcp_servers, _save_mcp_server
 
     try:
         name, server_config, bearer_token = _normalize_mcp_server_create(body)
@@ -117,7 +117,14 @@ async def add_mcp_server(body: MCPServerCreate, profile: Optional[str] = None):
             if name in _get_mcp_servers():
                 raise HTTPException(status_code=409, detail=f"Server '{name}' already exists")
             if bearer_token is not None:
-                server_config["headers"] = _save_bearer_auth_token(name, bearer_token)
+                # CX3 safe path: encrypted CX2 store when enabled (else the profile's
+                # .env); a failed config save rolls the credential back.
+                try:
+                    _commit_mcp_server_credential(
+                        name, bearer_token, base_config=server_config)
+                except ValueError as exc:
+                    raise HTTPException(status_code=400, detail=str(exc)) from exc
+                return
             if not _save_mcp_server(name, server_config):
                 raise HTTPException(
                     status_code=400, detail=f"Server '{name}' rejected: suspicious command/args configuration",
@@ -130,7 +137,7 @@ async def add_mcp_server(body: MCPServerCreate, profile: Optional[str] = None):
     except Exception as exc:
         _log.exception("POST /api/mcp/servers failed")
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return _mcp_server_summary(name, server_config)
+    return _mcp_server_summary(name, _get_mcp_servers().get(name, server_config))
 
 
 @router.put("/api/mcp/servers")
