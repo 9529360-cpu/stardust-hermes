@@ -13,6 +13,7 @@ const hudNativeDrag = hudWindowing?.nativeDrag === true
 const launchFlags = ipcRenderer.sendSync('stardust:launch-flags')
 
 contextBridge.exposeInMainWorld('stardustDesktop', {
+  bootLanguage: launchFlags?.bootLanguage,
   glassSupported: translucencySupport?.glass === true,
   translucencySupported: translucencySupport?.translucency === true,
   // Launch-flag fact: the app was started with --local, so the renderer may

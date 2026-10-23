@@ -141,6 +141,10 @@ export function resolveInitialLocale(saved: string | null | undefined, osLocale:
   return osPreferredLocale(osLocale) ?? DEFAULT_LOCALE
 }
 
+export function bootLocale(): Locale {
+  return normalizeLocale(typeof window === 'undefined' ? undefined : window.stardustDesktop?.bootLanguage)
+}
+
 export function localeConfigValue(locale: Locale): string {
   return LOCALE_OPTIONS.find(item => item.id === locale)?.configValue ?? DEFAULT_LOCALE
 }

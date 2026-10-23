@@ -72,6 +72,31 @@ describe('I18nProvider', () => {
     expect(copy.desktop.handoff.timedOut).toContain('stardust gateway')
   })
 
+  it('uses the saved preload language on the very first child render before config resolves', () => {
+    const previous = window.stardustDesktop
+    Object.defineProperty(window, 'stardustDesktop', { configurable: true, value: { bootLanguage: 'zh-CN' } })
+    const seen: string[] = []
+
+    function FirstRender() {
+      const { locale } = useI18n()
+      seen.push(locale)
+
+      return null
+    }
+
+    try {
+      render(
+        <I18nProvider configClient={{ getConfig: () => new Promise(() => {}), saveConfig: vi.fn() }}>
+          <FirstRender />
+        </I18nProvider>
+      )
+      expect(seen.length).toBeGreaterThan(0)
+      expect(seen.every(locale => locale === 'zh')).toBe(true)
+    } finally {
+      Object.defineProperty(window, 'stardustDesktop', { configurable: true, value: previous })
+    }
+  })
+
   it('defaults to English without a config client', () => {
     render(
       <I18nProvider configClient={null}>

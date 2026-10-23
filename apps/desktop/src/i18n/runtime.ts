@@ -1,10 +1,10 @@
 import { isRecord } from '@stardust/shared/i18n'
 
 import { TRANSLATIONS } from './catalog'
-import { DEFAULT_LOCALE } from './languages'
+import { bootLocale, DEFAULT_LOCALE } from './languages'
 import type { Locale } from './types'
 
-let runtimeLocale: Locale = DEFAULT_LOCALE
+let runtimeLocale: Locale = bootLocale()
 
 /** Walk a dot-path (`a.b.c`) into a nested message tree. */
 function resolvePath(source: unknown, key: string): unknown {

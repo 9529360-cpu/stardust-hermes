@@ -343,6 +343,8 @@ declare global {
       setActiveWork?: (payload: HermesActiveWork) => void
       setTitleBarTheme?: (payload: HermesTitleBarTheme) => void
       setNativeTheme?: (mode: 'dark' | 'light' | 'system') => void
+      /** Saved display language supplied by preload before renderer modules execute. */
+      bootLanguage?: unknown
       /** Main-process fact: this OS can back glass with a native material. */
       glassSupported?: boolean
       /** Main-process fact: this OS can do any translucency at all (not Linux). */
