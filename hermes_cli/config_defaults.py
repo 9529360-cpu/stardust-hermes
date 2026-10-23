@@ -1112,9 +1112,9 @@ DEFAULT_CONFIG = {
         "echo_transcripts": True,
         # No seeded "provider": a stored value counts as an explicit user pick; unset = autodetect
         # ladder. Valid: "local" (faster-whisper) | "groq" | "openai" | "mistral" | "elevenlabs" |
-        # "deepinfra". Global language hint unless a per-provider language overrides it. "en"
-        # because Whisper auto-detect misreads short/accented clips; "" = auto; or "es", "zh", ...
-        "language": "en",
+        # "deepinfra". Auto-detection preserves Chinese speech and English without translation.
+        # Per-provider language overrides this global hint; use "zh" or "en" to pin a language.
+        "language": "auto",
         # Client-side ffmpeg silence trim before cloud upload (local whisper uses VAD): silence
         # inflates upload time, billing and hallucinations. Failure = raw upload.
         "cloud_trim_silence": True,
