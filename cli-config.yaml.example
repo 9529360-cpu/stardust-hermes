@@ -554,6 +554,7 @@ tool_loop_guardrails:
   warnings_enabled: true
   hard_stop_enabled: false
   non_interactive_hard_stop_enabled: true
+  wait_repeat_advisory_enabled: false  # opt-in, one advisory per unchanged wait/status result
   warn_after:
     exact_failure: 2
     same_tool_failure: 3
