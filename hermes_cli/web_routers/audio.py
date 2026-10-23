@@ -330,10 +330,12 @@ async def speak_text(payload: TTSSpeakRequest, profile: Optional[str] = None):
     except OSError as exc:
         raise HTTPException(status_code=500, detail=f"Could not read audio: {exc}")
 
+    if not audio_bytes:
+        raise HTTPException(status_code=500, detail="Speech synthesis produced empty audio")
     encoded = base64.b64encode(audio_bytes).decode("ascii")
     return {
         "ok": True, "data_url": f"data:{mime_type};base64,{encoded}", "mime_type": mime_type,
-        "provider": result.get("provider"),
+        "provider": result.get("provider"), "fallback": result.get("fallback"),
     }
 
 

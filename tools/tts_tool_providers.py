@@ -200,8 +200,65 @@ async def _generate_edge_tts(text: str, output_path: str, tts_config: Dict[str, 
     kwargs = {"voice": edge_config.get("voice", DEFAULT_EDGE_VOICE)}
     if speed != 1.0:
         kwargs["rate"] = f"{round((speed - 1.0) * 100):+d}%"
-    await edge_tts.Communicate(text, **kwargs).save(output_path)
+    # Bound the actual coroutine: a timed-out worker Future cannot stop network I/O.
+    import asyncio
+    timeout = float((tts_config.get("fallback") or {}).get("edge_timeout_seconds", 1.0))
+    await asyncio.wait_for(edge_tts.Communicate(text, **kwargs).save(output_path), timeout=timeout)
     return output_path
+
+
+def _windows_tts_available() -> bool:
+    import sys
+    import shutil
+    return sys.platform == "win32" and shutil.which("powershell.exe") is not None
+
+
+def _generate_windows_tts(text: str, output_path: str, tts_config: Dict[str, Any]) -> str:
+    """Use installed Windows Chinese voices, with no downloads or paid services.
+
+    Text and paths travel as JSON on stdin, never as executable PowerShell.
+    WAV is returned with its actual extension so HTTP clients decode it correctly.
+    """
+    import subprocess
+    import wave
+    from pathlib import Path
+    if not _windows_tts_available():
+        raise RuntimeError("Windows local Chinese speech is unavailable")
+    path = str(Path(output_path).with_suffix(".wav"))
+    script = r'''
+$ErrorActionPreference = "Stop"
+[Console]::InputEncoding = New-Object System.Text.UTF8Encoding
+$p = [Console]::In.ReadToEnd() | ConvertFrom-Json
+Add-Type -AssemblyName System.Speech
+$s = New-Object System.Speech.Synthesis.SpeechSynthesizer
+try {
+    $voice = $s.GetInstalledVoices() | Where-Object { $_.Enabled -and $_.VoiceInfo.Culture.Name -like "zh-*" } | Select-Object -First 1
+    if (-not $voice) { throw "No installed Chinese Windows speech voice" }
+    $s.SelectVoice($voice.VoiceInfo.Name)
+    $s.Rate = $p.rate
+    $s.SetOutputToWaveFile($p.path)
+    $s.Speak($p.text)
+    $s.SetOutputToNull()
+} finally { $s.Dispose() }
+'''
+    speed = max(0.25, min(4.0, float(tts_config.get("speed", 1.0))))
+    result = subprocess.run(
+        ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
+        input=json.dumps({"text": text, "path": path, "rate": max(-10, min(10, round((speed - 1) * 5)))}, ensure_ascii=False),
+        encoding="utf-8", capture_output=True, timeout=15,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+    if result.returncode:
+        Path(path).unlink(missing_ok=True)
+        raise RuntimeError("Windows local Chinese speech failed (check installed Chinese voices)")
+    try:
+        with wave.open(path) as audio:
+            if audio.getnframes() <= 0:
+                raise ValueError("Windows speech produced empty audio")
+    except Exception:
+        Path(path).unlink(missing_ok=True)
+        raise
+    return path
 
 
 # --- ElevenLabs ---
