@@ -346,6 +346,10 @@ def main():
             "status": args.status, "source": args.source, "artifact": str(artifact),
             "artifact_sha256": hashlib.sha256(artifact.read_bytes()).hexdigest(),
             "created_at": ledger_timestamp(), "change": change_identity(contract["root"])})
+        from agent import acceptance_observations
+        if acceptance_observations.enabled():
+            contract["evidence"][-1]["provenance"] = acceptance_observations.resolve(
+                contract, args.source, artifact, args.tier)
         steps = _expected_steps(contract, args.criterion)
         if steps:
             linked = [(index, step) for index, step in steps

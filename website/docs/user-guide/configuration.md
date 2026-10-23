@@ -1242,6 +1242,26 @@ The evidence that feeds this guard (which test/lint/build commands ran, which fi
 
 For a user/plugin policy gate at the same point — keep the agent going with your own checks — see the [`pre_verify` hook](/user-guide/features/hooks#pre_verify).
 
+## Acceptance observation provenance (opt-in)
+
+Set `agent.bind_acceptance_observations: true` in `config.yaml` to label task
+acceptance evidence against committed tool observations. The default is off;
+legacy receipts and acceptance decisions remain unchanged. This flag only adds
+provenance labels, never blocks task execution or adds completion gates.
+
+For an active explicit task contract, successful executor results retain their
+session message ID (`message:ID`), timestamp, observed tier, tool-call/task identity
+and SHA-256 of explicitly referenced local files (up to 64 MiB). Cite either that
+message ID or the exact tool-call ID in `task_acceptance evidence --source`.
+Receipts add `provenance.verification: verified` when the source, tier and artifact
+bytes match. Unknown sources, unavailable/remote artifacts, changed files and
+legacy observations stay `self-reported/unverified` with a reason. Screenshots
+require an earlier recorded UI interaction in the same task and contract.
+Currently direct file tools and structured browser actions/artifact paths are
+supported; opaque terminal scripts and test output cannot establish UI provenance.
+This attests observation identity, not whether an image or file proves the claimed
+outcome. Raw commands, file contents and UI text are not copied into this metadata.
+
 ## Standing Goals (`/goal`)
 
 When a standing goal is active, Hermes judges whether each assistant response satisfies it. If not, it feeds a continuation prompt back into the same session and keeps working until the goal is done, the turn budget is exhausted, or the user pauses/clears it. The turn budget is the real backstop — judge failures fail **open** (continue) so a flaky judge never wedges progress.
