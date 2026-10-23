@@ -1078,6 +1078,7 @@ _EXTRA_KNOWN_ROOT_KEYS = {
     "multiplex_profiles", "profile_routes", "platforms", "require_mention",
     "unauthorized_dm_behavior", "signal", "allow_all_users",
     "timeouts",          # unified timeout resolution section (agent/deadline.py)
+    "connector_secret_store",  # opt-in OS-encrypted connector credential store (agent/connector_secrets.py)
 }
 _KNOWN_ROOT_KEYS = frozenset(DEFAULT_CONFIG.keys()) | _EXTRA_KNOWN_ROOT_KEYS
 
@@ -1576,18 +1577,23 @@ def _env_expand_match(m: re.Match) -> str:
     """Expand one ``${VAR}`` (legacy bare name) or ``${env:VAR}`` (Cursor-style SecretRef).
     Other SecretRef sources (``file:``, ``bitwarden:``, ``vault:``...) are NOT resolved here:
     external backends inject their values into the environment at startup (the ``secrets:``
-    block), so a config ref only ever needs the env shape. Unresolved refs stay verbatim so
+    block), so a config ref only ever needs the env shape. ``connector:<server>/<field>``
+    refs are also kept verbatim — they belong to the MCP config loader, which resolves
+    them from the opt-in OS-encrypted connector secret store
+    (agent/connector_secrets.py, tools/mcp_tool_config.py). Unresolved refs stay verbatim so
     callers can detect them."""
     raw = m.group(0)
     inner = m.group(1).strip()
     name = _env_ref_var_name(inner)
     if name is None:
         if not inner.startswith("env:") and _is_non_env_secret_ref(inner):
-            logger.warning(
-                "Config ref %r uses source %r which is not resolvable in "
-                "config.yaml — external secret sources inject env vars at "
-                "startup, so reference the variable as ${env:NAME} instead",
-                raw, inner.split(":", 1)[0])
+            source = inner.split(":", 1)[0]
+            if source != "connector":
+                logger.warning(
+                    "Config ref %r uses source %r which is not resolvable in "
+                    "config.yaml — external secret sources inject env vars at "
+                    "startup, so reference the variable as ${env:NAME} instead",
+                    raw, source)
         return raw  # non-env source, or empty ``${env:}``
     val = _env_ref_lookup(name)
     if val is not None:

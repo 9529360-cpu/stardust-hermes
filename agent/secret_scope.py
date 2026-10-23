@@ -178,6 +178,24 @@ def get_secret_str(name: str, default: str = "") -> str:
     return default if val is None else val
 
 
+def resolve_connector_secret(name: str) -> Optional[str]:
+    """Resolve a ``connector:<server>/<field>`` reference against the OS-encrypted
+    connector secret store (``agent/connector_secrets.py``).
+
+    Sits here — the profile-scoped credential-resolution module — because the
+    store is located under the CURRENT profile home (context-local override,
+    routed profile under multiplexing): two profiles running the same MCP server
+    name resolve their own entries, never each other's. ``None`` (caller keeps
+    the ``${connector:...}`` placeholder) when the option is off, the entry is
+    missing, or decryption fails; non-connector names return ``None`` untouched.
+    """
+    from agent.connector_secrets import parse_connector_reference, resolve_connector_secret_value
+    parsed = parse_connector_reference(name)
+    if parsed is None:
+        return None
+    return resolve_connector_secret_value(*parsed)
+
+
 def _strip_inline_comment(value: str) -> str:
     """Strip a dotenv-style inline comment (python-dotenv semantics): quoted values
     scan to the matching close quote (backslash-aware for double quotes) and drop a
