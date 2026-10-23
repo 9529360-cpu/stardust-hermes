@@ -1231,6 +1231,10 @@ export const zh = defineLocale({
       readFailed: '无法读取 Computer Use 状态'
     },
     about: {
+      desktopVersion: '桌面版本',
+      backendVersion: '后端版本',
+      backendUnavailable: '不可用（后端无法连接或未提供版本）',
+      remoteBackend: '远程',
       heading: 'Stardust Desktop',
       version: value => `版本 ${value}`,
       versionUnavailable: '版本不可用',

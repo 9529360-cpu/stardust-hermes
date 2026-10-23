@@ -928,6 +928,10 @@ export interface Translations {
       heading: string
       version: (value: string) => string
       versionUnavailable: string
+      desktopVersion: string
+      backendVersion: string
+      backendUnavailable: string
+      remoteBackend: string
       bundleOutOfSync: string
       bundleOutOfSyncDesc: string
       bundleOutOfSyncAction: string

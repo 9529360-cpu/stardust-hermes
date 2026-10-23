@@ -628,6 +628,7 @@ export interface HermesTerminalExit {
 }
 
 export interface DesktopVersionInfo {
+  /** Running Electron client version from app.getVersion(); independent of the backend. */
   appVersion: string
   electronVersion: string
   nodeVersion: string

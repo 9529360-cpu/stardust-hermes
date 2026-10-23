@@ -1053,6 +1053,10 @@ export const en: Translations = {
       readFailed: 'Could not read Computer Use status'
     },
     about: {
+      desktopVersion: 'Desktop version',
+      backendVersion: 'Backend version',
+      backendUnavailable: 'Unavailable (backend unreachable or version not reported)',
+      remoteBackend: 'Remote',
       heading: 'Stardust Desktop',
       version: value => `Version ${value}`,
       versionUnavailable: 'Version unavailable',
