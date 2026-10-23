@@ -306,7 +306,10 @@ class SessionPersistenceMixin:
         with _persist_lock(self):
             self._drop_trailing_empty_response_scaffolding(messages)
             self._session_messages = messages
-            self._flush_messages_to_session_db(messages, conversation_history)
+            flushed = self._flush_messages_to_session_db(messages, conversation_history)
+            if flushed:
+                from agent.task_checkpoint import persist as persist_checkpoint
+                persist_checkpoint(self)
             # Drain async token-accounting deltas at every persist point; cheap no-op when nothing queued.
             if self._session_db is not None:
                 self._session_db.flush_token_counts()

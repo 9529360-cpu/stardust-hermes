@@ -1040,6 +1040,11 @@ def build_turn_context(
     ):
         agent._flush_messages_to_session_db(conversation_history, conversation_history)
 
+    # Opted-in checkpoints must consume current steering before compression can fold old work.
+    from agent.task_checkpoint import enabled as checkpoint_enabled
+    from agent.task_acceptance import prepare as prepare_task_acceptance
+    checkpoint_on = checkpoint_enabled()
+    acceptance_context = prepare_task_acceptance(agent, original_user_message) if checkpoint_on else None
     compaction = run_turn_start_compaction(
         agent, messages=messages, system_message=system_message,
         active_system_prompt=active_system_prompt, conversation_history=conversation_history,
@@ -1056,8 +1061,8 @@ def build_turn_context(
         original_user_message=original_user_message, messages=messages,
         conversation_history=conversation_history,
     )
-    from agent.task_acceptance import prepare as prepare_task_acceptance
-    acceptance_context = prepare_task_acceptance(agent, original_user_message)
+    if not checkpoint_on:
+        acceptance_context = prepare_task_acceptance(agent, original_user_message)
     if acceptance_context:
         plugin_user_context = (plugin_user_context or "") + acceptance_context
     agent._task_acceptance_nudges = 0

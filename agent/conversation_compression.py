@@ -2724,6 +2724,13 @@ def _run_summary_dispatch(
 def _fold_todo_snapshot(agent: Any, compressed: list) -> None:
     """Strip stale todo snapshots from ``compressed`` and fold the live one in (in place)."""
     todo_snapshot = agent._todo_store.format_for_injection()
+    from agent.task_checkpoint import enabled as checkpoint_enabled, persist as persist_checkpoint, reference
+    if checkpoint_enabled():
+        persist_checkpoint(agent)
+        checkpoint = reference(agent)
+        if checkpoint:
+            from tools.todo_tool import TODO_INJECTION_HEADER
+            todo_snapshot = TODO_INJECTION_HEADER + checkpoint
     # Non-empty store (even all done) is authoritative: drop the old snapshot. A
     # truly empty store may be un-rehydrated post-compaction: keep the snapshot.
     _todo_has_items = getattr(agent._todo_store, "has_items", None)
@@ -3005,6 +3012,8 @@ def _publish_rotated_compaction(
         # state over a legacy compressed session that may still carry only the old text snapshot.
         if int(todo_state.get("revision", 0) or 0) > 0:
             child_model_config[TODO_SESSION_STATE_KEY] = todo_state
+    from agent.task_checkpoint import carry as carry_checkpoint
+    carry_checkpoint(agent, old_session_id, new_session_id, child_model_config)
     agent._session_db.publish_compression_child(
         parent_session_id=old_session_id, child_session_id=new_session_id,
         source=agent.platform or os.environ.get("STARDUST_SESSION_SOURCE", "cli"), model=agent.model,
