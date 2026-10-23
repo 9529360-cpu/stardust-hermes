@@ -41,7 +41,8 @@ from tools.tts_tool_delivery import (
     _repair_ogg_container, _resolve_audio_delivery_profile, _split_text_for_tts)
 from tools.tts_tool_providers import (
     _generate_edge_tts, _generate_elevenlabs, _generate_gemini_tts, _generate_minimax_tts,
-    _generate_mistral_tts, _generate_xai_tts, _resolve_minimax_tts_runtime)
+    _generate_mistral_tts, _generate_xai_tts, _resolve_minimax_tts_runtime,
+    _generate_windows_tts, _windows_tts_available)
 from tools.tts_tool_local import _generate_kittentts, _generate_neutts, _generate_piper_tts
 from tools.tts_tool_plugins import (
     _dispatch_to_plugin_provider, _plugin_provider_is_available,
@@ -234,6 +235,11 @@ def _finalize_voice_delivery(
     ffmpeg-converted only when the platform needs Opus."""
     if command_provider_config is not None:
         opted_in = _is_command_tts_voice_compatible(command_provider_config)
+    elif provider == "windows":
+        if want_opus:
+            opus_path = _convert_to_opus(file_str)
+            return (opus_path, True) if opus_path else (file_str, False)
+        return file_str, False
     elif provider not in BUILTIN_TTS_PROVIDERS:
         opted_in = _plugin_provider_is_voice_compatible(provider)
     elif want_opus and provider in _FFMPEG_OPUS_PROVIDERS and not file_str.endswith(".ogg"):
@@ -323,6 +329,7 @@ def _text_to_speech_single(
     Command providers resolve BEFORE built-in dispatch, but built-in names short-circuit so
     ``tts.providers.openai.command`` can't shadow OpenAI. Plugins fire only for names that are
     neither; a None return falls through to built-in dispatch (unknown -> Edge default)."""
+    fallback = None
     try:
         if command_provider_config is not None:
             logger.info("Generating speech with command TTS provider '%s'...", provider)
@@ -339,10 +346,26 @@ def _text_to_speech_single(
         ) is not None:
             file_str = _plugin_path
         else:
-            provider, error = _select_builtin_engine(provider)
-            if error:
-                return error
-            _synthesize_builtin(provider, text, file_str, tts_config, instructions)
+            try:
+                engine, error = _select_builtin_engine(provider)
+                if error:
+                    raise RuntimeError(json.loads(error).get("error", "TTS engine unavailable"))
+                _synthesize_builtin(engine, text, file_str, tts_config, instructions)
+                if not os.path.isfile(file_str) or os.path.getsize(file_str) == 0:
+                    raise RuntimeError("TTS generation produced no output")
+                provider = engine
+            except Exception as exc:
+                cfg = tts_config.get("fallback") or {}
+                if provider != "edge" or cfg.get("enabled", True) is False or not _windows_tts_available():
+                    raise
+                # Do not expose URLs/headers from upstream exceptions in API metadata.
+                reason = "timeout" if isinstance(exc, TimeoutError) else (
+                    "http_403" if "403" in str(exc) else "edge_unavailable")
+                fallback = {"from": "edge", "to": "windows", "reason": reason}
+                logger.warning("TTS fallback: edge -> windows (%s)", reason)
+                _remove_quietly(file_str)
+                file_str = _generate_windows_tts(text, file_str, tts_config)
+                provider = "windows"
         if not os.path.exists(file_str) or os.path.getsize(file_str) == 0:
             return _error_json(f"TTS generation produced no output (provider: {provider})")
 
@@ -353,7 +376,7 @@ def _text_to_speech_single(
         logger.info("TTS audio saved: %s (%s bytes, provider: %s)", file_str, f"{os.path.getsize(file_str):,}", provider)
         return json.dumps({
             "success": True, "file_path": file_str, "media_tag": _media_tag([file_str], voice_compatible),
-            "provider": provider, "voice_compatible": voice_compatible,
+            "provider": provider, "voice_compatible": voice_compatible, "fallback": fallback,
         }, ensure_ascii=False)
     except ValueError as e:
         return _tool_failure("TTS configuration error", provider, e)
@@ -446,6 +469,7 @@ def text_to_speech_tool(
             "success": True, "file_path": final_paths[0], "file_paths": final_paths,
             "media_tag": _media_tag(final_paths, voice_compatible),
             "provider": chunk_results[0].get("provider", provider), "voice_compatible": voice_compatible,
+            "fallback": next((r["fallback"] for r in chunk_results if r.get("fallback")), None),
             "chunk_count": len(chunks), "delivery_file_count": len(final_paths),
             "combined_chunks": bool(combined_chunks),
             "delivery_profile": {
