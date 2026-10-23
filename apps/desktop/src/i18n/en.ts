@@ -1080,6 +1080,8 @@ export const en: Translations = {
       releaseNotes: 'Release notes',
       onLatest: "You're on the latest version.",
       installing: 'An update is currently installing.',
+      detachedHead: "This source checkout has a detached HEAD and cannot auto-update. Switch to a branch first.",
+      gitMissing: "Git not found. Install Git or make it available to Stardust, then restart the app.",
       cantUpdate: "This build can't update itself from inside the app.",
       cantReach: "We couldn't reach the update server.",
       tapCheck: 'Tap "Check now" to look for updates.',

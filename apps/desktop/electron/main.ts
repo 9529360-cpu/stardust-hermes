@@ -393,6 +393,7 @@ import {
   windowOpacityOptions
 } from './translucency'
 import { branchTipApiUrl, cacheIsFresh, compareApiUrl, githubRepoSlug, parseCompare } from './update-api-check'
+import { hasGitMetadata, probeUpdateCheckout } from './update-checkout'
 import { waitForUpdateClearance } from './update-gate'
 import { readLiveUpdateMarker, updateHandoffConflict, writeUpdateMarker } from './update-marker'
 import { isOfficialSshRemote, OFFICIAL_REPO_HTTPS_URL } from './update-remote'
@@ -2789,7 +2790,7 @@ function resolveUpdateRoot() {
     isHermesSourceRoot(ACTIVE_HERMES_ROOT) ? ACTIVE_HERMES_ROOT : null
   ].filter(Boolean)
 
-  return candidates.find(c => directoryExists(path.join(c, '.git'))) || candidates[0] || ACTIVE_HERMES_ROOT
+  return candidates.find(c => hasGitMetadata(c)) || candidates[0] || ACTIVE_HERMES_ROOT
 }
 
 function runGit(args, options: any = {}): Promise<{ code: number; stdout: string; stderr: string }> {
@@ -2799,6 +2800,7 @@ function runGit(args, options: any = {}): Promise<{ code: number; stdout: string
       IS_WINDOWS ? ['-c', 'windows.appendAtomically=false', ...args] : args,
       hiddenWindowsChildOptions({
         cwd: options.cwd,
+        timeout: options.timeout ?? 15_000,
         env: { ...process.env, ...((options.env || {}) as any), GIT_TERMINAL_PROMPT: '0' },
         stdio: ['ignore', 'pipe', 'pipe']
       })
@@ -2881,9 +2883,9 @@ async function resolveHealedBranch(updateRoot, branch) {
 async function checkUpdates({ force = false }: { force?: boolean } = {}) {
   const updateRoot = resolveUpdateRoot()
   let { branch } = readDesktopUpdateConfig()
-  const gitDir = path.join(updateRoot, '.git')
+  const checkout = await probeUpdateCheckout(updateRoot, resolveGitBinary())
 
-  if (!directoryExists(gitDir)) {
+  if (checkout.kind === 'not-a-git-checkout') {
     return {
       supported: false,
       reason: 'not-a-git-checkout',
@@ -2895,7 +2897,18 @@ async function checkUpdates({ force = false }: { force?: boolean } = {}) {
     }
   }
 
-  const git = args => runGit(args, { cwd: updateRoot }).then(r => r.stdout.trim())
+  if (checkout.kind !== 'branch') {
+    return {
+      supported: false,
+      reason: checkout.kind,
+      message: checkout.kind === 'git-error' ? checkout.message : undefined,
+      hermesRoot: updateRoot,
+      branch,
+      currentBranch: checkout.kind === 'detached-head' ? checkout.currentBranch : undefined
+    }
+  }
+
+  const git = args => runGit(args, { cwd: updateRoot, timeout: 2000 }).then(r => r.stdout.trim())
 
   const [currentSha, dirtyStr, currentBranch, originUrl] = await Promise.all([
     git(['rev-parse', 'HEAD']),
@@ -4111,7 +4124,7 @@ async function handOffWindowsBootstrapRecovery(reason) {
   const updateRoot = resolveUpdateRoot()
   const { branch: configuredBranch } = readDesktopUpdateConfig()
 
-  const branch = directoryExists(path.join(updateRoot, '.git'))
+  const branch = hasGitMetadata(updateRoot)
     ? await resolveHealedBranch(updateRoot, configuredBranch || DEFAULT_UPDATE_BRANCH)
     : configuredBranch || DEFAULT_UPDATE_BRANCH
 

@@ -98,7 +98,11 @@ export function AboutSettings() {
   let statusTone: 'idle' | 'available' | 'error' = 'idle'
 
   if (!supported) {
-    statusLine = status?.message != null ? productCopy(status.message) : a.cantUpdate
+    statusLine = status?.reason === 'detached-head'
+      ? a.detachedHead
+      : status?.reason === 'git-missing'
+        ? a.gitMissing
+        : status?.message != null ? productCopy(status.message) : a.cantUpdate
     statusTone = 'error'
   } else if (status?.error) {
     statusLine = status.message ? `${a.cantReach} ${productCopy(status.message)}` : a.cantReach
