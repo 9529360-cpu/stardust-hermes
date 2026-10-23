@@ -1092,9 +1092,12 @@ def compute_error_backoff(
     # 60s backoff after a 5xx is not an anonymous spinner — this is transient
     # (rewritten by the next frame, cleared on recovery), so it does not add
     # the transcript chatter the buffer exists to avoid.
-    agent._emit_wait_notice(
-        f"⏳ waiting on provider — retrying in {wait_time:.0f}s (attempt {retry_count}/{max_retries})"
-    )
+    from agent.provider_retry_notice import ProviderRetryNotice
+
+    agent._emit_wait_notice(ProviderRetryNotice(
+        f"⏳ waiting on provider — retrying in {wait_time:.0f}s (attempt {retry_count}/{max_retries})",
+        seconds=round(wait_time), attempt=retry_count, max_attempts=max_retries,
+    ))
     logger.warning(
         "Retrying API call in %ss (attempt %s/%s) %s policy=%s error=%s",
         wait_time, retry_count, max_retries, agent._client_log_context(),

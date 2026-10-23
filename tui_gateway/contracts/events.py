@@ -118,7 +118,12 @@ class StreamDeltaPayload(Payload):
 event("message.delta", StreamDeltaPayload, doc="One streamed chunk of the assistant reply.")
 event("reasoning.delta", StreamDeltaPayload, doc="One streamed chunk of the model's reasoning.")
 event("reasoning.available", StreamDeltaPayload, doc="A completed reasoning block (non-streaming providers).")
-event("thinking.delta", StreamDeltaPayload, doc="Legacy thinking-text chunk (thinking_callback).")
+class ThinkingDeltaPayload(StreamDeltaPayload):
+    code: str | None = None
+    params: dict[str, int] | None = None
+
+
+event("thinking.delta", ThinkingDeltaPayload, doc="Thinking status with optional localized presentation code and params.")
 
 
 class MessageInterimPayload(Payload):

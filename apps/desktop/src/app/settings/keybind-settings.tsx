@@ -99,7 +99,7 @@ export function KeybindSettings() {
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-foreground">{k.title}</h2>
           <p className="mt-0.5 text-[0.72rem] text-muted-foreground">
-            {k.subtitle(openCombo ? formatCombo(openCombo) : '')}
+            {k.subtitle(openCombo ? formatCombo(openCombo, k.keys) : '')}
           </p>
         </div>
         <button

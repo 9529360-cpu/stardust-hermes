@@ -4068,6 +4068,14 @@ export interface StreamDeltaPayload {
   verbose?: boolean | null
   timestamp?: number | null
 }
+export interface ThinkingDeltaPayload {
+  text: string
+  rendered?: string | null
+  verbose?: boolean | null
+  timestamp?: number | null
+  code?: string | null
+  params?: Record<string, number> | null
+}
 /** ``prompt_turn._interim_assistant_cb`` / ``agent_callbacks`` interim_assistant_callback. */
 export interface MessageInterimPayload {
   text: string
@@ -5258,8 +5266,8 @@ export interface BackendGatewayEventMap {
   'subagent.tool': SubagentEventPayload
   /** An agent-owned background process closed. */
   'terminal.close': TerminalClosePayload
-  /** Legacy thinking-text chunk (thinking_callback). */
-  'thinking.delta': StreamDeltaPayload
+  /** Thinking status with optional localized presentation code and params. */
+  'thinking.delta': ThinkingDeltaPayload
   /** Point at a desktop element with a one-line tip bubble. */
   'tip.show': TipShowPayload
   /** Full todo snapshot after a todo tool ran. */

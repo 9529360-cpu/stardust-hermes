@@ -1,5 +1,7 @@
 import { atom, computed } from 'nanostores'
 
+import { translateNow } from '@/i18n'
+
 const keyFor = (sessionId: string | null | undefined): string => sessionId ?? ''
 
 export const $providerWaitSessions = atom<Record<string, string>>({})
@@ -42,8 +44,23 @@ export function clearAllProviderWaits(): void {
 
 /** Only the core's explained wait/reconnect frames belong in Desktop's status
  * row. Generic kawaii spinner rewrites remain presentation noise. */
-export function providerWaitText(text: string): string {
+export function providerWaitText(text: string, code?: unknown, params?: unknown): string {
   const value = text.trim()
+
+  if (code === 'provider_retry' && params && typeof params === 'object') {
+    const p = params as Record<string, unknown>
+
+    if ([p.seconds, p.attempt, p.max_attempts].every(n => typeof n === 'number' && Number.isFinite(n))) {
+      return translateNow('boot.providerRetry', p.seconds, p.attempt, p.max_attempts)
+    }
+  }
+
+  // Older independently updated runtimes send only text.
+  const retry = /^⏳ waiting on provider — retrying in (\d+)s \(attempt (\d+)\/(\d+)\)$/.exec(value)
+
+  if (retry) {
+    return translateNow('boot.providerRetry', Number(retry[1]), Number(retry[2]), Number(retry[3]))
+  }
 
   return /^(?:⏳|⚠|↻|⚙)\s*(?:waiting on|loading|processing prompt|no (?:output|response)|model returned)/i.test(value)
     ? value

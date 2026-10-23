@@ -46,7 +46,8 @@ export interface LocalBootFailureCopy {
  *  otherwise the raw error's FIRST line (never a traceback dump). */
 export function localBootFailureCopy(
   error: string | null | undefined,
-  causes: Record<LocalBootCause, string>
+  causes: Record<LocalBootCause, string>,
+  unknownHeadline?: string
 ): LocalBootFailureCopy {
   const raw = String(error || '').trim()
   const cause = classifyLocalBootFailure(raw)
@@ -57,5 +58,7 @@ export function localBootFailureCopy(
 
   const firstLine = raw.split('\n')[0]?.trim() ?? ''
 
-  return { headline: firstLine, rawDetail: firstLine === raw ? null : raw }
+  return unknownHeadline
+    ? { headline: unknownHeadline, rawDetail: raw || null }
+    : { headline: firstLine, rawDetail: firstLine === raw ? null : raw }
 }

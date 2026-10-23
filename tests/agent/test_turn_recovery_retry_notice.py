@@ -33,3 +33,5 @@ def test_retry_backoff_names_the_wait_on_the_live_status_line():
     text = agent._emit_wait_notice.call_args.args[0]
     assert text.startswith("⏳ waiting on provider")
     assert "attempt 1/3" in text
+    assert text.code == "provider_retry"
+    assert text.params == {"seconds": round(wait), "attempt": 1, "max_attempts": 3}

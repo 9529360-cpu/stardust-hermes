@@ -186,7 +186,7 @@ export function handleMessageStreamEvent(ctx: GatewayEventContext): boolean {
     // emits them after prolonged silence, so name that wait in the existing
     // bottom-of-thread status row instead of leaving only an unlabeled timer.
     if (sessionId) {
-      setSessionProviderWait(sessionId, providerWaitText(coerceGatewayText(payload?.text)))
+      setSessionProviderWait(sessionId, providerWaitText(coerceGatewayText(payload?.text), payload?.code, payload?.params))
     }
 
     return true

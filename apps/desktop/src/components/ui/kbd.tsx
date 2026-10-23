@@ -1,6 +1,7 @@
 import { cva, type VariantProps } from 'class-variance-authority'
 import * as React from 'react'
 
+import { useI18n } from '@/i18n'
 import { comboTokens } from '@/lib/keybinds/combo'
 import { cn } from '@/lib/utils'
 
@@ -102,7 +103,9 @@ interface KbdComboProps extends Omit<KbdGroupProps, 'keys'> {
 }
 
 function KbdCombo({ combo, ...props }: KbdComboProps) {
-  return <KbdGroup keys={comboTokens(combo)} {...props} />
+  const { t } = useI18n()
+
+  return <KbdGroup keys={comboTokens(combo, t.keybinds.keys)} {...props} />
 }
 
 export { Kbd, KbdCombo, KbdGroup, kbdVariants }

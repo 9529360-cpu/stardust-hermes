@@ -110,6 +110,7 @@ export const ar = defineLocale({
     pathCopied: 'تم نسخ المسار'
   },
   boot: {
+    providerRetry: (seconds, attempt, maxAttempts) => `⏳ انتظار الخدمة — إعادة المحاولة خلال ${seconds} ث (المحاولة ${attempt}/${maxAttempts})`,
     ready: 'Stardust Desktop جاهز',
     desktopBootFailedWithMessage: message => `فشل تشغيل سطح المكتب: ${message}`,
     steps: {
@@ -250,6 +251,7 @@ export const ar = defineLocale({
     layoutEditorTitle: modifier => `محرر التخطيط — انقر مع ${modifier} لإعادة ضبط التخطيط`
   },
   keybinds: {
+    keys: { space: 'مسافة', escape: 'إلغاء' },
     title: 'اختصارات لوحة المفاتيح',
     subtitle: open => `انقر على اختصار لإعادة تعيينه · ${open} يعيد فتح هذه اللوحة.`,
     search: 'ابحث في الاختصارات...',

@@ -208,7 +208,7 @@ export function BootFailureOverlay() {
   const failureCopy: LocalBootFailureCopy =
     connectionConfig?.mode === 'ssh'
       ? { headline: sshFailureMessage(connectionConfig, boot.error, t.settings.gateway), rawDetail: null }
-      : localBootFailureCopy(boot.error, t.boot.causes)
+      : localBootFailureCopy(boot.error, t.boot.causes, t.boot.errors.desktopBootFailed)
 
   const label = signInLabel(remoteReauth, {
     identityProvider: copy.identityProvider,

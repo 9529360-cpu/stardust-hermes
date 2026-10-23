@@ -118,6 +118,7 @@ export const ru = defineLocale({
     pathCopied: 'Путь скопирован'
   },
   boot: {
+    providerRetry: (seconds, attempt, maxAttempts) => `⏳ Ожидание сервиса — повтор через ${seconds} с (попытка ${attempt}/${maxAttempts})`,
     ready: 'Stardust Desktop готов',
     desktopBootFailedWithMessage: message => `Не удалось запустить приложение: ${message}`,
     steps: {
@@ -280,6 +281,7 @@ export const ru = defineLocale({
     layoutEditorTitle: mod => `Редактор раскладки — ${mod}-клик сбрасывает раскладку`
   },
   keybinds: {
+    keys: { space: 'Пробел', escape: 'Отмена' },
     title: 'Горячие клавиши',
     subtitle: open => `Нажмите на сочетание, чтобы переназначить · ${open} снова открывает эту панель.`,
     search: 'Поиск горячих клавиш…',

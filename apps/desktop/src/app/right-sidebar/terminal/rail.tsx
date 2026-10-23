@@ -68,7 +68,7 @@ export function TerminalRail() {
         ))}
         <li className="flex w-full justify-center">
           <Tip
-            label={<TipHintLabel hint={newHint && formatCombo(newHint)} text={t.rightSidebar.terminalNew} />}
+            label={<TipHintLabel hint={newHint && formatCombo(newHint, t.keybinds.keys)} text={t.rightSidebar.terminalNew} />}
             side="left"
           >
             <button
@@ -121,7 +121,7 @@ function TerminalRailItem({ active, canCloseOthers, index, term, toggleHint }: T
               className="absolute inset-y-0.5 right-0 w-0.5 rounded-l-sm bg-(--ui-stroke-primary)"
             />
           )}
-          <Tip label={<TipHintLabel hint={toggleHint && formatCombo(toggleHint)} text={label} />} side="left">
+          <Tip label={<TipHintLabel hint={toggleHint && formatCombo(toggleHint, t.keybinds.keys)} text={label} />} side="left">
             <button
               aria-label={label}
               aria-selected={active}

@@ -100,7 +100,9 @@ export const ja = defineLocale({
     pathCopied: 'パスをコピーしました'
   },
 
+  keybinds: { keys: { space: 'スペース', escape: '取消' } },
   boot: {
+    providerRetry: (seconds, attempt, maxAttempts) => `⏳ モデルサービスを待機中 — ${seconds}秒後に再試行（${attempt}/${maxAttempts}回目）`,
     ready: 'Stardust Desktop の準備ができました',
     desktopBootFailedWithMessage: message => `デスクトップの起動に失敗しました: ${message}`,
     steps: {

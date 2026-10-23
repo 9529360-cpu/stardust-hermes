@@ -51,10 +51,10 @@ const LOOPBACK_HOST_RE = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[?::1\]?)$/i
 // advertises them the way the native menu did. `formatCombo` renders
 // mod as ⌘ on macOS and Ctrl elsewhere.
 const EDIT_SHORTCUTS = {
-  copy: formatCombo('mod+c'),
-  cut: formatCombo('mod+x'),
-  paste: formatCombo('mod+v'),
-  selectAll: formatCombo('mod+a')
+  copy: 'mod+c',
+  cut: 'mod+x',
+  paste: 'mod+v',
+  selectAll: 'mod+a'
 } as const
 
 function isLoopbackUrl(url: string): boolean {
@@ -334,20 +334,20 @@ function domSections(open: Extract<OpenContextMenu, { kind: 'dom' }>, t: Transla
         key="edit-cut"
         label={copy.edit.cut}
         onSelect={() => editableCommand('cut')}
-        shortcut={EDIT_SHORTCUTS.cut}
+        shortcut={formatCombo(EDIT_SHORTCUTS.cut, t.keybinds.keys)}
       />,
       <Item
         disabled={!canCutCopy}
         key="edit-copy"
         label={t.common.copy}
         onSelect={() => editableCommand('copy')}
-        shortcut={EDIT_SHORTCUTS.copy}
+        shortcut={formatCombo(EDIT_SHORTCUTS.copy, t.keybinds.keys)}
       />,
       <Item
         key="edit-paste"
         label={copy.edit.paste}
         onSelect={() => editableCommand('paste')}
-        shortcut={EDIT_SHORTCUTS.paste}
+        shortcut={formatCombo(EDIT_SHORTCUTS.paste, t.keybinds.keys)}
       />
     ])
     sections.push([
@@ -356,7 +356,7 @@ function domSections(open: Extract<OpenContextMenu, { kind: 'dom' }>, t: Transla
         key="edit-select-all"
         label={copy.edit.selectAll}
         onSelect={selectAllInEditable}
-        shortcut={EDIT_SHORTCUTS.selectAll}
+        shortcut={formatCombo(EDIT_SHORTCUTS.selectAll, t.keybinds.keys)}
       />
     ])
   } else if (target.selectionText) {
@@ -489,21 +489,21 @@ function guestSections(open: Extract<OpenContextMenu, { kind: 'guest' }>, t: Tra
         key="guest-edit-cut"
         label={copy.edit.cut}
         onSelect={() => guestEdit('cut')}
-        shortcut={EDIT_SHORTCUTS.cut}
+        shortcut={formatCombo(EDIT_SHORTCUTS.cut, t.keybinds.keys)}
       />,
       <Item
         disabled={!params.editFlags.canCopy}
         key="guest-edit-copy"
         label={t.common.copy}
         onSelect={() => guestEdit('copy')}
-        shortcut={EDIT_SHORTCUTS.copy}
+        shortcut={formatCombo(EDIT_SHORTCUTS.copy, t.keybinds.keys)}
       />,
       <Item
         disabled={!params.editFlags.canPaste}
         key="guest-edit-paste"
         label={copy.edit.paste}
         onSelect={() => guestEdit('paste')}
-        shortcut={EDIT_SHORTCUTS.paste}
+        shortcut={formatCombo(EDIT_SHORTCUTS.paste, t.keybinds.keys)}
       />
     ])
     sections.push([
@@ -512,7 +512,7 @@ function guestSections(open: Extract<OpenContextMenu, { kind: 'guest' }>, t: Tra
         key="guest-edit-select-all"
         label={copy.edit.selectAll}
         onSelect={() => guestEdit('selectAll')}
-        shortcut={EDIT_SHORTCUTS.selectAll}
+        shortcut={formatCombo(EDIT_SHORTCUTS.selectAll, t.keybinds.keys)}
       />
     ])
   } else if (params.selectionText.trim()) {
@@ -531,7 +531,7 @@ function guestSections(open: Extract<OpenContextMenu, { kind: 'guest' }>, t: Tra
         key="guest-select-all"
         label={copy.edit.selectAll}
         onSelect={() => guestEdit('selectAll')}
-        shortcut={EDIT_SHORTCUTS.selectAll}
+        shortcut={formatCombo(EDIT_SHORTCUTS.selectAll, t.keybinds.keys)}
       />
     ])
   }
