@@ -215,6 +215,36 @@ wake_word:
 The small English KWS model (~13 MB) downloads once on first use. Each
 profile can set its own phrase — "hey \<profile\>" for every profile you run.
 
+#### Chinese wake word (V3a, opt-in)
+
+The free, local sherpa engine selects a Chinese wenetspeech KWS model for
+Chinese phrases and downloads it into the profile cache with SHA256 verification.
+To opt in explicitly:
+
+```yaml
+wake_word:
+  enabled: true
+  provider: sherpa
+  phrase: "星尘"
+  profile_routing: false
+  sherpa:
+    keywords_threshold: 0.25
+    keywords_score: 1.0
+```
+
+Global provider and phrase defaults remain unchanged. This example listens only
+for the current profile's phrase.
+
+#### Known limitations
+
+- The exact homophone "星辰" (xing1 chen2) also wakes the listener. Acoustic
+  keyword spotting cannot distinguish these two spellings of the same sounds.
+- V3a evidence uses a synthetic TTS corpus with repeated fixtures: 20/20 positives
+  (10/10 held-out), 2/2 homophone false wakes, 0/18 non-homophone false wakes,
+  and 0 false wakes in a 600-second Chinese speech/noise stream. No fixtures
+  were relabeled or removed. This is not real-room or independent-speaker accuracy.
+- Real microphone validation is planned for V3b.
+
 ### Waking a specific profile (desktop)
 
 With the sherpa engine, ONE listener can wake ANY profile. Every profile

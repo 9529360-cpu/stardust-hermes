@@ -1230,8 +1230,13 @@ DEFAULT_CONFIG = {
             "inference_framework": "",
         },
         "sherpa": {
-            # sherpa-onnx KWS model dir; empty = auto-download the small English zipformer
+            # Empty model_id selects Chinese wenetspeech for Chinese phrases, English otherwise.
+            # Opt in: provider: sherpa, phrase: 星尘; exact homophone 星辰 also wakes.
+            # Accuracy evidence is synthetic TTS, not real-room/independent speakers; V3b tests real mics.
             "model_dir": "",
+            "model_id": "",
+            "keywords_threshold": None,  # null derives from sensitivity; Chinese benchmark used 0.25
+            "keywords_score": 1.0,
         },
         "porcupine": {
             # built-in keyword ("jarvis", "computer", ...) or path to a custom .ppn
