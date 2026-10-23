@@ -87,10 +87,10 @@ test('MasterDetail sash commits, resets, cancels, and clears on a real window re
   await expect.poll(async () => (await paneState('capabilities-split') as { widthOverride?: number } | undefined)?.widthOverride).toBeGreaterThan(initialWidth)
   const committed = await paneState('capabilities-split') as { widthOverride?: number }
   expect(committed.widthOverride).toBeGreaterThan(initialWidth)
-  await page.getByRole('button', { name: 'MCP', exact: true }).click()
-  await expect(page).toHaveURL(/tab=mcp/)
-  await page.locator('[data-tour="tab-skills"]').click()
-  await expect(page).toHaveURL(/#\/skills$/)
+  await page.locator('[data-personal-product-nav]').getByRole('button', { name: '连接器', exact: true }).click()
+  await expect(page).toHaveURL(/#\/connectors$/)
+  await page.locator('[data-personal-product-nav]').getByRole('button', { name: '工具', exact: true }).click()
+  await expect(page).toHaveURL(/#\/skills\?tab=toolsets$/)
   await expect.poll(async () => (await paneState('capabilities-split') as { widthOverride?: number } | undefined)?.widthOverride).toBe(committed.widthOverride)
   expect(await page.evaluate(() => document.querySelectorAll('.stardust-resize-shield').length)).toBe(0)
 
@@ -129,8 +129,8 @@ test('MasterDetail sash commits, resets, cancels, and clears on a real window re
 
   const paneResize = async () => {
     const page = appPage()
-    await page.getByRole('button', { name: 'MCP', exact: true }).click()
-    await expect(page).toHaveURL(/tab=mcp/)
+    await page.locator('[data-personal-product-nav]').getByRole('button', { name: '连接器', exact: true }).click()
+    await expect(page).toHaveURL(/#\/connectors$/)
     const pane = page.locator('section').filter({ has: page.locator('.cursor-row-resize') }).last()
     await expect(pane.locator('.cursor-row-resize')).toBeVisible({ timeout: 30_000 })
 
@@ -154,8 +154,8 @@ test('MasterDetail sash commits, resets, cancels, and clears on a real window re
   const resizedBodyHeight = await paneBody.evaluate(el => el.getBoundingClientRect().height)
   await expect.poll(async () => (await paneState('mcp-logs') as { heightOverride?: number } | undefined)?.heightOverride).toBeGreaterThan(paneBodyHeight)
   expect(Math.abs(resizedBodyHeight - (await paneState('mcp-logs') as { heightOverride: number }).heightOverride)).toBeLessThanOrEqual(2)
-  await mcpPage.locator('[data-tour="tab-skills"]').click()
-  await expect(mcpPage).toHaveURL(/#\/skills$/)
+  await mcpPage.locator('[data-personal-product-nav]').getByRole('button', { name: '工具', exact: true }).click()
+  await expect(mcpPage).toHaveURL(/#\/skills\?tab=toolsets$/)
   const { page: remountedPage, pane: remountedPane } = await paneResize()
   const remountedBody = remountedPane.locator(':scope > div').last()
   await expect.poll(() => remountedBody.evaluate(el => el.getBoundingClientRect().height)).toBeCloseTo(resizedBodyHeight, 0)

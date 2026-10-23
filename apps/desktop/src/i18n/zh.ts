@@ -8,7 +8,7 @@ export const zh = defineLocale({
   },
   connectors: {
     pageTitle: '连接器',
-    pageDescription: '让星尘操作你的服务，比如读邮件、查日历、看 GitHub。',
+    pageDescription: '让 Stardust 操作你的服务，比如读邮件、查日历、看 GitHub。',
     connectedCount: (count: number) => `已连接 ${count}`,
     title: '连接你的应用',
     connect: '连接',
@@ -2565,8 +2565,8 @@ export const zh = defineLocale({
   },
 
   messaging: {
-    pageDescription: '你可以通过这些渠道和星尘对话，比如发邮件给它。',
-    defaultDescription: (name: string) => `通过 ${name} 与星尘收发消息。`,
+    pageDescription: '你可以通过这些渠道和 Stardust 对话，比如发邮件给它。',
+    defaultDescription: (name: string) => `通过 ${name} 与 Stardust 收发消息。`,
     pageTitle: '消息渠道',
     search: '搜索消息渠道…',
     loading: '正在加载消息渠道…',
@@ -2734,7 +2734,7 @@ export const zh = defineLocale({
       whatsapp: '通过 WhatsApp 与助理对话，并接收提醒和自动任务结果。',
       bluebubbles: '通过 BlueBubbles 把 iMessage 接入助理。',
       homeassistant: '把助理接入 Home Assistant，与智能家居自动化联动。',
-      email: '通过电子邮件与星尘对话，并接收回复和通知。',
+      email: '通过电子邮件与 Stardust 对话，并接收回复和通知。',
       sms: '通过 Twilio 短信与助理收发消息和提醒。',
       dingtalk: '把助理接入钉钉，用于团队消息、提醒和自动任务。',
       feishu: '把助理接入飞书 / Lark，用于团队消息、提醒和自动任务。',

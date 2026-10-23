@@ -2068,8 +2068,8 @@ export const zhHant = defineLocale({
   },
 
   messaging: {
-    pageDescription: '你可以透過這些管道和星塵對話，例如寄送郵件給它。',
-    defaultDescription: (name: string) => `透過 ${name} 與星塵收發訊息。`,
+    pageDescription: '你可以透過這些管道和 Stardust 對話，例如寄送郵件給它。',
+    defaultDescription: (name: string) => `透過 ${name} 與 Stardust 收發訊息。`,
     pageTitle: '訊息管道',
     search: '搜尋訊息管道…',
     loading: '正在載入訊息管道…',
@@ -2238,7 +2238,7 @@ export const zhHant = defineLocale({
       whatsapp: '透過 WhatsApp 與助理對話，並接收提醒和自動任務結果。',
       bluebubbles: '透過 BlueBubbles 把 iMessage 接入助理。',
       homeassistant: '把助理接入 Home Assistant，與智慧家庭自動化聯動。',
-      email: '透過電子郵件與星塵對話，並接收回覆和通知。',
+      email: '透過電子郵件與 Stardust 對話，並接收回覆和通知。',
       sms: '透過 Twilio 簡訊與助理收發訊息和提醒。',
       dingtalk: '把助理接入釘釘，用於團隊訊息、提醒和自動任務。',
       feishu: '把助理接入飛書 / Lark，用於團隊訊息、提醒和自動任務。',
@@ -4411,7 +4411,7 @@ export const zhHant = defineLocale({
   },
   connectors: {
     pageTitle: '連接器',
-    pageDescription: '讓星塵操作你的服務，例如讀取郵件、查詢行事曆、瀏覽 GitHub。',
+    pageDescription: '讓 Stardust 操作你的服務，例如讀取郵件、查詢行事曆、瀏覽 GitHub。',
     connectedCount: (count: number) => `已連線 ${count}`,
     skipThis: '略過此步',
     search: '尋找應用程式',
