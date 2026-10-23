@@ -38,12 +38,26 @@ class Recipe:
     port: int | None = None
     readiness_path: str = "/"
     evidence: list[str] = field(default_factory=list)
+    # None preserves reachability-only readiness; a list opts into HTTP health.
+    # Manifest example: "readinessAcceptedStatuses": [200, 401]. This checks
+    # status only, not response content or a complete application workflow.
+    readiness_accepted_statuses: list[int] | None = None
+
+    def __post_init__(self) -> None:
+        statuses = self.readiness_accepted_statuses
+        if statuses is not None and (
+            not isinstance(statuses, list) or not statuses
+            or any(type(code) is not int or not 100 <= code <= 599 for code in statuses)
+        ):
+            raise ValueError("readiness accepted statuses must be a non-empty list of HTTP status integers (100-599)")
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name, "kind": self.kind, "bootstrap": list(self.bootstrap),
             "build": list(self.build), "test": list(self.test), "start": self.start,
             "port": self.port, "readinessPath": self.readiness_path, "evidence": list(self.evidence),
+            "readinessAcceptedStatuses": (list(self.readiness_accepted_statuses)
+                                          if self.readiness_accepted_statuses is not None else None),
         }
 
     @classmethod
@@ -74,6 +88,9 @@ class Recipe:
             build=_as_strings(raw.get("build") or raw.get("buildCommands")),
             test=_as_strings(raw.get("test") or raw.get("testCommands")),
             evidence=_as_strings(raw.get("evidence")),
+            readiness_accepted_statuses=raw.get(
+                "readinessAcceptedStatuses", raw.get("readiness_accepted_statuses")
+            ),
         )
 
 

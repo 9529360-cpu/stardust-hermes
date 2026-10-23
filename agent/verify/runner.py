@@ -61,10 +61,16 @@ class ReadinessResult:
     duration: float
     error: str | None = None
     output_tail: str = ""
+    healthy: bool | None = None
+
+    @property
+    def reachable(self) -> bool:
+        return self.status_code is not None
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "url": self.url, "ready": self.ready, "statusCode": self.status_code,
+            "reachable": self.reachable, "healthy": self.healthy,
             "duration": round(self.duration, 3), "error": self.error, "outputTail": self.output_tail,
         }
 
@@ -80,8 +86,9 @@ class VerifyResult:
         return all(p.ok for p in self.phases) and (self.readiness is None or self.readiness.ready)
 
     def observations(self) -> list[dict[str, Any]]:
-        """Facts observed by this runner, never UI interaction or HTTP health.
+        """Facts observed by this runner, never UI interaction.
 
+        HTTP health is only assessed against an opted-in status expectation.
         A recipe's test command is test-tier evidence; it need not be a unit suite.
         Bootstrap and the aggregate result establish no acceptance tier.
         """
@@ -105,7 +112,8 @@ class VerifyResult:
                 "source": "agent.verify.runner._poll_readiness",
                 "recipe": self.recipe_name, "phase": "start", "tier": "runtime",
                 "status": "passed" if r.ready else "failed",
-                "observation": "http-reachability", "ready": r.ready,
+                "observation": "http-health" if r.healthy is not None else "http-reachability",
+                "ready": r.ready, "reachable": r.reachable, "healthy": r.healthy,
                 "status_code": r.status_code, "duration": round(r.duration, 3),
             })
         return observations
@@ -140,26 +148,47 @@ def _run_phase_command(
     return PhaseResult(phase, command, exit_code, duration, _tail(output), timed_out)
 
 
-def _poll_readiness(url: str, timeout: float, interval: float = 1.0) -> tuple[bool, int | None, str | None]:
+def _poll_readiness(
+    url: str, timeout: float, interval: float = 1.0,
+    accepted_statuses: list[int] | None = None,
+) -> tuple[bool, int | None, str | None]:
+    """Keep the last HTTP observation; only gate health when explicitly requested."""
     deadline = time.monotonic() + timeout
     last_error: str | None = None
-    while time.monotonic() < deadline:
+    last_status: int | None = None
+    while (remaining := deadline - time.monotonic()) > 0:
+        status = None
         try:
-            with urllib.request.urlopen(url, timeout=5) as resp:
-                return True, resp.status, None
+            with urllib.request.urlopen(url, timeout=min(5, remaining)) as resp:
+                status = resp.status
         except urllib.error.HTTPError as exc:
-            # The server answered — it is up, even if it returned 4xx/5xx.
-            return True, exc.code, None
+            status = exc.code
+            exc.close()
         except (urllib.error.URLError, OSError, TimeoutError) as exc:
             last_error = str(exc)
-        time.sleep(interval)
-    return False, None, last_error
+        if status is not None:
+            last_status = status
+            if accepted_statuses is None or status in accepted_statuses:
+                return True, status, None
+        time.sleep(min(interval, max(0, deadline - time.monotonic())))
+    if last_status is not None:
+        last_error = f"reachable but unhealthy ({last_status})"
+    return False, last_status, last_error
 
 
 def _terminate_process_group(proc: subprocess.Popen) -> None:
-    """SIGTERM the app's process group (``start_new_session=True`` on POSIX; just the
-    direct child on Windows, which lacks ``os.killpg``), SIGKILL after 10s."""
+    """Stop the owned app tree on Windows or its process group on POSIX."""
     if proc.poll() is not None:
+        return
+    if os.name == "nt":
+        # shell=True owns a cmd.exe child; terminating only it leaves the app
+        # alive with our stdout pipe open. Scope taskkill to this exact PID tree.
+        subprocess.run(
+            ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL, timeout=10, check=False,
+        )
+        proc.wait(timeout=5)
         return
     killpg = getattr(os, "killpg", None)
     getpgid = getattr(os, "getpgid", None)
@@ -204,14 +233,19 @@ def _run_start_phase(
     proc = subprocess.Popen(recipe.start, cwd=str(root), start_new_session=True, **_SUBPROCESS_KW)
     output = ""
     try:
-        ready, status, error = _poll_readiness(url, ready_timeout)
+        ready, status, error = _poll_readiness(
+            url, ready_timeout, accepted_statuses=recipe.readiness_accepted_statuses,
+        )
     finally:
         _terminate_process_group(proc)
         try:
             output = proc.stdout.read() or "" if proc.stdout is not None else ""
         except (OSError, ValueError):
             output = ""
-    return ReadinessResult(url, ready, status, time.monotonic() - started, error, _tail(output))
+    return ReadinessResult(
+        url, ready, status, time.monotonic() - started, error, _tail(output),
+        healthy=ready if recipe.readiness_accepted_statuses is not None else None,
+    )
 
 
 def _compose_live_state_reason(root: Path) -> str | None:
