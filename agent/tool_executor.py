@@ -1082,6 +1082,11 @@ def _commit_tool_result(
     _status_suffix = " (error)" if is_error else ""
     agent._touch_activity(f"tool completed: {function_name} ({tool_duration:.1f}s){_status_suffix}")
 
+    from agent import acceptance_observations
+    acceptance_capture = None
+    if observed and not blocked and not is_error and acceptance_observations.enabled():
+        acceptance_capture = acceptance_observations.capture(function_name, function_args, function_result)
+
     persisted_result = function_result
     if not _is_multimodal_tool_result(persisted_result):
         persisted_result = maybe_persist_tool_result(
@@ -1109,6 +1114,12 @@ def _commit_tool_result(
     messages.append(tool_message)
     if not _flush_session_db_after_tool_progress(agent, messages, stage=f"tool result {function_name}"):
         return None
+
+    if acceptance_capture is not None:
+        acceptance_observations.record(
+            agent, tool_message, function_name, function_args, function_result,
+            tool_call_id, effective_task_id, captured=acceptance_capture,
+        )
 
     # Todo is session state, not merely display text. Persist only after the paired tool result
     # is durably flushed so a crash cannot leave model_config claiming a write the transcript
