@@ -93,11 +93,16 @@ def test_owned_http_server(tmp_path, code, accepted, delay, expected):
         pid = int(pidfile.read_text())
         # POSIX shells can leave a terminated descendant as a zombie until the
         # host reaps it. A zombie is exited, even though its PID still exists.
-        try:
-            server_process = psutil.Process(pid)
-            exited = server_process.status() == psutil.STATUS_ZOMBIE
-        except psutil.NoSuchProcess:
-            exited = True
+        exit_deadline = time.monotonic() + 2
+        while True:
+            try:
+                server_process = psutil.Process(pid)
+                exited = server_process.status() == psutil.STATUS_ZOMBIE
+            except psutil.NoSuchProcess:
+                exited = True
+            if exited or time.monotonic() >= exit_deadline:
+                break
+            time.sleep(.02)
         assert exited, f"owned server {pid} survived teardown"
         with socket.socket() as sock:
             assert sock.connect_ex(("127.0.0.1", port)) != 0
