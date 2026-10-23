@@ -553,12 +553,20 @@ _TRUNCATION_PARAMS = (
     "truncate_before_user_ordinal", "truncate_before_row_id", "truncate_before_message_id")
 
 
+_TURN_BUSY = object()  # sentinel: a turn is already live; the caller takes the busy path
+
+
 def _lock_in_submit_turn(
     rid, sid, session, text, params, has_truncation, requested_rebind_ids, hosted_task):
-    """Under ``history_lock``: refuse watch-child races / malformed truncation, apply the
-    cut, mark the turn running + in flight.  Returns ``(err, survivor_fields)``."""
+    """Under ``history_lock``: atomically claim the turn (refuse if one is already live), refuse
+    watch-child races / malformed truncation, apply the cut, mark the turn running + in flight.
+    Returns ``(err, survivor_fields)``; ``err is _TURN_BUSY`` when another submit won the claim."""
     fields = {}
     with session["history_lock"]:
+        # The idle check and the running=True claim share ONE critical section: two submits that both
+        # passed an earlier idle check must not both start a turn (C1). The loser takes the busy path.
+        if session.get("running"):
+            return _TURN_BUSY, fields
         # A watch session's run lives in the PARENT turn (own running flag False); typing
         # mid-run would build a second agent racing the child on the same stored session.
         if session.get("lazy") and _child_run_active(str(session.get("session_key") or "")):
@@ -700,6 +708,20 @@ def _accept_prompt_submit(rid, params: dict) -> dict:
         if isinstance(raw_rebind_ids, list) else None)
     err, survivor_fields = _lock_in_submit_turn(
         rid, sid, session, text, params, has_truncation, requested_rebind_ids, hosted_task)
+    while err is _TURN_BUSY:
+        if internal_hosted_submit:
+            return _err(rid, 4091, "hosted room member session is busy")
+        # Another submit claimed the turn between the idle check and the claim: take the same busy path
+        # as any mid-turn prompt (busy_input_mode, queue). A None means that turn already ended: claim again.
+        with session["history_lock"]:
+            busy_transport = t or session.get("transport")
+        busy_response = _handle_busy_submit(
+            rid, sid, session, text, busy_transport, queued=bool(params.get("queued")), turn_author=turn_author,
+            client_message_id=params.get("client_message_id"))
+        if busy_response is not None:
+            return busy_response
+        err, survivor_fields = _lock_in_submit_turn(
+            rid, sid, session, text, params, has_truncation, requested_rebind_ids, hosted_task)
     if err is not None:
         return err
     if turn_isolation:
