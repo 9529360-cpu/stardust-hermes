@@ -1257,6 +1257,8 @@ export const zh = defineLocale({
       releaseNotes: '发行说明',
       onLatest: '你已是最新版本。',
       installing: '正在安装更新。',
+      detachedHead: '此源码工作树处于分离 HEAD（detached HEAD）状态，无法自动更新。请先切换到一个分支。',
+      gitMissing: '未找到 Git。请安装 Git 或确保 Stardust 能找到它，然后重启应用。',
       cantUpdate: '此版本无法在应用内自我更新。',
       cantReach: '无法连接更新服务器。',
       tapCheck: '点击"立即检查"以查找更新。',

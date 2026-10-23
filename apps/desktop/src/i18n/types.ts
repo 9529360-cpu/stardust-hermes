@@ -950,6 +950,8 @@ export interface Translations {
       releaseNotes: string
       onLatest: string
       installing: string
+      detachedHead: string
+      gitMissing: string
       cantUpdate: string
       cantReach: string
       tapCheck: string

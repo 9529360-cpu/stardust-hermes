@@ -214,7 +214,12 @@ function IdleView({
   if (!status.supported) {
     // A copy without version-control metadata can't self-update; the website
     // carries the current installer (same URL as Settings → About).
-    const [lead, detail] = splitDetails(status.message ?? u.unsupportedMessage)
+    const message = status.reason === 'detached-head'
+      ? t.settings.about.detachedHead
+      : status.reason === 'git-missing'
+        ? t.settings.about.gitMissing
+        : status.message ?? u.unsupportedMessage
+    const [lead, detail] = splitDetails(message)
 
     return (
       <CenteredStatus
