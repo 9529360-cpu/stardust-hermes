@@ -34,7 +34,6 @@ import { WorkspaceAddButton } from '../chat/sidebar/projects/workspace-header'
 import {
   type AppView,
   BOTS_ROUTE,
-  COMMAND_CENTER_ROUTE,
   MESSAGING_ROUTE,
   routePathname,
   SKILLS_ROUTE,
@@ -122,7 +121,7 @@ export function PersonalProductNav({
   onResumeSession
 }: PersonalProductNavProps) {
   const { locale, t } = useI18n()
-  const { pathname, search } = useLocation()
+  const { pathname } = useLocation()
   const copy = PRODUCT_NAV_COPY[locale]
   const [projectsOpen, setProjectsOpen] = useState(false)
   const [expandedProjectId, setExpandedProjectId] = useState<null | string>(null)
@@ -188,11 +187,6 @@ export function PersonalProductNav({
   const agentSpaceShowing = routePathname(pathname) === BOTS_ROUTE
   const messagingShowing = routePathname(pathname) === MESSAGING_ROUTE
 
-  const searchShowing =
-    currentView === 'command-center' &&
-    routePathname(pathname) === COMMAND_CENTER_ROUTE &&
-    (new URLSearchParams(search).get('section') ?? 'sessions') === 'sessions'
-
   // Picking a page or a new chat closes the overlay on a narrow window, so the
   // choice shows in the main area instead of under the nav.
   const pick = (item: SidebarNavItem) => {
@@ -218,14 +212,6 @@ export function PersonalProductNav({
       label: copy.newChat
     })
   }
-
-  const openSearch = () =>
-    pick({
-      id: 'command-center',
-      label: t.sidebar.searchAria,
-      icon: NULL_ICON,
-      route: `${COMMAND_CENTER_ROUTE}?section=sessions`
-    })
 
   const openAgentSpace = () =>
     pick({
@@ -317,13 +303,6 @@ export function PersonalProductNav({
       <div className="mb-3 px-2 text-[0.82rem] font-semibold tracking-[-0.01em] text-(--ui-text-primary)">Stardust</div>
       <div className="flex flex-col gap-0.5">
         <ProductNavButton icon="add" label={copy.newChat} onClick={newChat} tour="sidebar-nav-new-session" />
-        <ProductNavButton
-          active={searchShowing}
-          icon="search"
-          label={t.sidebar.searchAria}
-          onClick={openSearch}
-          tour="sidebar-nav-search"
-        />
         <ProductNavButton active={agentSpaceShowing} icon="hubot" label={copy.agentSpace} onClick={openAgentSpace} />
         <ProductNavButton
           active={currentView === 'tasks' || currentView === 'cron'}
