@@ -37,6 +37,20 @@ describe('interpretRuntimeReadiness', () => {
     expect(result.checksDisagree).toBe(true)
     expect(result.reason).toContain('No provider can serve the selected model.')
     expect(result.reason).toContain('setup.status reports configured credentials')
+    expect(result.issue).toBe('credentials_unavailable')
+  })
+
+  it('treats an empty home as ordinary setup and retains diagnostics separately', () => {
+    const result = interpretRuntimeReadiness({
+      setup: { provider_configured: false },
+      setupError: null,
+      runtime: { ok: false, error: 'Could not resolve runtime provider credentials.' },
+      runtimeError: null
+    })
+
+    expect(result.issue).toBe('needs_setup')
+    expect(result.checksDisagree).toBe(false)
+    expect(result.reason).toBe('Could not resolve runtime provider credentials.')
   })
 
   it('falls back to setup.status when runtime_check has no boolean result', () => {

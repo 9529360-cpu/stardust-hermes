@@ -4011,6 +4011,8 @@ export const zh = defineLocale({
   onboarding: {
     headerTitle: '开始设置 Stardust',
     headerDesc: '直接连接你自己的模型 API；也可以稍后在设置中添加。',
+    noModelConnected: '尚未连接模型。添加模型 API Key，或稍后在设置中连接。',
+    credentialsUnavailable: '已找到模型配置，但 Stardust 暂时无法使用。请在设置中检查所选模型和凭据。',
     setupRelay: '添加模型 API',
     setupRelayHint: '填写 API 地址、API Key 和模型即可。',
     advancedProviders: '高级选项：官方账号和其他提供方',

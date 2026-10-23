@@ -3729,6 +3729,9 @@ export const en: Translations = {
     setupRelayHint: 'Enter the API base URL, API key, and model.',
     advancedProviders: 'Advanced: provider accounts and other services',
     headerDesc: 'Connect your own model API directly, or add one later in Settings.',
+    noModelConnected: 'No model connected yet. Add a model API key, or set it up later in Settings.',
+    credentialsUnavailable:
+      'Model settings were found, but Stardust could not use them. Check the selected model and its credentials in Settings.',
     preparingInstall: 'Stardust is finishing install. This usually takes under a minute on first run.',
     starting: 'Starting Stardust…',
     lookingUpProviders: 'Looking up providers...',

@@ -3262,6 +3262,8 @@ export interface Translations {
     setupRelayHint: string
     advancedProviders: string
     headerDesc: string
+    noModelConnected: string
+    credentialsUnavailable: string
     preparingInstall: string
     starting: string
     lookingUpProviders: string

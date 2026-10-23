@@ -34,6 +34,7 @@ export interface RuntimeReadinessOptions {
 
 export interface RuntimeReadinessResult {
   checksDisagree: boolean
+  issue?: 'needs_setup' | 'credentials_unavailable'
   /** Passed through from `setup.runtime_check`: the resolved route is the free
    *  tier. Undefined when the check did not answer (older backend, transport
    *  fallback) — never read it as "not free tier". */
@@ -151,6 +152,7 @@ export function interpretRuntimeReadiness(
       ...route,
       checksDisagree,
       ready: false,
+      issue: setupConfigured === false ? 'needs_setup' : 'credentials_unavailable',
       reason,
       source: 'runtime_check'
     }
