@@ -988,6 +988,10 @@ export const ru = defineLocale({
       }
     }),
     about: {
+      desktopVersion: 'Версия Desktop',
+      backendVersion: 'Версия бэкенда',
+      backendUnavailable: 'Недоступно (нет связи или данных о версии)',
+      remoteBackend: 'Удалённый',
       heading: 'Stardust Desktop',
       version: value => `Версия ${value}`,
       versionUnavailable: 'Версия недоступна',

@@ -904,6 +904,10 @@ export const ja = defineLocale({
       }
     }),
     about: {
+      desktopVersion: 'デスクトップバージョン',
+      backendVersion: 'バックエンドバージョン',
+      backendUnavailable: '取得不可（接続できないか、バージョン情報がありません）',
+      remoteBackend: 'リモート',
       heading: 'Stardust Desktop',
       version: value => `バージョン ${value}`,
       versionUnavailable: 'バージョンを取得できません',

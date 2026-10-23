@@ -829,6 +829,10 @@ export const ar = defineLocale({
         'عندما يحدّث Stardust نفسه من التطبيق دون موجه طرفية، احتفظ بتعديلات المصدر المحلية أو تجاهلها.'
     },
     about: {
+      desktopVersion: 'إصدار سطح المكتب',
+      backendVersion: 'إصدار الخادم',
+      backendUnavailable: 'غير متاح (الخادم غير متصل أو لم يبلّغ عن إصداره)',
+      remoteBackend: 'بعيد',
       heading: 'حول Stardust',
       version: value => `الإصدار ${value}`,
       versionUnavailable: 'الإصدار غير متاح',

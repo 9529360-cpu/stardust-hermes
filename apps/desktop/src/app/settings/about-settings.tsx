@@ -8,6 +8,8 @@ import { type Translations, useI18n } from '@/i18n'
 import { AlertTriangle, CheckCircle2, ExternalLink, Loader2, RefreshCw } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import { PRODUCT_DESKTOP_NAME, PRODUCT_NAME, PRODUCT_RELEASES_URL } from '@/product-brand'
+import { $activeGatewayProfile } from '@/store/profile'
+import { $connection, $gatewayState } from '@/store/session'
 import {
   $desktopVersion,
   $updateApply,
@@ -21,6 +23,7 @@ import {
 
 import { SectionHeading, SettingsContent } from './primitives'
 import { UninstallSection } from './uninstall-section'
+import { useBackendVersion } from './use-backend-version'
 
 const INSTALLER_URL = PRODUCT_RELEASES_URL
 
@@ -55,6 +58,16 @@ export function AboutSettings() {
   const { t } = useI18n()
   const a = t.settings.about
   const version = useStore($desktopVersion)
+  const connection = useStore($connection)
+  const gatewayState = useStore($gatewayState)
+  const profile = useStore($activeGatewayProfile)
+
+  const backendVersion = useBackendVersion(
+    JSON.stringify([connection?.connectionId, connection?.mode, connection?.baseUrl, profile]),
+    gatewayState
+  )
+
+  const remote = connection?.mode === 'remote'
   const status = useStore($updateStatus)
   const apply = useStore($updateApply)
   const checking = useStore($updateChecking)
@@ -109,7 +122,11 @@ export function AboutSettings() {
         <div>
           <h2 className="text-lg font-semibold tracking-tight">{a.heading}</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            {version?.appVersion ? a.version(version.appVersion) : a.versionUnavailable}
+            {a.desktopVersion}: {version?.appVersion || a.versionUnavailable}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {a.backendVersion}: {backendVersion || a.backendUnavailable}
+            {remote ? ` (${a.remoteBackend})` : ''}
           </p>
         </div>
         {(version?.bundleOutOfSync || version?.bundleSwapPending) && (

@@ -999,6 +999,10 @@ export const zhHant = defineLocale({
       readFailed: '無法讀取 Computer Use 狀態'
     },
     about: {
+      desktopVersion: '桌面版本',
+      backendVersion: '後端版本',
+      backendUnavailable: '無法取得（後端無法連線或未提供版本）',
+      remoteBackend: '遠端',
       heading: 'Stardust Desktop',
       version: value => `版本 ${value}`,
       versionUnavailable: '版本不可用',
