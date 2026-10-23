@@ -1243,7 +1243,7 @@ _OVERFLOW_REASONS = frozenset({
 _RATE_LIMIT_REASONS = frozenset({
     FailoverReason.rate_limit, FailoverReason.billing, FailoverReason.upstream_rate_limit,
 })
-_TRANSPORT_FAILURE_REASONS = frozenset({FailoverReason.timeout, FailoverReason.overloaded})
+_TRANSPORT_FAILURE_REASONS = frozenset({FailoverReason.timeout, FailoverReason.connection_error, FailoverReason.overloaded})
 
 
 _LONG_CONTEXT_TIER_CAP = 200000

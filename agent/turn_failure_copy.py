@@ -115,6 +115,7 @@ _EXHAUSTED_LEADS: Dict[str, str] = {
     FailoverReason.overloaded.value: "{label} reported it was overloaded on all {attempts} attempts",
     FailoverReason.server_error.value: "{label} returned a server error on all {attempts} attempts",
     FailoverReason.timeout.value: "{label} didn't respond in time on any of {attempts} attempts",
+    FailoverReason.connection_error.value: "Could not connect to {label} on any of {attempts} attempts",
 }
 _EXHAUSTED_DEFAULT_LEAD = "{label} didn't answer after {attempts} attempts"
 
@@ -166,6 +167,7 @@ CONTENT_POLICY_NEXT_STEPS = (
 # Reasons absent here are NOT provider-shaped; callers fall back to the raw error text.
 FAILURE_CAUSE_GLOSS: Dict[str, str] = {
     FailoverReason.timeout.value: "the AI model service did not respond in time",
+    FailoverReason.connection_error.value: "the AI model service could not be reached",
     FailoverReason.rate_limit.value: "the AI model service was rate-limited (too many requests)",
     FailoverReason.upstream_rate_limit.value: "the AI model service was rate-limited (too many requests)",
     FailoverReason.overloaded.value: "the AI model service is overloaded right now",

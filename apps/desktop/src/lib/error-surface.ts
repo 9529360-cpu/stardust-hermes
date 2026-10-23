@@ -33,6 +33,7 @@ export const ERROR_CODE_KEYS = [
   'overloaded',
   'server_error',
   'timeout',
+  'connection_error',
   'stream_drop',
   'ssl_cert_verification',
   'context_overflow',
@@ -180,6 +181,7 @@ const FALLBACK_RESCUES: ReadonlySet<string> = new Set([
   'rate_limit',
   'upstream_rate_limit',
   'timeout',
+  'connection_error',
   'model_not_found',
   'provider_policy_blocked'
 ])
