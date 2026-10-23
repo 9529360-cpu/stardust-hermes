@@ -46,6 +46,7 @@ _BASE_COOLDOWNS = {
     FailoverReason.overloaded: 120,
     FailoverReason.server_error: 60,
     FailoverReason.timeout: 30,
+    FailoverReason.connection_error: 30,
     FailoverReason.model_not_found: 24 * 60 * 60,
     FailoverReason.provider_policy_blocked: 60 * 60,
     FailoverReason.unknown: 30,

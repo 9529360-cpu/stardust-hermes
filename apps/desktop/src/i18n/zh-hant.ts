@@ -3867,6 +3867,10 @@ export const zhHant = defineLocale({
           title: '模型服務出了問題',
           body: provider => `${provider} 回傳了伺服器錯誤。稍後重試，或切換服務商。`
         },
+        connection_error: {
+          title: '無法連線至模型服務',
+          body: provider => `無法連線至 ${provider}。請檢查服務位址、確認服務已啟動，並檢查網路或代理，然後重試。`
+        },
         timeout: {
           title: '回覆逾時了',
           body: provider => `${provider} 沒有及時回應。點「重試」重新傳送。`

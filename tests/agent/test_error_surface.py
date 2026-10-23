@@ -29,6 +29,20 @@ def _failed_result(reason: str = "", error: str = "provider exploded", **extra) 
     return result
 
 
+@pytest.mark.parametrize("provider,layer", [("custom", LAYER_ENDPOINT), ("openai", LAYER_PROVIDER)])
+@pytest.mark.parametrize("timeout", [False, True])
+def test_sdk_connection_and_timeout_surfaces_match_returned_results(provider, layer, timeout):
+    import httpx
+    import openai
+
+    request = httpx.Request("POST", "http://127.0.0.1:1/v1/chat/completions")
+    exc = openai.APITimeoutError(request=request) if timeout else openai.APIConnectionError(request=request)
+    reason = "timeout" if timeout else "connection_error"
+    surface = build_error_surface_from_exception(exc, provider=provider)
+    assert surface == build_error_surface_from_result(_failed_result(reason), provider=provider)
+    assert surface == {"layer": layer, "code": reason, "retryable": True, "provider": provider}
+
+
 def test_result_none_for_non_dict():
     assert build_error_surface_from_result("boom") is None
     assert build_error_surface_from_result(None) is None

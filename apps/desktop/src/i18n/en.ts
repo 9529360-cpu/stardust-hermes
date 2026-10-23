@@ -4380,6 +4380,10 @@ export const en: Translations = {
           title: 'The AI service had a problem',
           body: provider => `${provider} returned a server error. Retry in a moment or switch provider.`
         },
+        connection_error: {
+          title: 'Could not connect to the AI service',
+          body: provider => `Could not reach ${provider}. Check the service address, make sure the service is running, and check your network or proxy. Then retry.`
+        },
         timeout: {
           title: 'The reply timed out',
           body: provider => `${provider} did not answer in time. Retry to send it again.`

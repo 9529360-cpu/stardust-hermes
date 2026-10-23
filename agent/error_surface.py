@@ -44,7 +44,7 @@ _REASON_TO_LAYER = {
 
 # Failures between us and the base_url (not a provider verdict); on a
 # custom/local endpoint they point at the user's endpoint config.
-_TRANSPORT_REASONS = {"timeout", "ssl_cert_verification"}
+_TRANSPORT_REASONS = {"timeout", "connection_error", "ssl_cert_verification"}
 
 # Deterministic for the request — a bare "Retry" repeats the failure. Fallback
 # only: current backends stamp the classifier's verdict in ``failure_retryable``.

@@ -3676,6 +3676,10 @@ export const ja = defineLocale({
           body: provider =>
             `${provider} がサーバーエラーを返しました。少し待って再試行するか、プロバイダーを切り替えてください。`
         },
+        connection_error: {
+          title: 'AIサービスに接続できません',
+          body: provider => `${provider} に接続できません。サービスのアドレス、起動状態、ネットワークやプロキシを確認してから再試行してください。`
+        },
         timeout: {
           title: '返信がタイムアウトしました',
           body: provider => `${provider} が時間内に応答しませんでした。再試行するともう一度送信します。`

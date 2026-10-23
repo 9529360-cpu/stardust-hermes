@@ -59,7 +59,7 @@ class TestFailoverReason:
         expected = {
             "auth", "auth_permanent", "billing", "rate_limit",
             "upstream_rate_limit",
-            "overloaded", "server_error", "timeout",
+            "overloaded", "server_error", "timeout", "connection_error",
             "ssl_cert_verification",
             "context_overflow", "payload_too_large", "image_too_large",
             "image_corrupt",
@@ -1009,7 +1009,7 @@ class TestClassifyApiError:
     def test_connect_error(self):
         e = ConnectError("Connection refused")
         result = classify_api_error(e)
-        assert result.reason == FailoverReason.timeout
+        assert result.reason == FailoverReason.connection_error
 
     def test_connection_error_builtin(self):
         e = ConnectionError("Connection reset by peer")
@@ -1250,7 +1250,7 @@ class TestAdversarialEdgeCases:
     def test_connection_refused_error(self):
         e = ConnectionRefusedError("Connection refused: localhost:11434")
         result = classify_api_error(e, provider="ollama")
-        assert result.reason == FailoverReason.timeout
+        assert result.reason == FailoverReason.connection_error
 
 
     def test_disconnect_pattern_ordering(self):
@@ -1570,12 +1570,12 @@ class TestConnectionMessagePatterns:
         "TypeError: Failed to fetch",
         "upstream connect error or disconnect/reset before headers",
     ])
-    def test_generic_exception_with_connect_failure_message_is_timeout(self, message):
+    def test_generic_exception_with_connect_failure_message_is_connection_error(self, message):
         # RuntimeError — NOT in _TRANSPORT_ERROR_TYPES, not a ConnectionError
         # subclass, no status code. Without message matching this falls to
         # FailoverReason.unknown and misses the eager transport fallback.
         result = classify_api_error(RuntimeError(message))
-        assert result.reason == FailoverReason.timeout, message
+        assert result.reason == FailoverReason.connection_error, message
         assert result.retryable is True
         assert result.should_compress is False
 
@@ -1587,7 +1587,7 @@ class TestConnectionMessagePatterns:
             RuntimeError("connect ECONNREFUSED 10.0.0.5:443"),
             approx_tokens=180000, context_length=200000, num_messages=400,
         )
-        assert result.reason == FailoverReason.timeout
+        assert result.reason == FailoverReason.connection_error
         assert result.should_compress is False
 
     def test_midstream_disconnect_patterns_still_use_disconnect_path(self):

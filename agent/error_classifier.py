@@ -33,6 +33,7 @@ class FailoverReason(enum.Enum):
     overloaded = "overloaded"            # 503/529 — provider overloaded, backoff
     server_error = "server_error"        # 500/502 — internal server error, retry
     timeout = "timeout"                  # Connection/read timeout — rebuild client + retry
+    connection_error = "connection_error"  # Refused/unreachable endpoint — rebuild client + retry
     ssl_cert_verification = "ssl_cert_verification"  # Deterministic TLS chain failure — fail fast with guidance
     context_overflow = "context_overflow"  # Context too large — compress, not failover
     payload_too_large = "payload_too_large"  # 413 — compress payload
@@ -61,7 +62,7 @@ class FailoverReason(enum.Enum):
 # cooldown can outwait it.
 PROVIDER_UNAVAILABLE_REASONS = frozenset(reason.value for reason in (
     FailoverReason.overloaded, FailoverReason.server_error, FailoverReason.rate_limit,
-    FailoverReason.upstream_rate_limit, FailoverReason.timeout,
+    FailoverReason.upstream_rate_limit, FailoverReason.timeout, FailoverReason.connection_error,
 ))
 
 
@@ -369,6 +370,11 @@ _TRANSPORT_ERROR_TYPES = frozenset({
     "APIConnectionError", "APITimeoutError",
 })
 
+# Connection establishment failed; timeout subclasses have their own names and
+# retain the timeout verdict. Keep disconnect/SSL heuristics ahead of these.
+_CONNECTION_ERROR_TYPES = frozenset({"APIConnectionError", "ConnectError", "ConnectionError",
+                                     "ConnectionRefusedError", "gaierror"})
+
 # Ambiguous disconnects (no status): transient hiccup OR a gateway dropping an
 # oversized request. A large session + one of these → context-overflow path.
 _SERVER_DISCONNECT_PATTERNS = (
@@ -423,6 +429,7 @@ _V_SSL_CERT = _v(_R.ssl_cert_verification, **_ABORT_FALLBACK)
 _V_CONTEXT_OVERFLOW = _v(_R.context_overflow, should_compress=True)
 _V_PAYLOAD_TOO_LARGE = _v(_R.payload_too_large, should_compress=True)
 _V_OVERLOADED, _V_SERVER_ERROR, _V_TIMEOUT, _V_UNKNOWN = map(_v, (_R.overloaded, _R.server_error, _R.timeout, _R.unknown))
+_V_CONNECTION = _v(_R.connection_error)
 _V_IMAGE_TOO_LARGE, _V_IMAGE_CORRUPT = _v(_R.image_too_large), _v(_R.image_corrupt)
 _V_MULTIMODAL, _V_INVALID_ENCRYPTED = _v(_R.multimodal_tool_content_unsupported), _v(_R.invalid_encrypted_content)
 _V_REASONING_MANDATORY = _v(_R.reasoning_mandatory, should_compress=False, should_fallback=False)
@@ -490,7 +497,7 @@ _MESSAGE_TAIL_RULES = (
     (_RATE_LIMIT_PATTERNS, _V_RATE_LIMIT), (_EMPTY_PROVIDER_RESPONSE_PATTERNS, _V_SERVER_ERROR),
     (_CONTEXT_OVERFLOW_PATTERNS, _V_CONTEXT_OVERFLOW), (_AUTH_PATTERNS, _V_AUTH_ROTATE),
     (_PROVIDER_POLICY_BLOCKED_PATTERNS, _V_POLICY_BLOCKED), (_MODEL_NOT_FOUND_PATTERNS, _V_MODEL_NOT_FOUND),
-    (_TIMEOUT_MESSAGE_PATTERNS, _V_TIMEOUT), (_CONNECTION_MESSAGE_PATTERNS, _V_TIMEOUT),
+    (_TIMEOUT_MESSAGE_PATTERNS, _V_TIMEOUT), (_CONNECTION_MESSAGE_PATTERNS, _V_CONNECTION),
 )
 
 # Structured error code → verdict. The error-code rate_limit verdict rotates
@@ -697,6 +704,8 @@ def _by_transport(c: _Ctx) -> Optional[Verdict]:
     # network call): as ``unknown`` it would burn every retry instantly.
     if c.error_type == "RuntimeError" and "consecutive stale attempts" in msg and "aborting this call" in msg:
         return _v(_R.timeout, **_ABORT_FALLBACK)
+    if c.error_type in _CONNECTION_ERROR_TYPES or isinstance(c.error, ConnectionRefusedError):
+        return _V_CONNECTION
     transport = c.error_type in _TRANSPORT_ERROR_TYPES or isinstance(c.error, (TimeoutError, ConnectionError, OSError))
     return _V_TIMEOUT if transport else None
 

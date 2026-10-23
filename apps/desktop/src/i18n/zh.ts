@@ -4640,6 +4640,10 @@ export const zh = defineLocale({
           title: '模型服务出了问题',
           body: provider => `${provider} 返回了服务器错误。稍后重试，或切换服务商。`
         },
+        connection_error: {
+          title: '无法连接模型服务',
+          body: provider => `无法连接到 ${provider}。请检查服务地址、确认服务已启动，并检查网络或代理，然后重试。`
+        },
         timeout: {
           title: '回复超时了',
           body: provider => `${provider} 没有及时回应。点“重试”重新发送。`

@@ -15,6 +15,22 @@ import {
 } from './error-surface'
 import { errorCardText } from './error-surface-copy'
 
+describe.each([['en', en.assistant.thread], ['zh', zh.assistant.thread]] as const)(
+  'connection failures and timeouts (%s)', (_locale, thread) => {
+    it('uses distinct copy and keeps retry and fallback recovery', () => {
+      const connection: ErrorSurface = { code: 'connection_error', layer: 'endpoint', retryable: true, fallbackConfigured: false }
+      const timeout: ErrorSurface = { ...connection, code: 'timeout' }
+      const text = errorCardText(thread, connection)
+      const timedOut = errorCardText(thread, timeout)
+      expect(text.title).not.toBe(timedOut.title)
+      expect(text.body).not.toBe(timedOut.body)
+      expect(errorRecoveryPlan(connection)).toEqual(errorRecoveryPlan(timeout))
+      expect(errorRecoveryPlan(connection).retry).toBe(true)
+      expect(errorRecoveryPlan(connection).setUpFallback).toBe(true)
+    })
+  }
+)
+
 describe('parseErrorSurface', () => {
   it('accepts a valid descriptor', () => {
     expect(parseErrorSurface({ layer: 'streaming', code: 'stream_drop', retryable: true })).toEqual({
