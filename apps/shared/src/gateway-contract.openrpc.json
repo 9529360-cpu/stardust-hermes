@@ -31893,6 +31893,83 @@
         "title": "TerminalResizeResult",
         "type": "object"
       },
+      "ThinkingDeltaPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "rendered": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Rendered"
+          },
+          "verbose": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Verbose"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Timestamp"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Code"
+          },
+          "params": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Params"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "ThinkingDeltaPayload",
+        "type": "object"
+      },
       "TipShowPayload": {
         "additionalProperties": false,
         "description": "``tools/tip_tool.py``.",
@@ -36271,12 +36348,12 @@
     },
     {
       "name": "thinking.delta",
-      "summary": "Legacy thinking-text chunk (thinking_callback).",
+      "summary": "Thinking status with optional localized presentation code and params.",
       "params": [
         {
           "name": "payload",
           "schema": {
-            "$ref": "#/components/schemas/StreamDeltaPayload"
+            "$ref": "#/components/schemas/ThinkingDeltaPayload"
           }
         }
       ]

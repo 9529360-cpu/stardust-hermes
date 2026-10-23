@@ -1,6 +1,7 @@
 import { useStore } from '@nanostores/react'
 
 import { $registryVersion } from '@/contrib/registry'
+import { useI18n } from '@/i18n'
 import { $bindings, bindingsFor } from '@/store/keybinds'
 
 import { KEYBIND_READONLY } from './actions'
@@ -11,6 +12,7 @@ import { formatCombo } from './combo'
 // fall back to their fixed combo. Returns null for unknown action ids so the
 // tooltip shows just the text label with no trailing hint.
 export function useKeybindHint(actionId: string): string | null {
+  const { t } = useI18n()
   const bindings = useStore($bindings)
 
   // `bindingsFor`, not a raw `bindings[id]`: $bindings is seeded at module init
@@ -23,13 +25,13 @@ export function useKeybindHint(actionId: string): string | null {
   const rebindable = bindingsFor(actionId, bindings)[0]
 
   if (rebindable) {
-    return formatCombo(rebindable)
+    return formatCombo(rebindable, t.keybinds.keys)
   }
 
   const readonly = KEYBIND_READONLY.find(entry => entry.id === actionId)
 
   if (readonly) {
-    return formatCombo(readonly.keys[0])
+    return formatCombo(readonly.keys[0], t.keybinds.keys)
   }
 
   return null

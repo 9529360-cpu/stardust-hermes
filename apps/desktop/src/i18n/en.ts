@@ -141,6 +141,7 @@ export const en: Translations = {
   },
 
   boot: {
+    providerRetry: (seconds, attempt, maxAttempts) => `⏳ waiting on provider — retrying in ${seconds}s (attempt ${attempt}/${maxAttempts})`,
     connecting: 'CONNECTING',
     backendStarting: 'Starting Stardust backend',
     backendWaiting: 'Waiting for Stardust backend to become ready',
@@ -362,6 +363,7 @@ export const en: Translations = {
   },
 
   keybinds: {
+    keys: {},
     title: 'Keyboard shortcuts',
     subtitle: open => `Click a shortcut to rebind it · ${open} reopens this panel.`,
     search: 'Search shortcuts…',
@@ -418,6 +420,7 @@ export const en: Translations = {
       'view.toggleTabStrip': 'Toggle tabs',
       'view.showFiles': 'Show file browser',
       'view.showBrowser': 'Open browser',
+      'layout.editMode': 'Toggle layout edit mode',
       'view.toggleHud': 'Toggle HUD mode',
       'hud.snapToPointer': 'Move HUD to pointer (global, while HUD is open)',
       'view.showTerminal': 'Toggle terminal',

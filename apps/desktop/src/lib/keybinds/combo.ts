@@ -188,7 +188,13 @@ const TOKEN_LABELS: Record<string, string> = {
   right: '→'
 }
 
-function labelForBase(base: string): string {
+export type KeyLabels = Record<string, string>
+
+function labelForBase(base: string, labels?: KeyLabels): string {
+  if (labels?.[base]) {
+    return labels[base]
+  }
+
   if (TOKEN_LABELS[base]) {
     return TOKEN_LABELS[base]
   }
@@ -200,7 +206,11 @@ function labelForBase(base: string): string {
   return base.length === 1 ? base.toUpperCase() : base
 }
 
-export function formatModifierToken(mod: string): string {
+export function formatModifierToken(mod: string, labels?: KeyLabels): string {
+  if (labels?.[mod]) {
+    return labels[mod]
+  }
+
   if (mod === 'mod') {
     return IS_MAC ? '⌘' : 'Ctrl'
   }
@@ -222,16 +232,16 @@ export function formatModifierToken(mod: string): string {
 
 // Per-key display tokens, e.g. ["⌘", "K"] on macOS, ["Ctrl", "K"] elsewhere —
 // one cap per token for <KbdGroup>.
-export function comboTokens(combo: string): string[] {
+export function comboTokens(combo: string, labels?: KeyLabels): string[] {
   const parts = combo.split('+')
   const base = parts.pop() ?? ''
 
-  return [...parts.map(formatModifierToken), labelForBase(base)]
+  return [...parts.map(part => formatModifierToken(part, labels)), labelForBase(base, labels)]
 }
 
 // Human-readable label, e.g. "⌘⇧K" on macOS, "Ctrl+Shift+K" elsewhere.
-export function formatCombo(combo: string): string {
-  const tokens = comboTokens(combo)
+export function formatCombo(combo: string, labels?: KeyLabels): string {
+  const tokens = comboTokens(combo, labels)
 
   return IS_MAC ? tokens.join('') : tokens.join('+')
 }

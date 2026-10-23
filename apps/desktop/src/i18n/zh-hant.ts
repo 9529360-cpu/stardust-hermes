@@ -100,7 +100,9 @@ export const zhHant = defineLocale({
     pathCopied: '已複製路徑'
   },
 
+  keybinds: { keys: { mod: '控制', ctrl: '控制', alt: '替代', shift: '上檔', enter: '確認', escape: '退出', backspace: '退格', tab: '定位', pageup: '上頁', pagedown: '下頁', space: '空白' } },
   boot: {
+    providerRetry: (seconds, attempt, maxAttempts) => `⏳ 正在等待模型服務，${seconds} 秒後重試（第 ${attempt}/${maxAttempts} 次）`,
     ready: 'Stardust Desktop 已就緒',
     desktopBootFailedWithMessage: message => `桌面啟動失敗：${message}`,
     steps: {

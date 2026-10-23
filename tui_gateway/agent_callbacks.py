@@ -9,6 +9,7 @@ import json
 import contextlib
 import threading
 
+
 from .method_ctx import bind_module
 
 
@@ -79,6 +80,8 @@ def _mirror_subagent_to_child(event_type: str, payload: dict) -> None:
 
 
 def _agent_cbs(sid: str) -> dict:
+    from agent.provider_retry_notice import ProviderRetryNotice
+
     def _read_block(method: str, timeout: int):
         # read_terminal / read_preview (desktop GUI): server request like clarify; the preview
         # read gets longer since a URL tab extracts text from a live page.
@@ -92,7 +95,10 @@ def _agent_cbs(sid: str) -> dict:
         "tool_progress_callback": lambda event_type, name=None, preview=None, args=None, **kwargs: _on_tool_progress(
             sid, event_type, name, preview, args, **kwargs),
         "tool_gen_callback": lambda name: _tool_progress_enabled(sid) and _emit("tool.generating", sid, {"name": name}),
-        "thinking_callback": lambda text: _emit("thinking.delta", sid, {"text": text}),
+        "thinking_callback": lambda text: _emit("thinking.delta", sid, {
+            "text": str(text),
+            **({"code": text.code, "params": text.params} if isinstance(text, ProviderRetryNotice) else {}),
+        }),
         # Affection reaction (ily / <3 / good bot) → hearts; core-detected so TUI/desktop share it.
         "reaction_callback": lambda kind: _emit("reaction", sid, {"kind": kind}),
         "reasoning_callback": lambda text: _emit(

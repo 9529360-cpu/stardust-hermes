@@ -64,6 +64,9 @@ export type GatewayEventPayload = {
    * its local receipt clock when older gateways omit it. */
   timestamp?: number
   text?: string
+  /** thinking.delta: stable presentation metadata; text remains technical detail. */
+  code?: string | null
+  params?: Record<string, number> | null
   /** message.interim: this text is the turn's held-back final answer (verify-on-stop). */
   turn_id?: string
   final_candidate?: boolean

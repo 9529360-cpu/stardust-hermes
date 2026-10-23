@@ -99,7 +99,7 @@ export function ReviewShipBar() {
               runCommit(commitDefault)
             }
           }}
-          placeholder={c.commitPlaceholder(formatCombo('mod+enter'))}
+          placeholder={c.commitPlaceholder(formatCombo('mod+enter', t.keybinds.keys))}
           rows={1}
           size="sm"
           value={message}

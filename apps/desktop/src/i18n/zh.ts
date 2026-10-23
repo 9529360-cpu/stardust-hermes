@@ -135,6 +135,7 @@ export const zh = defineLocale({
   },
 
   boot: {
+    providerRetry: (seconds, attempt, maxAttempts) => `⏳ 正在等待模型服务，${seconds} 秒后重试（第 ${attempt}/${maxAttempts} 次）`,
     connecting: '正在连接',
     backendStarting: '正在启动 Stardust 后端',
     backendWaiting: '正在等待 Stardust 后端就绪',
@@ -153,15 +154,30 @@ export const zh = defineLocale({
       backgroundExited: 'Stardust 后台进程已退出。',
       backgroundExitedDuringStartup: 'Stardust 后台进程在启动期间退出。',
       backendStopped: '后端已停止',
+      restartHermes: '重启 Stardust',
+      openLogs: '打开日志',
+      reconnectNow: '立即重新连接',
+      connectionSettings: '连接设置',
+      gatewaySignInRequiredDetail: '请重新登录以恢复连接。你的对话和设置会保留。',
+      signInAgain: '重新登录',
       desktopBootFailed: '桌面启动失败',
       gatewayConnectionLost: '与网关的连接已断开',
       gatewayConnectionLostDetail:
-        'Still retrying in the background. You can keep reading and drafting — open Gateway settings if this persists.',
+        '仍在后台尝试重新连接。你可以继续阅读和起草；如果持续无法连接，请立即重连或检查连接设置。',
       gatewaySignInRequired: '需要登录网关',
       ipcBridgeUnavailable: '桌面 IPC 桥不可用。'
     },
+    causes: {
+      exitedEarly: 'Stardust 后台服务在启动后立即停止。',
+      timedOut: 'Stardust 后台服务未及时响应。',
+      permission: 'Stardust 无法写入数据文件夹，请检查访问权限。',
+      diskFull: '磁盘空间不足，Stardust 无法启动。',
+      portInUse: '其他程序正在使用 Stardust 所需的网络端口。',
+      installMissing: 'Stardust 安装不完整，请选择“修复安装”。'
+    },
     failure: {
       title: 'Stardust 无法启动',
+      details: '详情',
       description: '后台网关没有启动。请尝试下面的恢复步骤；这里不会删除你的对话或设置。',
       remoteTitle: '需要重新登录远程网关',
       remoteDescription: '你的远程网关会话已过期。请重新登录以恢复连接。这些操作不会删除你的对话或设置。',
@@ -190,6 +206,12 @@ export const zh = defineLocale({
   },
 
   notifications: {
+    actions: {
+      restartHermes: '重启 Stardust',
+      openKeys: '打开密钥设置',
+      openGateways: '打开网关设置',
+      openMaintenance: '打开维护设置'
+    },
     region: '通知',
     hide: '隐藏',
     show: '显示',
@@ -227,7 +249,8 @@ export const zh = defineLocale({
       microphonePermission: '麦克风权限已被拒绝。',
       openaiRejectedApiKey: 'OpenAI 拒绝了该 API key。',
       openaiTtsNeedsKey: 'OpenAI TTS 需要 VOICE_TOOLS_OPENAI_KEY 或 OPENAI_API_KEY。',
-      codeSkewRestartRequired: '更新后此后端仍在运行旧代码。请重启以加载新代码。'
+      codeSkewRestartRequired: '更新后此后端仍在运行旧代码。请重启以加载新代码。',
+      restartHermesFailed: '无法重启 Stardust'
     },
     voice: {
       configureSpeechToText: '配置语音转文字后即可使用语音模式。',
@@ -321,6 +344,7 @@ export const zh = defineLocale({
   },
 
   keybinds: {
+    keys: { mod: '控制', ctrl: '控制', alt: '替代', shift: '上档', enter: '回车', escape: '退出', backspace: '退格', tab: '制表', pageup: '上翻页', pagedown: '下翻页', space: '空格' },
     title: '键盘快捷键',
     subtitle: open => `点击快捷键即可重新绑定 · ${open} 可重新打开此面板。`,
     search: '搜索快捷键…',
@@ -377,6 +401,13 @@ export const zh = defineLocale({
       'view.toggleTabStrip': '切换标签',
       'view.showFiles': '显示文件浏览器',
       'view.showBrowser': '打开浏览器',
+      'view.toggleHud': '切换悬浮模式',
+      'hud.snapToPointer': '将悬浮窗口移到指针处（悬浮模式开启时全局生效）',
+      'view.newTerminal': '新建终端',
+      'view.nextTerminal': '下一个终端',
+      'view.prevTerminal': '上一个终端',
+      'view.closeTerminal': '关闭终端',
+      'layout.editMode': '切换布局编辑模式',
       'view.showTerminal': '显示终端',
       'view.selectionToComposer': '将选区发送到输入框',
       'view.terminalCopy': '复制终端选区',

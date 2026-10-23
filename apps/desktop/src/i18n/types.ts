@@ -196,6 +196,7 @@ export interface Translations {
   }
 
   boot: {
+    providerRetry: (seconds: number, attempt: number, maxAttempts: number) => string
     connecting: string
     backendStarting: string
     backendWaiting: string
@@ -404,6 +405,7 @@ export interface Translations {
   }
 
   keybinds: {
+    keys: Record<string, string>
     title: string
     subtitle: (open: string) => string
     search: string

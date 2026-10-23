@@ -462,7 +462,7 @@ function Preparing({ boot }: { boot: DesktopBootState }) {
   const { t, locale } = useI18n()
   const progress = Math.max(2, Math.min(100, Math.round(boot.progress)))
 
-  const status = locale === 'en' ? boot.message
+  const status = boot.error ? t.boot.errors.desktopBootFailed : locale === 'en' ? boot.message
     : boot.phase === 'backend.ready' ? t.boot.backendReady
       : boot.phase === 'backend.spawn' ? t.boot.backendStarting
         : boot.phase.startsWith('backend.') || boot.phase.startsWith('runtime.') ? t.boot.backendWaiting
@@ -486,7 +486,12 @@ function Preparing({ boot }: { boot: DesktopBootState }) {
         <span className="truncate">{status}</span>
         <span>{progress}%</span>
       </div>
-      {hasError ? <p className="text-xs text-destructive">{boot.error}</p> : null}
+      {hasError ? (
+        <details className="text-xs text-destructive">
+          <summary>{t.boot.failure.details}</summary>
+          <pre className="whitespace-pre-wrap wrap-break-word">{boot.error}</pre>
+        </details>
+      ) : null}
     </div>
   )
 }
