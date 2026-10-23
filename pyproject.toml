@@ -550,6 +550,7 @@ psutil = false
 pvporcupine = false
 pyasn1 = false
 pydantic = false
+pypinyin = false
 pyjwt = false
 pytest = false
 pytest-asyncio = false
