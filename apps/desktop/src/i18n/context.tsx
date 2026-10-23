@@ -5,6 +5,7 @@ import { getHermesConfigRecord, type HermesConfigRecord, saveHermesConfig } from
 
 import { TRANSLATIONS } from './catalog'
 import {
+  bootLocale,
   DEFAULT_LOCALE,
   isSupportedLocaleValue,
   localeConfigValue,
@@ -87,7 +88,10 @@ export interface I18nProviderProps {
 }
 
 export function I18nProvider({ children, configClient = defaultConfigClient, initialLocale }: I18nProviderProps) {
-  const [locale, setLocaleState] = useState<Locale>(() => normalizeLocale(initialLocale))
+  const [locale, setLocaleState] = useState<Locale>(() =>
+    initialLocale === undefined ? bootLocale() : normalizeLocale(initialLocale)
+  )
+
   const [isLoadingConfig, setIsLoadingConfig] = useState(false)
   const [isSavingLocale, setIsSavingLocale] = useState(false)
   const [configLoadError, setConfigLoadError] = useState<Error | null>(null)
@@ -156,7 +160,8 @@ export function I18nProvider({ children, configClient = defaultConfigClient, ini
           }
 
           setConfigLoadError(toError(error))
-          setLocaleState(DEFAULT_LOCALE)
+          // A transient backend failure must not discard the preloaded saved choice.
+          setLocaleState(initialLocale === undefined ? bootLocale() : DEFAULT_LOCALE)
 
           if (retryCount < MAX_LOCALE_RETRIES) {
             retryCount += 1

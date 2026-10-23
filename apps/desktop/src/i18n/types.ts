@@ -196,6 +196,10 @@ export interface Translations {
   }
 
   boot: {
+    connecting: string
+    backendStarting: string
+    backendWaiting: string
+    backendReady: string
     ready: string
     desktopBootFailedWithMessage: (message: string) => string
     steps: {

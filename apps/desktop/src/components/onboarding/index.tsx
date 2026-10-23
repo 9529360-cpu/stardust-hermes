@@ -459,8 +459,15 @@ function ReasonNotice({ reason }: { reason: string }) {
 }
 
 function Preparing({ boot }: { boot: DesktopBootState }) {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const progress = Math.max(2, Math.min(100, Math.round(boot.progress)))
+
+  const status = locale === 'en' ? boot.message
+    : boot.phase === 'backend.ready' ? t.boot.backendReady
+      : boot.phase === 'backend.spawn' ? t.boot.backendStarting
+        : boot.phase.startsWith('backend.') || boot.phase.startsWith('runtime.') ? t.boot.backendWaiting
+          : boot.message
+
   const hasError = Boolean(boot.error)
   const installing = boot.phase.startsWith('runtime.')
 
@@ -476,7 +483,7 @@ function Preparing({ boot }: { boot: DesktopBootState }) {
         value={progress / 100}
       />
       <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-        <span className="truncate">{boot.message}</span>
+        <span className="truncate">{status}</span>
         <span>{progress}%</span>
       </div>
       {hasError ? <p className="text-xs text-destructive">{boot.error}</p> : null}

@@ -141,6 +141,10 @@ export const en: Translations = {
   },
 
   boot: {
+    connecting: 'CONNECTING',
+    backendStarting: 'Starting Stardust backend',
+    backendWaiting: 'Waiting for Stardust backend to become ready',
+    backendReady: 'Stardust backend is ready. Finalizing desktop startup',
     ready: 'Stardust Desktop is ready',
     desktopBootFailedWithMessage: message => `Desktop boot failed: ${message}`,
     steps: {

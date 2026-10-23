@@ -74,6 +74,7 @@ import {
   shouldLatchHostKeyChangedFailure,
   shouldLatchRemoteReauthFailure
 } from './backend-start-failure'
+import { readBootLanguage } from './boot-language'
 import { describeBootstrapFailure, missingInstallPartMessage } from './bootstrap-failure-copy'
 import {
   detectRemoteDisplay,
@@ -15809,7 +15810,8 @@ ipcMain.on('stardust:launch-flags', event => {
   event.returnValue = {
     localModels: process.argv.includes('--local') || process.platform === 'win32' || process.platform === 'darwin',
     guestOnboarding: GUEST_ONBOARDING,
-    skipIntro: SKIP_INTRO
+    skipIntro: SKIP_INTRO,
+    bootLanguage: readBootLanguage(STARDUST_HOME, readActiveDesktopProfile())
   }
 })
 
