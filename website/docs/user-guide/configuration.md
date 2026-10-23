@@ -1905,6 +1905,7 @@ tool_loop_guardrails:
   warnings_enabled: true       # inject warnings into tool results (default: true)
   hard_stop_enabled: false     # also BLOCK the call past the hard-stop threshold (default: false)
   non_interactive_hard_stop_enabled: true  # default hard stops for gateway/cron
+  wait_repeat_advisory_enabled: false  # opt-in advice for repeated timeout/pending waits
   warn_after:
     exact_failure: 2           # identical failing call repeated N times
     same_tool_failure: 3       # same tool failing N times (different args)
@@ -1919,6 +1920,8 @@ tool_loop_guardrails:
 ```
 
 `hard_stop_enabled` explicitly enables hard stops on every platform. When it remains `false`, `non_interactive_hard_stop_enabled` still enables them for unattended gateway/cron-style platforms while preserving warning-only behavior for CLI, TUI, Desktop, ACP, subagents, and `api_server` runs (supervised task loops with a live parent or client). Set `non_interactive_hard_stop_enabled: false` to opt an unattended deployment out. See also [Docker / unattended deployments](docker.md).
+
+`wait_repeat_advisory_enabled` is independently opt-in (default `false`). On the second identical canonical wait/poll timeout or pending result it appends one advisory suggesting existing background completion notifications or a single one-shot status query. Only one hashed observation is kept per controller, including across turn resets; changed arguments/results, completion, or an observed successful mutation re-arm it. It adds no calls or hard stops, starts no work, and changes no authorization. Existing loop warnings and hard-stop settings still apply independently.
 
 Hard stops are designed to catch **replays** — the same call, unchanged, with nothing happening in between — not legitimate iteration:
 

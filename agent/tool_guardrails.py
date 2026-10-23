@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 from collections import deque
 from dataclasses import asdict, dataclass, field, fields
 from typing import Any, Mapping
@@ -75,7 +76,45 @@ def _browser_interact_is_wait(args: Mapping[str, Any] | None) -> bool:
     )
 
 
-_BOOL_FIELDS = ("warnings_enabled", "hard_stop_enabled", "non_interactive_hard_stop_enabled")
+_BOOL_FIELDS = ("warnings_enabled", "hard_stop_enabled", "non_interactive_hard_stop_enabled", "wait_repeat_advisory_enabled")
+
+_WAIT_ADVISORY = (
+    "[Wait repeat advisory: the same wait/status query timed out or remained pending with unchanged inputs. "
+    "Consider the existing background completion notification (terminal background=true, notify=true) "
+    "or a single one-shot status query instead of repeating the wait. "
+    "This advice does not start work or change user authorization.]"
+)
+_WAIT_COMMAND = re.compile(
+    r"(?:\bgh\s+(?:pr\s+checks|run\s+(?:watch|view))\b|\bkubectl\s+wait\b|"
+    r"(?:^|\s)--(?:watch|wait)(?:\s|=|$))", re.IGNORECASE,
+)
+_PENDING_STATUS = frozenset({"pending", "running", "queued", "in_progress", "waiting", "timeout", "timed_out"})
+
+
+def _wait_outcome(tool_name: str, args: Mapping[str, Any], result: str | None) -> str | None:
+    """Only canonical observers with an actual pending/timeout outcome qualify."""
+    if not isinstance(result, str):
+        return None
+    data = safe_json_loads(result)
+    if not isinstance(data, dict):
+        return None
+    if tool_name == "terminal":
+        if args.get("background") or not _WAIT_COMMAND.search(str(args.get("command") or "")):
+            return None
+        code = data.get("exit_code")
+        output = str(data.get("output") or "")
+        if code == 124:
+            # Keep partial output: changed status is new evidence, even on a timeout.
+            return _sha256(_canonical_json(("timeout", output)))
+        if code in (0, 8) and re.search(r"(?:^|[\s\t])(?:pending|queued|in_progress)(?:[\s\t]|$)", output, re.I):
+            return _sha256(_canonical_json(("pending", output)))
+    elif (
+        (tool_name in {"process_manage", "process"} and args.get("action") in {"poll", "wait"})
+        or tool_name.endswith(_STALL_GUARD_REPEATABLE_SUFFIXES)
+    ):
+        if data.get("status") in _PENDING_STATUS and not data.get("error"):
+            return _result_hash(result)
+    return None
 # Threshold field -> (nested section, nested key). The flat legacy key is the field name itself.
 _THRESHOLD_SOURCES: dict[str, tuple[str, str]] = {
     "exact_failure_warn_after": ("warn_after", "exact_failure"),
@@ -131,6 +170,7 @@ class ToolCallGuardrailConfig:
     warnings_enabled: bool = True
     hard_stop_enabled: bool = False
     non_interactive_hard_stop_enabled: bool = True
+    wait_repeat_advisory_enabled: bool = False
     exact_failure_warn_after: int = 2
     exact_failure_block_after: int = 5
     same_tool_failure_warn_after: int = 3
@@ -313,7 +353,37 @@ class ToolCallGuardrailController:
 
     def __init__(self, config: ToolCallGuardrailConfig | None = None):
         self.config = config or ToolCallGuardrailConfig()
+        # One bounded observation survives turn resets/background notices, unlike hard-stop counters.
+        self._wait_signature: tuple[ToolCallSignature, str] | None = None
+        self._wait_advised = False
         self.reset_for_turn()
+
+    def observe_wait(
+        self, tool_name: str, args: Mapping[str, Any] | None, result: str | None,
+    ) -> str | None:
+        """Return at most one advisory per unchanged wait; never affect existing decisions."""
+        if not self.config.wait_repeat_advisory_enabled or not isinstance(result, str):
+            return None
+        args = _coerce_args(args)
+        outcome = _wait_outcome(tool_name, args, result)
+        if outcome is not None:
+            signature = (ToolCallSignature.from_call(tool_name, args), outcome)
+            if signature != self._wait_signature:
+                self._wait_signature, self._wait_advised = signature, False
+                return None
+            if not self._wait_advised:
+                self._wait_advised = True
+                return _WAIT_ADVISORY
+            return None
+        failed, _ = classify_tool_failure(tool_name, result)
+        # Completed/changed observation or a landed mutation makes the next wait a new experiment.
+        if (
+            (self._wait_signature and self._wait_signature[0].tool_name == tool_name)
+            or file_mutation_result_landed(tool_name, result)
+            or (tool_name in PROGRESS_RESET_TOOL_NAMES and not failed)
+        ):
+            self._wait_signature, self._wait_advised = None, False
+        return None
 
     def reset_for_turn(self) -> None:
         self._exact_failure_counts: dict[ToolCallSignature, int] = {}

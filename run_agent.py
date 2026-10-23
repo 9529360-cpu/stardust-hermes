@@ -1286,6 +1286,7 @@ class AIAgent(
     def _append_guardrail_observation(self, tool_name: str, function_args: dict, function_result: str, *,
                                       failed: bool, tool_call_id: str = "") -> str:
         decision = self._tool_guardrails.after_call(tool_name, function_args, function_result, failed=failed)
+        wait_advice = self._tool_guardrails.observe_wait(tool_name, function_args, function_result)
         # Identical-call stall guards observe the RAW result (before the per-call loop suffix) and are applied
         # at result construction so tool results stay append-only / cache-safe.
         stall_notice = result_stub = None
@@ -1314,6 +1315,8 @@ class AIAgent(
                 self._set_tool_guardrail_halt(streak_halt)
         if stall_notice:
             function_result = (function_result or "") + "\n\n" + stall_notice
+        if wait_advice:
+            function_result = (function_result or "") + "\n\n" + wait_advice
         return function_result
 
     def _stall_guards_enabled(self) -> bool:
