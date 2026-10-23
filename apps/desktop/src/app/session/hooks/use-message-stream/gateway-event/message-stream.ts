@@ -349,6 +349,7 @@ export function handleMessageStreamEvent(ctx: GatewayEventContext): boolean {
         ? {
             error: coerceGatewayText(payload.error).trim() || finalText || 'Hermes reported an error',
             partial: Boolean(payload.partial),
+            turnId: payload.turn_id,
             surface: parseErrorSurface(payload.error_surface)
           }
         : undefined

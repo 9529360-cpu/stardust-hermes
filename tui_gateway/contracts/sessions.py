@@ -30,6 +30,7 @@ class InflightTurn(Result):
     """``session_auto_continue._inflight_snapshot``: the live (or retained failed) turn a reconnecting
     client rebuilds its bubbles from."""
 
+    turn_id: str | None = None
     assistant: str = ""
     streaming: bool = False
     user: str = ""

@@ -751,6 +751,7 @@ def _complete_turn_payload(session: dict, st: _TurnRun, status_note: str | None,
             # Retain the failed turn: resume's inflight payload is the only carrier of the
             # failure if this frame is lost to a disconnect.
             _fail_inflight_turn(session, error_value, error_surface=_error_surface)
+            payload["turn_id"] = session["inflight_turn"]["turn_id"]
             st.error_retained = True
             st.error_detail = _turn_failure_detail(
                 error_value, result.get("failure_reason"), st.prompt_text)

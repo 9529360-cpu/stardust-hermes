@@ -270,7 +270,7 @@ def _inflight_text(value: Any) -> str:
 
 def _start_inflight_turn(session: dict, text: Any) -> None:
     now = time.time()
-    session["inflight_turn"] = {"assistant": "", "started_at": now, "streaming": True, "updated_at": now, "user": _inflight_text(text)}
+    session["inflight_turn"] = {"assistant": "", "turn_id": uuid.uuid4().hex, "started_at": now, "streaming": True, "updated_at": now, "user": _inflight_text(text)}
 
 
 def _append_inflight_delta(session: dict, delta: Any) -> None:
@@ -315,6 +315,7 @@ def _fail_inflight_turn(session: dict, error: Any, error_surface: Optional[dict]
     turn = session.get("inflight_turn")
     if not isinstance(turn, dict):
         turn = {"assistant": "", "user": "", "started_at": now}
+    turn.setdefault("turn_id", uuid.uuid4().hex)
     turn.update(
         assistant=str(turn.get("assistant") or ""), user=str(turn.get("user") or ""),
         error=message or "turn failed", status="error", recoverable=True,

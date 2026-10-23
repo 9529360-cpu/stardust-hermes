@@ -30,6 +30,8 @@ export type ChatMessage = {
   completedAt?: number
   pending?: boolean
   error?: string
+  /** Gateway identity shared by terminal failures and retained resume snapshots. */
+  turnId?: string
   /** Structured layer descriptor for a failed turn (parsed error_surface).
    *  Drives the error card's layer label + actions; absent on older
    *  backends, where the card falls back to generic copy. */
@@ -63,6 +65,7 @@ export type GatewayEventPayload = {
   timestamp?: number
   text?: string
   /** message.interim: this text is the turn's held-back final answer (verify-on-stop). */
+  turn_id?: string
   final_candidate?: boolean
   rendered?: string
   status?: string
