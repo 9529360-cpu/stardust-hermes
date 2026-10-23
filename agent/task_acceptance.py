@@ -140,6 +140,57 @@ def change_identity(root):
     return digest.hexdigest()
 
 
+def _expected_steps(contract, criterion):
+    return [(i, step) for i, step in enumerate(contract.get("plan") or [])
+            if isinstance(step, dict) and step.get("criterion") == criterion
+            and "expected_result" in step]
+
+
+def _observe(step, artifact):
+    """Compare only deterministic artifact values; never interpret prose as success."""
+    result = {"step": step, "comparison": "unknown"}
+    reference = step.get("evidence_ref")
+    if not reference or Path(reference).resolve() != artifact:
+        return result
+    try:
+        text = artifact.read_text(encoding="utf-8")
+        if step.get("observer_type") == "text":
+            observed = text
+        elif step.get("observer_type") == "json":
+            envelope = json.loads(text)
+            if not isinstance(envelope, dict) or "observed" not in envelope or envelope.get("interrupted") is True:
+                return result
+            observed = envelope["observed"]
+        else:
+            return result
+        # JSON canonicalization keeps booleans distinct from numbers, including nested values.
+        expected_json = json.dumps(step["expected_result"], sort_keys=True, allow_nan=False)
+        observed_json = json.dumps(observed, sort_keys=True, allow_nan=False)
+        result.update(observed=observed, comparison="matched" if expected_json == observed_json else "mismatched")
+    except (OSError, UnicodeError, ValueError, TypeError):
+        return result
+    return result
+
+
+def _expectations_met(contract, criterion, evidence):
+    for index, step in _expected_steps(contract, criterion):
+        candidates = [(e, o) for e in contract["evidence"]
+                      if e["criterion"] == criterion and e["tier"] == evidence["tier"]
+                      and e["change"] == evidence["change"]
+                      for o in e.get("observations", [])
+                      if o.get("index") == index
+                      and json.dumps(o.get("step"), sort_keys=True) == json.dumps(step, sort_keys=True)]
+        if not candidates:
+            return False
+        receipt, observation = candidates[-1]
+        artifact = Path(receipt["artifact"])
+        if (receipt["status"] != "passed" or observation.get("comparison") != "matched"
+                or not artifact.is_file()
+                or hashlib.sha256(artifact.read_bytes()).hexdigest() != receipt.get("artifact_sha256")):
+            return False
+    return True
+
+
 def unmet(contract):
     if not contract:
         return []
@@ -155,9 +206,12 @@ def unmet(contract):
             artifact = Path(latest["artifact"])
             if not artifact.is_file() or hashlib.sha256(artifact.read_bytes()).hexdigest() != latest.get("artifact_sha256"):
                 latest = None
-        if not latest or latest["status"] != "passed":
-            missing.append(f'{criterion["id"]}: {criterion["text"]} [requires {criterion["tier"]}; '
-                           f'{latest["status"] if latest else "no current evidence"}]')
+        expectations_met = bool(latest) and _expectations_met(contract, criterion["id"], latest)
+        if not latest or latest["status"] != "passed" or not expectations_met:
+            verdict = latest["status"] if latest else "no current evidence"
+            if latest and not expectations_met:
+                verdict += "; expected observation mismatched or unknown"
+            missing.append(f'{criterion["id"]}: {criterion["text"]} [requires {criterion["tier"]}; {verdict}]')
     missing.extend(f"Blocker: {v}" for v in contract["blockers"])
     missing.extend(f"Todo: {v}" for v in contract["todos"])
     missing.extend(f"Cleanup: {v}" for v in contract["cleanup"])
@@ -173,6 +227,11 @@ def guidance(contract):
             + json.dumps(contract, ensure_ascii=False) + "\n"
             f"Before execution, record a small plan via the terminal: {command} "
             "--session SESSION plan --data JSON. JSON fields: steps (nonempty list), blockers, todos, cleanup. "
+            "Step objects may optionally include criterion (C1), action_category, expected_result, "
+            "observer_type (text or json), evidence_ref (absolute artifact path). Declaring expected_result "
+            "opts that criterion into strict comparison: text compares UTF-8 content; json reads the "
+            "observed field of a JSON object. Missing/unsupported/interrupted observations are unknown; "
+            "only matched observations can satisfy the criterion. JSON interrupted:true is unknown. "
             "Use the actual Python executable and session_id above. After each actual observation, record: "
             f"{command} --session SESSION evidence --criterion C1 --tier "
             "test|build|runtime|user-flow|review --status passed|failed --source TOOL_CALL_OR_COMMAND "
@@ -258,6 +317,16 @@ def main():
         data = json.loads(args.data)
         if not isinstance(data.get("steps"), list) or not data["steps"]:
             parser.error("plan needs a nonempty steps list")
+        for step in data["steps"]:
+            if not isinstance(step, dict):
+                continue  # Legacy step shapes retain their existing behavior.
+            if "expected_result" in step and step.get("criterion") not in {c["id"] for c in contract["criteria"]}:
+                parser.error("expected_result needs a known criterion")
+            for field in ("action_category", "observer_type", "evidence_ref"):
+                if field in step and not isinstance(step[field], str):
+                    parser.error(f"step {field} must be a string")
+            if step.get("evidence_ref") and not Path(step["evidence_ref"]).is_absolute():
+                parser.error("step evidence_ref must be an absolute artifact path")
         contract["plan"] = data["steps"]
         for field in ("blockers", "todos", "cleanup"):
             values = data.get(field, [])
@@ -277,6 +346,12 @@ def main():
             "status": args.status, "source": args.source, "artifact": str(artifact),
             "artifact_sha256": hashlib.sha256(artifact.read_bytes()).hexdigest(),
             "created_at": ledger_timestamp(), "change": change_identity(contract["root"])})
+        steps = _expected_steps(contract, args.criterion)
+        if steps:
+            linked = [(index, step) for index, step in steps
+                      if step.get("evidence_ref") and Path(step["evidence_ref"]).resolve() == artifact]
+            contract["evidence"][-1]["observations"] = [
+                dict(_observe(step, artifact), index=index) for index, step in (linked or steps)]
     if args.action != "status":
         save(contract)
     print(json.dumps({"contract": contract, "unmet": unmet(contract)}, ensure_ascii=False))
