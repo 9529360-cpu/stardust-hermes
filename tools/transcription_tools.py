@@ -95,7 +95,7 @@ def _resolve_stt_language(
 ) -> Optional[str]:
     """Language hint for an STT provider, first non-empty wins (never ""): ``stt.<provider>.language``
     (plus *extra_keys* aliases, e.g. ``language_code``) > ``stt.language`` > ``STARDUST_LOCAL_STT_LANGUAGE``
-    env > None (provider auto-detects)."""
+    env > None (provider auto-detects). A non-empty "auto" stops fallback and omits the hint."""
     if stt_config is None:
         stt_config = _load_stt_config()
     provider_cfg = _get_stt_section(stt_config, provider_key)
@@ -103,7 +103,9 @@ def _resolve_stt_language(
     if isinstance(stt_config, dict):
         candidates.append(stt_config.get("language"))
     candidates.append(os.getenv(LOCAL_STT_LANGUAGE_ENV))
-    return next((c.strip() for c in candidates if isinstance(c, str) and c.strip()), None)
+    language = next((c.strip() for c in candidates if isinstance(c, str) and c.strip()), None)
+    # "auto" explicitly stops fallback; Whisper and HTTP APIs auto-detect when omitted.
+    return None if language and language.lower() == "auto" else language
 
 
 def _openai_audio_unavailable_reason() -> Optional[str]:
@@ -460,6 +462,8 @@ def _dispatch_stt_provider(
         language=_get_stt_section(stt_config, provider).get("language"), prompt=prompt, source=source,
     )
     prompt = _enforce_prompt_length_limit(prompt, provider)
+    if isinstance(language, str) and language.strip().lower() == "auto":
+        language = None
     if provider in BUILTIN_STT_PROVIDERS:
         # Looked up in this module at call time so tests may patch ``_transcribe_*``.
         handler = globals()[f"_transcribe_{provider}"]
