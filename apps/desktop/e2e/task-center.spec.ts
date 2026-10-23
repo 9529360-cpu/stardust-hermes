@@ -60,20 +60,24 @@ test('task navigation and activity/automation tabs work in native Electron at wi
     const overflow = await center.evaluate(element => element.scrollWidth > element.clientWidth + 1)
     expect(overflow).toBe(false)
     const screenshots = process.env.TASK_CENTER_SCREENSHOT_DIR
+
     if (screenshots) {
       fs.mkdirSync(screenshots, { recursive: true })
       await page.screenshot({ path: path.join(screenshots, `tasks-${width}.png`) })
     }
   }
+
   const sandboxFiles = fs.readdirSync(fixture.sandbox.hermesHome)
   expect(sandboxFiles).not.toContain('tasks.db')
 })
 
 test('a real pending clarify appears as a task and returns to its owning conversation', async () => {
   test.setTimeout(180_000)
+
   if (!fixture) {
     throw new Error('Native fixture must be ready')
   }
+
   const { app, page } = fixture
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1220, 800))
   await page.locator('[data-personal-product-nav]').getByRole('button', { name: '新建对话', exact: true }).click()
@@ -100,15 +104,22 @@ test('a real pending clarify appears as a task and returns to its owning convers
 
 test('background completion is retained after leaving Tasks, source dismissal, and route remount', async () => {
   test.setTimeout(180_000)
-  if (!fixture) throw new Error('Native fixture must be ready')
+
+  if (!fixture) {
+    throw new Error('Native fixture must be ready')
+  }
+
   const { page } = fixture
+
   const newChat = () =>
     page.locator('[data-personal-product-nav]').getByRole('button', { name: '新建对话', exact: true }).click()
+
   await newChat()
   const composer = page.locator('[contenteditable="true"]').first()
   await composer.fill('E2E_AUTO_SHOW(taskhistory)')
   await composer.press('Enter')
-  await expect(page.getByText('TASK_HISTORY_STARTED', { exact: true })).toBeVisible({ timeout: 60_000 })
+  // The interim tool transcript and final reply can both contain this marker.
+  await expect(page.locator('[data-slot="aui_assistant-message-root"]').getByText('TASK_HISTORY_STARTED', { exact: true }).last()).toBeVisible({ timeout: 60_000 })
   // Keep Tasks unmounted while the real background command exits and its 4s source row clears.
   // The 30s completion linger must also elapse before the row belongs in Recent.
   historyRelease.release()
@@ -120,5 +131,8 @@ test('background completion is retained after leaving Tasks, source dismissal, a
   await page.getByRole('button', { name: '任务', exact: true }).click()
   await expect(recent.getByRole('button').filter({ hasText: historyCommand.slice(0, 200) })).toHaveCount(1)
   const screenshots = process.env.TASK_CENTER_SCREENSHOT_DIR
-  if (screenshots) await page.screenshot({ path: path.join(screenshots, 'task-history-after-remount.png') })
+
+  if (screenshots) {
+    await page.screenshot({ path: path.join(screenshots, 'task-history-after-remount.png') })
+  }
 })

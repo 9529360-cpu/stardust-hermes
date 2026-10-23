@@ -51,10 +51,20 @@ describe('useMessageStream turn-end todo cleanup', () => {
   it('drops a still-active task list when the turn errors out', () => {
     mountStream()
     setSessionTodos(SID, [todo('a', 'in_progress')])
+    stream.states.set(SID, { ...stream.state(), busy: true })
 
     act(() => stream.handleEvent({ payload: { message: 'boom' }, session_id: SID, type: 'error' }))
 
     expect($todosBySession.get()[SID]).toBeUndefined()
+  })
+
+  it('keeps active todos when a history-only session reports an initialization error', () => {
+    mountStream()
+    setSessionTodos(SID, [todo('a', 'in_progress')])
+
+    act(() => stream.handleEvent({ payload: { message: 'boom', scope: 'session' }, session_id: SID, type: 'error' }))
+
+    expect($todosBySession.get()[SID]).toHaveLength(1)
   })
 
   it('applies a dedicated todo snapshot immediately', () => {
