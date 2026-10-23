@@ -63,6 +63,19 @@ def fake_dpapi(monkeypatch):
     monkeypatch.setattr(dpapi, "_dpapi_unprotect", _fake_encrypt)
 
 
+@pytest.fixture()
+def fake_store_owner(fake_dpapi, monkeypatch):
+    """Owner chain (config → strict store → resolution) on the DPAPI store on EVERY host.
+
+    On Linux the platform dispatcher would hand out the no-backend store, so
+    tests that exercise the owner (not the dispatcher) pin it to the DPAPI
+    store under the fake cipher; the real dispatcher keeps its own tests below.
+    """
+    from agent import connector_secrets as cs
+    from agent.connector_secrets_dpapi import DpapiConnectorSecretStore
+    monkeypatch.setattr(cs, "_build_platform_store", lambda: DpapiConnectorSecretStore())
+
+
 def _write_config(home: Path, body: str) -> None:
     home.mkdir(parents=True, exist_ok=True)
     (home / "config.yaml").write_text(body, encoding="utf-8")
@@ -150,6 +163,16 @@ class TestDisabledByDefault:
 # ---------------------------------------------------------------------------
 
 class TestFailClosed:
+    def test_no_backend_platform_store_refuses_writes(self):
+        """The non-Windows dispatcher store: refuse new secrets, read as missing."""
+        from agent.connector_secrets import _NoSecureBackendStore
+        store = _NoSecureBackendStore("no OS secure-storage backend (test)")
+        assert store.is_available() == (False, "no OS secure-storage backend (test)")
+        with pytest.raises(ConnectorSecretStoreUnavailable):
+            store.store_secret("srv", "api_key", "v")
+        assert store.resolve_secret("srv", "api_key") is None
+        assert store.list_entries() == []
+
     def test_unavailable_backend_writes_nothing(self, tmp_path, monkeypatch):
         from agent import connector_secrets_dpapi as dpapi
 
@@ -162,7 +185,8 @@ class TestFailClosed:
             store.store_secret("srv", "api_key", "secret-value")
         assert not (tmp_path / "connector-secrets").exists()
 
-    def test_strict_owner_raises_when_backend_unavailable(self, enabled_home, monkeypatch):
+    def test_strict_owner_raises_when_backend_unavailable(self, enabled_home, monkeypatch,
+                                                          fake_store_owner):
         from agent import connector_secrets_dpapi as dpapi
 
         def _refuse(data: bytes) -> bytes:
@@ -211,7 +235,7 @@ class TestStoreLogic:
         assert store.resolve_secret("b", "f1") is None
 
     def test_damaged_ciphertext_raises_and_lenient_seam_returns_none(
-            self, enabled_home, monkeypatch, fake_dpapi, caplog):
+            self, enabled_home, monkeypatch, fake_store_owner, caplog):
         from agent import connector_secrets_dpapi as dpapi
 
         # Refuse only real entries, not the availability probe: the scenario is
@@ -341,7 +365,8 @@ class TestStoreLogic:
 # ---------------------------------------------------------------------------
 
 class TestResolutionIntegration:
-    def test_interpolation_resolves_connector_refs_when_enabled(self, enabled_home, fake_dpapi):
+    def test_interpolation_resolves_connector_refs_when_enabled(self, enabled_home,
+                                                                fake_store_owner):
         from tools.mcp_tool_config import _interpolate_env_vars
         get_connector_secret_store_strict().store_secret("github", "api_key", "cx2-value")
         out = _interpolate_env_vars({
@@ -355,7 +380,7 @@ class TestResolutionIntegration:
         assert out["mixed"] == "cx2-value-${connector:github/missing}"
         assert out["plain"] == "no refs"
 
-    def test_env_style_connector_ref_also_resolves(self, enabled_home, fake_dpapi):
+    def test_env_style_connector_ref_also_resolves(self, enabled_home, fake_store_owner):
         from tools.mcp_tool_config import _interpolate_env_vars
         get_connector_secret_store_strict().store_secret("s", "f", "v")
         assert _interpolate_env_vars("${env:connector:s/f}") == "v"
@@ -369,7 +394,7 @@ class TestResolutionIntegration:
         finally:
             reset_secret_scope(token)
 
-    def test_store_lives_under_profile_home(self, enabled_home, fake_dpapi):
+    def test_store_lives_under_profile_home(self, enabled_home, fake_store_owner):
         store = get_connector_secret_store_strict()
         store.store_secret("s", "f", "v")
         assert (enabled_home / "connector-secrets").is_dir()
