@@ -1433,6 +1433,19 @@ describe('preserveLocalPendingTurnMessages', () => {
 })
 
 describe('appendLiveSessionProjection', () => {
+  it('does not replay missing-model setup as a failed reply', () => {
+    const restored = appendLiveSessionProjection([], {
+      session_id: 'runtime-1',
+      inflight: {
+        user: 'hello',
+        assistant: '',
+        streaming: false,
+        error: 'Stardust is not connected to any AI provider yet.'
+      }
+    })
+    expect(restored.every(message => !message.error)).toBe(true)
+  })
+
   // Corrections typed while a turn ran are their own user bubbles on the same
   // turn, ordered by ARRIVAL. Without boundary offsets (older gateway) the
   // whole dump precedes them — never the old prompt → corrections → reply
@@ -1744,7 +1757,9 @@ describe('dedupeInflightUserAgainstTranscript', () => {
       }
     })
 
-    expect(restored.filter(message => message.role === 'assistant' && chatMessageText(message) === 'interim response')).toHaveLength(1)
+    expect(
+      restored.filter(message => message.role === 'assistant' && chatMessageText(message) === 'interim response')
+    ).toHaveLength(1)
   })
 
   it('preserves a new repeat when only part of the correction suffix matches', () => {
@@ -1840,7 +1855,9 @@ describe('dedupeInflightUserAgainstTranscript', () => {
       dedupeInflightUserAgainstTranscript(persisted, runtime, projection)
     )
 
-    expect(restored.filter(message => message.role === 'user' && chatMessageText(message).includes(correction))).toHaveLength(1)
+    expect(
+      restored.filter(message => message.role === 'user' && chatMessageText(message).includes(correction))
+    ).toHaveLength(1)
   })
 
   it('does not re-project a persisted corrected turn followed by gateway timeline markers', () => {

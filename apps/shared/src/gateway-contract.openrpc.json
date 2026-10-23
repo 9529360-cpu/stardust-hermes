@@ -11199,11 +11199,35 @@
       },
       "ErrorPayload": {
         "additionalProperties": false,
-        "description": "Every ``_emit(\"error\", \u2026)`` site sets exactly ``message``.",
+        "description": "Session failures may explicitly identify initialization outside a turn.",
         "properties": {
           "message": {
             "title": "Message",
             "type": "string"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Scope"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Code"
           }
         },
         "required": [

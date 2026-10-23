@@ -40,6 +40,31 @@ def failed_session(tmp_path, sid: str) -> dict:
     return session
 
 
+def test_failed_warmup_emits_non_turn_error(tmp_path, monkeypatch):
+    sid = "history-warmup-failure"
+    session = failed_session(tmp_path, sid)
+    session.pop("agent_build_started")
+    session["agent_ready"] = threading.Event()
+    events = []
+
+    def fail_build(*args, **kwargs):
+        raise RuntimeError("No inference provider configured")
+
+    monkeypatch.setattr(server, "_make_agent", fail_build)
+    monkeypatch.setattr("tui_gateway.entry.ensure_mcp_discovery_started", lambda: None)
+    monkeypatch.setattr(server, "_emit", lambda *args: events.append(args))
+    try:
+        server._start_agent_build(sid, session)
+        assert session["agent_ready"].wait(15)
+        errors = [payload for kind, _, payload in events if kind == "error"]
+        assert len(errors) == 1
+        assert errors[0]["scope"] == "session"
+        assert errors[0]["code"] == "agent_init_failed"
+        assert session["running"] is False
+    finally:
+        server._sessions.pop(sid, None)
+
+
 def test_restart_clears_failed_generation_and_rebuilds(tmp_path, monkeypatch):
     sid = "wedged-session"
     session = failed_session(tmp_path, sid)

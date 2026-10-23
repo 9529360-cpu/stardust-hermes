@@ -3879,6 +3879,9 @@ export interface Translations {
       errorGenericProvider: string
       /** Global toast title for a mid-turn gateway `error` event. */
       errorToastTitle: string
+      modelSetupTitle: string
+      modelSetupBody: string
+      modelSetupAction: string
       errorRetry: string
       /** Escape hatch when Retry would only reproduce SESSION_NOT_OWNED (#106217). */
       errorStartNewSession: string

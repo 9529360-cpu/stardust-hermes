@@ -4055,9 +4055,11 @@ export interface SetupReadyPayload {
   finished_at: number
   [key: string]: unknown
 }
-/** Every ``_emit("error", …)`` site sets exactly ``message``. */
+/** Session failures may explicitly identify initialization outside a turn. */
 export interface ErrorPayload {
   message: string
+  scope?: string | null
+  code?: string | null
 }
 /** ``tui_gateway/model_switch.py`` capability-refresh notice. */
 export interface NoticePayload {
