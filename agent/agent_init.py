@@ -2209,6 +2209,16 @@ _CALLBACK_PARAMS = (
 )
 
 
+def _init_identity(agent, config):
+    """No identity I/O or attributes unless explicitly enabled for this profile."""
+    section = config.get("digital_life", {})
+    if not isinstance(section, dict) or section.get("identity_enabled", False) is not True:
+        return
+    from agent.identity_store import initialize_identity
+    from hermes_constants import get_hermes_home
+    agent.identity = initialize_identity(get_hermes_home())
+
+
 def init_agent(
     agent, base_url: str = None, api_key: str = None, provider: str = None, api_mode: str = None,
     acp_command: str = None, acp_args: list[str] | None = None, command: str = None,
@@ -2330,6 +2340,7 @@ def init_agent(
     except Exception:
         _agent_cfg = {}
 
+    _init_identity(agent, _agent_cfg)
     _apply_display_config(agent, _agent_cfg, platform)
     _init_memory(agent, _agent_cfg, skip_memory, platform)
     _apply_agent_section(agent, _agent_cfg)
