@@ -18,13 +18,9 @@ const { codeToHtml } = vi.hoisted(() => ({
   })
 }))
 
-vi.mock('shiki', () => ({
-  bundledLanguages: { typescript: 'typescript-loader', text: 'text-loader' },
-  getSingletonHighlighter: vi.fn(async () => ({
-    codeToHtml: (code: string) => codeToHtml(code),
-    getLoadedLanguages: () => ['text', 'typescript'],
-    loadLanguage: vi.fn(async () => undefined)
-  }))
+vi.mock('@/components/chat/shiki-loader', () => ({
+  supportsLanguage: (language: string) => language === 'typescript',
+  highlightToHtml: (_language: string, code: string) => Promise.resolve(codeToHtml(code))
 }))
 
 vi.mock('shiki/engine/oniguruma', () => ({
@@ -50,6 +46,18 @@ afterEach(() => {
 })
 
 describe('CachedShikiBlock (warm-switch perf guard)', () => {
+  it('shows plain code while loading and handles unknown languages without errors', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const { container } = render(<CachedShikiBlock code={'unknown <tag> & "quoted"'} language="foo" />)
+    expect(container.textContent).toBe('unknown <tag> & "quoted"')
+    await waitForHighlighted()
+    expect(container.textContent).toBe('unknown <tag> & "quoted"')
+    expect(container.querySelector('tag')).toBeNull()
+    expect(codeToHtml).not.toHaveBeenCalled()
+    expect(error).not.toHaveBeenCalled()
+    error.mockRestore()
+  })
+
   it('highlights on first mount and reuses the cached HTML on remount', async () => {
     const { unmount } = render(<CachedShikiBlock {...TS_BLOCK} />)
     await waitForHighlighted()

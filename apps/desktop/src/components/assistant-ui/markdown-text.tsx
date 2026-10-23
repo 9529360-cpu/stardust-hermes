@@ -64,10 +64,9 @@ const onboardingEnabled = isOnboardingEnabled()
 // LLM convention). The default false-setting only accepts `$$...$$`.
 const mathPlugin = createMemoizedMathPlugin({ singleDollarTextMath: true })
 
-// `@streamdown/code` statically imports ALL of shiki (every grammar + theme —
-// the single largest chunk in the renderer), so it must never sit on the
-// entry graph. Load it on first markdown mount and swap it into the plugin
-// table when it lands; until then fenced code renders through the
+// The local code plugin shares the per-language Shiki loader; importing
+// @streamdown/code at runtime would pull in its full highlighter entry.
+// Load the plugin on first markdown mount; until then fenced code uses the
 // `SyntaxHighlighter` override's plain path (same output Shiki's own
 // `delay` fallback shows), so nothing flashes or reflows unexpectedly.
 type CodePlugin = typeof streamdownCode
@@ -83,7 +82,7 @@ function useCodePlugin(): CodePlugin | null {
 
     let cancelled = false
 
-    void import('@streamdown/code').then(({ code }) => {
+    void import('@/components/chat/shiki-code-plugin').then(({ code }) => {
       codePluginCache = code
 
       if (!cancelled) {
