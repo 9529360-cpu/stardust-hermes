@@ -13604,6 +13604,18 @@
         "additionalProperties": false,
         "description": "``session_auto_continue._inflight_snapshot``: the live (or retained failed) turn a reconnecting\nclient rebuilds its bubbles from.",
         "properties": {
+          "turn_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Turn Id"
+          },
           "assistant": {
             "default": "",
             "title": "Assistant",
@@ -15967,6 +15979,18 @@
             ],
             "default": null,
             "title": "Partial"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Turn Id"
           }
         },
         "title": "MessageCompletePayload",

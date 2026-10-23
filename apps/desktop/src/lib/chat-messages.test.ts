@@ -92,9 +92,12 @@ describe('toChatMessages', () => {
   it('keeps a persisted text-only continuation after tools separate and marked interim', () => {
     const messages = toChatMessages([
       { role: 'user', content: 'check files', timestamp: 1 },
-      { role: 'assistant', content: '', timestamp: 2, tool_calls: [
-        { id: 'tc', function: { name: 'terminal', arguments: '{}' } }
-      ] },
+      {
+        role: 'assistant',
+        content: '',
+        timestamp: 2,
+        tool_calls: [{ id: 'tc', function: { name: 'terminal', arguments: '{}' } }]
+      },
       { role: 'tool', tool_call_id: 'tc', content: 'ok', timestamp: 3 },
       { role: 'assistant', content: 'I will now check the files.', timestamp: 4 },
       { role: 'user', content: 'continue', display_kind: 'auto_continue', timestamp: 5 },
@@ -112,12 +115,20 @@ describe('toChatMessages', () => {
   it('recognizes the exact legacy untyped stall-guard nudge without treating normal users as continuation', () => {
     const messages = toChatMessages([
       { role: 'user', content: 'check files', timestamp: 1 },
-      { role: 'assistant', content: '', timestamp: 2, tool_calls: [
-        { id: 'tc', function: { name: 'terminal', arguments: '{}' } }
-      ] },
+      {
+        role: 'assistant',
+        content: '',
+        timestamp: 2,
+        tool_calls: [{ id: 'tc', function: { name: 'terminal', arguments: '{}' } }]
+      },
       { role: 'tool', tool_call_id: 'tc', content: 'ok', timestamp: 3 },
       { role: 'assistant', content: 'I will now check the files.', timestamp: 4 },
-      { role: 'user', content: '[System: Continue now. Execute the required tool calls and only send your final answer after completing the task.]', timestamp: 5 },
+      {
+        role: 'user',
+        content:
+          '[System: Continue now. Execute the required tool calls and only send your final answer after completing the task.]',
+        timestamp: 5
+      },
       { role: 'assistant', content: 'The file check is complete.', timestamp: 6 }
     ])
 
@@ -566,6 +577,20 @@ describe('interleaved reasoning/text boundaries', () => {
 })
 
 describe('preserveLocalAssistantErrors', () => {
+  it('reconciles a resumed failure by turn identity without collapsing a later identical failure', () => {
+    const local: ChatMessage = {
+      id: 'local-terminal',
+      turnId: 'turn-1',
+      role: 'assistant',
+      parts: [],
+      error: 'Connection error.'
+    }
+    const resumed: ChatMessage = { ...local, id: 'assistant-stream-session' }
+    expect(preserveLocalAssistantErrors([resumed], [local])).toEqual([resumed])
+    const retry = { ...resumed, turnId: 'turn-2' }
+    expect(preserveLocalAssistantErrors([retry], [local])).toEqual([retry, { ...local, pending: false }])
+  })
+
   it('preserves richer live boundaries when the durable row has only its completion time', () => {
     const durable = toChatMessages([{ role: 'assistant', content: 'Done.', timestamp: 3 }])
 
@@ -1469,7 +1494,10 @@ describe('sealOpenToolParts', () => {
       )
     ])
 
-    const messages = [...stopped, { id: 'u2', role: 'user', parts: [{ type: 'text', text: 'ask something else' }] } as ChatMessage]
+    const messages = [
+      ...stopped,
+      { id: 'u2', role: 'user', parts: [{ type: 'text', text: 'ask something else' }] } as ChatMessage
+    ]
 
     const restored = restorePendingClarifyToolCall(
       messages,

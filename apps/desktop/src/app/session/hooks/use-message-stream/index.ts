@@ -566,7 +566,7 @@ export function useMessageStream({
       sessionId: string,
       text: string,
       responsePreviewed?: boolean,
-      failure?: { error: string; partial: boolean; surface?: ErrorSurface | null },
+      failure?: { error: string; partial: boolean; surface?: ErrorSurface | null; turnId?: string },
       occurredAt = Date.now() / 1000
     ) => {
       let shouldHydrate = false
@@ -589,7 +589,9 @@ export function useMessageStream({
           }
         }
 
-        const streamId = state.streamId
+        const streamId =
+          state.streamId ??
+          (failure?.turnId ? state.messages.find(message => message.turnId === failure.turnId)?.id : undefined)
         const finalText = renderMediaTags(text).trim()
         // Structured failure from the terminal frame wins over the legacy text
         // heuristic ("Error: <provider detail>" texts don't match the regexes).
@@ -618,6 +620,7 @@ export function useMessageStream({
           const settled = {
             ...message,
             completedAt: occurredAt,
+            ...(failure?.turnId ? { turnId: failure.turnId } : {}),
             parts: completeOpenTimelineParts(message.parts, occurredAt),
             pending: false,
             interim: false,
@@ -637,7 +640,8 @@ export function useMessageStream({
         }
 
         const newAssistantFromCompletion = (): ChatMessage => ({
-          id: `assistant-${Date.now()}`,
+          id: failure?.turnId ? `assistant-turn-${failure.turnId}` : `assistant-${Date.now()}`,
+          ...(failure?.turnId ? { turnId: failure.turnId } : {}),
           role: 'assistant',
           parts:
             completionError && !keepFailedPartialText

@@ -123,6 +123,10 @@ def test_mid_stream_failure_emits_structured_error_event(emits, turn_env):
     assert len(completes) == 1
     payload = completes[0]
     assert payload["status"] == "error"
+    snapshot = server._inflight_snapshot(session)
+    assert payload["turn_id"] == snapshot["turn_id"]
+    server._start_inflight_turn(session, "retry the thing")
+    assert server._inflight_snapshot(session)["turn_id"] != payload["turn_id"]
     assert payload["recoverable"] is True
     assert payload["partial"] is True
     assert payload["text"] == "partial answer before crash"

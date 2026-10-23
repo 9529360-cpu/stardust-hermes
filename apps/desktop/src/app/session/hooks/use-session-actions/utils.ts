@@ -163,6 +163,7 @@ const COMPARED_FIELDS = [
   'role',
   'pending',
   'error',
+  'turnId',
   // Structured failure layer — drives the error card's title and action row,
   // so a change (e.g. resume replay attaching the descriptor) must repaint.
   'errorSurface',
@@ -277,6 +278,7 @@ export function chatMessagesEquivalent(a: ChatMessage, b: ChatMessage): boolean 
     a.displayKind !== b.displayKind ||
     a.pending !== b.pending ||
     a.error !== b.error ||
+    a.turnId !== b.turnId ||
     // Structural compare — the descriptor arrives as a fresh object per
     // resume/replay, so identity comparison would repaint forever.
     (a.errorSurface?.layer ?? null) !== (b.errorSurface?.layer ?? null) ||
@@ -706,7 +708,8 @@ export function preserveLocalPendingTurnMessages(
       message.pending !== true &&
       committedAssistantMessages.some(
         candidate =>
-          textWithoutReferenceLines(chatMessageText(candidate)) === textWithoutReferenceLines(chatMessageText(message)) ||
+          textWithoutReferenceLines(chatMessageText(candidate)) ===
+            textWithoutReferenceLines(chatMessageText(message)) ||
           (localAssistantText.length > 0 &&
             normalizedTranscriptText(chatMessageText(candidate)).includes(localAssistantText))
       )
@@ -728,9 +731,7 @@ export function preserveLocalPendingTurnMessages(
         continue
       }
 
-      if (
-        normalizedMessageText(authoritative) === normalizedMessageText(message)
-      ) {
+      if (normalizedMessageText(authoritative) === normalizedMessageText(message)) {
         continue
       }
     }
@@ -808,15 +809,17 @@ export function preserveLocalPendingTurnMessages(
 
       const coveredByCommitted =
         Boolean(liveText) &&
-        nextMessages.slice(lastUserInNext + 1).some(
-          candidate =>
-            candidate.role === 'assistant' &&
-            candidate.pending !== true &&
-            !candidate.id.startsWith('assistant-stream-') &&
-            !candidate.id.startsWith('inflight-assistant-') &&
-            (normalizedMessageText(candidate).includes(liveText) ||
-              normalizedReasoningText(candidate).includes(liveText))
-        )
+        nextMessages
+          .slice(lastUserInNext + 1)
+          .some(
+            candidate =>
+              candidate.role === 'assistant' &&
+              candidate.pending !== true &&
+              !candidate.id.startsWith('assistant-stream-') &&
+              !candidate.id.startsWith('inflight-assistant-') &&
+              (normalizedMessageText(candidate).includes(liveText) ||
+                normalizedReasoningText(candidate).includes(liveText))
+          )
 
       if (coveredByCommitted) {
         continue
@@ -998,12 +1001,14 @@ export function appendLiveSessionProjection(messages: ChatMessage[], projection:
     !(
       !inflightError &&
       inflightAssistant.trim() &&
-      messages.slice(latestUserRunStart).some(
-        message =>
-          message.role === 'assistant' &&
-          persistedMessageBelongsToInflightTurn(message, projection.turn_started_at) &&
-          normalizedMessageText(message) === normalizedTranscriptText(inflightAssistant)
-      )
+      messages
+        .slice(latestUserRunStart)
+        .some(
+          message =>
+            message.role === 'assistant' &&
+            persistedMessageBelongsToInflightTurn(message, projection.turn_started_at) &&
+            normalizedMessageText(message) === normalizedTranscriptText(inflightAssistant)
+        )
     )
 
   const pushCorrection = (correction: string, index: number): void => {
@@ -1064,6 +1069,7 @@ export function appendLiveSessionProjection(messages: ChatMessage[], projection:
         role: 'assistant',
         parts: inflightAssistant ? [assistantTextPart(inflightAssistant)] : [],
         pending: inflightStreaming,
+        ...(projection.inflight?.turn_id ? { turnId: projection.inflight.turn_id } : {}),
         ...(inflightError ? { error: inflightError } : {}),
         ...(inflightError && inflightErrorSurface ? { errorSurface: inflightErrorSurface } : {})
       })

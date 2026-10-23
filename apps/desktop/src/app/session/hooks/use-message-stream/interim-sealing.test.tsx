@@ -66,6 +66,22 @@ describe('useMessageStream interim text sealing', () => {
     vi.restoreAllMocks()
   })
 
+  it('settles replayed terminal failures onto the same turn while a retry remains distinct', () => {
+    mountStream()
+    const fail = (turnId: string) => act(() => stream.handleEvent({
+      session_id: SID,
+      type: 'message.complete',
+      payload: { text: 'provider unavailable', status: 'error', error: 'Connection error.', turn_id: turnId }
+    }))
+    start()
+    fail('turn-1')
+    fail('turn-1')
+    expect(getState().messages.filter(message => message.error)).toHaveLength(1)
+    start()
+    fail('turn-2')
+    expect(getState().messages.filter(message => message.error).map(message => message.turnId)).toEqual(['turn-1', 'turn-2'])
+  })
+
   it('keeps a verify-on-stop final candidate marked as a reply, not commentary', async () => {
     mountStream()
     await start()

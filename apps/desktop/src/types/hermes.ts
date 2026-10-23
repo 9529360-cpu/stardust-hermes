@@ -648,6 +648,7 @@ export interface SessionResumeResult {
   }
   hydrating?: boolean
   inflight?: null | {
+    turn_id?: string
     assistant?: string
     /** Mid-turn redirect corrections, oldest first. The turn's original prompt
      *  stays in `user`; these are the follow-ups typed while it ran. */

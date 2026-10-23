@@ -460,6 +460,8 @@ def _inflight_snapshot(session: dict) -> dict | None:
         snapshot["corrections"] = [c for c, _ in correction_pairs]
         if all(isinstance(offset, int) and offset >= 0 for _, offset in correction_pairs):
             snapshot["correction_offsets"] = [int(offset) for _, offset in correction_pairs]  # type: ignore[arg-type]
+    if turn.get("turn_id"):
+        snapshot["turn_id"] = turn["turn_id"]
     if error:
         # Retained failed turn (_fail_inflight_turn): a resuming client must rebuild the failed bubble, not render the
         # partial text as a healthy reply.
@@ -493,7 +495,7 @@ def _emit_terminal_turn_error(
     with contextlib.suppress(Exception):
         rendered = render_message(text, cols)
     payload = {"text": text, "usage": _get_usage(agent) if agent is not None else {}, "status": "error",
-               "error": message, "recoverable": True, **({"error_surface": error_surface} if error_surface else {}),
+               "error": message, "recoverable": True, "turn_id": turn["turn_id"], **({"error_surface": error_surface} if error_surface else {}),
                **({"partial": True} if partial else {}), **({"rendered": rendered} if rendered else {})}
     if retire_marker:
         _retire_turn_marker(session)

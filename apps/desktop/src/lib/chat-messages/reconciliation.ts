@@ -144,6 +144,12 @@ export function preserveLocalAssistantErrors(
   })
 
   const existingIds = new Set(mergedNextMessages.map(message => message.id))
+  const existingFailedTurns = new Set(
+    mergedNextMessages
+      .filter(message => message.error && !message.hidden)
+      .map(message => message.turnId)
+      .filter(Boolean)
+  )
   const preserveIds = new Set<string>()
   const normalize = (value: string) => value.replace(/\s+/g, ' ').trim()
   const tailUserInNext = [...mergedNextMessages].reverse().find(message => message.role === 'user' && !message.hidden)
@@ -158,7 +164,13 @@ export function preserveLocalAssistantErrors(
   for (let index = 0; index < currentMessages.length; index += 1) {
     const message = currentMessages[index]
 
-    if (message.role !== 'assistant' || !message.error || message.hidden || existingIds.has(message.id)) {
+    if (
+      message.role !== 'assistant' ||
+      !message.error ||
+      message.hidden ||
+      existingIds.has(message.id) ||
+      (message.turnId && existingFailedTurns.has(message.turnId))
+    ) {
       continue
     }
 

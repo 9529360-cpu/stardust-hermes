@@ -2663,6 +2663,7 @@ export interface SessionResumeResult {
 }
 /** ``session_auto_continue._inflight_snapshot``: the live (or retained failed) turn a reconnecting client rebuilds its bubbles from. */
 export interface InflightTurn {
+  turn_id?: string | null
   assistant?: string
   streaming?: boolean
   user?: string
@@ -4089,6 +4090,7 @@ export interface MessageCompletePayload {
   recoverable?: boolean | null
   error_surface?: ErrorSurface | null
   partial?: boolean | null
+  turn_id?: string | null
 }
 /** ``prompt_turn._result_status``. */
 export type TurnStatus = 'complete' | 'error' | 'interrupted'
