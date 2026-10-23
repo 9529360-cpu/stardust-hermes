@@ -29,7 +29,7 @@ import {
   dismissFirstRunOnboarding,
   type OnboardingContext,
   refreshOnboarding,
-  saveOnboardingApiKey,
+  saveOnboardingApiKey
 } from '@/store/onboarding'
 import { $onboardingSurfaces, onboardingSurfaceActive } from '@/store/onboarding-presence'
 
@@ -286,6 +286,7 @@ export function DesktopOnboardingOverlay({
 
   const reason =
     rawReason &&
+    !onboarding.runtimeIssue &&
     !isProviderSetupErrorMessage(rawReason) &&
     rawReason !== DEFAULT_ONBOARDING_REASON &&
     rawReason !== DEFAULT_MANUAL_ONBOARDING_REASON &&
@@ -321,9 +322,7 @@ export function DesktopOnboardingOverlay({
       data-glass-opaque=""
       // Which onboarding screen is up, independent of the UI language: E2E
       // specs wait on it instead of matching translated copy.
-      data-onboarding-state={
-        !ready ? 'preparing' : freeTierIntro ? 'free-tier' : showPicker ? 'picker' : 'flow'
-      }
+      data-onboarding-state={!ready ? 'preparing' : freeTierIntro ? 'free-tier' : showPicker ? 'picker' : 'flow'}
     >
       <div
         className={cn(
@@ -351,7 +350,21 @@ export function DesktopOnboardingOverlay({
           </Button>
         ) : null}
         <div className="grid gap-3 p-5">
-          {reason ? <ReasonNotice reason={reason} /> : null}
+          {onboarding.runtimeIssue && rawReason ? (
+            <div className="grid gap-2 text-sm text-muted-foreground">
+              <p>
+                {onboarding.runtimeIssue === 'needs_setup'
+                  ? t.onboarding.noModelConnected
+                  : t.onboarding.credentialsUnavailable}
+              </p>
+              <details>
+                <summary className="cursor-pointer">{t.notifications.details}</summary>
+                <p className="mt-2 break-words text-xs">{rawReason}</p>
+              </details>
+            </div>
+          ) : reason ? (
+            <ReasonNotice reason={reason} />
+          ) : null}
           {ready ? (
             freeTierIntro ? (
               <FreeTierReadyPanel leaving={leaving} onDismiss={dismissFreeTierIntro} />
@@ -525,9 +538,7 @@ export function Picker({ ctx }: { ctx: OnboardingContext }) {
       </Button>
       <p className="text-xs text-muted-foreground">{t.onboarding.setupRelayHint}</p>
       {$localModelsEnabled.get() ? <LocalModelsProviderRow onClick={openModelServices} /> : null}
-      <div className="flex items-center justify-between gap-3 pt-1">
-        {manual ? <span /> : <ChooseLaterLink />}
-      </div>
+      <div className="flex items-center justify-between gap-3 pt-1">{manual ? <span /> : <ChooseLaterLink />}</div>
     </div>
   )
 }

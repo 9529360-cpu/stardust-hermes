@@ -995,7 +995,7 @@ def _has_any_provider_configured(*, strict_profile_scope: bool = False) -> bool:
     make it appear ready. Unscoped callers keep the legacy behavior.
     """
     from hermes_cli.config import DEFAULT_CONFIG, get_env_path, get_hermes_home, load_config
-    from hermes_cli.auth import PROVIDER_REGISTRY, get_auth_status
+    from hermes_cli.auth import PROVIDER_REGISTRY, get_auth_status, is_provider_explicitly_configured
 
     cfg = load_config()
     model_cfg = cfg.get("model")
@@ -1022,10 +1022,11 @@ def _has_any_provider_configured(*, strict_profile_scope: bool = False) -> bool:
     for pconfig in PROVIDER_REGISTRY.values():
         if pconfig.auth_type == "api_key":
             provider_env_vars.update(pconfig.api_key_env_vars)
-    if strict_profile_scope:
-        from agent.secret_scope import current_secret_scope
+    from agent.secret_scope import current_secret_scope
 
-        read_provider_env = (current_secret_scope() or {}).get
+    secret_scope = current_secret_scope()
+    if strict_profile_scope or secret_scope is not None:
+        read_provider_env = (secret_scope or {}).get
     else:
         read_provider_env = os.getenv
     if any(read_provider_env(v) for v in provider_env_vars):
@@ -1046,13 +1047,14 @@ def _has_any_provider_configured(*, strict_profile_scope: bool = False) -> bool:
     ):
         return True
 
-    # Provider-specific auth fallbacks (e.g. Copilot via gh auth).
+    # Catalog availability and borrowed host login are not setup. Only probe
+    # provider-specific auth after the user explicitly selected that provider.
     if not strict_profile_scope:
         try:
             if any(
                 get_auth_status(pid).get("logged_in")
                 for pid, pconfig in PROVIDER_REGISTRY.items()
-                if pconfig.auth_type == "api_key"
+                if pconfig.auth_type == "api_key" and is_provider_explicitly_configured(pid)
             ):
                 return True
         except Exception:

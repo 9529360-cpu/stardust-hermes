@@ -59,6 +59,7 @@ export interface DesktopOnboardingState {
   mode: OnboardingMode
   providers: null | OAuthProvider[]
   reason: null | string
+  runtimeIssue?: RuntimeReadinessResult['issue']
   requested: boolean
   /** True when the user explicitly chose "I'll set this up later" on the
    *  first-run picker. Persisted to localStorage so the blocking overlay never
@@ -548,6 +549,7 @@ export function startManualOnboarding(reason: null | string = DEFAULT_MANUAL_ONB
   providersRefreshPromise = null
   patch({
     manual: true,
+    runtimeIssue: undefined,
     targetProfile: profile,
     providers: null,
     requested: true,
@@ -660,7 +662,7 @@ export async function refreshOnboarding(ctx: OnboardingContext) {
   const reason = runtime.reason || state.reason || DEFAULT_ONBOARDING_REASON
 
   writeCachedConfigured(false)
-  patch({ configured: false, reason })
+  patch({ configured: false, reason, runtimeIssue: runtime.issue })
 
   if (state.providers !== null && !state.requested) {
     return false
