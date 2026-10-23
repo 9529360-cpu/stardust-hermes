@@ -91,7 +91,14 @@ def test_owned_http_server(tmp_path, code, accepted, delay, expected):
         if delay:
             assert r.duration >= delay
         pid = int(pidfile.read_text())
-        assert not psutil.pid_exists(pid), f"owned server {pid} survived teardown"
+        # POSIX shells can leave a terminated descendant as a zombie until the
+        # host reaps it. A zombie is exited, even though its PID still exists.
+        try:
+            server_process = psutil.Process(pid)
+            exited = server_process.status() == psutil.STATUS_ZOMBIE
+        except psutil.NoSuchProcess:
+            exited = True
+        assert exited, f"owned server {pid} survived teardown"
         with socket.socket() as sock:
             assert sock.connect_ex(("127.0.0.1", port)) != 0
         print(json.dumps({"code": code, "accepted": accepted, "delay": delay,
