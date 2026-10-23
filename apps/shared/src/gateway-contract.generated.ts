@@ -3679,7 +3679,7 @@ export interface McpServerRuntimeRow {
   status: McpRuntimeStatus
 }
 export type McpRuntimeStatus = 'connected' | 'disabled' | 'connecting' | 'failed' | 'configured'
-/** ``preset`` (catalog id) and/or ``config`` (url/command/args/env/headers/auth/tools); a ``bearer_token`` is written to the profile's .env, only the header template persists. */
+/** ``preset`` (catalog id) and/or ``config`` (url/command/args/env/headers/auth/tools); a ``bearer_token`` goes through the CX3 safe path — encrypted CX2 store when enabled, else the profile's .env. Only a reference persists in config; the value is never echoed back (``credential_stored`` is the masked state: "encrypted" | "env"). */
 export interface McpServersAddParams {
   profile?: string | null
   name: string
@@ -3690,6 +3690,7 @@ export interface McpServersAddParams {
 export interface McpServersAddResult {
   ok: boolean
   name: string
+  credential_stored?: string | null
   server: McpServerSummary
 }
 export interface McpServersSetApiKeyParams {
@@ -3702,6 +3703,7 @@ export interface McpServersSetApiKeyResult {
   ok: boolean
   name: string
   env_var: string
+  credential_stored: string
   server: McpServerSummary
 }
 export interface McpServerNameParams {
@@ -4584,7 +4586,7 @@ export interface RpcMethods {
   'mcp.servers.oauth.start': { params: McpOauthStartParams; result: McpOauthStartResult }
   /** Drop a server from the profile's config.yaml. */
   'mcp.servers.remove': { params: McpServerNameParams; result: McpServersRemoveResult }
-  /** Store a credential in the profile's .env and reference it from the server config (header or env). */
+  /** Store a credential the safest available way (encrypted CX2 store when enabled, else the profile's .env) and reference it from the server config (header or env); a failed config save rolls the credential back, and the value is never echoed back. */
   'mcp.servers.set_api_key': { params: McpServersSetApiKeyParams; result: McpServersSetApiKeyResult }
   /** Cached runtime state per configured server; never connects, probes, or starts auth. */
   'mcp.servers.status': { params: ProfileParams; result: McpServersStatusResult }

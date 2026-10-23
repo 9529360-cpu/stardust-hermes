@@ -336,11 +336,180 @@ def _bearer_auth_headers(name: str) -> Dict[str, str]:
     return {"Authorization": f"Bearer ${{{_env_key_for_server(name)}}}"}
 
 
+# ---- CX3: safe credential write path (CX2 encrypted store first, legacy .env fallback) ----
+
+# One encrypted-store credential per server (CX2 reference ``${connector:<name>/api_key}``);
+# the ``${ENV}`` name stays the stdio env key / legacy .env key.
+_MCP_CREDENTIAL_FIELD = "api_key"
+
+# URL query parameters that carry credentials; a literal (non-``${...}``-reference) value
+# under one of these names is a secret sitting in config/logs — reject at write time.
+_SECRET_URL_QUERY_PARAM_RE = re.compile(
+    r"(?i)^(?:api[-_]?key|apikey|token|access[-_]?token|refresh[-_]?token|secret|"
+    r"client[-_]?secret|password|passwd|bearer|jwt)$")
+
+
+def _mcp_credential_storage() -> Tuple[str, Any]:
+    """("encrypted", store) when the opt-in CX2 store is usable, else ("env", None).
+
+    Probing never writes: it is DPAPI's in-memory protect/unprotect round-trip, so a
+    disabled or unavailable store silently means "legacy .env path" (fail-open on
+    storage choice, fail-closed on the encrypted store's own saves).
+    """
+    from agent.connector_secrets import get_connector_secret_store
+    store = get_connector_secret_store()
+    if store is not None:
+        return "encrypted", store
+    return "env", None
+
+
+def _mcp_secret_placement_issues(name: str, server_config: Dict[str, Any],
+                                 *, secret_value: Optional[str] = None) -> List[str]:
+    """Reject credentials placed where they would persist in plaintext: URL userinfo,
+    credential-shaped URL query parameters, command args, and literal Authorization
+    headers. References (``${...}``) are fine — only literal secrets are rejected."""
+    issues: List[str] = []
+    url = server_config.get("url")
+    if isinstance(url, str) and url:
+        from urllib.parse import parse_qsl, urlsplit
+        parsed = urlsplit(url)
+        if parsed.username or parsed.password:
+            issues.append(
+                "the server url embeds credentials in the userinfo (user:pass@host) — "
+                "remove them and pass the credential through the API key field instead")
+        for qname, qvalue in parse_qsl(parsed.query, keep_blank_values=True):
+            if _SECRET_URL_QUERY_PARAM_RE.match(qname) and not str(qvalue).lstrip().startswith("${"):
+                issues.append(
+                    f"URL query parameter '{qname}' looks like a credential — pass it "
+                    f"through the API key / environment field instead")
+        if secret_value and secret_value in url:
+            issues.append("the provided credential appears inside the server url")
+    args = server_config.get("args")
+    if secret_value and isinstance(args, list):
+        if any(secret_value in str(a) for a in args):
+            issues.append(
+                "the provided credential appears in the server command arguments "
+                "(visible in process listings) — pass it as an env value instead")
+    headers = server_config.get("headers")
+    if isinstance(headers, dict):
+        for key, value in headers.items():
+            if str(key).lower() != "authorization" or not isinstance(value, str):
+                continue
+            body = value.strip()
+            for prefix in ("bearer ", "token ", "basic "):
+                if body.lower().startswith(prefix):
+                    body = body[len(prefix):].strip()
+                    break
+            if body and not body.startswith("${"):
+                issues.append(
+                    "the Authorization header carries a literal credential — send the "
+                    "credential in the API key field (bearer_token / value); config keeps "
+                    "only a reference")
+    return issues
+
+
+def _commit_mcp_server_credential(
+    name: str,
+    value: str,
+    *,
+    env_var: Optional[str] = None,
+    existing: Optional[Dict[str, Any]] = None,
+    base_config: Optional[Dict[str, Any]] = None,
+) -> Tuple[str, Dict[str, Any]]:
+    """Validate, store, and atomically persist an MCP server credential (CX3).
+
+    The credential goes to the CX2 encrypted store when the opt-in is enabled
+    (config gets a ``${connector:<name>/api_key}`` reference), else to the
+    profile's ``.env`` via ``save_env_value`` (config gets the ``${ENV}``
+    reference) — byte-identical to the pre-CX3 legacy behavior. The HTTP shape
+    is a Bearer Authorization header template; stdio gets an ``env`` entry.
+
+    Atomicity: validation happens before any write; if the config save fails,
+    the credential is rolled back to its previous value (or removed when there
+    was none), leaving the existing config untouched. Returns
+    ``(storage_kind, final_server_config)`` — never the credential value.
+    """
+    from agent.connector_secrets import ConnectorSecretError, connector_secret_reference
+    from hermes_cli.config import remove_env_value
+
+    normalized = _strip_bearer_prefix(value)
+    if not normalized or normalized.lower() == "bearer":
+        raise ValueError("value is not a valid credential")
+    env_var = env_var or _env_key_for_server(name)
+    if not _ENV_VAR_NAME_RE.match(env_var):
+        raise ValueError(f"invalid env_var name '{env_var}'")
+
+    storage, store = _mcp_credential_storage()
+    reference = (connector_secret_reference(name, _MCP_CREDENTIAL_FIELD)
+                 if storage == "encrypted" else f"${{{env_var}}}")
+
+    entry = dict(existing) if existing is not None else dict(base_config or {})
+    if entry.get("url"):
+        entry["headers"] = {"Authorization": f"Bearer {reference}"}
+    else:
+        env_block = entry.get("env")
+        entry["env"] = dict(env_block) if isinstance(env_block, dict) else {}
+        entry["env"][env_var] = reference
+
+    issues = _mcp_secret_placement_issues(name, entry, secret_value=normalized)
+    if issues:
+        raise ValueError("; ".join(issues))
+    if not _validate_or_warn(name, entry):
+        raise ValueError(f"Server '{name}' rejected: suspicious command/args configuration")
+
+    # In-memory previous value for rollback only; never logged, never returned.
+    if storage == "encrypted":
+        try:
+            previous: Optional[str] = store.resolve_secret(name, _MCP_CREDENTIAL_FIELD)
+        except ConnectorSecretError:
+            previous = None
+    else:
+        previous = get_env_value(env_var)
+
+    if storage == "encrypted":
+        store.store_secret(name, _MCP_CREDENTIAL_FIELD, normalized)
+    else:
+        save_env_value(env_var, normalized)
+
+    def _rollback_credential() -> None:
+        try:
+            if storage == "encrypted":
+                if previous is not None:
+                    store.store_secret(name, _MCP_CREDENTIAL_FIELD, previous)
+                else:
+                    store.delete_secret(name, _MCP_CREDENTIAL_FIELD)
+            elif previous is not None:
+                save_env_value(env_var, previous)
+            else:
+                remove_env_value(env_var)
+        except Exception:
+            logger.warning("MCP credential rollback for '%s' failed (storage=%s)",
+                           name, storage, exc_info=True)
+
+    config = load_config()
+    config.setdefault("mcp_servers", {})[name] = entry
+    try:
+        save_config(config)
+    except Exception:
+        _rollback_credential()
+        raise
+    return storage, entry
+
+
 def _save_bearer_auth_token(name: str, token: str) -> Dict[str, str]:
-    """Persist a normalized Bearer token to ``.env`` and return the header template for config.yaml."""
+    """Persist a normalized Bearer token and return the header template for config.yaml.
+
+    CX2 store enabled → DPAPI ciphertext + ``${connector:...}`` template; else the
+    legacy ``.env`` slot. Shared by the CLI add flow and both API surfaces.
+    """
     normalized = _strip_bearer_prefix(token)
     if not normalized or normalized.lower() == "bearer":
         raise ValueError("Bearer token is required")
+    storage, store = _mcp_credential_storage()
+    from agent.connector_secrets import connector_secret_reference
+    if storage == "encrypted":
+        store.store_secret(name, _MCP_CREDENTIAL_FIELD, normalized)
+        return {"Authorization": f"Bearer {connector_secret_reference(name, _MCP_CREDENTIAL_FIELD)}"}
     save_env_value(_env_key_for_server(name), normalized)
     return _bearer_auth_headers(name)
 

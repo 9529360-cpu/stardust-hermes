@@ -18,10 +18,12 @@ def _normalize_mcp_server_create(body: MCPServerCreate) -> tuple[str, Dict[str, 
     """Validate a Dashboard MCP create request and build its safe config.
 
     The returned config never contains the Bearer token; callers persist it via
-    the shared Bearer helper once inside the intended profile scope. Shared by
+    the shared safe-credential helper once inside the intended profile scope. Shared by
     the MCP page and the Profile Builder so both enforce one transport/auth contract.
+    Secrets placed in URL userinfo/query, argv, or a literal Authorization header are
+    rejected here so no surface can persist them (CX3).
     """
-    from hermes_cli.mcp_config import _bearer_auth_headers, _strip_bearer_prefix
+    from hermes_cli.mcp_config import _bearer_auth_headers, _mcp_secret_placement_issues, _strip_bearer_prefix
     from hermes_cli.mcp_security import validate_mcp_server_entry
 
     name = (body.name or "").strip()
@@ -66,6 +68,9 @@ def _normalize_mcp_server_create(body: MCPServerCreate) -> tuple[str, Dict[str, 
         if body.env:
             server_config["env"] = dict(body.env)
 
+    issues = _mcp_secret_placement_issues(name, server_config, secret_value=bearer_token)
+    if issues:
+        raise ValueError(f"Server '{name}' rejected: {'; '.join(issues)}")
     issues = validate_mcp_server_entry(name, server_config)
     if issues:
         raise ValueError(f"Server '{name}' rejected: {'; '.join(issues)}")
