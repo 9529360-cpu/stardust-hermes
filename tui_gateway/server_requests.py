@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 class ServerRequest:
     __slots__ = ("id", "sid", "method", "params", "event", "result", "answered", "created_at",
-                 "qids", "locked", "on_result")
+                 "qids", "locked", "on_result", "state")
 
     def __init__(self, sid: str, method: str, params: dict, *, qids: list[str] | None = None,
                  on_result: Callable[[dict | None], None] | None = None) -> None:
@@ -46,6 +46,7 @@ class ServerRequest:
         self.event = threading.Event()
         self.result: dict | None = None
         self.answered = False
+        self.state = "pending"
         self.created_at = time.time()
         # Batch clarify: question ids still to lock, and the answers locked so far.
         self.qids = list(qids) if qids else None
@@ -98,6 +99,39 @@ def _register(req: ServerRequest) -> None:
     _write(req.frame())
 
 
+def _finish_locked(req: ServerRequest, state: str, result: dict | None = None,
+                   *, answered: bool = False) -> None:
+    """Commit the sole terminal transition; caller owns _lock and an open request."""
+    _open.pop(req.id)
+    req.state, req.result, req.answered = state, result, answered
+    req.event.set()
+
+
+def _notify_result(req: ServerRequest) -> None:
+    """Only the transition winner calls this, always outside _lock."""
+    if req.on_result is not None:
+        try:
+            req.on_result(req.result)
+        except Exception:
+            logger.exception("server request callback failed id=%s method=%s", req.id, req.method)
+
+
+def _withdraw(req: ServerRequest, reason: str) -> bool:
+    with _lock:
+        if _open.get(req.id) is not req:
+            won = False
+        else:
+            _finish_locked(req, "timed_out" if reason == "timeout" else "cancelled")
+            won = True
+    if won:
+        _notify_result(req)
+        _emit_cancel(req, reason)
+    else:
+        logger.debug("server request already resolved", extra={"request_id": req.id,
+                     "action": reason, "resolution": "already_resolved", "state": req.state})
+    return won
+
+
 def send(method: str, sid: str, params: dict, *, timeout: float | None,
          qids: list[str] | None = None) -> dict | None:
     """Send one request and block for the response ``result`` (a dict).
@@ -109,14 +143,13 @@ def send(method: str, sid: str, params: dict, *, timeout: float | None,
     """
     req = ServerRequest(sid, method, params, qids=qids)
     _register(req)
-    timed_out = False
     try:
-        timed_out = not req.event.wait(timeout)
-    finally:
-        with _lock:
-            _open.pop(req.id, None)
-    if timed_out:
-        _emit_cancel(req, "timeout")
+        if not req.event.wait(timeout):
+            _withdraw(req, "timeout")
+    except BaseException:
+        _withdraw(req, "cancelled")
+        raise
+    if req.state == "timed_out":
         if req.qids is not None:
             return {"answers": dict(req.locked), "timed_out": True}
         return None
@@ -131,10 +164,7 @@ def send_async(method: str, sid: str, params: dict, on_result: Callable[[dict | 
     _register(req)
 
     def settle(reason: str) -> None:
-        with _lock:
-            still_open = _open.pop(req.id, None) is not None
-        if still_open:
-            _emit_cancel(req, reason)
+        _withdraw(req, reason)
 
     return settle
 
@@ -147,28 +177,22 @@ def resolve_response(frame: dict) -> bool:
         return False
     with _lock:
         req = _open.get(rid)
-        if req is None:
-            return False
-        if req.on_result is not None:
-            _open.pop(rid, None)
-    if "error" in frame:
-        logger.debug("server request %s (%s) answered with error: %s", rid, req.method, frame.get("error"))
-        req.result, req.answered = None, False
-    else:
-        result = frame.get("result")
-        req.result = result if isinstance(result, dict) else {}
-        if req.qids and "answers" in req.result:
-            # Batch clarify: answers locked early via clarify.lock belong to the final set even when
-            # the closing response only carries the tail the user answered last.
-            answers = req.result.get("answers")
-            merged = dict(req.locked)
-            if isinstance(answers, dict):
-                merged.update(answers)
-            req.result = {**req.result, "answers": merged}
-        req.answered = True
-    if req.on_result is not None:
-        req.on_result(req.result)
-    req.event.set()
+        if req is not None:
+            answered = "error" not in frame
+            result = frame.get("result")
+            result = (result if isinstance(result, dict) else {}) if answered else None
+            if req.qids and result is not None and "answers" in result:
+                answers = result.get("answers")
+                merged = dict(req.locked)
+                if isinstance(answers, dict):
+                    merged.update(answers)
+                result = {**result, "answers": merged}
+            _finish_locked(req, "answered", result, answered=answered)
+    if req is None:
+        logger.debug("server request already resolved or foreign", extra={"request_id": rid,
+                     "action": "answer", "resolution": "already_resolved"})
+        return False
+    _notify_result(req)
     return True
 
 
@@ -185,9 +209,9 @@ def lock_answer(request_id: str, question_id: str, answer: str) -> list[str] | N
         req.locked[question_id] = answer
         remaining = [qid for qid in req.qids if qid not in req.locked]
         if not remaining:
-            req.result, req.answered = {"answers": dict(req.locked)}, True
+            _finish_locked(req, "answered", {"answers": dict(req.locked)}, answered=True)
     if not remaining:
-        req.event.set()
+        _notify_result(req)
     return remaining
 
 
@@ -198,12 +222,12 @@ def cancel(sid: str | None = None, reason: str = "interrupted") -> int:
     with _lock:
         targets = [req for req in _open.values() if sid is None or req.sid == sid]
         for req in targets:
-            _open.pop(req.id, None)
+            _finish_locked(req, "timed_out" if reason == "timeout" else "cancelled")
+    if not targets:
+        logger.debug("server request already resolved or no pending requests",
+                     extra={"session_id": sid, "action": reason, "resolution": "already_resolved"})
     for req in targets:
-        req.result, req.answered = None, False
-        if req.on_result is not None:
-            req.on_result(None)
-        req.event.set()
+        _notify_result(req)
         _emit_cancel(req, reason)
     return len(targets)
 
@@ -212,7 +236,7 @@ def open_requests(sid: str) -> list[dict]:
     """Unanswered requests for *sid*, oldest first."""
     with _lock:
         reqs = sorted((req for req in _open.values() if req.sid == sid), key=lambda r: r.created_at)
-    return [req.snapshot() for req in reqs]
+        return [req.snapshot() for req in reqs]
 
 
 def pending_kind(sid: str) -> str:
