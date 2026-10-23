@@ -149,6 +149,10 @@ def test_changed_expectation_and_legacy_evidence_require_new_observation(scenari
     assert acceptance.unmet(record(monkeypatch, artifact)) == []
     assert acceptance.unmet(plan(monkeypatch, artifact, 'different', 'text'))
     assert acceptance.unmet(record(monkeypatch, artifact))
+    contract = plan(monkeypatch, artifact, False)
+    artifact.write_text('{"observed":false}', encoding='utf-8')
+    assert acceptance.unmet(record(monkeypatch, artifact)) == []
+    assert acceptance.unmet(plan(monkeypatch, artifact, 0))
 
 
 def test_wrong_reference_and_tampered_artifact_cannot_satisfy(scenario, monkeypatch):

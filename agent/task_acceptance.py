@@ -178,7 +178,8 @@ def _expectations_met(contract, criterion, evidence):
                       if e["criterion"] == criterion and e["tier"] == evidence["tier"]
                       and e["change"] == evidence["change"]
                       for o in e.get("observations", [])
-                      if o.get("index") == index and o.get("step") == step]
+                      if o.get("index") == index
+                      and json.dumps(o.get("step"), sort_keys=True) == json.dumps(step, sort_keys=True)]
         if not candidates:
             return False
         receipt, observation = candidates[-1]
