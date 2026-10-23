@@ -2005,7 +2005,7 @@ export const zhHant = defineLocale({
       newChat: { title: '新對話', detail: '開始新的對話' },
       settings: { title: '設定', detail: '設定 Stardust 桌面端' },
       skills: { title: '技能與工具', detail: '啟用技能、工具集和提供方' },
-      messaging: { title: '訊息平台', detail: '設定 Telegram、Slack、Discord 等' },
+      messaging: { title: '訊息管道', detail: '設定 Telegram、Slack、Discord 等' },
       artifacts: { title: '成品', detail: '瀏覽產生的輸出' }
     },
     sectionEntries: {
@@ -2068,10 +2068,12 @@ export const zhHant = defineLocale({
   },
 
   messaging: {
-    pageTitle: '訊息平台',
-    search: '搜尋訊息平台…',
-    loading: '正在載入訊息平台…',
-    loadFailed: '訊息平台載入失敗',
+    pageDescription: '你可以透過這些管道和星塵對話，例如寄送郵件給它。',
+    defaultDescription: (name: string) => `透過 ${name} 與星塵收發訊息。`,
+    pageTitle: '訊息管道',
+    search: '搜尋訊息管道…',
+    loading: '正在載入訊息管道…',
+    loadFailed: '訊息管道載入失敗',
     states: {
       connected: '已連線',
       connecting: '連線中',
@@ -2236,7 +2238,7 @@ export const zhHant = defineLocale({
       whatsapp: '透過 WhatsApp 與助理對話，並接收提醒和自動任務結果。',
       bluebubbles: '透過 BlueBubbles 把 iMessage 接入助理。',
       homeassistant: '把助理接入 Home Assistant，與智慧家庭自動化聯動。',
-      email: '讓助理透過電子郵件收發訊息，用於通知、回覆和自動工作流程。',
+      email: '透過電子郵件與星塵對話，並接收回覆和通知。',
       sms: '透過 Twilio 簡訊與助理收發訊息和提醒。',
       dingtalk: '把助理接入釘釘，用於團隊訊息、提醒和自動任務。',
       feishu: '把助理接入飛書 / Lark，用於團隊訊息、提醒和自動任務。',
@@ -2683,7 +2685,7 @@ export const zhHant = defineLocale({
     nav: {
       'new-session': '新對話',
       skills: '技能與工具',
-      messaging: '訊息平台',
+      messaging: '訊息管道',
       artifacts: '成品',
       cron: '排程工作',
       more: '更多功能'
@@ -3470,7 +3472,7 @@ export const zhHant = defineLocale({
       connection: label => `連線：${label}`,
       recentActivity: '最近活動',
       viewAllLogs: '查看全部記錄 →',
-      messagingPlatforms: '訊息平台'
+      messagingPlatforms: '訊息管道'
     },
     approvalMode: {
       title: '核准模式',
@@ -4408,6 +4410,9 @@ export const zhHant = defineLocale({
     hatchingProgress: '孵化進度'
   },
   connectors: {
+    pageTitle: '連接器',
+    pageDescription: '讓星塵操作你的服務，例如讀取郵件、查詢行事曆、瀏覽 GitHub。',
+    connectedCount: (count: number) => `已連線 ${count}`,
     skipThis: '略過此步',
     search: '尋找應用程式',
     setupUnavailable: '目前無法使用連線功能，之後可以再設定。',

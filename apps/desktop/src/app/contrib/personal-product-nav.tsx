@@ -34,6 +34,7 @@ import { WorkspaceAddButton } from '../chat/sidebar/projects/workspace-header'
 import {
   type AppView,
   BOTS_ROUTE,
+  CONNECTORS_ROUTE,
   MESSAGING_ROUTE,
   routePathname,
   SKILLS_ROUTE,
@@ -237,6 +238,9 @@ export function PersonalProductNav({
       route: `${SKILLS_ROUTE}?tab=toolsets`
     })
 
+  const openConnectors = () =>
+    pick({ id: 'connectors', label: t.connectors.pageTitle, icon: NULL_ICON, route: CONNECTORS_ROUTE })
+
   const openMessaging = () =>
     pick({
       id: 'messaging',
@@ -316,6 +320,12 @@ export function PersonalProductNav({
           icon="broadcast"
           label={t.sidebar.nav.messaging}
           onClick={openMessaging}
+        />
+        <ProductNavButton
+          active={routePathname(pathname) === CONNECTORS_ROUTE}
+          icon="plug"
+          label={t.connectors.pageTitle}
+          onClick={openConnectors}
         />
         <ProductNavButton
           active={currentView === 'skills'}

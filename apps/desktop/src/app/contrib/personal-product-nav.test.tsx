@@ -103,6 +103,13 @@ const currentButtons = () =>
     .map(button => button.textContent?.trim())
 
 describe('PersonalProductNav', () => {
+  it('opens the connectors page and marks it current independently of messaging', () => {
+    const navigate = renderNav('connectors', '/connectors')
+    expect(currentButtons()).toEqual(['连接器'])
+    fireEvent.click(screen.getByRole('button', { name: '连接器' }))
+    expect(navigate).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'connectors', route: '/connectors' }))
+  })
+
   it('starts project chats in their folder and leaves project scope for a plain new chat', () => {
     $projectTree.set([
       { id: 'no-project', isNoProject: true, label: 'Home', path: null, repos: [], sessionCount: 1 },
@@ -141,7 +148,8 @@ describe('PersonalProductNav', () => {
       '新建对话',
       '智能体空间',
       '任务',
-      '消息平台',
+      '消息渠道',
+      '连接器',
       '工具',
       '项目'
     ])
@@ -171,7 +179,7 @@ describe('PersonalProductNav', () => {
     vi.mocked(dismissNarrowSidebar).mockClear()
     renderNav('chat')
 
-    for (const name of ['新建对话', '智能体空间', '任务', '消息平台', '工具']) {
+    for (const name of ['新建对话', '智能体空间', '任务', '消息渠道', '工具']) {
       fireEvent.click(screen.getByRole('button', { name }))
     }
 
@@ -190,7 +198,7 @@ describe('PersonalProductNav', () => {
     fireEvent.click(screen.getByRole('button', { name: '任务' }))
     expect(onNavigate).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'tasks', route: '/tasks' }))
 
-    fireEvent.click(screen.getByRole('button', { name: '消息平台' }))
+    fireEvent.click(screen.getByRole('button', { name: '消息渠道' }))
     expect(onNavigate).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'messaging', route: '/messaging' }))
 
     fireEvent.click(screen.getByRole('button', { name: '工具' }))
@@ -405,7 +413,7 @@ describe('PersonalProductNav', () => {
     cleanup()
 
     renderNav('chat', '/messaging')
-    expect(currentButtons()).toEqual(['消息平台'])
+    expect(currentButtons()).toEqual(['消息渠道'])
     cleanup()
 
     renderNav('chat')

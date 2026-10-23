@@ -62,7 +62,7 @@ const stateLabel = (state: null | string | undefined, m: Translations['messaging
   state ? m.states[state] || state.replace(/_/g, ' ') : m.unknown
 
 const platformDescription = (platform: MessagingPlatformInfo, m: Translations['messaging']) =>
-  m.platformDescriptions[platform.id] || platform.description
+  m.platformDescriptions[platform.id] || platform.description || m.defaultDescription(platform.name)
 
 function stateTone({ enabled, state }: MessagingPlatformInfo): StatusTone {
   if (!enabled) {
@@ -509,6 +509,7 @@ export function MessagingView({ setStatusbarItemGroup: _setStatusbarItemGroup, .
       searchValue={query}
       title={m.pageTitle}
     >
+      <p className="shrink-0 px-6 pb-3 text-sm text-(--ui-text-tertiary)">{m.pageDescription}</p>
       {!platforms ? (
         <PageLoader label={m.loading} />
       ) : (
@@ -632,7 +633,10 @@ function PlatformRow({
     >
       <PlatformAvatar platformId={platform.id} platformName={platform.name} />
       <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
-        <span className="truncate text-[length:var(--conversation-text-font-size)] font-normal">{platform.name}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[length:var(--conversation-text-font-size)] font-normal">{platform.name}</span>
+          <span className="block truncate text-xs text-(--ui-text-tertiary)">{platformDescription(platform, t.messaging)}</span>
+        </span>
         <span className="flex shrink-0 items-center gap-1.5">
           {/* Someone is waiting to be let in — the only way this page tells
               you so before you open the platform. */}

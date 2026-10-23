@@ -12,7 +12,16 @@ export const SETTINGS_ROUTE = '/settings'
 export const COMMAND_CENTER_ROUTE = '/command-center'
 export const SESSION_IMPORT_ROUTE = '/session-import'
 export const SKILLS_ROUTE = '/skills'
+export const CONNECTORS_ROUTE = '/connectors'
 export const MESSAGING_ROUTE = '/messaging'
+export function legacyMcpRedirect(search: string): string | null {
+  const params = new URLSearchParams(search)
+  if (params.get('tab') !== 'mcp') { return null }
+  params.delete('tab')
+  const query = params.toString()
+  return `${CONNECTORS_ROUTE}${query ? `?${query}` : ''}`
+}
+
 export const WEBHOOKS_ROUTE = '/webhooks'
 export const ARTIFACTS_ROUTE = '/artifacts'
 export const CRON_ROUTE = '/cron'
@@ -37,6 +46,7 @@ export type AppView =
   // so the sidebar kept a session highlighted and the titlebar kept the
   // session-title dropdown while a plugin page was showing.
   | 'extension'
+  | 'connectors'
   | 'messaging'
   | 'profiles'
   | 'settings'
@@ -52,6 +62,7 @@ export type AppRouteId =
   | 'command-center'
   | 'cron'
   | 'tasks'
+  | 'connectors'
   | 'messaging'
   | 'new'
   | 'profiles'
@@ -73,6 +84,7 @@ export const APP_ROUTES = [
   { id: 'settings', path: SETTINGS_ROUTE, view: 'settings' },
   { id: 'command-center', path: COMMAND_CENTER_ROUTE, view: 'command-center' },
   { id: 'skills', path: SKILLS_ROUTE, view: 'skills' },
+  { id: 'connectors', path: CONNECTORS_ROUTE, view: 'connectors' },
   { id: 'messaging', path: MESSAGING_ROUTE, view: 'messaging' },
   { id: 'webhooks', path: WEBHOOKS_ROUTE, view: 'webhooks' },
   { id: 'artifacts', path: ARTIFACTS_ROUTE, view: 'artifacts' },

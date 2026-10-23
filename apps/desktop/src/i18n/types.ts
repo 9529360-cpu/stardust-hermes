@@ -64,6 +64,9 @@ export interface Translations {
     opacityLabel: string
   }
   connectors: {
+    pageTitle: string
+    pageDescription: string
+    connectedCount: (count: number) => string
     title: string
     connect: string
     skip: string
@@ -2077,6 +2080,8 @@ export interface Translations {
   }
 
   messaging: {
+    pageDescription: string
+    defaultDescription: (name: string) => string
     pageTitle: string
     search: string
     loading: string

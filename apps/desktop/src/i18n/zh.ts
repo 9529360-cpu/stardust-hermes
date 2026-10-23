@@ -7,6 +7,9 @@ export const zh = defineLocale({
     opacityLabel: '图片不透明度'
   },
   connectors: {
+    pageTitle: '连接器',
+    pageDescription: '让星尘操作你的服务，比如读邮件、查日历、看 GitHub。',
+    connectedCount: (count: number) => `已连接 ${count}`,
     title: '连接你的应用',
     connect: '连接',
     skip: '暂不连接',
@@ -2437,7 +2440,7 @@ export const zh = defineLocale({
       newChat: { title: '新建对话', detail: '开始一个新对话' },
       settings: { title: '设置', detail: '配置 Stardust 桌面端' },
       skills: { title: '技能与工具', detail: '启用技能、工具集与提供方' },
-      messaging: { title: '消息平台', detail: '配置 Telegram、Slack、Discord 等' },
+      messaging: { title: '消息渠道', detail: '配置 Telegram、Slack、Discord 等' },
       artifacts: { title: '产物', detail: '浏览生成的输出' }
     },
     sectionEntries: {
@@ -2562,10 +2565,12 @@ export const zh = defineLocale({
   },
 
   messaging: {
-    pageTitle: '消息平台',
-    search: '搜索消息平台…',
-    loading: '正在加载消息平台…',
-    loadFailed: '消息平台加载失败',
+    pageDescription: '你可以通过这些渠道和星尘对话，比如发邮件给它。',
+    defaultDescription: (name: string) => `通过 ${name} 与星尘收发消息。`,
+    pageTitle: '消息渠道',
+    search: '搜索消息渠道…',
+    loading: '正在加载消息渠道…',
+    loadFailed: '消息渠道加载失败',
     states: {
       connected: '已连接',
       connecting: '连接中',
@@ -2729,7 +2734,7 @@ export const zh = defineLocale({
       whatsapp: '通过 WhatsApp 与助理对话，并接收提醒和自动任务结果。',
       bluebubbles: '通过 BlueBubbles 把 iMessage 接入助理。',
       homeassistant: '把助理接入 Home Assistant，与智能家居自动化联动。',
-      email: '让助理通过邮箱收发消息，用于通知、回复和自动工作流。',
+      email: '通过电子邮件与星尘对话，并接收回复和通知。',
       sms: '通过 Twilio 短信与助理收发消息和提醒。',
       dingtalk: '把助理接入钉钉，用于团队消息、提醒和自动任务。',
       feishu: '把助理接入飞书 / Lark，用于团队消息、提醒和自动任务。',
@@ -3349,7 +3354,7 @@ export const zh = defineLocale({
     nav: {
       'new-session': '新建对话',
       skills: '技能与工具',
-      messaging: '消息平台',
+      messaging: '消息渠道',
       artifacts: '文件与成果',
       cron: '自动任务',
       more: '更多功能'
@@ -4245,7 +4250,7 @@ export const zh = defineLocale({
       connection: label => `连接：${label}`,
       recentActivity: '最近活动',
       viewAllLogs: '查看全部日志 →',
-      messagingPlatforms: '消息平台'
+      messagingPlatforms: '消息渠道'
     },
     approvalMode: {
       title: '审批模式',

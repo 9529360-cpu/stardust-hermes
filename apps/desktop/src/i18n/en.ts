@@ -7,6 +7,9 @@ export const en: Translations = {
     opacityLabel: 'Image opacity'
   },
   connectors: {
+    pageTitle: 'Connectors',
+    pageDescription: 'Let Stardust use your services, such as reading email, checking calendars, and browsing GitHub.',
+    connectedCount: (count: number) => `Connected ${count}`,
     title: 'Connect your apps',
     connect: 'Connect',
     skip: 'Not now',
@@ -2311,7 +2314,9 @@ export const en: Translations = {
   },
 
   messaging: {
-    pageTitle: 'Messaging',
+    pageDescription: 'Talk to Stardust through these channels, such as by sending it an email.',
+    defaultDescription: (name: string) => `Exchange messages with Stardust through ${name}.`,
+    pageTitle: 'Messaging channels',
     search: 'Search messaging...',
     loading: 'Loading messaging platforms...',
     loadFailed: 'Messaging platforms failed to load',
@@ -2500,7 +2505,7 @@ export const en: Translations = {
         help: 'Recommended. Comma-separated phone numbers or WhatsApp IDs.'
       }
     },
-    platformDescriptions: {},
+    platformDescriptions: { email: 'Talk to Stardust by email and receive replies and notifications.' },
     platformIntro: {}
   },
 
