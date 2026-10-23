@@ -431,7 +431,7 @@ async function connectionMetadata(page: Page, profile?: string) {
 }
 
 async function openSearch(page: Page) {
-  await page.locator('[data-tour="sidebar-nav-search"]').click()
+  await page.evaluate(() => { window.location.hash = '/command-center?section=sessions' })
   const input = page.getByRole('textbox', { name: '搜索对话', exact: true })
   await expect(input).toBeFocused()
 
