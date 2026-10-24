@@ -416,3 +416,170 @@ def test_browser_interact_page_actions_remain_mutations_for_no_progress_guard():
     for _ in range(3):
         assert controller.before_call("browser_interact", args).action == "allow"
         assert controller.after_call("browser_interact", args, result, failed=False).action == "allow"
+
+
+# --- F5.5 identical-failure cap (opt-in, arms the interactive warn-only default) ---
+
+_CAP_CFG = {"identical_failure_cap": True, "identical_failure_cap_after": 5}
+
+
+def _cap_controller(**cfg_overrides) -> ToolCallGuardrailController:
+    cfg = dict(_CAP_CFG)
+    cfg.update(cfg_overrides)
+    return ToolCallGuardrailController(ToolCallGuardrailConfig.from_mapping(cfg, platform="cli"))
+
+
+def _fail_identically(controller, tool_name, args, result, count):
+    for _ in range(count):
+        assert controller.before_call(tool_name, args).action == "allow"
+        controller.after_call(tool_name, args, result, failed=True)
+
+
+def test_identical_failure_cap_default_off_keeps_interactive_warn_only_behaviour():
+    controller = ToolCallGuardrailController(ToolCallGuardrailConfig.from_mapping({}, platform="cli"))
+    args = {"path": "/tmp/missing.txt"}
+
+    for _ in range(100):
+        assert controller.before_call("read_file", args).action == "allow"
+        controller.after_call("read_file", args, '{"error": "File not found"}', failed=True)
+
+    assert controller.before_call("read_file", args).action == "allow"
+
+
+def test_identical_failure_cap_blocks_nth_consecutive_identical_failure_with_real_error():
+    controller = _cap_controller()
+    args = {"path": "/tmp/missing.txt"}
+    err = '{"error": "File not found: /tmp/missing.txt [similar: none]"}'
+
+    _fail_identically(controller, "read_file", args, err, 5)
+
+    blocked = controller.before_call("read_file", args)
+    assert blocked.action == "block"
+    assert blocked.code == "identical_failure_cap_block"
+    assert "File not found: /tmp/missing.txt" in blocked.message
+    assert "5 times" in blocked.message
+
+
+def test_identical_failure_cap_allows_first_n_and_blocks_the_rest():
+    controller = _cap_controller()
+    args = {"path": "/tmp/missing.txt"}
+    err = '{"error": "File not found"}'
+    allowed = blocked = 0
+    for _ in range(100):
+        decision = controller.before_call("read_file", args)
+        if decision.allows_execution:
+            allowed += 1
+            controller.after_call("read_file", args, err, failed=True)
+        else:
+            blocked += 1
+    assert allowed == 5
+    assert blocked == 95
+
+
+def test_identical_failure_cap_resets_on_different_args():
+    controller = _cap_controller()
+    err = '{"error": "File not found"}'
+    _fail_identically(controller, "read_file", {"path": "/tmp/a.txt"}, err, 5)
+    # Different args each call: separate signatures; 100 distinct paths never accumulate.
+    for i in range(100):
+        args = {"path": f"/tmp/var-{i}.txt"}
+        assert controller.before_call("read_file", args).action == "allow"
+        controller.after_call("read_file", args, err, failed=True)
+        assert controller.before_call("read_file", args).action == "allow"
+
+
+def test_identical_failure_cap_resets_when_error_changes():
+    controller = _cap_controller()
+    args = {"path": "/tmp/flaky.txt"}
+    _fail_identically(controller, "read_file", args, '{"error": "locked"}', 4)
+    # Different error: the streak restarts at 1.
+    controller.before_call("read_file", args)
+    controller.after_call("read_file", args, '{"error": "not found"}', failed=True)
+    _fail_identically(controller, "read_file", args, '{"error": "not found"}', 3)
+    assert controller.before_call("read_file", args).action == "allow"  # 1 + 3 = 4 < 5
+    controller.before_call("read_file", args)
+    controller.after_call("read_file", args, '{"error": "not found"}', failed=True)  # 5th
+    assert controller.before_call("read_file", args).action == "block"
+
+
+def test_identical_failure_cap_resets_on_success():
+    controller = _cap_controller()
+    args = {"path": "/tmp/late.txt"}
+    err = '{"error": "File not found"}'
+    _fail_identically(controller, "read_file", args, err, 5)
+    # The file appears: the call succeeds; the streak is gone.
+    controller.before_call("read_file", args)
+    controller.after_call("read_file", args, '{"content": "1|hi", "total_lines": 1}', failed=False)
+    for _ in range(3):
+        assert controller.before_call("read_file", args).action == "allow"
+        controller.after_call("read_file", args, err, failed=True)
+    assert controller.before_call("read_file", args).action == "allow"
+
+
+def test_identical_failure_cap_resets_on_filesystem_state_change(tmp_path):
+    controller = _cap_controller()
+    target = tmp_path / "external.txt"
+    args = {"path": str(target)}
+    err_text = '{"error": "File not found: external.txt"}'
+    for _ in range(5):
+        assert controller.before_call("read_file", args).action == "allow"
+        controller.after_call("read_file", args, err_text, failed=True)
+    assert controller.before_call("read_file", args).action == "block"
+    # An EXTERNAL change (not the agent) creates the file: the next retry must pass.
+    target.write_text("created externally", encoding="utf-8")
+    decision = controller.before_call("read_file", args)
+    assert decision.action == "allow"
+    # The same identical failure afterwards starts a fresh streak of 1.
+    controller.after_call("read_file", args, err_text, failed=True)
+    assert controller.before_call("read_file", args).action == "allow"
+
+
+def test_identical_failure_cap_shadow_counts_without_blocking():
+    controller = _cap_controller(identical_failure_cap_shadow=True)
+    args = {"path": "/tmp/missing.txt"}
+    err = '{"error": "File not found"}'
+    for _ in range(100):
+        decision = controller.before_call("read_file", args)
+        assert decision.action == "allow"
+        controller.after_call("read_file", args, err, failed=True)
+    # Shadow never blocked; the streak kept counting (record intact).
+    record = controller._identical_failure_cap[ToolCallSignature.from_call("read_file", args)]
+    assert record[1] == 100
+
+
+def test_identical_failure_cap_threshold_is_configurable():
+    controller = _cap_controller(identical_failure_cap_after=2)
+    args = {"path": "/tmp/missing.txt"}
+    err = '{"error": "File not found"}'
+    _fail_identically(controller, "read_file", args, err, 2)
+    assert controller.before_call("read_file", args).action == "block"
+
+
+def test_identical_failure_cap_arms_even_when_hard_stop_disabled():
+    # The F5.5 point: interactive default has hard_stop_enabled=False; the cap still fires.
+    controller = ToolCallGuardrailController(
+        ToolCallGuardrailConfig.from_mapping(
+            {"identical_failure_cap": True, "identical_failure_cap_after": 5}, platform="cli"
+        )
+    )
+    assert controller.config.hard_stop_enabled is False
+    args = {"path": "/tmp/missing.txt"}
+    err = '{"error": "File not found"}'
+    _fail_identically(controller, "read_file", args, err, 5)
+    assert controller.before_call("read_file", args).action == "block"
+
+
+def test_identical_failure_cap_coexists_with_hard_stop_enabled():
+    # With hard stops on, both detectors are armed; whichever threshold hits first wins.
+    controller = ToolCallGuardrailController(
+        ToolCallGuardrailConfig.from_mapping(
+            {"identical_failure_cap": True, "identical_failure_cap_after": 5, "hard_stop_enabled": True},
+            platform="cli",
+        )
+    )
+    args = {"path": "/tmp/missing.txt"}
+    err = '{"error": "File not found"}'
+    _fail_identically(controller, "read_file", args, err, 5)
+    decision = controller.before_call("read_file", args)
+    assert decision.action == "block"
+    assert decision.code in {"identical_failure_cap_block", "repeated_exact_failure_block"}
