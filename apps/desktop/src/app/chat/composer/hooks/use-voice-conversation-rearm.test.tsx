@@ -1,6 +1,7 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { VoiceTurnTrace } from '@/lib/voice-trace'
 import { $voicePlayback } from '@/store/voice-playback'
 
 import { useVoiceConversation } from './use-voice-conversation'
@@ -156,8 +157,16 @@ async function beginReply(hook: ReturnType<typeof renderRearmConversation>) {
 }
 
 describe('useVoiceConversation playback rearm', () => {
+  beforeEach(() => {
+    Object.defineProperty(window, 'stardustDesktop', {
+      configurable: true,
+      value: { api: vi.fn(async () => ({ enabled: false })) }
+    })
+  })
+
   afterEach(() => {
     cleanup()
+    Reflect.deleteProperty(window, 'stardustDesktop')
     vi.clearAllMocks()
     mocks.resetSpeechMocks()
     $voicePlayback.set({
@@ -249,7 +258,8 @@ describe('useVoiceConversation playback rearm', () => {
 
     await waitFor(() =>
       expect(mocks.playSpeechText).toHaveBeenCalledWith('Fallback reply', {
-        source: 'voice-conversation'
+        source: 'voice-conversation',
+        trace: expect.any(VoiceTurnTrace)
       })
     )
     await waitFor(() => expect(mocks.handle.start).toHaveBeenCalledTimes(2))

@@ -451,7 +451,9 @@ function openSpeechStream(wsUrl: string, options: VoicePlaybackOptions): SpeechS
     if (options.trace && !started && typeof context.getOutputTimestamp === 'function') {
       const outputContext = context
       const observe = () => {
-        if (settled || outputContext.state === 'closed') return
+        if (settled || outputContext.state === 'closed') {
+          return
+        }
         const stamp = outputContext.getOutputTimestamp()
         if ((stamp.contextTime ?? -1) >= startAt && (stamp.performanceTime ?? 0) > 0) {
           options.trace?.mark('playback_start')
@@ -475,7 +477,9 @@ function openSpeechStream(wsUrl: string, options: VoicePlaybackOptions): SpeechS
 
   ws.onmessage = event => {
     if (typeof event.data !== 'string') {
-      if ((event.data as ArrayBuffer).byteLength) options.trace?.mark('network_first_audio_byte')
+      if ((event.data as ArrayBuffer).byteLength) {
+        options.trace?.mark('network_first_audio_byte')
+      }
       schedule(event.data as ArrayBuffer)
 
       return
