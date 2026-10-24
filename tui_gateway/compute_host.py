@@ -145,6 +145,12 @@ class ComputeHost:
             getattr(self, handler)(frame)
 
     def _handle_shutdown(self, frame: dict[str, Any]) -> None:
+        if frame.get("settle_pending") is True:
+            # Stop admission and discard queued executor work; allow active turns a bounded
+            # chance to emit their real terminal frames before the parent settles the rest.
+            self._closed.set()
+            self._executor.shutdown(wait=False, cancel_futures=True)
+            concurrent.futures.wait(self._live_turns(), timeout=0.25)
         self.emit({"type": "shutdown.ack", "request_id": frame.get("request_id")})
         # Explicit shutdown is a clean close; SIGTERM and orphan paths do the durability flush.
         self.close()
@@ -160,6 +166,10 @@ class ComputeHost:
             self._turn_futures.pop(future, None)
 
     def _handle_turn_start(self, frame: dict[str, Any]) -> None:
+        if self._closed.is_set():
+            self._reply("turn.error", str(frame.get("sid") or ""), frame.get("request_id"),
+                        reason="shutdown", message="compute host is shutting down")
+            return
         future = self._executor.submit(self._run_real_turn, dict(frame))
         self._track_turn_future(future, str(frame.get("sid") or ""))
 

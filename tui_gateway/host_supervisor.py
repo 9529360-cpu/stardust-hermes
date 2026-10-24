@@ -182,7 +182,13 @@ class HostSupervisor:
         # frames behind after its replacement starts; those frames must never satisfy the
         # replacement host's hello/control/turn state merely because request ids collide.
         self._host_generation = 0
+        from hermes_cli.config_effective import load_user_config_effective
+        dashboard = load_user_config_effective().get("dashboard", {})
+        self._shutdown_settle = (
+            isinstance(dashboard, dict) and dashboard.get("compute_host_shutdown_settle") is True)
         self._closing = False
+        self._shutdown_in_progress = False
+        self._stdout_thread: threading.Thread | None = None
         self._stopped_respawning = False
         self._restart_times: list[float] = []
         self._pending_turns: dict[str, tuple[str, Callable[[dict], None] | None]] = {}
@@ -208,6 +214,8 @@ class HostSupervisor:
 
     def start(self) -> None:
         with self._lock:
+            if self._shutdown_settle and self._shutdown_in_progress:
+                raise RuntimeError("compute host is shutting down")
             self._refresh_respawn_breaker_locked()
             if self.is_running():
                 return
@@ -230,6 +238,9 @@ class HostSupervisor:
         logger.info("compute host crash-loop cooldown elapsed; restart allowed")
 
     def shutdown(self) -> None:
+        if self._shutdown_settle:
+            self._shutdown_and_settle()
+            return
         with self._lock:
             self._closing = True
             proc = self._proc
@@ -243,6 +254,49 @@ class HostSupervisor:
             self._terminate_process(proc)
         finally:
             self._remove_registry()
+
+    def _shutdown_and_settle(self) -> None:
+        deadline = time.monotonic() + _SHUTDOWN_TIMEOUT_SECS
+        with self._lock:
+            if self._shutdown_in_progress:
+                return
+            self._shutdown_in_progress = True
+            self._closing = True
+            proc = self._proc
+            stdout_thread = self._stdout_thread
+        try:
+            if proc is not None and proc.poll() is None:
+                try:
+                    self._send_frame({"type": "shutdown", "settle_pending": True,
+                                      "request_id": f"shutdown-{uuid.uuid4().hex}"})
+                    # Reserve output-drain time inside the existing total shutdown budget.
+                    proc.wait(timeout=max(0.0, deadline - time.monotonic()
+                                          - _STDOUT_DRAIN_AFTER_EXIT_SECS))
+                except Exception:
+                    if proc.poll() is None:
+                        proc.kill()
+                        proc.wait(timeout=max(0.0, deadline - time.monotonic()))
+            if stdout_thread is not None and stdout_thread is not threading.current_thread():
+                stdout_thread.join(timeout=max(0.0, deadline - time.monotonic()))
+            with self._lock:
+                # Once the bounded drain ends, retire any delayed reader before detaching work.
+                self._host_generation += 1
+                pending = self._take_pending_work_locked()
+            self._remove_registry()
+            self._deliver_failed_pending(
+                *pending, reason="shutdown", message="compute host shut down before completion")
+        finally:
+            with self._lock:
+                self._shutdown_in_progress = False
+
+    def _start_for_work(self) -> None:
+        with self._lock:
+            self._check_admission_locked()
+            self.start()
+
+    def _check_admission_locked(self) -> None:
+        if self._shutdown_settle and self._closing:
+            raise RuntimeError("compute host is shutting down; call start() to restart")
 
     def reconcile_startup_orphan(self) -> str:
         """Terminate a stale registered host, guarding against PID reuse."""
@@ -269,18 +323,21 @@ class HostSupervisor:
         return outcome
 
     def submit_turn(self, frame: dict[str, Any], *, on_complete: Callable[[dict], None] | None = None) -> str:
-        self.start()
+        with self._lock:
+            self._check_admission_locked()
+            self.start()
         request_id = str(frame.get("request_id") or uuid.uuid4().hex)
         sid = str(frame.get("sid") or "")
         payload = {**frame, "type": "turn.start", "request_id": request_id}
-        with self._lock:
-            self._pending_turns[request_id] = (sid, on_complete)
         try:
-            self._send_frame(payload)
+            with self._lock:
+                self._check_admission_locked()
+                self._pending_turns[request_id] = (sid, on_complete)
+                self._send_frame(payload)
         except Exception as exc:
             with self._lock:
-                self._pending_turns.pop(request_id, None)
-            if on_complete is not None:
+                pending = self._pending_turns.pop(request_id, None)
+            if pending is not None and on_complete is not None:
                 on_complete({"type": "turn.error", "sid": sid, "request_id": request_id,
                              "reason": "send_failed", "message": str(exc)})
             raise
@@ -292,7 +349,7 @@ class HostSupervisor:
         """Interrupt ``sid``. Background cleanup stays fire-and-forget; an explicit user Stop may
         ``wait`` for the host's ``interrupt.ack`` so the caller never reports success before the child
         actually applied the cancellation."""
-        self.start()
+        self._start_for_work()
         request_id = request_id or uuid.uuid4().hex
         frame = {"type": "interrupt", "sid": sid, "request_id": request_id}
         if not wait:
@@ -303,10 +360,11 @@ class HostSupervisor:
     def _await_reply(self, frame: dict[str, Any], request_id: str, timeout: float) -> dict:
         """Send ``frame`` and block for the host reply carrying ``request_id``."""
         q: queue.Queue[dict] = queue.Queue(maxsize=1)
-        with self._lock:
-            self._pending_controls[request_id] = q
         try:
-            self._send_frame(frame)
+            with self._lock:
+                self._check_admission_locked()
+                self._pending_controls[request_id] = q
+                self._send_frame(frame)
             return q.get(timeout=timeout)
         finally:
             with self._lock:
@@ -314,7 +372,7 @@ class HostSupervisor:
 
     def respond(self, sid: str, params: dict[str, Any], *, timeout: float = 15.0) -> dict:
         """Deliver an interactive prompt response to the host that owns it."""
-        self.start()
+        self._start_for_work()
         request_id = uuid.uuid4().hex
         frame = {"type": "respond", "sid": sid, "request_id": request_id, "params": dict(params)}
         return self._await_reply(frame, request_id, timeout)
@@ -333,7 +391,7 @@ class HostSupervisor:
         ``_LATE_CONTROL_TTL_SECS``/``_MAX``) instead of being dropped."""
         if route_name not in MUTATOR_ROUTE_TABLE:
             raise ValueError(f"unclassified host mutator route: {route_name}")
-        self.start()
+        self._start_for_work()
         payload = payload or {}
         request_id = str(payload.get("request_id") or uuid.uuid4().hex)
         frame = {"type": "control", **payload, "sid": sid, "route_name": route_name,
@@ -394,6 +452,7 @@ class HostSupervisor:
             target=self._drain_stdout, args=(proc, host_generation),
             name="compute-host-stdout", daemon=True,
         )
+        self._stdout_thread = stdout_thread
         stdout_thread.start()
         threading.Thread(
             target=self._drain_stderr, args=(proc,), name="compute-host-stderr", daemon=True,
@@ -453,6 +512,8 @@ class HostSupervisor:
 
     def _send_frame(self, frame: dict[str, Any]) -> None:
         with self._lock:
+            if frame.get("type") != "shutdown":
+                self._check_admission_locked()
             proc = self._proc
             if proc is None or proc.poll() is not None or proc.stdin is None:
                 raise RuntimeError("compute host is not running")
@@ -505,6 +566,8 @@ class HostSupervisor:
                 self.rpc_sink(frame["message"])
         elif ftype in ("turn.end", "turn.error"):
             with self._lock:
+                if source_generation is not None and source_generation != self._host_generation:
+                    return
                 pending = self._pending_turns.pop(request_id, None)
             if pending is not None and pending[1] is not None:
                 _call_logged(pending[1], frame, "compute host turn completion callback failed")
@@ -553,8 +616,9 @@ class HostSupervisor:
     ) -> None:
         failure = {"reason": reason, "message": message}
         for request_id, (sid, cb) in pending.items():
-            self.rpc_sink({"jsonrpc": "2.0", "method": "event",
-                           "params": {"type": "error", "session_id": sid, "payload": dict(failure)}})
+            _call_logged(self.rpc_sink, {"jsonrpc": "2.0", "method": "event",
+                         "params": {"type": "error", "session_id": sid, "payload": dict(failure)}},
+                         "compute host error event sink failed")
             if cb is not None:
                 frame = {"type": "turn.error", "sid": sid, "request_id": request_id, **failure}
                 _call_logged(cb, frame, "compute host error callback failed")
