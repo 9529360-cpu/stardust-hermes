@@ -288,14 +288,97 @@ _AWS_AUTH_ENV_CHAIN: Tuple[Tuple[str, ...], ...] = (
 )
 
 
-def _boto3_chain_has_credentials() -> bool:
-    """True if boto3's default chain resolves credentials (IMDS, task role, ...)."""
+# Bound for each IMDS request in the credential-detection probe. On a machine that is not
+# EC2/ECS there is no route to 169.254.169.254, so every attempt burns the full socket timeout
+# (botocore defaults to 1 s x 2 requests); 0.2 s keeps the whole probe < 0.5 s while remaining
+# generous for the link-local service on a real instance. Ignored when the user configured an
+# explicit timeout/attempts (env var or ~/.aws/config).
+_IMDS_PROBE_TIMEOUT_S = 0.2
+_IMDS_PROBE_ATTEMPTS = 1
+_METADATA_TIMEOUT_ENV = "AWS_METADATA_SERVICE_TIMEOUT"
+_METADATA_ATTEMPTS_ENV = "AWS_METADATA_SERVICE_NUM_ATTEMPTS"
+
+# Everything that can change what the boto3 default chain would resolve; the cached chain
+# result is invalidated whenever this fingerprint changes.
+_CHAIN_ENV_VARS: Tuple[str, ...] = (
+    "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_PROFILE",
+    "AWS_DEFAULT_PROFILE", "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI",
+    "AWS_WEB_IDENTITY_TOKEN_FILE", "AWS_BEARER_TOKEN_BEDROCK",
+    "AWS_EC2_METADATA_DISABLED", "AWS_EC2_METADATA_SERVICE_ENDPOINT",
+    "AWS_EC2_METADATA_SERVICE_ENDPOINT_MODE", "AWS_SHARED_CREDENTIALS_FILE",
+    "AWS_CONFIG_FILE", _METADATA_TIMEOUT_ENV, _METADATA_ATTEMPTS_ENV,
+)
+
+_chain_cache_key: Optional[str] = None
+_chain_cache_value: bool = False
+
+
+def reset_aws_credential_chain_cache() -> None:
+    """Forget the cached boto3 chain result (for tests; env/file changes auto-invalidate)."""
+    global _chain_cache_key, _chain_cache_value
+    _chain_cache_key = None
+    _chain_cache_value = False
+
+
+def _aws_chain_fingerprint(env: Dict[str, str]) -> str:
+    parts = [f"{k}={env.get(k, '')}" for k in _CHAIN_ENV_VARS]
+    home = os.path.expanduser("~")
+    for label, path in (
+        ("creds", env.get("AWS_SHARED_CREDENTIALS_FILE") or os.path.join(home, ".aws", "credentials")),
+        ("conf", env.get("AWS_CONFIG_FILE") or os.path.join(home, ".aws", "config")),
+    ):
+        try:
+            st = os.stat(path)
+            parts.append(f"{label}:{st.st_mtime_ns}:{st.st_size}")
+        except OSError:
+            parts.append(f"{label}:-")
+    return "|".join(parts)
+
+
+def _bound_imds_probe(session: Any, env: Dict[str, str]) -> None:
+    """Tighten the IMDS timeout on this probe session unless explicitly configured.
+
+    Uses the config-store override (which keeps the raw float); the env/config-file
+    precedence is respected by skipping the override when either side sets a value.
+    """
+    explicit = env.get(_METADATA_TIMEOUT_ENV) or env.get(_METADATA_ATTEMPTS_ENV)
+    if not explicit:
+        with suppress(Exception):
+            scoped = session.get_scoped_config() or {}
+            explicit = scoped.get("metadata_service_timeout") or scoped.get("metadata_service_num_attempts")
+    if explicit:
+        return
+    with suppress(Exception):
+        store = session.get_component("config_store")
+        store.set_config_variable("metadata_service_timeout", _IMDS_PROBE_TIMEOUT_S)
+        store.set_config_variable("metadata_service_num_attempts", _IMDS_PROBE_ATTEMPTS)
+
+
+def _run_boto3_chain(env: Dict[str, str]) -> bool:
     with suppress(Exception):
         import botocore.session
-        credentials = botocore.session.get_session().get_credentials()
+        session = botocore.session.get_session()
+        _bound_imds_probe(session, env)
+        credentials = session.get_credentials()
         resolved = credentials.get_frozen_credentials() if credentials is not None else None
         return bool(resolved and resolved.access_key)
     return False
+
+
+def _boto3_chain_has_credentials() -> bool:
+    """True if boto3's default chain resolves credentials (IMDS, task role, ...).
+
+    The chain touches the network (IMDS), so the result is cached per process and
+    re-evaluated only when the AWS_* env vars or the ~/.aws files change.
+    """
+    global _chain_cache_key, _chain_cache_value
+    env = os.environ
+    key = _aws_chain_fingerprint(env)
+    if key == _chain_cache_key:
+        return _chain_cache_value
+    _chain_cache_key = key
+    _chain_cache_value = _run_boto3_chain(env)
+    return _chain_cache_value
 
 
 def resolve_aws_auth_env_var(env: Optional[Dict[str, str]] = None) -> Optional[str]:
@@ -312,9 +395,10 @@ def has_aws_credentials(env: Optional[Dict[str, str]] = None) -> bool:
 
     This two-tier approach mirrors the pattern from OpenClaw PR #62673: cloud environments (EC2, ECS,
     Lambda) provide credentials via instance metadata, not environment variables. The env-var check is a
-    fast path for local development; the boto3 fallback covers all cloud deployments.
+    fast path for local development; the boto3 fallback covers all cloud deployments. ``resolve_aws_auth_env_var``
+    already consults the (cached) chain when no env var matches, so the chain runs at most once here.
     """
-    return resolve_aws_auth_env_var(env) is not None or _boto3_chain_has_credentials()
+    return resolve_aws_auth_env_var(env) is not None
 
 
 def resolve_bedrock_region(env: Optional[Dict[str, str]] = None) -> str:

@@ -51,6 +51,15 @@ _BOTO_PREFIXES = ("botocore", "boto3")
 
 
 @pytest.fixture(autouse=True)
+def _reset_aws_credential_chain_cache():
+    """Keep the per-process chain cache out of every test in this file (F7.1)."""
+    from agent.bedrock_adapter import reset_aws_credential_chain_cache
+    reset_aws_credential_chain_cache()
+    yield
+    reset_aws_credential_chain_cache()
+
+
+@pytest.fixture(autouse=True)
 def _boto_sys_modules_hygiene():
     """Restore every boto* sys.modules entry after each test (see above)."""
     import sys as _sys

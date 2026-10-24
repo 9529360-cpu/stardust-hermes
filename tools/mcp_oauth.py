@@ -44,6 +44,10 @@ from urllib.parse import parse_qs, urlparse
 from hermes_constants import secure_parent_dir
 from utils import atomic_json_write
 from tools.mcp_dashboard_oauth import contextvar_set as _contextvar_set, get_dashboard_oauth_flow
+from tools.mcp_oauth_store import (
+    SECURE_STORE_MARKER,
+    get_oauth_secret_codec,
+)
 
 if TYPE_CHECKING:  # annotations only; the SDK is imported lazily at runtime
     from mcp.client.auth import OAuthClientProvider
@@ -275,7 +279,9 @@ def _reserve_callback_port() -> int:
 def _cached_client_info(storage: "HermesTokenStorage | None") -> dict | None:
     """The on-disk client registration for *storage*, or None."""
     try:
-        return _read_json(storage._client_info_path()) if storage is not None else None
+        if storage is None:
+            return None
+        return storage._read_state(storage._client_info_path(), "client info")
     except (AttributeError, TypeError, ValueError):
         return None
 
@@ -403,6 +409,11 @@ class HermesTokenStorage:
     def __init__(self, server_name: str, *, hermes_home: str | Path | None = None):
         self._server_name = _safe_filename(server_name)
         self._hermes_home = Path(hermes_home) if hermes_home is not None else None
+        # CX4 secure-storage codec: None unless ``connectors.oauth_secure_store`` is on,
+        # in which case token/client-secret values live in the connector secret store
+        # and the files below hold only ``${connector:...}`` references. Keyed on the
+        # RAW server name (the store slugifies), not the filename sanitization above.
+        self._secret_codec = get_oauth_secret_codec(server_name, hermes_home)
         # Issuer binding: ``loaded_issuer`` is what the token file on disk recorded (the authorization
         # server that granted the stored refresh token); ``_bound_issuer`` is stamped onto the next
         # ``set_tokens`` write. See ``tools.mcp_oauth_provider.enforce_refresh_token_issuer``.
@@ -420,11 +431,47 @@ class HermesTokenStorage:
     def _state_paths(self) -> tuple[Path, Path, Path]:
         return self._tokens_path(), self._client_info_path(), self._meta_path()
 
-    @staticmethod
-    def _load_model(path: Path, sdk_name: str, label: str, fixup=None):
-        """Read *path* into SDK model *sdk_name*; None if absent, no SDK, or corrupt.
-        ``fixup(data)`` may rewrite the raw dict before validation."""
+    # -- CX4 secure storage ----------------------------------------------------
+
+    def _read_state(self, path: Path, label: str) -> dict | None:
+        """Read a state file; under the secure-store flag, migrate legacy plaintext
+        once and resolve ``${connector:...}`` references back to values.
+
+        Returns None when the file is absent/corrupt (legacy contract) or when a
+        referenced secret cannot be recovered — callers treat that as "no cached
+        state" and re-authorize.
+        """
         data = _read_json(path)
+        if data is None or self._secret_codec is None:
+            return data
+        if data.get(SECURE_STORE_MARKER) == "connector":
+            return self._secret_codec.resolve_tokens(data) if label == "tokens" \
+                else self._secret_codec.resolve_client_info(data)
+        skeleton = self._secret_codec.migrate_tokens(data, path) if label == "tokens" \
+            else self._secret_codec.migrate_client_info(data)
+        if skeleton is not data:
+            _write_json(path, skeleton)
+            logger.info("MCP OAuth %s for '%s' migrated into the connector secret store "
+                        "(plaintext removed from %s)", label, self._server_name, path.name)
+        return data  # legacy values already in memory — no need to round-trip the store
+
+    def _write_state(self, path: Path, data: dict, label: str) -> None:
+        """Persist a state file; under the flag the secret fields go to the store
+        first (fail closed) and the file receives the reference skeleton."""
+        if self._secret_codec is not None:
+            if label == "tokens":
+                data = self._secret_codec.protect_tokens(data)
+            else:
+                data = self._secret_codec.protect_client_info(data)
+        _write_json(path, data)
+
+    @staticmethod
+    def _load_model(path: Path, sdk_name: str, label: str, fixup=None, reader=None):
+        """Read *path* into SDK model *sdk_name*; None if absent, no SDK, or corrupt.
+        ``fixup(data)`` may rewrite the raw dict before validation. ``reader(path,
+        label)`` overrides the raw ``_read_json`` call (CX4 secure-store
+        resolve/migrate)."""
+        data = reader(path, label) if reader is not None else _read_json(path)
         cls = _sdk_class(sdk_name) if data is not None else None
         if (cls is not None and sdk_name == "OAuthMetadata" and isinstance(data, dict)
                 and data.get("device_authorization_endpoint")):
@@ -466,7 +513,8 @@ class HermesTokenStorage:
 
     async def get_tokens(self) -> "OAuthToken | None":
         self.loaded_issuer = None
-        return self._load_model(self._tokens_path(), "OAuthToken", "tokens", self._fixup_loaded_tokens)
+        return self._load_model(self._tokens_path(), "OAuthToken", "tokens",
+                                self._fixup_loaded_tokens, reader=self._read_state)
 
     async def set_tokens(self, tokens: "OAuthToken") -> None:
         payload = _model_json(tokens)
@@ -477,7 +525,7 @@ class HermesTokenStorage:
         if self._bound_issuer:  # which authorization server granted these tokens (never sent on the wire)
             payload["hermes_issuer"] = self._bound_issuer
             self.loaded_issuer = self._bound_issuer
-        _write_json(self._tokens_path(), payload)
+        self._write_state(self._tokens_path(), payload, "tokens")
         logger.debug("OAuth tokens saved for %s", self._server_name)
 
     def bind_issuer(self, issuer: str | None) -> None:
@@ -487,12 +535,12 @@ class HermesTokenStorage:
     def stamp_issuer(self, issuer: str) -> None:
         """Backfill ``hermes_issuer`` onto a pre-binding token file: adopt the currently discovered
         issuer once instead of forcing a re-login, so the *next* read is protected."""
-        data = _read_json(self._tokens_path())
+        data = self._read_state(self._tokens_path(), "tokens")
         if data is None or data.get("hermes_issuer"):
             return
         data["hermes_issuer"] = str(issuer)
         try:
-            _write_json(self._tokens_path(), data)
+            self._write_state(self._tokens_path(), data, "tokens")
         except OSError as exc:  # non-fatal — worst case we stamp next time
             logger.debug("Could not stamp issuer on tokens for %s: %s", self._server_name, exc)
             return
@@ -502,14 +550,16 @@ class HermesTokenStorage:
         """Drop the refresh token (and its issuer record) from disk, keeping the access token: the
         unexpired access token may still be used, but a refresh token must never go to a different
         issuer than the one that granted it."""
-        data = _read_json(self._tokens_path())
+        data = self._read_state(self._tokens_path(), "tokens")
         if data is None or not data.get("refresh_token"):
             return
         data.pop("refresh_token", None)
         data.pop("hermes_issuer", None)
+        if self._secret_codec is not None:
+            self._secret_codec.delete_refresh_token()
         self.loaded_issuer = None
         try:
-            _write_json(self._tokens_path(), data)
+            self._write_state(self._tokens_path(), data, "tokens")
         except OSError as exc:
             logger.warning("Could not strip refresh token for %s: %s", self._server_name, exc)
             return
@@ -530,15 +580,16 @@ class HermesTokenStorage:
         coerced: list[bool] = []
         info = self._load_model(
             self._client_info_path(), "OAuthClientInformationFull", "client info",
-            lambda data: coerced.append(self._coerce_secret_auth_method(data)))
-        if info is not None and coerced[0]:
-            _write_json(self._client_info_path(), _model_json(info))  # persist so later flows skip the coercion
+            lambda data: coerced.append(self._coerce_secret_auth_method(data)),
+            reader=self._read_state)
+        if info is not None and coerced and coerced[0]:
+            self._write_state(self._client_info_path(), _model_json(info), "client info")  # persist so later flows skip the coercion
         return info
 
     async def set_client_info(self, client_info: "OAuthClientInformationFull") -> None:
         data = _model_json(client_info)
         self._coerce_secret_auth_method(data)
-        _write_json(self._client_info_path(), data)
+        self._write_state(self._client_info_path(), data, "client info")
         logger.debug("OAuth client info saved for %s", self._server_name)
 
     def save_oauth_metadata(self, metadata: "OAuthMetadata") -> None:
@@ -570,14 +621,23 @@ class HermesTokenStorage:
         # while a peer holds the fence would let the next acquirer lock a fresh inode (two holders).
         for p in (*self._state_paths(), self._cimd_rejected_path()):
             p.unlink(missing_ok=True)
+        if self._secret_codec is not None:
+            self._secret_codec.delete_oauth_fields()
 
     def snapshot(self) -> dict[str, bytes]:
         """filename -> bytes of the existing state files; ``restore()`` it to undo a ``remove()`` after
-        a failed re-auth so a valid token survives."""
+        a failed re-auth so a valid token survives. Under the secure-store flag the current store
+        entries are captured alongside (``__secrets__`` pseudo-file) so the rollback also reverts
+        the ciphertext the failed flow may have overwritten."""
         snap: dict[str, bytes] = {}
         for p in self._state_paths():
             with contextlib.suppress(OSError):
                 snap[p.name] = p.read_bytes()
+        if self._secret_codec is not None and snap:
+            import json as _json
+            with contextlib.suppress(Exception):
+                capture = self._secret_codec.capture()
+                snap["__secrets__"] = _json.dumps(capture).encode("utf-8")  # must be JSON-safe
         return snap
 
     def restore(self, snapshot: dict[str, bytes], *, only_if_absent: bool = False) -> None:
@@ -591,6 +651,12 @@ class HermesTokenStorage:
         token_dir = _get_token_dir(self._hermes_home)
         token_dir.mkdir(parents=True, exist_ok=True)
         for fname, data in snapshot.items():
+            if fname == "__secrets__":
+                if self._secret_codec is not None:
+                    import json as _json
+                    with contextlib.suppress(Exception):
+                        self._secret_codec.restore_capture(_json.loads(data.decode("utf-8")))
+                continue
             try:
                 fd = os.open(str(token_dir / fname), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, stat.S_IRUSR | stat.S_IWUSR)
                 with os.fdopen(fd, "wb") as fh:
@@ -611,6 +677,8 @@ class HermesTokenStorage:
         except OSError as exc:  # non-fatal — proceed with the removal anyway
             logger.warning("Could not back up client info at %s: %s", client_path, exc)
         client_path.unlink(missing_ok=True)
+        if self._secret_codec is not None:
+            self._secret_codec.delete_client_secret()
         self._meta_path().unlink(missing_ok=True)
         logger.warning(
             "MCP OAuth '%s': cached client registration rejected as invalid_client; "
@@ -1077,6 +1145,37 @@ def _build_client_metadata(cfg: dict) -> "OAuthClientMetadata":
         return metadata_cls.model_validate(metadata_kwargs)
 
 
+def _client_secret_matches(existing: dict, new_client_secret: str | None) -> bool:
+    """Identity comparison tolerant of the CX4 secure-store reference form: when the
+    on-disk secret is a ``${connector:...}`` reference we cannot compare values, so
+    treat a present stored secret as matching (identity is decided by client_id)."""
+    stored = existing.get("client_secret") or None
+    if isinstance(stored, str) and stored.startswith("${connector:"):
+        return bool(new_client_secret) or bool(stored)
+    return stored == (new_client_secret or None)
+
+
+def _read_client_json_for_compare(storage: "HermesTokenStorage") -> dict | None:
+    """Client.json for identity comparison, resolved when CX4 holds the secret.
+
+    A reference-form ``client_secret`` is resolved through the secure store so
+    the value comparison in the cline invariant stays exact; any resolve
+    failure falls back to the raw file (whose reference form the tolerant
+    ``_client_secret_matches`` then treats as a match — identity is decided by
+    client_id, and a decrypt hiccup must not spuriously drop live tokens)."""
+    raw = _read_json(storage._client_info_path())
+    codec = getattr(storage, "_secret_codec", None)
+    if (isinstance(raw, dict) and codec is not None
+            and str(raw.get("client_secret", "")).startswith("${connector:")):
+        try:
+            resolved = storage._read_state(storage._client_info_path(), "client info")
+        except Exception:
+            resolved = None
+        if isinstance(resolved, dict):
+            return resolved
+    return raw
+
+
 def _invalidate_tokens_on_client_change(
     storage: "HermesTokenStorage", new_client_id: str, new_client_secret: str | None) -> None:
     """Drop cached tokens when the configured client identity changes: tokens minted under the old
@@ -1087,19 +1186,22 @@ def _invalidate_tokens_on_client_change(
     Matching identity is a no-op so live sessions and valid tokens are preserved. Port of
     cline/cline#12983's "invalidate tokens when OAuth client changes" invariant.
     """
-    existing = _read_json(storage._client_info_path())
+    existing = _read_client_json_for_compare(storage)
     old_client_id = existing.get("client_id") if isinstance(existing, dict) else None
-    if not old_client_id or (old_client_id == new_client_id and (existing.get("client_secret") or None) == (new_client_secret or None)):
+    if not old_client_id or (old_client_id == new_client_id and _client_secret_matches(existing, new_client_secret)):
         return
     removed = False
     for path in (storage._tokens_path(), storage._meta_path()):
         if not path.exists():
             continue
         try:
-            path.unlink()
+            path.unlink(missing_ok=True)
             removed = True
         except OSError as exc:  # non-fatal — stale tokens fail later anyway
             logger.warning("MCP OAuth '%s': could not remove stale %s after client change: %s", storage._server_name, path.name, exc)
+    codec = getattr(storage, "_secret_codec", None)
+    if codec is not None:
+        codec.delete_oauth_fields()  # stale store values must not outlive their token file
     if removed:
         logger.warning(
             "MCP OAuth '%s': configured OAuth client changed (client_id %r -> %r); discarded tokens minted under "
@@ -1121,7 +1223,7 @@ def _maybe_preregister_client(storage: "HermesTokenStorage", cfg: dict, client_m
         "response_types": client_metadata.response_types,
         "token_endpoint_auth_method": client_metadata.token_endpoint_auth_method,
         **{key: cfg[key] for key in ("client_secret", "client_name", "scope") if cfg.get(key)}}
-    _write_json(storage._client_info_path(), _model_json(info_cls.model_validate(info_dict)))
+    storage._write_state(storage._client_info_path(), _model_json(info_cls.model_validate(info_dict)), "client info")
     logger.debug("Pre-registered client_id=%s for '%s'", client_id, storage._server_name)
 
 
