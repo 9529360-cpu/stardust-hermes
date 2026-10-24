@@ -1,0 +1,224 @@
+"""Updated-fact case set (DL-P2.9): 30 conversation pairs where a stated fact is
+later changed, retracted, or restated. Synthetic but realistic personal-assistant
+content; no real user secrets. Each case runs through the REAL decision + store +
+recall path (extraction mocked to the model-stated facts, matching the pipeline's
+post-extraction seam), proving: current value served, old value never served as
+current, no duplicates, no physical deletion.
+
+Categories (per spec): city, job, preferred model, schedule, project names,
+preference reversed, fact retracted, plus value-change misc.
+"""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+_CASES = [
+    # ── city (5) ─────────────────────────────────────────────────────────
+    {"id": "uf01", "category": "city", "subject": "residence", "predicate": "居住地",
+     "turns": [
+         {"step": 1, "fact": "阿豪住在吉隆坡。", "observed_at": "2026-01-10T09:00:00+00:00"},
+         {"step": 2, "fact": "阿豪住在米兰。", "observed_at": "2026-03-15T10:00:00+00:00"},
+     ],
+     "current_value": "米兰", "old_values": ["吉隆坡"], "recall_query": "阿豪现在住在哪个城市？"},
+    {"id": "uf02", "category": "city", "subject": "residence-history", "predicate": "居住地",
+     "turns": [
+         {"step": 1, "fact": "阿豪住在罗马。", "observed_at": "2026-02-01T09:00:00+00:00"},
+         {"step": 2, "fact": "阿豪住在都灵。", "observed_at": "2026-04-01T09:00:00+00:00"},
+         {"step": 3, "fact": "阿豪住在那不勒斯。", "observed_at": "2026-06-01T09:00:00+00:00"},
+     ],
+     "current_value": "那不勒斯", "old_values": ["罗马", "都灵"], "recall_query": "阿豪现在的居住城市是哪里？"},
+    {"id": "uf03", "category": "city", "subject": "worktown", "predicate": "工作城市",
+     "turns": [
+         {"step": 1, "fact": "阿豪在杭州工作。", "observed_at": "2026-01-05T09:00:00+00:00"},
+         {"step": 2, "fact": "阿豪在深圳工作。", "observed_at": "2026-05-05T09:00:00+00:00"},
+     ],
+     "current_value": "深圳", "old_values": ["杭州"], "recall_query": "阿豪在哪个城市工作？"},
+    {"id": "uf04", "category": "city", "subject": "hometown", "predicate": "家乡",
+     "turns": [
+         {"step": 1, "fact": "阿豪的家乡是槟城。", "observed_at": "2026-01-20T09:00:00+00:00"},
+         {"step": 2, "fact": "阿豪的家乡是怡保。", "observed_at": "2026-07-20T09:00:00+00:00"},
+     ],
+     "current_value": "怡保", "old_values": ["槟城"], "recall_query": "阿豪的家乡在哪里？"},
+    {"id": "uf05", "category": "city", "subject": "residence-detail", "predicate": "居住地",
+     "turns": [
+         {"step": 1, "fact": "阿豪住在佛罗伦萨。", "observed_at": "2026-03-01T09:00:00+00:00"},
+         {"step": 2, "fact": "阿豪住在佛罗伦萨市中心。", "observed_at": "2026-08-01T09:00:00+00:00"},
+     ],
+     "current_value": "佛罗伦萨市中心", "old_values": [], "recall_query": "阿豪住在佛罗伦萨哪里？"},
+    # ── job (4) ──────────────────────────────────────────────────────────
+    {"id": "uf06", "category": "job", "subject": "job", "predicate": "职业",
+     "turns": [
+         {"step": 1, "fact": "阿豪的职业是银行分析师。", "observed_at": "2026-01-15T09:00:00+00:00"},
+         {"step": 2, "fact": "阿豪的职业是独立软件开发者。", "observed_at": "2026-05-15T09:00:00+00:00"},
+     ],
+     "current_value": "独立软件开发者", "old_values": ["银行", "分析师"], "recall_query": "阿豪现在做什么工作？"},
+    {"id": "uf07", "category": "job", "subject": "employer", "predicate": "雇主",
+     "turns": [
+         {"step": 1, "fact": "阿豪在 Acme 公司上班。", "observed_at": "2026-02-10T09:00:00+00:00"},
+         {"step": 2, "fact": "阿豪在 Globex 公司上班。", "observed_at": "2026-06-10T09:00:00+00:00"},
+     ],
+     "current_value": "Globex", "old_values": ["Acme"], "recall_query": "阿豪现在在哪家公司？"},
+    {"id": "uf08", "category": "job", "subject": "job-title", "predicate": "职位",
+     "turns": [
+         {"step": 1, "fact": "阿豪的职位是初级工程师。", "observed_at": "2026-01-01T09:00:00+00:00"},
+         {"step": 2, "fact": "阿豪的职位是高级工程师。", "observed_at": "2026-09-01T09:00:00+00:00"},
+     ],
+     "current_value": "高级工程师", "old_values": ["初级工程师"], "recall_query": "阿豪现在的职位是什么？"},
+    {"id": "uf09", "category": "job", "subject": "work-mode", "predicate": "工作方式",
+     "turns": [
+         {"step": 1, "fact": "阿豪在联合办公空间工作。", "observed_at": "2026-01-25T09:00:00+00:00"},
+         {"step": 2, "fact": "阿豪在家办公。", "observed_at": "2026-04-25T09:00:00+00:00"},
+     ],
+     "current_value": "在家办公", "old_values": ["联合办公"], "recall_query": "阿豪现在在哪里办公？"},
+    # ── preferred model (4) ─────────────────────────────────────────────
+    {"id": "uf10", "category": "preferred-model", "subject": "preferred-model", "predicate": "偏好模型",
+     "turns": [
+         {"step": 1, "fact": "阿豪最喜欢用 DeepSeek-V3。", "observed_at": "2026-02-05T09:00:00+00:00"},
+         {"step": 2, "fact": "阿豪最喜欢用 gpt-6-luna。", "observed_at": "2026-08-05T09:00:00+00:00"},
+     ],
+     "current_value": "gpt-6-luna", "old_values": ["DeepSeek"], "recall_query": "阿豪现在最喜欢用哪个模型？"},
+    {"id": "uf11", "category": "preferred-model", "subject": "coding-model", "predicate": "编码模型",
+     "turns": [
+         {"step": 1, "fact": "阿豪写代码用 Claude。", "observed_at": "2026-03-10T09:00:00+00:00"},
+         {"step": 2, "fact": "阿豪写代码用 gpt-6-luna。", "observed_at": "2026-07-10T09:00:00+00:00"},
+     ],
+     "current_value": "gpt-6-luna", "old_values": ["Claude"], "recall_query": "阿豪现在写代码用什么模型？"},
+    {"id": "uf12", "category": "preferred-model", "subject": "editor", "predicate": "编辑器",
+     "turns": [
+         {"step": 1, "fact": "阿豪的编辑器是 Vim。", "observed_at": "2026-01-30T09:00:00+00:00"},
+         {"step": 2, "fact": "阿豪的编辑器是 VS Code。", "observed_at": "2026-05-30T09:00:00+00:00"},
+     ],
+     "current_value": "VS Code", "old_values": ["Vim"], "recall_query": "阿豪现在用什么编辑器？"},
+    {"id": "uf13", "category": "preferred-model", "subject": "shell", "predicate": "终端",
+     "turns": [
+         {"step": 1, "fact": "阿豪用 bash。", "observed_at": "2026-02-20T09:00:00+00:00"},
+         {"step": 2, "fact": "阿豪用 zsh 加 starship 提示符。", "observed_at": "2026-06-20T09:00:00+00:00"},
+     ],
+     "current_value": "zsh", "old_values": ["bash"], "recall_query": "阿豪现在用什么 shell？"},
+    # ── schedule (4) ────────────────────────────────────────────────────
+    {"id": "uf14", "category": "schedule", "subject": "work-hours", "predicate": "工作时间",
+     "turns": [
+         {"step": 1, "fact": "阿豪工作时间是 9 点到 18 点。", "observed_at": "2026-01-12T09:00:00+00:00"},
+         {"step": 2, "fact": "阿豪工作时间是 10 点到 19 点。", "observed_at": "2026-05-12T09:00:00+00:00"},
+     ],
+     "current_value": "10 点到 19 点", "old_values": ["9 点到 18 点"], "recall_query": "阿豪现在的工作时间是几点到几点？"},
+    {"id": "uf15", "category": "schedule", "subject": "wake-time", "predicate": "起床时间",
+     "turns": [
+         {"step": 1, "fact": "阿豪每天 6 点起床。", "observed_at": "2026-02-15T09:00:00+00:00"},
+         {"step": 2, "fact": "阿豪每天 7 点半起床。", "observed_at": "2026-06-15T09:00:00+00:00"},
+     ],
+     "current_value": "7 点半", "old_values": ["6 点起床"], "recall_query": "阿豪现在每天几点起床？"},
+    {"id": "uf16", "category": "schedule", "subject": "gym-day", "predicate": "健身日",
+     "turns": [
+         {"step": 1, "fact": "阿豪周一去健身房。", "observed_at": "2026-03-05T09:00:00+00:00"},
+         {"step": 2, "fact": "阿豪周三去健身房。", "observed_at": "2026-07-05T09:00:00+00:00"},
+     ],
+     "current_value": "周三", "old_values": ["周一"], "recall_query": "阿豪现在星期几去健身房？"},
+    {"id": "uf17", "category": "schedule", "subject": "standup", "predicate": "站会",
+     "turns": [
+         {"step": 1, "fact": "阿豪每天早上开站会。", "observed_at": "2026-01-08T09:00:00+00:00"},
+         {"step": 2, "fact": "阿豪现在不用开站会了。", "observed_at": "2026-08-08T09:00:00+00:00"},
+     ],
+     "current_value": "不用开站会", "old_values": ["每天早上开站会"], "recall_query": "阿豪现在要开站会吗？"},
+    # ── project names (4) ───────────────────────────────────────────────
+    {"id": "uf18", "category": "project-names", "subject": "side-project", "predicate": "副业项目",
+     "turns": [
+         {"step": 1, "fact": "阿豪的副业项目叫 Nova。", "observed_at": "2026-02-25T09:00:00+00:00"},
+         {"step": 2, "fact": "阿豪的副业项目叫 RegressoLab。", "observed_at": "2026-06-25T09:00:00+00:00"},
+     ],
+     "current_value": "RegressoLab", "old_values": ["Nova"], "recall_query": "阿豪现在的副业项目叫什么？"},
+    {"id": "uf19", "category": "project-names", "subject": "main-project", "predicate": "主项目",
+     "turns": [
+         {"step": 1, "fact": "阿豪的主项目是 ZN 助手。", "observed_at": "2026-01-18T09:00:00+00:00"},
+         {"step": 2, "fact": "阿豪的主项目是 Stardust。", "observed_at": "2026-05-18T09:00:00+00:00"},
+     ],
+     "current_value": "Stardust", "old_values": ["ZN"], "recall_query": "阿豪现在的主项目是哪个？"},
+    {"id": "uf20", "category": "project-names", "subject": "repo", "predicate": "代码仓库",
+     "turns": [
+         {"step": 1, "fact": "阿豪把代码放在 GitLab 上。", "observed_at": "2026-03-20T09:00:00+00:00"},
+         {"step": 2, "fact": "阿豪把代码放在 GitHub 上。", "observed_at": "2026-07-20T09:00:00+00:00"},
+     ],
+     "current_value": "GitHub", "old_values": ["GitLab"], "recall_query": "阿豪现在把代码放在哪个平台？"},
+    {"id": "uf21", "category": "project-names", "subject": "app-name", "predicate": "应用名",
+     "turns": [
+         {"step": 1, "fact": "阿豪的桌面应用叫 Hermes 桌面版。", "observed_at": "2026-04-01T09:00:00+00:00"},
+         {"step": 2, "fact": "阿豪的桌面应用改名叫星尘桌面版。", "observed_at": "2026-08-01T09:00:00+00:00"},
+     ],
+     "current_value": "星尘桌面版", "old_values": ["Hermes 桌面版"], "recall_query": "阿豪的桌面应用现在叫什么名字？"},
+    # ── preference reversed (5) ─────────────────────────────────────────
+    {"id": "uf22", "category": "preference-reversed", "subject": "coffee", "predicate": "咖啡偏好",
+     "turns": [
+         {"step": 1, "fact": "阿豪喝拿铁要加糖。", "observed_at": "2026-02-08T09:00:00+00:00"},
+         {"step": 2, "fact": "阿豪现在喝美式不加糖。", "observed_at": "2026-06-08T09:00:00+00:00"},
+     ],
+     "current_value": "美式不加糖", "old_values": ["拿铁", "加糖"], "recall_query": "阿豪现在喝什么咖啡？"},
+    {"id": "uf23", "category": "preference-reversed", "subject": "dark-mode", "predicate": "深色模式",
+     "turns": [
+         {"step": 1, "fact": "阿豪喜欢浅色主题。", "observed_at": "2026-01-22T09:00:00+00:00"},
+         {"step": 2, "fact": "阿豪现在喜欢深色主题。", "observed_at": "2026-05-22T09:00:00+00:00"},
+     ],
+     "current_value": "深色主题", "old_values": ["浅色主题"], "recall_query": "阿豪现在喜欢什么主题？"},
+    {"id": "uf24", "category": "preference-reversed", "subject": "notifications", "predicate": "通知偏好",
+     "turns": [
+         {"step": 1, "fact": "阿豪开着所有通知。", "observed_at": "2026-03-12T09:00:00+00:00"},
+         {"step": 2, "fact": "阿豪现在关闭了大部分通知。", "observed_at": "2026-07-12T09:00:00+00:00"},
+     ],
+     "current_value": "关闭了大部分通知", "old_values": ["开着所有通知"], "recall_query": "阿豪现在的通知设置是什么样？"},
+    {"id": "uf25", "category": "preference-reversed", "subject": "language", "predicate": "回复语言",
+     "turns": [
+         {"step": 1, "fact": "阿豪希望助手用英文回复。", "observed_at": "2026-02-28T09:00:00+00:00"},
+         {"step": 2, "fact": "阿豪现在希望助手用中文回复。", "observed_at": "2026-06-28T09:00:00+00:00"},
+     ],
+     "current_value": "中文回复", "old_values": ["英文回复"], "recall_query": "阿豪希望助手用哪种语言回复？"},
+    {"id": "uf26", "category": "preference-reversed", "subject": "units", "predicate": "单位偏好",
+     "turns": [
+         {"step": 1, "fact": "阿豪看温度用华氏度。", "observed_at": "2026-01-28T09:00:00+00:00"},
+         {"step": 2, "fact": "阿豪看温度用摄氏度。", "observed_at": "2026-05-28T09:00:00+00:00"},
+     ],
+     "current_value": "摄氏度", "old_values": ["华氏度"], "recall_query": "阿豪现在看温度用什么单位？"},
+    # ── fact retracted (2) ──────────────────────────────────────────────
+    {"id": "uf27", "category": "retracted", "subject": "side-hustle", "predicate": "副业",
+     "turns": [
+         {"step": 1, "fact": "阿豪在卖手工咖啡豆。", "observed_at": "2026-03-18T09:00:00+00:00"},
+         {"step": 2, "fact": "阿豪不再卖咖啡豆了。", "observed_at": "2026-07-18T09:00:00+00:00", "retracted": True},
+     ],
+     "retracted": True, "current_value": "", "old_values": ["卖手工咖啡豆", "咖啡豆"],
+     "recall_query": "阿豪现在还在卖咖啡豆吗？"},
+    {"id": "uf28", "category": "retracted", "subject": "membership", "predicate": "会员",
+     "turns": [
+         {"step": 1, "fact": "阿豪是健身房租户会员。", "observed_at": "2026-02-12T09:00:00+00:00"},
+         {"step": 2, "fact": "阿豪退了健身房会员。", "observed_at": "2026-06-12T09:00:00+00:00", "retracted": True},
+     ],
+     "retracted": True, "current_value": "", "old_values": ["健身房会员"],
+     "recall_query": "阿豪现在有健身房会员吗？"},
+    # ── value-change misc (2) ───────────────────────────────────────────
+    {"id": "uf29", "category": "misc", "subject": "phone", "predicate": "手机",
+     "turns": [
+         {"step": 1, "fact": "阿豪的手机是 iPhone 15。", "observed_at": "2026-01-03T09:00:00+00:00"},
+         {"step": 2, "fact": "阿豪的手机是 iPhone 17。", "observed_at": "2026-09-23T09:00:00+00:00"},
+     ],
+     "current_value": "iPhone 17", "old_values": ["iPhone 15"], "recall_query": "阿豪现在用什么手机？"},
+    {"id": "uf30", "category": "misc", "subject": "bike", "predicate": "自行车",
+     "turns": [
+         {"step": 1, "fact": "阿豪骑 Giant 公路车。", "observed_at": "2026-02-02T09:00:00+00:00"},
+         {"step": 2, "fact": "阿豪骑 Bianchi 公路车。", "observed_at": "2026-06-02T09:00:00+00:00"},
+     ],
+     "current_value": "Bianchi", "old_values": ["Giant"], "recall_query": "阿豪现在骑什么牌子的公路车？"},
+]
+
+
+def load_cases() -> list[dict]:
+    return json.loads(json.dumps(_CASES, ensure_ascii=False))  # deep copy per run
+
+
+def cases_path() -> Path:
+    return Path(__file__).resolve().parent / "memory_fact_cases.json"
+
+
+if __name__ == "__main__":
+    cases_path().write_text(
+        json.dumps({"version": 1, "cases": _CASES}, ensure_ascii=False, indent=1),
+        encoding="utf-8",
+    )
+    print(f"wrote {len(_CASES)} cases -> {cases_path()}")

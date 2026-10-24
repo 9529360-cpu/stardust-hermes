@@ -7,7 +7,7 @@ SHA-256 of the injected sidecar context per question. Comparing two captures
 recall output.
 
 Run from the repo root of the tree under test with its venv python:
-  python evals/digital_life/context_hash_capture.py --home HOME --output HASHES.json
+  python -m evals.digital_life.context_hash_capture --home HOME --output HASHES.json
 """
 from __future__ import annotations
 
