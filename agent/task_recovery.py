@@ -22,6 +22,16 @@ def enabled():
         return False
 
 
+def auto_resume_enabled():
+    """DL-P2.5 gate: whitelisted goal auto-resume after restart (default OFF)."""
+    from hermes_cli.config import load_config_readonly
+    try:
+        config = load_config_readonly()
+        return (config.get('digital_life') or {}).get('auto_resume') is True
+    except (OSError, ValueError, TypeError, AttributeError):
+        return False
+
+
 def _available(agent):
     return enabled() and not getattr(agent, '_persist_disabled', False) and getattr(agent, '_session_db', None) is not None
 
@@ -52,6 +62,33 @@ def _save(agent, record):
 
 def _ref(name, args):
     return hashlib.sha256(json.dumps([name, args], sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+
+
+def _validate_owner_only(record, task_id):
+    """Validate a journal record's shape and owner scope without a live agent."""
+    if not isinstance(record, dict) or type(record.get('version')) is not int or record['version'] != VERSION:
+        raise ValueError('corrupt or unsupported checkpoint version')
+    from agent.task_checkpoint import scope
+    if record.get('scope') != scope():
+        raise ValueError('HOME/profile scope mismatch')
+    if not isinstance(task_id, str) or not task_id or record.get('task_id') != task_id:
+        raise ValueError('task mismatch')
+    steps = record.get('steps')
+    if not isinstance(steps, list) or len(steps) > MAX_STEPS:
+        raise ValueError('corrupt step list')
+    calls = set()
+    for index, step in enumerate(steps, 1):
+        if (not isinstance(step, dict) or type(step.get('step')) is not int or step['step'] != index
+                or step.get('task_id') != task_id or not isinstance(step.get('intent'), str)
+                or not isinstance(step.get('call_id'), str) or step['call_id'] in calls
+                or not isinstance(step.get('side_effect_ref'), str) or len(step['side_effect_ref']) != 64
+                or step.get('status') not in {'started', 'committed'}
+                or 'committed_at' not in step
+                or (step['status'] == 'committed' and not isinstance(step['committed_at'], str))
+                or (step['status'] == 'started' and step['committed_at'] is not None)):
+            raise ValueError('corrupt step')
+        calls.add(step['call_id'])
+    return record
 
 
 def _validate(agent, record, task_id):
@@ -116,6 +153,30 @@ def find_resume_point(agent, *, task_id=None):
         from agent.tool_result_classification import tool_may_have_side_effect
         pending = [s for s in record['steps'] if s['status'] == 'started' and tool_may_have_side_effect(s['intent'])]
         return {'status': 'needs_review' if pending else 'ready', 'task_id': task_id,
+                'last_committed_step': max((s['step'] for s in record['steps'] if s['status'] == 'committed'), default=0),
+                'pending': pending}
+    except (ValueError, TypeError, KeyError, OSError) as exc:
+        return {'status': 'rejected', 'reason': str(exc)}
+
+
+def journal_status(session_db, session_id):
+    """Startup auto-resume gate: read a session's journal WITHOUT a live agent.
+
+    ``ready`` = every step either committed or side-effect free; ``needs_review`` =
+    an uncommitted side-effecting step (unknown whether the effect landed);
+    ``rejected`` = foreign/corrupt journal; ``disabled`` = flag off or no journal.
+    Read-only: never mutates the journal.
+    """
+    if not enabled() or session_db is None:
+        return {'status': 'disabled'}
+    try:
+        record = session_db.get_session_model_config_value(session_id, KEY)
+        if not isinstance(record, dict):
+            return {'status': 'disabled'}
+        _validate_owner_only(record, record.get('task_id'))
+        from agent.tool_result_classification import tool_may_have_side_effect
+        pending = [s for s in record['steps'] if s['status'] == 'started' and tool_may_have_side_effect(s['intent'])]
+        return {'status': 'needs_review' if pending else 'ready', 'task_id': record['task_id'],
                 'last_committed_step': max((s['step'] for s in record['steps'] if s['status'] == 'committed'), default=0),
                 'pending': pending}
     except (ValueError, TypeError, KeyError, OSError) as exc:

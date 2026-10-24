@@ -512,6 +512,106 @@ class GatewayStartupMixin:
             logger.warning("Skipping auto-resume for %s: authorization check failed: %s", session_key, exc)
         return False
 
+    # ── DL-P2.5 whitelisted goal auto-resume after restart ──────────────
+
+    def _schedule_whitelisted_auto_resume(self) -> int:
+        """Resume goals explicitly whitelisted via ``/goal autoresume on`` after a restart.
+
+        Opt-in twice: the ``digital_life.auto_resume`` config flag (default OFF) AND the
+        per-goal whitelist marker. Each candidate must additionally pass the task-recovery
+        journal gate (no uncommitted side-effecting steps) and win the durable CAS claim,
+        so exactly one runner per goal and no repeated effects. The synthetic turn sends
+        the literal ``continue`` user message, which re-arms the existing DL-P2.4 recovery
+        replay path instead of building a new one.
+        """
+        from agent import task_recovery
+        if not task_recovery.auto_resume_enabled():
+            return 0
+        try:
+            from hermes_cli.goals import GoalManager
+            from hermes_state import SessionDB
+        except Exception as exc:  # pragma: no cover — defensive import guard
+            logger.warning("auto-resume: goals modules unavailable: %s", exc)
+            return 0
+        try:
+            db = SessionDB()
+        except Exception as exc:
+            logger.warning("auto-resume: session DB unavailable: %s", exc)
+            return 0
+        scheduled = 0
+        try:
+            for session_id in GoalManager.list_auto_resume_sessions(db):
+                entry = self._session_entry_for_id(session_id)
+                if entry is None or entry.origin is None:
+                    logger.info("auto-resume: no routable session entry for %s", session_id)
+                    continue
+                if self._is_session_running_by_id(session_id):
+                    continue
+                source = entry.origin
+                adapter = self._adapter_for_source(source)
+                if adapter is None or not self._resume_owner_authorized(session_id, source):
+                    continue
+                session_key = self._session_key_for_source(source)
+                if not self._claim_auto_resume_slot(session_key):
+                    continue
+                # Journal gate: uncommitted side-effecting steps or a foreign/corrupt journal
+                # keep the session interrupted for the user (fail-closed). ``disabled`` means
+                # no journal exists — equivalent to a manual /goal resume, so it proceeds.
+                journal = task_recovery.journal_status(db, session_id)
+                if journal['status'] not in ('ready', 'disabled'):
+                    logger.info("auto-resume: %s journal gate %s; leaving interrupted",
+                                session_id, journal['status'])
+                    continue
+                # Durable owner claim LAST: every cheap gate above has already passed, so a
+                # refused resume never spends one of the bounded auto_resume_attempts.
+                mgr = GoalManager(session_id=session_id, session_db=db)
+                prompt = mgr.claim_auto_resume()
+                if not prompt:
+                    continue
+                from gateway.run import _AGENT_PENDING_SENTINEL
+                _resume_state = self._session_state(session_key)
+                _resume_state.turn.agent = _AGENT_PENDING_SENTINEL
+                _resume_state.turn.started_ts = time.time()
+                self._persist_active_agents()
+                event = MessageEvent(text="continue", message_type=MessageType.TEXT,
+                                     source=source, internal=True)
+                task = self._retain_background_task(
+                    asyncio.create_task(self._run_startup_resume_event(adapter, event, session_key))
+                )
+                if getattr(self, "_startup_restore_in_progress", False):
+                    tasks = getattr(self, "_startup_restore_tasks", None)
+                    if tasks is None:
+                        tasks = self._startup_restore_tasks = []
+                    tasks.append(task)
+                scheduled += 1
+                logger.info("auto-resume: scheduled whitelisted goal for %s", session_key)
+        finally:
+            with suppress(Exception):
+                db.close()
+        return scheduled
+
+    def _is_session_running_by_id(self, session_id: str) -> bool:
+        """Whether the session entry for this id currently holds a running-turn slot."""
+        entry = self._session_entry_for_id(session_id)
+        return entry is not None and self._is_session_running(entry.session_key)
+
+    def _session_entry_for_id(self, session_id: str):
+        try:
+            with self.session_store._lock:  # noqa: SLF001 — snapshot under lock
+                self.session_store._ensure_loaded_locked()  # noqa: SLF001
+                for entry in self.session_store._entries.values():  # noqa: SLF001
+                    if entry.session_id == session_id:
+                        return entry
+        except Exception as exc:
+            logger.debug("auto-resume: session entry lookup failed for %s: %s", session_id, exc)
+        return None
+
+    def _claim_auto_resume_slot(self, session_key: str) -> bool:
+        state = self._peek_session_state(session_key)
+        if state is not None and state.turn.agent is not None:
+            return False
+        return True
+
     def _schedule_resume_pending_sessions(self, platform=None) -> int:
         """Auto-continue fresh restart-interrupted sessions: synthesize an empty-text turn (the
         ``_is_resume_pending`` injection path owns the wording). Sessions whose adapter is offline stay
@@ -1303,6 +1403,11 @@ class GatewayStartupMixin:
         # Auto-resume restart-interrupted sessions (ledger-answered ones were cleared above); a failed
         # auto-resume stays visible on the next user message.
         self._schedule_resume_pending_sessions()
+        # DL-P2.5: whitelisted goal auto-resume (digital_life.auto_resume, default OFF). A session
+        # already claimed by the empty-text pass above is skipped here — the slot claim is the
+        # single fence, so a session is never resumed by both mechanisms in one boot.
+        with _log_suppressed(logging.WARNING, "Whitelisted auto-resume scheduling failed: %s"):
+            self._schedule_whitelisted_auto_resume()
         await self._finish_startup_restore()
         # Surface state.db init failures to messaging platforms before the user loses data.
         # See #88235.
