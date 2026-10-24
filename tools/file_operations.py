@@ -681,16 +681,38 @@ class ShellFileOperations(LintMixin, SearchMixin, FileOperations):
             file_size=file_size, file_ends_with_newline=file_ends_with_newline)
 
     def _native_read_enabled(self) -> bool:
-        """Whether ``read_file`` and ``search_files`` may bypass the shell: only POSIX + ``LocalEnvironment``
-        (file is on this host, path already native; Windows keeps the shell path since
-        file_operations holds Git-Bash-style paths there). ``STARDUST_NATIVE_FILE_READ=0``
-        turns the fast path off."""
-        flag = os.environ.get("STARDUST_NATIVE_FILE_READ", "1").strip().lower()
+        """Whether ``read_file`` and ``search_files`` may bypass the shell: only
+        ``LocalEnvironment`` (file is on this host). On POSIX this is the default;
+        on Windows it is opt-in via ``STARDUST_NATIVE_FILE_READ=1`` (paths there
+        are host-native — ``LocalEnvironment`` normalizes ``cwd`` and every path
+        entering the native lane is mapped with ``_msys_to_windows_path`` — but
+        the lane has less Windows mileage, so it ships behind the flag until it
+        is measured better). ``STARDUST_NATIVE_FILE_READ=0`` is the kill switch
+        on every platform."""
+        flag = os.environ.get("STARDUST_NATIVE_FILE_READ", "").strip().lower()
         if flag in ("0", "false", "no", "off"):
+            return False
+        on_by_default = sys.platform != "win32"
+        if not on_by_default and flag not in ("1", "true", "yes", "on"):
             return False
         # Same "is this env the local host" test the LSP path uses; isinstance is
         # microseconds and self.env is never rebound, so nothing to memoize.
-        return sys.platform != "win32" and self._lsp_local_only()
+        return self._lsp_local_only()
+
+    @staticmethod
+    def _native_lane_path(path: str) -> str:
+        """Map *path* to the form the native lane opens: MSYS ``/c/...`` (or any
+        leftover Git-Bash spelling) becomes ``C:\\...``; ``C:/x`` keeps its drive
+        but is rebased onto an OS-native separator so ``os.stat``/``Popen(cwd=)``
+        resolve it identically on Windows. No-op for POSIX and UNC paths."""
+        from tools.environments.local import _msys_to_windows_path
+        mapped = _msys_to_windows_path(path)
+        drive, rest = os.path.splitdrive(mapped)
+        if drive and drive[0].isalpha() and len(drive) == 2:
+            if not rest.strip("/\\"):
+                return drive + os.sep
+            return drive + os.sep + rest.lstrip("/\\").replace("/", os.sep)
+        return mapped
 
     def _read_file_native(self, path: str, offset: int, limit: int) -> ReadResult:
         """``read_file`` without a shell — same contract as the shell path, byte for
@@ -704,8 +726,10 @@ class ShellFileOperations(LintMixin, SearchMixin, FileOperations):
         unexpected OSError hands over to the shell path."""
         import stat as _stat
 
-        full = path if os.path.isabs(path) else os.path.join(
-            getattr(self.env, "cwd", None) or self.cwd, path)
+        full = self._native_lane_path(path)
+        if not os.path.isabs(full):
+            full = os.path.join(self._native_lane_path(
+                getattr(self.env, "cwd", None) or self.cwd), full)
         try:
             st = os.stat(full)
         except (FileNotFoundError, NotADirectoryError):
@@ -728,6 +752,11 @@ class ShellFileOperations(LintMixin, SearchMixin, FileOperations):
         kept = bytearray()      # first ``clamp`` bytes of that line
         have_partial = False    # that line has bytes but no newline yet
         last_byte = b""
+        # Git Bash sed/awk open text files in CRLF mode: every \r preceding a \n
+        # is dropped before it reaches the transport (verified: `sed -n 1p` of a
+        # CRLF file emits `one\n`). The native lane must strip the same \r\n -> \n
+        # to stay byte-identical on Windows; on POSIX neither lane has \r.
+        crlf_mode = sys.platform == "win32"
         try:
             with open(full, "rb") as fh:
                 sample = fh.read(1000)
@@ -758,6 +787,8 @@ class ShellFileOperations(LintMixin, SearchMixin, FileOperations):
                         if in_page:
                             if len(kept) < clamp:
                                 kept += chunk[pos:min(nl, pos + (clamp - len(kept)))]
+                            if crlf_mode and kept.endswith(b"\r"):
+                                kept = kept[:-1]
                             page.append(bytes(kept) + b"\n")
                         kept = bytearray()
                         have_partial = False
