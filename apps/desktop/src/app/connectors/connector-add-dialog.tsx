@@ -21,10 +21,9 @@ import {
   DialogTitle
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { type ProfileScope, profileScopeKey, testMcpServer } from '@/hermes'
+import { type ProfileScope, testMcpServer } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { completeMcpDesktopOAuth, McpOAuthCancelled } from '@/lib/mcp-dashboard-oauth'
-import { probeCache, probeKey } from '@/lib/mcp-probe-cache'
 import { getServers } from '@/lib/mcp-servers'
 import { prettyName } from '@/lib/text'
 import type { McpCatalogEntry } from '@/types/hermes'
@@ -73,10 +72,6 @@ export function ConnectorAddDialog({ entry, profile, onClose, onConnected }: Con
   const c = t.connectors
   const { data: configRecord } = useHermesConfigRecord(profile)
   const existingNames = useMemo(() => new Set(Object.keys(getServers(configRecord ?? null))), [configRecord])
-  // Latest config for the post-install probe-cache write; a ref because the
-  // connect closure must see the record CURRENT at probe time, not at render.
-  const configRecordRef = useRef(configRecord)
-  configRecordRef.current = configRecord
 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -209,18 +204,6 @@ export function ConnectorAddDialog({ entry, profile, onClose, onConnected }: Con
       // Immediate feedback: handshake now, not "trust me". A failed probe is
       // still a connected config row — report it, the list will show state.
       const probed = await testMcpServer(entry.name, profile).catch(() => null)
-
-      // ConnectedRow reads probeCache; without this write a fresh install
-      // stays 未连接 until a manual recheck. Key on the just-written server
-      // block so the row's fingerprint lookup hits.
-      if (probed) {
-        const installed = getServers(configRecordRef.current ?? null)[entry.name]
-        probeCache.set(probeKey(entry.name, installed, profileScopeKey(profile ?? null)), {
-          at: Date.now(),
-          result: probed
-        })
-      }
-
       onConnected(entry.name)
 
       if (!probed?.ok) {

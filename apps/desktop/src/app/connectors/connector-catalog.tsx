@@ -7,16 +7,16 @@
 
 import { useStore } from '@nanostores/react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { getMcpCatalog } from '@/api/mcp'
 import { AvatarChip } from '@/components/ui/avatar-chip'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { type ProfileScope, profileScopeKey } from '@/hermes'
+import { type ProfileScope, profileScopeKey, testMcpServer } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { brandFor } from '@/lib/mcp-brands'
-import { probeCache, probeKey } from '@/lib/mcp-probe-cache'
+import { probeCache, probeKey, freshProbe } from '@/lib/mcp-probe-cache'
 import { getServers } from '@/lib/mcp-servers'
 import { hermesConfigKey } from '../hooks/use-config-record'
 import { $activeGatewayProfile } from '@/store/profile'
@@ -169,6 +169,35 @@ export function ConnectorCatalogView({ profile }: { profile: ProfileScope | null
 
     return () => window.clearInterval(timer)
   }, [])
+
+  // Auto-probe on mount / server-set change, mirroring the MCP tab: a fresh
+  // install (or an expired cache) otherwise reads as 未连接 with no tool count
+  // until a manual recheck. Failures land in the cache too — the row shows the
+  // error state, and 已连接 counts only successful handshakes.
+  const probedRef = useRef(new Set<string>())
+  useEffect(() => {
+    for (const [name, server] of servers) {
+      if (server.enabled === false || probedRef.current.has(name)) {
+        continue
+      }
+
+      const key = probeKey(name, server, scopeKey)
+
+      if (freshProbe(key) === null) {
+        probedRef.current.add(name)
+        void testMcpServer(name, scopeProfile ?? undefined)
+          .catch(() => null)
+          .then(result => {
+            if (result) {
+              probeCache.set(key, { at: Date.now(), result })
+              tick(value => value + 1)
+            }
+          })
+      }
+    }
+    // servers identity changes only when the config record does.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [servers])
 
   const refreshCatalog = () => {
     void catalogQuery.refetch()
