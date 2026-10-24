@@ -65,6 +65,11 @@ test('deepwiki (remote http) connects via the dialog', async () => {
   await page.locator('[data-slot="connector-connect"]').click()
 
   await expect(page.locator('[data-slot="connector-connected-row"][data-server="deepwiki"]')).toBeVisible({ timeout: 180_000 })
+  // Wait for the auto-probe to land: the row flips to 已连接 with a tool count
+  // (DeepWiki remote handshake takes a few seconds).
+  await expect(
+    page.locator('[data-slot="connector-connected-row"][data-server="deepwiki"]').getByText('已连接')
+  ).toBeVisible({ timeout: 120_000 })
   await page.screenshot({ path: 'D:/wt/logs/cx5-evidence/cx5-real-connected.png' })
   console.log('deepwiki row connected:', await page
     .locator('[data-slot="connector-connected-row"][data-server="deepwiki"]')
