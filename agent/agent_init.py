@@ -1245,6 +1245,7 @@ def _init_memory(agent, _agent_cfg, skip_memory, platform):
     agent._memory_nudge_interval = 10
     agent._memory_persistence_enabled = True
     agent._topic_summaries_enabled = False
+    agent._topic_provenance_enabled = False
     agent._topic_recall_limit = 2
     agent._topic_recall_char_budget = 1800
     agent._topic_recall_session_id = ""
@@ -1264,6 +1265,7 @@ def _init_memory(agent, _agent_cfg, skip_memory, platform):
                 MemoryStore,
                 get_builtin_memory_config,
                 memory_persistence_enabled as _memory_persistence_enabled,
+                topic_provenance_enabled,
                 topic_summaries_enabled,
             )
             memory_persistence_enabled = _memory_persistence_enabled
@@ -1282,6 +1284,7 @@ def _init_memory(agent, _agent_cfg, skip_memory, platform):
                     store_flags=(agent._memory_enabled, agent._user_profile_enabled),
                 )
             )
+            agent._topic_provenance_enabled = topic_provenance_enabled(_agent_cfg)
             agent._topic_recall_limit = max(0, min(5, _parse_config_int(mem_config.get("topic_recall_limit"), 2)))
             agent._topic_recall_char_budget = max(
                 256, min(4000, _parse_config_int(mem_config.get("topic_recall_char_budget"), 1800))
