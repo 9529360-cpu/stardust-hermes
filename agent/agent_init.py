@@ -2173,6 +2173,19 @@ def _emit_compression_summary(agent, cs):
     agent._compression_feasibility_checked = False
 
 
+def _snapshot_threshold_tokens(_cc) -> int:
+    """threshold_tokens snapshot that never triggers the deferred background probe.
+
+    threshold_tokens is a property deriving from context_length; reading it while
+    unresolved would block on the background probe. Snapshot the cached derivation
+    (0 while unresolved; recomputed on first real use). getattr: plugin engines may
+    lack the private cache entirely."""
+    _cached = getattr(_cc, "_threshold_tokens", None)
+    if defer_context_probe_enabled():
+        return _cached if _cached is not None else 0
+    return _cached if _cached is not None else _cc.threshold_tokens
+
+
 def _snapshot_primary_runtime(agent):
     # Per-turn restoration snapshot: after a fallback, the next turn restores these so the
     # preferred model gets a fresh attempt.
@@ -2206,12 +2219,9 @@ def _snapshot_primary_runtime(agent):
         # threshold_tokens is a property deriving from context_length; under the
         # deferred flag, reading it while unresolved would block on the background
         # probe — snapshot the cached derivation (0 while unresolved; recomputed on
-        # first real use through the property).
-        "compressor_threshold_tokens": (
-            (_cc._threshold_tokens if _cc._threshold_tokens is not None else _cc.threshold_tokens)
-            if not defer_context_probe_enabled()
-            else (_cc._threshold_tokens or 0)
-        ),
+        # first real use through the property). getattr: plugin engines may lack
+        # the private cache entirely.
+        "compressor_threshold_tokens": _snapshot_threshold_tokens(_cc),
     }
     if agent.api_mode == "anthropic_messages":
         agent._primary_runtime.update({
