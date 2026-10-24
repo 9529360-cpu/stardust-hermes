@@ -103,6 +103,36 @@ export interface Translations {
     nothingYetBody: string
     noneOfThese: string
     continueWithCount: (count: number) => string
+    // CX5 unified catalog + connect dialog (connectors.unified_dialog).
+    catalogTitle: string
+    addConnection: string
+    dialogCancel: string
+    publisher: string
+    requiredPermissions: string
+    runtimeLocation: string
+    runtimeLocal: string
+    runtimeRemote: string
+    apiKeyLabel: string
+    oauthLogin: string
+    connectedList: string
+    availableTools: string
+    lastChecked: (time: string) => string
+    customService: string
+    customUrlLabel: string
+    customCommandLabel: string
+    nameLabel: string
+    dialogTitle: string
+    installing: string
+    installFailed: (name: string) => string
+    nameRequired: string
+    nameDuplicate: (name: string) => string
+    urlOrCommandRequired: string
+    commandRequired: string
+    apiKeyRequired: string
+    connectFailed: (name: string) => string
+    probing: string
+    connectedOk: string
+    notConnectedYet: string
   }
   sessionImport: {
     title: string
