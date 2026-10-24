@@ -118,6 +118,10 @@ def run_preflight_gate(
             "History is retained. Reduce the current input/tool footprint or raise "
             "compression.request_input_budget_tokens before continuing."
         )
+        if getattr(_compressor, "degraded_retry_on_abort", False):
+            reason = getattr(_compressor, "_last_summary_error", None)
+            if reason:
+                v.final_response += f" Compression failed: {reason}."
         v.failed = True
         v._turn_exit_reason = "request_input_budget_exceeded"
         v.api_call_count = _refund_api_call(agent, v.api_call_count)

@@ -171,6 +171,7 @@ _COMPRESSOR_ATTEMPT_STATE_FIELDS = (
     "_verify_compaction_cleared_threshold", "_last_compression_made_progress", "_summary_failure_cooldown_until",
     "_cooldown_persist_failed", "_last_summary_error", "_consecutive_timeout_failures", "_last_summary_dropped_count",
     "_last_summary_fallback_used", "_last_compress_aborted", "_last_summary_auth_failure",
+    "_last_degraded_retry_reason", "_degraded_summary_active",
     "_last_summary_network_failure", "_last_summary_empty_content_failure", "_last_summary_truncated_failure",
     "_last_aux_model_failure_error", "_last_aux_model_failure_model", "_summary_model_fallen_back", "summary_model",
     "_last_compression_telemetry", "_active_compression_telemetry", "_compression_telemetry_seed",
@@ -3470,6 +3471,9 @@ def _run_summary_phase(
             agent, messages, compress_fn, compress_kwargs, commit_fence=commit_fence,
             attempt_generation=attempt.generation, hard_cancel_event=hard_cancel_event,
         )
+        retry_reason = getattr(agent.context_compressor, "_last_degraded_retry_reason", None)
+        if retry_reason:
+            agent._emit_warning(f"⚠ Compression aborted: {retry_reason}. Tried one degraded plain-text summary retry.")
     except AuxiliaryExplicitCancellation:
         try:
             attempt.restore_compressor(agent.context_compressor)
