@@ -1166,6 +1166,12 @@ def _start_agent_build(sid: str, session: dict) -> None:
             _announce_built_agent(sid, key, current, agent)
         except Exception as e:
             current["agent_error"] = str(e)
+            # Durable cause for a logs-only diagnosis: the client event is transient, the
+            # queued file handlers keep phase + both session ids + class + stack, and the
+            # RedactingFormatter scrubs any secret the exception text echoes (#D4-04/F4.4).
+            logger.exception(
+                "agent build failed: phase=agent_build runtime_session=%s session_key=%s class=%s",
+                sid, key, type(e).__name__)
             _emit("error", sid, {"message": agent_init_failed_message(e),
                                  "scope": "session", "code": "agent_init_failed"})
         finally:
