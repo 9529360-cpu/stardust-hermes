@@ -1,8 +1,8 @@
 'use client'
 
 /**
- * The ONLY static importer of shiki (and through it the multi-MB shiki
- * language/theme/wasm bundle). Every consumer reaches this module through
+ * Cache-aware chat highlighter using the per-language Shiki loader.
+ * Every consumer reaches this module through
  * `React.lazy(() => import('./shiki-block'))` — see `LazyShiki` in
  * shiki-highlighter.tsx — so the shiki chunk stays entirely off the
  * cold-start path and loads on the first highlighted code block instead.
@@ -19,12 +19,11 @@
  * starts.
  */
 import { useEffect, useMemo, useState } from 'react'
-import { bundledLanguages, getSingletonHighlighter } from 'shiki'
-import type { BundledLanguage, BundledTheme, Highlighter } from 'shiki'
-import { createOnigurumaEngine } from 'shiki/engine/oniguruma'
 
 import { SHIKI_HIGHLIGHT_SCOPE, SHIKI_THEME } from '@/components/chat/shiki-config'
 import { highlightCache, highlightCacheKey } from '@/components/chat/shiki-highlight-cache'
+
+import { highlightToHtml, supportsLanguage } from './shiki-loader'
 
 /** Same debounce react-shiki's `delay` used to throttle highlight work with. */
 const HIGHLIGHT_DELAY_MS = 120
@@ -42,10 +41,6 @@ export interface CachedShikiBlockProps {
   colorReplacements?: Record<string, Record<string, string>>
 }
 
-function isLoadableLanguage(language: string): boolean {
-  return language === 'text' || language in bundledLanguages
-}
-
 /**
  * Cache scope for one theme configuration. Part of the cache key: a block
  * highlighted under a different theme is a different render.
@@ -55,53 +50,6 @@ function highlightScope(
   colorReplacements: Record<string, Record<string, string>>
 ): string {
   return `${SHIKI_HIGHLIGHT_SCOPE}:${theme.dark}:${theme.light}:${JSON.stringify(colorReplacements)}`
-}
-
-let highlighterPromise: Promise<Highlighter> | null = null
-let loadedThemes = new Set<string>([SHIKI_THEME.dark, SHIKI_THEME.light])
-
-/**
- * Lazily-created shiki singleton, mirroring react-shiki's full bundle: only
- * the languages actually seen are loaded into it (the singleton is created
- * with the first block's language, later ones are `loadLanguage`d on demand;
- * override themes are `loadTheme`d the same way). Unknown languages are left
- * unloaded and fall through to shiki's plain-text handling, as before.
- */
-async function highlightToHtml(
-  language: string,
-  code: string,
-  theme: { dark: string; light: string },
-  colorReplacements: Record<string, Record<string, string>>
-): Promise<string> {
-  if (!highlighterPromise) {
-    highlighterPromise = getSingletonHighlighter({
-      // Only bundled languages are ever passed here (isLoadableLanguage
-      // guards both call sites), so the cast is safe.
-      langs: isLoadableLanguage(language) ? [language as BundledLanguage] : [],
-      themes: [SHIKI_THEME.dark, SHIKI_THEME.light],
-      engine: createOnigurumaEngine(import('shiki/wasm'))
-    })
-  }
-
-  const highlighter = await highlighterPromise
-
-  if (isLoadableLanguage(language) && !highlighter.getLoadedLanguages().includes(language)) {
-    await highlighter.loadLanguage(language as BundledLanguage)
-  }
-
-  const missingThemes = [theme.dark, theme.light].filter(name => !loadedThemes.has(name))
-
-  if (missingThemes.length > 0) {
-    await highlighter.loadTheme(...(missingThemes as BundledTheme[]))
-    missingThemes.forEach(name => loadedThemes.add(name))
-  }
-
-  return highlighter.codeToHtml(code, {
-    lang: language,
-    themes: { dark: theme.dark, light: theme.light },
-    defaultColor: 'light-dark()',
-    colorReplacements
-  })
 }
 
 function escapeHtml(text: string): string {
@@ -138,7 +86,11 @@ export default function CachedShikiBlock({ language, code, theme, colorReplaceme
     }
 
     const timer = window.setTimeout(() => {
-      highlightToHtml(language, code, themeConfig, replacements)
+      const result = supportsLanguage(language)
+        ? highlightToHtml(language, code, themeConfig, replacements)
+        : Promise.resolve(plainTextHtml(code))
+
+      result
         .then(result => {
           if (cancelled) {
             return
@@ -164,9 +116,7 @@ export default function CachedShikiBlock({ language, code, theme, colorReplaceme
   }, [cacheKey, code, language, replacements, themeConfig])
 
   if (html === null) {
-    // Nothing to paint yet (miss, debounce pending). Matches react-shiki's
-    // own empty render while the highlight is in flight.
-    return null
+    return <code className="block whitespace-pre">{code}</code>
   }
 
   return <div className="rs-root not-prose" dangerouslySetInnerHTML={{ __html: html }} data-testid="shiki-container" />
