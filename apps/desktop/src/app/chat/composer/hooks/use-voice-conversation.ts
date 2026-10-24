@@ -10,8 +10,8 @@ import {
   startSpeechStream,
   stopVoicePlayback
 } from '@/lib/voice-playback'
-import { VoiceTurnTrace } from '@/lib/voice-trace'
 import { isVoiceStopCommand } from '@/lib/voice-stop-word'
+import { VoiceTurnTrace } from '@/lib/voice-trace'
 import { notify, notifyError } from '@/store/notifications'
 import { $voicePlayback } from '@/store/voice-playback'
 
