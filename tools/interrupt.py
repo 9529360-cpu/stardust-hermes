@@ -7,6 +7,7 @@ import logging
 import os
 import threading
 from collections.abc import Callable
+from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,33 @@ _interrupt_reasons: dict[int, str] = {}
 # instead of killing it, so a mid-turn user message is not parked behind it.
 _yield_threads: set[int] = set()
 _lock = threading.Lock()
+# Scoped registrations own the Thread object as well as its recyclable numeric id.
+_interrupt_waiters: dict[int, dict[object, tuple[threading.Thread, Callable[[], None]]]] = {}
+
+
+@contextmanager
+def interrupt_wakeup(wake: Callable[[], None]):
+    """Wake a blocking current-thread wait on interrupt; always unregister on exit.
+
+    Registration and checking the existing bit share the interrupt lock, so an
+    interrupt immediately before registration cannot be lost. Callbacks must be
+    short and must not re-enter this module.
+    """
+    thread = threading.current_thread()
+    tid = thread.ident
+    token = object()
+    with _lock:
+        _interrupt_waiters.setdefault(tid, {})[token] = (thread, wake)
+        if tid in _interrupted_threads:
+            wake()
+    try:
+        yield
+    finally:
+        with _lock:
+            waiters = _interrupt_waiters.get(tid, {})
+            waiters.pop(token, None)
+            if not waiters:
+                _interrupt_waiters.pop(tid, None)
 
 
 def set_interrupt(active: bool, thread_id: int | None = None, *, reason: str | None = None) -> None:
@@ -38,6 +66,10 @@ def set_interrupt(active: bool, thread_id: int | None = None, *, reason: str | N
             _interrupt_reasons.pop(tid, None)
         if not active:
             _yield_threads.discard(tid)
+        if active:
+            for owner, wake in _interrupt_waiters.get(tid, {}).values():
+                if owner.is_alive():
+                    wake()
         _snapshot = set(_interrupted_threads) if _DEBUG_INTERRUPT else None
     if _DEBUG_INTERRUPT:
         logger.info(
