@@ -382,6 +382,9 @@ def main(argv=None):
     parser.add_argument('--provenance', action='store_true',
                         help='flag-on variant: stamp the corpus with bi-temporal provenance '
                              'and set memory.topic_provenance_enabled=true in the home config')
+    parser.add_argument('--hybrid', action='store_true',
+                        help='flag-on variant: set memory.hybrid_recall=true in the home config '
+                             '(summary-body scoring + same-domain decay + BM25/RRF fusion)')
     args = parser.parse_args(argv)
 
     home = assert_home(args.home)
@@ -390,13 +393,18 @@ def main(argv=None):
     output = args.output.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    if args.provenance:
-        # The agent reads memory.topic_provenance_enabled through the normal
-        # config path; write it into the isolated home before corpus write.
+    if args.provenance or args.hybrid:
+        # The agent reads memory.* flags through the normal config path; write
+        # them into the isolated home before corpus write.
         cfg = home / 'config.yaml'
         if cfg.exists():
             raise SystemExit(f'refusing to overwrite existing config: {cfg}')
-        cfg.write_text('memory:\n  topic_provenance_enabled: true\n', encoding='utf-8')
+        flags = []
+        if args.provenance:
+            flags.append('  topic_provenance_enabled: true')
+        if args.hybrid:
+            flags.append('  hybrid_recall: true')
+        cfg.write_text('memory:\n' + '\n'.join(flags) + '\n', encoding='utf-8')
 
     tokenizer, tokenizer_label = default_tokenizer()
 
@@ -429,6 +437,7 @@ def main(argv=None):
             'tokenizer': tokenizer_label,
             'topic_recall_limit': TOPIC_RECALL_LIMIT,
             'provenance': bool(args.provenance),
+            'hybrid': bool(args.hybrid),
             'timestamp_utc': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
         },
         'retrieval': summary,
