@@ -33,14 +33,18 @@ export class VoiceTurnTrace {
   }
 
   finish(reason = 'not_observed') {
-    if (this.ended) return
+    if (this.ended) {
+      return
+    }
     this.mark('turn_end')
     this.ended = true
     const table = Object.fromEntries(stages.map(stage => [stage,
       this.observations[stage] ?? { timestamp_ms: null, reason }
     ]))
     void this.enabled.then(enabled => {
-      if (!enabled) return
+      if (!enabled) {
+        return
+      }
       return hermesApi({ ...this.scope, path: '/api/audio/trace', method: 'POST', body: {
         turn_id: this.turnId, stages: table
       } })
