@@ -30,7 +30,15 @@ transport:
     - "${ALLOWED_DIR}"
 
 auth:
-  type: none
+  # Declared env rather than `type: none`: the transport args reference
+  # ${ALLOWED_DIR}, which install writes to .env and the connect path
+  # interpolates. `secret: false` → the dialog renders a plain folder field.
+  type: api_key
+  env:
+    - name: ALLOWED_DIR
+      prompt: "Folder the server may read/write (absolute path)"
+      required: true
+      secret: false
 
 post_install: |
   The server only sees the folder you allow when connecting. Start a new
