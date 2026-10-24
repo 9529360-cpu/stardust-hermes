@@ -973,6 +973,8 @@ DEFAULT_CONFIG = {
         "turn_isolation": False,
         "compute_host_heartbeat_secs": 15,
         "compute_host_respawn_max": 3,
+        # Opt in to bounded normal-shutdown drain and terminal callbacks for pending turns.
+        "compute_host_shutdown_settle": False,
         # Token/cost analytics surfaces are hidden by default: the numbers are a local LOWER-BOUND
         # estimate, not billing — only successful main-agent responses with a response.usage count;
         # auxiliary calls, retries, fallbacks and cache writes are missed, so the total can be
