@@ -169,24 +169,47 @@ def extract_constraints(text: str) -> Tuple[List[Dict[str, str]], List[str]]:
     return constraints, unknowns
 
 
+_IMPERATIVE_START_RE = re.compile(
+    r"^(?:用|把|请|先|别|不|查|看|确认|修|删|写|生成|总结|继续|安排|开|拆|清|核对|迁移|导入|报告|盘点|收尾|跑|推|发|给|列|检查|验证|提醒|以|按"
+    r"|fix|check|review|list|run|update|create|delete|send|continue|confirm|clean)", re.IGNORECASE)
+_FILE_TOKEN_RE = re.compile(
+    r"(?<![\w./\\-])(?:[\w\-. ]+[/\\])?[\w\-.]+\.(?:md|txt|json|ya?ml|py|ts|tsx|js|log|csv|html)\b", re.IGNORECASE)
+
+
 def _intent_line(text: str) -> str:
-    """One-line intent: prefer the first action clause; a short question
-    prefix before '：' yields to what follows it."""
+    """One-line intent: context lead + first imperative sentence, joined."""
     body = (text or "").strip()
     if "：" in body[:14]:
         body = body.split("：", 1)[1].strip() or body
     elif ":" in body[:14]:
         body = body.split(":", 1)[1].strip() or body
-    best = ""
-    for sentence in _SENT_SPLIT_RE.split(body):
-        s = sentence.strip()
-        if len(s) < 3:
-            continue
-        if not best:
-            best = s
-        if _VERB_RE.search(s):
-            return s[:_MAX_INTENT_CHARS]
-    return best[:_MAX_INTENT_CHARS]
+    sentences = [s.strip() for s in _SENT_SPLIT_RE.split(body) if len(s.strip()) >= 3]
+    if not sentences:
+        return ""
+    lead = sentences[0]
+    if _IMPERATIVE_START_RE.match(lead):
+        return lead[:_MAX_INTENT_CHARS]
+    for sentence in sentences[1:]:
+        if _IMPERATIVE_START_RE.match(sentence):
+            joined = f"{lead}{sentence}"
+            return joined[:_MAX_INTENT_CHARS]
+    fallback = next((s for s in sentences if _VERB_RE.search(s)), lead)
+    return fallback[:_MAX_INTENT_CHARS]
+
+
+def _named_files(text: str) -> List[str]:
+    """Explicit file targets the user named THIS turn (ReAct: knowns are read directly)."""
+    seen: set = set()
+    out: List[str] = []
+    for match in _FILE_TOKEN_RE.finditer(text or ""):
+        name = match.group(0).strip()
+        if name.lower() not in seen:
+            seen.add(name.lower())
+            out.append(name)
+        if len(out) >= 3:
+            break
+    return out
+
 
 
 def _ambiguity_score(current: str, unknowns: List[str], recent: List[str]) -> float:
@@ -207,6 +230,7 @@ def build_card_rules(current: str, recent: Optional[List[str]] = None) -> Dict[s
         "intent": _intent_line(current),
         "constraints": constraints,
         "unknowns": unknowns,
+        "named_files": _named_files(current),
         "ambiguity_score": _ambiguity_score(current, unknowns, list(recent or [])),
     }
 
@@ -298,8 +322,11 @@ def render_block(card: Dict[str, Any]) -> str:
     if unknowns:
         lines.append("未知项（作为下一步取证，不要空答）:")
         lines.extend(f"- 待确认: {u}" for u in unknowns)
+    files = card.get("named_files") or []
+    if files:
+        lines.append("点名文件（直接读它们，不要搜索）: " + "、".join(files))
     score = float(card.get("ambiguity_score") or 0.2)
-    lines.append(f"歧义: {'高' if score >= 0.7 else '中' if score >= 0.4 else '低'}")
+    lines.append(f"歧义: {'高' if score >= 0.7 else '中' if score >= 0.4 else '低'}（回答前先一句话复述意图与约束，再行动）")
     block = "\n".join(lines)
     if len(block) <= _MAX_BLOCK_CHARS:
         return block
