@@ -26,6 +26,7 @@ from agent.model_metadata import estimate_messages_tokens_rough, estimate_reques
 from agent.image_token_cost import bind_image_token_cost
 from agent.usage_anchor import anchored_context_tokens, restore_usage_anchor
 from agent.turn_author import parse_turn_author
+from hermes_logging import set_turn_context
 
 logger = logging.getLogger(__name__)
 
@@ -970,6 +971,9 @@ def build_turn_context(
         agent, task_id, stream_callback, persist_user_message,
         persist_user_timestamp, persist_user_platform_id,
     )
+    # Attribute this thread's log records to the turn (empty tag on threads without
+    # one), next to the session tag set above (#D4-04 / F4.4).
+    set_turn_context(turn_id)
     _reset_per_turn_agent_state(agent)
 
     _preview_text = summarize_user_message_for_log(user_message)

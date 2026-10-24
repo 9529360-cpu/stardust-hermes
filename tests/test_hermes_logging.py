@@ -52,6 +52,7 @@ def _reset_logging_state():
     root.setLevel(prev_root_level)
     hermes_logging._logging_initialized = False
     hermes_logging.clear_session_context()
+    hermes_logging.clear_turn_context()
 
 
 @pytest.fixture
@@ -350,6 +351,68 @@ class TestSessionContext:
         content = agent_log.read_text()
         assert "[abc123]" in content
         assert "tagged message" in content
+
+    def test_turn_tag_in_log_output_after_session_tag(self, hermes_home):
+        """Turn context adds [turn:<id>] after the session tag (F4.4 correlation)."""
+        hermes_logging.setup_logging(hermes_home=hermes_home)
+        hermes_logging.set_session_context("sess1")
+        hermes_logging.set_turn_context("turn-abc")
+
+        logging.getLogger("test.turn_tag").info("turn-tagged message")
+
+        hermes_logging.flush_log_queue()
+
+        content = (hermes_home / "logs" / "agent.log").read_text()
+        assert "[sess1] [turn:turn-abc] test.turn_tag: turn-tagged message" in content
+
+    def test_no_turn_context_keeps_pre_turn_tag_format(self, hermes_home):
+        """Without turn context the line is byte-identical to the old format."""
+        hermes_logging.setup_logging(hermes_home=hermes_home)
+        hermes_logging.set_session_context("sess2")
+
+        logging.getLogger("test.no_turn_tag").info("old format message")
+
+        hermes_logging.flush_log_queue()
+
+        line = next(l for l in (hermes_home / "logs" / "agent.log").read_text().splitlines()
+                    if "old format message" in l)
+        assert "[turn:" not in line
+        # Exactly one tag bracket group (the session tag), formatted as before.
+        assert line.split("test.no_turn_tag:")[0].count("[") == 1
+
+    def test_turn_context_clears(self, hermes_home):
+        """clear_turn_context / empty id drop the tag again."""
+        hermes_logging.setup_logging(hermes_home=hermes_home)
+        hermes_logging.set_turn_context("turn-x")
+        hermes_logging.set_turn_context("")
+        logging.getLogger("test.turn_clear").info("cleared message")
+        hermes_logging.set_turn_context("turn-y")
+        hermes_logging.clear_turn_context()
+        logging.getLogger("test.turn_clear").info("cleared message 2")
+
+        hermes_logging.flush_log_queue()
+
+        content = (hermes_home / "logs" / "agent.log").read_text()
+        assert "[turn:" not in content
+
+    def test_turn_tag_thread_local_concurrent_turns(self, hermes_home):
+        """Two threads with different turn ids each tag their own lines."""
+        hermes_logging.setup_logging(hermes_home=hermes_home)
+        hermes_logging.set_session_context("conc-sess")
+        logs = []
+
+        def worker(turn_id):
+            hermes_logging.set_turn_context(turn_id)
+            logging.getLogger("test.turn_conc").info("from %s", turn_id)
+
+        t1 = threading.Thread(target=worker, args=("turn-1",))
+        t2 = threading.Thread(target=worker, args=("turn-2",))
+        t1.start(); t2.start(); t1.join(); t2.join()
+
+        hermes_logging.flush_log_queue()
+        content = (hermes_home / "logs" / "agent.log").read_text()
+        assert "[turn:turn-1] test.turn_conc: from turn-1" in content
+        assert "[turn:turn-2] test.turn_conc: from turn-2" in content
 
 
 

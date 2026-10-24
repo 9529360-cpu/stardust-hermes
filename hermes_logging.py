@@ -43,9 +43,16 @@ _logging_initialized = False
 # Thread-local per-conversation session context.
 _session_context = threading.local()
 
-# ``%(session_tag)s`` exists on every LogRecord via _install_session_record_factory().
-_LOG_FORMAT = "%(asctime)s %(levelname)s%(session_tag)s %(name)s: %(message)s"
-_LOG_FORMAT_VERBOSE = "%(asctime)s - %(name)s - %(levelname)s%(session_tag)s - %(message)s"
+# Thread-local per-turn context: the current turn's id, so interleaved logs of
+# concurrent turns on one session are attributable (#D4-04 / F4.4).
+_turn_context = threading.local()
+
+# ``%(session_tag)s`` / ``%(turn_tag)s`` exist on every LogRecord via
+# _install_session_record_factory(); both are empty strings when unset, so lines
+# from threads without context stay byte-identical to the pre-turn-tag format.
+_LOG_FORMAT = "%(asctime)s %(levelname)s%(session_tag)s%(turn_tag)s %(name)s: %(message)s"
+_LOG_FORMAT_VERBOSE = (
+    "%(asctime)s - %(name)s - %(levelname)s%(session_tag)s%(turn_tag)s - %(message)s")
 
 
 def _safe_stderr():  # type: ignore[return]
@@ -113,6 +120,21 @@ def clear_session_context() -> None:
     _session_context.session_id = None
 
 
+def set_turn_context(turn_id: str) -> None:
+    """Set the turn ID for the current thread; empty/falsy clears it.
+
+    ``build_turn_context`` binds this next to ``set_session_context`` so every
+    record logged on the turn's thread carries ``[turn:<id>]`` after the session
+    tag. Thread-local like the session id: concurrent turns on one session each
+    keep their own tag."""
+    _turn_context.turn_id = turn_id or None
+
+
+def clear_turn_context() -> None:
+    """Clear the turn ID for the current thread."""
+    _turn_context.turn_id = None
+
+
 def _install_session_record_factory() -> None:
     """Replace the global LogRecord factory with one that adds ``session_tag``.
 
@@ -128,6 +150,8 @@ def _install_session_record_factory() -> None:
         record = current_factory(*args, **kwargs)
         sid = getattr(_session_context, "session_id", None)
         record.session_tag = f" [{sid}]" if sid else ""  # type: ignore[attr-defined]
+        tid = getattr(_turn_context, "turn_id", None)
+        record.turn_tag = f" [turn:{tid}]" if tid else ""  # type: ignore[attr-defined]
         # QueueListener formats on its own thread, after the profile-scoped
         # ContextVar is gone; keep the resolved home on the record so a
         # multiplex desktop ticker can route to the job owner's files (#97489).
