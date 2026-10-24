@@ -2393,6 +2393,8 @@ def init_agent(
     _configure_ollama_num_ctx(agent, _model_cfg, _config_context_length)
     _emit_compression_summary(agent, cs)
     _snapshot_primary_runtime(agent)
+    from agent.life_event_log import initialize_agent_log
+    initialize_agent_log(agent, _agent_cfg)
 
 
 __all__ = ["init_agent"]

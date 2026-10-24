@@ -53,6 +53,7 @@ class TurnFacadeMixin:
         from agent.turn_facade_lease import admit_durable_turn_lease, carry_unadmitted_user_message
         from hermes_cli.observability.relay_shared_metrics import finish_task_run, start_task_run
 
+        from agent.life_event_log import emit_agent_event
         effective_task_id = task_id or str(uuid.uuid4())
         session_id = str(getattr(self, "session_id", None) or "")
         task_context = {
@@ -73,6 +74,7 @@ class TurnFacadeMixin:
         token = affinity_token = acct_token = None
         task_started = task_finished = False
         relay_outcome = "failed"
+        life_task_started = False
 
         try:
             # First statement of the try so the finally's note_turn_finished balances every exit.
@@ -93,6 +95,8 @@ class TurnFacadeMixin:
                 return admission.early_result
             lease = admission.lease
             conversation_history = admission.conversation_history
+            emit_agent_event(self, 'task_started', task_id=effective_task_id)
+            life_task_started = True
 
             relay_lease = relay_runtime.SESSION_COORDINATOR.acquire_conversation(
                 profile_key=relay_runtime.current_profile_key(),
@@ -175,6 +179,9 @@ class TurnFacadeMixin:
                 finish_task_run(**task_context, error=exc)
             raise
         finally:
+            if life_task_started:
+                emit_agent_event(self, 'task_finished' if relay_outcome == 'success' else 'task_failed',
+                                 task_id=effective_task_id, outcome=relay_outcome)
             try:
                 if relay_turn is not None:
                     relay_runtime.SESSION_COORDINATOR.end_turn(relay_turn, outcome=relay_outcome)
