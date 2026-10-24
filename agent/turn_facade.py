@@ -54,6 +54,9 @@ class TurnFacadeMixin:
         from hermes_cli.observability.relay_shared_metrics import finish_task_run, start_task_run
 
         from agent.life_event_log import emit_agent_event
+        from agent.task_recovery import enabled as recovery_enabled
+        if recovery_enabled():
+            self._recovery_explicit_task_id = task_id
         effective_task_id = task_id or str(uuid.uuid4())
         session_id = str(getattr(self, "session_id", None) or "")
         task_context = {

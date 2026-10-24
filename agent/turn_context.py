@@ -1067,6 +1067,11 @@ def build_turn_context(
     )
     if not checkpoint_on:
         acceptance_context = prepare_task_acceptance(agent, original_user_message)
+    from agent.task_recovery import prepare as prepare_recovery
+    recovery_context = prepare_recovery(agent, original_user_message,
+                                        task_id=getattr(agent, '_recovery_explicit_task_id', None))
+    if recovery_context:
+        acceptance_context = (acceptance_context or '') + recovery_context
     if acceptance_context:
         plugin_user_context = (plugin_user_context or "") + acceptance_context
     agent._task_acceptance_nudges = 0

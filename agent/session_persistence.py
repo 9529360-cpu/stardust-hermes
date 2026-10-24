@@ -221,6 +221,9 @@ def _db_flush_write(agent, batch_rows: List[Dict[str, Any]], batch_msgs: List[Di
         turn_lease_holder=getattr(agent, "_active_session_turn_lease_holder", None),
         turn_lease_ttl_seconds=getattr(agent, "_active_session_turn_lease_ttl_seconds", 300.0) or 300.0,
     )
+    from agent import task_recovery
+    if task_recovery.enabled():
+        task_recovery.reconcile(agent)
     sync_flushed_message_markers(batch_msgs, batch_rows)
 
 

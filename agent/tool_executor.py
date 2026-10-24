@@ -737,7 +737,16 @@ def _dispatch_authorized_once(
     elif ref.name == "skill_manage":
         agent._iters_since_skill = 0
 
+    from agent import task_recovery
+    recovery_decision = task_recovery.before_dispatch(agent, ref.call_id, ref.name, ref.args)
+    if recovery_decision is not None:
+        _advance_start_order()
+        state.blocked = True
+        if recovery_decision['status'] == 'replay':
+            return recovery_decision['result']
+        return json.dumps({'error': 'Task recovery requires review', **recovery_decision})
     _advance_start_order(lambda: _begin_tool_execution(agent, ref, display_index))
+    task_recovery.start_step(agent, ref.call_id, ref.name, ref.args)
     return _run_with_activity_heartbeat(agent, ref.name, lambda: execute(ref.args))
 
 
@@ -1111,9 +1120,21 @@ def _commit_tool_result(
     # string-safe fallback so a rejected image result never poisons history.
     _tool_content = agent._tool_result_content_for_active_model(function_name, persisted_result)
     tool_message = make_tool_result_message(function_name, _tool_content, tool_call_id, effect_disposition=effect_disposition)
+    if observed and not blocked and not is_error:
+        from agent.task_recovery import enabled as recovery_enabled, result_committed
+        if recovery_enabled() and result_committed(function_name, function_result):
+            tool_message['display_metadata'] = {
+                **(tool_message.get('display_metadata') or {}),
+                'task_recovery': {'version': 1, 'committed': True},
+            }
     messages.append(tool_message)
     if not _flush_session_db_after_tool_progress(agent, messages, stage=f"tool result {function_name}"):
         return None
+
+    from agent.task_recovery import commit_step
+    if (observed and not blocked and not is_error
+            and (tool_message.get('display_metadata') or {}).get('task_recovery')):
+        commit_step(agent, tool_call_id, function_result)
 
     if acceptance_capture is not None:
         acceptance_observations.record(
