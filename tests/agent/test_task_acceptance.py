@@ -86,3 +86,56 @@ def test_real_command_records_source_time_and_change(workspace, monkeypatch, cap
     assert recorded['change'] and recorded['created_at'] and recorded['artifact_sha256']
     assert recorded['source'] == 'browser click #1'
     assert 'failed' in capsys.readouterr().out
+
+
+@pytest.mark.parametrize('prompt,expected', [
+    ('Create result.txt containing 42 and read it back.', ('result.txt', '42', True)),
+    ('请生成 result.txt，内容为 42，并读回核对。', ('result.txt', '42', True)),
+    ('Write "a b.txt" containing "hello world"', ('a b.txt', 'hello world', False)),
+    ('How do I create result.txt containing 42?', None),
+    ('Do not create result.txt', None),
+    ('Explain this code', None),
+])
+def test_artifact_request_contract(workspace, prompt, expected):
+    contract = acceptance.artifact_contract(prompt, workspace)
+    if expected is None:
+        assert contract is None
+    else:
+        assert contract == dict(path=str((workspace / expected[0]).resolve()),
+                                content=expected[1], read_back=expected[2])
+
+
+def test_artifact_requires_current_successful_write_and_read(workspace):
+    path = workspace / 'result.txt'
+    path.write_text('42', encoding='utf8')
+    agent = SimpleNamespace(_artifact_contract=acceptance.artifact_contract(
+        f'Create {path.as_posix()} containing 42 and read it back', workspace))
+    assert acceptance.check_artifact(agent, [])['task_verified'] is False
+    def pair(name, args, receipt, ident):
+        return [dict(role='assistant', tool_calls=[dict(id=ident, function=dict(
+            name=name, arguments=json.dumps(args)))]),
+            dict(role='tool', tool_call_id=ident, content=json.dumps(receipt))]
+    write = pair('write_file', dict(path=str(path), content='42'),
+                 dict(files_modified=[str(path)]), 'w')
+    read = pair('read_file', dict(path=str(path)), dict(content='1|42'), 'r')
+    assert acceptance.check_artifact(agent, write)['task_verified'] is False
+    assert acceptance.check_artifact(agent, write + read)['task_verified'] is True
+    assert acceptance.check_artifact(agent, read + write)['task_verified'] is False
+    assert acceptance.check_artifact(agent, write + read + write)['task_verified'] is False
+    path.write_text('wrong', encoding='utf8')
+    assert acceptance.check_artifact(agent, write + read)['task_verified'] is False
+    path.write_text('42', encoding='utf8')
+    assert acceptance.check_artifact(agent, write + read + [dict(role='user',content='new turn')])['task_verified'] is False
+    failure = pair('write_file', dict(path=str(path)),
+                   dict(error='Permission denied', files_modified=[str(path)]), 'f')
+    assert acceptance.check_artifact(agent, failure + read)['task_verified'] is False
+    assert acceptance.check_artifact(agent, write[:1] + read)['task_verified'] is False
+    path.unlink()
+    assert acceptance.check_artifact(agent, write + read)['task_verified'] is False
+
+
+@pytest.mark.parametrize('value', [None, False, 'false', 'true', 1, True])
+def test_artifact_flag_is_explicit_opt_in(monkeypatch, value):
+    monkeypatch.setattr('hermes_cli.config.load_config_readonly',
+                        lambda: {'agent': {'artifact_acceptance': value}})
+    assert acceptance.artifact_acceptance_enabled() is (value is True)

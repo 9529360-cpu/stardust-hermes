@@ -139,6 +139,11 @@ def apply_stop_gates(
 
     from agent.task_acceptance import nudge as acceptance_nudge, refresh_current_goal
     refresh_current_goal(agent, messages)
+    from agent.task_acceptance import check_artifact, artifact_notice
+    artifact = check_artifact(agent, messages)
+    if artifact is not None and not artifact["task_verified"]:
+        final_response = artifact_notice(artifact)
+        final_msg["content"] = final_response
     _acceptance_nudge = acceptance_nudge(agent)
     if _acceptance_nudge:
         final_msg["finish_reason"] = "acceptance_required"

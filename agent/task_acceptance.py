@@ -242,11 +242,131 @@ def guidance(contract):
             "Update plan todos/blockers/cleanup as they are resolved. Never claim done with unmet criteria.\n")
 
 
+def artifact_acceptance_enabled():
+    """Opt-in via agent.artifact_acceptance; missing/invalid values stay off."""
+    from hermes_cli.config import load_config_readonly
+    try:
+        config = load_config_readonly() or {}
+    except (OSError, ValueError):
+        return False
+    section = config.get("agent", {}) if isinstance(config, dict) else None
+    return isinstance(section, dict) and section.get("artifact_acceptance") is True
+
+
+def artifact_contract(request, root):
+    """Conservative contract for an explicit, named local file creation request.
+
+    Advice, negation, and ambiguous paths are intentionally outside this first gate.
+    Only current user input is parsed; model/tool prose cannot establish a goal.
+    """
+    if not isinstance(request, str) or re.search(
+        r"(?i)\b(how|explain|advice|example|do not|don't)\b|如何|怎么|建议|不要|别创建|仅讨论", request
+    ):
+        return None
+    action = re.search(r"(?i)\b(create|write|save|generate)\b|创建|生成|写入|保存", request)
+    if not action:
+        return None
+    tail = request[action.end():]
+    path_match = re.search(
+        r"[`\"']([^`\"'\r\n]+\.[a-zA-Z0-9]{1,12})[`\"']|"
+        r"((?:[a-zA-Z]:[/\\]|\.?\.?[/\\])?[^\s,，;；。`\"'<>]+\.[a-zA-Z0-9]{1,12})(?=[\s,，;；。]|$)", tail
+    )
+    if not path_match:
+        return None
+    raw = path_match[1] or path_match[2]
+    if "://" in raw:
+        return None
+    path = Path(raw).expanduser()
+    if not path.is_absolute():
+        path = Path(root) / path
+    content_match = re.search(
+        r"(?i)(?:containing|with content|内容(?:为|是)?|写入内容)\s*[:：]?\s*"
+        r"(?:[`\"']([^`\"'\r\n]*)[`\"']|([^\s,，;；。]+))", tail[path_match.end():]
+    )
+    content = (content_match[1] if content_match[1] is not None else content_match[2]) if content_match else None
+    return {"path": str(path.resolve()), "content": content,
+            "read_back": bool(re.search(r"(?i)read(?: it)? back|读回", request))}
+
+
+def check_artifact(agent, messages):
+    """Check disk plus successful, paired tool receipts from the current turn.
+
+    An existing matching file and an assistant's proposed tool call are insufficient.
+    Generic terminal tools can supply their structured files_modified receipt; opaque
+    shell prose is deliberately not accepted as proof of an artifact mutation.
+    """
+    contract = getattr(agent, "_artifact_contract", None)
+    if not isinstance(contract, dict):
+        return None
+    target = Path(contract["path"])
+    calls = {}
+    written = read = False
+    from agent.runtime_cwd import resolve_agent_cwd
+
+    def matches(raw):
+        if not isinstance(raw, str):
+            return False
+        path = Path(raw).expanduser()
+        if not path.is_absolute():
+            path = Path(resolve_agent_cwd()) / path
+        return path.resolve() == target
+
+    for message in messages:
+        if message.get("role") == "user" and not any(
+            message.get(k) for k in ("_verification_stop_synthetic", "_pre_verify_synthetic")
+        ):
+            calls.clear()
+            written = read = False
+        for call in message.get("tool_calls") or []:
+            function = call.get("function", {})
+            try:
+                args = json.loads(function.get("arguments", "{}"))
+            except (TypeError, ValueError):
+                continue
+            if isinstance(args, dict):
+                calls[call.get("id")] = (function.get("name"), args)
+        if message.get("role") != "tool" or message.get("tool_call_id") not in calls:
+            continue
+        name, args = calls[message["tool_call_id"]]
+        try:
+            receipt = json.loads(message.get("content", ""))
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(receipt, dict) or receipt.get("error") or receipt.get("success") is False:
+            continue
+        modified = receipt.get("files_modified")
+        if isinstance(modified, list) and any(matches(p) for p in modified):
+            written = True
+            read = False
+        if name == "read_file" and matches(args.get("path")) and "content" in receipt:
+            read = True
+    missing = []
+    try:
+        if not target.is_file():
+            missing.append("artifact missing / 文件不存在")
+        elif contract["content"] is not None and target.read_text(encoding="utf-8") != contract["content"]:
+            missing.append("content mismatch / 内容不符")
+    except (OSError, UnicodeError):
+        missing.append("artifact unreadable / 文件无法读取")
+    if not written:
+        missing.append("no successful write receipt / 缺少成功写入证据")
+    if contract["read_back"] and not read:
+        missing.append("no read-back receipt / 缺少读回证据")
+    return {"task_verified": not missing, "acceptance": {
+        "kind": "file", "path": str(target), "unmet": missing,
+    }}
+
+
+def artifact_notice(verdict):
+    return "Task not verified / 文件任务未验收：" + "; ".join(verdict["acceptance"]["unmet"]) + "."
+
+
 def prepare(agent, request):
     from agent.runtime_cwd import resolve_agent_cwd
     contract = begin(getattr(agent, "session_id", None), request, resolve_agent_cwd())
     agent._task_acceptance_active = bool(contract)
     agent._task_acceptance_request = request
+    agent._artifact_contract = artifact_contract(request, resolve_agent_cwd()) if artifact_acceptance_enabled() else None
     from agent.task_checkpoint import prepare as prepare_checkpoint
     return guidance(contract) + prepare_checkpoint(agent, request)
 
@@ -261,7 +381,8 @@ def refresh_current_goal(agent, messages):
     """Consume only genuine mid-turn user rows, never tool/summary text."""
     if not isinstance(getattr(agent, "_task_acceptance_request", None), str):
         return
-    if getattr(agent, "_task_acceptance_active", False) is not True:
+    if (getattr(agent, "_task_acceptance_active", False) is not True
+            and not isinstance(getattr(agent, "_artifact_contract", None), dict)):
         return
     from agent.prompt_builder import STEER_DISPLAY_KIND, STEER_MARKER_OPEN, STEER_MARKER_CLOSE
     for message in reversed(messages):

@@ -551,6 +551,17 @@ def finalize_turn(
                              _persist_transcript,
                              _cleanup_errors, logger)
 
+    from agent.task_acceptance import check_artifact, artifact_notice
+    artifact = check_artifact(agent, messages)
+    if artifact is not None and not artifact["task_verified"]:
+        final_response = artifact_notice(artifact)
+        agent._response_was_previewed = False
+        if messages and messages[-1].get("role") == "assistant" and not messages[-1].get("tool_calls"):
+            messages[-1]["content"] = final_response
+        else:
+            append_message(messages, {"role": "assistant", "content": final_response})
+        _guarded_cleanup("persist_artifact_receipt", _persist_transcript, _cleanup_errors, logger)
+
     # Context engine observation hook: the turn finished with the finalized transcript.
     # Fail-open. ``_last_turn_usage`` is the last response's canonical usage dict, or
     # ``None`` on turns that never reached a provider response — by contract.
@@ -633,6 +644,8 @@ def finalize_turn(
         ).get("service_tier"),
         "session_id": agent.session_id,
     }
+    if artifact is not None:
+        result.update(artifact)
     if agent._tool_guardrail_halt_decision is not None:
         result["guardrail"] = agent._tool_guardrail_halt_decision.to_metadata()
     # Persistence failures already set failed=True; also stamp `error` so the gateway
