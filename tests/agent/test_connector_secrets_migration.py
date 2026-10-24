@@ -228,6 +228,22 @@ class TestFlagOnMigration:
         assert read_raw_config()["mcp_servers"]["demo"]["env"]["DEMO_API_KEY"] == "${DEMO_API_KEY}"
         assert "DEMO_API_KEY=" in (home / ".env").read_text()
 
+    def test_dotenv_inline_comments_preserve_resolved_value(self, tmp_path, monkeypatch, fake_store_owner):
+        home = _setup_home(tmp_path / "home", _config_with_servers(_SERVERS, True),
+                           'DEMO_API_KEY="quoted-canary" # annotation\nPATH_HINT=/bin\n')
+        monkeypatch.setenv("STARDUST_HOME", str(home))
+        assert migrate_connector_secrets_once(home) is True
+        assert resolve_connector_secret_value("demo", "api_key") == "quoted-canary"
+
+    def test_shared_with_skipped_multi_server_keeps_legacy_key(self, tmp_path, monkeypatch, fake_store_owner):
+        servers = ("  demo:\n    command: demo\n    env:\n      DEMO_API_KEY: ${DEMO_API_KEY}\n"
+                   "  multi:\n    command: demo\n    env:\n      DEMO_API_KEY: ${DEMO_API_KEY}\n      OTHER_TOKEN: ${OTHER_TOKEN}\n")
+        home = _setup_home(tmp_path / "home", _config_with_servers(servers, True),
+                           _ENV + "OTHER_TOKEN=other-canary\n")
+        monkeypatch.setenv("STARDUST_HOME", str(home))
+        assert migrate_connector_secrets_once(home) is True
+        assert "DEMO_API_KEY=" in (home / ".env").read_text()
+
     def test_no_credentials_writes_empty_marker(self, tmp_path, monkeypatch, fake_store_owner):
         home = _setup_home(tmp_path / "home", "connector_secret_store:\n  enabled: true\n", "")
         monkeypatch.setenv("STARDUST_HOME", str(home))

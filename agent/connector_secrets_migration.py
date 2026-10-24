@@ -108,8 +108,8 @@ def _strip_auth_scheme(auth: str) -> str:
 def _credential_env_refs(server_config: Dict[str, Any]) -> List[str]:
     """Env var names referenced by credential slots a CX3 write would own.
 
-    A credential slot is (a) an ``env`` block value that is a bare ``${VAR}``
-    reference, or (b) an ``Authorization: <scheme> ${VAR}`` header. Bare env
+    A credential slot is (a) a KEY/TOKEN/SECRET/PASSWORD env slot holding
+        a bare ``${VAR}`` reference, or (b) an Authorization header.
     references elsewhere (command, args, urls) are the server's own plumbing
     (PATH etc.) and are deliberately NOT migrated.
     """
@@ -135,25 +135,12 @@ def _credential_env_refs(server_config: Dict[str, Any]) -> List[str]:
 def _read_env_values_at(env_file: Path) -> Dict[str, str]:
     """Parse one ``.env`` file into a flat dict (quotes stripped; comments and
     non-assignments skipped)."""
-    values: Dict[str, str] = {}
+    from dotenv import dotenv_values
     try:
-        text = env_file.read_text(encoding="utf-8-sig", errors="replace")
-    except OSError:
-        return values
-    for line in text.splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or "=" not in stripped:
-            continue
-        key, _, val = stripped.partition("=")
-        key = key.strip()
-        if key.startswith("export "):
-            key = key[7:].strip()
-        val = val.strip()
-        if len(val) >= 2 and val[0] == val[-1] and val[0] in "\"'":
-            val = val[1:-1]
-        if key:
-            values[key] = val
-    return values
+        return {key: value for key, value in dotenv_values(
+            env_file, encoding="utf-8-sig", interpolate=False).items() if value is not None}
+    except (OSError, ValueError):
+        return {}
 
 
 def _secure_backup_dir(path: Path) -> None:
@@ -258,13 +245,16 @@ def migrate_connector_secrets_once(home: Path) -> bool:
 
     # Remove owned slots from a copy; any remaining reference is shared with
     # non-credential config and must keep its legacy value untouched.
+    env_values = _read_env_values_at(home / ".env")
     unowned = json.loads(json.dumps(raw))
     for name, entry in (unowned.get("mcp_servers") or {}).items():
         if isinstance(entry, dict):
-            for env_name in _credential_env_refs(entry):
+            refs = _credential_env_refs(entry)
+            if len({key for key in refs if env_values.get(key)}) > 1:
+                continue  # skipped server still depends on every original reference
+            for env_name in refs:
                 _rewrite_refs(entry, env_name, name)
     unowned_text = json.dumps(unowned)
-    env_values = _read_env_values_at(home / ".env")
     migrated: List[Dict[str, str]] = []
     changed_servers: Dict[str, Dict[str, Any]] = {}
     touched_env_keys: Set[str] = set()
