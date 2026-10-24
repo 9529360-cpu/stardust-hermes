@@ -1926,6 +1926,7 @@ tool_loop_guardrails:
   hard_stop_enabled: false     # also BLOCK the call past the hard-stop threshold (default: false)
   non_interactive_hard_stop_enabled: true  # default hard stops for gateway/cron
   wait_repeat_advisory_enabled: false  # opt-in advice for repeated timeout/pending waits
+  identical_failure_cap: false # opt-in: cap N consecutive identical failing calls even when hard stops are off
   warn_after:
     exact_failure: 2           # identical failing call repeated N times
     same_tool_failure: 3       # same tool failing N times (different args)
@@ -1934,6 +1935,7 @@ tool_loop_guardrails:
     exact_failure: 5
     same_tool_failure: 8
     idempotent_no_progress: 5
+    identical_failure: 5       # threshold for identical_failure_cap above
   loop_caps:
     max_web_searches: 50       # max web_search calls per turn (0 = unlimited)
     max_subagents: 50          # max subagents spawned per turn (0 = unlimited)
@@ -1942,6 +1944,8 @@ tool_loop_guardrails:
 `hard_stop_enabled` explicitly enables hard stops on every platform. When it remains `false`, `non_interactive_hard_stop_enabled` still enables them for unattended gateway/cron-style platforms while preserving warning-only behavior for CLI, TUI, Desktop, ACP, subagents, and `api_server` runs (supervised task loops with a live parent or client). Set `non_interactive_hard_stop_enabled: false` to opt an unattended deployment out. See also [Docker / unattended deployments](docker.md).
 
 `wait_repeat_advisory_enabled` is independently opt-in (default `false`). On the second identical canonical wait/poll timeout or pending result it appends one advisory suggesting existing background completion notifications or a single one-shot status query. Only one hashed observation is kept per controller, including across turn resets; changed arguments/results, completion, or an observed successful mutation re-arm it. It adds no calls or hard stops, starts no work, and changes no authorization. Existing loop warnings and hard-stop settings still apply independently.
+
+`identical_failure_cap` is independently opt-in (default `false`, threshold `hard_stop_after.identical_failure`, default 5). It closes the gap where an interactive warn-only session keeps ALLOWING the same failing call forever because a model ignores the warnings: after N consecutive failures of the *exact* same call (same tool, same arguments, same error), further identical calls are blocked with a message that quotes the real repeated error, and the turn stops cleanly. The streak resets on any change — different arguments, a different error text, a success, a landed mutation, or a filesystem change of the paths named in the arguments (probed before each call), so a retry after the cause is fixed always goes through. Set `identical_failure_cap_shadow: true` to count and log would-blocks without blocking.
 
 Hard stops are designed to catch **replays** — the same call, unchanged, with nothing happening in between — not legitimate iteration:
 

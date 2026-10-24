@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import re
 from collections import deque
 from dataclasses import asdict, dataclass, field, fields
@@ -76,7 +77,10 @@ def _browser_interact_is_wait(args: Mapping[str, Any] | None) -> bool:
     )
 
 
-_BOOL_FIELDS = ("warnings_enabled", "hard_stop_enabled", "non_interactive_hard_stop_enabled", "wait_repeat_advisory_enabled")
+_BOOL_FIELDS = (
+    "warnings_enabled", "hard_stop_enabled", "non_interactive_hard_stop_enabled", "wait_repeat_advisory_enabled",
+    "identical_failure_cap", "identical_failure_cap_shadow",
+)
 
 _WAIT_ADVISORY = (
     "[Wait repeat advisory: the same wait/status query timed out or remained pending with unchanged inputs. "
@@ -123,6 +127,7 @@ _THRESHOLD_SOURCES: dict[str, tuple[str, str]] = {
     "exact_failure_block_after": ("hard_stop_after", "exact_failure"),
     "same_tool_failure_halt_after": ("hard_stop_after", "same_tool_failure"),
     "no_progress_block_after": ("hard_stop_after", "idempotent_no_progress"),
+    "identical_failure_cap_after": ("hard_stop_after", "identical_failure"),
 }
 
 # Per-turn caps on runaway-prone tools (counters reset in reset_for_turn).
@@ -171,8 +176,15 @@ class ToolCallGuardrailConfig:
     hard_stop_enabled: bool = False
     non_interactive_hard_stop_enabled: bool = True
     wait_repeat_advisory_enabled: bool = False
+    # F5.5 (D5-05): opt-in cap on a CONSECUTIVE identical failing call (same tool, same
+    # canonical args, same error) that also arms when hard_stop_enabled is false — the
+    # interactive default where the exact-failure BLOCK is disarmed and warnings alone
+    # let a model burn the whole budget on the same failing call.
+    identical_failure_cap: bool = False
+    identical_failure_cap_shadow: bool = False
     exact_failure_warn_after: int = 2
     exact_failure_block_after: int = 5
+    identical_failure_cap_after: int = 5
     same_tool_failure_warn_after: int = 3
     same_tool_failure_halt_after: int = 8
     no_progress_warn_after: int = 2
@@ -263,6 +275,54 @@ def canonical_tool_args(args: Mapping[str, Any]) -> str:
     return _canonical_json(args)
 
 
+# F5.5: args keys whose string values name filesystem paths probed for external change.
+_PATH_ARG_NAMES = ("path", "file_path", "file", "src", "dst", "source", "target")
+# How much of the real error text the cap's block message quotes back to the model.
+_IDENTICAL_FAILURE_ERROR_PREVIEW_CHARS = 300
+
+
+def _probed_paths(args: Mapping[str, Any]) -> tuple[str, ...]:
+    """Path values in a call's args, for filesystem-state probing."""
+    paths = []
+    for key in _PATH_ARG_NAMES:
+        value = args.get(key)
+        if isinstance(value, str) and value.strip():
+            paths.append(value.strip())
+    return tuple(paths)
+
+
+def _fs_state(paths: tuple[str, ...]) -> tuple:
+    """Cheap per-path filesystem fingerprint: None when absent, else (mtime_ns, size)."""
+    state = []
+    for p in paths:
+        try:
+            st = os.stat(p)
+            state.append((st.st_mtime_ns, st.st_size))
+        except OSError:
+            state.append(None)
+    return tuple(state)
+
+
+def _error_preview(result: str | None) -> str:
+    """Human-readable error text for the identical-failure block message.
+
+    JSON ``error`` fields are quoted directly; any other payload falls back to the raw
+    text so the message always states the concrete repeated error.
+    """
+    text = result if isinstance(result, str) else str(result or "")
+    data = safe_json_loads(text)
+    if isinstance(data, dict):
+        err = data.get("error")
+        if isinstance(err, str) and err.strip():
+            text = err
+        elif isinstance(err, dict):
+            text = _canonical_json(err)
+    text = " ".join(text.split())
+    if len(text) > _IDENTICAL_FAILURE_ERROR_PREVIEW_CHARS:
+        text = text[:_IDENTICAL_FAILURE_ERROR_PREVIEW_CHARS] + "…"
+    return text or "(no error text)"
+
+
 def classify_tool_failure(tool_name: str, result: str | None) -> tuple[bool, str]:
     """Fallback classifier used only when callers don't pass ``failed``; mirrors
     ``agent.display._detect_tool_failure`` so the guardrail never disagrees with the CLI's ``[error]`` tag."""
@@ -288,6 +348,16 @@ def classify_tool_failure(tool_name: str, result: str | None) -> tuple[bool, str
 # Guardrail verdict text injected into the conversation, keyed by decision code.
 # ``same_tool_failure_warning`` is built by _tool_failure_recovery_hint (tool-specific).
 _DECISION_MESSAGES: dict[str, str] = {
+    "identical_failure_cap_block": (
+        "Blocked {tool_name}: this exact call (identical arguments) has failed {count} times in a row "
+        "with the same error. Repeating it unchanged will keep failing. "
+        "The repeated error was: {error} — change the arguments, fix the cause (create the missing "
+        "file, correct the path, wait for the dependency), or use a different tool."
+    ),
+    "identical_failure_cap_would_block": (
+        "[would block] {tool_name}: identical failing call reached {count} consecutive failures "
+        "with error: {error} (shadow mode; call allowed)."
+    ),
     "repeated_exact_failure_block": (
         "Blocked {tool_name}: the same tool call failed {count} times with identical arguments. "
         "Stop retrying it unchanged; change strategy or explain the blocker."
@@ -411,6 +481,14 @@ class ToolCallGuardrailController:
         self._persisted_result_paths: dict[str, str] = {}
         self._turn_web_search_count = 0
         self._turn_subagent_count = 0
+        # F5.5 identical-failure cap: signature -> (error_hash, count, fs_state, error_preview).
+        # Consecutive identical (tool, canonical args, error) failures only; any change in
+        # args, error, filesystem state of the named paths, or a success resets the streak.
+        self._identical_failure_cap: dict[ToolCallSignature, tuple[str, int, tuple, str]] = {}
+        # fs state probed at the last allowed before_call per signature — the state the
+        # call's result was produced under, so an external change landing mid-execution
+        # is still detected as a change at the next before_call.
+        self._cap_fs_probe: dict[ToolCallSignature, tuple] = {}
 
     @property
     def halt_decision(self) -> ToolGuardrailDecision | None:
@@ -437,6 +515,15 @@ class ToolCallGuardrailController:
         signature = ToolCallSignature.from_call(tool_name, args)
         allow = ToolGuardrailDecision(tool_name=tool_name, signature=signature)
 
+        # F5.5 identical-failure cap (opt-in, independent of hard_stop_enabled so it also
+        # arms the interactive warn-only default — D5-05). The fs probe is recorded for
+        # after_call: this allowed call's result is produced under this state.
+        if self.config.identical_failure_cap:
+            cap_block = self._check_identical_failure_cap(tool_name, args, signature)
+            if cap_block is not None:
+                return cap_block
+            self._cap_fs_probe[signature] = _fs_state(_probed_paths(args))
+
         # Loop caps apply regardless of hard_stop_enabled (which only governs the detector).
         cap_block = self._check_loop_cap(tool_name, args, signature)
         if cap_block is not None or not self.config.hard_stop_enabled:
@@ -449,6 +536,33 @@ class ToolCallGuardrailController:
         if record is not None and record[1] >= self.config.no_progress_block_after:
             return self._decide("block", "idempotent_no_progress_block", tool_name, record[1], signature)
         return allow
+
+    def _check_identical_failure_cap(
+        self, tool_name: str, args: Mapping[str, Any], signature: ToolCallSignature,
+    ) -> ToolGuardrailDecision | None:
+        """F5.5 opt-in cap: block the (N+1)-th consecutive identical failing call.
+
+        The streak resets on ANY change — different args (different signature), a
+        different error, a success, a landed mutation, or a filesystem-state change of
+        the paths named in the args (probed here because a blocked call never sees a
+        fresh result). Shadow mode counts and logs would-blocks without blocking.
+        """
+        record = self._identical_failure_cap.get(signature)
+        if record is None:
+            return None
+        error_hash, count, fs_state, error_preview = record
+        if count < self.config.identical_failure_cap_after:
+            return None
+        if _fs_state(_probed_paths(args)) != fs_state:
+            # The world changed since the last identical failure; let the retry through.
+            self._identical_failure_cap.pop(signature, None)
+            return None
+        if self.config.identical_failure_cap_shadow:
+            self._decide("allow", "identical_failure_cap_would_block", tool_name, count, signature,
+                         error=error_preview)
+            return None
+        return self._decide("block", "identical_failure_cap_block", tool_name, count, signature,
+                            error=error_preview)
 
     def after_call(
         self, tool_name: str, args: Mapping[str, Any] | None, result: str | None,
@@ -465,6 +579,22 @@ class ToolCallGuardrailController:
             # a mutation since the last identical failure restarts the exact-args streak.
             if self._progress_since_failure.pop(signature, False):
                 self._exact_failure_counts.pop(signature, None)
+            # F5.5 identical-failure cap (opt-in): consecutive same (tool, args, error)
+            # streak. fs state comes from the before_call probe — the state that produced
+            # this result — so an external change landing mid-execution still counts as a
+            # change at the next before_call.
+            if self.config.identical_failure_cap:
+                error_hash = _result_hash(result)
+                fs_state = self._cap_fs_probe.pop(signature, None)
+                if fs_state is None:
+                    fs_state = _fs_state(_probed_paths(args))
+                cap_record = self._identical_failure_cap.get(signature)
+                if cap_record is not None and cap_record[0] == error_hash:
+                    self._identical_failure_cap[signature] = (
+                        error_hash, cap_record[1] + 1, fs_state, _error_preview(result))
+                else:
+                    self._identical_failure_cap[signature] = (
+                        error_hash, 1, fs_state, _error_preview(result))
             exact_count = self._exact_failure_counts[signature] = self._exact_failure_counts.get(signature, 0) + 1
             same_count = self._same_tool_failure_counts[tool_name] = self._same_tool_failure_counts.get(tool_name, 0) + 1
             self._no_progress.pop(signature, None)
@@ -498,6 +628,8 @@ class ToolCallGuardrailController:
 
         self._exact_failure_counts.pop(signature, None)
         self._same_tool_failure_counts.pop(tool_name, None)
+        # A success resets the F5.5 identical-failure streak for this signature.
+        self._identical_failure_cap.pop(signature, None)
         # A successful mutation is progress for every failing signature still counted
         # this turn. Pure loops never mutate between attempts, so the replay detector keeps its teeth.
         call_marks_progress = (
