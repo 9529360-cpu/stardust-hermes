@@ -16,6 +16,7 @@ import {
 } from '@/store/voice-playback'
 
 import { sanitizeTextForSpeech } from './speech-text'
+import type { VoiceTurnTrace } from './voice-trace'
 
 // Free Edge TTS occasionally hands back audio that never fires `playing`/`ended`
 // nor `error` — leaving voice mode stuck "speaking" forever. Reject if playback
@@ -72,6 +73,7 @@ function currentState(
 }
 
 export interface VoicePlaybackOptions {
+  trace?: VoiceTurnTrace | null
   messageId?: string | null
   source: VoicePlaybackSource
 }
@@ -248,6 +250,7 @@ function openClientDirectSpeechSession(tts: DirectTtsConfig, options: VoicePlayb
         let bytes: ArrayBuffer
 
         try {
+          options.trace?.mark('tts_request')
           bytes = await synthesizeSpeechClientDirect(tts, sentence)
         } catch {
           // Provider rejected mid-reply. Nothing played yet → let the caller
@@ -273,6 +276,7 @@ function openClientDirectSpeechSession(tts: DirectTtsConfig, options: VoicePlayb
           await new Promise<void>((resolve, reject) => {
             const audio = new Audio(url)
             playing = audio
+            audio.addEventListener('playing', () => options.trace?.mark('playback_start'), { once: true })
             audio.addEventListener('ended', () => resolve(), { once: true })
             audio.addEventListener('error', () => reject(new Error('Playback failed')), { once: true })
             void audio.play().catch(reject)
@@ -441,6 +445,22 @@ function openSpeechStream(wsUrl: string, options: VoicePlaybackOptions): SpeechS
 
     const startAt = Math.max(context.currentTime + 0.05, nextStartAt)
     source.start(startAt)
+    options.trace?.mark('audio_context_scheduled')
+    // getOutputTimestamp reports the output device timeline. A timer alone
+    // would only measure scheduling, and must never be called playback.
+    if (options.trace && !started && typeof context.getOutputTimestamp === 'function') {
+      const outputContext = context
+      const observe = () => {
+        if (settled || outputContext.state === 'closed') return
+        const stamp = outputContext.getOutputTimestamp()
+        if ((stamp.contextTime ?? -1) >= startAt && (stamp.performanceTime ?? 0) > 0) {
+          options.trace?.mark('playback_start')
+        } else {
+          window.setTimeout(observe, 10)
+        }
+      }
+      observe()
+    }
     nextStartAt = startAt + buffer.duration
 
     if (!started) {
@@ -455,6 +475,7 @@ function openSpeechStream(wsUrl: string, options: VoicePlaybackOptions): SpeechS
 
   ws.onmessage = event => {
     if (typeof event.data !== 'string') {
+      if ((event.data as ArrayBuffer).byteLength) options.trace?.mark('network_first_audio_byte')
       schedule(event.data as ArrayBuffer)
 
       return
@@ -500,6 +521,7 @@ function openSpeechStream(wsUrl: string, options: VoicePlaybackOptions): SpeechS
     // the only safe granularity when constructs span delta boundaries.
     append: text => {
       if (text && !finished && !settled) {
+        options.trace?.mark('tts_request')
         send({ text })
       }
     },
@@ -573,6 +595,7 @@ async function playSpeechDataUrl(
   options: VoicePlaybackOptions,
   isCurrent: () => boolean
 ): Promise<boolean> {
+  options.trace?.mark('tts_request')
   const response = await speakText(speakableText)
 
   if (!isCurrent()) {
@@ -624,6 +647,7 @@ async function playSpeechDataUrl(
       resolve()
     }
 
+    audio.addEventListener('playing', () => options.trace?.mark('playback_start'), { once: true })
     audio.addEventListener('ended', onEnded, { once: true })
     audio.addEventListener('error', onError, { once: true })
     audio.addEventListener('timeupdate', armStall)
