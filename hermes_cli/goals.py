@@ -441,6 +441,10 @@ class GoalState:
     # crash marker. Message ids (not clocks) prevent replay after later work.
     continuation_after_message_id: int = 0
     continuation_attempts: int = 0
+    # DL-P2.5 whitelist: only goals explicitly marked via ``/goal autoresume on`` may be
+    # resumed automatically after a restart. Attempts bound the restart loop.
+    auto_resume: bool = False
+    auto_resume_attempts: int = 0
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), ensure_ascii=False)
@@ -449,7 +453,7 @@ class GoalState:
     def from_json(cls, raw: str) -> "GoalState":
         data = json.loads(raw)
         raw_subgoals = data.get("subgoals") or []
-        ints = {k: int(data.get(k) or 0) for k in ("turns_used", "consecutive_parse_failures", "consecutive_transport_failures", "waiting_on_delegations")}
+        ints = {k: int(data.get(k) or 0) for k in ("turns_used", "consecutive_parse_failures", "consecutive_transport_failures", "waiting_on_delegations", "auto_resume_attempts")}
         ints.update({k: max(0, int(data.get(k) or 0)) for k in (
             "continuation_after_message_id", "continuation_attempts")})
         floats = {k: float(data.get(k) or 0.0) for k in ("created_at", "last_turn_at", "waiting_until", "waiting_since")}
@@ -460,6 +464,7 @@ class GoalState:
             last_verdict=data.get("last_verdict"),
             last_reason=data.get("last_reason"),
             paused_reason=data.get("paused_reason"),
+            auto_resume=bool(data.get("auto_resume")),
             subgoals=[str(s).strip() for s in raw_subgoals if str(s).strip()] if isinstance(raw_subgoals, list) else [],
             waiting_on_pid=(int(data["waiting_on_pid"]) if data.get("waiting_on_pid") else None),
             waiting_on_session=(str(data["waiting_on_session"]) if data.get("waiting_on_session") else None),
@@ -1194,6 +1199,66 @@ class GoalManager:
         return db.compare_and_set_meta(
             _meta_key(self.session_id), current["snapshot"], self._state.to_json(),
             session_id=self.session_id, message_watermark=self._state.continuation_after_message_id)
+
+    # ── DL-P2.5 whitelisted auto-resume after restart ──────────────────
+    # Reuses the same CAS shape as continuation claims: the sqlite write is the single
+    # owner fence, so two runners can never both hold a goal.
+
+    AUTO_RESUME_MAX_ATTEMPTS = 3
+
+    def set_auto_resume(self, enabled: bool) -> Optional[GoalState]:
+        """Whitelist (``/goal autoresume on``) or un-whitelist the current goal."""
+        if self._state is None or not self.has_goal():
+            return None
+        self._state.auto_resume = bool(enabled)
+        if not enabled:
+            self._state.auto_resume_attempts = 0
+        return self._save()
+
+    def claim_auto_resume(self, *, max_attempts: Optional[int] = None) -> Optional[str]:
+        """Atomically claim one auto-resume attempt for a whitelisted, active goal.
+
+        Returns the continuation prompt on success, None otherwise. The CAS spends an
+        attempt AND re-reads current state in the same write, so exactly one caller
+        can win; a paused goal, a non-whitelisted goal, an exhausted attempt budget
+        or a concurrent mutation all fail closed.
+        """
+        db = self._db if self._db is not None else _get_session_db()
+        if db is None:
+            return None
+        limit = int(max_attempts if max_attempts is not None else self.AUTO_RESUME_MAX_ATTEMPTS)
+        for _ in range(4):
+            raw = db.get_meta(_meta_key(self.session_id))
+            if not raw:
+                return None
+            state = GoalState.from_json(raw)
+            if (state.status != "active" or not state.auto_resume
+                    or state.turns_used >= state.max_turns
+                    or state.waiting_on_pid or state.waiting_on_session or state.waiting_until
+                    or state.waiting_on_delegations
+                    or state.auto_resume_attempts >= limit):
+                return None
+            state.auto_resume_attempts += 1
+            snapshot = state.to_json()
+            if db.compare_and_set_meta(_meta_key(self.session_id), raw, snapshot):
+                self._state = state
+                return self.next_continuation_prompt()
+        return None
+
+    @staticmethod
+    def list_auto_resume_sessions(db: Any) -> List[str]:
+        """Sessions whose persisted goal is whitelisted and active (startup scan)."""
+        sessions = []
+        for key, raw in (db.list_meta_prefix(_meta_key("")) if db is not None else []):
+            if not key.startswith("goal:"):
+                continue
+            try:
+                state = GoalState.from_json(raw)
+            except (ValueError, TypeError):
+                continue
+            if state.status == "active" and state.auto_resume:
+                sessions.append(key[len("goal:"):])
+        return sessions
 
     def discard_continuation(self) -> None:
         """A live-turn marker has taken over recovery; its attempts must not get a second budget."""

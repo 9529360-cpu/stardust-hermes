@@ -52,6 +52,21 @@ def _resume(mgr, arg, render):
                              prompt=mgr.next_continuation_prompt())
 
 
+def _autoresume(mgr, arg, render):
+    """DL-P2.5 whitelist: mark the current goal eligible for auto-resume after a restart."""
+    choice = (arg or "").strip().lower()
+    if choice not in {"on", "off"}:
+        return GoalCommandResult("Usage: /goal autoresume on|off — whitelists this goal for "
+                                 "restart auto-resume (digital_life.auto_resume must be enabled "
+                                 "in config.yaml).", error=True)
+    state = mgr.set_auto_resume(choice == "on")
+    if state is None:
+        return GoalCommandResult(render("gateway.goal.no_goal_set", "No goal set."))
+    return GoalCommandResult(
+        "♻ Auto-resume after restart: ON for this goal." if state.auto_resume
+        else "♻ Auto-resume after restart: OFF for this goal.")
+
+
 def _clear(mgr, arg, render):
     had = mgr.has_goal()
     mgr.clear()
@@ -99,6 +114,7 @@ _EXACT_HANDLERS = {
     "": _status, "status": _status, "show": _show, "pause": _pause,
     "resume": _resume, "clear": _clear, "stop": _clear, "done": _clear, "unwait": _unwait,
 }
+_PREFIX_HANDLERS = {"autoresume": _autoresume}
 
 
 def _gate(mgr, arg, authorize_gate):
@@ -158,7 +174,8 @@ def _set(mgr, arg, *, drafting, last_user_message, render, progress):
 def is_goal_control(arg: str) -> bool:
     """Whether this command controls an existing goal rather than replacing it."""
     normalized = arg.strip().lower()
-    return normalized in _EXACT_HANDLERS or normalized.split(None, 1)[0] in {"wait", "gate"}
+    return (normalized in _EXACT_HANDLERS
+            or normalized.split(None, 1)[0] in {"wait", "gate", *_PREFIX_HANDLERS})
 
 
 def dispatch_goal_command(
@@ -179,6 +196,9 @@ def dispatch_goal_command(
     try:
         if handler := _EXACT_HANDLERS.get(arg.lower()):
             return handler(mgr, "", render)
+        if prefix_handler := _PREFIX_HANDLERS.get(verb):
+            prefix = "/goal autoresume"
+            return prefix_handler(mgr, rest, render)
         if verb == "wait":
             prefix = "/goal wait"
             return _wait(mgr, rest)
