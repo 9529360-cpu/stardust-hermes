@@ -191,6 +191,11 @@ class TestNativeSearchParityWindows:
             via_native = ops.search("find*", ".", target="files", limit=10).to_dict()
         finally:
             os.environ.pop("STARDUST_NATIVE_FILE_READ", None)
+        # rg's parallel walk makes the ENTRY ORDER unstable run-to-run (the shell
+        # lane is non-deterministic there too); the contract is the same SET with
+        # the same totals, not the same order.
+        via_native["files"] = sorted(via_native["files"])
+        via_shell["files"] = sorted(via_shell["files"])
         assert via_native == via_shell
         assert via_native["total_count"] >= 6
 
