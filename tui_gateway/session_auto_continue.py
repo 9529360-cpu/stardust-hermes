@@ -153,6 +153,7 @@ def _maybe_schedule_auto_continue(sid: str, session: dict, session_key: str) -> 
             return None
         session["_auto_continue_scheduled"] = True
         queue_generation = int(session.get("_queued_prompt_generation", 0))
+        host_epoch = int(session.get("_compute_host_epoch", 0))
     attempt = marker["attempts"] + 1
     text = (
         "[System note: Resuming your standing goal after the backend stopped. "
@@ -172,7 +173,8 @@ def _maybe_schedule_auto_continue(sid: str, session: dict, session_key: str) -> 
             return
         with session["history_lock"]:
             if (session.get("running") or session.get("_turn_cancel_requested") or session.get("_finalized")
-                    or int(session.get("_queued_prompt_generation", 0)) != queue_generation):
+                    or int(session.get("_queued_prompt_generation", 0)) != queue_generation
+                    or (_epoch_guard_enabled() and int(session.get("_compute_host_epoch", 0)) != host_epoch)):
                 session["_auto_continue_scheduled"] = False  # a real user prompt beat us; it clears the marker
                 return
             session["running"] = True
@@ -199,7 +201,8 @@ def _maybe_schedule_auto_continue(sid: str, session: dict, session_key: str) -> 
                     return
             with session["history_lock"]:
                 if (session.get("_turn_cancel_requested") or session.get("_finalized")
-                        or int(session.get("_queued_prompt_generation", 0)) != queue_generation):
+                        or int(session.get("_queued_prompt_generation", 0)) != queue_generation
+                    or (_epoch_guard_enabled() and int(session.get("_compute_host_epoch", 0)) != host_epoch)):
                     session["running"] = session["_auto_continue_scheduled"] = False
                     return
                 # Only publish marker inputs after ownership and the durable claim;

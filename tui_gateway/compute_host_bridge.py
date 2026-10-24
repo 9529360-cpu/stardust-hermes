@@ -26,6 +26,11 @@ def _turn_isolation_enabled(cfg: dict | None = None) -> bool:
     return bool((cfg or _load_dashboard_process_isolation_config()).get("turn_isolation"))
 
 
+def _epoch_guard_enabled() -> bool:
+    """F6.1 opt-in flag: reject compute-host frames minted for an older host build."""
+    return os.environ.get("STARDUST_COMPUTE_HOST_EPOCH_GUARD") == "1"
+
+
 def _session_uses_compute_host(session: dict, cfg: dict | None = None) -> bool:
     # Routes lazy sessions whose AIAgent was never built in-process; already-built
     # sessions keep the in-process path unless a prior isolated turn marked host ownership.
@@ -40,11 +45,45 @@ def _get_compute_host_supervisor(cfg: dict | None = None):
     with _compute_host_supervisor_lock:
         if _compute_host_supervisor is None:
             from tui_gateway.host_supervisor import HostSupervisor
+            # Resolve the opt-in here without expanding the server facade.
+            dashboard = _load_cfg().get("dashboard", {})
+            enabled = is_truthy_value(dashboard.get("compute_host_epoch_guard"), default=False)
+            if enabled:
+                os.environ["STARDUST_COMPUTE_HOST_EPOCH_GUARD"] = "1"
+            else:
+                os.environ.pop("STARDUST_COMPUTE_HOST_EPOCH_GUARD", None)
             _compute_host_supervisor = HostSupervisor(
                 rpc_sink=_relay_compute_host_rpc,
                 heartbeat_secs=int(isolation_cfg.get("compute_host_heartbeat_secs") or 15),
-                respawn_max=int(isolation_cfg.get("compute_host_respawn_max") or 3))
+                respawn_max=int(isolation_cfg.get("compute_host_respawn_max") or 3),
+                on_rebuild=_on_compute_host_rebuild)
         return _compute_host_supervisor
+
+
+def _on_compute_host_rebuild(info: dict) -> dict[str, int]:
+    """Advance active sessions before spawning and seed the replacement's fence."""
+    if not _epoch_guard_enabled():
+        return {}
+    with _sessions_lock:
+        sessions = list(_sessions.items())
+    epochs = {}
+    for sid, session in sessions:
+        if not session.get("_compute_host_active"):
+            continue
+        with _history_lock(session):
+            session["_compute_host_epoch"] = _session_epoch(session) + 1
+            epochs[sid] = _session_epoch(session)
+    return epochs
+
+
+def _session_epoch(session: dict) -> int:
+    """Current session execution epoch for the epoch guard (F6.1).
+
+    The parent bumps this whenever the session's compute host is rebuilt, so a frame
+    stamped with an older epoch is stale by construction: it was minted for a host
+    build that no longer exists. Kept per-session on the parent record.
+    """
+    return int(session.get("_compute_host_epoch", 0))
 
 
 def _compute_host_turn_frame(
@@ -54,6 +93,8 @@ def _compute_host_turn_frame(
         history = list(session.get("history", []))
         history_version = int(session.get("history_version", 0))
         attached_images = list(image_paths if image_paths is not None else session.get("attached_images", []))
+        host_epoch = _session_epoch(session)
+        parent_generation = int(session.get("_queued_prompt_generation", 0))
     return {
         "type": "turn.start", "sid": sid, "request_id": rid,
         "session_key": session.get("session_key") or sid, "text": text,
@@ -67,7 +108,12 @@ def _compute_host_turn_frame(
         "service_tier_override": session.get("create_service_tier_override"),
         "source": _session_source(session), "attached_images": attached_images,
         "auth_user_id": _session_auth_user_id(session),
-        "queued_prompt_generation": queued_prompt_generation}
+        "queued_prompt_generation": queued_prompt_generation,
+        # F6.1 epoch guard (opt-in, child-side): the exact parent generation this
+        # frame was minted against, plus the monotonically increasing session epoch.
+        # ``queued_prompt_generation`` stays as minted (None for fresh prompts) so the
+        # flag-off comparison against the child's local counter is unchanged.
+        "host_epoch": host_epoch, "parent_queued_prompt_generation": parent_generation}
 
 
 def _metadata_mirror(session: dict | None) -> dict:
@@ -237,6 +283,13 @@ def _submit_prompt_to_compute_host(
     rid: str, sid: str, session: dict, text: Any, image_paths: list[str] | None = None,
     queued_prompt_generation: int | None = None, display_kind: str | None = None) -> dict:
     cfg = _load_dashboard_process_isolation_config()
+    try:
+        supervisor = _get_compute_host_supervisor(cfg)
+        # A lazy spawn may advance the epoch; mint legitimate work afterwards.
+        if _epoch_guard_enabled():
+            supervisor.start()
+    except Exception as exc:
+        return _err(rid, 5019, f"compute-host dispatch failed: {exc}")
     frame = _compute_host_turn_frame(rid, sid, session, text, image_paths=image_paths,
                                      queued_prompt_generation=queued_prompt_generation,
                                      display_kind=display_kind)
