@@ -259,7 +259,13 @@ def finish_text_response(
     # Make the answer durable before leaving the loop (_DB_PERSISTED_MARKER keeps
     # _persist_session idempotent). Failure must NOT abort the turn: finalize retries.
     try:
-        agent._flush_messages_to_session_db(messages, conversation_history)
+        if agent._flush_messages_to_session_db(messages, conversation_history) is False:
+            logger.warning(
+                "final text-turn flush failed (session=%s, cause=%s); "
+                "reply is not yet durable; relying on finalize_turn retry",
+                getattr(agent, "session_id", None) or "none",
+                getattr(agent, "_last_persistence_error_cause", None) or "unknown",
+            )
     except Exception:
         logger.warning(
             "final text-turn flush failed (session=%s) — reply is "

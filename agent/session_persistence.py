@@ -254,7 +254,11 @@ def _db_flush_failed(agent, e: Exception, batch_rows: List[Dict[str, Any]], adop
     # explanation can distinguish lock contention from disk-full/read-only.
     from hermes_state import StateDbCorruptError, StateDbReplacedError, classify_persistence_error, divert_session_transcript_jsonl
     from hermes_state_errors import CompressionSessionClosedError
-    agent._last_persistence_error_cause = classify_persistence_error(e)
+    cause = classify_persistence_error(e)
+    if cause == "unknown":
+        # SQLite exposes stable extended codes for failures such as trigger rejection.
+        cause = (getattr(e, "sqlite_errorname", None) or "unknown").lower()
+    agent._last_persistence_error_cause = cause
     if isinstance(e, (StateDbReplacedError, StateDbCorruptError)):
         # A replaced/quarantined handle will not take this batch again — keep it on disk.
         try:
@@ -313,7 +317,9 @@ class SessionPersistenceMixin:
             # Drain async token-accounting deltas at every persist point; cheap no-op when nothing queued.
             if self._session_db is not None:
                 self._session_db.flush_token_counts()
-            note_turn_persisted(self)
+            if flushed is not False:
+                note_turn_persisted(self)
+            return flushed
 
     def _drop_trailing_empty_response_scaffolding(self, messages: List[Dict]) -> None:
         """Pop empty-response retry scaffolding from the tail, then (only if any was present) rewind the
@@ -374,6 +380,7 @@ class SessionPersistenceMixin:
             self._last_flushed_db_idx = len(messages)
             # Snapshot for the bounded scan — only on full success, so a partial list is never treated as settled.
             self._db_flush_scan_prefix = messages[:]
+            self._last_persistence_error_cause = None
             return True
         except Exception as e:
             if _db_flush_failed(self, e, batch_rows, _adoption_budget):

@@ -432,6 +432,25 @@ def finalize_turn(
     # stream-recovered ``final_response`` is rebound the moment it is computed — BEFORE
     # the fallible tail-shaping / override / micro-compaction / persist calls — so a
     # raise in any of them can't drop text the user already saw (#95514, #8049).
+    persistence_status = "not_attempted"
+    persistence_error_cause = None
+
+    def _persist_transcript():
+        nonlocal persistence_status, persistence_error_cause
+        try:
+            flushed = agent._persist_session(messages, conversation_history)
+        except Exception as exc:
+            from hermes_state import classify_persistence_error
+            persistence_status = "failed"
+            persistence_error_cause = classify_persistence_error(exc)
+            if persistence_error_cause == "unknown":
+                persistence_error_cause = (getattr(exc, "sqlite_errorname", None) or type(exc).__name__).lower()
+            raise
+        persistence_status = "failed" if flushed is False else "saved" if flushed is True else "disabled"
+        persistence_error_cause = (
+            getattr(agent, "_last_persistence_error_cause", None) or "unknown"
+        ) if flushed is False else None
+
     def _persist_step():
         nonlocal final_response
         _drop_transcript_scaffolding(agent, messages)
@@ -441,7 +460,7 @@ def finalize_turn(
         _close_transcript_tail(agent, messages, final_response, interrupted, _recovered_from_stream)
         if not interrupted and not failed:
             _micro_compact_after_turn(agent, messages, final_response, logger)
-        agent._persist_session(messages, conversation_history)
+        _persist_transcript()
 
     _guarded_cleanup("persist_session", _persist_step, _cleanup_errors, logger)
 
@@ -480,7 +499,7 @@ def finalize_turn(
             # Persist the authoritative receipt after transforms, not just the candidate.
             append_message(messages, {"role": "assistant", "content": final_response})
             _guarded_cleanup("persist_acceptance_receipt",
-                             lambda: agent._persist_session(messages, conversation_history),
+                             _persist_transcript,
                              _cleanup_errors, logger)
 
     # Context engine observation hook: the turn finished with the finalized transcript.
@@ -515,9 +534,26 @@ def finalize_turn(
             agent._response_was_previewed = False
         append_message(messages, {"role": "assistant", "content": footer})
         _guarded_cleanup("persist_cleanup_receipt",
-                         lambda: agent._persist_session(messages, conversation_history),
+                         _persist_transcript,
                          _cleanup_errors, logger)
+    if persistence_status == "failed" or (
+        persistence_status == "not_attempted" and any(
+            error.startswith("persist_session:") for error in _cleanup_errors
+        )
+    ):
+        persistence_status = "failed"
+        persistence_error_cause = persistence_error_cause or "finalization_error"
+        completed, failed = False, True
+        _turn_exit_reason = "session_persistence_failed"
+        agent._last_persistence_error_cause = persistence_error_cause
+        logger.warning(
+            "final transcript persistence failed (session=%s, turn=%s, cause=%s); "
+            "visible reply retained but not saved",
+            agent.session_id, turn_id, persistence_error_cause,
+        )
     result = {
+        "persistence_status": persistence_status,
+        "persistence_error_cause": persistence_error_cause,
         "cleanup_receipt": cleanup_receipt,
         "final_response": final_response,
         "last_reasoning": _last_turn_reasoning(messages),
@@ -554,9 +590,11 @@ def finalize_turn(
     # surfaces status="error" (desktop can toast) instead of a quiet complete frame, plus
     # the machine-readable cause 'session_persistence_failed:<locked|compression|...>'.
     if failed and str(_turn_exit_reason) == "session_persistence_failed":
-        result["error"] = final_response or (
-            "session storage could not be written — check the state database "
-            "health (`stardust doctor`), then send your message again"
+        result["error"] = (
+            "final reply was not saved: session storage could not be written — "
+            "check the state database health (`stardust doctor`)"
+        ) if persistence_status == "failed" else final_response or (
+            "session storage could not be written — check the state database health (`stardust doctor`)"
         )
         _cause = getattr(agent, "_last_persistence_error_cause", None)
         result["failure_reason"] = "session_persistence_failed:" + (_cause or "unknown")
