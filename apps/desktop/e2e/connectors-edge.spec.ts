@@ -25,7 +25,7 @@ async function openConnectors(page: import('@playwright/test').Page) {
   await expect(page.locator('[data-slot="connector-catalog-page"]')).toBeVisible({ timeout: 30_000 })
 }
 
-test('cancel leaves config unchanged', async ({ page: _p }) => {
+test('cancel leaves config unchanged', async () => {
   const page = fixture!.page
   await openConnectors(page)
   await page.locator('[data-slot="connect-deepwiki"]').click()
@@ -51,6 +51,9 @@ test('duplicate name is rejected in Chinese', async () => {
   await page.locator('[data-slot="custom-command"]').fill('npx -y @modelcontextprotocol/server-filesystem@2026.7.10 D:/wt/Temp/stardust/cx5/fs-allow')
   await page.locator('[data-slot="custom-connect"]').click()
   await expect(page.getByText('已存在同名连接 filesystem。')).toBeVisible({ timeout: 15_000 })
+  // Close the dialog so later tests start from a clean page.
+  await page.getByRole('button', { name: '取消' }).click()
+  await expect(page.getByRole('heading', { name: '自定义服务（URL/命令）' })).toHaveCount(0)
 })
 
 test('missing command/url is rejected in Chinese', async () => {
@@ -60,6 +63,8 @@ test('missing command/url is rejected in Chinese', async () => {
   await page.locator('[data-slot="custom-name"]').fill('empty-service')
   await page.locator('[data-slot="custom-connect"]').click()
   await expect(page.getByText('请输入服务 URL 或命令。')).toBeVisible({ timeout: 15_000 })
+  await page.getByRole('button', { name: '取消' }).click()
+  await expect(page.getByRole('heading', { name: '自定义服务（URL/命令）' })).toHaveCount(0)
 })
 
 test('missing name is rejected in Chinese', async () => {
@@ -69,6 +74,8 @@ test('missing name is rejected in Chinese', async () => {
   await page.locator('[data-slot="custom-command"]').fill('npx -y some-server')
   await page.locator('[data-slot="custom-connect"]').click()
   await expect(page.getByText('请输入连接名称。')).toBeVisible({ timeout: 15_000 })
+  await page.getByRole('button', { name: '取消' }).click()
+  await expect(page.getByRole('heading', { name: '自定义服务（URL/命令）' })).toHaveCount(0)
 })
 
 test('custom URL + API key branch: missing key rejected, then connects', async () => {

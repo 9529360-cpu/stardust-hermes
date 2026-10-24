@@ -27,7 +27,7 @@ async function openConnectors(page: import('@playwright/test').Page) {
   await expect(page.locator('[data-slot="connector-catalog-page"]')).toBeVisible({ timeout: 30_000 })
 }
 
-test('filesystem (local stdio, pinned) connects via the dialog', async ({ }, testInfo) => {
+test('filesystem (local stdio, pinned) connects via the dialog', async () => {
   const page = fixture!.page
   await openConnectors(page)
 
