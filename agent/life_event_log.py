@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 MAX_EVENTS = 4096
 MAX_PAGES = 4096
 MAX_PAYLOAD_BYTES = 2048
+MAX_WAL_BYTES = 1024 * 1024
 _ALLOWED_FIELDS = {'session_id', 'task_id', 'process_id', 'outcome', 'identity_version'}
 _REGISTRY = {}
 _LOCK = threading.Lock()
@@ -54,7 +55,11 @@ class LifeEventLog:
                 db.execute('PRAGMA synchronous=FULL')
                 db.execute(f'PRAGMA max_page_count={MAX_PAGES}')
                 db.execute('PRAGMA journal_size_limit=0')
+                db.execute('PRAGMA wal_checkpoint(TRUNCATE)')
                 db.execute('BEGIN IMMEDIATE')
+                wal = self.path.with_name(self.path.name + '-wal')
+                if wal.exists() and wal.stat().st_size >= MAX_WAL_BYTES:
+                    raise OSError('lifecycle WAL capacity reached')
                 db.execute('CREATE TABLE IF NOT EXISTS life_events ('
                            'event_id TEXT PRIMARY KEY, timestamp_ns INTEGER UNIQUE NOT NULL, '
                            'record TEXT NOT NULL)')

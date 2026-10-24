@@ -82,6 +82,20 @@ def test_payload_bound_and_invalid_type_fail_soft(tmp_path, caplog):
     assert 'ValueError' in caplog.text
 
 
+def test_pinned_reader_bounds_wal_and_recovers(tmp_path, monkeypatch):
+    monkeypatch.setattr('agent.life_event_log.MAX_WAL_BYTES', 32768)
+    ledger = LifeEventLog(tmp_path)
+    assert ledger.emit('process_started')
+    with closing(sqlite3.connect(ledger.path)) as reader:
+        reader.execute('BEGIN')
+        reader.execute('SELECT * FROM life_events').fetchall()
+        results = [ledger.emit('task_started') for _ in range(30)]
+        assert False in results
+        assert ledger.path.with_name('life_events.db-wal').stat().st_size < 131072
+    assert ledger.emit('task_finished')
+    assert records(tmp_path)[-1]['event_type'] == 'task_finished'
+
+
 def test_session_close_idempotent(tmp_path):
     agent = SimpleNamespace(session_id='session', _life_event_log=LifeEventLog(tmp_path))
     close_agent_log(agent)
