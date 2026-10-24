@@ -515,6 +515,7 @@ elevenlabs = false
 exa-py = false
 fal-client = false
 fastapi = false
+fastembed = false  # [semantic-recall] exact pin ==0.9.1 (published 2026-10-24, newer than the cutoff)
 faster-whisper = false
 fire = false
 firecrawl-anydoc = false
