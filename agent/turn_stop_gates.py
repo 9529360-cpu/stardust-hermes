@@ -55,6 +55,33 @@ def _verify_on_stop_nudge(agent) -> Optional[str]:
     return None
 
 
+def _messaging_claim_gate_nudge(agent, final_response, messages) -> Optional[str]:
+    """Opt-in evidence gate for messaging completion claims (DL-P2.8e).
+
+    Shares the ``_verification_stop_nudges`` counter with the edit gate, so at
+    most one such nudge fires per turn and the pair stays bounded together.
+    Reads the turn boundary from ``_persist_user_message_idx`` (reanchored
+    after compaction by the turn context) and the raw user text from the live
+    user row (memory sidecar bytes live in ``api_content`` only).
+    """
+    try:
+        from agent.verification_stop import messaging_claim_gate_nudge
+
+        return messaging_claim_gate_nudge(
+            final_response=final_response,
+            messages=messages,
+            current_turn_user_idx=getattr(agent, "_persist_user_message_idx", None),
+            user_message=messages[getattr(agent, "_persist_user_message_idx", -1)].get("content")
+            if isinstance(getattr(agent, "_persist_user_message_idx", None), int)
+            and 0 <= getattr(agent, "_persist_user_message_idx", -1) < len(messages)
+            else None,
+            attempts=getattr(agent, "_verification_stop_nudges", 0),
+        )
+    except Exception:
+        logger.debug("messaging claim gate check failed", exc_info=True)
+        return None
+
+
 def _pre_verify_nudge(agent, final_response, attempt: int) -> Optional[str]:
     """After code edits a registered ``pre_verify`` hook may keep the agent going one
     more turn; no default continuation cost."""
@@ -164,6 +191,18 @@ def apply_stop_gates(
         verdict = _continue(_verify_nudge, "_verification_stop_synthetic")
         # Internal nudge: stay silent on the terminal, debug-log only.
         logger.debug("verification stop-loop nudge issued (attempt %d)", agent._verification_stop_nudges)
+        return verdict
+
+    _claim_nudge = _messaging_claim_gate_nudge(agent, final_response, messages)
+    if _claim_nudge:
+        final_msg["finish_reason"] = "verification_required"
+        if not persist_interim_answer(
+            agent, final_msg, messages, conversation_history, "messaging claim gate interim flush failed"
+        ):
+            return StopGateVerdict(False, "", None, False, persistence_failed=True)
+        agent._verification_stop_nudges = getattr(agent, "_verification_stop_nudges", 0) + 1
+        verdict = _continue(_claim_nudge, "_verification_stop_synthetic")
+        logger.debug("messaging claim-gate nudge issued (attempt %d)", agent._verification_stop_nudges)
         return verdict
 
     _attempt = getattr(agent, "_pre_verify_nudges", 0)
