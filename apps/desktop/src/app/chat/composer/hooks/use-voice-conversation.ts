@@ -10,6 +10,7 @@ import {
   startSpeechStream,
   stopVoicePlayback
 } from '@/lib/voice-playback'
+import { VoiceTurnTrace } from '@/lib/voice-trace'
 import { isVoiceStopCommand } from '@/lib/voice-stop-word'
 import { notify, notifyError } from '@/store/notifications'
 import { $voicePlayback } from '@/store/voice-playback'
@@ -62,6 +63,7 @@ export function useVoiceConversation({
   const { handle, level } = useMicRecorder(voiceCopy)
   const [status, setStatus] = useState<ConversationStatus>('idle')
   const [muted, setMuted] = useState(false)
+  const traceRef = useRef<VoiceTurnTrace | null>(null)
   const turnTimeoutRef = useRef<number | null>(null)
   const pendingStartRef = useRef(false)
   const turnClosingRef = useRef(false)
@@ -146,9 +148,11 @@ export function useVoiceConversation({
       setStatus('transcribing')
 
       try {
+        traceRef.current?.mark('eos')
         const result = await handle.stop()
 
         if (!result || (!result.heardSpeech && !forceTranscribe) || !onTranscribeAudio) {
+          traceRef.current?.finish('no_speech')
           if (enabledRef.current && !mutedRef.current && !busyRef.current && statusRef.current !== 'speaking') {
             pendingStartRef.current = true
           }
@@ -159,9 +163,12 @@ export function useVoiceConversation({
         }
 
         try {
+          traceRef.current?.mark('stt_request')
           const transcript = (await onTranscribeAudio(result.audio)).trim()
+          traceRef.current?.mark('stt_result')
 
           if (!transcript) {
+            traceRef.current?.finish('no_speech')
             if (enabledRef.current) {
               pendingStartRef.current = true
             }
@@ -176,6 +183,7 @@ export function useVoiceConversation({
           // utterance stop commands match, so "stop the container" still goes
           // through as a real request.
           if (isVoiceStopCommand(transcript)) {
+            traceRef.current?.finish('cancelled')
             dropSpeechSession()
             setStatus('idle')
             onStopWordRef.current?.()
@@ -188,6 +196,7 @@ export function useVoiceConversation({
           await onSubmit(transcript)
           setStatus('thinking')
         } catch (error) {
+          traceRef.current?.finish('failed')
           notifyError(error, voiceCopy.transcriptionFailed)
 
           if (enabledRef.current && !mutedRef.current && !busyRef.current) {
@@ -234,11 +243,15 @@ export function useVoiceConversation({
 
     try {
       // VAD tuning mirrors `tools.voice_mode` defaults so the browser loop matches the CLI.
+      traceRef.current?.finish('cancelled')
+      traceRef.current = VoiceTurnTrace.begin()
+      traceRef.current?.mark('listen_start')
       await handle.start({
         silenceLevel: 0.075,
         silenceMs: 1_250,
         idleSilenceMs: 12_000,
         onError: error => {
+          traceRef.current?.finish('failed')
           notifyError(error, voiceCopy.microphoneFailed)
           pendingStartRef.current = false
           onFatalError?.()
@@ -254,6 +267,7 @@ export function useVoiceConversation({
       clearTurnTimeout()
       turnTimeoutRef.current = window.setTimeout(() => void handleTurn(), 60_000)
     } catch (error) {
+      traceRef.current?.finish('failed')
       notifyError(error, voiceCopy.couldNotStartSession)
       pendingStartRef.current = false
       setStatus('idle')
@@ -263,6 +277,8 @@ export function useVoiceConversation({
 
   const settleAfterSpeech = useCallback(
     (barged: boolean, stoppedDuringSetup = false) => {
+      traceRef.current?.finish(barged || stoppedDuringSetup ? 'cancelled' : 'not_observed')
+      traceRef.current = null
       if (barged || !awaitingSpokenResponseRef.current) {
         awaitingSpokenResponseRef.current = false
         consumePendingResponse()
@@ -324,9 +340,15 @@ export function useVoiceConversation({
       setStatus('transcribing')
 
       try {
+        traceRef.current?.finish('cancelled')
+        traceRef.current = VoiceTurnTrace.begin()
+        traceRef.current?.mark('eos')
+        traceRef.current?.mark('stt_request')
         const transcript = (await onTranscribeAudio(audio)).trim()
+        traceRef.current?.mark('stt_result')
 
         if (!transcript) {
+          traceRef.current?.finish('no_speech')
           resumeListening()
 
           return
@@ -336,6 +358,7 @@ export function useVoiceConversation({
         // turn/playback was already cut at trip time; now end the conversation
         // instead of submitting "stop" as a new prompt.
         if (isVoiceStopCommand(transcript)) {
+          traceRef.current?.finish('cancelled')
           dropSpeechSession()
           setStatus('idle')
           onStopWordRef.current?.()
@@ -357,6 +380,7 @@ export function useVoiceConversation({
         await onSubmit(transcript)
         setStatus('thinking')
       } catch (error) {
+        traceRef.current?.finish('failed')
         notifyError(error, voiceCopy.transcriptionFailed)
         resumeListening()
       }
@@ -459,7 +483,7 @@ export function useVoiceConversation({
         // this is a safety net for read-aloud-style entries into the loop.
         ensureBargeMonitor()
 
-        const playback = playSpeechText(response.text, { source: 'voice-conversation' })
+        const playback = playSpeechText(response.text, { source: 'voice-conversation', trace: traceRef.current })
         // playSpeechText performs its normal cleanup synchronously before
         // returning. Capture the sequence after that internal increment so
         // only a later, external stop suppresses the next listen cycle.
@@ -500,7 +524,7 @@ export function useVoiceConversation({
       ensureBargeMonitor()
 
       void (async () => {
-        const session = await startSpeechStream({ source: 'voice-conversation' })
+        const session = await startSpeechStream({ source: 'voice-conversation', trace: traceRef.current })
 
         // The session may resolve after the loop moved on (barge, disable).
         if (responseIdRef.current !== responseId) {
@@ -600,6 +624,8 @@ export function useVoiceConversation({
   ])
 
   const end = useCallback(async () => {
+    traceRef.current?.finish('cancelled')
+    traceRef.current = null
     pendingStartRef.current = false
     clearTurnTimeout()
     stopVoicePlayback()
@@ -623,6 +649,7 @@ export function useVoiceConversation({
       const next = !value
 
       if (next) {
+        traceRef.current?.finish('cancelled')
         clearTurnTimeout()
         handle.cancel()
         setStatus('idle')
