@@ -884,7 +884,13 @@ def dispatch(req: dict, transport: Optional[Transport] = None) -> dict | None:
     """Route inbound RPCs — long handlers to the pool (returns None; the worker writes its own
     response via the bound transport), everything else inline (returns the response dict).
     *transport* pins every write of this request — events included — to that transport;
-    omitted → the module stdio transport (``tui_gateway.entry`` behaviour)."""
+    omitted → the module stdio transport (``tui_gateway.entry`` behaviour).
+
+    With ``tui_gateway.rpc_admission.enabled`` (F1.3, default OFF) long handlers
+    go through a bounded gate instead: a full queue is answered immediately with
+    the 4028 busy error, and a request that waited out ``queue_deadline_ms``
+    before starting is dropped (4029) without executing. Inline control-path
+    methods never touch the gate."""
     t = transport or _stdio_transport
     token = bind_transport(t)
     try:
@@ -910,7 +916,21 @@ def dispatch(req: dict, transport: Optional[Transport] = None) -> dict | None:
                 resp = _err(req.get("id"), -32000, f"handler error: {exc}")
             if resp is not None:
                 t.write(resp)
-        _pool.submit(lambda: ctx.run(run))
+
+        from tui_gateway import rpc_admission
+        admission = rpc_admission.current_admission(_load_cfg, _rpc_pool_workers)
+        if admission is None:  # flag OFF: historical unbounded path, unchanged
+            _pool.submit(lambda: ctx.run(run))
+            return None
+        gate = rpc_admission.gate_for(admission, _rpc_pool_workers)
+        rid = req.get("id")
+
+        def on_expired(err: dict) -> None:
+            t.write({"jsonrpc": "2.0", "id": rid, "error": err})
+
+        admitted, busy = gate.try_submit(lambda: ctx.run(run), _pool.submit, on_expired)
+        if not admitted:
+            return {"jsonrpc": "2.0", "id": rid, "error": busy}
         return None
     finally:
         reset_transport(token)

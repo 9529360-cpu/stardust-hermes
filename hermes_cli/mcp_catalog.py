@@ -104,6 +104,12 @@ class CatalogEntry:
     post_install: str = ""
     suggest: Optional[SuggestSpec] = None
     manifest_path: Path = field(default_factory=Path)
+    # CX5 catalog-detail metadata. Optional on purpose: existing manifests
+    # predate it, and the catalog JSON derives a runtime from the transport so
+    # no manifest edit is forced by the UI change.
+    publisher: str = ""
+    permissions: List[str] = field(default_factory=list)
+    runtime: str = ""  # "local" | "remote"; empty = derive from transport
 
 
 class CatalogError(Exception):
@@ -260,10 +266,21 @@ def _parse_manifest(path: Path) -> CatalogEntry:
     tools = _parse_tools(path, data.get("tools"))
     suggest = _parse_suggest(path, data.get("suggest"))
     install = _parse_install(path, data.get("install"))
+    publisher_raw = data.get("publisher")
+    if publisher_raw is not None and not isinstance(publisher_raw, str):
+        raise CatalogError(f"{path}: 'publisher' must be a string")
+    permissions_raw = data.get("permissions") or []
+    if not isinstance(permissions_raw, list) or not all(isinstance(p, str) and p.strip() for p in permissions_raw):
+        raise CatalogError(f"{path}: 'permissions' must be a list of non-empty strings")
+    runtime_raw = str(data.get("runtime") or "").strip().lower()
+    if runtime_raw and runtime_raw not in ("local", "remote"):
+        raise CatalogError(f"{path}: 'runtime' must be 'local' or 'remote'")
     return CatalogEntry(
         name=name, description=description, source=str(data.get("source") or "").strip(),
         transport=transport, auth=auth, tools=tools, install=install,
         post_install=str(data.get("post_install") or ""), suggest=suggest, manifest_path=path,
+        publisher=str(publisher_raw or "").strip(), permissions=[str(p) for p in permissions_raw],
+        runtime=runtime_raw,
     )
 
 

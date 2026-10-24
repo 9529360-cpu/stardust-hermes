@@ -252,3 +252,69 @@ def test_preexisting_copilot_controls_remain_usable(
 
     assert _resolve_command() == "/opt/operator/copilot"
     assert _resolve_args() == ["--acp", "--stdio", "--operator-mode"]
+
+
+def test_catalog_entry_detail_returns_metadata_and_default_tools(
+    client: TestClient,
+    catalog_env: Path,
+):
+    """CX5 connect dialog: entry detail exposes publisher/permissions/runtime
+    (runtime derived from transport when the manifest does not pin it) plus
+    the default tool selection, and never echoes env values."""
+    response = client.get("/api/mcp/catalog/entry/demo", headers=HEADERS)
+
+    assert response.status_code == 200
+    detail = response.json()
+    assert detail["name"] == "demo"
+    assert detail["runtime"] == "local"  # stdio transport -> local
+    assert detail["publisher"] == ""
+    assert detail["permissions"] == []
+    assert detail["default_tools"] is None
+    assert "DEMO_API_KEY" in [e["name"] for e in detail["required_env"]]
+
+
+def test_catalog_entry_detail_404_unknown_name(client: TestClient, catalog_env: Path):
+    response = client.get("/api/mcp/catalog/entry/missing", headers=HEADERS)
+
+    assert response.status_code == 404
+    assert "missing" in response.json()["detail"]
+
+
+def test_catalog_entry_detail_prefers_manifest_runtime_and_metadata(
+    client: TestClient,
+    catalog_env: Path,
+):
+    catalog_root = Path(os.environ["STARDUST_OPTIONAL_MCPS"])
+    manifest_path = catalog_root / "demo" / "manifest.yaml"
+    manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    manifest["publisher"] = "Example Corp"
+    manifest["permissions"] = ["Read demo data", "Write demo data"]
+    manifest["runtime"] = "remote"
+    manifest_path.write_text(yaml.safe_dump(manifest), encoding="utf-8")
+
+    response = client.get("/api/mcp/catalog/entry/demo", headers=HEADERS)
+
+    assert response.status_code == 200
+    detail = response.json()
+    assert detail["publisher"] == "Example Corp"
+    assert detail["permissions"] == ["Read demo data", "Write demo data"]
+    assert detail["runtime"] == "remote"  # explicit manifest choice wins
+
+
+def test_catalog_manifest_rejects_bad_publisher_and_runtime(catalog_env: Path):
+    from hermes_cli.mcp_catalog import catalog_diagnostics, list_catalog
+
+    catalog_root = Path(os.environ["STARDUST_OPTIONAL_MCPS"])
+    manifest_path = catalog_root / "demo" / "manifest.yaml"
+    base = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+
+    for field, bad in (("publisher", 42), ("runtime", "cloud"), ("permissions", "read")):
+        manifest = {**base, field: bad}
+        manifest_path.write_text(yaml.safe_dump(manifest), encoding="utf-8")
+        assert list_catalog() == []
+        assert any(kind == "invalid" for (_n, kind, _m) in catalog_diagnostics())
+    # good values parse back cleanly
+    manifest = {**base, "publisher": "Example Corp", "runtime": "remote",
+                "permissions": ["Read"]}
+    manifest_path.write_text(yaml.safe_dump(manifest), encoding="utf-8")
+    assert any(e.name == "demo" for e in list_catalog())
