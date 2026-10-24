@@ -15,11 +15,37 @@ import threading
 import time
 import uuid
 
-from tools.interrupt import is_interrupted
+from contextlib import contextmanager
+from tools.interrupt import interrupt_wakeup, is_interrupted
 from tools import approval_context as _ctx
 from tools.approval_human_wait import activity_heartbeat, human_wait_window
 
 logger = logging.getLogger("tools.approval")
+
+
+class _ApprovalEvent(threading.Event):
+    """Fan out an answer to private waiter events without sharing interrupts."""
+
+    def __init__(self):
+        super().__init__()
+        self._listeners_lock = threading.Lock()
+        self._listeners = set()
+
+    def set(self):
+        with self._listeners_lock:
+            super().set()
+            for listener in self._listeners:
+                listener.set()
+
+    def subscribe(self, listener):
+        with self._listeners_lock:
+            self._listeners.add(listener)
+            if self.is_set():
+                listener.set()
+
+    def unsubscribe(self, listener):
+        with self._listeners_lock:
+            self._listeners.discard(listener)
 
 
 class _ApprovalEntry:
@@ -27,7 +53,7 @@ class _ApprovalEntry:
     __slots__ = ("event", "data", "result", "reason", "acknowledged", "settle")
 
     def __init__(self, data: dict):
-        self.event = threading.Event()
+        self.event = _ApprovalEvent()
         self.data = dict(data)
         # Hosted-room approvals are fixed by target-issued policy, even if the
         # profile's ordinary approval mode changes while the request is pending.
@@ -44,11 +70,26 @@ class _ApprovalEntry:
         self.reason: str | None = None
 
 
+@contextmanager
+def _wait_signal(event):
+    if _ctx._get_approval_config().get("event_driven_interrupt") is not True:
+        yield event
+        return
+    wake = threading.Event()
+    event.subscribe(wake)
+    try:
+        with interrupt_wakeup(wake.set):
+            yield wake
+    finally:
+        event.unsubscribe(wake)
+
+
 def _poll_event(event: threading.Event, session_key: str, *, interrupt_log: str,
                 bypass_when_off: bool = False) -> str:
     """Wait on *event* until it fires, the turn is interrupted, or approvals.timeout
     elapses; returns ``"set"`` | ``"interrupted"`` | ``"timeout"``. Polls in ~1s
-    slices so activity heartbeats reach the agent's inactivity tracker every ~10s —
+    slices (opt-in interrupts wake immediately) so activity heartbeats reach the
+    agent's inactivity tracker every ~10s —
     otherwise the gateway watchdog kills the agent while the user is still
     responding (mirrors ``_wait_for_process()`` cadence). The loop is recorded as
     human-wait time so the concurrent batch deadline excludes it.
@@ -60,8 +101,10 @@ def _poll_event(event: threading.Event, session_key: str, *, interrupt_log: str,
     dedicated interrupt-cause channel, not string matching."""
     deadline = time.monotonic() + max(_ctx._get_approval_timeout(), 0)
     heartbeat = activity_heartbeat("waiting for user approval")
-    with human_wait_window(session_key):
+    with human_wait_window(session_key), _wait_signal(event) as wake:
         while True:
+            if wake is not event:
+                wake.clear()
             # The poll loop below is verifiably blocked on a human answer (the user tapping approve/deny on
             # the gateway surface), bounded by the approval timeout. Record it as human-wait time so the
             # concurrent batch deadline excludes it (#79719).
@@ -73,8 +116,12 @@ def _poll_event(event: threading.Event, session_key: str, *, interrupt_log: str,
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 return "timeout"
-            if event.wait(timeout=min(1.0, remaining)):
+            if wake is not event and event.is_set():
                 return "set"
+            if wake.wait(timeout=min(1.0, remaining)):
+                if wake is event:
+                    return "set"
+                continue
             heartbeat()
 
 

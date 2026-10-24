@@ -1621,6 +1621,8 @@ DEFAULT_CONFIG = {
         # prompt expired before the user reached their phone), so the default is 300.
         "mode": "smart",
         "timeout": 300,
+        # Wake blocked gateway approvals immediately on a thread-scoped Stop.
+        "event_driven_interrupt": False,
         "cron_mode": "deny",
         "single_query_mode": "deny",
         "unattended_mode": "deny",
