@@ -1,0 +1,1870 @@
+{
+  "meta": {
+    "seed": 20261024,
+    "facts": 100,
+    "writes": 55,
+    "topics": 30,
+    "questions": 100
+  },
+  "writes": [
+    {
+      "topic": "fav-color",
+      "title": "最喜欢的颜色",
+      "keywords": [
+        "颜色",
+        "偏好",
+        "蓝色"
+      ],
+      "summary": "阿豪最喜欢的颜色是蓝色。 阿豪觉得蓝色让人平静，适合工作环境。",
+      "phase": "initial"
+    },
+    {
+      "topic": "fav-color",
+      "title": "最喜欢的颜色",
+      "keywords": [
+        "颜色",
+        "偏好",
+        "蓝色"
+      ],
+      "summary": "阿豪最喜欢的颜色是蓝色。 阿豪觉得蓝色让人平静，适合工作环境。 买衣物时阿豪优先选深蓝色。 阿豪的电脑桌面壁纸常年是蓝色调。",
+      "phase": "grow"
+    },
+    {
+      "topic": "fav-food",
+      "title": "最喜欢的食物",
+      "keywords": [
+        "食物",
+        "偏好",
+        "意面"
+      ],
+      "summary": "阿豪最喜欢的食物是意大利面。 阿豪每周至少吃两次意大利面。",
+      "phase": "initial"
+    },
+    {
+      "topic": "fav-food",
+      "title": "最喜欢的食物",
+      "keywords": [
+        "食物",
+        "偏好",
+        "意面"
+      ],
+      "summary": "阿豪最喜欢的食物是意大利面。 阿豪每周至少吃两次意大利面。 阿豪最常做的意面是培根蛋面。 阿豪吃意面喜欢配气泡水。",
+      "phase": "grow"
+    },
+    {
+      "topic": "birth-city",
+      "title": "出生城市",
+      "keywords": [
+        "出生",
+        "家乡",
+        "槟城"
+      ],
+      "summary": "阿豪出生在马来西亚槟城。 阿豪在槟城生活到十八岁。",
+      "phase": "initial"
+    },
+    {
+      "topic": "birth-city",
+      "title": "出生城市",
+      "keywords": [
+        "出生",
+        "家乡",
+        "槟城"
+      ],
+      "summary": "阿豪出生在马来西亚槟城。 阿豪在槟城生活到十八岁。 阿豪的出生医院是槟城中央医院。 阿豪童年常去槟城的海边。",
+      "phase": "grow"
+    },
+    {
+      "topic": "current-city",
+      "title": "居住城市",
+      "keywords": [
+        "居住",
+        "搬家",
+        "米兰"
+      ],
+      "summary": "阿豪现在住在意大利米兰。 阿豪在米兰的公寓靠近运河区。",
+      "phase": "initial"
+    },
+    {
+      "topic": "current-city",
+      "title": "居住城市",
+      "keywords": [
+        "居住",
+        "搬家",
+        "米兰"
+      ],
+      "summary": "阿豪现在住在意大利米兰。 阿豪在米兰的公寓靠近运河区。 阿豪搬来米兰已经四年。 阿豪的米兰住址邮编是20144。",
+      "phase": "grow"
+    },
+    {
+      "topic": "job",
+      "title": "职业",
+      "keywords": [
+        "工作",
+        "职业",
+        "工程师"
+      ],
+      "summary": "阿豪是一名后端工程师。 阿豪主要写 Python 和 Go。",
+      "phase": "initial"
+    },
+    {
+      "topic": "job",
+      "title": "职业",
+      "keywords": [
+        "工作",
+        "职业",
+        "工程师"
+      ],
+      "summary": "阿豪是一名后端工程师。 阿豪主要写 Python 和 Go。 阿豪负责支付系统的稳定性。 阿豪每周三参加技术评审会。",
+      "phase": "grow"
+    },
+    {
+      "topic": "company",
+      "title": "公司",
+      "keywords": [
+        "公司",
+        "雇主",
+        "Brightline"
+      ],
+      "summary": "阿豪在 Brightline Labs 工作。 阿豪的工位在三层靠窗位置。",
+      "phase": "initial"
+    },
+    {
+      "topic": "company",
+      "title": "公司",
+      "keywords": [
+        "公司",
+        "雇主",
+        "Brightline"
+      ],
+      "summary": "阿豪在 Brightline Labs 工作。 阿豪的工位在三层靠窗位置。 阿豪的公司在米兰岛区办公。 阿豪的直属经理叫 Elena。",
+      "phase": "grow"
+    },
+    {
+      "topic": "hobby-photography",
+      "title": "摄影爱好",
+      "keywords": [
+        "摄影",
+        "镜头",
+        "街头"
+      ],
+      "summary": "阿豪的爱好是街头摄影。 阿豪常用 35mm 定焦镜头拍街头。",
+      "phase": "initial"
+    },
+    {
+      "topic": "hobby-photography",
+      "title": "摄影爱好",
+      "keywords": [
+        "摄影",
+        "镜头",
+        "街头"
+      ],
+      "summary": "阿豪的爱好是街头摄影。 阿豪常用 35mm 定焦镜头拍街头。 阿豪的相机是 Ricoh GR III。 阿豪每月整理一次照片库。",
+      "phase": "grow"
+    },
+    {
+      "topic": "hobby-running",
+      "title": "跑步习惯",
+      "keywords": [
+        "跑步",
+        "清晨",
+        "晨跑"
+      ],
+      "summary": "阿豪每周跑步三次。 阿豪通常在清晨六点跑步。",
+      "phase": "initial"
+    },
+    {
+      "topic": "hobby-running",
+      "title": "跑步习惯",
+      "keywords": [
+        "跑步",
+        "清晨",
+        "晨跑"
+      ],
+      "summary": "阿豪每周跑步三次。 阿豪通常在清晨六点跑步。 阿豪沿运河路线跑步。 阿豪参加过去年的米兰半马。",
+      "phase": "grow"
+    },
+    {
+      "topic": "fav-music",
+      "title": "喜欢的音乐",
+      "keywords": [
+        "音乐",
+        "乐队",
+        "后摇"
+      ],
+      "summary": "阿豪最喜欢听 Post-rock。 阿豪最喜欢的乐队是 Explosions in the Sky。",
+      "phase": "initial"
+    },
+    {
+      "topic": "fav-music",
+      "title": "喜欢的音乐",
+      "keywords": [
+        "音乐",
+        "乐队",
+        "后摇"
+      ],
+      "summary": "阿豪最喜欢听 Post-rock。 阿豪最喜欢的乐队是 Explosions in the Sky。 阿豪写代码时听器乐后摇。 阿豪收藏了三十多张黑胶。",
+      "phase": "grow"
+    },
+    {
+      "topic": "fav-book",
+      "title": "喜欢的书",
+      "keywords": [
+        "书",
+        "阅读",
+        "科幻"
+      ],
+      "summary": "阿豪最喜欢的书是《三体》。 阿豪读过《三体》三遍。",
+      "phase": "initial"
+    },
+    {
+      "topic": "fav-book",
+      "title": "喜欢的书",
+      "keywords": [
+        "书",
+        "阅读",
+        "科幻"
+      ],
+      "summary": "阿豪最喜欢的书是《三体》。 阿豪读过《三体》三遍。 阿豪的枕边书是《球状闪电》。 阿豪偏好硬科幻多于奇幻。",
+      "phase": "grow"
+    },
+    {
+      "topic": "pet",
+      "title": "宠物",
+      "keywords": [
+        "宠物",
+        "猫",
+        "Pixel"
+      ],
+      "summary": "阿豪养了一只猫叫 Pixel。 Pixel 是一只英国短毛猫。",
+      "phase": "initial"
+    },
+    {
+      "topic": "pet",
+      "title": "宠物",
+      "keywords": [
+        "宠物",
+        "猫",
+        "Pixel"
+      ],
+      "summary": "阿豪养了一只猫叫 Pixel。 Pixel 是一只英国短毛猫。 Pixel 今年三岁。 Pixel 最爱睡在键盘旁边。",
+      "phase": "grow"
+    },
+    {
+      "topic": "car",
+      "title": "汽车",
+      "keywords": [
+        "车",
+        "通勤",
+        "Fiat"
+      ],
+      "summary": "阿豪开一辆蓝色的 Fiat Panda。 阿豪的车是手动挡。",
+      "phase": "initial"
+    },
+    {
+      "topic": "car",
+      "title": "汽车",
+      "keywords": [
+        "车",
+        "通勤",
+        "Fiat"
+      ],
+      "summary": "阿豪开一辆蓝色的 Fiat Panda。 阿豪的车是手动挡。 阿豪的车停在公寓地下车库。 阿豪每半年保养一次车。",
+      "phase": "grow"
+    },
+    {
+      "topic": "timezone",
+      "title": "时区",
+      "keywords": [
+        "时区",
+        "作息",
+        "罗马"
+      ],
+      "summary": "阿豪在 Europe/Rome 时区。 阿豪通常午夜前入睡。",
+      "phase": "initial"
+    },
+    {
+      "topic": "timezone",
+      "title": "时区",
+      "keywords": [
+        "时区",
+        "作息",
+        "罗马"
+      ],
+      "summary": "阿豪在 Europe/Rome 时区。 阿豪通常午夜前入睡。 阿豪早上八点半开始工作。 阿豪午休习惯二十分钟小睡。",
+      "phase": "grow"
+    },
+    {
+      "topic": "keyboard",
+      "title": "键盘",
+      "keywords": [
+        "键盘",
+        "HHKB",
+        "静电容"
+      ],
+      "summary": "阿豪用 HHKB 静电容键盘。 阿豪习惯 HHKB 的 Control 键布局。",
+      "phase": "initial"
+    },
+    {
+      "topic": "keyboard",
+      "title": "键盘",
+      "keywords": [
+        "键盘",
+        "HHKB",
+        "静电容"
+      ],
+      "summary": "阿豪用 HHKB 静电容键盘。 阿豪习惯 HHKB 的 Control 键布局。 阿豪的键盘用了五年。 阿豪备用键盘是客制化的 65 配列。",
+      "phase": "grow"
+    },
+    {
+      "topic": "editor",
+      "title": "编辑器",
+      "keywords": [
+        "编辑器",
+        "开发",
+        "VS Code"
+      ],
+      "summary": "阿豪主力编辑器是 VS Code。 阿豪在 VS Code 里用 Vim 插件。",
+      "phase": "initial"
+    },
+    {
+      "topic": "editor",
+      "title": "编辑器",
+      "keywords": [
+        "编辑器",
+        "开发",
+        "VS Code"
+      ],
+      "summary": "阿豪主力编辑器是 VS Code。 阿豪在 VS Code 里用 Vim 插件。 阿豪的主题是暗色 Solarized。 阿豪的终端字体用 JetBrains Mono。",
+      "phase": "grow"
+    },
+    {
+      "topic": "coffee",
+      "title": "咖啡习惯",
+      "keywords": [
+        "咖啡",
+        "手冲",
+        "浅烘"
+      ],
+      "summary": "阿豪每天喝两杯咖啡。 阿豪偏好手冲浅烘咖啡。",
+      "phase": "initial"
+    },
+    {
+      "topic": "coffee",
+      "title": "咖啡习惯",
+      "keywords": [
+        "咖啡",
+        "手冲",
+        "浅烘"
+      ],
+      "summary": "阿豪每天喝两杯咖啡。 阿豪偏好手冲浅烘咖啡。 阿豪常去的咖啡馆在运河边。 阿豪家里有 V60 滤杯。",
+      "phase": "grow"
+    },
+    {
+      "topic": "guitar",
+      "title": "吉他",
+      "keywords": [
+        "吉他",
+        "乐器",
+        "木吉他"
+      ],
+      "summary": "阿豪会弹木吉他。 阿豪的吉他是 Yamaha FG800。",
+      "phase": "initial"
+    },
+    {
+      "topic": "guitar",
+      "title": "吉他",
+      "keywords": [
+        "吉他",
+        "乐器",
+        "木吉他"
+      ],
+      "summary": "阿豪会弹木吉他。 阿豪的吉他是 Yamaha FG800。 阿豪每晚练琴十五分钟。 阿豪会弹的第一首歌是《丁香花》。",
+      "phase": "grow"
+    },
+    {
+      "topic": "bank",
+      "title": "开户行",
+      "keywords": [
+        "银行",
+        "账户",
+        "Intesa"
+      ],
+      "summary": "阿豪的工资卡在 Intesa 银行。 阿豪的银行网点在中央车站旁。",
+      "phase": "initial"
+    },
+    {
+      "topic": "bank",
+      "title": "开户行",
+      "keywords": [
+        "银行",
+        "账户",
+        "Intesa"
+      ],
+      "summary": "阿豪的工资卡在 Intesa 银行。 阿豪的银行网点在中央车站旁。 阿豪的储蓄账户也在 Intesa。 阿豪每月发薪日是二十七号。",
+      "phase": "grow"
+    },
+    {
+      "topic": "language",
+      "title": "语言",
+      "keywords": [
+        "语言",
+        "中文",
+        "意大利语"
+      ],
+      "summary": "阿豪会说中文、英文和意大利语。 阿豪的意大利语带托斯卡纳口音。",
+      "phase": "initial"
+    },
+    {
+      "topic": "language",
+      "title": "语言",
+      "keywords": [
+        "语言",
+        "中文",
+        "意大利语"
+      ],
+      "summary": "阿豪会说中文、英文和意大利语。 阿豪的意大利语带托斯卡纳口音。 阿豪日常思考用中文。 阿豪正在学第四门语言西班牙语。",
+      "phase": "grow"
+    },
+    {
+      "topic": "allergy",
+      "title": "过敏",
+      "keywords": [
+        "过敏",
+        "芒果",
+        "饮食限制"
+      ],
+      "summary": "阿豪对芒果过敏。 阿豪随身带抗过敏药。",
+      "phase": "initial"
+    },
+    {
+      "topic": "allergy",
+      "title": "过敏",
+      "keywords": [
+        "过敏",
+        "芒果",
+        "饮食限制"
+      ],
+      "summary": "阿豪对芒果过敏。 阿豪随身带抗过敏药。 阿豪吃东南亚菜会先问配料。 阿豪的过敏是六岁时发现的。",
+      "phase": "grow"
+    },
+    {
+      "topic": "phone",
+      "title": "手机",
+      "keywords": [
+        "手机",
+        "设备",
+        "换机"
+      ],
+      "summary": "阿豪的手机号尾号是 7788。 阿豪给手机贴了磨砂膜。 阿豪的手机是 Pixel 8。",
+      "phase": "initial"
+    },
+    {
+      "topic": "phone",
+      "title": "手机",
+      "keywords": [
+        "手机",
+        "设备",
+        "换机"
+      ],
+      "summary": "阿豪的手机号尾号是 7788。 阿豪给手机贴了磨砂膜。 阿豪现在用 iPhone 17。",
+      "phase": "update"
+    },
+    {
+      "topic": "phone-old",
+      "title": "手机（旧）",
+      "keywords": [
+        "手机",
+        "设备",
+        "换机",
+        "旧"
+      ],
+      "summary": "阿豪的手机是 Pixel 8（2026 年之前的旧记录）。",
+      "phase": "stale-fork"
+    },
+    {
+      "topic": "laptop",
+      "title": "笔记本电脑",
+      "keywords": [
+        "笔记本",
+        "电脑",
+        "开发机"
+      ],
+      "summary": "阿豪的电脑包是 Tomtoc 的。 阿豪给笔记本贴了防窥膜。 阿豪的笔记本是 ThinkPad X1。",
+      "phase": "initial"
+    },
+    {
+      "topic": "laptop",
+      "title": "笔记本电脑",
+      "keywords": [
+        "笔记本",
+        "电脑",
+        "开发机"
+      ],
+      "summary": "阿豪的电脑包是 Tomtoc 的。 阿豪给笔记本贴了防窥膜。 阿豪现在用 MacBook Air M4。",
+      "phase": "update"
+    },
+    {
+      "topic": "laptop-old",
+      "title": "笔记本电脑（旧）",
+      "keywords": [
+        "笔记本",
+        "电脑",
+        "开发机",
+        "旧"
+      ],
+      "summary": "阿豪的笔记本是 ThinkPad X1（已退役的旧记录）。",
+      "phase": "stale-fork"
+    },
+    {
+      "topic": "gym",
+      "title": "健身房",
+      "keywords": [
+        "健身",
+        "训练",
+        "力量"
+      ],
+      "summary": "阿豪每周练三次力量。 阿豪的教练叫 Marco。 阿豪在 FitPlus 健身房办了卡。",
+      "phase": "initial"
+    },
+    {
+      "topic": "gym",
+      "title": "健身房",
+      "keywords": [
+        "健身",
+        "训练",
+        "力量"
+      ],
+      "summary": "阿豪每周练三次力量。 阿豪的教练叫 Marco。 阿豪现在在 Verde Gym 健身。",
+      "phase": "update"
+    },
+    {
+      "topic": "gym-membership",
+      "title": "健身房会员（旧）",
+      "keywords": [
+        "健身",
+        "训练",
+        "力量",
+        "旧"
+      ],
+      "summary": "阿豪在 FitPlus 健身房办过卡（已退卡的旧记录）。",
+      "phase": "stale-fork"
+    },
+    {
+      "topic": "dentist",
+      "title": "牙医",
+      "keywords": [
+        "牙医",
+        "口腔",
+        "复诊"
+      ],
+      "summary": "阿豪每半年洗一次牙。 阿豪用电动牙刷。 阿豪的牙医是 Rossi 医生。",
+      "phase": "initial"
+    },
+    {
+      "topic": "dentist",
+      "title": "牙医",
+      "keywords": [
+        "牙医",
+        "口腔",
+        "复诊"
+      ],
+      "summary": "阿豪每半年洗一次牙。 阿豪用电动牙刷。 阿豪现在的牙医是 Bianchi 医生。",
+      "phase": "update"
+    },
+    {
+      "topic": "dentist-rossi",
+      "title": "牙医 Rossi（旧）",
+      "keywords": [
+        "牙医",
+        "口腔",
+        "复诊",
+        "旧"
+      ],
+      "summary": "阿豪的牙医是 Rossi 医生（已退休的旧记录）。",
+      "phase": "stale-fork"
+    },
+    {
+      "topic": "desk",
+      "title": "书桌",
+      "keywords": [
+        "书桌",
+        "书房",
+        "办公桌"
+      ],
+      "summary": "阿豪的书桌靠窗摆放。 阿豪桌上有一盏屏幕挂灯。 阿豪用宜家升降桌。",
+      "phase": "initial"
+    },
+    {
+      "topic": "desk",
+      "title": "书桌",
+      "keywords": [
+        "书桌",
+        "书房",
+        "办公桌"
+      ],
+      "summary": "阿豪的书桌靠窗摆放。 阿豪桌上有一盏屏幕挂灯。 阿豪现在用 Oaksam 实木书桌。",
+      "phase": "update"
+    },
+    {
+      "topic": "desk-old",
+      "title": "书桌（旧）",
+      "keywords": [
+        "书桌",
+        "书房",
+        "办公桌",
+        "旧"
+      ],
+      "summary": "阿豪用过宜家升降桌（已出二手的旧记录）。",
+      "phase": "stale-fork"
+    }
+  ],
+  "topics": [
+    {
+      "key": "fav-color",
+      "title": "最喜欢的颜色",
+      "keywords": [
+        "颜色",
+        "偏好",
+        "蓝色"
+      ],
+      "facts": [
+        "阿豪最喜欢的颜色是蓝色。",
+        "阿豪觉得蓝色让人平静，适合工作环境。",
+        "买衣物时阿豪优先选深蓝色。",
+        "阿豪的电脑桌面壁纸常年是蓝色调。"
+      ],
+      "kind": "static"
+    },
+    {
+      "key": "fav-food",
+      "title": "最喜欢的食物",
+      "keywords": [
+        "食物",
+        "偏好",
+        "意面"
+      ],
+      "facts": [
+        "阿豪最喜欢的食物是意大利面。",
+        "阿豪每周至少吃两次意大利面。",
+        "阿豪最常做的意面是培根蛋面。",
+        "阿豪吃意面喜欢配气泡水。"
+      ],
+      "kind": "static"
+    },
+    {
+      "key": "birth-city",
+      "title": "出生城市",
+      "keywords": [
+        "出生",
+        "家乡",
+        "槟城"
+      ],
+      "facts": [
+        "阿豪出生在马来西亚槟城。",
+        "阿豪在槟城生活到十八岁。",
+        "阿豪的出生医院是槟城中央医院。",
+        "阿豪童年常去槟城的海边。"
+      ],
+      "kind": "static"
+    },
+    {
+      "key": "current-city",
+      "title": "居住城市",
+      "keywords": [
+        "居住",
+        "搬家",
+        "米兰"
+      ],
+      "facts": [
+        "阿豪现在住在意大利米兰。",
+        "阿豪在米兰的公寓靠近运河区。",
+        "阿豪搬来米兰已经四年。",
+        "阿豪的米兰住址邮编是20144。"
+      ],
+      "kind": "static"
+    },
+    {
+      "key": "job",
+      "title": "职业",
+      "keywords": [
+        "工作",
+        "职业",
+        "工程师"
+      ],
+      "facts": [
+        "阿豪是一名后端工程师。",
+        "阿豪主要写 Python 和 Go。",
+        "阿豪负责支付系统的稳定性。",
+        "阿豪每周三参加技术评审会。"
+      ],
+      "kind": "static"
+    },
+    {
+      "key": "company",
+      "title": "公司",
+      "keywords": [
+        "公司",
+        "雇主",
+        "Brightline"
+      ],
+      "facts": [
+        "阿豪在 Brightline Labs 工作。",
+        "阿豪的工位在三层靠窗位置。",
+        "阿豪的公司在米兰岛区办公。",
+        "阿豪的直属经理叫 Elena。"
+      ],
+      "kind": "static"
+    },
+    {
+      "key": "hobby-photography",
+      "title": "摄影爱好",
+      "keywords": [
+        "摄影",
+        "镜头",
+        "街头"
+      ],
+      "facts": [
+        "阿豪的爱好是街头摄影。",
+        "阿豪常用 35mm 定焦镜头拍街头。",
+        "阿豪的相机是 Ricoh GR III。",
+        "阿豪每月整理一次照片库。"
+      ],
+      "kind": "static"
+    },
+    {
+      "key": "hobby-running",
+      "title": "跑步习惯",
+      "keywords": [
+        "跑步",
+        "清晨",
+        "晨跑"
+      ],
+      "facts": [
+        "阿豪每周跑步三次。",
+        "阿豪通常在清晨六点跑步。",
+        "阿豪沿运河路线跑步。",
+        "阿豪参加过去年的米兰半马。"
+      ],
+      "kind": "static"
+    },
+    {
+      "key": "fav-music",
+      "title": "喜欢的音乐",
+      "keywords": [
+        "音乐",
+        "乐队",
+        "后摇"
+      ],
+      "facts": [
+        "阿豪最喜欢听 Post-rock。",
+        "阿豪最喜欢的乐队是 Explosions in the Sky。",
+        "阿豪写代码时听器乐后摇。",
+        "阿豪收藏了三十多张黑胶。"
+      ],
+      "kind": "static"
+    },
+    {
+      "key": "fav-book",
+      "title": "喜欢的书",
+      "keywords": [
+        "书",
+        "阅读",
+        "科幻"
+      ],
+      "facts": [
+        "阿豪最喜欢的书是《三体》。",
+        "阿豪读过《三体》三遍。",
+        "阿豪的枕边书是《球状闪电》。",
+        "阿豪偏好硬科幻多于奇幻。"
+      ],
+      "kind": "static"
+    },
+    {
+      "key": "pet",
+      "title": "宠物",
+      "keywords": [
+        "宠物",
+        "猫",
+        "Pixel"
+      ],
+      "facts": [
+        "阿豪养了一只猫叫 Pixel。",
+        "Pixel 是一只英国短毛猫。",
+        "Pixel 今年三岁。",
+        "Pixel 最爱睡在键盘旁边。"
+      ],
+      "kind": "static"
+    },
+    {
+      "key": "car",
+      "title": "汽车",
+      "keywords": [
+        "车",
+        "通勤",
+        "Fiat"
+      ],
+      "facts": [
+        "阿豪开一辆蓝色的 Fiat Panda。",
+        "阿豪的车是手动挡。",
+        "阿豪的车停在公寓地下车库。",
+        "阿豪每半年保养一次车。"
+      ],
+      "kind": "static"
+    },
+    {
+      "key": "timezone",
+      "title": "时区",
+      "keywords": [
+        "时区",
+        "作息",
+        "罗马"
+      ],
+      "facts": [
+        "阿豪在 Europe/Rome 时区。",
+        "阿豪通常午夜前入睡。",
+        "阿豪早上八点半开始工作。",
+        "阿豪午休习惯二十分钟小睡。"
+      ],
+      "kind": "static"
+    },
+    {
+      "key": "keyboard",
+      "title": "键盘",
+      "keywords": [
+        "键盘",
+        "HHKB",
+        "静电容"
+      ],
+      "facts": [
+        "阿豪用 HHKB 静电容键盘。",
+        "阿豪习惯 HHKB 的 Control 键布局。",
+        "阿豪的键盘用了五年。",
+        "阿豪备用键盘是客制化的 65 配列。"
+      ],
+      "kind": "static"
+    },
+    {
+      "key": "editor",
+      "title": "编辑器",
+      "keywords": [
+        "编辑器",
+        "开发",
+        "VS Code"
+      ],
+      "facts": [
+        "阿豪主力编辑器是 VS Code。",
+        "阿豪在 VS Code 里用 Vim 插件。",
+        "阿豪的主题是暗色 Solarized。",
+        "阿豪的终端字体用 JetBrains Mono。"
+      ],
+      "kind": "static"
+    },
+    {
+      "key": "coffee",
+      "title": "咖啡习惯",
+      "keywords": [
+        "咖啡",
+        "手冲",
+        "浅烘"
+      ],
+      "facts": [
+        "阿豪每天喝两杯咖啡。",
+        "阿豪偏好手冲浅烘咖啡。",
+        "阿豪常去的咖啡馆在运河边。",
+        "阿豪家里有 V60 滤杯。"
+      ],
+      "kind": "static"
+    },
+    {
+      "key": "guitar",
+      "title": "吉他",
+      "keywords": [
+        "吉他",
+        "乐器",
+        "木吉他"
+      ],
+      "facts": [
+        "阿豪会弹木吉他。",
+        "阿豪的吉他是 Yamaha FG800。",
+        "阿豪每晚练琴十五分钟。",
+        "阿豪会弹的第一首歌是《丁香花》。"
+      ],
+      "kind": "static"
+    },
+    {
+      "key": "bank",
+      "title": "开户行",
+      "keywords": [
+        "银行",
+        "账户",
+        "Intesa"
+      ],
+      "facts": [
+        "阿豪的工资卡在 Intesa 银行。",
+        "阿豪的银行网点在中央车站旁。",
+        "阿豪的储蓄账户也在 Intesa。",
+        "阿豪每月发薪日是二十七号。"
+      ],
+      "kind": "static"
+    },
+    {
+      "key": "language",
+      "title": "语言",
+      "keywords": [
+        "语言",
+        "中文",
+        "意大利语"
+      ],
+      "facts": [
+        "阿豪会说中文、英文和意大利语。",
+        "阿豪的意大利语带托斯卡纳口音。",
+        "阿豪日常思考用中文。",
+        "阿豪正在学第四门语言西班牙语。"
+      ],
+      "kind": "static"
+    },
+    {
+      "key": "allergy",
+      "title": "过敏",
+      "keywords": [
+        "过敏",
+        "芒果",
+        "饮食限制"
+      ],
+      "facts": [
+        "阿豪对芒果过敏。",
+        "阿豪随身带抗过敏药。",
+        "阿豪吃东南亚菜会先问配料。",
+        "阿豪的过敏是六岁时发现的。"
+      ],
+      "kind": "static"
+    },
+    {
+      "key": "phone",
+      "title": "手机",
+      "keywords": [
+        "手机",
+        "设备",
+        "换机"
+      ],
+      "facts": [
+        "阿豪的手机号尾号是 7788。",
+        "阿豪给手机贴了磨砂膜。",
+        "阿豪现在用 iPhone 17。"
+      ],
+      "kind": "current"
+    },
+    {
+      "key": "phone-old",
+      "title": "手机（旧）",
+      "keywords": [
+        "手机",
+        "设备",
+        "换机",
+        "旧"
+      ],
+      "facts": [
+        "阿豪的手机是 Pixel 8（2026 年之前的旧记录）。"
+      ],
+      "kind": "stale_fork"
+    },
+    {
+      "key": "laptop",
+      "title": "笔记本电脑",
+      "keywords": [
+        "笔记本",
+        "电脑",
+        "开发机"
+      ],
+      "facts": [
+        "阿豪的电脑包是 Tomtoc 的。",
+        "阿豪给笔记本贴了防窥膜。",
+        "阿豪现在用 MacBook Air M4。"
+      ],
+      "kind": "current"
+    },
+    {
+      "key": "laptop-old",
+      "title": "笔记本电脑（旧）",
+      "keywords": [
+        "笔记本",
+        "电脑",
+        "开发机",
+        "旧"
+      ],
+      "facts": [
+        "阿豪的笔记本是 ThinkPad X1（已退役的旧记录）。"
+      ],
+      "kind": "stale_fork"
+    },
+    {
+      "key": "gym",
+      "title": "健身房",
+      "keywords": [
+        "健身",
+        "训练",
+        "力量"
+      ],
+      "facts": [
+        "阿豪每周练三次力量。",
+        "阿豪的教练叫 Marco。",
+        "阿豪现在在 Verde Gym 健身。"
+      ],
+      "kind": "current"
+    },
+    {
+      "key": "gym-membership",
+      "title": "健身房会员（旧）",
+      "keywords": [
+        "健身",
+        "训练",
+        "力量",
+        "旧"
+      ],
+      "facts": [
+        "阿豪在 FitPlus 健身房办过卡（已退卡的旧记录）。"
+      ],
+      "kind": "stale_fork"
+    },
+    {
+      "key": "dentist",
+      "title": "牙医",
+      "keywords": [
+        "牙医",
+        "口腔",
+        "复诊"
+      ],
+      "facts": [
+        "阿豪每半年洗一次牙。",
+        "阿豪用电动牙刷。",
+        "阿豪现在的牙医是 Bianchi 医生。"
+      ],
+      "kind": "current"
+    },
+    {
+      "key": "dentist-rossi",
+      "title": "牙医 Rossi（旧）",
+      "keywords": [
+        "牙医",
+        "口腔",
+        "复诊",
+        "旧"
+      ],
+      "facts": [
+        "阿豪的牙医是 Rossi 医生（已退休的旧记录）。"
+      ],
+      "kind": "stale_fork"
+    },
+    {
+      "key": "desk",
+      "title": "书桌",
+      "keywords": [
+        "书桌",
+        "书房",
+        "办公桌"
+      ],
+      "facts": [
+        "阿豪的书桌靠窗摆放。",
+        "阿豪桌上有一盏屏幕挂灯。",
+        "阿豪现在用 Oaksam 实木书桌。"
+      ],
+      "kind": "current"
+    },
+    {
+      "key": "desk-old",
+      "title": "书桌（旧）",
+      "keywords": [
+        "书桌",
+        "书房",
+        "办公桌",
+        "旧"
+      ],
+      "facts": [
+        "阿豪用过宜家升降桌（已出二手的旧记录）。"
+      ],
+      "kind": "stale_fork"
+    }
+  ],
+  "questions": [
+    {
+      "id": "q001",
+      "category": "direct",
+      "question": "阿豪最喜欢的颜色是什么？",
+      "target_topic": "fav-color",
+      "answer_key": "蓝色"
+    },
+    {
+      "id": "q002",
+      "category": "direct",
+      "question": "阿豪买衣物时优先选什么颜色？",
+      "target_topic": "fav-color",
+      "answer_key": "深蓝色"
+    },
+    {
+      "id": "q003",
+      "category": "direct",
+      "question": "阿豪最喜欢的食物是什么？",
+      "target_topic": "fav-food",
+      "answer_key": "意大利面"
+    },
+    {
+      "id": "q004",
+      "category": "direct",
+      "question": "阿豪最常做的意面是哪种？",
+      "target_topic": "fav-food",
+      "answer_key": "培根蛋面"
+    },
+    {
+      "id": "q005",
+      "category": "direct",
+      "question": "阿豪出生在哪个城市？",
+      "target_topic": "birth-city",
+      "answer_key": "槟城"
+    },
+    {
+      "id": "q006",
+      "category": "direct",
+      "question": "阿豪的出生医院是哪家？",
+      "target_topic": "birth-city",
+      "answer_key": "槟城中央医院"
+    },
+    {
+      "id": "q007",
+      "category": "direct",
+      "question": "阿豪现在住在哪个城市？",
+      "target_topic": "current-city",
+      "answer_key": "米兰"
+    },
+    {
+      "id": "q008",
+      "category": "direct",
+      "question": "阿豪的米兰住址邮编是多少？",
+      "target_topic": "current-city",
+      "answer_key": "20144"
+    },
+    {
+      "id": "q009",
+      "category": "direct",
+      "question": "阿豪的职业是什么？",
+      "target_topic": "job",
+      "answer_key": "后端工程师"
+    },
+    {
+      "id": "q010",
+      "category": "direct",
+      "question": "阿豪负责什么系统的稳定性？",
+      "target_topic": "job",
+      "answer_key": "支付系统"
+    },
+    {
+      "id": "q011",
+      "category": "direct",
+      "question": "阿豪在哪家公司工作？",
+      "target_topic": "company",
+      "answer_key": "Brightline Labs"
+    },
+    {
+      "id": "q012",
+      "category": "direct",
+      "question": "阿豪的直属经理叫什么？",
+      "target_topic": "company",
+      "answer_key": "Elena"
+    },
+    {
+      "id": "q013",
+      "category": "direct",
+      "question": "阿豪的爱好是什么？",
+      "target_topic": "hobby-photography",
+      "answer_key": "街头摄影"
+    },
+    {
+      "id": "q014",
+      "category": "direct",
+      "question": "阿豪的相机是什么型号？",
+      "target_topic": "hobby-photography",
+      "answer_key": "Ricoh GR III"
+    },
+    {
+      "id": "q015",
+      "category": "direct",
+      "question": "阿豪每周跑步几次？",
+      "target_topic": "hobby-running",
+      "answer_key": "三次"
+    },
+    {
+      "id": "q016",
+      "category": "direct",
+      "question": "阿豪参加过哪场半马？",
+      "target_topic": "hobby-running",
+      "answer_key": "米兰半马"
+    },
+    {
+      "id": "q017",
+      "category": "direct",
+      "question": "阿豪最喜欢什么风格的音乐？",
+      "target_topic": "fav-music",
+      "answer_key": "Post-rock"
+    },
+    {
+      "id": "q018",
+      "category": "direct",
+      "question": "阿豪收藏了多少张黑胶？",
+      "target_topic": "fav-music",
+      "answer_key": "三十多张"
+    },
+    {
+      "id": "q019",
+      "category": "direct",
+      "question": "阿豪最喜欢的书是什么？",
+      "target_topic": "fav-book",
+      "answer_key": "三体"
+    },
+    {
+      "id": "q020",
+      "category": "direct",
+      "question": "阿豪的枕边书是哪本？",
+      "target_topic": "fav-book",
+      "answer_key": "球状闪电"
+    },
+    {
+      "id": "q021",
+      "category": "direct",
+      "question": "阿豪养了什么宠物？",
+      "target_topic": "pet",
+      "answer_key": "猫"
+    },
+    {
+      "id": "q022",
+      "category": "direct",
+      "question": "Pixel 今年几岁？",
+      "target_topic": "pet",
+      "answer_key": "三岁"
+    },
+    {
+      "id": "q023",
+      "category": "direct",
+      "question": "阿豪开什么车？",
+      "target_topic": "car",
+      "answer_key": "Fiat Panda"
+    },
+    {
+      "id": "q024",
+      "category": "direct",
+      "question": "阿豪的车平时停在哪里？",
+      "target_topic": "car",
+      "answer_key": "地下车库"
+    },
+    {
+      "id": "q025",
+      "category": "direct",
+      "question": "阿豪在哪个时区？",
+      "target_topic": "timezone",
+      "answer_key": "Europe/Rome"
+    },
+    {
+      "id": "q026",
+      "category": "direct",
+      "question": "阿豪早上几点开始工作？",
+      "target_topic": "timezone",
+      "answer_key": "八点半"
+    },
+    {
+      "id": "q027",
+      "category": "direct",
+      "question": "阿豪用什么键盘？",
+      "target_topic": "keyboard",
+      "answer_key": "HHKB"
+    },
+    {
+      "id": "q028",
+      "category": "direct",
+      "question": "阿豪的备用键盘是什么配列？",
+      "target_topic": "keyboard",
+      "answer_key": "65配列"
+    },
+    {
+      "id": "q029",
+      "category": "direct",
+      "question": "阿豪的主力编辑器是什么？",
+      "target_topic": "editor",
+      "answer_key": "VS Code"
+    },
+    {
+      "id": "q030",
+      "category": "direct",
+      "question": "阿豪的终端字体是什么？",
+      "target_topic": "editor",
+      "answer_key": "JetBrains Mono"
+    },
+    {
+      "id": "q031",
+      "category": "direct",
+      "question": "阿豪每天喝几杯咖啡？",
+      "target_topic": "coffee",
+      "answer_key": "两杯"
+    },
+    {
+      "id": "q032",
+      "category": "direct",
+      "question": "阿豪家里有什么咖啡器具？",
+      "target_topic": "coffee",
+      "answer_key": "V60滤杯"
+    },
+    {
+      "id": "q033",
+      "category": "direct",
+      "question": "阿豪会弹什么乐器？",
+      "target_topic": "guitar",
+      "answer_key": "木吉他"
+    },
+    {
+      "id": "q034",
+      "category": "direct",
+      "question": "阿豪每晚练琴多久？",
+      "target_topic": "guitar",
+      "answer_key": "十五分钟"
+    },
+    {
+      "id": "q035",
+      "category": "direct",
+      "question": "阿豪的工资卡在哪家银行？",
+      "target_topic": "bank",
+      "answer_key": "Intesa"
+    },
+    {
+      "id": "q036",
+      "category": "direct",
+      "question": "阿豪的每月发薪日是哪天？",
+      "target_topic": "bank",
+      "answer_key": "二十七号"
+    },
+    {
+      "id": "q037",
+      "category": "direct",
+      "question": "阿豪正在学的第四门语言是什么？",
+      "target_topic": "language",
+      "answer_key": "西班牙语"
+    },
+    {
+      "id": "q038",
+      "category": "direct",
+      "question": "阿豪的意大利语带什么口音？",
+      "target_topic": "language",
+      "answer_key": "托斯卡纳"
+    },
+    {
+      "id": "q039",
+      "category": "direct",
+      "question": "阿豪对什么过敏？",
+      "target_topic": "allergy",
+      "answer_key": "芒果"
+    },
+    {
+      "id": "q040",
+      "category": "direct",
+      "question": "阿豪的过敏是几岁时发现的？",
+      "target_topic": "allergy",
+      "answer_key": "六岁"
+    },
+    {
+      "id": "q041",
+      "category": "paraphrase",
+      "question": "如果要送阿豪一件衣服，最稳妥的颜色选择是什么？",
+      "target_topic": "fav-color",
+      "answer_key": "蓝色"
+    },
+    {
+      "id": "q042",
+      "category": "paraphrase",
+      "question": "请阿豪吃饭，最保险的主食是什么？",
+      "target_topic": "fav-food",
+      "answer_key": "意大利面"
+    },
+    {
+      "id": "q043",
+      "category": "paraphrase",
+      "question": "阿豪的人生起点在哪座城市？",
+      "target_topic": "birth-city",
+      "answer_key": "槟城"
+    },
+    {
+      "id": "q044",
+      "category": "paraphrase",
+      "question": "阿豪如今定居在意大利的哪座城市？",
+      "target_topic": "current-city",
+      "answer_key": "米兰"
+    },
+    {
+      "id": "q045",
+      "category": "paraphrase",
+      "question": "阿豪靠什么手艺吃饭？",
+      "target_topic": "job",
+      "answer_key": "后端工程师"
+    },
+    {
+      "id": "q046",
+      "category": "paraphrase",
+      "question": "阿豪的雇主叫什么名字？",
+      "target_topic": "company",
+      "answer_key": "Brightline Labs"
+    },
+    {
+      "id": "q047",
+      "category": "paraphrase",
+      "question": "拿着相机扫街是阿豪的什么？",
+      "target_topic": "hobby-photography",
+      "answer_key": "爱好"
+    },
+    {
+      "id": "q048",
+      "category": "paraphrase",
+      "question": "清晨的运河边阿豪在做什么运动？",
+      "target_topic": "hobby-running",
+      "answer_key": "跑步"
+    },
+    {
+      "id": "q049",
+      "category": "paraphrase",
+      "question": "阿豪耳机里常循环的是哪类音乐？",
+      "target_topic": "fav-music",
+      "answer_key": "Post-rock"
+    },
+    {
+      "id": "q050",
+      "category": "paraphrase",
+      "question": "哪本科幻小说让阿豪翻了很多遍？",
+      "target_topic": "fav-book",
+      "answer_key": "三体"
+    },
+    {
+      "id": "q051",
+      "category": "paraphrase",
+      "question": "阿豪家里的毛孩子叫什么？",
+      "target_topic": "pet",
+      "answer_key": "Pixel"
+    },
+    {
+      "id": "q052",
+      "category": "paraphrase",
+      "question": "阿豪的代步工具是什么牌子的车？",
+      "target_topic": "car",
+      "answer_key": "Fiat"
+    },
+    {
+      "id": "q053",
+      "category": "paraphrase",
+      "question": "和阿豪约会议要按哪个时区？",
+      "target_topic": "timezone",
+      "answer_key": "Europe/Rome"
+    },
+    {
+      "id": "q054",
+      "category": "paraphrase",
+      "question": "阿豪敲代码用哪块键盘？",
+      "target_topic": "keyboard",
+      "answer_key": "HHKB"
+    },
+    {
+      "id": "q055",
+      "category": "paraphrase",
+      "question": "阿豪写代码打开的第一个应用是什么？",
+      "target_topic": "editor",
+      "answer_key": "VS Code"
+    },
+    {
+      "id": "q056",
+      "category": "paraphrase",
+      "question": "阿豪在家自己怎么泡咖啡？",
+      "target_topic": "coffee",
+      "answer_key": "V60"
+    },
+    {
+      "id": "q057",
+      "category": "paraphrase",
+      "question": "阿豪会摆弄什么弦乐器？",
+      "target_topic": "guitar",
+      "answer_key": "木吉他"
+    },
+    {
+      "id": "q058",
+      "category": "paraphrase",
+      "question": "阿豪的钱主要存在哪家银行？",
+      "target_topic": "bank",
+      "answer_key": "Intesa"
+    },
+    {
+      "id": "q059",
+      "category": "paraphrase",
+      "question": "阿豪日常思考用哪种语言？",
+      "target_topic": "language",
+      "answer_key": "中文"
+    },
+    {
+      "id": "q060",
+      "category": "paraphrase",
+      "question": "哪种水果阿豪碰不得？",
+      "target_topic": "allergy",
+      "answer_key": "芒果"
+    },
+    {
+      "id": "q061",
+      "category": "distractor",
+      "question": "阿豪现在住的城市和出生地是同一座吗？他现在住在哪？",
+      "target_topic": "current-city",
+      "answer_key": "米兰",
+      "distractor_topic": "birth-city"
+    },
+    {
+      "id": "q062",
+      "category": "distractor",
+      "question": "请阿豪吃饭，除了他爱吃的意面，还要避开什么水果？",
+      "target_topic": "allergy",
+      "answer_key": "芒果",
+      "distractor_topic": "fav-food"
+    },
+    {
+      "id": "q063",
+      "category": "distractor",
+      "question": "阿豪除了晨跑，现在在哪家健身房练力量？",
+      "target_topic": "gym",
+      "answer_key": "Verde Gym",
+      "distractor_topic": "hobby-running"
+    },
+    {
+      "id": "q064",
+      "category": "distractor",
+      "question": "阿豪对芒果过敏，那他家的英国短毛猫叫什么？",
+      "target_topic": "pet",
+      "answer_key": "Pixel",
+      "distractor_topic": "allergy"
+    },
+    {
+      "id": "q065",
+      "category": "distractor",
+      "question": "阿豪的车是什么颜色？和他最喜欢的颜色一样吗？那个颜色是什么？",
+      "target_topic": "fav-color",
+      "answer_key": "蓝色",
+      "distractor_topic": "car"
+    },
+    {
+      "id": "q066",
+      "category": "distractor",
+      "question": "除了 HHKB 键盘，阿豪写代码的主力编辑器是什么？",
+      "target_topic": "editor",
+      "answer_key": "VS Code",
+      "distractor_topic": "keyboard"
+    },
+    {
+      "id": "q067",
+      "category": "distractor",
+      "question": "阿豪练完吉他习惯喝什么？他偏好哪种咖啡？",
+      "target_topic": "coffee",
+      "answer_key": "手冲浅烘",
+      "distractor_topic": "guitar"
+    },
+    {
+      "id": "q068",
+      "category": "distractor",
+      "question": "阿豪在 Brightline Labs 的工资打到哪家银行？",
+      "target_topic": "bank",
+      "answer_key": "Intesa",
+      "distractor_topic": "company"
+    },
+    {
+      "id": "q069",
+      "category": "distractor",
+      "question": "阿豪在米兰常说的三种语言是什么？",
+      "target_topic": "language",
+      "answer_key": "意大利语",
+      "distractor_topic": "current-city"
+    },
+    {
+      "id": "q070",
+      "category": "distractor",
+      "question": "阿豪弹木吉他时最喜欢伴奏哪类音乐？",
+      "target_topic": "fav-music",
+      "answer_key": "Post-rock",
+      "distractor_topic": "guitar"
+    },
+    {
+      "id": "q071",
+      "category": "distractor",
+      "question": "阿豪当后端工程师主要写哪两种语言？",
+      "target_topic": "job",
+      "answer_key": "Python",
+      "distractor_topic": "editor"
+    },
+    {
+      "id": "q072",
+      "category": "distractor",
+      "question": "《三体》阿豪是用哪种语言读的？",
+      "target_topic": "fav-book",
+      "answer_key": "中文",
+      "distractor_topic": "language"
+    },
+    {
+      "id": "q073",
+      "category": "distractor",
+      "question": "阿豪给家里的猫拍照常用什么镜头？",
+      "target_topic": "hobby-photography",
+      "answer_key": "35mm",
+      "distractor_topic": "pet"
+    },
+    {
+      "id": "q074",
+      "category": "distractor",
+      "question": "按阿豪的时区，他清晨几点跑步？",
+      "target_topic": "timezone",
+      "answer_key": "六点",
+      "distractor_topic": "hobby-running"
+    },
+    {
+      "id": "q075",
+      "category": "distractor",
+      "question": "阿豪写 Python 和 Go 代码用哪块键盘？",
+      "target_topic": "keyboard",
+      "answer_key": "HHKB",
+      "distractor_topic": "job"
+    },
+    {
+      "id": "q076",
+      "category": "distractor",
+      "question": "听 Explosions in the Sky 时阿豪会弹什么乐器？",
+      "target_topic": "guitar",
+      "answer_key": "木吉他",
+      "distractor_topic": "fav-music"
+    },
+    {
+      "id": "q077",
+      "category": "distractor",
+      "question": "阿豪在槟城长大先学会的是什么语言？",
+      "target_topic": "birth-city",
+      "answer_key": "中文",
+      "distractor_topic": "language"
+    },
+    {
+      "id": "q078",
+      "category": "distractor",
+      "question": "阿豪在米兰的银行网点在哪个地标旁？",
+      "target_topic": "bank",
+      "answer_key": "中央车站",
+      "distractor_topic": "current-city"
+    },
+    {
+      "id": "q079",
+      "category": "distractor",
+      "question": "阿豪远程为 Brightline Labs 办公时用什么书桌？",
+      "target_topic": "desk",
+      "answer_key": "Oaksam",
+      "distractor_topic": "company"
+    },
+    {
+      "id": "q080",
+      "category": "distractor",
+      "question": "阿豪每天两杯咖啡是按哪个时区的作息算的？",
+      "target_topic": "coffee",
+      "answer_key": "Europe/Rome",
+      "distractor_topic": "timezone"
+    },
+    {
+      "id": "q081",
+      "category": "outdated",
+      "question": "阿豪现在用的是什么手机？",
+      "target_topic": "phone",
+      "answer_key": "阿豪现在用 iPhone 17。",
+      "current_topic": "phone",
+      "stale_topic": "phone-old",
+      "stale_answer_key": "阿豪的手机是 Pixel 8。"
+    },
+    {
+      "id": "q082",
+      "category": "outdated",
+      "question": "阿豪现在用的是什么笔记本？",
+      "target_topic": "laptop",
+      "answer_key": "阿豪现在用 MacBook Air M4。",
+      "current_topic": "laptop",
+      "stale_topic": "laptop-old",
+      "stale_answer_key": "阿豪的笔记本是 ThinkPad X1。"
+    },
+    {
+      "id": "q083",
+      "category": "outdated",
+      "question": "阿豪现在用的是什么健身房？",
+      "target_topic": "gym",
+      "answer_key": "阿豪现在在 Verde Gym 健身。",
+      "current_topic": "gym",
+      "stale_topic": "gym-membership",
+      "stale_answer_key": "阿豪在 FitPlus 健身房办了卡。"
+    },
+    {
+      "id": "q084",
+      "category": "outdated",
+      "question": "阿豪现在用的是什么牙医？",
+      "target_topic": "dentist",
+      "answer_key": "阿豪现在的牙医是 Bianchi 医生。",
+      "current_topic": "dentist",
+      "stale_topic": "dentist-rossi",
+      "stale_answer_key": "阿豪的牙医是 Rossi 医生。"
+    },
+    {
+      "id": "q085",
+      "category": "outdated",
+      "question": "阿豪现在用的是什么书桌？",
+      "target_topic": "desk",
+      "answer_key": "阿豪现在用 Oaksam 实木书桌。",
+      "current_topic": "desk",
+      "stale_topic": "desk-old",
+      "stale_answer_key": "阿豪用宜家升降桌。"
+    },
+    {
+      "id": "q086",
+      "category": "outdated",
+      "question": "手机方面，阿豪目前的情况是什么？",
+      "target_topic": "phone",
+      "answer_key": "阿豪现在用 iPhone 17。",
+      "current_topic": "phone",
+      "stale_topic": "phone-old",
+      "stale_answer_key": "阿豪的手机是 Pixel 8。"
+    },
+    {
+      "id": "q087",
+      "category": "outdated",
+      "question": "笔记本方面，阿豪目前的情况是什么？",
+      "target_topic": "laptop",
+      "answer_key": "阿豪现在用 MacBook Air M4。",
+      "current_topic": "laptop",
+      "stale_topic": "laptop-old",
+      "stale_answer_key": "阿豪的笔记本是 ThinkPad X1。"
+    },
+    {
+      "id": "q088",
+      "category": "outdated",
+      "question": "健身房方面，阿豪目前的情况是什么？",
+      "target_topic": "gym",
+      "answer_key": "阿豪现在在 Verde Gym 健身。",
+      "current_topic": "gym",
+      "stale_topic": "gym-membership",
+      "stale_answer_key": "阿豪在 FitPlus 健身房办了卡。"
+    },
+    {
+      "id": "q089",
+      "category": "outdated",
+      "question": "牙医方面，阿豪目前的情况是什么？",
+      "target_topic": "dentist",
+      "answer_key": "阿豪现在的牙医是 Bianchi 医生。",
+      "current_topic": "dentist",
+      "stale_topic": "dentist-rossi",
+      "stale_answer_key": "阿豪的牙医是 Rossi 医生。"
+    },
+    {
+      "id": "q090",
+      "category": "outdated",
+      "question": "书桌方面，阿豪目前的情况是什么？",
+      "target_topic": "desk",
+      "answer_key": "阿豪现在用 Oaksam 实木书桌。",
+      "current_topic": "desk",
+      "stale_topic": "desk-old",
+      "stale_answer_key": "阿豪用宜家升降桌。"
+    },
+    {
+      "id": "q091",
+      "category": "outdated",
+      "question": "阿豪最新的手机是什么？",
+      "target_topic": "phone",
+      "answer_key": "阿豪现在用 iPhone 17。",
+      "current_topic": "phone",
+      "stale_topic": "phone-old",
+      "stale_answer_key": "阿豪的手机是 Pixel 8。"
+    },
+    {
+      "id": "q092",
+      "category": "outdated",
+      "question": "阿豪最新的笔记本是什么？",
+      "target_topic": "laptop",
+      "answer_key": "阿豪现在用 MacBook Air M4。",
+      "current_topic": "laptop",
+      "stale_topic": "laptop-old",
+      "stale_answer_key": "阿豪的笔记本是 ThinkPad X1。"
+    },
+    {
+      "id": "q093",
+      "category": "outdated",
+      "question": "阿豪最新的健身房是什么？",
+      "target_topic": "gym",
+      "answer_key": "阿豪现在在 Verde Gym 健身。",
+      "current_topic": "gym",
+      "stale_topic": "gym-membership",
+      "stale_answer_key": "阿豪在 FitPlus 健身房办了卡。"
+    },
+    {
+      "id": "q094",
+      "category": "outdated",
+      "question": "阿豪最新的牙医是什么？",
+      "target_topic": "dentist",
+      "answer_key": "阿豪现在的牙医是 Bianchi 医生。",
+      "current_topic": "dentist",
+      "stale_topic": "dentist-rossi",
+      "stale_answer_key": "阿豪的牙医是 Rossi 医生。"
+    },
+    {
+      "id": "q095",
+      "category": "outdated",
+      "question": "阿豪最新的书桌是什么？",
+      "target_topic": "desk",
+      "answer_key": "阿豪现在用 Oaksam 实木书桌。",
+      "current_topic": "desk",
+      "stale_topic": "desk-old",
+      "stale_answer_key": "阿豪用宜家升降桌。"
+    },
+    {
+      "id": "q096",
+      "category": "outdated",
+      "question": "阿豪当前的手机安排是怎样的？",
+      "target_topic": "phone",
+      "answer_key": "阿豪现在用 iPhone 17。",
+      "current_topic": "phone",
+      "stale_topic": "phone-old",
+      "stale_answer_key": "阿豪的手机是 Pixel 8。"
+    },
+    {
+      "id": "q097",
+      "category": "outdated",
+      "question": "阿豪当前的笔记本安排是怎样的？",
+      "target_topic": "laptop",
+      "answer_key": "阿豪现在用 MacBook Air M4。",
+      "current_topic": "laptop",
+      "stale_topic": "laptop-old",
+      "stale_answer_key": "阿豪的笔记本是 ThinkPad X1。"
+    },
+    {
+      "id": "q098",
+      "category": "outdated",
+      "question": "阿豪当前的健身房安排是怎样的？",
+      "target_topic": "gym",
+      "answer_key": "阿豪现在在 Verde Gym 健身。",
+      "current_topic": "gym",
+      "stale_topic": "gym-membership",
+      "stale_answer_key": "阿豪在 FitPlus 健身房办了卡。"
+    },
+    {
+      "id": "q099",
+      "category": "outdated",
+      "question": "阿豪当前的牙医安排是怎样的？",
+      "target_topic": "dentist",
+      "answer_key": "阿豪现在的牙医是 Bianchi 医生。",
+      "current_topic": "dentist",
+      "stale_topic": "dentist-rossi",
+      "stale_answer_key": "阿豪的牙医是 Rossi 医生。"
+    },
+    {
+      "id": "q100",
+      "category": "outdated",
+      "question": "阿豪当前的书桌安排是怎样的？",
+      "target_topic": "desk",
+      "answer_key": "阿豪现在用 Oaksam 实木书桌。",
+      "current_topic": "desk",
+      "stale_topic": "desk-old",
+      "stale_answer_key": "阿豪用宜家升降桌。"
+    }
+  ]
+}
