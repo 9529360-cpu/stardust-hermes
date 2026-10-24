@@ -199,9 +199,12 @@ class TestNativeSearchParityWindows:
         assert via_native == via_shell
         # '*find*' wraps to a basename glob; whether it also catches
         # 'deeper_find.txt' depends on the runner's rg version, so only the five
-        # unambiguous files are required.
-        assert {f for f in via_native["files"] if "deeper" not in f} == {
-            f".\\find{i}.txt" for i in range(5)}
+        # unambiguous files are required. rg's relative-path separator is also
+        # version-dependent (14.x prints './find0.txt', 15.x '.\\find0.txt').
+        def _names(file_list):
+            return {os.path.basename(f.replace("\\", "/")) for f in file_list}
+        assert _names(f for f in via_native["files"] if "deeper" not in f) == {
+            f"find{i}.txt" for i in range(5)}
 
     def test_content_search_matches_shell_lane(self, ops, tmp_path):
         ops, _calls = ops
