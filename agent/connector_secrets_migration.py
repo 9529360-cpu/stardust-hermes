@@ -168,7 +168,7 @@ def copy_plaintext_backup(source: Path, destination: Path) -> None:
                         '$ErrorActionPreference = "Stop"; '
                         'Get-Acl -LiteralPath $env:CX2B_BACKUP_SOURCE | '
                         'Set-Acl -LiteralPath $env:CX2B_BACKUP_DEST'],
-                       env=env, check=True, capture_output=True, timeout=15)
+                       env=env, stdin=subprocess.DEVNULL, check=True, capture_output=True, timeout=15)
 
 
 def _backup_files(home: Path, backup_dir: Path) -> bool:
