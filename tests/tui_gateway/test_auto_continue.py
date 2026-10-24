@@ -574,6 +574,22 @@ def schedule_env(monkeypatch, marker_home):
     return submitted
 
 
+def test_rebuild_during_auto_continue_build_cancels_dispatch(schedule_env, marker_home, monkeypatch):
+    monkeypatch.setenv("STARDUST_COMPUTE_HOST_EPOCH_GUARD", "1")
+    record_turn_start(marker_home, "session-key", "resume once")
+    session = _session()
+    session["_compute_host_epoch"] = 0
+
+    def rebuild(session, rid, timeout=30.0):
+        session["_compute_host_epoch"] += 1
+        return None
+
+    monkeypatch.setattr(server, "_wait_agent", rebuild)
+    server._maybe_schedule_auto_continue("sid", session, "session-key")
+    assert not schedule_env
+    assert session["_auto_continue_scheduled"] is False
+
+
 def test_fresh_marker_schedules_continuation(emits, schedule_env, marker_home):
     record_turn_start(marker_home, "session-key", "fix the flaky test")
     session = _session()

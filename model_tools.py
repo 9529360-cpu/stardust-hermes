@@ -628,12 +628,16 @@ def _resolve_active_context_length() -> int:
     enforces a smaller window than the direct API for the same slug); the on-disk
     metadata cache (slightly stale is fine for picking a tier and avoids a ~200 ms
     /models probe per CLI startup); then the full live resolver.
+    With ``STARDUST_DEFER_CONTEXT_PROBE=1`` the live resolver is skipped: a
+    blackholed endpoint would otherwise stall every tool-load (DISCOVERY-2 U1)
+    for the 2 s connect timeout. 0 is a supported input — the gate sizes the
+    listing budget from a default percentage leg instead.
     """
     try:
         model_id, model_cfg = _active_model_config()
         if not model_id:
             return 0
-        from agent.model_metadata import get_cached_context_length, get_model_context_length
+        from agent.model_metadata import defer_context_probe_enabled, get_cached_context_length, get_model_context_length
         # Honor explicit `model.context_length` in config.yaml — short-circuits the OpenRouter /models probe
         # at get_model_context_length step 0, so non-OpenRouter providers don't pay the ~2-3s OpenRouter
         # fetch at every CLI startup. See issue #46620.
@@ -660,6 +664,8 @@ def _resolve_active_context_length() -> int:
                     return cached_ctx
             except Exception:
                 pass
+        if config_ctx is None and base_url and defer_context_probe_enabled():
+            return 0
         return int(get_model_context_length(model_id, base_url=base_url, api_key=api_key,
                                             config_context_length=config_ctx, provider=provider) or 0)
     except Exception as e:
