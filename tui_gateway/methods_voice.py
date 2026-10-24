@@ -216,10 +216,56 @@ def _fd_barge_params(cfg: dict) -> tuple[float, int]:
     return mult, max(0, num(lambda v: int(float(v) * 1000), "barge_in_grace_seconds", 0.5))
 
 
+def _barge_in_owner_only() -> bool:
+    """``voice.barge_in_owner_only`` (default False): barge-in interrupts only the session that
+    owns the voice turn instead of every running session."""
+    raw = _voice_cfg_dict().get("barge_in_owner_only", False)
+    return raw is True or raw == "true"
+
+
+def _voice_owner_session() -> "tuple[str, dict | None, str]":
+    """``(owner sid, owner session dict or None, failure reason)`` for the current voice turn.
+    Owner is the sid that most recently armed voice (``_voice_event_sid``, set by
+    ``voice.record``/``voice.toggle`` from the session that owns the mic/TTS turn). Empty sid,
+    unknown sid, gone session, or a detached (WS-disconnected) transport means the owner can't
+    be proven — callers must then interrupt nothing except local audio, never a foreign
+    session."""
+    with _voice_sid_lock:
+        sid = _voice_event_sid
+    if not sid:
+        return "", None, "no_owner_sid"
+    with _sessions_lock:
+        session = _sessions.get(sid)
+        if session is None:
+            return sid, None, "owner_session_gone"
+        if session.get("transport") is _detached_ws_transport:
+            return sid, None, "owner_transport_detached"
+        return sid, session, ""
+
+
+def _interrupt_owner_turn_only(reason_hint: str) -> None:
+    """Owner-scoped barge-in interrupt (flag on): apply the shared ``session.interrupt``
+    contract (``_interrupt_session_turn``) to the voice owner session ONLY. On any unprovable
+    owner (no/unknown sid, gone session, detached transport) interrupt no session — local
+    audio was already cut by the caller — and log a warning."""
+    sid, session, reason = _voice_owner_session()
+    if session is None:
+        logger.warning(
+            "voice barge-in owner unresolved (%s%s) — interrupting no session (audio stop only)",
+            reason, f"; {reason_hint}" if reason_hint else "")
+        return
+    try:
+        _interrupt_session_turn(sid, session)
+    except Exception as e:
+        logger.warning("voice barge-in owner interrupt failed (sid=%s): %s",
+                       session.get("session_key") or sid, e)
+
+
 def _fd_trip(phase: str) -> None:
     """Listener tripped: latch the interruption, cut TTS FIRST (so a stale reply can never
-    speak), and during generation also interrupt every running turn (the ``agent.interrupt()``
-    seam ``session.interrupt`` uses)."""
+    speak), and during generation also interrupt the running turn (the ``agent.interrupt()``
+    seam ``session.interrupt`` uses). With ``voice.barge_in_owner_only`` on, that interrupt
+    targets only the session owning the voice turn."""
     from tools.tts_streaming import mark_speech_interrupted
     from tools.voice_mode import stop_playback
     mark_speech_interrupted()
@@ -235,14 +281,17 @@ def _fd_trip(phase: str) -> None:
             _stop.set()
     stop_playback()
     if phase != "playback":
-        try:
-            for s in _running_sessions():
-                agent = s.get("agent")
-                if agent is not None and hasattr(agent, "interrupt"):
-                    with contextlib.suppress(Exception):
-                        agent.interrupt()
-        except Exception as e:
-            logger.debug("voice interjection interrupt failed: %s", e)
+        if _barge_in_owner_only():
+            _interrupt_owner_turn_only(phase)
+        else:
+            try:
+                for s in _running_sessions():
+                    agent = s.get("agent")
+                    if agent is not None and hasattr(agent, "interrupt"):
+                        with contextlib.suppress(Exception):
+                            agent.interrupt()
+            except Exception as e:
+                logger.debug("voice interjection interrupt failed: %s", e)
     _voice_emit("voice.interrupted")
 
 
