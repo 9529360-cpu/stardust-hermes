@@ -1,4 +1,33 @@
-# Digital-life recovery kill measurement
+# Digital-life evals
+
+## Long-term memory retrieval benchmark (DL-P2.6)
+
+Offline, opt-in measurement of the EXISTING long-term memory (topic summaries
++ per-turn recall) on a fixed, committed case set: 100 synthetic facts in 25
+fact-domains, written through the real `memory_tool` write path into an
+isolated HOME, then 100 questions (40 direct / 20 paraphrase / 20 distractor /
+20 outdated) asked through the real production recall path
+(`_memory_turn_start_and_prefetch` on a real AIAgent, fresh session per
+question, production recall limits). Prior art and baseline numbers:
+`D:\wt\logs\RESULT-dl-p2-6.md`.
+
+    python -B -m evals.digital_life.memory_retrieval \
+        --home <isolated-home> --output <evidence>/results.json [--qa]
+
+Zero product behaviour change: eval-only code under `evals/`, no product file
+modified, no new product flag. `--qa` answers through the default configured
+model via the local magpie gateway (at most 100 calls; skipped automatically
+if the gateway is unreachable). The dump-all-memory control in the output is
+cost reporting only, never a proposed solution. QA scoring is strict: an
+outdated question counts as correct only when the new value appears AND the
+superseded value does not (LongMemEval counts "both mentioned" as correct, so
+our QA number is a lower bound by that convention).
+
+Case set is regenerated deterministically by
+`evals/digital_life/generate_memory_cases.py` (RNG-free tables, fixed seed
+20261024); the committed test asserts byte-identical regeneration.
+
+## Digital-life recovery kill measurement
 
 This offline evaluation changes no product behavior and adds no product flag. It uses the real AIAgent conversation loop, real SessionDB, real write_file tool, and the existing OpenAI-compatible loopback FakeModel (dynamic port 0). No paid model or credentials are used. Product configuration flags remain at shipped defaults; checkpoint and life-event fields can therefore be null/empty. These are measured absences, not fabricated recovery records.
 
