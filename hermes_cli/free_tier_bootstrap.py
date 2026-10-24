@@ -23,6 +23,8 @@ logger = logging.getLogger("hermes_cli.auth")
 
 # The desktop's first ``setup.status`` waits this long for the record before falling back to a live
 # probe. The mint budget is 5 s (``GUEST_MINT_TIMEOUT_SECONDS``); the rest covers the inventory.
+# It is the CEILING, not the plan: ``_done`` fires as soon as the bootstrap finishes, and a
+# bootstrap that cannot mint (gate closed, identity refused) finishes right after its inventory.
 SETUP_READY_WAIT_SECONDS = 8.0
 SETUP_READY_EVENT = "setup.ready"
 
@@ -59,7 +61,11 @@ def wait_for_record(timeout: float = SETUP_READY_WAIT_SECONDS) -> Optional[Setup
     """Block up to ``timeout`` seconds for a bootstrap that is IN FLIGHT, then return whatever it
     produced. Returns None at once when no bootstrap ever started in this process (a bare
     ``tui_gateway`` under test, an old serve without the boot hook): the caller falls back to its
-    live probe instead of paying the wait for nothing."""
+    live probe instead of paying the wait for nothing.
+
+    The wait is on ``_done`` (set exactly when the record is published), so it ends with the
+    bootstrap — which, when no free-tier identity can come of it (gate closed / identity refused /
+    internal failure), is right after the inventory, never the full budget."""
     if not _started:
         return None
     _done.wait(timeout)
@@ -96,47 +102,77 @@ def _resolve_inference() -> str:
         return ""
 
 
+def _error_record(other: bool, state: Optional[Dict[str, Any]], exc: Exception) -> SetupRecord:
+    """The record for a bootstrap that blew up outside a guarded step: the honest answer is
+    "nothing configured, bootstrap failed" — published immediately so ``setup.status`` (and every
+    later wait) answers at once instead of sitting out the wait budget forever."""
+    return SetupRecord(
+        provider_configured=bool(other) or bool(state),
+        inference_provider="",
+        free_tier=False,
+        has_identity=bool(state),
+        other_providers=other,
+        error=f"bootstrap failed: {exc}",
+    )
+
+
 def run_bootstrap(*, announce: bool = True) -> SetupRecord:
     """Inventory -> ensure identity (gate permitting) -> resolve inference -> record -> broadcast.
 
     Runs every boot; only the mint is gated. Idempotent per process: a second call returns the
-    existing record without touching the portal. Never raises. ``announce=False`` skips the
-    ``setup.ready`` event: the plain CLI has no client to tell and its stdout is the user's terminal.
-    """
+    existing record without touching the portal. Never raises: every step is guarded and an
+    unexpected failure still publishes an error record, so a crashed bootstrap can never leave
+    ``setup.status`` waiting out ``SETUP_READY_WAIT_SECONDS`` on every call. ``announce=False``
+    skips the ``setup.ready`` event: the plain CLI has no client to tell and its stdout is the
+    user's terminal."""
     global _record, _started
     with _lock:
         if _record is not None:
             return _record
-        if _started:
-            _done.wait(SETUP_READY_WAIT_SECONDS)
+        in_flight = _started
+        _started = True
+    if in_flight:
+        # Wait OUTSIDE ``_lock``: the publisher needs the lock, so waiting under it stalls every
+        # concurrent caller for the whole budget while the finisher queues behind them.
+        _done.wait(SETUP_READY_WAIT_SECONDS)
+        with _lock:
             if _record is not None:
                 return _record
-        _started = True
-
+            # The in-flight bootstrap exceeded our budget (thread died without publishing);
+            # fall through and take it over so this caller — and every later one — still ends
+            # with a record.
     from hermes_cli import anon_auth
 
-    other = _inventory_other_providers()
+    other = False
     error = ""
-    state: Optional[Dict[str, Any]] = anon_auth.current_nous_state()
-    if anon_auth.guest_enabled():
-        try:
-            # ``other`` decides whether the mint may also claim ``active_provider`` (NS-845 Q1.3).
-            state = anon_auth.ensure_portal_identity(explicit=True, carries_inference=not other)
-        except Exception as exc:
-            error = str(exc)
-            logger.info("Nous free tier not set up at boot: %s", exc)
-    free_tier = bool(state) and anon_auth.is_guest_state(state) and anon_auth.guest_enabled()
-    record = SetupRecord(
-        provider_configured=other or free_tier or (bool(state) and not anon_auth.is_guest_state(state)),
-        inference_provider=_resolve_inference(),
-        free_tier=free_tier,
-        has_identity=bool(state),
-        other_providers=other,
-        error=error,
-    )
+    state: Optional[Dict[str, Any]] = None
+    try:
+        other = _inventory_other_providers()
+        state = anon_auth.current_nous_state()
+        if anon_auth.guest_enabled():
+            try:
+                # ``other`` decides whether the mint may also claim ``active_provider`` (NS-845 Q1.3).
+                state = anon_auth.ensure_portal_identity(explicit=True, carries_inference=not other)
+            except Exception as exc:
+                error = str(exc)
+                logger.info("Nous free tier not set up at boot: %s", exc)
+        free_tier = bool(state) and anon_auth.is_guest_state(state) and anon_auth.guest_enabled()
+        record = SetupRecord(
+            provider_configured=other or free_tier or (bool(state) and not anon_auth.is_guest_state(state)),
+            inference_provider=_resolve_inference(),
+            free_tier=free_tier,
+            has_identity=bool(state),
+            other_providers=other,
+            error=error,
+        )
+    except Exception as exc:  # identity/state reads are filesystem I/O; a crash still records
+        logger.warning("free tier bootstrap failed: %s", exc)
+        record = _error_record(other, state, exc)
     with _lock:
-        _record = record
-        _done.set()
+        if _record is None:
+            _record = record
+            _done.set()
+        record = _record
     if announce:
         _broadcast(record)
     return record
