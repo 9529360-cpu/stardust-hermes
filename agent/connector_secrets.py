@@ -233,6 +233,13 @@ def resolve_connector_secret_value(server: str, field: str) -> Optional[str]:
     """
     store = get_connector_secret_store()
     if store is None:
+        if _connector_store_enabled():
+            from agent.connector_secrets_migration import legacy_value_for_reference
+            legacy = legacy_value_for_reference(server, field)
+            if legacy is not None:
+                logger.warning("MCP connector secret %s/%s backend unavailable; using retained legacy copy",
+                               server, field)
+            return legacy
         return None
     try:
         return store.resolve_secret(server, field)

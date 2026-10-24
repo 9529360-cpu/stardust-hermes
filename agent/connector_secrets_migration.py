@@ -2,7 +2,7 @@
 """One-time migration of legacy plaintext connector credentials into the
 OS-encrypted connector secret store (CX2b).
 
-Runs on the first MCP config load after the store became enabled by default.
+Runs on the first MCP config load after the user explicitly enables the store.
 For every ``mcp_servers`` entry whose credential is a legacy ``${ENV_VAR}``
 reference, the plaintext value is read from the profile ``.env``, copied into
 the store, the config reference rewritten to ``${connector:<server>/api_key}``,
@@ -39,7 +39,7 @@ import re
 import shutil
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set
 
 logger = logging.getLogger("agent.connector_secrets")
 
@@ -116,9 +116,11 @@ def _credential_env_refs(server_config: Dict[str, Any]) -> List[str]:
     refs: List[str] = []
     env_block = server_config.get("env")
     if isinstance(env_block, dict):
-        for value in env_block.values():
+        for slot, value in env_block.items():
             name = _bare_env_ref(value)
-            if name is not None:
+            credential_name = re.search(r"(?:^|_)(?:KEY|TOKEN|SECRET|PASSWORD)(?:_|$)",
+                                        str(slot).upper())
+            if name is not None and credential_name:
                 refs.append(name)
     headers = server_config.get("headers")
     if isinstance(headers, dict):
@@ -168,6 +170,20 @@ def _secure_backup_dir(path: Path) -> None:
         pass
 
 
+def copy_plaintext_backup(source: Path, destination: Path) -> None:
+    """Keep original bytes and permissions, including the Windows DACL."""
+    shutil.copy2(source, destination)
+    if os.name == "nt":
+        import subprocess
+        env = dict(os.environ, CX2B_BACKUP_SOURCE=str(source),
+                   CX2B_BACKUP_DEST=str(destination))
+        subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
+                        '$ErrorActionPreference = "Stop"; '
+                        'Get-Acl -LiteralPath $env:CX2B_BACKUP_SOURCE | '
+                        'Set-Acl -LiteralPath $env:CX2B_BACKUP_DEST'],
+                       env=env, check=True, capture_output=True, timeout=15)
+
+
 def _backup_files(home: Path, backup_dir: Path) -> bool:
     """Copy the plaintext files migration may change into *backup_dir*.
 
@@ -178,7 +194,7 @@ def _backup_files(home: Path, backup_dir: Path) -> bool:
     for name in (".env", "config.yaml"):
         src = home / name
         if src.is_file():
-            shutil.copy2(src, backup_dir / name)
+            copy_plaintext_backup(src, backup_dir / name)
             copied = True
     return copied
 
@@ -213,6 +229,13 @@ def migrate_connector_secrets_once(home: Path) -> bool:
         return False
 
     try:
+        from hermes_cli.config import is_managed
+        if is_managed():
+            return False  # config.yaml is read-only there; rewrite below could not complete
+    except Exception:
+        pass
+
+    try:
         from agent.connector_secrets import get_connector_secret_store
         store = get_connector_secret_store()
     except Exception:
@@ -233,6 +256,14 @@ def migrate_connector_secrets_once(home: Path) -> bool:
                        exc.__class__.__name__)
         return False
 
+    # Remove owned slots from a copy; any remaining reference is shared with
+    # non-credential config and must keep its legacy value untouched.
+    unowned = json.loads(json.dumps(raw))
+    for name, entry in (unowned.get("mcp_servers") or {}).items():
+        if isinstance(entry, dict):
+            for env_name in _credential_env_refs(entry):
+                _rewrite_refs(entry, env_name, name)
+    unowned_text = json.dumps(unowned)
     env_values = _read_env_values_at(home / ".env")
     migrated: List[Dict[str, str]] = []
     changed_servers: Dict[str, Dict[str, Any]] = {}
@@ -241,13 +272,23 @@ def migrate_connector_secrets_once(home: Path) -> bool:
     for server, server_config in raw_servers.items():
         if not isinstance(server_config, dict):
             continue
-        # Collect first so one server with two slots referencing the same env
-        # var is migrated as one store entry per referenced server name.
+        # One store field (api_key) per server is the CX3 ownership model; two
+        # DIFFERENT credential env vars under one server would overwrite each
+        # other's value, so such servers stay legacy entirely.
+        refs = _credential_env_refs(server_config)
+        present = [name for name in refs if env_values.get(name)]
+        if len({name for name in present}) > 1:
+            logger.warning("Connector secret migration skipped '%s' (multiple "
+                           "credential env references); keeping plaintext",
+                           server)
+            continue
         seen_vars: Set[str] = set()
-        for env_name in _credential_env_refs(server_config):
+        for env_name in refs:
             if env_name in seen_vars:
                 continue
             seen_vars.add(env_name)
+            if f"${{{env_name}}}" in unowned_text:
+                continue
             value = env_values.get(env_name)
             if not value:
                 continue  # not present in .env (process-env-only or already gone)
@@ -278,7 +319,7 @@ def migrate_connector_secrets_once(home: Path) -> bool:
         backup_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
         _secure_backup_dir(backup_dir)
         backed_up = _backup_files(home, backup_dir)
-    except OSError as exc:
+    except Exception as exc:
         logger.warning("Connector secret migration aborted: backup failed (%s) — plaintext "
                        "files left unchanged", exc.__class__.__name__)
         _rollback_store_entries(store, migrated)
@@ -410,6 +451,23 @@ def legacy_value_for_reference(server: str, field: str) -> Optional[str]:
             if val:
                 return val
     return None
+
+
+def disable_unrecoverable_migrated_server(server: str, config: dict) -> None:
+    """Disable only this migration's unresolved server while the opt-in is on."""
+    from agent.connector_secrets import _connector_store_enabled, connector_secret_reference
+    if not _connector_store_enabled():
+        return
+    from hermes_constants import get_hermes_home
+    marker = _load_marker(Path(get_hermes_home()))
+    migrated = marker.get("migrated", {}) if marker else {}
+    if f"{server}/{MIGRATION_FIELD}" not in migrated:
+        return
+    if connector_secret_reference(server, MIGRATION_FIELD) in json.dumps(config):
+        config["enabled"] = False
+        config["disabled_reason"] = "connector_secret_unavailable"
+        logger.warning("MCP server '%s' disabled: connector secret unavailable and no retained legacy copy",
+                       server)
 
 
 def _legacy_key_guess(values: Dict[str, str], server: str) -> Optional[str]:

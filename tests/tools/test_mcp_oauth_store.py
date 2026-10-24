@@ -97,7 +97,7 @@ def _grep_count(home: Path, value: str) -> int:
         return 0
     count = 0
     for p in home.rglob("*"):
-        if p.is_file():
+        if p.is_file() and not any(part.startswith("backup-") for part in p.relative_to(home).parts):
             try:
                 if value in p.read_text(encoding="utf-8", errors="ignore"):
                     count += 1

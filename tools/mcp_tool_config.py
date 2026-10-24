@@ -361,6 +361,10 @@ def _load_mcp_config() -> Dict[str, dict]:
             interpolated = _interpolate_env_vars(cfg)
             if isinstance(interpolated, dict):
                 _warn_hidden_whitespace(name, interpolated)
+                # Only migrated entries are subject to this new failure policy;
+                # default-off legacy and manually authored placeholders stay unchanged.
+                from agent.connector_secrets_migration import disable_unrecoverable_migrated_server
+                disable_unrecoverable_migrated_server(name, interpolated)
                 safe_servers[name] = interpolated
         _portable_mcp_servers(safe_servers)
         return safe_servers
