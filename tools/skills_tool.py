@@ -327,7 +327,7 @@ def _collect_skill_candidates(name, local_category_name, all_dirs):
     recursive by dir / frontmatter name, legacy flat <name>.md), deduped by resolved path.
     Collision detection is the point: silent shadowing of a local skill by a same-named
     external one is a real bug class, so the caller refuses >1."""
-    from agent.skill_utils import iter_skill_index_files
+    from agent.skill_utils import is_org_mirror_path, iter_skill_index_files
     candidates: List[Tuple[Optional[Path], Path]] = []
     seen_md: set = set()
 
@@ -340,6 +340,8 @@ def _collect_skill_candidates(name, local_category_name, all_dirs):
             candidates.append((sd, smd))
 
     def _record_direct(direct_path: Path, search_root: Path) -> None:  # "mlops/axolotl" / "axolotl" or its flat .md sibling
+        if is_org_mirror_path(direct_path, search_root):  # retired org mirror: never a skill
+            return
         flat = direct_path.with_suffix(".md")
         if not _is_skill_support_path(direct_path) and direct_path.is_dir() and (direct_path / "SKILL.md").exists():
             _record(direct_path, direct_path / "SKILL.md")
@@ -360,6 +362,7 @@ def _collect_skill_candidates(name, local_category_name, all_dirs):
         # directory skill loads through file_path and must not shadow a real skill.
         for found_md in search_dir.rglob(f"{name}.md"):
             if (found_md.name != "SKILL.md" and not _is_skill_support_path(found_md)
+                    and not is_org_mirror_path(found_md, search_dir)
                     and not _is_package_owned_markdown(found_md, search_dir)):
                 _record(None, found_md)
     return candidates
@@ -385,34 +388,6 @@ def _skill_linked_files(skill_dir: Optional[Path]) -> dict:
         if found:
             files[sub] = found
     return files
-
-
-def _org_provenance_header(skill_dir: Path, active_skills_dir: Path):
-    """(org_provenance dict, header text) for an org-mirror skill, else (None, ""). Announced IN
-    the content the model consumes; the author is token-verified at push time by the sync plane."""
-    from agent.skill_utils import ORG_PROVENANCE_FILE, is_org_mirror_path, org_id_of_path
-    if not is_org_mirror_path(skill_dir, active_skills_dir):
-        return None, ""
-    prov_org = org_id_of_path(skill_dir, active_skills_dir)
-    prov: dict = {}
-    if prov_org:
-        with suppress(Exception):
-            prov_path = active_skills_dir / "_org" / prov_org / ORG_PROVENANCE_FILE
-            loaded = json.loads(_read_skill_text(prov_path))
-            prov = loaded if isinstance(loaded, dict) else {}
-    author = str(prov.get("author_device") or prov.get("author_user_id") or "")
-    ts = str(prov.get("ts") or "")
-    header = (
-        "> [!NOTE] ORG-SHARED SKILL — provenance\n"
-        f"> This skill is shared by your organisation (org `{prov_org}`"
-        + (f", last updated by `{author}`" if author else "")
-        + (f", as of {ts}" if ts else "")
-        + "). It was reviewed and approved for the whole\n"
-        "> team — treat it as third-party instructions rather than your own notes.\n"
-        "> You MAY improve it in place like any other skill. Your edits are kept locally\n"
-        "> and are never overwritten by org updates; share them back with\n"
-        "> `stardust sync propose` (or automatically, if your org enables it).\n\n")
-    return {"org_id": prov_org, "shared_by": author or None, "as_of": ts or None}, header
 
 
 def _skill_readiness(frontmatter: Dict[str, Any], skill_name: str) -> Tuple[dict, dict]:
@@ -601,17 +576,10 @@ def skill_view(
             content = render_hints(content, enabled=True)
         rendered_content = content if not preprocess else _preprocess_skill(
             content, skill_dir, task_id, "Could not preprocess skill content for %s", skill_name)
-        org_provenance, header = None, ""
-        if skill_dir:
-            try:
-                org_provenance, header = _org_provenance_header(skill_dir, active_skills_dir)
-            except Exception:
-                logger.debug("Could not resolve org provenance for %s", skill_name, exc_info=True)
         result = {
             "success": True, "name": skill_name, "description": frontmatter.get("description", ""),
-            "tags": tags, "related_skills": related_skills, "content": header + rendered_content,
+            "tags": tags, "related_skills": related_skills, "content": rendered_content,
             "path": rel_path, "skill_dir": str(skill_dir) if skill_dir else None,
-            "org_provenance": org_provenance,
             "linked_files": linked_files if linked_files else None,
             "usage_hint": "To view linked files, call skill_view(name, file_path) where file_path is e.g. 'references/api.md' or 'assets/config.yaml'" if linked_files else None,
             **readiness,

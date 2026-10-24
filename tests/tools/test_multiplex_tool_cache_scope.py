@@ -124,33 +124,19 @@ def test_home_keyed_caches_serve_each_profile_its_own_config(tmp_path, monkeypat
     sem_a.release()
 
 
-def test_debounced_sync_push_fires_in_the_scheduling_profiles_context(two_homes, monkeypatch):
-    """Timer threads start with empty ContextVars: the push must run under the writing profile's
-    home, and B's write must not cancel A's pending push."""
-    import tools.skill_manager_tool as smt
-    import tools.skill_usage as su
-    import tools.skills_sync_client as ssc
-    from hermes_constants import get_hermes_home
+def test_skill_writes_do_not_upload_from_either_profile(two_homes, monkeypatch):
+    import tools.skill_manager_tool as manager
+    import tools.skill_usage as usage
 
-    a, b = two_homes
-    fired: dict[str, str] = {}
-    both = threading.Event()
-
-    def fake_push(*, message=""):
-        fired[message] = str(get_hermes_home())
-        if len(fired) == 2:
-            both.set()
-
-    monkeypatch.setattr(su, "is_sync_enabled", lambda name: True)
-    monkeypatch.setattr(ssc, "maybe_push_skills", fake_push)
-    monkeypatch.setattr(smt, "_SYNC_PUSH_DEBOUNCE_S", 0.05)
-    monkeypatch.setattr(smt, "_sync_push_timers", {})
-    with _scoped(a):
-        smt._maybe_debounced_sync_push("skill-a")
-    with _scoped(b):
-        smt._maybe_debounced_sync_push("skill-b")
-    assert both.wait(5), fired
-    assert fired == {"sync: skill-a": str(a), "sync: skill-b": str(b)}
+    timers = []
+    monkeypatch.setattr(threading, "Timer", lambda *a, **kw: timers.append((a, kw)))
+    for home in two_homes:
+        with _scoped(home):
+            usage.save_usage({"local-skill": {"created_by": "agent", "sync": True}})  # historical opt-in
+            manager._record_success(
+                "patch", "local-skill", {}, file_path=None, absorbed_into=None,
+                curator_managed=False, task_id=None, session_id=None, ledger_before=[])
+    assert timers == []
 
 
 def test_endpoint_model_catalog_memo_is_keyed_by_credential(two_homes, monkeypatch):

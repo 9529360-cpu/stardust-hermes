@@ -2793,6 +2793,11 @@ export const ja = defineLocale({
     stop: '停止',
     dismiss: '閉じる',
     exit: code => `終了コード ${code}`,
+    recoveryUnknown: count => `サブエージェントの結果不明 ${count} 件`,
+    recoveryNote:
+      'これらを実行していたバックグラウンド処理は結果を報告する前に停止したため、完了したかどうかは不明です。自動的な再実行は行われていません。',
+    recoveryRowState: '結果不明',
+    recoveryGoalCount: count => `バッチ内の目標 ${count} 件`,
     control: {
       goalActiveTurns: (turn, maxTurns) => `ターン ${turn}/${maxTurns}`,
       goalDoneTurns: turns => `${turns} ターン`,

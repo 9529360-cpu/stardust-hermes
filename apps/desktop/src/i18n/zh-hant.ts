@@ -3022,6 +3022,10 @@ export const zhHant = defineLocale({
     stop: '停止',
     dismiss: '關閉',
     exit: code => `結束碼 ${code}`,
+    recoveryUnknown: count => `${count} 項子代理結果未知`,
+    recoveryNote: '執行它們的背景處理程序在回報結果前已停止，無法確定是否已完成。系統沒有自動重新執行任何任務。',
+    recoveryRowState: '結果未知',
+    recoveryGoalCount: count => `批次 ${count} 個目標`,
     control: {
       goalActiveTurns: (turn, maxTurns) => `第 ${turn}/${maxTurns} 輪`,
       goalDoneTurns: turns => `共 ${turns} 輪`,

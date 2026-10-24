@@ -32,10 +32,12 @@ import { $threadScrolledUp } from '@/store/thread-scroll'
 import { openSessionInNewWindow } from '@/store/windows'
 
 import { PreviewStatusRow } from './preview-row'
+import { RecoverySection } from './recovery-section'
 import { SessionControlSections } from './session-control'
 import { useSessionValue } from './session-control-utils'
 import { StatusItemRow } from './status-row'
 import { SubagentSection } from './subagent-section'
+import { useDelegationRecovery } from './use-delegation-recovery'
 import { useRunningCronRuns } from './use-running-cron-runs'
 import { useSubagentSnapshot } from './use-subagent-snapshot'
 
@@ -96,6 +98,7 @@ export function ComposerStatusStack({ onSubmit, queue, sessionId }: ComposerStat
   const { t } = useI18n()
   const navigate = useNavigate()
   useSubagentSnapshot(sessionId)
+  const recoveryReceipts = useDelegationRecovery(sessionId)
   const cronRuns = useRunningCronRuns(Boolean(sessionId))
   // Subscribe to THIS session's slice only. Both maps churn on other
   // sessions' activity (subagent ticks, background polls, preview updates in
@@ -259,6 +262,11 @@ export function ComposerStatusStack({ onSubmit, queue, sessionId }: ComposerStat
   // Running cron runs can exist without any subagent group, so the roster renders on their own.
   if (sessionId && cronRuns.length > 0 && !groups.some(group => group.type === 'subagent')) {
     sections.push({ key: 'subagent', node: <SubagentSection cronRuns={cronRuns} key={sessionId} sessionId={sessionId} /> })
+  }
+
+  // Display-only receipts for delegations whose owner exited: outcome unknown, never re-run from here.
+  if (recoveryReceipts.length > 0) {
+    sections.push({ key: 'recovery', node: <RecoverySection receipts={recoveryReceipts} /> })
   }
 
   if (queue) {
