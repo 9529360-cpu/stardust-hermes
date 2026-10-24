@@ -197,7 +197,11 @@ class TestNativeSearchParityWindows:
         via_native["files"] = sorted(via_native["files"])
         via_shell["files"] = sorted(via_shell["files"])
         assert via_native == via_shell
-        assert via_native["total_count"] >= 6
+        # '*find*' wraps to a basename glob; whether it also catches
+        # 'deeper_find.txt' depends on the runner's rg version, so only the five
+        # unambiguous files are required.
+        assert {f for f in via_native["files"] if "deeper" not in f} == {
+            f".\\find{i}.txt" for i in range(5)}
 
     def test_content_search_matches_shell_lane(self, ops, tmp_path):
         ops, _calls = ops
