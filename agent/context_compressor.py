@@ -9,6 +9,7 @@ import json
 import logging
 import sqlite3
 import re
+import threading
 import time
 import uuid
 from dataclasses import dataclass
@@ -1801,14 +1802,54 @@ class ContextCompressor(SummaryDispatchMixin, MicroCompactionMixin, ContextEngin
     def _resolve_context_length(self) -> int:
         """Resolve and cache the model's context length on first access."""
         if self._resolved_context_length is None:
-            self._resolved_context_length = get_model_context_length(
-                self.model, base_url=self.base_url, api_key=self.api_key,
-                config_context_length=self._config_context_length, provider=self.provider,
-                custom_providers=self.custom_providers,
-            )
-            # Raise-only small-context floor; must run after context_length resolves and before threshold_tokens derives.
-            self.threshold_percent = self._effective_threshold_percent(self._resolved_context_length, self._base_threshold_percent)
-            self._emit_init_summary_once()
+            # Single-flight: construction may start the probe in a daemon thread
+            # (start_context_probe); a reader arriving before it finishes must not
+            # launch a SECOND network probe alongside it.
+            with self._ctx_probe_lock:
+                if self._resolved_context_length is None:
+                    self._resolved_context_length = get_model_context_length(
+                        self.model, base_url=self.base_url, api_key=self.api_key,
+                        config_context_length=self._config_context_length, provider=self.provider,
+                        custom_providers=self.custom_providers,
+                    )
+                    # Raise-only small-context floor; must run after context_length resolves and before threshold_tokens derives.
+                    self.threshold_percent = self._effective_threshold_percent(self._resolved_context_length, self._base_threshold_percent)
+                    self._emit_init_summary_once()
+        return self._resolved_context_length
+
+    def start_context_probe(self) -> None:
+        """Begin resolving the context window off-thread (idempotent).
+
+        Only called when the deferred-probe flag is on: the 64K floor check in
+        agent_init then waits a bounded time for this thread instead of paying the
+        full probe latency inline. The probe still runs exactly once (see
+        _resolve_context_length's single-flight lock)."""
+        if self._ctx_probe_started:
+            return
+        self._ctx_probe_started = True
+
+        def _probe() -> None:
+            try:
+                self._resolve_context_length()
+            except Exception:
+                logger.debug("background context-length probe failed", exc_info=True)
+
+        threading.Thread(target=_probe, name="ctx-length-probe", daemon=True).start()
+
+    def resolved_context_length_within(self, budget_s: float) -> Optional[int]:
+        """Wait up to ``budget_s`` for the background probe, else None (still unresolved).
+
+        Returns the value WITHOUT triggering a probe: caller must fall back to
+        _resolve_context_length() when it genuinely needs the window."""
+        if self._resolved_context_length is not None:
+            return self._resolved_context_length
+        if not self._ctx_probe_started:
+            return None
+        deadline = time.monotonic() + max(0.0, budget_s)
+        while time.monotonic() < deadline:
+            if self._resolved_context_length is not None:
+                return self._resolved_context_length
+            time.sleep(0.01)
         return self._resolved_context_length
 
     @property
@@ -2388,6 +2429,8 @@ class ContextCompressor(SummaryDispatchMixin, MicroCompactionMixin, ContextEngin
         self._config_context_length = config_context_length
         self._configured_threshold_percent = self.threshold_percent
         self._resolved_context_length: int | None = None
+        self._ctx_probe_lock = threading.Lock()
+        self._ctx_probe_started = False
         self._threshold_tokens = self._tail_token_budget = self._max_summary_tokens = None
         self.compression_count = 0
         # The init log reports resolved budgets; emit it on first resolution to keep construction non-blocking.

@@ -298,6 +298,14 @@ def _endpoint_disk_cache_put(normalized: str, cache: Dict[str, Dict[str, Any]]) 
 # Descending probe tiers for unknown models; tier[0] is also the default fallback.
 CONTEXT_PROBE_TIERS = [256_000, 128_000, 64_000, 32_000, 16_000, 8_000]
 DEFAULT_FALLBACK_CONTEXT = CONTEXT_PROBE_TIERS[0]
+
+
+def defer_context_probe_enabled() -> bool:
+    """``STARDUST_DEFER_CONTEXT_PROBE=1``: AIAgent construction must not block on a
+    network probe (the 2 s blackhole connect of DISCOVERY-2 U1). Off by default while
+    the timing change is validated; same pattern as ``STARDUST_NATIVE_FILE_READ``."""
+    import os
+    return os.environ.get("STARDUST_DEFER_CONTEXT_PROBE", "0").strip().lower() in ("1", "true", "yes", "on")
 _FALLBACK_WARNED: set = set()  # the fallback is never cached, so dedupe its warning per (model, base_url)
 _CATALOG_HIT_NOTED: set = set()  # nor is a custom endpoint's catalog hit: note it once per (model, base_url)
 
