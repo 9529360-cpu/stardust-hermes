@@ -77,13 +77,33 @@ def epoch_guard(monkeypatch):
 
 # ---------------------------------------------------------------- child-side gate
 
+
+def test_first_stale_frame_after_rebuild_is_rejected(turn_env, epoch_guard, monkeypatch):
+    monkeypatch.setenv("STARDUST_COMPUTE_HOST_SESSION_EPOCHS", '{"s1": 2}')
+    out = io.StringIO()
+    host = ComputeHost(stdout=out, heartbeat_secs=0)
+    server._sessions["s1"] = _session()
+    try:
+        host.handle_frame({"type": "turn.start", "sid": "s1", "request_id": "stale-first",
+                           "prompt": "STALE", "host_epoch": 1,
+                           "parent_queued_prompt_generation": 0})
+        end = _wait(out, lambda f: f.get("request_id") == "stale-first"
+                    and f["type"] == "turn.end")
+        assert end and end.get("stale_epoch") is True
+        assert not any(f["type"] == "turn.started" for f in _frames(out))
+        assert server._sessions["s1"]["history"] == []
+    finally:
+        server._sessions.pop("s1", None)
+        host.close()
+
 def test_stale_epoch_frame_gets_terminal_reply_and_never_executes(turn_env, epoch_guard):
     out = io.StringIO()
     host = ComputeHost(stdout=out, heartbeat_secs=0)
     sid = "s1"
     server._sessions[sid] = _session()
     try:
-        # establish known epoch = 1
+        # The replacement starts with the parent's authoritative epoch.
+        host._session_epochs[sid] = 1
         host.handle_frame({"type": "turn.start", "sid": sid, "request_id": "t1",
                            "prompt": "current", "host_epoch": 1,
                            "parent_queued_prompt_generation": 0})
@@ -115,7 +135,8 @@ def test_post_rebuild_legitimate_frame_runs_exactly_once(turn_env, epoch_guard):
                            "prompt": "pre-rebuild", "host_epoch": 0,
                            "parent_queued_prompt_generation": 0})
         assert _wait(out, lambda f: f["type"] == "turn.end" and f.get("request_id") == "t1")
-        # new build adopts epoch 1; the pending frame minted at parent gen 1 runs
+        # Simulate the replacement seeded by the supervisor at epoch 1.
+        host._session_epochs[sid] = 1
         host.handle_frame({"type": "turn.start", "sid": sid, "request_id": "t2",
                            "prompt": "legit-queued", "host_epoch": 1,
                            "parent_queued_prompt_generation": 1,
@@ -171,12 +192,12 @@ def test_fresh_prompt_unaffected_by_guard(turn_env, epoch_guard):
     assert end is not None and end["interrupted"] is False
 
 
-def test_epoch_adopt_is_monotonic(turn_env, epoch_guard):
-    """Frames from a NEWER epoch are adopted (first frame after rebuild); the known
-    epoch never moves backwards."""
+def test_future_epoch_cannot_advance_build_fence(turn_env, epoch_guard):
+    """Only an exact epoch match is accepted; a frame cannot advance authority."""
     out = io.StringIO()
     host = ComputeHost(stdout=out, heartbeat_secs=0)
     sid = "s1"
+    host._session_epochs[sid] = 1
     server._sessions[sid] = _session()
     try:
         for i, epoch in enumerate((0, 1, 5, 3)):
@@ -184,8 +205,9 @@ def test_epoch_adopt_is_monotonic(turn_env, epoch_guard):
             host.handle_frame({"type": "turn.start", "sid": sid, "request_id": rid,
                                "prompt": f"p{i}", "host_epoch": epoch,
                                "parent_queued_prompt_generation": 0})
-            _wait(out, lambda f, rid=rid: f["type"] == "turn.end" and f.get("request_id") == rid)
-        assert host._session_epochs[sid] == 5
+            end = _wait(out, lambda f, rid=rid: f["type"] == "turn.end" and f.get("request_id") == rid)
+            assert end and bool(end.get("stale_epoch")) == (epoch != 1)
+        assert host._session_epochs[sid] == 1
     finally:
         server._sessions.pop(sid, None)
         host.close()

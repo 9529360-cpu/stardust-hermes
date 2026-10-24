@@ -45,10 +45,10 @@ def _get_compute_host_supervisor(cfg: dict | None = None):
     with _compute_host_supervisor_lock:
         if _compute_host_supervisor is None:
             from tui_gateway.host_supervisor import HostSupervisor
-            # F6.1 epoch guard: the child reads this env snapshot at each spawn
-            # (_spawn_locked merges os.environ), so the flag follows the config and
-            # a flipped flag applies to the NEXT host build without a gateway restart.
-            if isolation_cfg.get("compute_host_epoch_guard"):
+            # Resolve the opt-in here without expanding the server facade.
+            dashboard = _load_cfg().get("dashboard", {})
+            enabled = is_truthy_value(dashboard.get("compute_host_epoch_guard"), default=False)
+            if enabled:
                 os.environ["STARDUST_COMPUTE_HOST_EPOCH_GUARD"] = "1"
             else:
                 os.environ.pop("STARDUST_COMPUTE_HOST_EPOCH_GUARD", None)
@@ -60,19 +60,20 @@ def _get_compute_host_supervisor(cfg: dict | None = None):
         return _compute_host_supervisor
 
 
-def _on_compute_host_rebuild(info: dict) -> None:
-    """F6.1 epoch guard (opt-in): a new host build just replaced the old one. Bump the
-    session epoch for every session that ever used the compute host, so any frame minted
-    for the dead build (in-flight, queued, replayed) is stale for the replacement."""
+def _on_compute_host_rebuild(info: dict) -> dict[str, int]:
+    """Advance active sessions before spawning and seed the replacement's fence."""
     if not _epoch_guard_enabled():
-        return
+        return {}
     with _sessions_lock:
-        sessions = list(_sessions.values())
-    for session in sessions:
+        sessions = list(_sessions.items())
+    epochs = {}
+    for sid, session in sessions:
         if not session.get("_compute_host_active"):
             continue
         with _history_lock(session):
             session["_compute_host_epoch"] = _session_epoch(session) + 1
+            epochs[sid] = _session_epoch(session)
+    return epochs
 
 
 def _session_epoch(session: dict) -> int:
@@ -161,18 +162,6 @@ def _relay_compute_host_rpc(message: dict) -> bool:
             with _history_lock(session):
                 if _open_request_matches(session, payload.get("id")):
                     session.pop("_compute_host_open_request", None)
-    # F6.1 epoch guard (opt-in): a host death/rebuild invalidates every frame that
-    # host could still emit for this session. Bump the session epoch so any frame
-    # minted before the rebuild is stale for the next one; the flag is read from the
-    # supervisor's environment snapshot taken at spawn time (STARDUST_COMPUTE_HOST_EPOCH_GUARD).
-    if (isinstance(message, dict) and message.get("method") == "event"
-            and isinstance(params, dict) and params.get("type") == "error"
-            and isinstance(params.get("payload"), dict)
-            and params["payload"].get("reason") in ("crash", "shutdown")):
-        session = _sessions.get(str(params.get("session_id") or ""))
-        if session is not None and _epoch_guard_enabled():
-            with _history_lock(session):
-                session["_compute_host_epoch"] = _session_epoch(session) + 1
     return write_json(message)
 
 
@@ -294,6 +283,13 @@ def _submit_prompt_to_compute_host(
     rid: str, sid: str, session: dict, text: Any, image_paths: list[str] | None = None,
     queued_prompt_generation: int | None = None, display_kind: str | None = None) -> dict:
     cfg = _load_dashboard_process_isolation_config()
+    try:
+        supervisor = _get_compute_host_supervisor(cfg)
+        # A lazy spawn may advance the epoch; mint legitimate work afterwards.
+        if _epoch_guard_enabled():
+            supervisor.start()
+    except Exception as exc:
+        return _err(rid, 5019, f"compute-host dispatch failed: {exc}")
     frame = _compute_host_turn_frame(rid, sid, session, text, image_paths=image_paths,
                                      queued_prompt_generation=queued_prompt_generation,
                                      display_kind=display_kind)

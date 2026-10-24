@@ -1267,10 +1267,6 @@ def _load_dashboard_process_isolation_config(cfg: dict | None = None) -> dict[st
             dash.get("compute_host_heartbeat_secs"), _DASHBOARD_COMPUTE_HOST_HEARTBEAT_SECS_DEFAULT, min_value=1),
         "compute_host_respawn_max": _coerce_int_config_value(
             dash.get("compute_host_respawn_max"), _DASHBOARD_COMPUTE_HOST_RESPAWN_MAX_DEFAULT, min_value=0),
-        # F6.1 opt-in epoch guard: reject compute-host frames minted for an older
-        # host build (default OFF).
-        "compute_host_epoch_guard": is_truthy_value(
-            dash.get("compute_host_epoch_guard"), default=False),
     }
 
 
