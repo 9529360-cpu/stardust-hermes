@@ -1,5 +1,5 @@
+import { type MockBackendFixture, setupMockBackend, waitForAppReady } from './fixtures'
 import { expect, test } from './test'
-import { setupMockBackend, waitForAppReady, type MockBackendFixture } from './fixtures'
 
 // CX5 edge cases (connectors.unified_dialog ON, real backend, mock LLM):
 // duplicate name, missing command, cancel, API-key branch, custom URL/command.
@@ -39,16 +39,22 @@ test('cancel leaves config unchanged', async () => {
 test('duplicate name is rejected in Chinese', async () => {
   const page = fixture!.page
   await openConnectors(page)
-  // Connect filesystem first (real install).
-  await page.locator('[data-slot="connect-filesystem"]').click()
-  await page.locator('[data-slot="connector-env-ALLOWED_DIR"]').fill('D:/wt/Temp/stardust/cx5/fs-allow')
-  await page.locator('[data-slot="connector-connect"]').click()
-  await expect(page.locator('[data-slot="connector-connected-row"][data-server="filesystem"]')).toBeVisible({ timeout: 180_000 })
+  // Seed an existing `filesystem` server through the custom-URL branch. The
+  // duplicate guard under test is the dialog's name check against
+  // mcp_servers, not the catalog install — addMcpServer returns as soon as
+  // the config is written (no handshake), so this stays hermetic: no npx
+  // download, no reachable endpoint. The real catalog install path (with a
+  // real npx handshake) is covered by connectors-real.spec.ts.
+  await page.locator('[data-slot="add-connection"]').click()
+  await page.locator('[data-slot="custom-name"]').fill('filesystem')
+  await page.locator('[data-slot="custom-url"]').fill('https://mcp.example.invalid/mcp')
+  await page.locator('[data-slot="custom-connect"]').click()
+  await expect(page.locator('[data-slot="connector-connected-row"][data-server="filesystem"]')).toBeVisible({ timeout: 60_000 })
 
   // Now the custom dialog with the same name → duplicate error, no crash.
   await page.locator('[data-slot="add-connection"]').click()
   await page.locator('[data-slot="custom-name"]').fill('filesystem')
-  await page.locator('[data-slot="custom-command"]').fill('npx -y @modelcontextprotocol/server-filesystem@2026.7.10 D:/wt/Temp/stardust/cx5/fs-allow')
+  await page.locator('[data-slot="custom-command"]').fill('npx -y some-fake-server')
   await page.locator('[data-slot="custom-connect"]').click()
   await expect(page.getByText('已存在同名连接 filesystem。')).toBeVisible({ timeout: 15_000 })
   // Close the dialog so later tests start from a clean page.
