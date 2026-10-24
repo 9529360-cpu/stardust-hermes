@@ -16570,10 +16570,14 @@ def test_session_create_seed_failure_after_row_compensates(monkeypatch):
     )
 
     assert "result" in resp
-    key = resp["result"]["stored_session_id"]
+    # A failed seed must not advertise a recoverable stored session.
+    assert resp["result"]["stored_session_id"] == ""
+    assert resp["result"]["info"]["durable"] is False
+    assert resp["result"]["info"]["persistence_error"]
     # The half-written child was rolled back — no durable empty row left to
-    # shadow the lazy seed path.
-    assert seen.get("deleted") == key
+    # shadow the lazy seed path. Compare the internal create/delete keys.
+    assert seen["created"]
+    assert seen["deleted"] == seen["created"]
     # pending_title survived: it still lands via the lazy post-turn apply.
     runtime_sid = resp["result"]["session_id"]
     assert server._sessions[runtime_sid]["pending_title"] == "My Branch"

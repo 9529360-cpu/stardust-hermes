@@ -1,5 +1,7 @@
 """session.create with seeded messages: the seed is durable before the first prompt, and durable once."""
 
+import pytest
+
 from hermes_state import SessionDB
 from tui_gateway import server
 
@@ -35,6 +37,8 @@ def test_parentless_seed_survives_a_restart_and_hides_its_runbook(monkeypatch, t
             ]})
         sids.append(result["session_id"])
         key = result["stored_session_id"]
+        assert result["info"]["durable"] is True
+        assert "persistence_error" not in result["info"]
         assert [m["role"] for m in result["messages"]] == ["assistant", "user"]
         assert result["message_count"] == 2  # counts what is on the wire, as session.resume does
         live = server.handle_request({"id": "live", "method": "session.resume", "params": {"session_id": key, "cols": 96}})["result"]
@@ -105,7 +109,11 @@ def test_partial_seed_copy_is_rolled_back_not_duplicated(monkeypatch, tmp_path):
     try:
         result = _create({"cols": 96, "source": "desktop", "title": "Welcome",
                           "messages": [{"role": "user", "content": "hi"}, {"role": "assistant", "content": "hello"}]})
-        sid, key = result["session_id"], result["stored_session_id"]
+        sid = result["session_id"]
+        key = server._sessions[sid]["session_key"]
+        assert result["stored_session_id"] == ""
+        assert result["info"]["durable"] is False
+        assert result["info"]["persistence_error"]
         assert db.get_session(key) is None  # rolled back, so the first prompt starts clean
 
         assert server._persist_session_row_for_submit("rid", server._sessions[sid]) is None
@@ -114,4 +122,57 @@ def test_partial_seed_copy_is_rolled_back_not_duplicated(monkeypatch, tmp_path):
     finally:
         if sid:
             server._sessions.pop(sid, None)
+        db.close()
+
+
+@pytest.mark.parametrize("branch", [False, True])
+@pytest.mark.parametrize("failure", ["messages", "title", "unavailable"])
+def test_seed_failure_receipt_keeps_retryable_history(monkeypatch, tmp_path, branch, failure):
+    db = SessionDB(db_path=tmp_path / "state.db")
+    _quiet_create(monkeypatch, db)
+    seed = [{"role": "user", "content": "hello"}, {"role": "assistant", "content": "reply"}]
+    if branch:
+        db.create_session("parent", source="desktop")
+        db.set_session_title("parent", "Parent")
+    if failure == "unavailable":
+        monkeypatch.setattr(server, "_get_db", lambda: None)
+    elif failure == "messages":
+        db._conn.execute("CREATE TRIGGER reject_seed BEFORE INSERT ON messages BEGIN SELECT RAISE(ABORT, 'reject seed'); END")
+    else:
+        db._conn.execute("CREATE TRIGGER reject_title BEFORE UPDATE OF title ON sessions BEGIN SELECT RAISE(ABORT, 'reject title'); END")
+    sid = None
+    try:
+        result = _create({"messages": seed, "title": "Imported", **({"parent_session_id": "parent"} if branch else {})})
+        sid = result["session_id"]
+        record = server._sessions[sid]
+        assert result["info"]["durable"] is False
+        assert result["info"]["persistence_error"]
+        assert result["stored_session_id"] == ""
+        assert result["message_count"] == len(result["messages"]) == 2
+        assert len(record["history"]) == 2
+        assert not record.get("_branch_seed_persisted")
+        assert db.get_session(record["session_key"]) is None
+        if failure == "unavailable":
+            monkeypatch.setattr(server, "_get_db", lambda: db)
+        else:
+            db._conn.execute("DROP TRIGGER " + ("reject_seed" if failure == "messages" else "reject_title"))
+        assert server._persist_session_row_for_submit("retry", record) is None
+        assert [m["content"] for m in db.get_messages_as_conversation(record["session_key"])] == ["hello", "reply"]
+    finally:
+        if sid:
+            server._sessions.pop(sid, None)
+        db.close()
+
+
+def test_empty_draft_retains_lazy_receipt(monkeypatch, tmp_path):
+    db = SessionDB(db_path=tmp_path / "state.db")
+    _quiet_create(monkeypatch, db)
+    result = _create({})
+    try:
+        assert result["stored_session_id"]
+        assert result["message_count"] == 0
+        assert "durable" not in result["info"]
+        assert db.get_session(result["stored_session_id"]) is None
+    finally:
+        server._sessions.pop(result["session_id"], None)
         db.close()

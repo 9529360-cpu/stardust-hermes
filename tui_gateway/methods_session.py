@@ -262,55 +262,53 @@ def _persist_branch(db, new_key: str, parent_key: str, title: str, history: list
         raise
 
 
-def _seed_branch_row(record: dict, key: str, parent_session_id: str, history: list, source: str, profile_home):
-    """Persist a seeded desktop branch child NOW (the one session.create exception to lazy rows): the
-    renderer's post-create resume re-fetches it via REST/defer_history, so an unpersisted child 404s and
-    the fail-latch spins forever. Best-effort — on failure the lazy first-prompt path is the fallback."""
+def _seed_branch_row(record: dict, key: str, parent_session_id: str, history: list, source: str, profile_home) -> bool:
+    """Persist a branch seed now; retain live history for retry if the write fails."""
     try:
         with _session_db(record) as db:
             if db is None:
-                return
+                return False
             _persist_branch(
                 db, key, parent_session_id, _branch_title(db, parent_session_id), history,
                 source=source, cwd=record["cwd"],
                 profile_name=profile_name_for_home(profile_home) or _current_profile_name(), compensate=True,
-                # Seeded history defines the branch point. Do not import the parent's current task state
-                # when the client intentionally branched an older transcript prefix.
                 todo_state=_todo_state_from_history(history),
             )
             record["pending_title"] = None
-            # The first submit's _persist_branch_seed is the fallback for a failed seed, not a second copy.
             record["_branch_seed_persisted"] = True
+            return True
     except Exception:
-        logger.warning("seeded-branch persistence failed for %s; falling back to lazy row creation", key,
+        logger.warning("seeded-branch persistence failed for %s; live history retained for retry", key,
                        exc_info=True)
+        return False
 
 
-def _seed_row(record: dict) -> None:
-    """Persist a parentless seeded session NOW, for the reason ``_seed_branch_row`` gives: seeded content is
-    intent, not an abandoned draft, and the renderer's post-create hydration reads the DB. The client's title
-    lands with the row so a restart before the first prompt keeps it. Best-effort — the first-prompt path is
-    the fallback, and it re-copies the WHOLE seed, so a partial copy is rolled back here (the compensation
-    ``_persist_branch`` applies to branch children) rather than left to be duplicated."""
+def _seed_row(record: dict) -> bool:
+    """A seed receipt covers both transcript and title, unlike a lazy empty draft.
+
+    Lower-level helpers can swallow storage failures, so their persisted marker AND
+    the owning row must exist before acknowledging durability. Roll back a failed
+    seed because the first-submit fallback copies the whole in-memory transcript.
+    """
     key = record.get("session_key")
     try:
         if _ensure_session_db_row(record) is False:
-            return
+            return False
         _persist_branch_seed(record)
-    except Exception:
-        logger.warning("seeded-session persistence failed for %s; falling back to lazy row creation", key, exc_info=True)
-    if not record.get("_branch_seed_persisted"):
-        with contextlib.suppress(Exception), _session_db(record) as db:
-            if db is not None:
-                db.delete_session(key)
-        return
-    try:
-        if title := record.get("pending_title"):
+        if record.get("_branch_seed_persisted"):
             with _session_db(record) as db:
-                if db is not None and db.set_session_title(key, title):
-                    record["pending_title"] = None
+                if db is not None and db.get_session(key) is not None:
+                    title = record.get("pending_title")
+                    if not title or db.set_session_title(key, title):
+                        record["pending_title"] = None
+                        return True
     except Exception:
-        logger.debug("seeded-session title write failed for %s; pending_title stays queued", key, exc_info=True)
+        logger.warning("seeded-session persistence failed for %s; live history retained for retry", key, exc_info=True)
+    record.pop("_branch_seed_persisted", None)
+    with contextlib.suppress(Exception), _session_db(record) as db:
+        if db is not None:
+            db.delete_session(key)
+    return False
 
 
 def _create_overrides(params: dict) -> tuple:
@@ -385,10 +383,17 @@ def _(rid, params: dict) -> dict:
     # The same holds for a seeded session WITHOUT a parent (a client opening a chat with its first turns
     # already written): the transcript exists only in memory, so a restart before the first prompt lost it
     # and the post-create resume 404'd. Persist it up front too; only empty drafts stay lazy.
+    durable = None
     if parent_session_id and history:
-        _seed_branch_row(_sessions[sid], key, parent_session_id, history, source, profile_home)
+        durable = _seed_branch_row(_sessions[sid], key, parent_session_id, history, source, profile_home)
     elif history:
-        _seed_row(_sessions[sid])
+        durable = _seed_row(_sessions[sid])
+    # SessionLiveInfo is an extensible wire surface; preserve the existing top-level contract.
+    persistence_info = {} if durable is None else {"durable": durable}
+    if durable is False:
+        persistence_info["persistence_error"] = (
+            "seed_persistence_failed: imported history or title could not be saved; "
+            "history remains in this live session only and will not survive a restart. Retry before closing.")
     # Return immediately so Ink can paint; the AIAgent builds right after the flush.
     _schedule_agent_build(sid)
     _schedule_session_cap_enforcement()  # trim detached idle sessions over the cap
@@ -396,13 +401,14 @@ def _(rid, params: dict) -> dict:
     override = session_model_override or {}
     messages = _history_to_messages(history)  # hidden seed rows are not on the wire; count what is (as resume does)
     return _ok(rid, {
-        "session_id": sid, "stored_session_id": key, "message_count": len(messages), "messages": messages,
+        "session_id": sid, "stored_session_id": key if durable is not False else "",
+        "message_count": len(messages), "messages": messages,
         # Reflect the override now so the client doesn't clobber its sticky pick.
         "info": {"model": override.get("model") if override else _resolve_model(),
                  **({"provider": override["provider"]} if override.get("provider") else {}),
                  "tools": {}, "skills": {}, "cwd": cwd, "branch": git_probe.branch(cwd),
                  "project": _project_info_for_cwd(cwd), "lazy": True, "desktop_contract": DESKTOP_BACKEND_CONTRACT,
-                 "profile_name": _response_profile_name(profile)}})
+                 "profile_name": _response_profile_name(profile), **persistence_info}})
 
 
 def _unarchive_recoverable(db, session_id: str) -> bool:
