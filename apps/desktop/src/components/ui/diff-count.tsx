@@ -1,5 +1,5 @@
-import { motion, useSpring, useTransform } from 'motion/react'
-import { useEffect } from 'react'
+import { useMotionValueEvent, useSpring, useTransform } from 'motion/react'
+import { useEffect, useRef } from 'react'
 
 import { cn } from '@/lib/utils'
 
@@ -14,12 +14,24 @@ const SPRING = { stiffness: 320, damping: 30, mass: 0.5 } as const
 export function AnimatedInt({ value }: { value: number }) {
   const spring = useSpring(value, SPRING)
   const text = useTransform(spring, latest => Math.round(latest).toString())
+  const element = useRef<HTMLSpanElement>(null)
+  const initial = useRef(String(value))
+
+  useMotionValueEvent(text, 'change', latest => {
+    // Preserve the text node. textContent replaces it and invalidates ancestor
+    // :has() selectors, forcing style recalculation across the transcript.
+    const node = element.current?.firstChild
+
+    if (node && node.nodeValue !== latest) {
+      node.nodeValue = latest
+    }
+  })
 
   useEffect(() => {
     spring.set(value)
   }, [value, spring])
 
-  return <motion.span>{text}</motion.span>
+  return <span ref={element}>{initial.current}</span>
 }
 
 interface DiffCountProps {
