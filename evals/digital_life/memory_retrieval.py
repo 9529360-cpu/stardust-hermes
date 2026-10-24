@@ -42,6 +42,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import statistics
 import sys
 import time
@@ -97,8 +98,15 @@ def percentile(values, fraction):
     return ordered[idx]
 
 
-def write_corpus(home: Path):
-    """Write the fixed 100-fact corpus through the REAL memory write path."""
+def write_corpus(home: Path, provenance: bool = False):
+    """Write the fixed 100-fact corpus through the REAL memory write path.
+
+    provenance=True (the DL-P2.7 flag-on variant) stamps every write with
+    explicit bi-temporal facts the generator knows semantically: the current
+    track is observed 2026-10-20, each stale fork records an older observation
+    (2026-09-01) that expired 2026-10-01 — mirroring how a writer archives a
+    superseded fact behind a newer one (Zep/Graphiti valid_at/invalid_at).
+    """
     from tools.memory_tool import memory_tool
 
     cases = load_cases()
@@ -108,10 +116,17 @@ def write_corpus(home: Path):
         raise ValueError(f'case set drifted: {len(writes)} writes, expected {expected}')
     count = 0
     for payload in writes:
+        kwargs = {}
+        if provenance:
+            if payload['phase'] == 'stale-fork':
+                kwargs = {'observed_at': '2026-09-01', 'valid_until': '2026-10-01'}
+            else:
+                kwargs = {'observed_at': '2026-10-20'}
         result = memory_tool(
             action='add', target='topic',
             topic=payload['topic'], title=payload['title'],
             keywords=payload['keywords'], content=payload['summary'],
+            **kwargs,
         )
         parsed = json.loads(result)
         if not parsed.get('success'):
@@ -295,11 +310,25 @@ def qa_answer(question, context_block):
     return data['choices'][0]['message']['content']
 
 
+def _value_runs(text: str, exclude: str) -> list[str]:
+    """Latin/digit runs (len>=2) in text that do not appear in exclude."""
+    norm = lambda s: ''.join(ch.lower() for ch in str(s or '') if ch.isalnum())
+    answer_norm, exclude_norm = norm(text), norm(exclude)
+    runs = re.findall(r'[A-Za-z0-9][A-Za-z0-9 .+-]{1,}', str(text or ''))
+    return [r for r in runs if norm(r) and norm(r) not in exclude_norm]
+
+
 def run_qa(rows, questions_by_id, tokenizer, max_calls=QA_MAX_CALLS):
     """Optional QA layer over the retrieval rows (same model, same budget).
 
-    Correct = normalized answer key contained in the response; for outdated
-    questions the superseded value must NOT appear (stale answer = wrong).
+    Correct = the answer states the current fact and never the superseded one.
+    A containment check alone is too brittle for Chinese paraphrase ('现在用'
+    vs '目前用的是'), so grading is two-tier for outdated questions:
+    (a) the normalized key is contained in the answer or vice versa, or
+    (b) the key's distinguishing latin/digit value runs (those absent from the
+    stale key) all appear in the answer. Either way, a stale value in the
+    answer fails the question (stale answer = wrong; stricter than
+    LongMemEval, which counts 'both mentioned' as correct).
     """
     answered, correct, skipped = 0, 0, 0
     per_category = {}
@@ -322,8 +351,12 @@ def run_qa(rows, questions_by_id, tokenizer, max_calls=QA_MAX_CALLS):
         except Exception as exc:
             return {'error': f'QA layer aborted: {exc}', 'answered_before_abort': answered}
         answered += 1
-        ok = norm(expected) in norm(answer)
-        stale_key = q.get('stale_answer_key')
+        stale_key = q.get('stale_answer_key') or ''
+        ok = norm(expected) in norm(answer) or norm(answer) in norm(expected)
+        if not ok and stale_key:
+            current_runs = _value_runs(expected, stale_key)
+            if current_runs:
+                ok = all(norm(run) in norm(answer) for run in current_runs)
         if ok and stale_key:
             ok = norm(stale_key) not in norm(answer)
         per_cat['asked'] += 1
@@ -346,6 +379,9 @@ def main(argv=None):
     parser.add_argument('--home', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--qa', action='store_true', help='run the optional QA layer via magpie')
+    parser.add_argument('--provenance', action='store_true',
+                        help='flag-on variant: stamp the corpus with bi-temporal provenance '
+                             'and set memory.topic_provenance_enabled=true in the home config')
     args = parser.parse_args(argv)
 
     home = assert_home(args.home)
@@ -354,13 +390,21 @@ def main(argv=None):
     output = args.output.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
 
+    if args.provenance:
+        # The agent reads memory.topic_provenance_enabled through the normal
+        # config path; write it into the isolated home before corpus write.
+        cfg = home / 'config.yaml'
+        if cfg.exists():
+            raise SystemExit(f'refusing to overwrite existing config: {cfg}')
+        cfg.write_text('memory:\n  topic_provenance_enabled: true\n', encoding='utf-8')
+
     tokenizer, tokenizer_label = default_tokenizer()
 
     # 1) Corpus through the real write path (fresh home each invocation).
     topics_file = home / 'memories' / 'TOPICS.json'
     if topics_file.exists():
         raise SystemExit(f'refusing to overwrite populated home: {topics_file}')
-    count = write_corpus(home)
+    count = write_corpus(home, provenance=args.provenance)
 
     cases = load_cases()
     topics_meta = {row['key']: row for row in cases['topics']}
@@ -384,6 +428,7 @@ def main(argv=None):
             'questions': len(questions),
             'tokenizer': tokenizer_label,
             'topic_recall_limit': TOPIC_RECALL_LIMIT,
+            'provenance': bool(args.provenance),
             'timestamp_utc': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
         },
         'retrieval': summary,

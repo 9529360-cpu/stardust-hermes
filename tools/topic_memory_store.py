@@ -30,6 +30,12 @@ _MAX_KEYWORDS = 12
 _MAX_KEYWORD_CHARS = 48
 _DEFAULT_RECALL_LIMIT = 2
 _DEFAULT_RECALL_CHAR_BUDGET = 1800
+_MAX_SOURCE_CHARS = 160
+# Provenance fields added by DL-P2.7; stripped from recall rows when the flag is
+# OFF so flag-off output stays byte-identical even over a store written flag-on.
+_PROVENANCE_FIELDS = frozenset({"source", "observed_at", "valid_until", "verified", "superseded_on"})
+# ISO-8601 prefix (date or datetime, optionally with time zone) for provenance stamps.
+_TIMESTAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$")
 
 
 def topic_memory_path() -> Path:
@@ -38,6 +44,28 @@ def topic_memory_path() -> Path:
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _normalize_timestamp(value: Any) -> str | None:
+    """Return a valid ISO-8601 timestamp string, or None for empty/invalid input."""
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if not _TIMESTAMP_RE.match(text):
+        return None
+    return text
+
+
+def _parse_timestamp(value: Any) -> datetime:
+    """Parse an ISO-8601 date/datetime; naive values are treated as UTC."""
+    text = str(value or "").strip().replace(" ", "T")
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return datetime.min.replace(tzinfo=timezone.utc)
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
 def _norm(value: Any) -> str:
@@ -153,6 +181,10 @@ def upsert_topic_summary(
     *,
     title: str | None = None,
     keywords: Any = None,
+    source: str | None = None,
+    observed_at: str | None = None,
+    valid_until: str | None = None,
+    verified: bool | None = None,
 ) -> dict[str, Any]:
     key = _topic_key(topic or title)
     clean_summary = str(summary or "").strip()
@@ -162,6 +194,16 @@ def upsert_topic_summary(
         return {"success": False, "error": "topic is required for a topic summary"}
     if not clean_summary:
         return {"success": False, "error": "content is required for a topic summary"}
+    clean_source = str(source or "").strip()[:_MAX_SOURCE_CHARS] or None
+    clean_observed_at = _normalize_timestamp(observed_at)
+    clean_valid_until = _normalize_timestamp(valid_until)
+    stamps = {"observed_at": (observed_at, clean_observed_at), "valid_until": (valid_until, clean_valid_until)}
+    for label, (raw, normalized) in stamps.items():
+        if str(raw or "").strip() and normalized is None:
+            return {"success": False, "error": f"invalid {label}: use ISO 8601 (e.g. 2026-10-24 or 2026-10-24T09:00:00+02:00)"}
+    if (clean_observed_at and clean_valid_until
+            and _parse_timestamp(clean_valid_until) < _parse_timestamp(clean_observed_at)):
+        return {"success": False, "error": "valid_until is earlier than observed_at"}
     if len(clean_summary) > _MAX_SUMMARY_CHARS:
         return {
             "success": False,
@@ -190,6 +232,22 @@ def upsert_topic_summary(
             "created_at": existing.get("created_at") or now,
             "updated_at": now,
         }
+        if clean_source is not None:
+            row["source"] = clean_source
+        elif isinstance(existing.get("source"), str) and existing["source"].strip():
+            row["source"] = existing["source"]
+        if clean_observed_at is not None:
+            row["observed_at"] = clean_observed_at
+        elif isinstance(existing.get("observed_at"), str) and existing["observed_at"].strip():
+            row["observed_at"] = existing["observed_at"]
+        if clean_valid_until is not None:
+            row["valid_until"] = clean_valid_until
+        elif isinstance(existing.get("valid_until"), str) and existing["valid_until"].strip():
+            row["valid_until"] = existing["valid_until"]
+        if verified is not None:
+            row["verified"] = bool(verified)
+        elif isinstance(existing.get("verified"), bool):
+            row["verified"] = existing["verified"]
         if idx is None:
             if len(topics) >= _MAX_TOPICS:
                 return {
@@ -271,28 +329,101 @@ def _score(query: str, query_signals: set[str], topic: dict[str, Any]) -> int:
     return score
 
 
+def _expired(topic: dict[str, Any], now: datetime) -> bool:
+    """True when the topic carries a valid_until that has passed."""
+    valid_until = topic.get("valid_until")
+    if not isinstance(valid_until, str) or not valid_until.strip():
+        return False
+    return _parse_timestamp(valid_until) < now
+
+
+def _observed_sort_key(topic: dict[str, Any]) -> tuple[int, str]:
+    """Newest observation first; missing observed_at sorts last (fallback: updated_at)."""
+    raw = topic.get("observed_at") or topic.get("updated_at") or ""
+    parsed = _parse_timestamp(raw) if str(raw or "").strip() else None
+    if parsed is None or parsed == datetime.min.replace(tzinfo=timezone.utc):
+        return (0, "")
+    return (1, str(parsed))
+
+
+def _same_domain_forks(a: dict[str, Any], b: dict[str, Any]) -> bool:
+    """True when two topics are same-domain forks: equal normalized keys, one key
+    a dash-separated prefix of the other, or >= 2 normalized keywords shared."""
+    ka, kb = _topic_key(a.get("key") or ""), _topic_key(b.get("key") or "")
+    if ka and kb:
+        if ka == kb:
+            return True
+        if kb.startswith(ka + "-") or ka.startswith(kb + "-"):
+            return True
+    kwa = {_norm(k) for k in a.get("keywords") or [] if _norm(k)}
+    kwb = {_norm(k) for k in b.get("keywords") or [] if _norm(k)}
+    return len(kwa & kwb) >= 2
+
+
+def _rank_superseded_forks(scored: list[tuple[int, dict[str, Any]]]) -> dict[str, str]:
+    """Within each same-domain fork pair, mark the older topic superseded by the newer.
+
+    Returns {superseded_key: supersede_date} where supersede_date is the newer
+    topic's observed_at (or updated_at), used both for ranking (superseded rows
+    drop below every current row) and for the injected label. Both-legs marking
+    keeps the pair from being injected as two competing current facts; a topic
+    with no newer same-domain partner is never marked.
+    """
+    superseded: dict[str, str] = {}
+    n = len(scored)
+    for i in range(n):
+        for j in range(n):
+            if i == j:
+                continue
+            ti, tj = scored[i][1], scored[j][1]
+            if not _same_domain_forks(ti, tj):
+                continue
+            if _observed_sort_key(tj) <= _observed_sort_key(ti):
+                continue
+            # j is strictly newer than i in the same domain: i is superseded.
+            superseded[str(ti.get("key") or "")] = _display_date(tj)
+    return superseded
+
+
+def _display_date(topic: dict[str, Any]) -> str:
+    raw = str(topic.get("observed_at") or topic.get("updated_at") or "").strip()
+    return raw[:10] if raw else "unknown date"
+
+
 def recall_topic_summaries(
     query: str,
     *,
     limit: int = _DEFAULT_RECALL_LIMIT,
     char_budget: int = _DEFAULT_RECALL_CHAR_BUDGET,
+    provenance: bool = False,
 ) -> list[dict[str, Any]]:
     clean_query = str(query or "").strip()
     if not clean_query or limit <= 0 or char_budget <= 0:
         return []
     query_signals = _signals(clean_query)
+    now = datetime.now(timezone.utc)
     scored = []
     for topic in load_topics():
+        if provenance and _expired(topic, now):
+            continue
         score = _score(clean_query, query_signals, topic)
         if score >= 6 and str(topic.get("summary") or "").strip():
             scored.append((score, topic))
     scored.sort(key=lambda item: (-item[0], str(item[1].get("key") or "")))
+    superseded: dict[str, str] = {}
+    if provenance and scored:
+        superseded = _rank_superseded_forks(scored)
+        if superseded:
+            fresh_rows = [item for item in scored if str(item[1].get("key") or "") not in superseded]
+            stale_rows = [item for item in scored if str(item[1].get("key") or "") in superseded]
+            scored = fresh_rows + stale_rows
 
     selected: list[dict[str, Any]] = []
     used = 0
     for score, topic in scored:
         summary = str(topic.get("summary") or "").strip()
         title = str(topic.get("title") or topic.get("key") or "").strip()
+        superseded_by = superseded.get(str(topic.get("key") or ""))
         cost = len(title) + len(summary) + 16
         if selected and used + cost > char_budget:
             continue
@@ -303,16 +434,36 @@ def recall_topic_summaries(
             continue
         selected.append(
             {
-                **topic,
+                **({k: v for k, v in topic.items() if k not in _PROVENANCE_FIELDS} if not provenance else topic),
                 "summary": summary,
                 "score": score,
                 "version": _topic_version(topic),
+                **({"superseded_on": superseded_by} if superseded_by is not None else {}),
             }
         )
         used += cost
         if len(selected) >= limit:
             break
     return selected
+
+
+def _provenance_note(topic: dict[str, Any]) -> str:
+    """Compact evidence/uncertainty suffix for one injected topic row."""
+    bits: list[str] = []
+    if topic.get("superseded_on"):
+        bits.append(f"older, superseded on {topic['superseded_on']}")
+    observed = str(topic.get("observed_at") or "").strip()
+    if observed:
+        bits.append(f"observed {observed[:10]}")
+    if topic.get("valid_until"):
+        bits.append(f"valid until {str(topic['valid_until'])[:10]}")
+    if topic.get("verified") is True:
+        bits.append("verified")
+    elif topic.get("verified") is False:
+        bits.append("unverified")
+    if topic.get("source"):
+        bits.append(f"source: {topic['source']}")
+    return f" ({'; '.join(bits)})" if bits else ""
 
 
 def format_topic_recall(topics: Iterable[dict[str, Any]]) -> str:
@@ -323,7 +474,15 @@ def format_topic_recall(topics: Iterable[dict[str, Any]]) -> str:
         "Relevant topic summaries (current state; use session_search only when exact historical detail is needed):"
     ]
     for topic in rows:
-        parts.append(f"### {topic.get('title') or topic.get('key')}\n{topic.get('summary') or ''}")
+        note = _provenance_note(topic)
+        header = f"### {topic.get('title') or topic.get('key')}"
+        body = topic.get("summary") or ""
+        if note:
+            # Own line under the header: the bare `### <title>` line stays parseable
+            # by consumers that map titles back to topic keys.
+            parts.append(f"{header}\n{note}\n{body}")
+        else:
+            parts.append(f"{header}\n{body}")
     return "\n\n".join(parts)
 
 

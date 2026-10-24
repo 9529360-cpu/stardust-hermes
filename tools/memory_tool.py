@@ -210,7 +210,8 @@ def _background_delete_gate(
 def memory_tool(action: str = None, target: str = "memory", content: str = None, old_text: str = None,
                 new_text: str = None, operations: Optional[List[Dict[str, Any]]] = None,
                 topic: str = None, title: str = None, keywords: Any = None,
-                store: Optional[MemoryStore] = None) -> str:
+                source: str = None, observed_at: str = None, valid_until: str = None,
+                verified: bool = None, store: Optional[MemoryStore] = None) -> str:
     """Tool entry point for core/user memory and topic summaries."""
     if content is None and new_text is not None:
         content = new_text
@@ -234,7 +235,10 @@ def memory_tool(action: str = None, target: str = "memory", content: str = None,
             if gate_result is not None:
                 return gate_result
             return json.dumps(
-                upsert_topic_summary(topic_key, content, title=title, keywords=keywords),
+                upsert_topic_summary(
+                    topic_key, content, title=title, keywords=keywords,
+                    source=source, observed_at=observed_at, valid_until=valid_until, verified=verified,
+                ),
                 ensure_ascii=False,
             )
         if action == "remove":
@@ -322,6 +326,17 @@ def get_builtin_memory_store_flags(config: Optional[Dict[str, Any]] = None) -> T
     return tuple(is_truthy_value(section.get(k), default=True) for k in ("memory_enabled", "user_profile_enabled"))
 
 
+def topic_provenance_enabled(config: Optional[Dict[str, Any]] = None) -> bool:
+    """Return the ``memory.topic_provenance_enabled`` opt-in flag (default OFF).
+
+    Provenance stamps (source/observed_at/valid_until/verified) and
+    recency-aware superseding are written/applied only when this is true;
+    OFF keeps writes and recall byte-identical to the pre-flag behaviour.
+    """
+    section = get_builtin_memory_config(config)
+    return is_truthy_value(section.get("topic_provenance_enabled"), default=False)
+
+
 def topic_summaries_enabled(
     config: Optional[Dict[str, Any]] = None,
     *,
@@ -391,7 +406,9 @@ def apply_memory_pending(payload: Dict[str, Any], store: "MemoryStore") -> Dict[
         topic = payload.get("topic") or payload.get("title") or ""
         if action in {"add", "replace", "upsert"}:
             return upsert_topic_summary(
-                topic, payload.get("content") or "", title=payload.get("title"), keywords=payload.get("keywords")
+                topic, payload.get("content") or "", title=payload.get("title"), keywords=payload.get("keywords"),
+                source=payload.get("source"), observed_at=payload.get("observed_at"),
+                valid_until=payload.get("valid_until"), verified=payload.get("verified"),
             )
         if action == "remove":
             return remove_topic_summary(topic)
@@ -464,7 +481,28 @@ MEMORY_SCHEMA = {
             "keywords": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "Optional recall aliases/keywords for target='topic'."
+                "description": "Optional recall aliases/keywords for target='topic'.",
+            },
+            "source": {
+                "type": "string",
+                "description": ("Optional provenance for target='topic': where this came from "
+                                "(conversation, user statement, session id). Stored when "
+                                "memory.topic_provenance_enabled is on."),
+            },
+            "observed_at": {
+                "type": "string",
+                "description": ("Optional ISO-8601 date/datetime when the fact was observed "
+                                "(not when written). Stored when memory.topic_provenance_enabled is on."),
+            },
+            "valid_until": {
+                "type": "string",
+                "description": ("Optional ISO-8601 date/datetime after which this topic is "
+                                "superseded/expired; recall drops it once passed. Set when archiving "
+                                "an old fact behind a newer one."),
+            },
+            "verified": {
+                "type": "boolean",
+                "description": "Optional explicit verification status for target='topic'.",
             },
             "content": {
                 "type": "string",

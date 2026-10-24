@@ -147,3 +147,51 @@ def test_percentile_ordered():
     assert mr.percentile([1, 2, 3, 4], 0.5) == 3
     assert mr.percentile([1, 2, 3, 4], 0.95) == 4
     assert mr.percentile([], 0.5) == 0.0
+
+
+def test_write_corpus_provenance_stamps_stale_forks(tmp_path, monkeypatch):
+    """DL-P2.7 flag-on variant: stale forks get old observed_at + expired valid_until."""
+    import json as _json
+    home = tmp_path / 'home'
+    monkeypatch.setenv('STARDUST_HOME', str(home))
+    count = mr.write_corpus(home, provenance=True)
+    assert count == 55
+    topics = _json.loads((home / 'memories' / 'TOPICS.json').read_text(encoding='utf-8'))['topics']
+    stale = [t for t in topics if t['key'] == 'phone-old'][0]
+    current = [t for t in topics if t['key'] == 'phone'][0]
+    assert stale['observed_at'] == '2026-09-01' and stale['valid_until'] == '2026-10-01'
+    assert current['observed_at'] == '2026-10-20' and 'valid_until' not in current
+
+
+def test_write_corpus_without_provenance_writes_no_stamps(tmp_path, monkeypatch):
+    """Default variant: no provenance fields land in TOPICS.json (flag-off writes unchanged)."""
+    import json as _json
+    home = tmp_path / 'home'
+    monkeypatch.setenv('STARDUST_HOME', str(home))
+    mr.write_corpus(home, provenance=False)
+    topics = _json.loads((home / 'memories' / 'TOPICS.json').read_text(encoding='utf-8'))['topics']
+    assert topics
+    for t in topics:
+        for field in ('source', 'observed_at', 'valid_until', 'verified'):
+            assert field not in t, (t['key'], field)
+
+
+def test_run_qa_accepts_bare_answer_for_sentence_key(monkeypatch):
+    """QA grading: a bare 'iPhone 17' answer matches the sentence key, and a
+    stale value in the answer still fails the outdated question."""
+    answers = iter(['iPhone 17', '阿豪的手机是 Pixel 8', '阿豪现在用 iPhone 17。'])
+    monkeypatch.setattr(mr, 'qa_answer', lambda question, context_block: next(answers))
+    rows = [
+        {'id': 'q1', 'category': 'outdated', 'question': '阿豪现在用的是什么手机？', 'context_block': 'ctx'},
+        {'id': 'q2', 'category': 'outdated', 'question': '阿豪现在用的是什么手机？', 'context_block': 'ctx'},
+        {'id': 'q3', 'category': 'outdated', 'question': '阿豪现在用的是什么手机？', 'context_block': 'ctx'},
+    ]
+    by_id = {
+        'q1': {'answer_key': '阿豪现在用 iPhone 17。', 'stale_answer_key': '阿豪的手机是 Pixel 8'},
+        'q2': {'answer_key': '阿豪现在用 iPhone 17。', 'stale_answer_key': '阿豪的手机是 Pixel 8'},
+        'q3': {'answer_key': '阿豪现在用 iPhone 17。', 'stale_answer_key': ''},
+    }
+    result = mr.run_qa(rows, by_id, tokenizer=None)
+    assert result['answered'] == 3
+    # bare ok, stale fails, full ok
+    assert result['per_category']['outdated'] == {'asked': 3, 'accuracy': round(2 / 3, 4)}

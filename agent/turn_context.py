@@ -792,6 +792,7 @@ def _memory_turn_start_and_prefetch(
                     _query,
                     limit=getattr(agent, "_topic_recall_limit", 2),
                     char_budget=getattr(agent, "_topic_recall_char_budget", 1800),
+                    provenance=bool(getattr(agent, "_topic_provenance_enabled", False)),
                 )
                 fresh = [row for row in selected if seen.get(str(row.get("key") or "")) != row.get("version")]
                 if fresh:
