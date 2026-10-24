@@ -506,6 +506,25 @@ def hybrid_recall_enabled() -> bool:
     return is_truthy_value(section.get("hybrid_recall"), default=False)
 
 
+def semantic_recall_enabled() -> bool:
+    """Return the ``memory.semantic_recall`` opt-in flag (default OFF).
+
+    Same lazy config read as ``hybrid_recall_enabled`` (DL-P2.7 pattern);
+    the semantic leg also requires hybrid mode, enforced by the caller.
+    OFF keeps recall byte-identical and never imports fastembed.
+    """
+    try:
+        from tools.memory_tool import get_builtin_memory_config
+
+        section = get_builtin_memory_config()
+    except Exception:
+        logger.debug("Could not read memory config for semantic recall", exc_info=True)
+        return False
+    from utils import is_truthy_value
+
+    return is_truthy_value(section.get("semantic_recall"), default=False)
+
+
 def _hybrid_ranked_keys(
     topics: list[dict[str, Any]],
     query: str,
@@ -547,19 +566,32 @@ def _hybrid_ranked_keys(
         # the recall would be empty, so a score-gated BM25-only fill is a
         # strict improvement; with any lexical hit present, BM25-only rows
         # stay out — an OR-match over filler words must not fill slot 2.
-        from tools.memory_hybrid import EXTRA_ADMIT_FRACTION, EXTRA_FILL_SLOTS
+        # DL-P2.10 fill-in leg: with the semantic flag ON, the embedding
+        # top-1 owns this fill slot first (mode C — paraphrases with zero
+        # word overlap are exactly what BM25 cannot see); the BM25 fill
+        # serves unchanged whenever the semantic leg is unavailable (flag
+        # OFF, fastembed missing, offline, ONNX error) so no path degrades.
+        sem_fill: list[str] = []
+        if semantic_recall_enabled():
+            from tools.memory_semantic import semantic_rank
 
-        best = fts_rank[0][1]
-        # bm25() is negative: a row qualifies when it retains at least
-        # EXTRA_ADMIT_FRACTION of the leader's magnitude. best >= 0 means no
-        # real signal anywhere; -0.0 magnitude would make every row qualify.
-        threshold = best * EXTRA_ADMIT_FRACTION
-        extras = [
-            key
-            for key, score in fts_rank
-            if key not in lexical_keys and score <= threshold
-        ][:EXTRA_FILL_SLOTS]
-        ordered_keys += [key for key in extras if key not in ordered_keys]
+            sem_fill = [key for key, _score in semantic_rank(query, topics, top_k=1, signature=signature)]
+        if sem_fill:
+            ordered_keys += [key for key in sem_fill if key not in ordered_keys]
+        else:
+            from tools.memory_hybrid import EXTRA_ADMIT_FRACTION, EXTRA_FILL_SLOTS
+
+            best = fts_rank[0][1]
+            # bm25() is negative: a row qualifies when it retains at least
+            # EXTRA_ADMIT_FRACTION of the leader's magnitude. best >= 0 means no
+            # real signal anywhere; -0.0 magnitude would make every row qualify.
+            threshold = best * EXTRA_ADMIT_FRACTION
+            extras = [
+                key
+                for key, score in fts_rank
+                if key not in lexical_keys and score <= threshold
+            ][:EXTRA_FILL_SLOTS]
+            ordered_keys += [key for key in extras if key not in ordered_keys]
     return ordered_keys
 
 

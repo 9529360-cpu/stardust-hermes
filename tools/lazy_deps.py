@@ -112,6 +112,9 @@ LAZY_DEPS: dict[str, tuple[str, ...]] = {
     # install on the sealed Docker image (durable-target only).
     "memory.supermemory": ("supermemory==3.50.0",),
     "memory.mem0": ("mem0ai==2.0.10",),
+    # Local embedding leg for topic recall (memory.semantic_recall);
+    # pin mirrored in the `semantic-recall` pyproject extra.
+    "memory.semantic": ("fastembed==0.9.1",),
 
     # ─── Messaging platforms (lazy-installable on demand) ──────────────────
     "platform.telegram": ("python-telegram-bot[webhooks]==22.8",),
