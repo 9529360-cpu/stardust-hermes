@@ -1,4 +1,4 @@
-import type { McpCatalogResponse, McpServerSummary } from '@/types/hermes'
+import type { McpCatalogEntryDetail, McpCatalogResponse, McpServerSummary } from '@/types/hermes'
 
 import { capabilityScoped, hermesApi, type ProfileScope, profileScoped } from './client'
 
@@ -129,6 +129,15 @@ export function getMcpCatalog(profile?: ProfileScope): Promise<McpCatalogRespons
   return window.stardustDesktop.api<McpCatalogResponse>({
     ...capabilityScoped(profile),
     path: '/api/mcp/catalog'
+  })
+}
+
+/** CX5 connect dialog: one catalog entry's full detail (older backends 404 —
+ *  fall back to the list entry). */
+export function getMcpCatalogEntry(name: string, profile?: ProfileScope): Promise<McpCatalogEntryDetail> {
+  return window.stardustDesktop.api<McpCatalogEntryDetail>({
+    ...capabilityScoped(profile),
+    path: `/api/mcp/catalog/entry/${encodeURIComponent(name)}`
   })
 }
 

@@ -1690,6 +1690,11 @@ export interface McpCatalogEntry {
   source: string
   transport: string
   auth_type: string
+  /** CX5 catalog-detail metadata (older backends omit; derive client-side). */
+  publisher?: string
+  permissions?: string[]
+  /** Where the server runs: 'local' stdio on this machine, 'remote' vendor host. */
+  runtime?: 'local' | 'remote'
   required_env: { name: string; prompt: string; required: boolean }[]
   command: string | null
   args: string[]
@@ -1706,6 +1711,11 @@ export interface McpCatalogEntry {
   needs_install: boolean
   installed: boolean
   enabled: boolean
+}
+
+/** `GET /api/mcp/catalog/entry/{name}` — the connect dialog's detail view. */
+export interface McpCatalogEntryDetail extends McpCatalogEntry {
+  default_tools: string[] | null
 }
 
 export interface McpCatalogResponse {

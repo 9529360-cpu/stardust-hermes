@@ -1,0 +1,37 @@
+# Nous-approved MCP catalog entry.
+# Presence in this directory = approval. Merged via PR review.
+#
+# Schema version 1.
+manifest_version: 1
+
+name: filesystem
+description: Read/write a chosen folder through the official Model Context Protocol filesystem server (runs locally).
+source: https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem
+
+# CX5 metadata shown in the connector catalog detail view.
+publisher: Model Context Protocol (official)
+# What the server can do once connected — surfaced as 所需权限 in the connect dialog.
+permissions:
+  - Read files under the folders you allow
+  - Create and edit files and folders under the allowed folders
+  - List and move/rename files under the allowed folders
+runtime: local
+
+# Official npm distribution. The version is pinned per catalog dependency
+# policy; bumping the pin is a PR to this manifest. npx -y installs on first
+# connect, OSV malware preflight runs before every spawn.
+transport:
+  type: stdio
+  command: npx
+  args:
+    - "-y"
+    - "@modelcontextprotocol/server-filesystem@2026.7.10"
+    # ${ALLOWED_DIR} is substituted at connect time from the dialog's folder choice.
+    - "${ALLOWED_DIR}"
+
+auth:
+  type: none
+
+post_install: |
+  The server only sees the folder you allow when connecting. Start a new
+  session to load its tools.

@@ -371,6 +371,13 @@ def _catalog_entry_json(entry: Any, installed: bool, enabled: bool) -> Dict[str,
         "source": entry.source,
         "transport": transport.type,
         "auth_type": getattr(auth, "type", "none"),
+        # CX5 catalog-detail metadata. `runtime` prefers the manifest's
+        # explicit choice (local/remote), else derives from the transport:
+        # stdio spawns on this machine, http reaches a vendor host.
+        "publisher": getattr(entry, "publisher", "") or "",
+        "permissions": list(getattr(entry, "permissions", None) or []),
+        "runtime": ("local" if transport.type == "stdio" else "remote")
+        if not getattr(entry, "runtime", None) else entry.runtime,
         # Env vars the user must supply (names + prompts only, never values).
         "required_env": [
             {"name": e.name, "prompt": e.prompt, "required": e.required}
@@ -426,6 +433,37 @@ async def list_mcp_catalog(profile: Optional[str] = None):
     except Exception:
         pass
     return {"entries": entries, "diagnostics": diagnostics}
+
+
+@router.get("/api/mcp/catalog/entry/{name}")
+async def get_mcp_catalog_entry(name: str, profile: Optional[str] = None):
+    """One catalog entry's full detail (CX5 connect dialog): the list JSON plus
+    the transport command/args/url the dialog previews before connecting."""
+    with http_failure("mcp_catalog import failed", 500, "Catalog unavailable"):
+        from hermes_cli import mcp_catalog
+
+    try:
+        def _read():
+            with _profile_scope(profile):
+                entry = mcp_catalog.get_entry(name)
+                if entry is None:
+                    return None
+                return entry, (mcp_catalog.is_installed(name), mcp_catalog.is_enabled(name))
+
+        result = await asyncio.to_thread(_read)
+    except HTTPException:
+        raise
+    except Exception:
+        _log.exception("get_mcp_catalog_entry failed")
+        raise HTTPException(status_code=500, detail="Catalog unavailable")
+
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"No catalog entry '{name}'")
+
+    entry, (installed, enabled) = result
+    detail = _catalog_entry_json(entry, installed, enabled)
+    detail["default_tools"] = list(entry.tools.default_enabled) if entry.tools.default_enabled is not None else None
+    return detail
 
 
 @router.post("/api/mcp/catalog/install")
