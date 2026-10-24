@@ -220,6 +220,49 @@ def finish_text_response(
 
     final_response = agent._strip_think_blocks(final_response).strip()
 
+    # F5.4 capability-refusal guard (agent.capability_refusal_guard, default off):
+    # a generic inability claim ("我无法访问本地文件") while a matching tool is
+    # available and was NOT tried this turn gets at most ONE corrective
+    # continuation naming the tool; real failed attempts and capability
+    # questions never trigger.
+    from agent.capability_refusal_guard import (
+        build_capability_refusal_nudge,
+        should_nudge_capability_refusal,
+    )
+
+    _guard_tool = should_nudge_capability_refusal(agent, user_message, final_response, messages)
+    if _guard_tool:
+        logger.info(
+            "Capability-refusal guard: inability claim with %s available and "
+            "untried — one corrective continuation",
+            _guard_tool,
+        )
+        interim_msg = agent._build_assistant_message(assistant_message, "incomplete")
+        if not persist_interim_answer(
+            agent,
+            interim_msg,
+            messages,
+            conversation_history,
+            "capability-refusal interim flush failed",
+        ):
+            failed, final_response = True, ""
+            _pending_verification_response = None
+            _pending_verification_response_previewed = False
+            _turn_exit_reason = "session_persistence_failed"
+            return _verdict("break")
+        agent._capability_refusal_continuations = (
+            getattr(agent, "_capability_refusal_continuations", 0) + 1
+        )
+        append_message(
+            messages,
+            {"role": "user", "content": build_capability_refusal_nudge(_guard_tool, user_message)},
+        )
+        agent._session_messages = messages
+        # The refusal is non-final: its text must not suppress iteration-limit
+        # summarization if the continuation exhausts budget.
+        final_response = None
+        return _verdict("continue")
+
     final_msg = agent._build_assistant_message(assistant_message, finish_reason)
 
     # Dropped tool-call recovery (copilot/Claude): finish_reason="tool_calls" with empty
