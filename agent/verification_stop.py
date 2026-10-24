@@ -7,9 +7,12 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import tempfile
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, List, Optional, Tuple
+
+from utils import is_truthy_value
 
 
 _MAX_CHANGED_PATHS_IN_NUDGE = 8
@@ -75,6 +78,32 @@ def verify_on_stop_enabled(config: dict[str, Any] | None = None) -> bool:
     if token == "auto":
         return not _session_is_messaging_surface()
     return token in _TRUTHY_TOKENS
+
+
+def _load_agent_config() -> dict[str, Any]:
+    try:
+        from hermes_cli.config import load_config_readonly
+
+        config = load_config_readonly()
+    except Exception:
+        config = {}
+    agent_cfg = (config or {}).get("agent") if isinstance(config, dict) else None
+    return agent_cfg if isinstance(agent_cfg, dict) else {}
+
+
+def verify_on_stop_messaging_enabled(config: dict[str, Any] | None = None) -> bool:
+    """Return the ``agent.verify_on_stop_messaging`` opt-in flag (default OFF).
+
+    When ON, a final response on a messaging surface that asserts a completed
+    action ("done/fixed/完成/搞定/...") must be backed by a successful tool
+    result from this turn, else the turn continues once with a nudge. Mirrors
+    the ``memory.topic_provenance_enabled`` read pattern: safe default, no
+    config_defaults change, flag OFF = byte-identical behaviour.
+    """
+    agent_cfg = config.get("agent") if isinstance(config, dict) else None
+    if not isinstance(agent_cfg, dict):
+        agent_cfg = _load_agent_config()
+    return is_truthy_value(agent_cfg.get("verify_on_stop_messaging"), default=False)
 
 
 def _candidate_cwds(paths: Iterable[str]) -> list[Path]:
@@ -262,4 +291,189 @@ def build_verify_on_stop_nudge(
     )
 
 
-__all__ = ["build_verify_on_stop_nudge", "verify_on_stop_enabled"]
+# ── messaging completion-claim evidence gate (DL-P2.8e, opt-in) ──────────
+#
+# Lexicon kept conservative on purpose: a false nudge on a correct answer
+# costs a full extra model round and annoys the user (DISCOVERY-8 u17/u18),
+# while a missed weak claim ("基本好了") only leaves today's behaviour in
+# place. Claims are matched per clause so a negation in one half does not
+# silence a real claim in the other ("还没完成X，但Y已删除").
+
+_CLAIM_CN_PATTERNS = (
+    r"已(?:经)?(?:完成|修复|搞定|弄好|做好|办好|处理完|写完|改完|删除|删掉|清理完|清理干净|发送|发出去|交付|合入|合并|部署|创建|建好|配置好|设置好|更新|升级|安装|启动|运行|验证|确认|核对|检查|读取|写入|检索|执行)",
+    r"(?:完成|搞定|弄好|做好|办好|处理完|修复|收尾|交付|清理|删除|发送|部署|验证|确认)了",
+    r"搞定了|都搞定了|全部完成|全部搞定|一切就绪|大功告成|收尾完成",
+)
+
+_CLAIM_EN_PATTERN = re.compile(
+    r"\b(?:done|fixed|sent|deleted|removed|cleaned|completed|complete|created|updated|"
+    r"deployed|installed|configured|verified|confirmed|migrated|merged|"
+    r"published|submitted)\b",
+    re.IGNORECASE,
+)
+
+# Future/negation guards within a clause: "I will fix", "not done yet",
+# "还没完成" are intents, not completion claims.
+_CLAIM_NEGATIVE_RE = re.compile(
+    r"(?:还没|尚未|没有|未)(?:完成|搞定|弄好|做好|修复|处理|发送|删除|清理|验证|确认|做完)"
+    r"|待完成|将(?:会?)?(?:完成|修复|处理|发送|删除|清理|验证)"
+    r"|打算|准备去做|还没来得及"
+    r"|not\s+(?:yet\s+)?done|will\s+(?:fix|do|send|delete|remove|clean|complete)"
+    r"|plan(?:ning)?\s+to|to\s+be\s+done|TODO",
+    re.IGNORECASE,
+)
+
+_CLAIM_CN_RE = re.compile("|".join(_CLAIM_CN_PATTERNS))
+
+# Explicit user opt-out of verification in the CURRENT user turn: the user's
+# instruction outranks any automatic nudge (DISCOVERY-8 u17/u18/c03).
+_USER_OPT_OUT_RE = re.compile(
+    r"不用验证|不用复核|不需要验证|不用复验|无需验证|不必验证"
+    r"|不要再?跑|不要重跑|别再?跑|不用再?跑|不要复测|不用复测"
+    r"|不用执行|无需执行|不要再?执行|免验证|跳过验证"
+    r"|以我的指令为准|以用户指令为准|直接(?:收尾|标记完成|结束|交付)"
+    r"|就基于现有结果|基于现有结果|基于(?:现有|上面|刚才)的?结果"
+    r"|no\s+need\s+to\s+verify|skip\s+verification"
+    r"|don'?t\s+(?:re)?run|do\s+not\s+(?:re)?run"
+    r"|based\s+on\s+(?:the\s+)?existing|as-is",
+    re.IGNORECASE,
+)
+
+# Tool families that never prove an external action happened; a claim backed
+# only by these is still unverified (asking a question is not doing the thing).
+_NON_EVIDENCE_TOOLS = frozenset({
+    "clarify", "todo", "memory", "session_search", "skills", "think",
+})
+
+_CLAIM_CLAUSE_SPLIT_RE = re.compile(r"[。！!？?；;\n，,]+")
+
+
+def _response_text(final_response: Any) -> str:
+    if isinstance(final_response, str):
+        return final_response
+    if isinstance(final_response, list):
+        return "".join(
+            str(p.get("text") or "") for p in final_response if isinstance(p, dict)
+        )
+    return ""
+
+
+def _clause_claims_completion(clause: str) -> str | None:
+    if _CLAIM_NEGATIVE_RE.search(clause):
+        return None
+    m = _CLAIM_CN_RE.search(clause) or _CLAIM_EN_PATTERN.search(clause)
+    if m:
+        return m.group(0)
+    stripped = clause.strip()
+    # Bare "好了" / "搞好了" asserts completion; "你好/好像/也好" do not (the
+    # split already isolated the clause, so a leading 好了 is unambiguous).
+    if stripped.startswith("好了") or stripped.startswith("搞好了"):
+        return "好了"
+    return None
+
+
+def contains_completion_claim(text: str) -> str | None:
+    """First matched completion claim in ``text``, or ``None`` (conservative)."""
+    if not text:
+        return None
+    for clause in _CLAIM_CLAUSE_SPLIT_RE.split(text):
+        claim = _clause_claims_completion(clause)
+        if claim:
+            return claim
+    return None
+
+
+def user_opted_out_of_verification(user_text: Any) -> bool:
+    """The current user turn explicitly waived verification/re-runs."""
+    return bool(isinstance(user_text, str) and user_text and _USER_OPT_OUT_RE.search(user_text))
+
+
+def _tool_result_text(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(
+            str(p.get("text") or "") for p in content if isinstance(p, dict)
+        )
+    return str(content or "")
+
+
+def turn_tool_evidence(messages: List[Dict[str, Any]], current_turn_user_idx: Any) -> List[Tuple[str, str]]:
+    """``(tool_name, result_text)`` pairs from THIS turn's executed tools.
+
+    The boundary is the current user turn's index (post-compaction reanchor);
+    everything after it belongs to this turn's tool loop.
+    """
+    if not isinstance(current_turn_user_idx, int) or current_turn_user_idx < 0:
+        return []
+    pairs: list[tuple[str, str]] = []
+    for msg in messages[current_turn_user_idx + 1:]:
+        if not (isinstance(msg, dict) and msg.get("role") == "tool"):
+            continue
+        pairs.append((str(msg.get("name") or ""), _tool_result_text(msg.get("content"))))
+    return pairs
+
+
+def _has_evidence(pairs: List[Tuple[str, str]]) -> bool:
+    """Evidence = at least one successful non-housekeeping tool result this
+    turn (``tool_result_outcome`` reads declared envelope facts only; error,
+    cancelled, pending and unknown outcomes are not evidence)."""
+    from agent.tool_result_classification import tool_result_outcome
+    from utils import safe_json_loads
+
+    for name, text in pairs:
+        if name in _NON_EVIDENCE_TOOLS:
+            continue
+        outcome = tool_result_outcome(name, safe_json_loads(text) if text else None)
+        if outcome == "success":
+            return True
+    return False
+
+
+def messaging_claim_gate_nudge(
+    *, final_response: Any, messages: List[Dict[str, Any]], current_turn_user_idx: Any,
+    user_message: Any, attempts: int = 0, config: dict[str, Any] | None = None,
+) -> Optional[str]:
+    """Opt-in messaging evidence gate: nudge (once) when the final response
+    asserts a completed action that no successful tool result this turn backs.
+
+    Returns ``None`` — no nudge — unless every condition holds: the
+    ``agent.verify_on_stop_messaging`` flag is ON, the turn is on a messaging
+    surface, the response contains a completion claim, the user did not
+    explicitly waive verification this turn, no successful tool result exists,
+    and no verification nudge was issued yet this turn (shared counter).
+    """
+    if attempts >= 1:
+        return None
+    try:
+        if not verify_on_stop_messaging_enabled(config):
+            return None
+        if not _session_is_messaging_surface():
+            return None
+        claim = contains_completion_claim(_response_text(final_response))
+        if claim is None:
+            return None
+        if user_opted_out_of_verification(user_message):
+            return None
+        if _has_evidence(turn_tool_evidence(messages, current_turn_user_idx)):
+            return None
+        return (
+            "[System: 若用户本轮已明说不必验证/不必重跑，则以用户指令为准，直接保留你原来的回答。]\n"
+            "Your final answer claims an action is complete (\"" + claim[:80] + "\"), but no "
+            "successful tool result from this turn backs it. Either run the real "
+            "tool/command now and report its actual output, or state plainly which "
+            "parts are unverified. Do not repeat the completion claim without evidence."
+        )
+    except Exception:
+        return None
+
+
+__all__ = [
+    "build_verify_on_stop_nudge",
+    "verify_on_stop_enabled",
+    "verify_on_stop_messaging_enabled",
+    "contains_completion_claim",
+    "user_opted_out_of_verification",
+    "turn_tool_evidence",
+    "messaging_claim_gate_nudge",
+]
