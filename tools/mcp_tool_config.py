@@ -345,6 +345,11 @@ def _load_mcp_config() -> Dict[str, dict]:
         from utils import env_var_enabled as _env_enabled
         if _env_enabled("STARDUST_SAFE_MODE"):
             return {}
+        try:  # one-time legacy-credential migration into the encrypted store (CX2b)
+            from agent.connector_secrets_migration import maybe_migrate_connector_secrets
+            maybe_migrate_connector_secrets()
+        except Exception:
+            pass
         servers = load_config().get("mcp_servers")
         try:  # ensure .env vars are available for interpolation
             from hermes_cli.env_loader import load_hermes_dotenv

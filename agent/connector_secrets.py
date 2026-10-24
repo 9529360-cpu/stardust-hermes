@@ -7,8 +7,12 @@ stay byte-identical plaintext — into an OS-user-bound encrypted store.
 Opt-in and migration-safe: the store activates ONLY when
 ``connector_secret_store.enabled: true`` is set in config.yaml. With the option
 off (the default) nothing changes — legacy plaintext credentials load exactly as
-before, ``${connector:...}`` placeholders stay literal, and no store file is
-ever created.
+before, ``${connector:...}`` placeholders stay literal, no migration runs, and
+no store file is ever created. The first config load under an enabled store
+migrates legacy plaintext MCP credentials into it once
+(agent/connector_secrets_migration.py), with a plaintext backup under
+``<profile>/connector-secrets/backup-<ts>/`` and per-reference fallback while a
+legacy copy survives.
 
 The management seam later surfaces (CX3 key writer, CX4 OAuth adapter, CX7
 disconnect cleanup) build on:
@@ -222,6 +226,10 @@ def resolve_connector_secret_value(server: str, field: str) -> Optional[str]:
     failures never raise past this seam — they log a value-free warning and
     return ``None`` so one broken entry cannot take down the whole MCP config
     load (other servers keep working; the affected server fails auth on its own).
+    When decryption fails but a legacy plaintext copy survives (the
+    connector-secrets migration backup, or the pre-migration ``.env`` value),
+    that copy is returned instead — the one-line warning never contains the
+    value or the fallback source path details.
     """
     store = get_connector_secret_store()
     if store is None:
@@ -229,11 +237,24 @@ def resolve_connector_secret_value(server: str, field: str) -> Optional[str]:
     try:
         return store.resolve_secret(server, field)
     except ConnectorSecretDecryptError as exc:
+        from agent.connector_secrets_migration import legacy_value_for_reference
+        legacy = legacy_value_for_reference(server, field)
+        if legacy is not None:
+            logger.warning("MCP connector secret %s/%s could not be decrypted (%s); "
+                           "using the retained legacy copy — re-save the secret to fix it",
+                           server, field, _safe_error(exc))
+            return legacy
         logger.warning("MCP connector secret %s/%s could not be decrypted (%s); keeping the "
                        "${connector:...} placeholder — re-save the secret to fix it",
-                       server, field, exc)
+                       server, field, _safe_error(exc))
         return None
     except ConnectorSecretError as exc:
         logger.warning("MCP connector secret %s/%s could not be read (%s); keeping the "
                        "${connector:...} placeholder", server, field, exc)
         return None
+
+
+def _safe_error(exc: Exception) -> str:
+    """Value-free error text for warnings (backends already sanitize; belt-and-braces
+    against an exception string ever embedding decrypted material)."""
+    return exc.__class__.__name__
