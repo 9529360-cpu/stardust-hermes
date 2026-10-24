@@ -26,6 +26,11 @@ def _turn_isolation_enabled(cfg: dict | None = None) -> bool:
     return bool((cfg or _load_dashboard_process_isolation_config()).get("turn_isolation"))
 
 
+def _epoch_guard_enabled() -> bool:
+    """F6.1 opt-in flag: reject compute-host frames minted for an older host build."""
+    return os.environ.get("STARDUST_COMPUTE_HOST_EPOCH_GUARD") == "1"
+
+
 def _session_uses_compute_host(session: dict, cfg: dict | None = None) -> bool:
     # Routes lazy sessions whose AIAgent was never built in-process; already-built
     # sessions keep the in-process path unless a prior isolated turn marked host ownership.
@@ -40,11 +45,44 @@ def _get_compute_host_supervisor(cfg: dict | None = None):
     with _compute_host_supervisor_lock:
         if _compute_host_supervisor is None:
             from tui_gateway.host_supervisor import HostSupervisor
+            # F6.1 epoch guard: the child reads this env snapshot at each spawn
+            # (_spawn_locked merges os.environ), so the flag follows the config and
+            # a flipped flag applies to the NEXT host build without a gateway restart.
+            if isolation_cfg.get("compute_host_epoch_guard"):
+                os.environ["STARDUST_COMPUTE_HOST_EPOCH_GUARD"] = "1"
+            else:
+                os.environ.pop("STARDUST_COMPUTE_HOST_EPOCH_GUARD", None)
             _compute_host_supervisor = HostSupervisor(
                 rpc_sink=_relay_compute_host_rpc,
                 heartbeat_secs=int(isolation_cfg.get("compute_host_heartbeat_secs") or 15),
-                respawn_max=int(isolation_cfg.get("compute_host_respawn_max") or 3))
+                respawn_max=int(isolation_cfg.get("compute_host_respawn_max") or 3),
+                on_rebuild=_on_compute_host_rebuild)
         return _compute_host_supervisor
+
+
+def _on_compute_host_rebuild(info: dict) -> None:
+    """F6.1 epoch guard (opt-in): a new host build just replaced the old one. Bump the
+    session epoch for every session that ever used the compute host, so any frame minted
+    for the dead build (in-flight, queued, replayed) is stale for the replacement."""
+    if not _epoch_guard_enabled():
+        return
+    with _sessions_lock:
+        sessions = list(_sessions.values())
+    for session in sessions:
+        if not session.get("_compute_host_active"):
+            continue
+        with _history_lock(session):
+            session["_compute_host_epoch"] = _session_epoch(session) + 1
+
+
+def _session_epoch(session: dict) -> int:
+    """Current session execution epoch for the epoch guard (F6.1).
+
+    The parent bumps this whenever the session's compute host is rebuilt, so a frame
+    stamped with an older epoch is stale by construction: it was minted for a host
+    build that no longer exists. Kept per-session on the parent record.
+    """
+    return int(session.get("_compute_host_epoch", 0))
 
 
 def _compute_host_turn_frame(
@@ -54,6 +92,8 @@ def _compute_host_turn_frame(
         history = list(session.get("history", []))
         history_version = int(session.get("history_version", 0))
         attached_images = list(image_paths if image_paths is not None else session.get("attached_images", []))
+        host_epoch = _session_epoch(session)
+        parent_generation = int(session.get("_queued_prompt_generation", 0))
     return {
         "type": "turn.start", "sid": sid, "request_id": rid,
         "session_key": session.get("session_key") or sid, "text": text,
@@ -67,7 +107,12 @@ def _compute_host_turn_frame(
         "service_tier_override": session.get("create_service_tier_override"),
         "source": _session_source(session), "attached_images": attached_images,
         "auth_user_id": _session_auth_user_id(session),
-        "queued_prompt_generation": queued_prompt_generation}
+        "queued_prompt_generation": queued_prompt_generation,
+        # F6.1 epoch guard (opt-in, child-side): the exact parent generation this
+        # frame was minted against, plus the monotonically increasing session epoch.
+        # ``queued_prompt_generation`` stays as minted (None for fresh prompts) so the
+        # flag-off comparison against the child's local counter is unchanged.
+        "host_epoch": host_epoch, "parent_queued_prompt_generation": parent_generation}
 
 
 def _metadata_mirror(session: dict | None) -> dict:
@@ -116,6 +161,18 @@ def _relay_compute_host_rpc(message: dict) -> bool:
             with _history_lock(session):
                 if _open_request_matches(session, payload.get("id")):
                     session.pop("_compute_host_open_request", None)
+    # F6.1 epoch guard (opt-in): a host death/rebuild invalidates every frame that
+    # host could still emit for this session. Bump the session epoch so any frame
+    # minted before the rebuild is stale for the next one; the flag is read from the
+    # supervisor's environment snapshot taken at spawn time (STARDUST_COMPUTE_HOST_EPOCH_GUARD).
+    if (isinstance(message, dict) and message.get("method") == "event"
+            and isinstance(params, dict) and params.get("type") == "error"
+            and isinstance(params.get("payload"), dict)
+            and params["payload"].get("reason") in ("crash", "shutdown")):
+        session = _sessions.get(str(params.get("session_id") or ""))
+        if session is not None and _epoch_guard_enabled():
+            with _history_lock(session):
+                session["_compute_host_epoch"] = _session_epoch(session) + 1
     return write_json(message)
 
 

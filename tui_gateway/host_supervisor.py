@@ -161,7 +161,8 @@ class HostSupervisor:
         cwd: str | Path | None = None, env: dict[str, str] | None = None,
         rpc_sink: Callable[[dict], None] | None = None, respawn_max: int = 3,
         heartbeat_secs: int = 15, expected_build_sha: str | None = None,
-        expected_hermes_home: str | None = None, autostart: bool = True) -> None:
+        expected_hermes_home: str | None = None, autostart: bool = True,
+        on_rebuild: Callable[[str], None] | None = None) -> None:
         self.registry_path = (
             Path(registry_path) if registry_path is not None
             else get_hermes_home() / "state" / _REGISTRY_NAME)
@@ -198,6 +199,10 @@ class HostSupervisor:
         # The host emits its control.ack whenever it finishes; without this the ack matched no queue and was
         # silently dropped. See #97948.
         self._late_control_handlers: dict[str, tuple[float, Callable[[dict], None]]] = {}
+        # F6.1: fired after every host spawn that REPLACES a previous build (crash,
+        # respawn, shutdown+start). The bridge bumps per-session epochs here so frames
+        # minted for the dead build can never execute on the replacement.
+        self.on_rebuild = on_rebuild
         self._stderr_tail: list[str] = []
         self._last_progress_counter = 0
         if autostart:
@@ -481,6 +486,9 @@ class HostSupervisor:
             self._terminate_process(proc)
             raise
         logger.info("compute host started pid=%s reason=%s", proc.pid, reason)
+        if host_generation > 1 and self.on_rebuild is not None:
+            _call_logged(self.on_rebuild, {"reason": reason},
+                         "compute host on_rebuild callback failed")
 
     def _validate_hello(self) -> None:
         hello = self._hello

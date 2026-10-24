@@ -21,6 +21,12 @@ from typing import Any, Callable, Collection
 from tui_gateway.host_supervisor import MUTATOR_ROUTE_TABLE, _build_sha
 
 
+def _epoch_guard_enabled() -> bool:
+    """F6.1 opt-in flag: reject frames minted for an older host build (set by the
+    parent supervisor at spawn time from ``dashboard.compute_host_epoch_guard``)."""
+    return os.environ.get("STARDUST_COMPUTE_HOST_EPOCH_GUARD") == "1"
+
+
 def now_ns() -> int:
     return time.perf_counter_ns()
 
@@ -73,6 +79,8 @@ class ComputeHost:
         # Future -> the ``sid`` whose turn it runs; ``shutdown`` leaves live sids unfinalized.
         self._turn_futures: dict[concurrent.futures.Future, str] = {}
         self._turn_futures_lock = threading.Lock()
+        # F6.1 epoch guard: highest session epoch accepted per sid (host-build fence).
+        self._session_epochs: dict[str, int] = {}
         self._transport = _HostTransport(self.emit)
         self._heartbeat_secs = (
             float(heartbeat_secs) if heartbeat_secs is not None
@@ -226,6 +234,28 @@ class ComputeHost:
         if not sid:
             self._reply("turn.error", sid, request_id, message="sid required")
             return
+        epoch_guard = _epoch_guard_enabled()
+        if epoch_guard:
+            # F6.1: drop frames minted for an older host build. The parent bumps the
+            # session epoch on every host death/rebuild, so ``host_epoch < known``
+            # means the frame predates the current build; adopt newer epochs (first
+            # frame after a rebuild) so the guard needs no state transfer. A stale
+            # frame still gets an explicit terminal reply: the parent's waiter must
+            # settle, and "interrupted" is the truthful outcome (cancelled by the
+            # rebuild, never executed).
+            try:
+                frame_epoch = int(frame.get("host_epoch", 0))
+            except (TypeError, ValueError):
+                frame_epoch = 0
+            known_epoch = self._session_epochs.get(sid, 0)
+            if frame_epoch < known_epoch:
+                logging.getLogger(__name__).debug(
+                    "epoch guard dropped stale frame sid=%s epoch=%s known=%s request_id=%s",
+                    sid, frame_epoch, known_epoch, request_id)
+                self._reply("turn.end", sid, request_id, interrupted=True,
+                            stale_epoch=True, ended_ns=now_ns())
+                return
+            self._session_epochs[sid] = frame_epoch
         try:
             from tui_gateway import server
             session = self._ensure_server_session(server, frame)
@@ -233,7 +263,21 @@ class ComputeHost:
             inflight = frame["text"] if "text" in frame else frame.get("prompt")
             with session["history_lock"]:
                 queued_gen = frame.get("queued_prompt_generation")
-                current_gen = int(session.get("_queued_prompt_generation", 0))
+                if epoch_guard and "parent_queued_prompt_generation" in frame:
+                    # F6.1: compare against the parent generation the frame was minted
+                    # with — not this (possibly rebuilt) child's local counter, which
+                    # defaults to 0 after a rebuild and both drops legitimate queued
+                    # work and admits pre-rebuild frames (C6.1).
+                    try:
+                        minted_gen = int(frame["parent_queued_prompt_generation"])
+                    except (TypeError, ValueError):
+                        minted_gen = 0
+                    if queued_gen is not None and minted_gen != int(queued_gen):
+                        self._reply("turn.end", sid, request_id, interrupted=True, ended_ns=now_ns())
+                        return
+                    current_gen = minted_gen
+                else:
+                    current_gen = int(session.get("_queued_prompt_generation", 0))
                 if queued_gen is not None and current_gen != int(queued_gen):
                     self._reply("turn.end", sid, request_id, interrupted=True, ended_ns=now_ns())
                     return
