@@ -6,8 +6,8 @@ import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
 import { cn } from '@/lib/utils'
 
+import { activePromptIndex, observeVisibleGroups } from './thread-scroll-geometry'
 import {
-  activeTimelineIndex,
   deriveTimelineEntries,
   sameTimelineEntries,
   type TimelineEntry,
@@ -281,15 +281,7 @@ const ActiveThreadTimeline: FC = () => {
         return
       }
 
-      const top = viewport.getBoundingClientRect().top
-
-      const offsets = entries.map(entry => {
-        const node = viewport.querySelector<HTMLElement>(`[data-message-id="${CSS.escape(entry.id)}"]`)
-
-        return node ? node.getBoundingClientRect().top - top : null
-      })
-
-      const next = activeTimelineIndex(offsets)
+      const next = activePromptIndex(viewport, entries.map(entry => entry.id), visibility.visible)
 
       setActiveIndex(prev => (prev === next ? prev : next))
     }
@@ -306,11 +298,13 @@ const ActiveThreadTimeline: FC = () => {
     // forces a full reflow per read on a large transcript. One rAF later the
     // reads batch into a single layout pass, and back-to-back entries updates
     // (prefetch paint, then resume reconcile) coalesce into one compute.
+    const visibility = observeVisibleGroups(viewport, viewport, onScroll)
     onScroll()
     viewport.addEventListener('scroll', onScroll, { passive: true })
 
     return () => {
       viewport.removeEventListener('scroll', onScroll)
+      visibility.dispose()
 
       if (raf) {
         cancelAnimationFrame(raf)

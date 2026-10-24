@@ -50,14 +50,23 @@ function observeStickyPromptClip(viewport: HTMLElement, content: HTMLElement) {
 
   const measure = () => {
     frame = 0
-    const viewportTop = viewport.getBoundingClientRect().top
+    const viewportRect = viewport.getBoundingClientRect()
+    const viewportTop = viewportRect.top
     const next = new Map<HTMLElement, number>()
     let activePrompt: HTMLElement | null = null
     let exclusionBottom = viewportTop
+    const currentVisible: HTMLElement[] = []
 
     for (const group of visible) {
       // Read only intersecting groups: measuring a skipped turn's descendants
       // would defeat content-visibility and wake the entire transcript.
+      const groupRect = group.getBoundingClientRect()
+
+      if (groupRect.bottom <= viewportTop || groupRect.top >= viewportRect.bottom) {
+        continue
+      }
+
+      currentVisible.push(group)
       const prompt = group.querySelector<HTMLElement>(PROMPT)
 
       if (!prompt) {
@@ -104,7 +113,7 @@ function observeStickyPromptClip(viewport: HTMLElement, content: HTMLElement) {
         }
       }
 
-      for (const group of visible) {
+      for (const group of currentVisible) {
         // Keep the IO target itself unmasked; clipping it would change its
         // intersection and oscillate between hiding and revealing the group.
         for (const child of group.children) {

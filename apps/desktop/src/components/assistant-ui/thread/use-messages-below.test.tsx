@@ -93,6 +93,17 @@ describe('messages below the viewport', () => {
       }
     )
 
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        constructor(private callback: IntersectionObserverCallback) {}
+        observe(target: Element) {
+          this.callback([{ target, isIntersecting: true } as IntersectionObserverEntry], this as unknown as IntersectionObserver)
+        }
+        disconnect() {}
+      }
+    )
+
     const flush = () =>
       act(() => {
         const callback = frame
