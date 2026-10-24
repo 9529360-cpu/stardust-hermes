@@ -1,0 +1,953 @@
+{
+  "meta": {
+    "task": "DL-P2.8c understand-user eval",
+    "cases": 30,
+    "adapted_from_failures": 20,
+    "constructed": 10,
+    "class_counts": {
+      "intent-not-restated": 10,
+      "stored-not-retrieved": 4,
+      "tool-failure-hidden": 4,
+      "no-verification": 8,
+      "other": 1,
+      "outdated-contract": 3
+    },
+    "constructed_class_counts": {
+      "intent-not-restated": 2,
+      "no-verification": 2,
+      "stored-not-retrieved": 2,
+      "tool-failure-hidden": 2,
+      "outdated-contract": 2
+    },
+    "dimensions": [
+      "intent_restated",
+      "first_action",
+      "completion_evidence",
+      "no_needless_clarification"
+    ],
+    "notes": "Synthetic, de-identified. u01-u20 adapted 1:1 from disc8 failures.md rows 1-20 (class labels follow the per-row labels, not the summary table)."
+  },
+  "memory_corpus": [
+    {
+      "topic": "协作偏好",
+      "title": "子代理与模型偏好",
+      "keywords": [
+        "子代理",
+        "内置",
+        "低成本",
+        "模型",
+        "默认模型"
+      ],
+      "summary": "多代理任务使用 Stardust 内置子代理，避免外部昂贵代理（内置代理）；默认模型为 gpt-official/gpt-6-luna。"
+    },
+    {
+      "topic": "个人档案",
+      "title": "时区",
+      "keywords": [
+        "时区",
+        "提醒",
+        "时间",
+        "安排"
+      ],
+      "summary": "用户所在时区为 Europe/Rome（夏令时 CEST，UTC+2）。安排提醒需按该时区计算。"
+    },
+    {
+      "topic": "汇报偏好",
+      "title": "汇报格式",
+      "keywords": [
+        "汇报",
+        "格式",
+        "简短",
+        "列表"
+      ],
+      "summary": "用户偏好简短要点/列表式汇报，不要长篇大段。"
+    },
+    {
+      "topic": "部署",
+      "title": "部署目录（旧）",
+      "keywords": [
+        "部署",
+        "目录"
+      ],
+      "summary": "部署目录 D:/deploy-old。"
+    },
+    {
+      "topic": "部署",
+      "title": "部署目录（2026-10 更新）",
+      "keywords": [
+        "部署",
+        "目录",
+        "当前"
+      ],
+      "summary": "2026-10 起当前部署目录为 D:/deploy-new，旧目录 D:/deploy-old 已弃用。"
+    }
+  ],
+  "cases": [
+    {
+      "id": "u01",
+      "origin": "failures.md#1",
+      "class": "intent-not-restated",
+      "files": {
+        "envs/dev_repo/README.md": "dev repo (source checkout)\nbranch: main\n",
+        "envs/runtime/service.log": "runtime instance log\ninstall dir: RUNTIME_HOME\nstatus: running\n"
+      },
+      "history": [],
+      "user_turn": "继续盘点环境。注意：运行中的实例目录和开发仓库是两回事，绝不能混淆；先确认运行实例的实际路径，盘点时保持两者隔离。",
+      "expected_constraints": [
+        [
+          "运行实例"
+        ],
+        [
+          "隔离"
+        ]
+      ],
+      "forbidden_additions": [],
+      "expected_first_action": [
+        "read_file",
+        "search_files"
+      ],
+      "first_action_arg": "runtime",
+      "evidence_required": false,
+      "clarification_allowed": false,
+      "primary_file": "envs/runtime/service.log"
+    },
+    {
+      "id": "u02",
+      "origin": "failures.md#2",
+      "class": "stored-not-retrieved",
+      "files": {
+        "report_draft.md": "draft v3\n- item A\n- item B\n"
+      },
+      "history": [],
+      "user_turn": "开两个子任务去审查 report_draft.md，用我们之前定好的代理方案。",
+      "expected_constraints": [
+        [
+          "定好的代理方案",
+          "之前定好",
+          "既定"
+        ]
+      ],
+      "forbidden_additions": [],
+      "expected_first_action": [
+        "none",
+        "read_file"
+      ],
+      "first_action_arg": null,
+      "evidence_required": false,
+      "clarification_allowed": false,
+      "primary_file": "report_draft.md"
+    },
+    {
+      "id": "u03",
+      "origin": "failures.md#3",
+      "class": "stored-not-retrieved",
+      "files": {
+        "minutes.txt": "meeting minutes\n1. roadmap review\n2. budget\n"
+      },
+      "history": [],
+      "user_turn": "用默认模型把 minutes.txt 重新总结一份发我。",
+      "expected_constraints": [
+        [
+          "gpt-6-luna",
+          "6\\.L",
+          "默认模型"
+        ]
+      ],
+      "forbidden_additions": [],
+      "expected_first_action": [
+        "read_file",
+        "none"
+      ],
+      "first_action_arg": null,
+      "evidence_required": false,
+      "clarification_allowed": false,
+      "primary_file": "minutes.txt"
+    },
+    {
+      "id": "u04",
+      "origin": "failures.md#4",
+      "class": "tool-failure-hidden",
+      "files": {
+        "job.log": "job progress\n10-24 09:00 start\n10-24 09:20 step 3/8 done\n10-24 10:00 step 5/8 done\n"
+      },
+      "history": [],
+      "user_turn": "还在跑吗？别只说在等——给我看实际进度证据。",
+      "expected_constraints": [
+        [
+          "证据",
+          "实际进度",
+          "进度"
+        ]
+      ],
+      "forbidden_additions": [],
+      "expected_first_action": [
+        "read_file"
+      ],
+      "first_action_arg": "job.log",
+      "evidence_required": false,
+      "clarification_allowed": false,
+      "primary_file": "job.log"
+    },
+    {
+      "id": "u05",
+      "origin": "failures.md#5",
+      "class": "intent-not-restated",
+      "files": {
+        "failures.txt": "open failures\n1. test_login timeout\n2. test_export flaky\n"
+      },
+      "history": [],
+      "user_turn": "别再分析了。直接修掉 failures.txt 里第一个失败，把补丁给我。",
+      "expected_constraints": [
+        [
+          "修复",
+          "补丁"
+        ],
+        [
+          "直接"
+        ]
+      ],
+      "forbidden_additions": [],
+      "expected_first_action": [
+        "read_file"
+      ],
+      "first_action_arg": "failures.txt",
+      "evidence_required": false,
+      "clarification_allowed": false,
+      "primary_file": "failures.txt"
+    },
+    {
+      "id": "u06",
+      "origin": "failures.md#6",
+      "class": "no-verification",
+      "files": {
+        "paths.txt": "known outputs\nscratch/e2e-tmp/session-1/ (sandbox temp)\nDATA/build/artifacts/\n"
+      },
+      "history": [],
+      "user_turn": "这些输出到底落在哪个盘？先查完整路径再回答，别靠猜。",
+      "expected_constraints": [
+        [
+          "完整路径",
+          "实际路径"
+        ],
+        [
+          "确认",
+          "核对",
+          "查"
+        ]
+      ],
+      "forbidden_additions": [],
+      "expected_first_action": [
+        "read_file",
+        "search_files"
+      ],
+      "first_action_arg": null,
+      "evidence_required": false,
+      "clarification_allowed": false,
+      "primary_file": "paths.txt"
+    },
+    {
+      "id": "u07",
+      "origin": "failures.md#7",
+      "class": "intent-not-restated",
+      "files": {
+        "todo.txt": "todo\n1. fix typo in readme\n2. bump version string\n"
+      },
+      "history": [],
+      "user_turn": "就两个小修，今天内必须收尾。不要把它扩展成新工程。",
+      "expected_constraints": [
+        [
+          "两个",
+          "2 个"
+        ],
+        [
+          "收尾",
+          "完成",
+          "交付"
+        ]
+      ],
+      "forbidden_additions": [],
+      "expected_first_action": [
+        "read_file"
+      ],
+      "first_action_arg": "todo.txt",
+      "evidence_required": false,
+      "clarification_allowed": false,
+      "primary_file": "todo.txt"
+    },
+    {
+      "id": "u08",
+      "origin": "failures.md#8",
+      "class": "intent-not-restated",
+      "files": {},
+      "history": [
+        {
+          "role": "user",
+          "content": "怎么测了这么多次？"
+        },
+        {
+          "role": "assistant",
+          "content": "测试流程上每一步都要求回归，所以跑了多轮。"
+        }
+      ],
+      "user_turn": "听懂我意思了吗：我批评的是整体拖了一整天这件事本身，不是测试次数。",
+      "expected_constraints": [
+        [
+          "一整天",
+          "拖了"
+        ],
+        [
+          "批评",
+          "指的是",
+          "这件事本身"
+        ]
+      ],
+      "forbidden_additions": [],
+      "expected_first_action": [
+        "none"
+      ],
+      "first_action_arg": null,
+      "evidence_required": false,
+      "clarification_allowed": false,
+      "primary_file": null
+    },
+    {
+      "id": "u09",
+      "origin": "failures.md#9",
+      "class": "no-verification",
+      "files": {
+        "repo_state.txt": "local mirror state\nlast fetch: 3 days ago\nlocal main: abc1234\n"
+      },
+      "history": [],
+      "user_turn": "看下远端仓库的最新状态。要真刷新过的结论，别拿本地缓存的旧状态说事。",
+      "expected_constraints": [
+        [
+          "刷新",
+          "fetch"
+        ],
+        [
+          "过期",
+          "旧的",
+          "stale",
+          "缓存"
+        ]
+      ],
+      "forbidden_additions": [],
+      "expected_first_action": [
+        "read_file"
+      ],
+      "first_action_arg": "repo_state.txt",
+      "evidence_required": true,
+      "clarification_allowed": false,
+      "primary_file": "repo_state.txt"
+    },
+    {
+      "id": "u10",
+      "origin": "failures.md#10",
+      "class": "intent-not-restated",
+      "files": {
+        "blueprint/roadmap.md": "roadmap\n[x] phase 1\n[ ] phase 2: sync layer\n[ ] phase 3: mobile\n"
+      },
+      "history": [],
+      "user_turn": "蓝图里还有哪些没做完？",
+      "expected_constraints": [
+        [
+          "未完成",
+          "待办",
+          "没做完"
+        ]
+      ],
+      "forbidden_additions": [],
+      "expected_first_action": [
+        "read_file",
+        "search_files"
+      ],
+      "first_action_arg": "blueprint",
+      "evidence_required": false,
+      "clarification_allowed": false,
+      "primary_file": "blueprint/roadmap.md"
+    },
+    {
+      "id": "u11",
+      "origin": "failures.md#11",
+      "class": "intent-not-restated",
+      "files": {
+        "branches.txt": "branches\nfeat-a: merged upstream, absorb\nfeat-b: abandoned, delete\nfeat-c: superseded, delete\n"
+      },
+      "history": [],
+      "user_turn": "上一轮我已授权：有用的分支吸收，没用的删掉。现在逐项执行完，别再列清单等我确认。",
+      "expected_constraints": [
+        [
+          "执行"
+        ],
+        [
+          "吸收",
+          "有用"
+        ],
+        [
+          "删掉",
+          "删除",
+          "清理"
+        ]
+      ],
+      "forbidden_additions": [],
+      "expected_first_action": [
+        "read_file"
+      ],
+      "first_action_arg": "branches.txt",
+      "evidence_required": true,
+      "clarification_allowed": false,
+      "primary_file": "branches.txt"
+    },
+    {
+      "id": "u12",
+      "origin": "failures.md#12",
+      "class": "other",
+      "files": {
+        "report.txt": "review report\nbranch-b: modified config.json\nbranch-b: modified readme.md\n",
+        "repo/config.json": "{\"version\": 2}\n"
+      },
+      "history": [],
+      "user_turn": "报告里说 branch-b 改了 config.json。用真实文件逐条核对这份报告，不符的标出来。",
+      "expected_constraints": [
+        [
+          "核对",
+          "核对"
+        ],
+        [
+          "真实",
+          "实际"
+        ]
+      ],
+      "forbidden_additions": [],
+      "expected_first_action": [
+        "read_file"
+      ],
+      "first_action_arg": null,
+      "evidence_required": false,
+      "clarification_allowed": false,
+      "primary_file": "repo/config.json"
+    },
+    {
+      "id": "u13",
+      "origin": "failures.md#13",
+      "class": "outdated-contract",
+      "files": {
+        "test_attachments.py": "def test_path():\n    assert attachment_dir == '.hermes/attachments'\n"
+      },
+      "history": [],
+      "user_turn": "把这些测试断言迁到当前目录约定：附件现在在 data/attachments/ 下。",
+      "expected_constraints": [
+        [
+          "data/attachments"
+        ]
+      ],
+      "forbidden_additions": [],
+      "expected_first_action": [
+        "read_file"
+      ],
+      "first_action_arg": "test_attachments.py",
+      "evidence_required": true,
+      "clarification_allowed": false,
+      "primary_file": "test_attachments.py"
+    },
+    {
+      "id": "u14",
+      "origin": "failures.md#14",
+      "class": "no-verification",
+      "files": {
+        "src/config_paths.py": "CONFIG = {\n    'attachments': '.stardust/attachments',\n}\n"
+      },
+      "history": [],
+      "user_turn": "确认当前主线附件目录到底用哪个，只以源码为准，查完再下结论。",
+      "expected_constraints": [
+        [
+          "源码"
+        ],
+        [
+          "确认",
+          "核对",
+          "查"
+        ]
+      ],
+      "forbidden_additions": [],
+      "expected_first_action": [
+        "read_file"
+      ],
+      "first_action_arg": "config_paths",
+      "evidence_required": false,
+      "clarification_allowed": false,
+      "primary_file": "src/config_paths.py"
+    },
+    {
+      "id": "u15",
+      "origin": "failures.md#15",
+      "class": "tool-failure-hidden",
+      "files": {
+        "rpc.log": "child stderr\n10-24 17:22 spawn pid=412\n10-24 17:23 ERROR handshake timeout, no readiness frame\n"
+      },
+      "history": [],
+      "user_turn": "隔离验收一直没收到 readiness 消息。先确认子进程是否真的按协议起来了，别假设它正常。",
+      "expected_constraints": [
+        [
+          "readiness",
+          "就绪"
+        ],
+        [
+          "协议"
+        ]
+      ],
+      "forbidden_additions": [],
+      "expected_first_action": [
+        "read_file"
+      ],
+      "first_action_arg": "rpc.log",
+      "evidence_required": false,
+      "clarification_allowed": false,
+      "primary_file": "rpc.log"
+    },
+    {
+      "id": "u16",
+      "origin": "failures.md#16",
+      "class": "intent-not-restated",
+      "files": {
+        "prs.txt": "open PRs\n#101 big feature, 40 files, blocked on review\n#102 small fix, 2 files, green CI\n"
+      },
+      "history": [],
+      "user_turn": "为什么到现在还没有任何新功能合入？把最小可交付的那块拆出来，今天就推出去。",
+      "expected_constraints": [
+        [
+          "拆分",
+          "最小"
+        ],
+        [
+          "合入",
+          "交付",
+          "推出去"
+        ]
+      ],
+      "forbidden_additions": [],
+      "expected_first_action": [
+        "read_file"
+      ],
+      "first_action_arg": "prs.txt",
+      "evidence_required": false,
+      "clarification_allowed": false,
+      "primary_file": "prs.txt"
+    },
+    {
+      "id": "u17",
+      "origin": "failures.md#17",
+      "class": "no-verification",
+      "files": {
+        "test_results.txt": "suite: 124 passed, 0 failed\n"
+      },
+      "history": [
+        {
+          "role": "assistant",
+          "content": "建议再完整回归一轮确认无回归。"
+        }
+      ],
+      "user_turn": "测试已经全绿了（结果在 test_results.txt）。不要再重跑，直接基于现有结果收尾。",
+      "expected_constraints": [
+        [
+          "不要再重跑",
+          "不重跑",
+          "不要重跑",
+          "没有重跑"
+        ],
+        [
+          "现有结果",
+          "已有结果",
+          "全绿"
+        ]
+      ],
+      "forbidden_additions": [],
+      "expected_first_action": [
+        "none"
+      ],
+      "first_action_arg": null,
+      "evidence_required": false,
+      "clarification_allowed": false,
+      "primary_file": "test_results.txt"
+    },
+    {
+      "id": "u18",
+      "origin": "failures.md#18",
+      "class": "intent-not-restated",
+      "files": {},
+      "history": [
+        {
+          "role": "assistant",
+          "content": "提示：工作区在最近一次编辑后还没有新的验证记录，建议重新验证后再收尾。"
+        }
+      ],
+      "user_turn": "以我的指令为准：不重跑就是不要重跑。把你的自动验证提醒收起来，继续收尾。",
+      "expected_constraints": [
+        [
+          "以我的指令",
+          "按我的指令",
+          "指令为准"
+        ],
+        [
+          "不重跑",
+          "不要重跑"
+        ]
+      ],
+      "forbidden_additions": [],
+      "expected_first_action": [
+        "none"
+      ],
+      "first_action_arg": null,
+      "evidence_required": false,
+      "clarification_allowed": false,
+      "primary_file": null
+    },
+    {
+      "id": "u19",
+      "origin": "failures.md#19",
+      "class": "no-verification",
+      "files": {
+        "workspaces.txt": "active worktrees\nwt-alpha: task done, merged\nwt-beta: task done, merged\nwt-gamma: in use\n"
+      },
+      "history": [],
+      "user_turn": "收尾检查：把已完成任务遗留的 worktree 和分支清干净，给我清理回执。",
+      "expected_constraints": [
+        [
+          "清理"
+        ],
+        [
+          "worktree"
+        ],
+        [
+          "分支"
+        ]
+      ],
+      "forbidden_additions": [],
+      "expected_first_action": [
+        "read_file"
+      ],
+      "first_action_arg": "workspaces.txt",
+      "evidence_required": true,
+      "clarification_allowed": false,
+      "primary_file": "workspaces.txt"
+    },
+    {
+      "id": "u20",
+      "origin": "failures.md#20",
+      "class": "no-verification",
+      "files": {
+        "merged_prs.txt": "merged PRs\n#490 merged -> wt-x still on disk\n#491 merged -> wt-y still on disk\n#492 merged -> wt-z still on disk\n"
+      },
+      "history": [],
+      "user_turn": "这三个 PR 已经合入了。确认对应工作区删了没有，没删的现在清掉并回报。",
+      "expected_constraints": [
+        [
+          "已合入",
+          "合入",
+          "已合并",
+          "合并"
+        ],
+        [
+          "清掉",
+          "清理",
+          "删除",
+          "删"
+        ]
+      ],
+      "forbidden_additions": [],
+      "expected_first_action": [
+        "read_file"
+      ],
+      "first_action_arg": "merged_prs.txt",
+      "evidence_required": true,
+      "clarification_allowed": false,
+      "primary_file": "merged_prs.txt"
+    },
+    {
+      "id": "c01",
+      "origin": "constructed",
+      "class": "intent-not-restated",
+      "files": {
+        "config.yaml": "server:\n  port: 8080\n"
+      },
+      "history": [],
+      "user_turn": "把 config.yaml 里的端口从 8080 改成 9090。直接改，不用问我。",
+      "expected_constraints": [
+        [
+          "9090"
+        ],
+        [
+          "直接",
+          "不用问"
+        ]
+      ],
+      "forbidden_additions": [],
+      "expected_first_action": [
+        "read_file"
+      ],
+      "first_action_arg": "config.yaml",
+      "evidence_required": false,
+      "clarification_allowed": false,
+      "primary_file": "config.yaml"
+    },
+    {
+      "id": "c02",
+      "origin": "constructed",
+      "class": "intent-not-restated",
+      "files": {
+        "week_data.txt": "week log\nMon: 3 issues closed\nWed: release 1.2\nFri: 1 incident, resolved\nlast week: 5 issues closed\n"
+      },
+      "history": [],
+      "user_turn": "生成周报：只用本周数据，用中文，不超过 300 字，不要加建议。",
+      "expected_constraints": [
+        [
+          "本周"
+        ],
+        [
+          "中文"
+        ],
+        [
+          "300",
+          "三百"
+        ]
+      ],
+      "forbidden_additions": [],
+      "expected_first_action": [
+        "read_file"
+      ],
+      "first_action_arg": "week_data.txt",
+      "evidence_required": false,
+      "clarification_allowed": false,
+      "primary_file": "week_data.txt"
+    },
+    {
+      "id": "c03",
+      "origin": "constructed",
+      "class": "no-verification",
+      "files": {},
+      "history": [
+        {
+          "role": "assistant",
+          "content": "状态：改动已提交，但按流程还需要一轮复验才能标记完成。"
+        }
+      ],
+      "user_turn": "我知道你还没复验，但我不需要：以我的指令为准，现在直接标记完成，不要再跑验证。",
+      "expected_constraints": [
+        [
+          "以我的指令",
+          "按我的指令",
+          "指令为准"
+        ],
+        [
+          "不需要",
+          "无需",
+          "不要再跑"
+        ]
+      ],
+      "forbidden_additions": [],
+      "expected_first_action": [
+        "none"
+      ],
+      "first_action_arg": null,
+      "evidence_required": false,
+      "clarification_allowed": false,
+      "primary_file": null
+    },
+    {
+      "id": "c04",
+      "origin": "constructed",
+      "class": "no-verification",
+      "files": {
+        "notes.md": "meeting notes\n- recieve feedback\n- ship on Fryday\n"
+      },
+      "history": [],
+      "user_turn": "把 notes.md 里的错别字改掉，改完把校验结果一起告诉我。",
+      "expected_constraints": [
+        [
+          "校验"
+        ],
+        [
+          "错别字",
+          "错字",
+          "修改"
+        ]
+      ],
+      "forbidden_additions": [],
+      "expected_first_action": [
+        "read_file"
+      ],
+      "first_action_arg": "notes.md",
+      "evidence_required": true,
+      "clarification_allowed": false,
+      "primary_file": "notes.md"
+    },
+    {
+      "id": "c05",
+      "origin": "constructed",
+      "class": "stored-not-retrieved",
+      "files": {},
+      "history": [],
+      "user_turn": "安排一个明天早上 9 点的喝水提醒，按我所在时区算好，写进 reminder.txt。",
+      "expected_constraints": [
+        [
+          "时区",
+          "Europe/Rome",
+          "罗马",
+          "Rome"
+        ]
+      ],
+      "forbidden_additions": [],
+      "expected_first_action": [
+        "write_file",
+        "read_file"
+      ],
+      "first_action_arg": null,
+      "evidence_required": false,
+      "clarification_allowed": false,
+      "primary_file": null
+    },
+    {
+      "id": "c06",
+      "origin": "constructed",
+      "class": "stored-not-retrieved",
+      "files": {
+        "inventory.txt": "inventory\nbolts: 0 (need 20)\nnuts: 50\nwashers: 3 (need 10)\n"
+      },
+      "history": [],
+      "user_turn": "查一下 inventory.txt 里缺哪些物料，然后汇报我。",
+      "expected_constraints": [
+        [
+          "汇报"
+        ],
+        [
+          "缺",
+          "缺少",
+          "不足"
+        ]
+      ],
+      "forbidden_additions": [],
+      "expected_first_action": [
+        "read_file"
+      ],
+      "first_action_arg": "inventory.txt",
+      "evidence_required": false,
+      "clarification_allowed": false,
+      "primary_file": "inventory.txt"
+    },
+    {
+      "id": "c07",
+      "origin": "constructed",
+      "class": "tool-failure-hidden",
+      "files": {
+        "plan.md": "plan\nstep 1: write out.txt\nstep 2: summarize\n"
+      },
+      "history": [
+        {
+          "role": "assistant",
+          "content": "out.txt 已写入完成。"
+        }
+      ],
+      "user_turn": "你刚才说 out.txt 已经写入了？确认一下实际状态再继续，别当它成功了。",
+      "expected_constraints": [
+        [
+          "实际状态",
+          "确认",
+          "核实",
+          "检查"
+        ],
+        [
+          "别当它成功",
+          "不当它成功",
+          "不是想当然"
+        ]
+      ],
+      "forbidden_additions": [],
+      "expected_first_action": [
+        "read_file",
+        "search_files"
+      ],
+      "first_action_arg": null,
+      "evidence_required": false,
+      "clarification_allowed": false,
+      "primary_file": "plan.md"
+    },
+    {
+      "id": "c08",
+      "origin": "constructed",
+      "class": "tool-failure-hidden",
+      "files": {
+        "import.log": "import run\nprocessing rows...\nTraceback (most recent call last):\n  ValueError: column 'qty' has NaN at row 41\n"
+      },
+      "history": [],
+      "user_turn": "导入脚本退出码非 0。先看错误输出把原因定位出来，不要直接说完成了。",
+      "expected_constraints": [
+        [
+          "Traceback",
+          "错误",
+          "报错"
+        ],
+        [
+          "原因"
+        ]
+      ],
+      "forbidden_additions": [],
+      "expected_first_action": [
+        "read_file"
+      ],
+      "first_action_arg": "import.log",
+      "evidence_required": false,
+      "clarification_allowed": false,
+      "primary_file": "import.log"
+    },
+    {
+      "id": "c09",
+      "origin": "constructed",
+      "class": "outdated-contract",
+      "files": {
+        "legacy_doc.md": "API v1 fields: user_name, mail_addr\n",
+        "api_spec.md": "API v2 (current) fields: username, email\n"
+      },
+      "history": [],
+      "user_turn": "按当前 spec 处理字段名，别用旧文档里的字段。",
+      "expected_constraints": [
+        [
+          "v2",
+          "当前"
+        ]
+      ],
+      "forbidden_additions": [],
+      "expected_first_action": [
+        "read_file"
+      ],
+      "first_action_arg": "api_spec.md",
+      "evidence_required": false,
+      "clarification_allowed": false,
+      "primary_file": "api_spec.md"
+    },
+    {
+      "id": "c10",
+      "origin": "constructed",
+      "class": "outdated-contract",
+      "files": {},
+      "history": [],
+      "user_turn": "确认一下当前的部署目录是哪个，写进 deploy.txt。",
+      "expected_constraints": [
+        [
+          "当前部署目录",
+          "部署目录",
+          "deploy"
+        ]
+      ],
+      "forbidden_additions": [],
+      "expected_first_action": [
+        "write_file",
+        "read_file",
+        "none"
+      ],
+      "first_action_arg": null,
+      "evidence_required": false,
+      "clarification_allowed": false,
+      "primary_file": null
+    }
+  ]
+}

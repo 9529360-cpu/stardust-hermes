@@ -27,6 +27,37 @@ Case set is regenerated deterministically by
 `evals/digital_life/generate_memory_cases.py` (RNG-free tables, fixed seed
 20261024); the committed test asserts byte-identical regeneration.
 
+## Understand-user benchmark (DL-P2.8c)
+
+Offline, opt-in measurement of user-intent understanding on a fixed,
+committed case set of 30 synthetic, de-identified cases: 20 adapted 1:1
+from the DISCOVERY-8 real-failure evidence (per-row root-cause labels) +
+10 constructed counter-cases (every root-cause class >=2, including
+"explicit user instruction overrides automatic behaviour" and "clear
+instruction must NOT trigger clarification"). Each case scores 0/1 and
+passes only if all four dimensions hold: intent restated (all constraint
+groups surface, no forbidden additions), first action correct (from the
+real tool-call trace), completion claims backed by tool-result evidence
+when required, and no needless `clarify` calls. Scoring is deterministic
+first (keyword/structure/trace checks); the default configured model via
+magpie judges only restatement adequacy, at most 1 judge call per case and
+2 agent API calls per case per run.
+
+    python -B -m evals.digital_life.understand_user \
+        --home <isolated-home> --output <evidence>/results.json \
+        [--ab agent.turn_intent=true] [--offline]
+
+Owner hard rule enforced: sha256 of SOUL.md / AGENTS.md / USER.md in the
+eval HOME is recorded after product warm-up and re-checked after the run;
+any difference fails the run (the product itself writes a default SOUL.md
+into a fresh home on first agent construction — the baseline is taken
+after that initialisation, and the guard catches anything the RUN changes).
+`--ab FLAG=VALUE` writes the flag into the ISOLATED eval home's
+config.yaml only (never the user's), so DL-P2.8d/e can A/B off-vs-on
+without editing the harness. `--offline` swaps in a deterministic loopback
+fake model (harness-mechanics test, zero model calls). Baseline numbers
+and prior art: `D:\wt\logs\RESULT-dl-p2-8c.md`.
+
 ## Digital-life recovery kill measurement
 
 This offline evaluation changes no product behavior and adds no product flag. It uses the real AIAgent conversation loop, real SessionDB, real write_file tool, and the existing OpenAI-compatible loopback FakeModel (dynamic port 0). No paid model or credentials are used. Product configuration flags remain at shipped defaults; checkpoint and life-event fields can therefore be null/empty. These are measured absences, not fabricated recovery records.
