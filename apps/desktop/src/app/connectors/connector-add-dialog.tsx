@@ -7,11 +7,10 @@
  * default); the legacy Capabilities surface never mounts this.
  */
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 
 import { addMcpServer, getMcpCatalogEntry, installMcpCatalogEntry } from '@/api/mcp'
 import { getActionStatus } from '@/api/system'
-import { type ProfileScope, testMcpServer } from '@/hermes'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -22,11 +21,12 @@ import {
   DialogTitle
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { McpOAuthCancelled, completeMcpDesktopOAuth } from '@/lib/mcp-dashboard-oauth'
+import { type ProfileScope, testMcpServer } from '@/hermes'
+import { useI18n } from '@/i18n'
+import { completeMcpDesktopOAuth, McpOAuthCancelled } from '@/lib/mcp-dashboard-oauth'
 import { getServers } from '@/lib/mcp-servers'
 import { prettyName } from '@/lib/text'
 import type { McpCatalogEntry } from '@/types/hermes'
-import { useI18n } from '@/i18n'
 
 import { useHermesConfigRecord } from '../hooks/use-config-record'
 
@@ -86,9 +86,11 @@ export function ConnectorAddDialog({ entry, profile, onClose, onConnected }: Con
   const [detail, setDetail] = useState<McpCatalogEntry | null>(null)
   useEffect(() => {
     setDetail(null)
+
     if (!entry) {
       return
     }
+
     let alive = true
     getMcpCatalogEntry(entry.name, profile)
       .then(loaded => {
@@ -101,6 +103,7 @@ export function ConnectorAddDialog({ entry, profile, onClose, onConnected }: Con
           setDetail(entry)
         }
       })
+
     return () => {
       alive = false
     }
@@ -136,6 +139,7 @@ export function ConnectorAddDialog({ entry, profile, onClose, onConnected }: Con
     if (busy) {
       return
     }
+
     setError(null)
 
     if (isInstalled) {
@@ -149,6 +153,7 @@ export function ConnectorAddDialog({ entry, profile, onClose, onConnected }: Con
 
       return
     }
+
     if (plainEnv.some(envVar => envVar.required && !plainValues[envVar.name]?.trim())) {
       setError(c.urlOrCommandRequired)
 
@@ -170,6 +175,7 @@ export function ConnectorAddDialog({ entry, profile, onClose, onConnected }: Con
           env[envVar.name] = value
         }
       }
+
       for (const envVar of secretEnv) {
         const value = secretValues[envVar.name]?.trim()
 
@@ -212,6 +218,7 @@ export function ConnectorAddDialog({ entry, profile, onClose, onConnected }: Con
       if (!(err instanceof McpOAuthCancelled)) {
         setError(err instanceof Error ? err.message : String(err))
       }
+
       setBusy(false)
     }
   }
@@ -333,6 +340,7 @@ export function CustomConnectorAddDialog({ open, profile, onClose, onConnected }
     if (busy) {
       return
     }
+
     setError(null)
 
     const trimmedName = name.trim()
@@ -342,6 +350,7 @@ export function CustomConnectorAddDialog({ open, profile, onClose, onConnected }
 
       return
     }
+
     if (existingNames.has(trimmedName)) {
       setError(c.nameDuplicate(trimmedName))
 
@@ -356,11 +365,13 @@ export function CustomConnectorAddDialog({ open, profile, onClose, onConnected }
 
       return
     }
+
     if (!trimmedUrl && useApiKey) {
       setError(c.commandRequired)
 
       return
     }
+
     if (useApiKey && !apiKey.trim()) {
       setError(c.apiKeyRequired)
 

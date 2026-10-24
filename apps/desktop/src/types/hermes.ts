@@ -1695,7 +1695,7 @@ export interface McpCatalogEntry {
   permissions?: string[]
   /** Where the server runs: 'local' stdio on this machine, 'remote' vendor host. */
   runtime?: 'local' | 'remote'
-  required_env: { name: string; prompt: string; required: boolean }[]
+  required_env: { name: string; prompt: string; required: boolean; secret?: boolean }[]
   command: string | null
   args: string[]
   url: string | null

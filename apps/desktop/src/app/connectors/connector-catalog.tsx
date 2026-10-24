@@ -5,24 +5,27 @@
  * rendering the legacy Capabilities surface byte-identically.
  */
 
-import { useQuery } from '@tanstack/react-query'
 import { useStore } from '@nanostores/react'
+import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 
 import { getMcpCatalog } from '@/api/mcp'
 import { AvatarChip } from '@/components/ui/avatar-chip'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { type ProfileScope, profileScopeKey } from '@/hermes'
+import { useI18n } from '@/i18n'
 import { brandFor } from '@/lib/mcp-brands'
 import { probeCache, probeKey } from '@/lib/mcp-probe-cache'
 import { getServers } from '@/lib/mcp-servers'
-import { normalizeProfileKey, $activeGatewayProfile, type ProfileScope, profileScopeKey } from '@/hermes'
-import { useI18n } from '@/i18n'
+import { $activeGatewayProfile } from '@/store/profile'
 import type { McpCatalogEntry } from '@/types/hermes'
 
 import { useHermesConfigRecord } from '../hooks/use-config-record'
-import { ConnectedSummary } from './index'
+
 import { ConnectorAddDialog, CustomConnectorAddDialog } from './connector-add-dialog'
+
+import { ConnectedSummary } from './index'
 
 /** One catalog card: name, description, auth tag, runtime tag, publisher. */
 function CatalogCard({ entry, onConnect }: { entry: McpCatalogEntry; onConnect: () => void }) {
@@ -34,8 +37,8 @@ function CatalogCard({ entry, onConnect }: { entry: McpCatalogEntry; onConnect: 
   return (
     <div
       className="flex min-w-0 flex-col gap-2 rounded-lg border border-(--ui-stroke-secondary) bg-(--ui-chat-surface-background) p-3"
-      data-slot="connector-catalog-card"
       data-entry={entry.name}
+      data-slot="connector-catalog-card"
     >
       <div className="flex items-center gap-2">
         <AvatarChip brand={brand} name={entry.name} />
@@ -92,8 +95,8 @@ function ConnectedRow({ name, server, scopeKey }: { name: string; server: Record
   return (
     <div
       className="flex items-center gap-2 rounded-md px-2 py-2"
-      data-slot="connector-connected-row"
       data-server={name}
+      data-slot="connector-connected-row"
     >
       <AvatarChip brand={brandFor(name)} name={name} />
       <div className="min-w-0 flex-1">

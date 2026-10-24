@@ -379,8 +379,9 @@ def _catalog_entry_json(entry: Any, installed: bool, enabled: bool) -> Dict[str,
         "runtime": ("local" if transport.type == "stdio" else "remote")
         if not getattr(entry, "runtime", None) else entry.runtime,
         # Env vars the user must supply (names + prompts only, never values).
+        # `secret` tells the connect dialog which fields render masked.
         "required_env": [
-            {"name": e.name, "prompt": e.prompt, "required": e.required}
+            {"name": e.name, "prompt": e.prompt, "required": e.required, "secret": e.secret}
             for e in getattr(auth, "env", []) or []
         ],
         # Transport details surfaced on purpose: the trust model asks users to

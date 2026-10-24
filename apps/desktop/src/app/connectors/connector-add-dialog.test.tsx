@@ -2,6 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import type { ProfileScope } from '@/hermes'
 import type { McpCatalogEntry } from '@/types/hermes'
 
 const addMcpServer = vi.fn()
@@ -30,9 +31,12 @@ vi.mock('@/lib/mcp-probe-cache', () => ({
   probeKey: () => 'probe'
 }))
 vi.mock('@/store/notifications', () => ({ notify: vi.fn(), notifyError: vi.fn() }))
+const useHermesConfigRecord = vi.fn((profile?: ProfileScope) => ({ data: profile ? undefined : { mcp_servers: {}, connectors: { unified_dialog: true } } }))
 vi.mock('../hooks/use-config-record', () => ({
-  useHermesConfigRecord: () => ({ data: { mcp_servers: {}, connectors: { unified_dialog: true } } })
+  useHermesConfigRecord: (profile?: ProfileScope) => useHermesConfigRecord(profile)
 }))
+
+import { I18nProvider } from '@/i18n/context'
 
 import { ConnectorAddDialog, CustomConnectorAddDialog } from './connector-add-dialog'
 
@@ -64,6 +68,7 @@ const baseEntry = (overrides: Partial<McpCatalogEntry> = {}): McpCatalogEntry =>
 
 beforeEach(() => {
   vi.clearAllMocks()
+  useHermesConfigRecord.mockReturnValue({ data: { mcp_servers: {}, connectors: { unified_dialog: true } } })
   getMcpCatalogEntry.mockResolvedValue(baseEntry())
   installMcpCatalogEntry.mockResolvedValue({ ok: true, background: false })
   testMcpServer.mockResolvedValue({ ok: true, tools: [{ name: 'read_file', description: '' }] })
@@ -71,8 +76,12 @@ beforeEach(() => {
 
 afterEach(cleanup)
 
+// The dialog copy asserted below is the product's Chinese labels (spec), so
+// wrap mounts in the zh locale like the other copy-pinned specs.
+const zh = (ui: React.ReactElement) => <I18nProvider configClient={null} initialLocale="zh-CN">{ui}</I18nProvider>
+
 const mountCatalogDialog = (entry: McpCatalogEntry | null) =>
-  render(<ConnectorAddDialog entry={entry} onClose={() => undefined} onConnected={() => undefined} />)
+  render(zh(<ConnectorAddDialog entry={entry} onClose={() => undefined} onConnected={() => undefined} />))
 
 describe('ConnectorAddDialog (CX5)', () => {
   it('shows publisher, permissions and runtime location in Chinese', async () => {
@@ -81,7 +90,7 @@ describe('ConnectorAddDialog (CX5)', () => {
     expect(screen.getByText('Model Context Protocol (official)')).toBeTruthy()
     expect(screen.getByText('所需权限')).toBeTruthy()
     expect(screen.getByText('运行位置（本地/远程）')).toBeTruthy()
-    expect(screen.getByText(/本地/)).toBeTruthy()
+    expect(screen.getAllByText(/本地/).length).toBeGreaterThan(0)
     expect(screen.getByText('Read files')).toBeTruthy()
   })
 
@@ -104,6 +113,7 @@ describe('ConnectorAddDialog (CX5)', () => {
       runtime: 'remote',
       required_env: [{ name: 'N8N_API_KEY', prompt: 'n8n API key', required: true }]
     })
+
     getMcpCatalogEntry.mockResolvedValue(entry)
     mountCatalogDialog(entry)
     await waitFor(() => expect(screen.getByText('n8n API key')).toBeTruthy())
@@ -119,9 +129,7 @@ describe('ConnectorAddDialog (CX5)', () => {
   it('shows the duplicate-name state for an already-configured entry and disables connect', async () => {
     const entry = baseEntry({ name: 'deepwiki', transport: 'http', url: 'https://mcp.deepwiki.com/mcp', runtime: 'remote' })
     getMcpCatalogEntry.mockResolvedValue(entry)
-    // Pre-configure deepwiki in the config record mock for this test.
-    const { useHermesConfigRecord } = await import('../hooks/use-config-record')
-    vi.mocked(useHermesConfigRecord).mockReturnValueOnce({
+    useHermesConfigRecord.mockReturnValue({
       data: { mcp_servers: { deepwiki: { url: 'https://mcp.deepwiki.com/mcp' } } }
     } as never)
     mountCatalogDialog(entry)
@@ -131,7 +139,8 @@ describe('ConnectorAddDialog (CX5)', () => {
 })
 
 describe('CustomConnectorAddDialog (CX5)', () => {
-  const mountCustom = () => render(<CustomConnectorAddDialog onClose={() => undefined} onConnected={() => undefined} open />)
+  const mountCustom = () =>
+    render(zh(<CustomConnectorAddDialog onClose={() => undefined} onConnected={() => undefined} open />))
 
   it('demands a name, then a URL or command (missing-command edge case)', async () => {
     mountCustom()
