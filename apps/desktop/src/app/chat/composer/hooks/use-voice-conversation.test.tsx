@@ -13,6 +13,9 @@ import { useVoiceConversation } from './use-voice-conversation'
 // window covered generation, and playback bleed made the old monitor's
 // trigger unreachable).
 
+// Keep the real trace implementation; only replace the Electron IPC boundary.
+const traceApi = vi.fn(async () => ({ enabled: false }))
+
 const monitorCalls: BargeMonitorCallbacks[] = []
 const stopMonitor = vi.fn()
 
@@ -138,11 +141,44 @@ describe('useVoiceConversation full-duplex barge-in', () => {
   beforeEach(() => {
     monitorCalls.length = 0
     vi.clearAllMocks()
+    traceApi.mockResolvedValue({ enabled: false })
+    Object.defineProperty(window, 'stardustDesktop', {
+      configurable: true,
+      value: { api: traceApi }
+    })
     micHandle.start.mockResolvedValue(undefined)
     micHandle.stop.mockResolvedValue(null)
   })
 
-  afterEach(cleanup)
+  afterEach(() => {
+    cleanup()
+    Reflect.deleteProperty(window, 'stardustDesktop')
+  })
+
+  it('listens and ends without uploading a trace when tracing is disabled', async () => {
+    const { hook } = renderConversation()
+
+    await act(async () => {
+      await hook.result.current.start()
+    })
+    expect(hook.result.current.status).toBe('listening')
+    expect(micHandle.start).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      await hook.result.current.end()
+    })
+    expect(traceApi).toHaveBeenCalledExactlyOnceWith({ path: '/api/audio/trace-config' })
+  })
+
+  it('does not wait for trace configuration before listening', async () => {
+    traceApi.mockImplementationOnce(() => new Promise(() => {}))
+    const { hook } = renderConversation()
+
+    await act(async () => {
+      await hook.result.current.start()
+    })
+    expect(hook.result.current.status).toBe('listening')
+    expect(micHandle.start).toHaveBeenCalledTimes(1)
+  })
 
   it('arms the barge monitor during generation (before any reply audio exists)', async () => {
     const { hook } = renderConversation()
