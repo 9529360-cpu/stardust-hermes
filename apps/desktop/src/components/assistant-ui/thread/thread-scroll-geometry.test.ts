@@ -23,6 +23,16 @@ it('keeps timeline selection identical across sticky prompt boundaries', () => {
   }
 })
 
+it('uses the first mounted entry while visibility delivery is pending', () => {
+  const viewport = document.createElement('div')
+  vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue(box(0, 600))
+  const node = document.createElement('div')
+  node.dataset.slot = 'aui_user-message-root'
+  node.dataset.messageId = 'second'
+  viewport.append(node)
+  expect(activePromptIndex(viewport, ['first', 'second'], new Set())).toBe(1)
+})
+
 function box(top: number, bottom: number): DOMRect {
   return { top, bottom, height: bottom - top } as DOMRect
 }

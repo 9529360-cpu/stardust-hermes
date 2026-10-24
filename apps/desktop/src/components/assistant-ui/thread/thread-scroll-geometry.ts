@@ -122,7 +122,7 @@ export function activePromptIndex(viewport: HTMLElement, ids: readonly string[],
 
   if (visible) {
     const candidates = mounted.filter(item => currentVisible!.has(item.node.closest<HTMLElement>(GROUP)!))
-    let active = candidates[0]?.index ?? 0
+    let active = mounted[0]?.index ?? 0
 
     for (const item of candidates) {
       if (item.node.getBoundingClientRect().top <= top + 8) {
