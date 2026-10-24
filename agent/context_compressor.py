@@ -3353,7 +3353,11 @@ Summary generation was unavailable, so this is a best-effort deterministic fallb
         has_user_turn = getattr(self, "_summary_has_user_turn", None)
         if has_user_turn is None:
             has_user_turn = self._transcript_has_real_user_turn(turns_to_summarize)
-        prompt = self._build_summary_prompt(content_to_summarize, summary_budget, focus_topic, memory_context, has_user_turn)
+        prompt_builder = (self._degraded_summary_prompt if getattr(self, "_degraded_summary_active", False)
+                          else None)
+        prompt = (prompt_builder(content_to_summarize, summary_budget, focus_topic, memory_context)
+                  if prompt_builder else self._build_summary_prompt(
+                      content_to_summarize, summary_budget, focus_topic, memory_context, has_user_turn))
         try:
             content = self._call_summary_llm(prompt, prompt_started_at)
             # Strip <think> blocks: they would be stored, injected, and compounded on every iterative update.
@@ -3361,6 +3365,8 @@ Summary generation was unavailable, so this is a best-effort deterministic fallb
             content = strip_think_blocks(None, content).strip() or content
             # The summarizer may echo secrets verbatim; redact the output too.
             summary = _redact_compaction_text(content.strip())
+            if getattr(self, "_degraded_summary_active", False):
+                summary = self._normalize_degraded_summary(summary)
             # Restore any [SKILL_PRUNED] marker the summarizer paraphrased away.
             # See #32106.
             summary = _reinject_pruned_skill_markers(summary, _pruned_skill_names)
@@ -3552,7 +3558,9 @@ Write only the summary body. Do not include any preamble or prefix."""
             )
         # A distinct summary model gets ONE main-model retry: a specific reason for known transient classes,
         # else a best-effort "failed" retry — losing N turns is worse than one extra summary attempt.
-        if self.summary_model and self.summary_model != self.model and not getattr(self, "_summary_model_fallen_back", False):
+        if (self.summary_model and self.summary_model != self.model
+                and not getattr(self, "_summary_model_fallen_back", False)
+                and not getattr(self, "_degraded_summary_active", False)):
             self._fallback_to_main_for_compression(e, kind.fallback_reason())
             # Retry immediately on the main model.
             return self._generate_summary(turns_to_summarize, focus_topic=focus_topic, memory_context=memory_context)
@@ -4373,6 +4381,7 @@ Write only the summary body. Do not include any preamble or prefix."""
 
     def _begin_compress_attempt(self, current_tokens: Optional[int], force: bool) -> Dict[str, Any]:
         """Reset per-call result state (callers read it after compress()) and open telemetry."""
+        self._last_degraded_retry_reason = None
         self._last_summary_dropped_count = 0
         self._last_summary_fallback_used = False
         self._last_feasibility_skip = False
@@ -4739,7 +4748,12 @@ Write only the summary body. Do not include any preamble or prefix."""
             if not summary and self._abort_on_summary_failure(
                 telemetry, compress_end - compress_start, scan.previous_summary_before,
             ):
-                return messages
+                summary = self._retry_degraded_summary(
+                    turns_to_summarize, focus_topic, memory_context, current_tokens,
+                )
+                if not summary:
+                    return messages
+                telemetry.pop("failure_class", None)
         if not summary:
             summary = self._fallback_summary_for_window(
                 telemetry, turns_to_summarize, compress_end - compress_start, feasibility_skip,

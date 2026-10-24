@@ -1537,6 +1537,7 @@ def _parse_compression_config(agent, _agent_cfg) -> CompressionSettings:
         ),
         protect_first=protect_first,
         abort_on_summary_failure=_cfg_flag(cfg, "abort_on_summary_failure", False),
+        degraded_retry_on_abort=_cfg_flag(cfg, "degraded_retry_on_abort", False),
         # Per-model threshold overrides: keys substring-matched against the model name
         # (longest match wins); {} = global threshold for all models.
         model_thresholds=_compression_model_thresholds(cfg),
@@ -1915,6 +1916,7 @@ def _build_context_engine(agent, _agent_cfg, cs, _custom_providers, _effective_c
     if callable(_bind_session_state):
         with suppress(Exception):
             _bind_session_state(session_db=session_db, session_id=agent.session_id)
+    agent.context_compressor.degraded_retry_on_abort = cs.degraded_retry_on_abort
     agent.request_input_budget_tokens = cs.request_input_budget_tokens
     agent.context_compressor.require_continuity_fields = cs.request_input_budget_tokens > 0
     agent.context_compressor.request_input_budget_tokens = cs.request_input_budget_tokens
