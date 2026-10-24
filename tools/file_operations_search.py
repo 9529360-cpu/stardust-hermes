@@ -369,9 +369,17 @@ class SearchMixin:
         ``merge_stderr`` mirrors the shell path's stderr handling: merged for content
         search (diagnostics feed the error message), discarded (``2>/dev/null``) for
         file lists and probes."""
-        from tools.environments.local import _kill_process_group_posix, _make_run_env
-        cwd = getattr(self.env, "cwd", None) or self.cwd
+        from tools.environments.local import (
+            _IS_WINDOWS, _kill_process_group_posix, _kill_process_windows, _make_run_env)
+        cwd = self._native_lane_path(getattr(self.env, "cwd", None) or self.cwd)
         args = shlex.split(" ".join(argv))
+        # argv[0] comes from ``command -v rg`` (Git Bash spells it ``/c/...``) or
+        # the off-PATH resolver (``C:/...``); Windows needs a native ``C:\\...``
+        # spelling, and one without an extension is not executable there.
+        if _IS_WINDOWS:
+            args[0] = self._native_lane_path(args[0])
+            if os.path.isabs(args[0]) and not os.path.splitext(args[0])[1]:
+                args[0] += ".exe"
         try:
             proc = subprocess.Popen(
                 args, cwd=cwd, env=_make_run_env(self.env.env), stdin=subprocess.DEVNULL,
@@ -407,7 +415,7 @@ class SearchMixin:
                 exit_code = 124
                 break
         if proc.poll() is None:
-            _kill_process_group_posix(proc)  # native lane is POSIX-only (gate above)
+            (_kill_process_windows if _IS_WINDOWS else _kill_process_group_posix)(proc)
         proc.wait()
         drainer.join()
         proc.stdout.close()
@@ -527,7 +535,10 @@ class SearchMixin:
     def _path_exists_probe(self, path: str) -> str:
         """Stdout of the existence probe: contains "exists" or "not_found"."""
         if self._native_read_enabled():
-            full = path if os.path.isabs(path) else os.path.join(getattr(self.env, "cwd", None) or self.cwd, path)
+            full = self._native_lane_path(path)
+            if not os.path.isabs(full):
+                full = os.path.join(self._native_lane_path(
+                    getattr(self.env, "cwd", None) or self.cwd), full)
             return "exists" if os.path.exists(full) else "not_found"
         return self._exec(f"test -e {self._escape_shell_arg(path)} && echo exists || echo not_found").stdout
 
