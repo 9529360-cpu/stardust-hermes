@@ -2893,6 +2893,64 @@ def sanitize_api_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]
     return _realign_tool_result_names(messages)
 
 
+def commitment_stall_zh_enabled(agent) -> bool:
+    """Read the opt-in agent flag once, using the neighbouring config-read pattern."""
+    cached = getattr(agent, "_commitment_stall_zh_cache", None)
+    if cached is None:
+        try:
+            from hermes_cli.config import load_config
+            section = (load_config() or {}).get("agent", {})
+            cached = isinstance(section, dict) and section.get("commitment_stall_zh") is True
+        except Exception:
+            cached = False
+        agent._commitment_stall_zh_cache = cached
+    return cached
+
+
+_COMMITMENT_ZH_RE = re.compile(
+    r"(?:好的[，, ]*|好[，, ]*|没问题[，, ]*)?我"
+    r"(?:来|会|将|马上|这就|现在(?:就)?(?:去|开始)?|先)"
+    r"(?:处理|改|修复|修改|检查|运行|查看|排查|读取|搜索|测试|执行|打开)"
+    r"[^。！？.!?\n：:；;]{0,100}[。.!！…]?"
+)
+_INFORMATION_REQUEST_RE = re.compile(
+    r"解释|说明|计划|方案|怎么|如何|什么|为何|为什么|只讨论|不做事|不要执行|不执行"
+    r"|\b(?:explain|describe|plan|what|how|why|without executing|do not execute)\b",
+    re.IGNORECASE,
+)
+
+
+def pure_commitment_stall(agent, user_message, text, messages) -> bool:
+    """Only a short self-commitment after an action request with zero tools this turn.
+
+    History tools do not count: the last original user row starts this turn; appended
+    retry nudges are not a new request. Result-bearing multi-sentence replies are excluded.
+    """
+    from agent.codex_responses_adapter import _summarize_user_message_for_log
+    request = _summarize_user_message_for_log(user_message).strip()
+    if not request or _INFORMATION_REQUEST_RE.search(request) or request.endswith(("?", "？")):
+        return False
+    start = next((i for i in range(len(messages) - 1, -1, -1)
+                  if messages[i].get("role") == "user"
+                  and messages[i].get("content") == user_message), 0)
+    if any(m.get("role") == "tool" or m.get("tool_calls") for m in messages[start:]):
+        return False
+    text = agent._strip_think_blocks(text or "").strip()
+    if not text or len(text) > 160 or re.search(
+        r"已经|已完成|已修复|结果|成功|失败|\b(?:done|fixed|completed|result|because)\b",
+        text, re.IGNORECASE,
+    ):
+        return False
+    if _COMMITMENT_ZH_RE.fullmatch(text):
+        return True
+    # Require a single commitment sentence; substantive explanations/results stay final.
+    if re.search(r"[.!?。！？]\s*\S|[:：;；\n]", text):
+        return False
+    return bool(_ACK_FUTURE_RE.search(text.lower())) and any(
+        marker in text.lower() for marker in _ACK_ACTION_MARKERS
+    )
+
+
 _ACK_FUTURE_RE = re.compile(r"\b(i['’]ll|i will|let me|i can do that|i can help with that)\b")
 _ACK_ACTION_MARKERS = (
     "look into", "look at", "inspect", "scan", "check", "analyz", "review", "explore", "read", "open",
