@@ -12,16 +12,23 @@ question, production recall limits). Prior art and baseline numbers:
 `D:\wt\logs\RESULT-dl-p2-6.md`.
 
     python -B -m evals.digital_life.memory_retrieval \
-        --home <isolated-home> --output <evidence>/results.json [--qa]
+        --home <isolated-home> --output <evidence>/results.json [--qa] [--provenance]
 
-Zero product behaviour change: eval-only code under `evals/`, no product file
-modified, no new product flag. `--qa` answers through the default configured
+Zero product behaviour change by default: eval-only invocation, no product flag
+set. `--qa` answers through the default configured
 model via the local magpie gateway (at most 100 calls; skipped automatically
 if the gateway is unreachable). The dump-all-memory control in the output is
 cost reporting only, never a proposed solution. QA scoring is strict: an
 outdated question counts as correct only when the new value appears AND the
 superseded value does not (LongMemEval counts "both mentioned" as correct, so
 our QA number is a lower bound by that convention).
+
+`--provenance` (added in DL-P2.7) measures the opt-in product flag
+`memory.topic_provenance_enabled`: it writes that flag into the isolated
+home's config.yaml and stamps the corpus with bi-temporal provenance
+(observed_at on every write; expired valid_until on stale forks), so the
+flag-on recall path (recency-aware superseding, provenance labels) runs
+end-to-end against the same fixed 100 questions.
 
 Case set is regenerated deterministically by
 `evals/digital_life/generate_memory_cases.py` (RNG-free tables, fixed seed
