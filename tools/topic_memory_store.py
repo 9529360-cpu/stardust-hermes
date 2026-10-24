@@ -34,6 +34,18 @@ _MAX_SOURCE_CHARS = 160
 # Provenance fields added by DL-P2.7; stripped from recall rows when the flag is
 # OFF so flag-off output stays byte-identical even over a store written flag-on.
 _PROVENANCE_FIELDS = frozenset({"source", "observed_at", "valid_until", "verified", "superseded_on"})
+# Hybrid-recall weights (DL-P2.8a): summary-body bigram overlap scores lower
+# than the title/key/keyword signals so a body hit ranks a candidate in but
+# never outranks a direct title/key hit on another topic.
+_SUMMARY_SIGNAL_WEIGHT = 1
+_SAME_DOMAIN_STALE_PENALTY = 6
+# Same-domain pairing window (top-N scored rows): forks are score-tied with
+# their current twin, so pairing beyond the recall neighbourhood is both
+# useless and O(n^2)-expensive on large stores.
+_DECAY_WINDOW = 12
+# Hybrid-recall threshold (DL-P2.8): step a keeps the >=6 gate on the lexical
+# score; RRF-fused candidates enter through rank position instead.
+_HYBRID_MIN_SCORE = 6
 # ISO-8601 prefix (date or datetime, optionally with time zone) for provenance stamps.
 _TIMESTAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$")
 
@@ -311,6 +323,26 @@ def _signals(text: str) -> set[str]:
     return signals
 
 
+# Per-process summary-signal cache for the hybrid scoring loop (DL-P2.8a):
+# recomputing bigram sets for every topic on every query dominated recall
+# latency on large stores (2000 topics: ~90ms -> a few ms after caching).
+# Invalidated by the TOPICS.json (mtime_ns, size) signature so a store write
+# cannot serve stale signals.
+_summary_signal_cache: dict[str, set[str]] = {}
+_summary_signal_signature: tuple[int, int] | None = None
+
+
+def _summary_signals_for(topics: list[dict[str, Any]], signature: tuple[int, int]) -> dict[str, set[str]]:
+    global _summary_signal_cache, _summary_signal_signature
+    if _summary_signal_signature != signature:
+        _summary_signal_cache = {
+            str(topic.get("key") or f"#{index}"): _signals(str(topic.get("summary") or ""))
+            for index, topic in enumerate(topics)
+        }
+        _summary_signal_signature = signature
+    return _summary_signal_cache
+
+
 def _score(query: str, query_signals: set[str], topic: dict[str, Any]) -> int:
     q = _norm(query)
     title = _norm(topic.get("title"))
@@ -327,6 +359,27 @@ def _score(query: str, query_signals: set[str], topic: dict[str, Any]) -> int:
     candidate_signals = _signals(" ".join([title, key, *keywords]))
     score += 3 * len(query_signals & candidate_signals)
     return score
+
+
+def _score_with_summary(
+    query: str,
+    query_signals: set[str],
+    topic: dict[str, Any],
+    summary_signals: set[str] | None = None,
+) -> int:
+    """DL-P2.8a: lexical score plus a lower-weighted summary-body signal.
+
+    The summary body carries the actual facts (the query words users type),
+    but its bigrams are shared across topics far more often than titles or
+    keywords, so weight 1 per shared bigram vs 3 for title/key/keyword
+    signals: a body hit pulls a candidate in, a title hit decides the rank.
+    ``summary_signals`` lets the caller pass a precomputed body signal set
+    (see _summary_signal_cache) on large stores.
+    """
+    score = _score(query, query_signals, topic)
+    if summary_signals is None:
+        summary_signals = _signals(str(topic.get("summary") or ""))
+    return score + _SUMMARY_SIGNAL_WEIGHT * len(query_signals & summary_signals)
 
 
 def _expired(topic: dict[str, Any], now: datetime) -> bool:
@@ -360,6 +413,50 @@ def _same_domain_forks(a: dict[str, Any], b: dict[str, Any]) -> bool:
     return len(kwa & kwb) >= 2
 
 
+def _decay_same_domain_forks(
+    scored: list[tuple[int, dict[str, Any]]],
+    superseded: dict[str, str],
+    *,
+    window: int = _DECAY_WINDOW,
+) -> None:
+    """DL-P2.8a: demote older same-domain forks below every non-fork row.
+
+    Works with or without the provenance flag: with it, ``superseded`` names
+    the stale forks directly; without it (equal timestamps, e.g. bulk-written
+    stores), every same-domain pair gets the older-by-updated_at member
+    demoted so the newer write wins the top slots. Pure score adjustment, no
+    reordering side channels.
+
+    Pairing runs over the top ``window`` rows only: same-domain forks are
+    near-tied on score, so a fork outside the recall window can never
+    displace a candidate inside it, and the O(n^2) pairing stays tiny on
+    large stores (2000 topics: ~80ms -> low ms).
+    """
+    if len(scored) < 2:
+        return
+    head = scored[:window]
+    by_key = {str(item[1].get("key") or ""): item for item in head}
+    demoted: set[str] = set(superseded)
+    for key_a, (_score_a, topic_a) in list(by_key.items()):
+        for key_b, (_score_b, topic_b) in by_key.items():
+            if key_a == key_b or not _same_domain_forks(topic_a, topic_b):
+                continue
+            if _observed_sort_key(topic_b) == _observed_sort_key(topic_a):
+                # No recency information at all: leave the lexical order.
+                continue
+            if _observed_sort_key(topic_b) > _observed_sort_key(topic_a):
+                demoted.add(key_a)
+    if not demoted:
+        return
+    adjusted: list[tuple[int, dict[str, Any]]] = []
+    for score, topic in scored:
+        key = str(topic.get("key") or "")
+        if key in demoted:
+            score = max(0, score - _SAME_DOMAIN_STALE_PENALTY)
+        adjusted.append((score, topic))
+    scored[:] = adjusted
+
+
 def _rank_superseded_forks(scored: list[tuple[int, dict[str, Any]]]) -> dict[str, str]:
     """Within each same-domain fork pair, mark the older topic superseded by the newer.
 
@@ -390,24 +487,120 @@ def _display_date(topic: dict[str, Any]) -> str:
     return raw[:10] if raw else "unknown date"
 
 
+def hybrid_recall_enabled() -> bool:
+    """Return the ``memory.hybrid_recall`` opt-in flag (default OFF).
+
+    Read lazily through the same config path as ``topic_provenance_enabled``
+    (DL-P2.7); the caller decides the granularity. OFF keeps recall
+    byte-identical to the pre-flag behaviour.
+    """
+    try:
+        from tools.memory_tool import get_builtin_memory_config
+
+        section = get_builtin_memory_config()
+    except Exception:
+        logger.debug("Could not read memory config for hybrid recall", exc_info=True)
+        return False
+    from utils import is_truthy_value
+
+    return is_truthy_value(section.get("hybrid_recall"), default=False)
+
+
+def _hybrid_ranked_keys(
+    topics: list[dict[str, Any]],
+    query: str,
+    lexical_order: list[str],
+) -> list[str]:
+    """RRF-fuse the lexical order with the FTS5 BM25 order (DL-P2.8b).
+
+    Only BM25 rows that also passed the lexical gate compete for rank
+    (RRF, k=60): a weak OR-match can never displace a lexical hit. When the
+    lexical list is completely empty, a score-gated BM25-only fill rescues
+    the zero-hit questions (27/100 in the DL-P2.6 baseline). Falls back to
+    the lexical order when FTS5 is unavailable.
+    """
+    try:
+        from tools.memory_hybrid import global_index, store_signature
+    except Exception:
+        logger.debug("memory_hybrid unavailable; lexical-only recall", exc_info=True)
+        return lexical_order
+    try:
+        stat = topic_memory_path().stat()
+        signature = store_signature(topics, mtime_ns=stat.st_mtime_ns, size=stat.st_size)
+    except OSError:
+        return lexical_order
+    index = global_index()
+    if not index.ensure(topics, signature):
+        return lexical_order
+    fts_rank = index.search(query)
+    if not fts_rank:
+        return lexical_order
+    from tools.memory_hybrid import FTS_ADMIT, rrf_fuse
+
+    lexical_keys = set(lexical_order)
+    fts_trimmed = [(key, score) for key, score in fts_rank if key in lexical_keys]
+    # Rank competition only among rows that also passed the lexical gate.
+    fused = rrf_fuse([(key, 0.0) for key in lexical_order], fts_trimmed)
+    ordered_keys = [key for key, _score in fused]
+    if not lexical_order:
+        # Total lexical starvation (the 27-zero-hit failure mode of DL-P2.6):
+        # the recall would be empty, so a score-gated BM25-only fill is a
+        # strict improvement; with any lexical hit present, BM25-only rows
+        # stay out — an OR-match over filler words must not fill slot 2.
+        from tools.memory_hybrid import EXTRA_ADMIT_FRACTION, EXTRA_FILL_SLOTS
+
+        best = fts_rank[0][1]
+        # bm25() is negative: a row qualifies when it retains at least
+        # EXTRA_ADMIT_FRACTION of the leader's magnitude. best >= 0 means no
+        # real signal anywhere; -0.0 magnitude would make every row qualify.
+        threshold = best * EXTRA_ADMIT_FRACTION
+        extras = [
+            key
+            for key, score in fts_rank
+            if key not in lexical_keys and score <= threshold
+        ][:EXTRA_FILL_SLOTS]
+        ordered_keys += [key for key in extras if key not in ordered_keys]
+    return ordered_keys
+
+
 def recall_topic_summaries(
     query: str,
     *,
     limit: int = _DEFAULT_RECALL_LIMIT,
     char_budget: int = _DEFAULT_RECALL_CHAR_BUDGET,
     provenance: bool = False,
+    hybrid: bool | None = None,
 ) -> list[dict[str, Any]]:
     clean_query = str(query or "").strip()
     if not clean_query or limit <= 0 or char_budget <= 0:
         return []
+    if hybrid is None:
+        hybrid = hybrid_recall_enabled()
     query_signals = _signals(clean_query)
     now = datetime.now(timezone.utc)
+    topics = load_topics()
+    try:
+        _stat = topic_memory_path().stat()
+        store_sig = (_stat.st_mtime_ns, _stat.st_size)
+    except OSError:
+        store_sig = (0, 0)
+    # Hybrid rank admission (DL-P2.8b): every non-expired topic is a fusion
+    # candidate; the lexical gate still ranks the lexical list.
+    eligible = [topic for topic in topics if not (provenance and _expired(topic, now))]
+    summary_signals = _summary_signals_for(topics, store_sig) if hybrid else None
     scored = []
-    for topic in load_topics():
-        if provenance and _expired(topic, now):
-            continue
-        score = _score(clean_query, query_signals, topic)
-        if score >= 6 and str(topic.get("summary") or "").strip():
+    for topic in eligible:
+        if hybrid:
+            key = str(topic.get("key") or "")
+            score = _score_with_summary(
+                clean_query,
+                query_signals,
+                topic,
+                summary_signals=summary_signals.get(key) if summary_signals else None,
+            )
+        else:
+            score = _score(clean_query, query_signals, topic)
+        if score >= _HYBRID_MIN_SCORE and str(topic.get("summary") or "").strip():
             scored.append((score, topic))
     scored.sort(key=lambda item: (-item[0], str(item[1].get("key") or "")))
     superseded: dict[str, str] = {}
@@ -417,6 +610,45 @@ def recall_topic_summaries(
             fresh_rows = [item for item in scored if str(item[1].get("key") or "") not in superseded]
             stale_rows = [item for item in scored if str(item[1].get("key") or "") in superseded]
             scored = fresh_rows + stale_rows
+    elif hybrid and scored:
+        # Precision guard FIRST, on raw match strength: a slot-2 lexical hit
+        # far below the leader is a filler-word match (q001 颜色 → fav-food
+        # at 25% of the leader), not a second relevant topic; keep slot 2
+        # only when it is at least 40% as strong — dual-target questions
+        # (住址+出生地) land at ~40%, shared 最喜欢的/什么 collisions at ~25%.
+        if len(scored) > 1:
+            leader = scored[0][0]
+            scored = [scored[0]] + [
+                item for item in scored[1:] if item[0] * 5 >= leader * 2
+            ]
+        _decay_same_domain_forks(scored, superseded)
+        scored.sort(key=lambda item: (-item[0], str(item[1].get("key") or "")))
+
+    if hybrid:
+        # RRF-fuse the lexical order with the BM25 order (DL-P2.8b). The
+        # lexical list comes from the gated `scored` entries; the top
+        # FTS_ADMIT BM25 rows that missed the lexical gate join by rank
+        # position alone (rank admission: BM25 scores are not comparable to
+        # lexical scores). Under provenance the stale rows are re-partitioned
+        # to the back so BM25 cannot pull a superseded fork above current.
+        lexical_order = [str(topic.get("key") or "") for _score, topic in scored]
+        fused_keys = _hybrid_ranked_keys(eligible, clean_query, lexical_order)
+        by_key = {str(topic.get("key") or ""): (_score, topic) for _score, topic in scored}
+        eligible_by_key = {str(topic.get("key") or ""): topic for topic in eligible}
+        ordered: list[tuple[int, dict[str, Any]]] = []
+        for key in fused_keys:
+            item = by_key.pop(key, None)
+            if item is not None:
+                ordered.append(item)
+            elif key in eligible_by_key:
+                ordered.append((0, eligible_by_key[key]))
+        ordered.extend(by_key.values())
+        if superseded:
+            ordered = (
+                [item for item in ordered if str(item[1].get("key") or "") not in superseded]
+                + [item for item in ordered if str(item[1].get("key") or "") in superseded]
+            )
+        scored = ordered
 
     selected: list[dict[str, Any]] = []
     used = 0
