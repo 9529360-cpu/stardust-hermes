@@ -1196,6 +1196,11 @@ DEFAULT_CONFIG = {
         "silence_threshold": 200,  # RMS below this = silence (0-32767)
         "silence_duration": 3.0,  # seconds of silence before auto-stop
         "barge_in": True,  # interrupt the agent / stop TTS when the user starts talking
+        # Opt-in (F6.3): barge-in interrupts ONLY the session that owns the voice turn
+        # (the sid that armed voice.record/voice.toggle) via the canonical session.interrupt
+        # path; unrelated running sessions keep going. False (default) keeps the historical
+        # process-wide interrupt-every-running-session behaviour.
+        "barge_in_owner_only": False,
         # Trip suppression after TTS onset (mic stays live the whole turn).
         "barge_in_grace_seconds": 0.5,
         # Speech trigger = quiet-room floor x this (floor calibrated BEFORE playback).
