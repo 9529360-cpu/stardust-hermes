@@ -445,8 +445,33 @@ class HermesTokenStorage:
         if data is None or self._secret_codec is None:
             return data
         if data.get(SECURE_STORE_MARKER) == "connector":
-            return self._secret_codec.resolve_tokens(data) if label == "tokens" \
+            resolved = self._secret_codec.resolve_tokens(data) if label == "tokens" \
                 else self._secret_codec.resolve_client_info(data)
+            if resolved is not None:
+                return resolved
+            # Retain the pre-migration bytes for account/machine recovery.
+            for backup in sorted((path.parent.parent / "connector-secrets").glob(
+                    "backup-*/mcp-tokens/" + path.name), reverse=True):
+                legacy = _read_json(backup)
+                if legacy is not None and not legacy.get(SECURE_STORE_MARKER):
+                    logger.warning("MCP OAuth '%s' secure state unavailable; using retained legacy copy",
+                                   self._server_name)
+                    return legacy
+            return None
+        # Back up before the codec writes any encrypted entries or rewrites the file.
+        # CX4 is independently opt-in; its flag-off path above is unchanged.
+        try:
+            from agent.connector_secrets_migration import _secure_backup_dir, copy_plaintext_backup
+            backup_dir = path.parent.parent / "connector-secrets" / "backup-oauth" / "mcp-tokens"
+            backup_dir.mkdir(parents=True, exist_ok=True)
+            _secure_backup_dir(backup_dir)
+            backup = backup_dir / path.name
+            if not backup.exists():
+                copy_plaintext_backup(path, backup)
+        except Exception as exc:
+            logger.warning("MCP OAuth migration backup failed (%s); keeping legacy state",
+                           type(exc).__name__)
+            return data
         skeleton = self._secret_codec.migrate_tokens(data, path) if label == "tokens" \
             else self._secret_codec.migrate_client_info(data)
         if skeleton is not data:
