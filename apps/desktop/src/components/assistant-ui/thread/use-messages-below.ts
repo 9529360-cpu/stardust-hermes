@@ -2,8 +2,9 @@ import { type ReactNode, type RefObject, useEffect } from 'react'
 
 import { publishThreadMessagesBelow } from '@/store/thread-scroll'
 
-const MESSAGE_ROOTS =
-  '[data-slot="aui_user-message-root"], [data-slot="aui_assistant-message-root"], [data-slot="aui_system-message-root"]'
+import { countMessagesBelow, observeVisibleGroups } from './thread-scroll-geometry'
+
+export { countMessagesBelow } from './thread-scroll-geometry'
 
 interface MessagesBelowOptions {
   contentRef: RefObject<HTMLElement | null>
@@ -12,38 +13,6 @@ interface MessagesBelowOptions {
   paneVisible: boolean
   rows: ReactNode
   sessionKey: string | null | undefined
-}
-
-/** Only measure inside the viewport's turn; leave skipped off-screen content asleep. */
-export function countMessagesBelow(viewport: HTMLElement, content: HTMLElement): number {
-  const bottom = viewport.getBoundingClientRect().bottom
-  let count = 0
-
-  for (const group of content.querySelectorAll<HTMLElement>('[data-slot="aui_message-group"]')) {
-    const rect = group.getBoundingClientRect()
-
-    if (rect.bottom <= bottom + 1) {
-      continue
-    }
-
-    const messages = group.querySelectorAll<HTMLElement>(MESSAGE_ROOTS)
-
-    if (rect.top >= bottom) {
-      count += messages.length
-
-      continue
-    }
-
-    for (const message of messages) {
-      const messageRect = message.getBoundingClientRect()
-
-      if (messageRect.height > 0 && messageRect.bottom > bottom + 1) {
-        count++
-      }
-    }
-  }
-
-  return count
 }
 
 export function useMessagesBelow({
@@ -76,7 +45,7 @@ export function useMessagesBelow({
 
     const measure = () => {
       frame = 0
-      publishThreadMessagesBelow(countMessagesBelow(viewport, content), { paneVisible })
+      publishThreadMessagesBelow(countMessagesBelow(viewport, content, visibility.visible), { paneVisible })
     }
 
     const schedule = () => {
@@ -85,6 +54,7 @@ export function useMessagesBelow({
       }
     }
 
+    const visibility = observeVisibleGroups(viewport, content, schedule)
     schedule()
     viewport.addEventListener('scroll', schedule, { passive: true })
     const observer = new ResizeObserver(schedule)
@@ -95,6 +65,7 @@ export function useMessagesBelow({
       cancelAnimationFrame(frame)
       viewport.removeEventListener('scroll', schedule)
       observer.disconnect()
+      visibility.dispose()
     }
   }, [contentRef, scrollRef, isAtBottom, paneVisible, rows, sessionKey])
 }
