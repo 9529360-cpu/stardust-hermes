@@ -352,7 +352,7 @@ def _parse_config_int(raw: Any, default: int) -> int:
 
 def _cfg_flag(cfg: Dict[str, Any], key: str, default: bool) -> bool:
     """Legacy string-set truthiness used by the ``compression`` section."""
-    return str(cfg.get(key, default)).lower() in {"true", "1", "yes"}
+    return str(_config_scalar(cfg, "compression", key, default)).lower() in {"true", "1", "yes"}
 
 
 def _cfg_dict(cfg: Dict[str, Any], key: str) -> Dict[str, Any]:
@@ -1348,7 +1348,7 @@ def _apply_agent_section(agent, _agent_cfg):
     # Wall-clock run budget from config — only when the constructor arg was not given.
     if agent.run_budget_seconds is None:
         agent.run_budget_seconds = _normalize_run_budget_seconds(
-            _agent_section.get("run_budget_seconds")
+            _config_scalar(_agent_section, "agent", "run_budget_seconds", None)
         )
 
     # Empty-response guard: a malformed section falls back to schema defaults (on, $0.25).
@@ -1381,7 +1381,7 @@ def _apply_agent_section(agent, _agent_cfg):
 
     # App-level API retry count (wraps each model API call). Default 3; 1 = single attempt.
     try:
-        _api_retries = max(int(_agent_section.get("api_max_retries", 3)), 1)
+        _api_retries = max(int(_config_scalar(_agent_section, "agent", "api_max_retries", 3)), 1)
     except (TypeError, ValueError):
         _api_retries = 3
     agent._api_max_retries = _api_retries
@@ -1398,11 +1398,43 @@ def _positive_int(raw: Any, *, reject: tuple = ()) -> Optional[int]:
     return parsed if parsed > 0 else None
 
 
+def _config_scalar(cfg: Dict[str, Any], section: str, key: str, default: Any) -> Any:
+    """Check a consumed scalar before legacy coercion; warn and use its schema default."""
+    from hermes_cli.config import _agent_config_value_error
+
+    raw = cfg.get(key, default)
+    path = f'{section}.{key}'
+    expected = _agent_config_value_error(path, raw)
+    if expected:
+        logger.warning('Invalid %s=%r; expected %s; using documented default %r',
+                       path, raw, expected, default)
+        return default
+    return raw
+
+
+def _compression_model_thresholds(cfg: Dict[str, Any]) -> Dict[str, float]:
+    from hermes_cli.config import _agent_config_value_error
+
+    raw = cfg.get('model_thresholds', {})
+    if not isinstance(raw, dict):
+        logger.warning('Invalid compression.model_thresholds: expected mapping; using default {}')
+        return {}
+    result = {}
+    for key, value in raw.items():
+        path = f'compression.model_thresholds.{key}'
+        expected = _agent_config_value_error(path, value)
+        if expected:
+            logger.warning('Invalid %s=%r; expected %s; using global threshold', path, value, expected)
+        else:
+            result[str(key)] = float(value)
+    return result
+
+
 def _compression_threshold(agent, cfg: Dict[str, Any]) -> tuple[float, bool]:
     """Global threshold merged with the per-model override; stashes the autoraise notice.
     Codex gpt-5.4/5.5 raise to 85% (272K cap → 50% would compact at ~136K); the opt-out flag
     restores the global value, and the notice has its own display gate."""
-    threshold = float(cfg.get("threshold", 0.50))
+    threshold = float(_config_scalar(cfg, "compression", "threshold", 0.50))
     autoraise = _cfg_flag(cfg, "codex_gpt55_autoraise", True)
     notice_enabled = _cfg_flag(cfg, "codex_gpt55_autoraise_notice", True)
     agent._compression_threshold_autoraised = None
@@ -1441,8 +1473,8 @@ def _compression_codex_settings(cfg: Dict[str, Any]) -> tuple[str, bool, Optiona
         app_server_auto = "native"
     # Native Responses server-side compaction (opt-in; gate in agent/native_compaction.py).
     # Truthy coercion so "false"/"off" strings stay disabled.
-    responses_native = is_truthy_value(cfg.get("codex_responses_native", False))
-    _raw = cfg.get("codex_responses_compact_threshold")
+    responses_native = is_truthy_value(_config_scalar(cfg, "compression", "codex_responses_native", False))
+    _raw = _config_scalar(cfg, "compression", "codex_responses_compact_threshold", None)
     compact_threshold = None
     if _raw is not None:
         compact_threshold = _positive_int(_raw, reject=(bool, float))
@@ -1459,30 +1491,30 @@ def _parse_compression_config(agent, _agent_cfg) -> CompressionSettings:
     """Parse the ``compression`` section. Defaults here MUST match DEFAULT_CONFIG."""
     cfg = _cfg_dict(_agent_cfg, "compression")
     threshold, autoraise_notice_enabled = _compression_threshold(agent, cfg)
-    # Plain int()/float() coercions raise on garbage; evaluated up front, in config order.
-    target_ratio = float(cfg.get("target_ratio", 0.20))
-    protect_last = int(cfg.get("protect_last_n", 20))
+    # Validate before coercion; preserve the legacy parsing and clamp behavior.
+    target_ratio = float(_config_scalar(cfg, "compression", "target_ratio", 0.20))
+    protect_last = int(_config_scalar(cfg, "compression", "protect_last_n", 20))
     # max_attempts: retry rounds before "max compression attempts reached"; some sessions
     # need >3 (incompressible tool schemas). Default 3, floor 1, cap 10.
-    max_attempts = _parse_config_int(cfg.get("max_attempts", 3), 3)
+    max_attempts = _parse_config_int(_config_scalar(cfg, "compression", "max_attempts", 3), 3)
     if max_attempts < 1:
         max_attempts = 3
     # threshold_tokens: absolute cap (lower of ratio threshold and this); clamped to the
     # window at apply-time.
-    threshold_tokens = cfg.get("threshold_tokens")
+    threshold_tokens = _config_scalar(cfg, "compression", "threshold_tokens", None)
     if threshold_tokens is not None:
         threshold_tokens = _positive_int(threshold_tokens)
     # Non-system head messages to protect (system prompt is always protected); 0 is a
     # legitimate "system prompt + summary + tail".
-    protect_first = max(0, int(cfg.get("protect_first_n", 3)))
-    checkpoint_required = is_truthy_value(cfg.get("checkpoint_required"), default=False)
+    protect_first = max(0, int(_config_scalar(cfg, "compression", "protect_first_n", 3)))
+    checkpoint_required = is_truthy_value(_config_scalar(cfg, "compression", "checkpoint_required", False), default=False)
     _refuse_checkpoint_required_on_codex_app_server(
         checkpoint_required, getattr(agent, "api_mode", None)
     )
     app_server_auto, responses_native, compact_threshold = _compression_codex_settings(cfg)
     # Opt-in idle compaction: compact up front when a session resumes after this many
     # seconds idle (0 = disabled). Consumed by build_turn_context().
-    idle_compact_after_seconds = max(0, int(cfg.get("idle_compact_after_seconds", 0)))
+    idle_compact_after_seconds = max(0, int(_config_scalar(cfg, "compression", "idle_compact_after_seconds", 0)))
     return CompressionSettings(
         threshold=threshold,
         autoraise_notice_enabled=autoraise_notice_enabled,
@@ -1493,39 +1525,36 @@ def _parse_compression_config(agent, _agent_cfg) -> CompressionSettings:
         # "legacy" restores the 0.20*threshold tail. Unknown → lean inside the compressor.
         tail_mode=str(cfg.get("tail_mode", "lean")).strip().lower(),
         # Actionable user messages guaranteed to survive in the tail (default 1, floor 1).
-        min_tail_users=max(1, _parse_config_int(cfg.get("min_tail_user_messages", 1), 1)),
+        min_tail_users=max(1, _parse_config_int(_config_scalar(cfg, "compression", "min_tail_user_messages", 1), 1)),
         max_attempts=min(max_attempts, 10),
         # Opt-in proactive tool-result prune trigger (0 = disabled; negatives = disabled).
-        proactive_prune_tokens=max(0, _parse_config_int(cfg.get("proactive_prune_tokens", 0), 0)),
+        proactive_prune_tokens=max(0, _parse_config_int(_config_scalar(cfg, "compression", "proactive_prune_tokens", 0), 0)),
         proactive_prune_min_chars=_parse_config_int(
-            cfg.get("proactive_prune_min_result_chars", 8000), 8000
+            _config_scalar(cfg, "compression", "proactive_prune_min_result_chars", 8000), 8000
         ),
         proactive_prune_min_reclaim=max(
-            0, _parse_config_int(cfg.get("proactive_prune_min_reclaim_tokens", 4096), 4096)
+            0, _parse_config_int(_config_scalar(cfg, "compression", "proactive_prune_min_reclaim_tokens", 4096), 4096)
         ),
         protect_first=protect_first,
         abort_on_summary_failure=_cfg_flag(cfg, "abort_on_summary_failure", False),
         # Per-model threshold overrides: keys substring-matched against the model name
         # (longest match wins); {} = global threshold for all models.
-        model_thresholds={
-            str(k): float(v) for k, v in _cfg_dict(cfg, "model_thresholds").items()
-            if isinstance(v, (int, float)) and not isinstance(v, bool)
-        },
+        model_thresholds=_compression_model_thresholds(cfg),
         threshold_tokens=threshold_tokens,
-        request_input_budget_tokens=_positive_int(cfg.get("request_input_budget_tokens"), reject=(bool, float)) or 0,
+        request_input_budget_tokens=_positive_int(_config_scalar(cfg, "compression", "request_input_budget_tokens", 0), reject=(bool, float)) or 0,
         checkpoint_required=checkpoint_required,
         # In-place compaction: no session-id rotation. default=True MUST match DEFAULT_CONFIG
         # (a False default flipped agents into rotation mode when the key was omitted).
-        in_place=is_truthy_value(cfg.get("in_place"), default=True),
+        in_place=is_truthy_value(_config_scalar(cfg, "compression", "in_place", True), default=True),
         # Opt-in: micro-compaction rewrites sent history per turn (breaks the cache prefix).
-        micro_compact=is_truthy_value(cfg.get("micro_compact"), default=False),
+        micro_compact=is_truthy_value(_config_scalar(cfg, "compression", "micro_compact", False), default=False),
         # Pass cadence in completed turns; each pass costs one prompt-cache break (>= 1).
         micro_compact_every_n_turns=max(
-            1, _parse_config_int(cfg.get("micro_compact_every_n_turns", 1), 1)
+            1, _parse_config_int(_config_scalar(cfg, "compression", "micro_compact_every_n_turns", 1), 1)
         ),
         # Rolling-summary defrag threshold, in tokens.
         micro_compact_defrag_tokens=max(
-            1, _parse_config_int(cfg.get("micro_compact_defrag_threshold_tokens", 2000), 2000)
+            1, _parse_config_int(_config_scalar(cfg, "compression", "micro_compact_defrag_threshold_tokens", 2000), 2000)
         ),
         codex_app_server_auto=app_server_auto,
         codex_responses_native=responses_native,
@@ -2275,6 +2304,14 @@ def init_agent(
         setattr(agent, _name, _params[_name])
     for _name in _GATEWAY_IDENTITY_PARAMS:
         setattr(agent, f"_{_name}", _params[_name])
+    # max_iterations is supplied by CLI/gateway from agent.max_turns. Validate the
+    # numeric boundary here too so bypassing config check cannot break the turn loop.
+    raw_max_iterations = _config_scalar(
+        {"max_turns": max_iterations}, "agent", "max_turns", sys.maxsize
+    )
+    from hermes_cli.config import resolve_turn_limit
+    max_iterations = resolve_turn_limit(raw_max_iterations)
+    agent.max_iterations = max_iterations
     # Shared iteration budget: parent creates, children inherit.
     agent.iteration_budget = iteration_budget or IterationBudget(max_iterations)
     # CLI replaces this with _cprint so raw ANSI status lines go through prompt_toolkit's

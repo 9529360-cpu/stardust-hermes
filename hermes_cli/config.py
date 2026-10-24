@@ -5,6 +5,7 @@ import copy
 import difflib
 import json
 import logging
+import math
 import os
 import platform
 import re
@@ -1206,6 +1207,129 @@ def _validate_web_backends(config: Dict[str, Any], issues: List[ConfigIssue]) ->
                    "Run 'stardust tools' and pick a different Web Search & Extract provider")
 
 
+# Numeric and boolean fields consumed by Agent compression and turn-limit parsing.
+
+# Bounds follow existing consumer semantics: clamped integer settings retain their
+# historical clamps (including negative proactive_prune_tokens = disabled).
+_AGENT_NUMERIC_RULES = {
+    'compression.threshold': ('ratio', 0, 1, False),
+    'compression.target_ratio': ('ratio', 0, 1, False),
+    **{f'compression.{key}': ('integer', None, None, False) for key in (
+        'max_attempts', 'protect_first_n', 'idle_compact_after_seconds',
+        'min_tail_user_messages', 'proactive_prune_tokens',
+        'proactive_prune_min_result_chars', 'proactive_prune_min_reclaim_tokens',
+        'micro_compact_every_n_turns', 'micro_compact_defrag_threshold_tokens',
+    )},
+    'compression.protect_last_n': ('integer', 0, None, False),
+    'compression.threshold_tokens': ('integer', 1, None, True),
+    'compression.request_input_budget_tokens': ('integer', 0, None, False),
+    'compression.codex_responses_compact_threshold': ('integer', 1, None, True),
+    'agent.api_max_retries': ('integer', None, None, False),
+    'agent.max_turns': ('integer', 1, None, True),
+    'agent.run_budget_seconds': ('number', 0, None, True),
+}
+_COMPRESSION_BOOL_KEYS = (
+    'enabled', 'codex_gpt55_autoraise', 'codex_gpt55_autoraise_notice',
+    'abort_on_summary_failure', 'checkpoint_required', 'in_place',
+    'micro_compact', 'codex_responses_native',
+)
+
+
+def _agent_config_value_error(path: str, value: Any) -> Optional[str]:
+    """Expected type/range for an invalid scalar, else None; never mutate config.
+
+    Numeric strings stay compatible with int()/float() consumers. Integer floats
+    remain accepted where legacy consumers accepted them, but never bool/fractional.
+    """
+    if path == 'agent.max_turns':
+        expected = 'finite turn count or unlimited (null/none/unlimited/inf/0/-1)'
+        if value is None:
+            return None
+        if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+            return expected
+        if isinstance(value, str) and (not value.strip() or value.strip().lower() in _UNLIMITED_SPELLINGS):
+            return None
+        try:
+            # Match resolve_turn_limit's compatible numeric-string/fraction coercion.
+            int(float(value)) if isinstance(value, str) else int(value)
+        except (TypeError, ValueError, OverflowError):
+            return expected
+        return None
+    if path.startswith('compression.model_thresholds.'):
+        rule = ('ratio', 0, 1, False)
+        # Overrides historically accepted only actual numeric YAML scalars.
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            return 'finite numeric fraction > 0 and <= 1'
+    elif path in {f'compression.{key}' for key in _COMPRESSION_BOOL_KEYS}:
+        if isinstance(value, bool) or value in (0, 1):
+            return None
+        if isinstance(value, str) and value.strip().lower() in {
+            'true', 'false', 'yes', 'no', 'on', 'off', '1', '0',
+        }:
+            return None
+        return 'boolean (true/false, yes/no, on/off, 1/0)'
+    else:
+        rule = _AGENT_NUMERIC_RULES.get(path)
+        if rule is None:
+            return None
+    kind, minimum, maximum, nullable = rule
+    expected = {'ratio': 'finite numeric fraction > 0 and <= 1',
+                'integer': 'integer', 'number': 'finite positive number'}[kind]
+    if kind == 'integer' and minimum is not None:
+        expected += f' >= {minimum}'
+    if nullable:
+        expected += ' or null'
+        if value is None:
+            return None
+    if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+        return expected
+    try:
+        if kind == 'integer':
+            if isinstance(value, float) and not value.is_integer():
+                return expected
+            parsed = int(value)
+        else:
+            parsed = float(value)
+        if not math.isfinite(parsed):
+            return expected
+    except (TypeError, ValueError, OverflowError):
+        return expected
+    if minimum is not None and (parsed <= minimum if kind != 'integer' else parsed < minimum):
+        return expected
+    if maximum is not None and parsed > maximum:
+        return expected
+    return None
+
+
+def _validate_agent_numeric_config(config: Dict[str, Any], issues: List['ConfigIssue']) -> None:
+    for section in ('agent', 'compression'):
+        if section in config and not isinstance(config[section], dict):
+            _issue(issues, 'error', f'{section}: expected a mapping; got {type(config[section]).__name__}',
+                   f'Use a YAML mapping for {section}')
+    paths = list(_AGENT_NUMERIC_RULES) + [f'compression.{key}' for key in _COMPRESSION_BOOL_KEYS]
+    for path in paths:
+        section, key = path.split('.')
+        mapping = config.get(section)
+        if isinstance(mapping, dict) and key in mapping:
+            expected = _agent_config_value_error(path, mapping[key])
+            if expected:
+                _issue(issues, 'error', f'{path}={mapping[key]!r}: expected {expected}',
+                       'Remove the invalid value to use the documented default')
+    compression = config.get('compression')
+    if isinstance(compression, dict) and 'model_thresholds' in compression:
+        overrides = compression['model_thresholds']
+        if not isinstance(overrides, dict):
+            _issue(issues, 'error', 'compression.model_thresholds: expected a mapping',
+                   'Use model-name: fraction entries')
+        else:
+            for key, value in overrides.items():
+                path = f'compression.model_thresholds.{key}'
+                expected = _agent_config_value_error(path, value)
+                if expected:
+                    _issue(issues, 'error', f'{path}={value!r}: expected {expected}',
+                           'Remove the invalid override to use the global threshold')
+
+
 def validate_config_structure(config: Optional[Dict[str, Any]] = None) -> List["ConfigIssue"]:
     """Validate config.yaml structure and return detected issues (accepts a pre-loaded dict).
     Catches common YAML mistakes that otherwise surface as confusing runtime errors."""
@@ -1217,6 +1341,7 @@ def validate_config_structure(config: Optional[Dict[str, Any]] = None) -> List["
             return [config_load_issue(exc)]
 
     issues: List[ConfigIssue] = []
+    _validate_agent_numeric_config(config, issues)
     _validate_voice(config, issues)
     cp = config.get("custom_providers")
     fb = config.get("fallback_model")
