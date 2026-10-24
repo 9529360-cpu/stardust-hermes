@@ -136,9 +136,15 @@ def finish_text_response(
     # delivery channel (gateway status message / CLI print). NEVER appended to messages/api_messages:
     # conversation context and the cached prompt prefix stay byte-identical.
     from agent.agent_runtime_helpers import (
+        commitment_stall_zh_enabled, pure_commitment_stall,
         intent_ack_continuation_mode, trailing_continue_intent
     )
 
+    _commitment_enabled = commitment_stall_zh_enabled(agent)
+    _commitment_stall = (
+        _commitment_enabled and agent.valid_tool_names
+        and pure_commitment_stall(agent, user_message, final_response, messages)
+    )
     _ack_mode = intent_ack_continuation_mode(agent)
     # Said-continue-but-stopped guard: no tool calls but the short reply TAILS with an
     # announced next action. Reuses the SAME bounded continuation counter (max 2 per turn).
@@ -148,7 +154,7 @@ def finish_text_response(
         and codex_ack_continuations < 2
         and trailing_continue_intent(agent._strip_think_blocks(final_response or ""))
     )
-    if _stall_continue_intent or (
+    _legacy_ack_stall = _stall_continue_intent or (
         _ack_mode != "off"
         and agent.valid_tool_names
         and codex_ack_continuations < 2
@@ -156,6 +162,26 @@ def finish_text_response(
             user_message=user_message, assistant_content=final_response, messages=messages,
             require_workspace=(_ack_mode == "codex_only"),
         )
+    )
+    if _commitment_stall and codex_ack_continuations >= 2:
+        final_response = (
+            "Blocked / 未完成：连续承诺但未调用工具，已达到两次重试上限。"
+            " / No tool was called after two retries; the requested action remains undone."
+        )
+        failed = True
+        _turn_exit_reason = "commitment_stall_blocked"
+        _pending_verification_response = None
+        _pending_verification_response_previewed = False
+        final_msg = agent._build_assistant_message(assistant_message, "stop")
+        final_msg["content"] = final_response
+        append_message(messages, final_msg)
+        try:
+            agent._flush_messages_to_session_db(messages, conversation_history)
+        except Exception:
+            logger.warning("commitment-stall receipt flush failed; finalize will retry", exc_info=True)
+        return _verdict("break")
+    if (_commitment_stall and codex_ack_continuations < 2) or (
+        not _commitment_enabled and _legacy_ack_stall
     ):
         if _stall_continue_intent:
             logger.info(
