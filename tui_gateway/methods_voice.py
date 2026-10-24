@@ -700,6 +700,25 @@ def _vr_on_status(state):
         _resume_voice_wake()
 
 
+def _vr_trace_status(trace, state):
+    if trace is not None:
+        if state == "listening":
+            trace.mark("listen_start")
+        elif state == "transcribing":
+            trace.mark("eos")
+            # Capture callback precedes WAV finalization; the provider request
+            # itself is not observable at this seam, so leave stt_request null.
+        elif state == "idle":
+            trace.finish("not_observed")
+    _vr_on_status(state)
+
+
+def _vr_trace_transcript(trace, text):
+    if trace is not None:
+        trace.mark("stt_result")
+    _vr_transcript({"text": text})
+
+
 @method("voice.record")
 def _(rid, params: dict) -> dict:
     """VAD-bounded push-to-talk. ``start`` emits ``voice.transcript`` when silence stops the
@@ -749,8 +768,24 @@ def _(rid, params: dict) -> dict:
         if wake_paused:
             with _voice_sid_lock:
                 _voice_wake_owner = transport
+        from tools.voice_trace import VoiceTrace
+        trace_owner = [None]
+
+        def trace_status(state):
+            if state == "listening":
+                if trace_owner[0] is not None:
+                    trace_owner[0].finish("not_observed")
+                trace_owner[0] = VoiceTrace.begin({"voice": voice_cfg})
+            _vr_trace_status(trace_owner[0], state)
+
+        def trace_transcript(text):
+            _vr_trace_transcript(trace_owner[0], text)
+            if trace_owner[0] is not None:
+                trace_owner[0].finish("not_observed")
+
         started = start_continuous(
-            on_transcript=lambda t: _vr_transcript({"text": t}), on_status=_vr_on_status,
+            on_transcript=trace_transcript,
+            on_status=trace_status,
             on_silent_limit=lambda: _vr_transcript({"no_speech_limit": True}),
             silence_threshold=_voice_cfg_number(voice_cfg.get("silence_threshold"), 200),
             silence_duration=_voice_cfg_number(voice_cfg.get("silence_duration"), 3.0),
