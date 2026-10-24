@@ -7,6 +7,7 @@ imported lazily from ``agent.conversation_loop`` (no cycle, same logger name).""
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import suppress
 from typing import Any, Callable, List, Optional, Tuple
 
@@ -30,6 +31,50 @@ _SESSION_TOKEN_KEYS = (
     "reasoning_tokens", "prompt_tokens", "completion_tokens", "total_tokens",
 )
 _SESSION_COST_KEYS = ("estimated_cost_usd", "cost_status", "cost_source")
+
+# A preserved verification candidate restored at budget exhaustion still claims
+# success in its own words; this bilingual notice (task_acceptance receipt style)
+# tells the user those claims were never verified (#D5-04 / F5.1).
+_UNVERIFIED_FALLBACK_NOTICE = (
+    "⚠️ Unverified answer / 回答未经验证：verify-on-stop held this reply back and the "
+    "iteration budget ran out before verification completed, so the claims above were "
+    "NOT actually verified. / 迭代预算在验证完成前耗尽，以上内容未经实际验证，请核对后再采信。"
+)
+
+
+def _unverified_fallback_notice_enabled(agent) -> bool:
+    """``display.unverified_fallback_notice`` / ``STARDUST_UNVERIFIED_FALLBACK_NOTICE``
+    (default False — opt-in). Mirrors ``_display_flag_enabled`` in ``turn_explainers``
+    but fails closed: any failure or missing setting leaves the output unchanged."""
+    try:
+        env = os.environ.get("STARDUST_UNVERIFIED_FALLBACK_NOTICE")
+        if env is not None:
+            return env.strip().lower() in {"1", "true", "yes", "on"}
+        cached = getattr(agent, "_unverified_fallback_notice_enabled_cache", None)
+        if cached is not None:
+            return cached
+        try:
+            from hermes_cli.config import load_config as _load_config
+            _cfg = _load_config() or {}
+        except Exception:
+            _cfg = {}
+        _display = _cfg.get("display") if isinstance(_cfg, dict) else None
+        enabled = (
+            bool(_display.get("unverified_fallback_notice"))
+            if isinstance(_display, dict) and "unverified_fallback_notice" in _display
+            else False
+        )
+        setattr(agent, "_unverified_fallback_notice_enabled_cache", enabled)
+        return enabled
+    except Exception:
+        return False
+
+
+def _append_unverified_fallback_notice(final_response):
+    """Mark a restored verification candidate as unverified; never touches other replies."""
+    if isinstance(final_response, str) and final_response.strip():
+        return final_response.rstrip() + "\n\n" + _UNVERIFIED_FALLBACK_NOTICE
+    return _UNVERIFIED_FALLBACK_NOTICE
 
 
 def _assistant_row_missing_visible_text(msg: dict) -> bool:
@@ -100,6 +145,10 @@ def _resolve_budget_fallback(
             if _pending_verification_response_previewed:
                 agent._response_was_previewed = True
             preserved_verification_fallback = True
+            # Opt-in: the restored text is an unverified success claim; say so
+            # instead of letting it read as a normal answer (F5.1).
+            if _unverified_fallback_notice_enabled(agent):
+                final_response = _append_unverified_fallback_notice(final_response)
         else:
             # _handle_max_iterations makes one extra toolless request for a summary.
             agent._emit_status(
