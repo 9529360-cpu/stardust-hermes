@@ -13,7 +13,7 @@ import pytest
 def context(tmp_path, monkeypatch):
     home = tmp_path / 'home'
     home.mkdir()
-    for key in ('HOME', 'HERMES_HOME', 'STARDUST_HOME', 'TEMP', 'TMP'):
+    for key in ('HOME', 'USERPROFILE', 'HERMES_HOME', 'STARDUST_HOME', 'TEMP', 'TMP'):
         monkeypatch.setenv(key, str(home))
     monkeypatch.setenv('HERMES_PROFILE', 'default')
     (home / 'config.yaml').write_text('agent:\n  task_checkpoint: true\n  bind_acceptance_observations: true\n')
@@ -170,3 +170,56 @@ def test_disabled_writes_nothing(context):
     harness._session_db = agent._session_db
     harness._persist_session([{'role': 'assistant', 'content': 'pending'}])
     assert agent._session_db.get_session(agent.session_id)['model_config'] == before
+
+
+@pytest.mark.parametrize('input_value', [None, {}, ['continue']])
+def test_missing_current_input_does_not_authorize_or_mutate(context, input_value):
+    from agent import task_checkpoint as checkpoint
+    from tools.todo_tool import persist_todo_session_state
+    agent, _ = context
+    checkpoint.prepare(agent, 'Acceptance criteria:\n- [runtime] Write three files')
+    agent._todo_store.write([dict(id='1', content='Write a.txt', status='pending')])
+    persist_todo_session_state(agent._session_db, agent.session_id, agent._todo_store)
+    checkpoint.persist(agent)
+    before = agent._session_db.get_session(agent.session_id)['model_config']
+    assert checkpoint.prepare(agent, input_value) == ''
+    assert agent._session_db.get_session(agent.session_id)['model_config'] == before
+    assert 'no autonomous dispatch' in checkpoint.reference(agent)
+
+
+@pytest.mark.parametrize('key', ['HOME', 'USERPROFILE', 'STARDUST_HOME', 'HERMES_HOME', 'TEMP', 'TMP'])
+def test_recovery_harness_rejects_each_unsafe_home_variable(tmp_path, key):
+    from evals.digital_life.recovery import HOME_VARS, assert_home
+    env = {name: str(tmp_path) for name in HOME_VARS}
+    assert assert_home(tmp_path, env) == tmp_path.resolve()
+    env[key] = 'D:/Stardust/home'
+    with pytest.raises(ValueError, match=key):
+        assert_home(tmp_path, env)
+    del env[key]
+    with pytest.raises(ValueError, match=key):
+        assert_home(tmp_path, env)
+
+
+def test_recovery_measurement_keeps_both_denominators_and_errors():
+    from evals.digital_life.recovery import report
+    rows = [dict(verdict='recorded', auto={'completed': False},
+                 continue_command=True, **{'continue': {'completed': True, 'duplicate_side_effects': 1}}),
+            dict(verdict='harness_error')]
+    result = report(rows)
+    assert result['auto_continue'] == {'completed': 0, 'denominator': 2}
+    assert result['continue_command'] == {'completed': 1, 'denominator': 2}
+    assert result['recorded'] == 1
+    assert result['duplicate_side_effects'] == 1
+
+
+def test_recovery_reads_real_life_event_database(tmp_path):
+    from agent.life_event_log import LifeEventLog
+    from evals.digital_life.recovery import durable_state
+    import sqlite3
+    with sqlite3.connect(tmp_path / 'state.db') as db:
+        db.execute('CREATE TABLE sessions (id TEXT, model_config TEXT)')
+        db.execute("INSERT INTO sessions VALUES ('recovery', '{}')")
+    assert LifeEventLog(tmp_path).emit('process_started', {'process_id': 123})
+    state = durable_state(tmp_path)
+    assert state['checkpoint'] is None
+    assert [event['event_type'] for event in state['life_events']] == ['process_started']
