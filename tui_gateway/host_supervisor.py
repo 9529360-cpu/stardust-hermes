@@ -161,7 +161,8 @@ class HostSupervisor:
         cwd: str | Path | None = None, env: dict[str, str] | None = None,
         rpc_sink: Callable[[dict], None] | None = None, respawn_max: int = 3,
         heartbeat_secs: int = 15, expected_build_sha: str | None = None,
-        expected_hermes_home: str | None = None, autostart: bool = True) -> None:
+        expected_hermes_home: str | None = None, autostart: bool = True,
+        on_rebuild: Callable[[dict], dict[str, int] | None] | None = None) -> None:
         self.registry_path = (
             Path(registry_path) if registry_path is not None
             else get_hermes_home() / "state" / _REGISTRY_NAME)
@@ -198,6 +199,9 @@ class HostSupervisor:
         # The host emits its control.ack whenever it finishes; without this the ack matched no queue and was
         # silently dropped. See #97948.
         self._late_control_handlers: dict[str, tuple[float, Callable[[dict], None]]] = {}
+        # F6.1: invoked before a replacement spawn (crash or shutdown+start).
+        # The bridge advances session epochs and returns the child's initial fence.
+        self.on_rebuild = on_rebuild
         self._stderr_tail: list[str] = []
         self._last_progress_counter = 0
         if autostart:
@@ -442,6 +446,10 @@ class HostSupervisor:
         env.setdefault("PYTHONPATH", root)
         if root not in env["PYTHONPATH"].split(os.pathsep):
             env["PYTHONPATH"] = root + os.pathsep + env["PYTHONPATH"]
+        # Seed the replacement before it can accept its first (possibly stale) frame.
+        if host_generation > 1 and self.on_rebuild is not None:
+            epochs = self.on_rebuild({"reason": reason})
+            env["STARDUST_COMPUTE_HOST_SESSION_EPOCHS"] = json.dumps(epochs or {})
         # Lossy UTF-8 decode: a locale-mismatched byte must not raise inside the drain threads.
         proc = subprocess.Popen(
             self.argv, cwd=str(self.cwd), env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
