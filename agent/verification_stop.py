@@ -345,6 +345,16 @@ _NON_EVIDENCE_TOOLS = frozenset({
     "clarify", "todo", "memory", "session_search", "skills", "think",
 })
 
+# DL-P2.8f: deterministic post-check note for the iteration-budget summary.
+# Wording deliberately avoids the messaging claim lexicon (no 已/完成/done/...)
+# so the note itself can never read as a new completion claim, and lists the
+# checklist the reader applies instead of asserting anything about the work.
+_MAXITER_UNVERIFIED_NOTE = (
+    "⚠️ 注意：本回复是在工具调用预算耗尽后生成的收尾总结，其中关于任务结果的表述"
+    "未经本轮工具输出核实，请以实际执行记录为准。"
+)
+
+
 _CLAIM_CLAUSE_SPLIT_RE = re.compile(r"[。！!？?；;\n，,]+")
 
 
@@ -468,6 +478,36 @@ def messaging_claim_gate_nudge(
         return None
 
 
+def max_iterations_unverified_note(
+    *, summary_text: Any, messages: List[Dict[str, Any]], current_turn_user_idx: Any,
+    user_message: Any, config: dict[str, Any] | None = None,
+) -> Optional[str]:
+    """Opt-in deterministic post-check for the iteration-budget summary (DL-P2.8f).
+
+    The max-iterations summary is composed after the loop has already exited,
+    so it never passes the stop gate. When ``agent.verify_on_stop_messaging``
+    is ON and the summary asserts a completed action that no successful tool
+    result from this turn backs, return the plain unverified note to append.
+    Same flag, lexicon, evidence and user-opt-out rules as
+    :func:`messaging_claim_gate_nudge`; no model call, no extra iteration. Any
+    failure returns ``None`` (summary unchanged).
+    """
+    try:
+        if not verify_on_stop_messaging_enabled(config):
+            return None
+        if not _session_is_messaging_surface():
+            return None
+        if contains_completion_claim(_response_text(summary_text)) is None:
+            return None
+        if user_opted_out_of_verification(user_message):
+            return None
+        if _has_evidence(turn_tool_evidence(messages, current_turn_user_idx)):
+            return None
+        return _MAXITER_UNVERIFIED_NOTE
+    except Exception:
+        return None
+
+
 __all__ = [
     "build_verify_on_stop_nudge",
     "verify_on_stop_enabled",
@@ -476,4 +516,5 @@ __all__ = [
     "user_opted_out_of_verification",
     "turn_tool_evidence",
     "messaging_claim_gate_nudge",
+    "max_iterations_unverified_note",
 ]

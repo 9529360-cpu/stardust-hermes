@@ -2143,6 +2143,28 @@ _SUMMARY_ATTEMPT_BUILDERS = {"codex_responses": _codex_summary_attempt, "anthrop
 
 def handle_max_iterations(agent, messages: list, api_call_count: int) -> str:
     """Request a summary when max iterations are reached. Returns the final response text."""
+    def _max_iterations_unverified_note(agent, messages: list, summary_text: str):
+        """Opt-in unverified-claim note for the budget-exhaustion summary (DL-P2.8f).
+
+        Kept local so the summary path needs no new module-level import surface;
+        every check lives in ``agent.verification_stop`` and fails closed.
+        """
+        try:
+            from agent.verification_stop import max_iterations_unverified_note
+
+            user_idx = getattr(agent, "_persist_user_message_idx", None)
+            user_message = (
+                messages[user_idx].get("content")
+                if isinstance(user_idx, int) and 0 <= user_idx < len(messages)
+                else None
+            )
+            return max_iterations_unverified_note(
+                summary_text=summary_text, messages=messages,
+                current_turn_user_idx=user_idx, user_message=user_message,
+            )
+        except Exception:
+            return None
+
     warning = f"⚠️  Reached maximum iterations ({agent.max_iterations}). Requesting summary..."
     if getattr(agent, "suppress_status_output", False):
         # Strict machine-readable mode (-Q, oneshot): keep diagnostics off stdout. quiet_mode is
@@ -2176,6 +2198,14 @@ def handle_max_iterations(agent, messages: list, api_call_count: int) -> str:
                 text = re.sub(r'<think>.*?</think>\s*', '', text, flags=re.DOTALL).strip()
             if text:
                 summary_call_outcome = "success"
+                # DL-P2.8f: the budget-exhaustion summary never passes the stop
+                # gate, so an unproven "done" claim could ship as-is. Deterministic
+                # post-check (same flag/lexicon/evidence as the messaging claim
+                # gate): append the plain unverified note when the claim has no
+                # successful tool result behind it. Opt-in, no extra model call.
+                note = _max_iterations_unverified_note(agent, messages, text)
+                if note:
+                    text = text.rstrip() + "\n\n" + note
                 append_message(messages, {"role": "assistant", "content": text})
                 final_response = text
             break
