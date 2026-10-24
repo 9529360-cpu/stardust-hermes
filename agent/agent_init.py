@@ -29,7 +29,8 @@ from agent.iteration_budget import IterationBudget, normalize_budget_warning_rat
 from agent.memory_manager import StreamingContextScrubber
 from agent.session_activity import ActivityProvenance
 from agent.model_metadata import (
-    MINIMUM_CONTEXT_LENGTH, fetch_model_metadata, is_local_endpoint, query_ollama_num_ctx
+    MINIMUM_CONTEXT_LENGTH, defer_context_probe_enabled, fetch_model_metadata,
+    is_local_endpoint, query_ollama_num_ctx
 )
 from agent.process_bootstrap import _install_safe_stdio
 from agent.subdirectory_hints import SubdirectoryHintTracker
@@ -1954,10 +1955,21 @@ def _build_context_engine(agent, _agent_cfg, cs, _custom_providers, _effective_c
     agent.compression_idle_compact_after_seconds = cs.idle_compact_after_seconds
 
 
-def _enforce_minimum_context(agent):
+def _enforce_minimum_context(agent, budget_s: float = 0.15):
     # Reject windows below the 64K floor needed for reliable tool-calling; an explicit
     # positive model.context_length on LM Studio is allowed below the floor.
-    _ctx = getattr(agent.context_compressor, "context_length", 0)
+    # Deferred-probe mode (STARDUST_DEFER_CONTEXT_PROBE=1): reading .context_length
+    # would re-introduce the blocking network probe #32221 removed from __init__
+    # (the DISCOVERY-2 U1 2 s blackhole connect). Wait a bounded time for the
+    # background probe; a live local server answers in ~ms, so the floor still
+    # catches small windows there. Unresolved after the budget: defer the check to
+    # first use (_resolve_context_length still applies the floor; a below-floor
+    # model then fails on the first turn with the same ValueError, not at build).
+    _compressor = getattr(agent, "context_compressor", None)
+    if _compressor is not None and defer_context_probe_enabled():
+        _ctx = _compressor.resolved_context_length_within(budget_s)
+    else:
+        _ctx = getattr(_compressor, "context_length", 0)
     _allow_lmstudio_explicit_below_floor = (
         str(agent.provider or "").strip().lower() == "lmstudio"
         and isinstance(agent._config_context_length, int)
@@ -2037,10 +2049,18 @@ def _inject_context_engine_tools(agent):
 
     if agent.context_compressor:
         try:
+            # Deferred-probe mode: getattr .context_length would synchronously run the
+            # network probe this change removes from the build path; pass the resolved
+            # value when the background probe already landed, else 0 (on_session_start
+            # treats 0 as "unknown", same as an unresolved window).
+            if defer_context_probe_enabled():
+                _ce_ctx = agent.context_compressor.resolved_context_length_within(0.0) or 0
+            else:
+                _ce_ctx = getattr(agent.context_compressor, "context_length", 0)
             agent.context_compressor.on_session_start(
                 agent.session_id, hermes_home=str(get_hermes_home()),
                 platform=agent.platform or "cli", model=agent.model,
-                context_length=getattr(agent.context_compressor, "context_length", 0),
+                context_length=_ce_ctx,
                 conversation_id=getattr(agent, "_gateway_session_key", None),
             )
         except Exception as _ce_err:
@@ -2058,14 +2078,19 @@ def _configure_ollama_num_ctx(agent, _model_cfg, _config_context_length):
         except (TypeError, ValueError):
             _ra().logger.debug("Invalid ollama_num_ctx config value: %r", _override)
     if agent._ollama_num_ctx is None and agent.base_url and is_local_endpoint(agent.base_url):
-        try:
-            # api_key may be a callable (Entra token provider); detection needs a string.
-            _key = agent.api_key if isinstance(agent.api_key, str) else ""
-            _detected = query_ollama_num_ctx(agent.model, agent.base_url, api_key=_key or "")
-            if _detected and _detected > 0:
-                agent._ollama_num_ctx = _detected
-        except Exception as exc:
-            _ra().logger.debug("Ollama num_ctx detection failed: %s", exc)
+        # Deferred-probe mode skips the /api/show network probe here (DISCOVERY-2 U1:
+        # a blackholed local endpoint stalls construction for the 2 s connect
+        # timeout). num_ctx stays None for this build; Ollama then serves its
+        # configured default window — set model.ollama_num_ctx to pin it.
+        if not defer_context_probe_enabled():
+            try:
+                # api_key may be a callable (Entra token provider); detection needs a string.
+                _key = agent.api_key if isinstance(agent.api_key, str) else ""
+                _detected = query_ollama_num_ctx(agent.model, agent.base_url, api_key=_key or "")
+                if _detected and _detected > 0:
+                    agent._ollama_num_ctx = _detected
+            except Exception as exc:
+                _ra().logger.debug("Ollama num_ctx detection failed: %s", exc)
     # Cap auto-detected num_ctx to the explicit context_length (GGUF metadata can advertise
     # 256K+ and Ollama would allocate that much VRAM); never override an explicit num_ctx.
     if (
@@ -2091,7 +2116,11 @@ def _configure_ollama_num_ctx(agent, _model_cfg, _config_context_length):
     # trigger could sit several times ABOVE the real served window and never fire. Clamp the compressor's
     # window to the effective num_ctx so threshold math operates on the context the server actually serves.
     # (Overlaps #60103's silent-clamp dead zone; this is the init-order half.)
-    _cc_window = getattr(agent.context_compressor, "context_length", 0) or 0
+    if defer_context_probe_enabled():
+        # Same deferral as above: do not read the property (network probe) during build.
+        _cc_window = (agent.context_compressor.resolved_context_length_within(0.0) or 0) if agent.context_compressor else 0
+    else:
+        _cc_window = getattr(agent.context_compressor, "context_length", 0) or 0
     if agent._ollama_num_ctx and agent._ollama_num_ctx > 0 and _cc_window and agent._ollama_num_ctx < _cc_window:
         _ra().logger.info(
             "Compressor window clamped to Ollama num_ctx: %d -> %d",
@@ -2144,6 +2173,19 @@ def _emit_compression_summary(agent, cs):
     agent._compression_feasibility_checked = False
 
 
+def _snapshot_threshold_tokens(_cc) -> int:
+    """threshold_tokens snapshot that never triggers the deferred background probe.
+
+    threshold_tokens is a property deriving from context_length; reading it while
+    unresolved would block on the background probe. Snapshot the cached derivation
+    (0 while unresolved; recomputed on first real use). getattr: plugin engines may
+    lack the private cache entirely."""
+    _cached = getattr(_cc, "_threshold_tokens", None)
+    if defer_context_probe_enabled():
+        return _cached if _cached is not None else 0
+    return _cached if _cached is not None else _cc.threshold_tokens
+
+
 def _snapshot_primary_runtime(agent):
     # Per-turn restoration snapshot: after a fallback, the next turn restores these so the
     # preferred model gets a fresh attempt.
@@ -2165,8 +2207,21 @@ def _snapshot_primary_runtime(agent):
         "compressor_base_url": getattr(_cc, "base_url", agent.base_url),
         "compressor_api_key": getattr(_cc, "api_key", ""),
         "compressor_provider": getattr(_cc, "provider", agent.provider),
-        "compressor_context_length": _cc.context_length,
-        "compressor_threshold_tokens": _cc.threshold_tokens,
+        # Deferred-probe mode: reading .context_length/.threshold_tokens would run the
+        # network probe during build; snapshot the resolved-if-ready value instead. A
+        # not-yet-resolved window is restored as 0, and the first turn re-resolves
+        # through the compressor's own lazy path (identical outcome).
+        "compressor_context_length": (
+            (_cc.resolved_context_length_within(0.0) or 0)
+            if defer_context_probe_enabled() and hasattr(_cc, "resolved_context_length_within")
+            else _cc.context_length
+        ),
+        # threshold_tokens is a property deriving from context_length; under the
+        # deferred flag, reading it while unresolved would block on the background
+        # probe — snapshot the cached derivation (0 while unresolved; recomputed on
+        # first real use through the property). getattr: plugin engines may lack
+        # the private cache entirely.
+        "compressor_threshold_tokens": _snapshot_threshold_tokens(_cc),
     }
     if agent.api_mode == "anthropic_messages":
         agent._primary_runtime.update({
@@ -2388,6 +2443,8 @@ def init_agent(
         agent, _agent_cfg, base_url
     )
     _build_context_engine(agent, _agent_cfg, cs, _custom_providers, _effective_context_length, session_db)
+    if defer_context_probe_enabled() and hasattr(agent.context_compressor, "start_context_probe"):
+        agent.context_compressor.start_context_probe()
     _enforce_minimum_context(agent)
     _warn_nonagentic_hermes_model(agent)
     _inject_context_engine_tools(agent)
