@@ -1083,6 +1083,20 @@ def build_turn_context(
     _bind_interrupt_scope(agent, ra)
     ext_prefetch_cache = _memory_turn_start_and_prefetch(agent, original_user_message, turn_author)
 
+    # Per-turn intent sidecar (agent.turn_intent / agent.turn_intent_llm, default OFF):
+    # rides the same user-message injection channel as the memory context, so
+    # the system prompt stays byte-stable and flag-off bytes stay identical.
+    with suppress(Exception):
+        from agent.turn_intent import maybe_turn_intent_block
+        _turn_intent_block = maybe_turn_intent_block(
+            original_user_message, messages, current_turn_user_idx,
+        )
+        if _turn_intent_block:
+            plugin_user_context = (
+                (plugin_user_context + "\n\n" + _turn_intent_block)
+                if plugin_user_context else _turn_intent_block
+            )
+
     # Sidecar skipped for codex_app_server/MoA.
     if (
         not moa_active
