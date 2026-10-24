@@ -6,7 +6,7 @@
  */
 
 import { useStore } from '@nanostores/react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 
 import { getMcpCatalog } from '@/api/mcp'
@@ -18,6 +18,7 @@ import { useI18n } from '@/i18n'
 import { brandFor } from '@/lib/mcp-brands'
 import { probeCache, probeKey } from '@/lib/mcp-probe-cache'
 import { getServers } from '@/lib/mcp-servers'
+import { hermesConfigKey } from '../hooks/use-config-record'
 import { $activeGatewayProfile } from '@/store/profile'
 import type { McpCatalogEntry } from '@/types/hermes'
 
@@ -131,6 +132,7 @@ export function ConnectorCatalogView({ profile }: { profile: ProfileScope | null
   const scopeProfile = profile ?? activeProfile
   const scopeKey = profileScopeKey(scopeProfile)
   const { data: configRecord } = useHermesConfigRecord(scopeProfile)
+  const queryClient = useQueryClient()
   const [, tick] = useState(0)
 
   const catalogQuery = useQuery({
@@ -174,6 +176,9 @@ export function ConnectorCatalogView({ profile }: { profile: ProfileScope | null
 
   const onConnected = () => {
     refreshCatalog()
+    // The connected list reads the config record; a fresh install wrote
+    // mcp_servers there, so invalidate or the new row never shows until remount.
+    void queryClient.invalidateQueries({ queryKey: hermesConfigKey(scopeProfile) })
   }
 
   return (
