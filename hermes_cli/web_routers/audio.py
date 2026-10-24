@@ -17,6 +17,9 @@ import os
 import urllib.parse
 import urllib.request
 from fastapi import APIRouter
+from pydantic import BaseModel, ConfigDict, Field
+from tools.voice_trace import VoiceTrace, STAGES, REASONS, trace_enabled
+from hermes_cli.config_effective import load_user_config_effective
 from hermes_cli.web_routers._common import http_failure
 from hermes_cli.web_deps import late
 from hermes_cli.web_server_chat import _ws_auth_ok, _ws_request_is_allowed
@@ -72,6 +75,48 @@ async def _run_config_scoped(profile: Optional[str], fn):
 def _audio_extension_for_mime(mime_type: str) -> str:
     normalized = (mime_type or "").split(";", 1)[0].strip().lower()
     return _AUDIO_MIME_EXTENSIONS.get(normalized, ".webm")
+
+
+class VoiceTraceStage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    timestamp_ms: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
+    reason: Optional[str] = Field(default=None, max_length=40)
+
+
+class VoiceTraceRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    turn_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
+    task_id: Optional[str] = Field(default=None, pattern=r"^[A-Za-z0-9_-]{1,128}$")
+    stages: Dict[str, VoiceTraceStage] = Field(max_length=10)
+
+
+@router.get("/api/audio/trace-config")
+async def get_voice_trace_config(profile: Optional[str] = None):
+    return {"enabled": await _run_config_scoped(profile, lambda: trace_enabled(load_user_config_effective()))}
+
+
+@router.post("/api/audio/trace")
+async def record_voice_trace(payload: VoiceTraceRequest, profile: Optional[str] = None):
+    if set(payload.stages) != set(STAGES):
+        raise HTTPException(status_code=400, detail="Incomplete voice stage table")
+    for stage in payload.stages.values():
+        if (stage.timestamp_ms is None) == (stage.reason is None) or (stage.reason is not None and stage.reason not in REASONS):
+            raise HTTPException(status_code=400, detail="Invalid voice stage observation")
+
+    def _record():
+        trace = VoiceTrace.begin(load_user_config_effective(), turn_id=payload.turn_id)
+        if trace is None:
+            return {"ok": True, "recorded": False}
+        if payload.task_id:
+            trace.link_task(payload.task_id)
+        for name, stage in payload.stages.items():
+            if stage.timestamp_ms is not None:
+                trace.mark(name, timestamp_ms=stage.timestamp_ms, clock="renderer")
+            else:
+                trace.missing(name, stage.reason)
+        return {"ok": True, "recorded": trace.finish()}
+
+    return await _run_config_scoped(profile, _record)
 
 
 @router.post("/api/audio/transcribe")

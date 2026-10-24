@@ -1169,6 +1169,7 @@ DEFAULT_CONFIG = {
     },
 
     "voice": {
+        "trace_enabled": False,  # content-free per-turn timing in profile logs
         # How the Desktop voice conversation is wired:
         #   chained  — STT → Hermes turn → TTS (the stt.* / tts.* providers below)
         #   gpt-live — one full-duplex voice model (OpenAI GPT-Live) owns the mic and speaker and
