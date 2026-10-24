@@ -1,17 +1,52 @@
+import { type MockBackendFixture, setupMockBackend, waitForAppReady } from './fixtures'
 import { expect, test } from './test'
-import { setupMockBackend, waitForAppReady, type MockBackendFixture } from './fixtures'
 
 // CX5 real acceptance (connectors.unified_dialog ON). The backend chain is
 // REAL (electron → stardust serve → real MCP transports); only the LLM is the
 // loopback mock, per spec. filesystem = local stdio via pinned npx package;
 // deepwiki = remote HTTP MCP. No JSON editing anywhere in the flow.
+//
+// Network note: the filesystem leg downloads the pinned npm package on first
+// connect and deepwiki needs the public endpoint, so this spec exercises the
+// real network paths (npm registry / mcp.deepwiki.com) exactly like a user
+// machine; CI reaches both. Only the ALLOWED_DIR sandbox path is local.
 
 let fixture: MockBackendFixture | null = null
+let fsAllowDir = ''
 
 test.beforeAll(async () => {
   fixture = await setupMockBackend({
     extraConfig: 'connectors:\n  unified_dialog: true\n'
   })
+
+  // The folder filesystem is allowed to serve. It must EXIST before the
+  // server spawns — @modelcontextprotocol/server-filesystem exits immediately
+  // on a missing root, which fails the connect probe (this is exactly what
+  // broke CI when the path pointed at a dev-machine directory).
+  const fs = await import('node:fs')
+  const path = await import('node:path')
+  fsAllowDir = path.join(fixture.sandbox.root, 'fs-allow')
+  fs.mkdirSync(fsAllowDir, { recursive: true })
+  fs.writeFileSync(path.join(fsAllowDir, 'README.txt'), 'e2e filesystem allow dir\n')
+
+  // Warm the npx cache once up front: the connect dialog's probe has a 60 s
+  // client timeout, and a cold npm download plus handshake can eat most of it
+  // on a slow runner. One bounded pre-download (exit code is irrelevant — the
+  // package just needs to be in the cache) keeps the real connect well inside
+  // the budget and avoids two probes racing the same cold install. spawn with
+  // a shell on Windows because npx there is a .cmd (execFile ENOENTs on it).
+  const { spawn } = await import('node:child_process')
+  await new Promise<void>(resolve => {
+    const child = spawn(
+      'npx',
+      ['-y', '@modelcontextprotocol/server-filesystem@2026.7.10', '--help'],
+      { shell: process.platform === 'win32', timeout: 120_000 }
+    )
+
+    child.on('error', () => resolve())
+    child.on('close', () => resolve())
+  })
+
   await waitForAppReady(fixture, 120_000)
 })
 
@@ -27,35 +62,35 @@ async function openConnectors(page: import('@playwright/test').Page) {
   await expect(page.locator('[data-slot="connector-catalog-page"]')).toBeVisible({ timeout: 30_000 })
 }
 
-test('filesystem (local stdio, pinned) connects via the dialog', async () => {
+test('filesystem (local stdio, pinned) connects via the dialog', async ({}, testInfo) => { // eslint-disable-line no-empty-pattern
   const page = fixture!.page
   await openConnectors(page)
 
   // Catalog card present → open the connect dialog.
   await expect(page.getByText('filesystem', { exact: true })).toBeVisible({ timeout: 30_000 })
-  await page.screenshot({ path: 'D:/wt/logs/cx5-evidence/cx5-catalog.png' })
+  await page.screenshot({ path: testInfo.outputPath('cx5-catalog.png') })
   await page.locator('[data-slot="connect-filesystem"]').click()
 
   // Detail dialog: publisher/permissions/runtime rows per spec.
   await expect(page.getByText('发布者', { exact: true })).toBeVisible({ timeout: 15_000 })
   await expect(page.getByText('运行位置（本地/远程）', { exact: true })).toBeVisible()
-  await page.screenshot({ path: 'D:/wt/logs/cx5-evidence/cx5-add.png' })
+  await page.screenshot({ path: testInfo.outputPath('cx5-add.png') })
 
   // Plain (non-secret) folder field, then connect. The real install writes
   // mcp_servers.filesystem + ALLOWED_DIR to .env, then probes the real server.
-  await page.locator('[data-slot="connector-env-ALLOWED_DIR"]').fill('D:/wt/Temp/stardust/cx5/fs-allow')
+  await page.locator('[data-slot="connector-env-ALLOWED_DIR"]').fill(fsAllowDir)
   await page.locator('[data-slot="connector-connect"]').click()
 
   // Dialog closes on success; the connected list gains the row.
   await expect(page.locator('[data-slot="connector-connected-row"][data-server="filesystem"]')).toBeVisible({ timeout: 180_000 })
   await expect(page.getByText('可用工具:', { exact: false }).first()).toBeVisible({ timeout: 180_000 })
-  await page.screenshot({ path: 'D:/wt/logs/cx5-evidence/cx5-filesystem-connected.png' })
+  await page.screenshot({ path: testInfo.outputPath('cx5-filesystem-connected.png') })
   console.log('filesystem row connected:', await page
     .locator('[data-slot="connector-connected-row"][data-server="filesystem"]')
     .innerText())
 })
 
-test('deepwiki (remote http) connects via the dialog', async () => {
+test('deepwiki (remote http) connects via the dialog', async ({}, testInfo) => { // eslint-disable-line no-empty-pattern
   const page = fixture!.page
   await openConnectors(page)
 
@@ -70,7 +105,7 @@ test('deepwiki (remote http) connects via the dialog', async () => {
   await expect(
     page.locator('[data-slot="connector-connected-row"][data-server="deepwiki"]').getByText('已连接')
   ).toBeVisible({ timeout: 120_000 })
-  await page.screenshot({ path: 'D:/wt/logs/cx5-evidence/cx5-real-connected.png' })
+  await page.screenshot({ path: testInfo.outputPath('cx5-real-connected.png') })
   console.log('deepwiki row connected:', await page
     .locator('[data-slot="connector-connected-row"][data-server="deepwiki"]')
     .innerText())
