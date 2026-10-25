@@ -482,6 +482,52 @@ def messaging_claim_gate_nudge(
         return None
 
 
+def _unverified_claim_note(*, budget_exhausted: bool = True) -> str:
+    if budget_exhausted:
+        return _MAXITER_UNVERIFIED_NOTE
+    return "⚠️ 注意：本回复中关于任务结果的表述未经本轮工具输出核实，请以实际执行记录为准。"
+
+
+def ignored_nudge_unverified_note(
+    *, final_response: Any, messages: List[Dict[str, Any]], current_turn_user_idx: Any,
+    user_message: Any, attempts: int = 0, refusal_attempts: int = 0,
+) -> Optional[str]:
+    """Annotate an ignored bounded nudge without another model round.
+
+    Completion claims reuse the budget-summary predicate. False inability is
+    separate from that lexicon: only an actually nudged, repeated refusal with
+    no tool attempt qualifies, preserving honest failure reports.
+    """
+    text = _response_text(final_response)
+    if any(note in text for note in (_unverified_claim_note(), _unverified_claim_note(budget_exhausted=False))):
+        return None
+    if attempts >= 1:
+        note = max_iterations_unverified_note(
+            summary_text=text, messages=messages,
+            current_turn_user_idx=current_turn_user_idx, user_message=user_message,
+        )
+        if note:
+            return _unverified_claim_note(budget_exhausted=False)
+    if refusal_attempts < 1:
+        return None
+    if not verify_on_stop_messaging_enabled() or not _session_is_messaging_surface():
+        return None
+    if user_opted_out_of_verification(user_message):
+        return None
+    from agent.capability_refusal_guard import _claims_local_file_inability
+
+    if not _claims_local_file_inability(text):
+        return None
+    # Unlike successful completion evidence, even a failed tool attempt makes
+    # inability an observed outcome rather than an untried capability claim.
+    if not isinstance(current_turn_user_idx, int) or not 0 <= current_turn_user_idx < len(messages):
+        return None
+    turn = messages[current_turn_user_idx + 1:]
+    if any(m.get("role") == "tool" or m.get("tool_calls") for m in turn):
+        return None
+    return _unverified_claim_note(budget_exhausted=False)
+
+
 def max_iterations_unverified_note(
     *, summary_text: Any, messages: List[Dict[str, Any]], current_turn_user_idx: Any,
     user_message: Any, config: dict[str, Any] | None = None,
@@ -507,7 +553,7 @@ def max_iterations_unverified_note(
             return None
         if _has_evidence(turn_tool_evidence(messages, current_turn_user_idx)):
             return None
-        return _MAXITER_UNVERIFIED_NOTE
+        return _unverified_claim_note()
     except Exception:
         return None
 
@@ -520,5 +566,6 @@ __all__ = [
     "user_opted_out_of_verification",
     "turn_tool_evidence",
     "messaging_claim_gate_nudge",
+    "ignored_nudge_unverified_note",
     "max_iterations_unverified_note",
 ]
