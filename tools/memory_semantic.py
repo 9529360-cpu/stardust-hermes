@@ -28,7 +28,7 @@ import logging
 import os
 import threading
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +71,12 @@ def _text_hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+class _IndexSnapshot(NamedTuple):
+    keys: tuple[str, ...]
+    matrix: Any
+    generation: tuple[int, int, int] | None
+
+
 class SemanticTopicIndex:
     """Embedding index over the topic store; rebuilt on store change.
 
@@ -86,9 +92,7 @@ class SemanticTopicIndex:
         self._model: Any = None
         self._model_state = _UNATTEMPTED
         self._warned: set[str] = set()
-        self._signature: tuple[int, int, int] | None = None
-        self._keys: list[str] = []
-        self._matrix: Any = None  # normalized ndarray once built
+        self._snapshot = _IndexSnapshot((), None, None)
         self._vec_cache: dict[str, Any] = {}  # sha256(text) -> ndarray
         self.available = False
 
@@ -209,14 +213,12 @@ class SemanticTopicIndex:
         if model is None:
             return False
         with self._lock:
-            if self._matrix is not None and signature == self._signature:
+            if self._snapshot.matrix is not None and signature == self._snapshot.generation:
                 return True
             if not rows:
                 # Same contract as HybridTopicIndex.ensure: nothing to
                 # index is not an error, simply unusable.
-                self._signature = signature
-                self._keys = []
-                self._matrix = None
+                self._snapshot = _IndexSnapshot((), None, signature)
                 return False
             try:
                 import numpy as np
@@ -239,9 +241,9 @@ class SemanticTopicIndex:
                 norms = np.linalg.norm(matrix, axis=1, keepdims=True)
                 norms[norms == 0] = 1.0
                 matrix = matrix / norms
-                self._keys = keys
-                self._matrix = matrix
-                self._signature = signature
+                matrix.setflags(write=False)
+                # Copy-on-write publication: readers retain their entire generation.
+                self._snapshot = _IndexSnapshot(tuple(keys), matrix, signature)
                 return True
             except Exception:
                 self._warn_once("index-build", "semantic recall disabled: index build failed; keeping hybrid BM25 fill")
@@ -249,7 +251,11 @@ class SemanticTopicIndex:
                 return False
 
     def search(self, query: str, limit: int = SEMANTIC_FETCH) -> list[tuple[str, float]]:
-        """Return ``[(key, cosine)]`` best-first; empty on any failure."""
+        """Return ``[(key, cosine)]`` best-first; empty on any failure.
+
+        Use the latest complete generation captured after query embedding.
+        A rebuild or close after capture cannot change this search's pairing.
+        """
         model = self._get_model()
         if model is None:
             return []
@@ -262,10 +268,11 @@ class SemanticTopicIndex:
                 return []
             qvec = qvec / norm
             with self._lock:
-                if self._matrix is None or not self._keys:
-                    return []
-                sims = (self._matrix @ qvec).tolist()
-            ranked = sorted(zip(self._keys, sims), key=lambda item: (-item[1], item[0]))[:limit]
+                snapshot = self._snapshot
+            if snapshot.matrix is None or not snapshot.keys:
+                return []
+            sims = (snapshot.matrix @ qvec).tolist()
+            ranked = sorted(zip(snapshot.keys, sims), key=lambda item: (-item[1], item[0]))[:limit]
             return [(str(key), float(score)) for key, score in ranked]
         except Exception:
             self._warn_once("search", "semantic recall degraded: query embedding failed")
@@ -274,9 +281,7 @@ class SemanticTopicIndex:
 
     def close(self) -> None:
         with self._lock:
-            self._keys = []
-            self._matrix = None
-            self._signature = None
+            self._snapshot = _IndexSnapshot((), None, None)
 
 
 _GLOBAL_INDEX = SemanticTopicIndex()
