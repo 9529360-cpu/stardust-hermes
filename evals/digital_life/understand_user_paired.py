@@ -190,9 +190,10 @@ def bind_fixture(agent, case, user_turn):
 
 
 def worker(home, case_id, output):
-    import yaml
     uu.assert_home(home)
-    config = yaml.safe_load((home / 'config.yaml').read_text(encoding='utf-8'))
+    # Import only after all HOME variables have been validated for this worker.
+    from hermes_cli.config import load_config_readonly
+    config = load_config_readonly()
     route = config['model']
     data = uu.load_cases()
     case = next(c for c in data['cases'] if c['id'] == case_id)
