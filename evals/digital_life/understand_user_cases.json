@@ -783,6 +783,7 @@
     },
     {
       "id": "c05",
+      "allowed_tools": ["read_file", "search_files", "write_file"],
       "origin": "constructed",
       "class": "stored-not-retrieved",
       "files": {},
@@ -926,6 +927,7 @@
     },
     {
       "id": "c10",
+      "allowed_tools": ["read_file", "search_files", "write_file"],
       "origin": "constructed",
       "class": "outdated-contract",
       "files": {},
