@@ -1,4 +1,4 @@
-"""Local semantic recall leg (DL-P2.10): fastembed + BAAI/bge-small-zh-v1.5.
+"""Local semantic recall leg (DL-P2.10): local ONNX + BAAI/bge-small-zh-v1.5.
 
 A fill-in leg on top of the #584 hybrid ranking, in exactly the mode the
 DL-P2.10 investigation measured ("mode C"): embeddings contribute ONLY
@@ -8,7 +8,7 @@ Measured on the DL-P2.6 benchmark: top-2 0.92->0.94, paraphrase 0.85->0.95,
 irrelevant 0.05->0.04 (D:\\wt\\logs\\DL-P2.10-INV.md).
 
 Process-level singleton mirroring ``tools/memory_hybrid.HybridTopicIndex``:
-fastembed is imported by the background worker with the flag ON;
+the thin ONNX embedder is imported by the background worker with the flag ON;
 model files are cached under ``<home>/cache/fastembed``; topic vectors are
 cached persistently keyed by content hash (``vectors.npz``) so a store
 rewrite or process restart re-embeds only new entries. Every failure mode
@@ -115,17 +115,12 @@ class SemanticTopicIndex:
     # ── model lifecycle ─────────────────────────────────────────────────
 
     def _load_model(self) -> Any:
-        """Load fastembed in-process. Caller holds no lock.
-
-        The fastembed import itself (0.7 s: onnxruntime, requests, the
-        image-model chain) runs in this background thread too, so a starved
-        recall never pays it on the reply path.
-        """
-        from fastembed import TextEmbedding
+        """Load our thin ONNX embedder off-turn. Caller holds no lock."""
+        from tools.memory_embedder import LocalTextEmbedding
 
         cache_dir = _model_cache_dir()
         cache_dir.mkdir(parents=True, exist_ok=True)
-        model = TextEmbedding(model_name=MODEL_NAME, cache_dir=str(cache_dir))
+        model = LocalTextEmbedding(cache_dir=str(cache_dir))
         logger.info("semantic recall model ready (%s, cache %s)", MODEL_NAME, cache_dir)
         return model
 
@@ -143,7 +138,7 @@ class SemanticTopicIndex:
                     "semantic recall disabled: model load/download failed "
                     f"({MODEL_NAME}); keeping hybrid BM25 fill",
                 )
-                logger.debug("fastembed load failure detail", exc_info=True)
+                logger.debug("local ONNX load failure detail", exc_info=True)
                 self._model_loaded.set()
                 return
             with _STATE_LOCK:
@@ -160,7 +155,7 @@ class SemanticTopicIndex:
     def _get_model(self) -> Any:
         """Return the loaded model, or None; never raises into the turn.
 
-        Both the cold download and the warm re-load (fastembed import +
+        Both the cold download and the warm re-load (lazy ONNX import +
         ONNX session, ~0.9 s) run on a daemon thread: a starved recall
         never blocks the reply beyond the flag check. Until the model is
         ready the recall degrades to the hybrid BM25 fill.
