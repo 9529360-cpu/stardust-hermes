@@ -1300,6 +1300,9 @@ def _init_memory(agent, _agent_cfg, skip_memory, platform):
                 )
                 if agent._memory_persistence_enabled:
                     agent._memory_store.load_from_disk()
+            if not skip_memory and is_truthy_value(mem_config.get("semantic_recall"), default=False):
+                from tools.memory_semantic import schedule_session_warm
+                schedule_session_warm()
 
     agent._memory_manager = None
     if not skip_memory and agent._memory_persistence_enabled:
