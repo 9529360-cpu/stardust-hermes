@@ -1285,6 +1285,11 @@ DEFAULT_CONFIG = {
         # External memory provider plugin (empty = built-in only); only ONE at a time: "openviking",
         # "mem0", "hindsight", "holographic", "retaindb", "byterover".
         "provider": "",
+        # Opt-in structured fact pipeline (DL-P2.9): after a conversation the
+        # background review extracts ADD/UPDATE/DELETE/NOOP facts into
+        # memories/FACTS.json with bi-temporal supersede (valid_from/valid_to);
+        # recall appends currently-valid fact lines. Default OFF.
+        "fact_pipeline": False,
     },
     # Subagent delegation — override the provider:model used by delegate_task so children run on a
     # cheaper/faster model. Uses the same runtime provider resolution as CLI/gateway startup, so
