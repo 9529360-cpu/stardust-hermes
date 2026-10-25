@@ -291,6 +291,7 @@ DEFAULT_CONFIG = {
         # Opt-in local missing-command recall; 24h TTL, one advisory per fact.
         "environment_failure_recall": False,
         "cwd": ".",  # Use current directory
+        "cwd_env_policy": "env_first",  # session_first opts out of inherited TERMINAL_CWD
         # Root for terminal session temp files (background logs/pid/exit files, code-exec
         # sandboxes). Empty = TMPDIR/TMP/TEMP if set, else STARDUST_HOME/cache/terminal (auto-pruned
         # after 72h) — NOT tmpfs /tmp, which is RAM-capped and fills under load. Must be an existing

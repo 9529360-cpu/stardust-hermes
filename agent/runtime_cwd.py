@@ -9,6 +9,7 @@ logical cwd via `_SESSION_CWD`.
 
 import logging
 import os
+from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from pathlib import Path
 from typing import Any
@@ -55,7 +56,61 @@ def scope_terminal_cwd() -> str:
         from tools.terminal_scope import terminal_env
     except ImportError:
         return os.environ.get("TERMINAL_CWD", "")
+    override = _SESSION_CWD.get()
+    if override is not _UNSET and override:
+        # Still enforce a refusing terminal scope before returning a session path.
+        terminal_env("TERMINAL_CWD", "")
+        return str(override)
     return terminal_env("TERMINAL_CWD", "")
+
+
+def initial_session_cwd() -> str:
+    """Capture launch cwd once when session_first is enabled.
+
+    A bound gateway/cron/ACP scope already represents an explicit session choice.
+    Remote backends retain their backend namespace rather than acquiring a host cwd.
+    """
+    from tools.terminal_scope import get_terminal_scope, terminal_env
+    override = _SESSION_CWD.get()
+    if override is not _UNSET and override:
+        return str(override)
+    if get_terminal_scope() is not None:
+        return terminal_env("TERMINAL_CWD", "")
+    from hermes_cli.config_effective import load_user_config_effective
+    terminal = load_user_config_effective().get("terminal") or {}
+    configured = str(terminal.get("cwd") or "").strip()
+    if configured and configured not in {".", "./", "auto", "cwd"}:
+        return os.path.expanduser(configured)
+    if terminal_env("TERMINAL_ENV", "local") != "local":
+        return terminal_env("TERMINAL_CWD", "")
+    if terminal.get("cwd_env_policy", "env_first") != "session_first":
+        return terminal_env("TERMINAL_CWD", "") or os.getcwd()
+    return os.getcwd()
+
+
+@contextmanager
+def conversation_cwd(agent, task_id):
+    """Bind prompt and tools to the same session cwd, restoring nested callers."""
+    from tools.terminal_tool import get_session_cwd, record_session_cwd, clear_session_cwd
+    session_id = getattr(agent, "session_id", None)
+    if task_id is None:
+        task_id = session_id or "default"
+    cwd = (get_session_cwd(task_id) if task_id else None) or get_session_cwd(session_id)
+    if not cwd:
+        cwd = getattr(agent, "session_cwd", None) or getattr(agent, "_initial_session_cwd", None)
+    if cwd is None:
+        cwd = initial_session_cwd()
+        agent._initial_session_cwd = cwd
+    record_session_cwd(session_id, cwd)
+    record_session_cwd(task_id, cwd)
+    token = set_session_cwd(cwd)
+    try:
+        yield
+    finally:
+        record_session_cwd(session_id, get_session_cwd(task_id))
+        if session_id and task_id != session_id:
+            clear_session_cwd(task_id)
+        _SESSION_CWD.reset(token)
 
 
 def _existing_dir(raw: str, label: str) -> Path | None:

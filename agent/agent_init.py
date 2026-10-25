@@ -1126,6 +1126,8 @@ def _init_session_state(agent, session_id, session_db, parent_session_id, reason
     checkpoints_enabled, checkpoint_max_snapshots, checkpoint_max_total_size_mb, checkpoint_max_file_size_mb):
     agent.session_start = datetime.now()
     agent.session_id = session_id or new_session_id(agent.session_start)
+    from agent.runtime_cwd import initial_session_cwd
+    agent._initial_session_cwd = initial_session_cwd()
     _publish_session_id(agent.session_id)
 
     # ~/.stardust/sessions/ — kept unconditionally for request_dump_*.json debug breadcrumbs.
