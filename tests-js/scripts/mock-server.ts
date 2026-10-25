@@ -134,32 +134,34 @@ const INTERIM_SCRIPT: ScriptedTurn[] = [
   },
 ]
 
-/** Per-server request counter so we can walk through the script turns. */
+/**
+ * Script cursors are process-wide: one Playwright worker loads this module
+ * once and runs many specs. `startMockServer` and `restartMockServer` both
+ * rewind them so a new server does not inherit the previous test's step.
+ * Verify-on-stop does not use a cursor; its step comes from the request.
+ */
 let _scriptIndex = 0
 let _workProgressIndex = 0
 
-/** Per-server counter for the sidebar-states script (independent from _scriptIndex). */
+/** Sidebar-states script cursor (independent from _scriptIndex). */
 let _sidebarScriptIndex = 0
 
-/** Per-server counter for the cross-session sidebar script. */
+/** Cross-session sidebar script cursor. */
 let _sidebarCrossIndex = 0
 
-/** Per-server counter for the queue-stop script. */
+/** Queue-stop script cursor. */
 let _queueStopIndex = 0
 
-/** Per-server counter for the correction/session-switch script. */
+/** Correction/session-switch script cursor. */
 let _correctionSwitchIndex = 0
 
-/** Per-server counter for the verify-on-stop script. */
-let _verificationStopIndex = 0
-
-/** Per-server counter for the task-panel warm-resume script. */
+/** Task-panel warm-resume script cursor. */
 let _taskPanelResumeIndex = 0
 
 /** User messages received by the mock, for E2E assertions on real submits. */
 const _receivedUserTexts: string[] = []
 
-/** Reset the script indices (called between tests via restartMockServer). */
+/** Rewind every shared script cursor. */
 function resetScriptIndex(): void {
   _scriptIndex = 0
   _workProgressIndex = 0
@@ -167,7 +169,6 @@ function resetScriptIndex(): void {
   _sidebarCrossIndex = 0
   _queueStopIndex = 0
   _correctionSwitchIndex = 0
-  _verificationStopIndex = 0
   _taskPanelResumeIndex = 0
   _receivedUserTexts.length = 0
 }
@@ -327,6 +328,27 @@ function verificationStopScript(writePath: string): ScriptedTurn[] {
 
 export const VERIFICATION_STOP_TRIGGER = 'E2E_VERIFY_ON_STOP_TRIGGER'
 export const VERIFICATION_STOP_TEXT = 'I cannot provide fresh verification evidence for that edit.'
+
+function messageTextIncludes(message: { content?: unknown } | null | undefined, needle: string): boolean {
+  return typeof message?.content === 'string' && message.content.includes(needle)
+}
+
+/**
+ * Step is the number of assistant replies after the triggering user message
+ * in THIS request. A process-wide cursor would keep counting after the
+ * previous spec (or an auxiliary completion that echoes the trigger) and
+ * serve the exhausted-verifier line before any code edit or nudge exists.
+ */
+export function verificationStopTurnFor(
+  messages: readonly { role?: string; content?: unknown }[],
+  writePath: string,
+): ScriptedTurn {
+  const script = verificationStopScript(writePath)
+  const start = messages.findIndex(message => messageTextIncludes(message, VERIFICATION_STOP_TRIGGER))
+  const step = messages.slice(start + 1).filter(message => message?.role === 'assistant').length
+
+  return script[Math.min(step, script.length - 1)]
+}
 
 /**
  * A marker that makes the mock emit a real blocking clarify tool call. Tests
@@ -571,6 +593,8 @@ function autoShowTurnFor(messages: any[], scripts: Record<string, ScriptedTurn[]
  * @returns a handle with `port`, `url`, received user prompts, and `close()`.
  */
 export function startMockServer(options: MockServerOptions = {}): Promise<MockServer> {
+  resetScriptIndex()
+
   return new Promise((resolve, reject) => {
     const receivedPrompts: string[] = []
     let resolveHeldStreamStarted: (() => void) | null = null
@@ -688,8 +712,8 @@ export function startMockServer(options: MockServerOptions = {}): Promise<MockSe
           const isQueueStopTrigger = userText.includes('E2E_QUEUE_STOP_TRIGGER')
           const isTaskPanelResumeTrigger = userText.includes(TASK_PANEL_RESUME_TRIGGER)
 
-          const isVerificationStopTrigger = messages.some(
-            message => typeof message?.content === 'string' && message.content.includes(VERIFICATION_STOP_TRIGGER),
+          const isVerificationStopTrigger = messages.some(message =>
+            messageTextIncludes(message, VERIFICATION_STOP_TRIGGER),
           )
 
           const isCorrectionSwitchTrigger = messages.some(
@@ -818,9 +842,10 @@ export function startMockServer(options: MockServerOptions = {}): Promise<MockSe
           }
 
           if (isVerificationStopTrigger) {
-            const script = verificationStopScript(options.verificationWritePath ?? 'e2e-verification-target.py')
-            const turn = script[_verificationStopIndex] ?? script[script.length - 1]
-            _verificationStopIndex++
+            const turn = verificationStopTurnFor(
+              messages,
+              options.verificationWritePath ?? 'e2e-verification-target.py',
+            )
 
             if (stream) {
               streamScriptedTurn(res, model, turn)
