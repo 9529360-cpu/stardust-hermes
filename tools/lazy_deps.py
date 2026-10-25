@@ -114,7 +114,7 @@ LAZY_DEPS: dict[str, tuple[str, ...]] = {
     "memory.mem0": ("mem0ai==2.0.10",),
     # Local embedding leg for topic recall (memory.semantic_recall);
     # pin mirrored in the `semantic-recall` pyproject extra.
-    "memory.semantic": ("fastembed==0.9.1",),
+    "memory.semantic": ("onnxruntime==1.27.0",),
 
     # ─── Messaging platforms (lazy-installable on demand) ──────────────────
     "platform.telegram": ("python-telegram-bot[webhooks]==22.8",),
