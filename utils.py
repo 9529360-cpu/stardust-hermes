@@ -41,9 +41,10 @@ def file_signature(st: os.stat_result) -> "tuple[int, int, int, int]":
 
     mtime + size alone miss a replacement that preserves both (``cp -p``, ``rsync -t``, a tar
     restore, a script pinning the timestamp with ``os.utime``). The inode changes on an atomic
-    replace and ctime cannot be backdated from user space, so the pair catches those writers.
-    On Windows ``st_ctime_ns`` is creation time, not NTFS ChangeTime; use :func:`path_signature`
-    when same-path in-place rewrites must also invalidate a cache.
+    replace. ctime cannot be backdated, but a filesystem timestamp quantum (about 4ms on this
+    class of ext4) does not move for an in-place rewrite that finishes inside the same tick, so
+    ctime stays equal too. Use :func:`path_signature` when same-path in-place rewrites must
+    invalidate a cache. On Windows ``st_ctime_ns`` is creation time, not NTFS ChangeTime.
     """
     return (st.st_mtime_ns, st.st_size, st.st_ino, st.st_ctime_ns)
 
@@ -97,29 +98,35 @@ def _windows_change_time(path: Union[str, Path]) -> int:
         close_handle(handle)
 
 
+def _content_digest(path: Union[str, Path]) -> bytes:
+    """blake2b-128 of *path*, streamed so a large file does not allocate with its size."""
+    import hashlib
+
+    digest = hashlib.blake2b(digest_size=16)
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(65536), b""):
+            digest.update(chunk)
+    return digest.digest()
+
+
 def path_signature(path: Union[str, Path]) -> tuple:
     """Robust change-detection key for a filesystem path.
 
-    POSIX uses :func:`file_signature`. Windows adds a content digest: on some Windows and
-    virtual filesystems even native ChangeTime remains unchanged after a same-size rewrite
-    with the original mtime restored. Config and env caches must not serve stale contents.
+    Stat metadata misses a same-size in-place rewrite that restores mtime when the
+    timestamp quantum does not advance: ext4 ctime stays put inside one ~4ms tick, and
+    on some Windows and virtual filesystems native ChangeTime stays put as well.
+    Config and env caches must not serve stale contents, so every platform appends a
+    content digest. Windows also records native ChangeTime.
     """
     st = os.stat(path)
     sig = file_signature(st)
+    digest = _content_digest(path)
     if os.name != "nt":
-        return sig
-    # ChangeTime is insufficient on some filesystems even when FileBasicInfo succeeds.
-    # Hash the configuration/state files whose caches use this signature; stream the
-    # input so a misplaced large file does not create a correspondingly large allocation.
-    import hashlib
-    digest = hashlib.blake2b(digest_size=16)
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(65536), b""):
-            digest.update(chunk)
+        return (*sig, digest)
     try:
-        return (*sig, _windows_change_time(path), digest.digest())
+        return (*sig, _windows_change_time(path), digest)
     except OSError:
-        return (*sig, digest.digest())
+        return (*sig, digest)
 
 
 def _preserve_file_mode(path: Path) -> "int | None":
