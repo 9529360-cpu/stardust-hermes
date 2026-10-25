@@ -65,16 +65,44 @@ def _conversation_text(messages: List[Dict]) -> str:
     return joined
 
 
+def _model_reply_text(raw: Any, *, _depth: int = 0) -> str:
+    """Read answer text from SDK objects/dicts, never stringify non-text blocks."""
+    if isinstance(raw, str):
+        return raw
+    if raw is None or _depth >= 6:
+        return ""
+
+    def field(name: str) -> Any:
+        return raw.get(name) if isinstance(raw, dict) else getattr(raw, name, None)
+
+    if isinstance(raw, (list, tuple)):
+        return "".join(_model_reply_text(block, _depth=_depth + 1) for block in raw)
+    kind = field("type")
+    if kind is not None and kind not in ("text", "output_text", "message"):
+        return ""
+    choices = field("choices")
+    if choices is not None:
+        if not isinstance(choices, (list, tuple)) or not choices:
+            return ""
+        first = choices[0]
+        message = first.get("message") if isinstance(first, dict) else getattr(first, "message", None)
+        return _model_reply_text(message, _depth=_depth + 1)
+    for name in ("output_text", "text"):
+        text = field(name)
+        if isinstance(text, str):
+            return text
+    for name in ("content", "output"):
+        content = field(name)
+        if content is not None:
+            return _model_reply_text(content, _depth=_depth + 1)
+    return ""
+
+
 def _parse_model_facts(raw: Any) -> List[Dict[str, Any]]:
     """Tolerantly parse the model's JSON reply; malformed output -> [] (skip)."""
-    text = ""
-    if isinstance(raw, str):
-        text = raw.strip()
-    elif isinstance(raw, dict):
+    if isinstance(raw, dict) and "facts" in raw:
         return _validate_fact_items(raw.get("facts"))
-    elif raw is not None:
-        # Some adapters return a completion object; take .content defensively.
-        text = str(getattr(raw, "content", "") or "").strip()
+    text = _model_reply_text(raw).strip()
     if not text:
         return []
     match = re.search(r"\{.*\}", text, re.DOTALL)
