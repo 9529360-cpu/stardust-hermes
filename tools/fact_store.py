@@ -75,7 +75,7 @@ def _normalize_subject(value: Any) -> str:
     return text.strip("-")[:_MAX_SUBJECT_CHARS]
 
 
-_CACHE_LOCK = threading.Lock()
+_CACHE_LOCK = threading.RLock()  # RLock: recall_facts holds it while calling load_facts -> _read_payload
 _CACHE = {"key": None, "payload": None}  # (path, mtime_ns, size) -> parsed payload
 _SIG_CACHE = {"key": None, "signatures": None, "df": None, "size": 0}
 
