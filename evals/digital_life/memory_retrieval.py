@@ -135,6 +135,51 @@ def write_corpus(home: Path, provenance: bool = False):
     return count
 
 
+def seed_fact_store(home: Path):
+    """DL-P2.9 flag-on variant: seed FACTS.json from the corpus semantics.
+
+    For every outdated-question domain the generator knows both values: the
+    stale fork (e.g. "阿豪的手机是 Pixel 8") and the current answer key. The
+    seed replays exactly what the pipeline would have stored: old fact added,
+    then closed (valid_to set) when the new value arrived — never deleted.
+    """
+    from tools import fact_store as fs
+
+    cases = load_cases()
+    stale_by_topic = {w['topic']: w for w in cases['writes'] if w['phase'] == 'stale-fork'}
+    seen_domains = set()
+    added = closed = 0
+    for q in cases['questions']:
+        if q['category'] != 'outdated' or q.get('stale_topic') not in stale_by_topic:
+            continue
+        domain = q['current_topic']
+        if domain in seen_domains:
+            continue
+        seen_domains.add(domain)
+        stale = stale_by_topic[q['stale_topic']]
+        old = fs.add_fact(
+            subject=domain, predicate='现状',
+            content=stale['summary'].split('（')[0].rstrip('。') + '。',
+            source='fact-seed', source_session_id='corpus-seed',
+            observed_at='2026-09-01T00:00:00+00:00',
+        )
+        added += 1
+        if old.get('success'):
+            closed_row = fs.close_fact(
+                old['target_id'], reason='superseded',
+                valid_to='2026-10-01T00:00:00+00:00',
+            )
+            closed += int(bool(closed_row.get('success')))
+        fs.add_fact(
+            subject=domain, predicate='现状',
+            content=q['answer_key'].rstrip('。') + '。',
+            source='fact-seed', source_session_id='corpus-seed',
+            observed_at='2026-10-20T00:00:00+00:00',
+        )
+        added += 1
+    return {'domains': len(seen_domains), 'added': added, 'closed': closed}
+
+
 def make_agent(session_id: str):
     """Build a REAL AIAgent with memory enabled (skip_memory=False).
 
@@ -385,6 +430,9 @@ def main(argv=None):
     parser.add_argument('--hybrid', action='store_true',
                         help='flag-on variant: set memory.hybrid_recall=true in the home config '
                              '(summary-body scoring + same-domain decay + BM25/RRF fusion)')
+    parser.add_argument('--fact-pipeline', action='store_true',
+                        help='flag-on variant: set memory.fact_pipeline=true and seed FACTS.json '
+                             'from the corpus (stale forks closed, current values open)')
     args = parser.parse_args(argv)
 
     home = assert_home(args.home)
@@ -393,7 +441,7 @@ def main(argv=None):
     output = args.output.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    if args.provenance or args.hybrid:
+    if args.provenance or args.hybrid or args.fact_pipeline:
         # The agent reads memory.* flags through the normal config path; write
         # them into the isolated home before corpus write.
         cfg = home / 'config.yaml'
@@ -404,6 +452,8 @@ def main(argv=None):
             flags.append('  topic_provenance_enabled: true')
         if args.hybrid:
             flags.append('  hybrid_recall: true')
+        if args.fact_pipeline:
+            flags.append('  fact_pipeline: true')
         cfg.write_text('memory:\n' + '\n'.join(flags) + '\n', encoding='utf-8')
 
     tokenizer, tokenizer_label = default_tokenizer()
@@ -413,6 +463,8 @@ def main(argv=None):
     if topics_file.exists():
         raise SystemExit(f'refusing to overwrite populated home: {topics_file}')
     count = write_corpus(home, provenance=args.provenance)
+    if args.fact_pipeline:
+        seed_fact_store(home)
 
     cases = load_cases()
     topics_meta = {row['key']: row for row in cases['topics']}

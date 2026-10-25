@@ -1222,6 +1222,13 @@ def _run_review_in_thread(
         finish_background_review_run(agent, review_run)
         return
     _set_thread_approval_callback(_bg_review_auto_deny)
+    # Structured fact extraction (DL-P2.9): opt-in via memory.fact_pipeline, runs
+    # in this background thread so the user-visible reply latency is unchanged.
+    # Best-effort by contract: never raises, never blocks the review below.
+    with suppress(Exception):
+        from tools.fact_pipeline import run_fact_extraction
+
+        run_fact_extraction(messages_snapshot, source_session_id=str(getattr(agent, "session_id", "") or ""))
     # A client that can't carry Hermes tool calls back would spawn a fork that cannot write
     # anything. Checked BEFORE the thread-scoped silence so the warning is not swallowed; cheap
     # check first so the normal path never resolves the runtime twice.

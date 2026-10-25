@@ -563,6 +563,45 @@ def _hybrid_ranked_keys(
     return ordered_keys
 
 
+def _facts_sidecar(query: str, *, remaining_budget: int) -> list[dict[str, Any]]:
+    """Fact rows (DL-P2.9) matching the query: only when memory.fact_pipeline is
+    ON and the store is non-empty. Rendered as pseudo-topic rows keyed
+    ``fact:<id>`` so the existing fresh/version/budget plumbing carries them;
+    OFF (or empty store) returns [] and recall output is byte-identical."""
+    try:
+        from tools.fact_store import fact_pipeline_enabled, recall_facts
+    except Exception:
+        return []
+    if not fact_pipeline_enabled():
+        return []
+    try:
+        if not fact_store_has_rows():
+            return []
+    except Exception:
+        return []
+    facts = recall_facts(query, limit=3, char_budget=max(0, remaining_budget))
+    return [
+        {
+            "key": f"fact:{fact.get('id')}",
+            "title": "",
+            "summary": str(fact.get("content") or ""),
+            "score": fact.get("score", 0),
+            "version": str(fact.get("valid_from") or fact.get("observed_at") or ""),
+            "_fact": {k: v for k, v in fact.items() if k in ("subject", "content", "observed_at", "confidence")},
+        }
+        for fact in facts
+    ]
+
+
+def fact_store_has_rows() -> bool:
+    try:
+        from tools.fact_store import fact_store_path
+
+        return fact_store_path().exists()
+    except Exception:
+        return False
+
+
 def recall_topic_summaries(
     query: str,
     *,
@@ -676,6 +715,11 @@ def recall_topic_summaries(
         used += cost
         if len(selected) >= limit:
             break
+    # Fact sidecar (DL-P2.9): appended AFTER the topic slots so a fact never
+    # displaces a topic; shares the remaining char budget (recall_facts already
+    # bounded rows to it). Flag OFF / empty store keeps this a no-op and the
+    # return value byte-identical.
+    selected.extend(_facts_sidecar(clean_query, remaining_budget=max(0, char_budget - used)))
     return selected
 
 
@@ -702,10 +746,26 @@ def format_topic_recall(topics: Iterable[dict[str, Any]]) -> str:
     rows = list(topics)
     if not rows:
         return ""
-    parts = [
-        "Relevant topic summaries (current state; use session_search only when exact historical detail is needed):"
-    ]
+    parts: list[str] = []
+    fact_lines: list[str] = []
+    topic_rows = []
     for topic in rows:
+        if isinstance(topic.get("_fact"), dict):
+            fact = topic["_fact"]
+            note_bits = []
+            if fact.get("observed_at"):
+                note_bits.append(f"observed {str(fact['observed_at'])[:10]}")
+            if fact.get("confidence") is not None:
+                note_bits.append(f"conf {fact['confidence']}")
+            note = f" ({'; '.join(note_bits)})" if note_bits else ""
+            fact_lines.append(f"- {fact.get('content')}{note}")
+        else:
+            topic_rows.append(topic)
+    if topic_rows:
+        parts.append(
+            "Relevant topic summaries (current state; use session_search only when exact historical detail is needed):"
+        )
+    for topic in topic_rows:
         note = _provenance_note(topic)
         header = f"### {topic.get('title') or topic.get('key')}"
         body = topic.get("summary") or ""
@@ -715,6 +775,11 @@ def format_topic_recall(topics: Iterable[dict[str, Any]]) -> str:
             parts.append(f"{header}\n{note}\n{body}")
         else:
             parts.append(f"{header}\n{body}")
+    if fact_lines:
+        parts.append(
+            "Current facts about the user (structured store; superseded values are history only):\n"
+            + "\n".join(fact_lines)
+        )
     return "\n\n".join(parts)
 
 
