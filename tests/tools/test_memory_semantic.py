@@ -216,58 +216,40 @@ def test_fallback_first_recall_degrades_while_downloading(topic_home, monkeypatc
 
 
 def test_vector_cache_reused_across_singleton_reset(topic_home, monkeypatch):
+    # numpy only ships in [voice]/[wake] extras; the CI core-test env has
+    # neither (repo precedent: tests/plugins/memory/test_holographic_*).
+    pytest.importorskip("numpy")
     _write(topic_home, _topics())
     calls = []
 
     class Recorder:
-        def __init__(self):
-            self.call = 0
-
+        # Plain float lists (no numpy import): the module converts via
+        # np.asarray, so the stub stays hermetic even without numpy.
         def embed(self, texts, batch_size=32):
-            self.call += 1
             calls.append(list(texts))
-            import numpy as np
-
-            return [np.ones(4, dtype="float32") for _ in texts]
+            return [[1.0, 0.0, 0.0, 0.0] for _ in texts]
 
         def query_embed(self, query):
-            import numpy as np
-
-            return iter([np.ones(4, dtype="float32")])
+            return iter([[1.0, 0.0, 0.0, 0.0]])
 
     real_model = Recorder()
+    # Sync model access (no loader thread): this test targets the vector
+    # cache, not the async load; the thread path has its own tests.
     monkeypatch.setattr(
-        ms.SemanticTopicIndex, "_load_model", lambda self: real_model
+        ms.SemanticTopicIndex, "_get_model", lambda self: real_model
     )
-
-    def _wait_ready(timeout=5.0):
-        import time as _time
-
-        deadline = _time.monotonic() + timeout
-        while _time.monotonic() < deadline:
-            if ms.global_index()._model_state == ms._READY:
-                return True
-            _time.sleep(0.01)
-        return False
 
     topics = _topics()
     rank1 = ms.semantic_rank("什么动物", topics)
-    if not rank1:
-        # First call only armed the loader thread; wait for READY and retry.
-        assert _wait_ready(), "model thread did not become READY"
-        rank1 = ms.semantic_rank("什么动物", topics)
     assert rank1, "expected a ranked result"
 
     # New process = fresh singleton; docs must come from the npz cache, so
     # the (shared) recorder sees no new embed calls.
     ms.reset_global_index()
     monkeypatch.setattr(
-        ms.SemanticTopicIndex, "_load_model", lambda self: real_model
+        ms.SemanticTopicIndex, "_get_model", lambda self: real_model
     )
     rank2 = ms.semantic_rank("什么颜色", topics)
-    if not rank2:
-        assert _wait_ready(), "model thread did not become READY (2nd)"
-        rank2 = ms.semantic_rank("什么颜色", topics)
     assert len(calls) == 1, f"docs re-embedded despite cache: {calls}"
     assert rank2
 
