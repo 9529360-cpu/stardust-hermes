@@ -309,19 +309,31 @@ test('sticky prompts clip scrolling replies without an opaque backing', async ({
 
   // Exercise the production message/edit components as well as the colored
   // clipping markers. Editing replaces the prompt with a display:contents root.
+  //
+  // The real thread first-paints a tail, then prepends older turns in a
+  // transition and restores scroll from the bottom. Sampling `.first()` while
+  // that commit is still outstanding reads a row the clip was never applied
+  // to, so the custom property is empty and the alignment is NaN.
   await page.goto(`${url}?real`)
   const realViewport = page.getByTestId('first-transcript').locator('[data-slot="aui_thread-viewport"]')
-  await realViewport.locator('[data-slot="aui_assistant-message-root"]').first().waitFor()
-  await realViewport
-    .locator('[data-slot="aui_assistant-message-root"]')
-    .first()
-    .evaluate(el => {
-      el.style.height = '900px'
+  const realAssistant = realViewport.locator('[data-message-id="assistant-0"]')
+  const realPrompt = realViewport.locator('[data-message-id="user-0"]')
+  await expect(realAssistant).toBeAttached({ timeout: 20_000 })
+  await expect(realPrompt).toBeAttached({ timeout: 20_000 })
+  await expect
+    .poll(async () => {
+      const before = await realViewport.evaluate(el => el.scrollTop)
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+
+      return (await realViewport.evaluate(el => el.scrollTop)) === before
     })
+    .toBe(true)
+  await realAssistant.evaluate(el => {
+    el.style.height = '900px'
+  })
   await realViewport.evaluate(el => {
     el.scrollTop = 300
   })
-  const realPrompt = realViewport.locator('[data-slot="aui_user-message-root"]').first()
   await realPrompt.getByRole('button', { name: 'Edit message', exact: true }).click()
   const editor = realViewport.getByRole('textbox', { name: 'Edit message', exact: true })
   await expect(editor).toBeVisible()
@@ -331,20 +343,15 @@ test('sticky prompts clip scrolling replies without an opaque backing', async ({
   })
   await expect
     .poll(() =>
-      realViewport
-        .locator('[data-slot="aui_assistant-message-root"]')
-        .first()
-        .evaluate(el => {
-          const prompt = el
-            .closest('[data-slot="aui_message-group"]')!
-            .querySelector('[data-slot="aui_user-message-root"]')!
+      realAssistant.evaluate(el => {
+        const prompt = el.closest('[data-slot="aui_message-group"]')!.querySelector('[data-slot="aui_user-message-root"]')!
 
-          return Math.abs(
-            el.getBoundingClientRect().top +
-              Number.parseFloat(getComputedStyle(el).getPropertyValue('--sticky-prompt-clip')) -
-              prompt.getBoundingClientRect().bottom
-          )
-        })
+        return Math.abs(
+          el.getBoundingClientRect().top +
+            Number.parseFloat(getComputedStyle(el).getPropertyValue('--sticky-prompt-clip')) -
+            prompt.getBoundingClientRect().bottom
+        )
+      })
     )
     .toBeLessThan(1)
 })
