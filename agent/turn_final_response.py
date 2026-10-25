@@ -324,6 +324,7 @@ def finish_text_response(
         final_response = None
         return _verdict("continue")
 
+    final_response = _sg.final_response
     append_message(messages, final_msg)
     # Make the answer durable before leaving the loop (_DB_PERSISTED_MARKER keeps
     # _persist_session idempotent). Failure must NOT abort the turn: finalize retries.

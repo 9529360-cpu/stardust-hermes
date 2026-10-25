@@ -218,6 +218,20 @@ def apply_stop_gates(
         logger.debug("pre_verify nudge issued (attempt %d)", agent._pre_verify_nudges)
         return verdict
 
+    from agent.verification_stop import ignored_nudge_unverified_note
+
+    user_idx = getattr(agent, "_persist_user_message_idx", None)
+    note = ignored_nudge_unverified_note(
+        final_response=final_response, messages=messages, current_turn_user_idx=user_idx,
+        user_message=messages[user_idx].get("content")
+        if isinstance(user_idx, int) and 0 <= user_idx < len(messages) else None,
+        attempts=getattr(agent, "_verification_stop_nudges", 0),
+        refusal_attempts=getattr(agent, "_capability_refusal_continuations", 0),
+    )
+    if note:
+        final_response = final_response + "\n\n" + note
+        final_msg["content"] = final_response
+
     return StopGateVerdict(
         continue_turn=False, final_response=final_response,
         pending_verification_response=pending_verification_response,
