@@ -200,7 +200,7 @@ export function ComposerTriggerPopover({
 
           return (
             <Fragment key={item.id}>
-              {showHeader && (
+              {showHeader && group && (
                 <div className={cn(GROUP_HEADER_CLASS, isFirstHeader ? 'pt-0.5' : 'pt-2')}>
                   {slashSectionLabel(group)}
                 </div>
