@@ -73,7 +73,8 @@ def test_lazy_installable_extras_excluded_from_all():
         "messaging", "slack", "matrix", "dingtalk", "feishu", "google-chat",
         "honcho", "hindsight",
         "supermemory", "mem0",
-        "mistral",  # mistralai — Voxtral STT/TTS, lazy-installed (stt.mistral / tts.mistral)
+        "semantic-recall",  # fastembed — memory.semantic_recall embedding leg
+        "mistral",  # mistralai — Voxtral STT, lazy-installed (stt.mistral / tts.mistral)
     }
     all_extra_specs = optional_dependencies["all"]
     for extra in lazy_covered_extras:
