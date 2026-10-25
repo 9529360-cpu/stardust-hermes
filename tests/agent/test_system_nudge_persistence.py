@@ -26,6 +26,9 @@ def test_internal_continuation_is_not_a_durable_user_turn(tmp_path, monkeypatch,
     assert nudge['role'] == 'user'
     assert nudge['content']
     rows, _ = _db_flush_collect(agent, messages, [])
+    commentary = [row for row in rows if row['role'] == 'assistant']
+    assert commentary[-1]['content'] == 'candidate answer'
+    assert commentary[-1]['display_metadata']['interim_commentary'] is True
     with SessionDB(tmp_path / 'state.db') as db:
         db.create_session(agent.session_id, source='cli')
         db.append_messages_batch(agent.session_id, rows)

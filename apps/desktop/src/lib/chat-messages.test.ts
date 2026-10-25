@@ -140,6 +140,34 @@ describe('toChatMessages', () => {
     expect(messages[3].role).toBe('system')
   })
 
+  it('marks sealed continuation commentary interim when the nudge was not stored', () => {
+    const messages = toChatMessages([
+      { role: 'user', content: 'check files', timestamp: 1 },
+      {
+        role: 'assistant',
+        content: '',
+        timestamp: 2,
+        tool_calls: [{ id: 'tc', function: { name: 'terminal', arguments: '{}' } }]
+      },
+      { role: 'tool', tool_call_id: 'tc', content: 'ok', timestamp: 3 },
+      {
+        role: 'assistant',
+        content: 'I will now check the files.',
+        timestamp: 4,
+        display_metadata: { interim_commentary: true }
+      },
+      { role: 'assistant', content: 'The file check is complete.', timestamp: 6 }
+    ])
+
+    const assistants = messages.filter(message => message.role === 'assistant')
+    expect(assistants).toHaveLength(3)
+    expect(assistants[0].parts.map(part => part.type)).toEqual(['tool-call'])
+    expect(assistants[1].parts.map(part => part.type)).toEqual(['text'])
+    expect(assistants[1].interim).toBe(true)
+    expect(assistants[2].interim).toBeFalsy()
+    expect(messages.some(message => message.autoContinue)).toBe(false)
+  })
+
   it('keeps a turn with interleaved tool-only rows in a single bubble', () => {
     const messages = toChatMessages([
       { role: 'assistant', content: 'Planning.', timestamp: 1 },

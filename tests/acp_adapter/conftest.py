@@ -12,7 +12,24 @@ Tests that assert model-state behavior re-patch these same attributes with
 default is transparent to them.
 """
 
+import importlib.util
+
 import pytest
+
+# The ACP adapter depends on the optional ``acp`` extra
+# (agent-client-protocol). Without it, importing these modules raises
+# ModuleNotFoundError at collection time and hides real failures in a plain
+# ``.[dev]`` environment. Ignore the directory before those imports run, and
+# say so in the pytest header so the skip is visible.
+_ACP_AVAILABLE = importlib.util.find_spec("acp") is not None
+if not _ACP_AVAILABLE:
+    collect_ignore_glob = ["test_*.py"]
+
+
+def pytest_report_header(config):
+    if _ACP_AVAILABLE:
+        return None
+    return "acp extra not installed: tests/acp_adapter skipped"
 
 
 @pytest.fixture(autouse=True)

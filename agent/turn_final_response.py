@@ -44,6 +44,19 @@ class FinalResponseVerdict:
     failed: bool = False
 
 
+def _mark_interim_commentary(message: Dict[str, Any]) -> None:
+    """Remember that this sealed text is continuation commentary, not the answer.
+
+    The user-role nudge that used to sit after it is ephemeral and is not written
+    to the transcript. Renderers can no longer infer interim-ness from a row that
+    is deliberately absent.
+    """
+    meta = message.get("display_metadata")
+    if not isinstance(meta, dict):
+        meta = {}
+    message["display_metadata"] = {**meta, "interim_commentary": True}
+
+
 def finish_text_response(
     agent: Any, *, assistant_message: Any, response: Any, finish_reason: Any, messages: Any,
     api_messages: Any, conversation_history: Any, api_call_count: Any, user_message: Any,
@@ -190,6 +203,7 @@ def finish_text_response(
                 "(%d/2)", codex_ack_continuations + 1,
             )
         interim_msg = agent._build_assistant_message(assistant_message, "incomplete")
+        _mark_interim_commentary(interim_msg)
         if not persist_interim_answer(
             agent, interim_msg, messages, conversation_history, "intent-ack interim flush failed"
         ):
@@ -241,6 +255,7 @@ def finish_text_response(
             _guard_tool,
         )
         interim_msg = agent._build_assistant_message(assistant_message, "incomplete")
+        _mark_interim_commentary(interim_msg)
         if not persist_interim_answer(
             agent,
             interim_msg,
