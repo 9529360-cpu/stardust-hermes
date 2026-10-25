@@ -146,6 +146,14 @@ _V4A_SINGLE_HEADER_RE = re.compile(r'^(\*\*\*\s*(Update|Add|Delete)\s+File:\s*)(
 _V4A_MOVE_HEADER_RE = re.compile(r'^(\*\*\*\s*Move\s+File:\s*)(.+?)\s*->\s*(.+)$', re.MULTILINE)
 
 
+def _file_search_session_anchor_enabled() -> bool:
+    """Opt in per profile; absent or invalid configuration preserves legacy roots."""
+    from hermes_cli.config import load_config_readonly
+
+    tools = load_config_readonly().get("tools")
+    return isinstance(tools, dict) and tools.get("file_search_session_anchor", False) is True
+
+
 def _rewrite_v4a_patch_paths_for_host(patch: str, path_to_resolved: dict, file_ops) -> str:
     """Rewrite V4A file headers to the resolved host paths (host backends only).
 
@@ -1034,8 +1042,12 @@ def search_tool(pattern: str, target: str = "content", path: str = ".",
         if cached_search_nf is not None:
             return cached_search_nf
 
-        result = _get_file_ops(task_id).search(
-            pattern=pattern, path=path, target=target, file_glob=file_glob,
+        file_ops = _get_file_ops(task_id)
+        search_path = path
+        if _file_ops_uses_host_paths(file_ops) and _file_search_session_anchor_enabled():
+            search_path = str(_resolve_path_for_task(path, task_id))
+        result = file_ops.search(
+            pattern=pattern, path=search_path, target=target, file_glob=file_glob,
             limit=limit, offset=offset, output_mode=output_mode, context=context, order=order)
         omitted = _filter_read_blocked_search_results(result, task_id)
         for m in getattr(result, "matches", None) or ():
