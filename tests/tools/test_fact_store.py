@@ -133,6 +133,28 @@ def test_max_facts_guard(store_home, monkeypatch):
     assert res["success"] is False and "already has" in res["error"]
 
 
+def test_same_millisecond_updates_have_distinct_ids_and_recall_current_value(store_home, monkeypatch):
+    monkeypatch.setattr(fs.time, "time", lambda: 1792886400.123)
+    stamp = "2026-10-25T00:00:00+00:00"
+    first = _add(store_home, content="Ah Hao lives in Rome.", observed_at=stamp)
+    second = fs.update_fact(first["target_id"], content="Ah Hao lives in Milan.", observed_at=stamp)
+    third = fs.update_fact(second["target_id"], content="Ah Hao lives in Turin.", observed_at=stamp)
+    assert first["success"] and second["success"] and third["success"]
+    assert len({first["target_id"], second["target_id"], third["target_id"]}) == 3
+    assert [row["content"] for row in fs.recall_facts("Where does Ah Hao live?")] == [
+        "Ah Hao lives in Turin."]
+    assert len(fs.load_facts(include_history=True)) == 3
+    assert [row["id"] for row in fs.fact_history("residence")] == [
+        third["target_id"], second["target_id"], first["target_id"]]
+
+
+def test_loaded_facts_cannot_mutate_cached_store(store_home):
+    _add(store_home, content="Ah Hao lives in Rome.")
+    facts = fs.load_facts()
+    facts[0]["content"] = "Ah Hao lives in Milan."
+    assert [row["content"] for row in fs.load_facts()] == ["Ah Hao lives in Rome."]
+
+
 def test_update_closed_fact_rejected(store_home):
     r1 = _add(store_home, content="Ah Hao works at a bank.")
     fs.close_fact(r1["target_id"], reason="retracted")

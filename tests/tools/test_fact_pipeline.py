@@ -143,6 +143,54 @@ def test_dangerous_content_rejected_by_store(store_home, flag_on):
     assert any(not r.get("success") for r in result["results"])
 
 
+@pytest.mark.parametrize("action", ["ADD", "UPDATE", "DELETE"])
+def test_failed_write_never_changes_recall_or_leaks_into_next_write(store_home, monkeypatch, action):
+    first = fs.add_fact("residence", "city", "Ah Hao lives in Rome.")
+    # Warm both the payload and lexical caches, as a normal recall does.
+    assert fs.recall_facts("Rome.")
+    path = fs.fact_store_path()
+    before = path.read_bytes()
+    operation = {"action": action, "target_id": first["target_id"],
+                 "subject": "residence", "content": "Ah Hao lives in Milan."}
+    with monkeypatch.context() as failure:
+        def reject_replace(*_args):
+            raise OSError("synthetic replace failure")
+        failure.setattr(fs.os, "replace", reject_replace)
+        assert fp.apply_fact_ops([operation])[0]["success"] is False
+    assert path.read_bytes() == before
+    assert [row["content"] for row in fs.load_facts()] == ["Ah Hao lives in Rome."]
+    assert fs.recall_facts("Milan.") == []
+    assert fs.add_fact("editor", "preference", "Ah Hao uses Cursor.")["success"]
+    persisted = json.loads(path.read_text(encoding="utf-8"))["facts"]
+    assert {row["content"] for row in persisted} == {"Ah Hao lives in Rome.", "Ah Hao uses Cursor."}
+    assert not any(row.get("valid_to") for row in persisted)
+    assert not list(path.parent.glob("*.tmp-*"))
+    assert not list(path.parent.glob(".facts.*"))
+
+
+@pytest.mark.parametrize("oversized_tail", [False, True])
+def test_extraction_keeps_latest_correction_after_long_history(store_home, flag_on, oversized_tail):
+    latest = "LATEST_CORRECTION: I now live in Milan."
+    messages = _conv(
+        ("user", "a" * 5980 + " OLD_VALUE: I live in Rome."),
+        ("assistant", "b" * 6100),
+        ("user", ("c" * 13000 if oversized_tail else "") + latest),
+    )
+    captured = []
+    def extract(**kwargs):
+        captured.append(kwargs["messages"][1]["content"])
+        return {"facts": [{"subject": "residence", "content": "Ah Hao lives in Milan."}]}
+    result = fp.run_fact_extraction(messages, call_llm=extract)
+    assert result["counts"] == {"ADD": 1}
+    assert latest in captured[0]
+    if oversized_tail:
+        assert "OLD_VALUE" not in captured[0]
+    else:
+        assert captured[0].index("OLD_VALUE") < captured[0].index(latest)
+    assert len(fp._conversation_text(messages)) <= fp._MAX_CONVERSATION_CHARS
+    assert fs.load_facts()[0]["content"] == "Ah Hao lives in Milan."
+
+
 def test_model_unavailable_skips_safely(store_home, flag_on):
     def unavailable(**kw):
         raise ConnectionError("endpoint unreachable")
