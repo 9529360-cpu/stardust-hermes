@@ -264,7 +264,21 @@ def score_question(q, selected, context, elapsed_ms, tokenizer):
         if q.get(extra):
             related.add(q[extra])
     irrelevant = [k for k in selected if k not in related]
-    outdated_as_current = bool(q.get('stale_topic')) and q.get('stale_topic') in selected[:2]
+    stale_selected = bool(q.get('stale_topic')) and q.get('stale_topic') in selected[:2]
+    outdated_as_current = stale_selected
+    # A retained stale topic is acceptable only when its injected copy is
+    # explicitly marked outdated. Never infer this from a current fact appended
+    # elsewhere: the original topic can still assert the superseded value.
+    if stale_selected:
+        from tools.topic_memory_store import get_topic_summary
+
+        stale = get_topic_summary(q['stale_topic'])
+        if stale:
+            heading = '### ' + str(stale.get('title') or stale.get('key') or '')
+            body = str(context or '').split(heading, 1)
+            if len(body) == 2:
+                injected = body[1].split('\n### ', 1)[0].strip()
+                outdated_as_current = not injected.startswith('[outdated, now:')
     return {
         'id': q['id'],
         'category': q['category'],

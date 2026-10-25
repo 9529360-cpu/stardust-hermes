@@ -365,6 +365,48 @@ def update_fact(
     }
 
 
+def closed_fact_supersessions() -> list[dict[str, Any]]:
+    """Resolve closed supersession chains to current values without mutating history.
+
+    Explicit UPDATE pointers take precedence over observation time (an update
+    can correct a backdated observation). The close-then-add seed path has no
+    pointer: only a superseded closure with a later observation of the same
+    subject AND predicate qualifies. Retractions never invent a replacement.
+    """
+    facts = load_facts(include_history=True)
+    by_id = {str(row.get("id") or ""): row for row in facts}
+    live_by_slot: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for row in facts:
+        if not row.get("valid_to"):
+            slot = (str(row.get("subject") or ""), str(row.get("predicate") or ""))
+            live_by_slot.setdefault(slot, []).append(row)
+    result = []
+    for row in facts:
+        if not row.get("valid_to") or row.get("closed_reason") != "superseded":
+            continue
+        slot = (str(row.get("subject") or ""), str(row.get("predicate") or ""))
+        successor = row
+        seen = set()
+        while successor.get("superseded_by"):
+            pointer = str(successor["superseded_by"])
+            if pointer in seen or pointer not in by_id:
+                break
+            seen.add(pointer)
+            successor = by_id[pointer]
+        live = live_by_slot.get(slot, [])
+        if successor is not row and successor in live:
+            successors = [successor]
+        elif not row.get("superseded_by"):
+            successors = [item for item in live
+                          if str(item.get("observed_at") or "") > str(row.get("observed_at") or "")]
+        else:
+            successors = []
+        if successors:
+            result.append({"subject": slot[0], "old_content": str(row.get("content") or ""),
+                           "current_contents": [str(item.get("content") or "") for item in successors]})
+    return result
+
+
 def fact_history(subject: str) -> list[dict[str, Any]]:
     """Full history (open + closed) for one subject, newest-first."""
     norm = _normalize_subject(subject)
@@ -501,5 +543,5 @@ def fact_pipeline_enabled() -> bool:
 __all__ = [
     "fact_store_path", "load_facts", "add_fact", "update_fact", "close_fact",
     "fact_history", "recall_facts", "format_fact_recall", "find_candidate_facts",
-    "reset_fact_store", "fact_pipeline_enabled",
+    "reset_fact_store", "fact_pipeline_enabled", "closed_fact_supersessions",
 ]

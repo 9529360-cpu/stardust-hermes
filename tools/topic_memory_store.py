@@ -634,6 +634,215 @@ def fact_store_has_rows() -> bool:
         return False
 
 
+def _superseded_value_tokens(old_content: str, current_contents: list[str]) -> list[str]:
+    """Distinguishing value tokens of a superseded statement (DL-P2.9b).
+
+    Latin/digit runs (len>=2 after strip, e.g. ``Pixel 8``) are the strongest
+    distinguishing tokens; runs that also appear in a current value of the same
+    subject (``17`` inside ``iPhone 17`` vs ``Pixel 8``) are common particles,
+    not old-value evidence, and are dropped. When the statement has no latin
+    runs at all (``阿豪用过宜家升降桌``), the CJK bigram/char difference
+    against the current value is used instead, excluding single chars that any
+    Chinese sentence shares (的/是/用).
+    """
+    current_norm = _norm(" ".join(current_contents))
+    runs = [run.strip() for run in re.findall(r"[A-Za-z0-9][A-Za-z0-9 .+-]{1,}", str(old_content or ""))]
+    runs = [run for run in runs if len(run) >= 2 and _norm(run) not in current_norm]
+    if runs:
+        return runs
+    old_signals = _signals(old_content)
+    current_signals = _signals(" ".join(current_contents))
+    diff = old_signals - current_signals
+    return [token for token in diff if len(token) >= 2]
+
+
+# Per-process superseded-value gate cache (DL-P2.9b): extracting value tokens
+# and subject signals for 1000 closed facts dominated gate latency; the derived
+# index is invalidated by the FACTS.json (mtime_ns, size) signature so a store
+# write can never serve a stale gate.
+_gate_index_cache: tuple[Any, dict[str, Any]] | None = None
+# Derived identity fields per topic (norm/signals/stems are pure functions of
+# key+title+keywords; bounded and rebuilt on any change to those fields).
+_gate_topic_cache: dict[tuple, tuple[str, set[str], frozenset[str]]] = {}
+
+
+_gate_result_cache: tuple[Any, dict[str, str]] | None = None
+
+
+def _closed_value_gate(topics: list[dict[str, Any]]) -> dict[str, str]:
+    """Cache one derived injected view, keyed by home, fact file and topic bytes."""
+    from tools.fact_store import fact_pipeline_enabled, fact_store_path
+
+    if not fact_pipeline_enabled():
+        return {}
+    path = fact_store_path()
+    try:
+        stat = path.stat()
+    except OSError:
+        return {}
+    signature = (str(path), stat.st_mtime_ns, stat.st_size, tuple(
+        (str(t.get("key") or ""), str(t.get("title") or ""),
+         str(t.get("summary") or ""), tuple(t.get("keywords") or [])) for t in topics
+    ))
+    global _gate_result_cache
+    cached = _gate_result_cache
+    if cached is not None and cached[0] == signature:
+        return cached[1]
+    result = _compute_closed_value_gate(topics)
+    _gate_result_cache = (signature, result)
+    return result
+
+
+def _compute_closed_value_gate(topics: list[dict[str, Any]]) -> dict[str, str]:
+    """Injected summary replacements; empty values drop wholly stale topics.
+
+    Reuse closed fact history only under memory.fact_pipeline. Subject linkage
+    uses topic identity signals/stems; normalized old-value matches remove
+    sentences from a copy, never from TOPICS.json. An unrelated topic carrying
+    the same value remains eligible. Current sentences cannot whitelist old
+    sentences elsewhere in the summary.
+    """
+    try:
+        from tools.fact_store import (
+            closed_fact_supersessions,
+            fact_pipeline_enabled,
+            fact_store_path,
+        )
+    except Exception:
+        return {}
+    if not fact_pipeline_enabled():
+        return {}
+
+    # Per-entry precomputation, cached on the FACTS.json (mtime_ns, size)
+    # signature (a cache hit skips reading the store at all): a signal ->
+    # entries inverted index keeps linkage subquadratic and a topic only
+    # inspects the supersessions its identity signals hit. Latin subjects
+    # additionally store their stem set; the substring fallback then reduces to
+    # subset checks against the topic's identity stem set.
+    global _gate_index_cache
+    try:
+        stat = fact_store_path().stat()
+        signature = (str(fact_store_path()), stat.st_mtime_ns, stat.st_size)
+    except OSError:
+        signature = None
+    cached_index = _gate_index_cache
+    if signature is not None and cached_index is not None and cached_index[0] == signature:
+        entries_by_signal = cached_index[1]["by_signal"]
+        entries_by_stem = cached_index[1]["by_stem"]
+        entries = cached_index[1]["entries"]
+    else:
+        try:
+            if not fact_store_has_rows():
+                return {}
+            supersessions = closed_fact_supersessions()
+            if not supersessions:
+                return {}
+        except Exception:
+            logger.debug("closed-fact gate unavailable; recall unchanged", exc_info=True)
+            return {}
+
+        def _stems(text: str) -> set[str]:
+            return {stem for stem in re.findall(r"[a-z0-9]+", text)
+                    if len(stem) >= 3 or stem.isdigit()}
+
+        entries_by_signal: dict[str, list[int]] = {}
+        entries_by_stem: dict[str, list[int]] = {}
+        entries: list[tuple[str, frozenset[str], list[tuple[str, list[str]]]]] = []
+        for entry in supersessions:
+            subject_norm = _norm(entry["subject"])
+            currents_norm = [_norm(c) for c in entry["current_contents"] if _norm(c)]
+            tokens_norm = [
+                token_norm
+                for token in _superseded_value_tokens(entry["old_content"], entry["current_contents"])
+                if (token_norm := _norm(token))
+            ]
+            if not tokens_norm:
+                continue
+            subject_stems = frozenset(_stems(subject_norm))
+            index = len(entries)
+            entries.append((subject_norm, subject_stems, [(token, currents_norm) for token in tokens_norm]))
+            for signal in _signals(entry["subject"]):
+                entries_by_signal.setdefault(signal, []).append(index)
+            for stem in subject_stems:
+                entries_by_stem.setdefault(stem, []).append(index)
+        if signature is not None:
+            _gate_index_cache = (signature, {
+                "by_signal": entries_by_signal,
+                "by_stem": entries_by_stem,
+                "entries": entries,
+            })
+
+    if len(_gate_topic_cache) > 512:
+        _gate_topic_cache.clear()
+    suppressed: dict[str, str] = {}
+    for topic in topics:
+        key = str(topic.get("key") or "")
+        if not key or key in suppressed:
+            continue
+        cache_key = (key, str(topic.get("title") or ""),
+                     tuple(str(x) for x in topic.get("keywords") or []))
+        cached_identity = _gate_topic_cache.get(cache_key)
+        if cached_identity is None:
+            # Subject linkage on the identity fields (key/title/keywords).
+            identity = _norm(" ".join([
+                key, str(topic.get("title") or ""),
+                " ".join(str(x) for x in topic.get("keywords") or []),
+            ]))
+            identity_signals = _signals(identity)
+            identity_stems = frozenset(
+                stem for stem in re.findall(r"[a-z0-9]+", identity)
+                if len(stem) >= 3 or stem.isdigit())
+            cached_identity = (identity, identity_signals, identity_stems)
+            _gate_topic_cache[cache_key] = cached_identity
+        identity, identity_signals, identity_stems = cached_identity
+        candidates: set[int] = set()
+        for signal in identity_signals:
+            candidates.update(entries_by_signal.get(signal, ()))
+        # Substring fallback through the stem index: a latin subject links to
+        # the topic only when every subject stem appears in the identity stem
+        # set — exactly when the full subject can be a substring of identity.
+        for index in tuple(candidates):
+            _subject_norm, subject_stems, _pairs = entries[index]
+            if subject_stems and not subject_stems <= identity_stems:
+                candidates.discard(index)
+        stem_candidates: set[int] = set()
+        for stem in identity_stems:
+            stem_candidates.update(entries_by_stem.get(stem, ()))
+        for index in stem_candidates:
+            _subject_norm, subject_stems, _pairs = entries[index]
+            if subject_stems and subject_stems <= identity_stems:
+                candidates.add(index)
+        if not candidates:
+            continue
+        def stale(text: str) -> bool:
+            normalized = _norm(text)
+            for index in candidates:
+                _subject_norm, _stems_set, pairs = entries[index]
+                for token, _currents in pairs:
+                    # Latin value boundaries distinguish Pixel 8 from Pixel 80.
+                    pattern = re.escape(token)
+                    if token[0].isascii() and token[0].isalnum():
+                        pattern = r"(?<![a-z0-9])" + pattern
+                    if token[-1].isascii() and token[-1].isalnum():
+                        pattern += r"(?![a-z0-9])"
+                    if re.search(pattern, normalized):
+                        return True
+            return False
+
+        # A stale title would still be injected even after cleaning the body.
+        if stale(str(topic.get("title") or "")):
+            suppressed[key] = ""
+            continue
+        summary = str(topic.get("summary") or "")
+        # Keep sentence delimiters and all unaffected bytes; only the injected
+        # copy changes. A current sentence elsewhere cannot excuse a stale one.
+        sentences = re.split(r"(?<=[。！？!?\n])|(?<=\.)(?=[ \t])", summary)
+        kept = [sentence for sentence in sentences if not stale(sentence)]
+        if len(kept) != len(sentences):
+            suppressed[key] = "".join(kept).strip()
+    return suppressed
+
+
 def recall_topic_summaries(
     query: str,
     *,
@@ -658,6 +867,15 @@ def recall_topic_summaries(
     # Hybrid rank admission (DL-P2.8b): every non-expired topic is a fusion
     # candidate; the lexical gate still ranks the lexical list.
     eligible = [topic for topic in topics if not (provenance and _expired(topic, now))]
+    # Clean injected copies before all lexical/hybrid/semantic admission.
+    # Whole-topic removal is reserved for stale titles or empty cleaned bodies.
+    gate = _closed_value_gate(eligible)
+    if gate:
+        eligible = [
+            {**topic, "summary": gate[key]} if key in gate else topic
+            for topic in eligible
+            if (key := str(topic.get("key") or "")) not in gate or gate[key]
+        ]
     summary_signals = _summary_signals_for(topics, store_sig) if hybrid else None
     scored = []
     for topic in eligible:
@@ -667,7 +885,7 @@ def recall_topic_summaries(
                 clean_query,
                 query_signals,
                 topic,
-                summary_signals=summary_signals.get(key) if summary_signals else None,
+                summary_signals=(summary_signals.get(key) if summary_signals and key not in gate else None),
             )
         else:
             score = _score(clean_query, query_signals, topic)
