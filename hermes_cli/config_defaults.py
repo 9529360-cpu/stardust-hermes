@@ -1291,6 +1291,8 @@ DEFAULT_CONFIG = {
         # memories/FACTS.json with bi-temporal supersede (valid_from/valid_to);
         # recall appends currently-valid fact lines. Default OFF.
         "fact_pipeline": False,
+        # Opt-in local embedding leg for hybrid topic recall (DL-P2.10).
+        "semantic_recall": False,
     },
     # Subagent delegation — override the provider:model used by delegate_task so children run on a
     # cheaper/faster model. Uses the same runtime provider resolution as CLI/gateway startup, so
