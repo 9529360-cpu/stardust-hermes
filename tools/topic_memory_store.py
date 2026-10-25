@@ -552,7 +552,7 @@ def _hybrid_ranked_keys(
     if not index.ensure(topics, signature):
         return lexical_order
     fts_rank = index.search(query)
-    if not fts_rank:
+    if not fts_rank and lexical_order:
         return lexical_order
     from tools.memory_hybrid import FTS_ADMIT, rrf_fuse
 
@@ -575,10 +575,17 @@ def _hybrid_ranked_keys(
         if semantic_recall_enabled():
             from tools.memory_semantic import semantic_rank
 
-            sem_fill = [key for key, _score in semantic_rank(query, topics, top_k=1, signature=signature)]
+            # BM25 starvation no longer suppresses dense retrieval. This new
+            # admission path needs a cosine floor: unlike the existing BM25
+            # fill, it has no sparse evidence to guard unrelated queries.
+            sem_fill = [
+                key
+                for key, score in semantic_rank(query, topics, top_k=1, signature=signature)
+                if fts_rank or score >= 0.45
+            ]
         if sem_fill:
             ordered_keys += [key for key in sem_fill if key not in ordered_keys]
-        else:
+        elif fts_rank:
             from tools.memory_hybrid import EXTRA_ADMIT_FRACTION, EXTRA_FILL_SLOTS
 
             best = fts_rank[0][1]

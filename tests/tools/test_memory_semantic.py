@@ -265,6 +265,59 @@ def test_vector_cache_corrupt_falls_back_to_reembed(topic_home, monkeypatch):
     assert index.ensure(_topics(), (1, 2, 3)) is False
 
 
+# ── zero-BM25 rescue (F11.2) ─────────────────────────────────────────────
+
+
+@pytest.fixture
+def zero_bm25_adapter(topic_home, monkeypatch):
+    """Exercise real retrieval/cosine ranking with deterministic embeddings."""
+    pytest.importorskip("numpy")
+    rows = [{"key": "vacation", "title": "假期偏好", "keywords": ["海边", "假期"],
+             "summary": "我喜欢在海边度假，听海浪看日落。"}]
+    _write(topic_home, rows)
+
+    class Adapter:
+        def embed(self, texts, batch_size=32):
+            return [[1.0, 0.0] for _ in texts]
+
+        def query_embed(self, query):
+            # The paraphrase clears the rescue floor; unrelated queries do not.
+            return iter([[0.5, 0.8660254] if query == "休憩时爱去沙滩吹风吗"
+                         else [0.1, 0.9949874]])
+
+    monkeypatch.setattr(ms.SemanticTopicIndex, "_get_model", lambda self: Adapter())
+    _flag_on(monkeypatch)
+    return rows
+
+
+def test_zero_bm25_paraphrase_rescued(zero_bm25_adapter):
+    from tools.memory_hybrid import global_index
+
+    query = "休憩时爱去沙滩吹风吗"
+    assert recall_topic_summaries(query, hybrid=False) == []
+    hits = recall_topic_summaries(query, hybrid=True)
+    assert global_index().search(query) == []
+    assert [hit["key"] for hit in hits] == ["vacation"]
+
+
+def test_zero_bm25_unrelated_queries_rejected(zero_bm25_adapter):
+    from tools.memory_hybrid import global_index
+
+    queries = ["quantum entanglement", "database indexing", "rocket propulsion",
+               "compiler design", "stock valuation", "protein folding",
+               "tire pressure", "password encryption", "stellar evolution",
+               "matrix inversion", "ceramic firing", "battery lifespan",
+               "judicial procedure", "virus detection", "earthquake prediction",
+               "steam engines", "algorithm complexity", "fiber transmission",
+               "grape cultivation", "structural loads"]
+    injections = []
+    for query in queries:
+        hits = recall_topic_summaries(query, hybrid=True)
+        assert global_index().search(query) == []
+        injections.extend(hits)
+    assert injections == []
+
+
 # ── OFF byte-identical vs origin/main (DL-P2.7 context-hash method) ────────
 
 
