@@ -205,6 +205,22 @@ class TestLoadConfigDefaults:
             assert config["terminal"]["backend"] == "local"
             assert config["display"]["interim_assistant_messages"] is True
 
+    @pytest.mark.parametrize("memory", [None, {}, {"semantic_recall": True}])
+    def test_semantic_recall_defaults_off_and_preserves_opt_in(self, tmp_path, memory):
+        with patch.dict(os.environ, {"STARDUST_HOME": str(tmp_path)}):
+            if memory is not None:
+                (tmp_path / "config.yaml").write_text(
+                    yaml.safe_dump({"memory": memory}), encoding="utf-8"
+                )
+
+            config = load_config()
+
+            assert DEFAULT_CONFIG["memory"]["semantic_recall"] is False
+            assert config["memory"]["semantic_recall"] is (
+                memory is not None and memory.get("semantic_recall", False)
+            )
+            assert config["memory"]["fact_pipeline"] is False
+
     def test_legacy_root_level_max_turns_migrates_to_agent_config(self, tmp_path):
         with patch.dict(os.environ, {"STARDUST_HOME": str(tmp_path)}):
             config_path = tmp_path / "config.yaml"
