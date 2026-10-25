@@ -366,59 +366,45 @@ def update_fact(
 
 
 def closed_fact_supersessions() -> list[dict[str, Any]]:
-    """Closed facts superseded by a newer open fact, with old/current values.
+    """Resolve closed supersession chains to current values without mutating history.
 
-    Read helper for recall-time suppression (DL-P2.9b): the topic sidecar can
-    only suppress lines, never rewrite stored topics. A closed row counts as
-    superseded when the same subject has a currently-open fact observed later
-    (the UPDATE path records ``superseded_by``; the seed/close-then-add path
-    lands in the same state without the pointer, so the check is on subject +
-    recency, not on the pointer alone). Rows without such a successor (plain
-    close/retraction) carry no replacement value and are skipped: retracted
-    facts are already excluded from recall and a bare close is not a knowledge
-    update.
-
-    Each row carries ``subject``, ``old_content`` and the successor
-    ``current_contents``; value extraction (latin runs vs CJK difference) is
-    the caller's choice, kept out of the store layer.
+    Explicit UPDATE pointers take precedence over observation time (an update
+    can correct a backdated observation). The close-then-add seed path has no
+    pointer: only a superseded closure with a later observation of the same
+    subject AND predicate qualifies. Retractions never invent a replacement.
     """
-    open_by_subject: dict[str, list[dict[str, Any]]] = {}
-    for row in load_facts():
-        open_by_subject.setdefault(str(row.get("subject") or ""), []).append(row)
-    live_ids = {
-        str(row.get("id") or "")
-        for rows in open_by_subject.values()
-        for row in rows
-    }
-    rows: list[dict[str, Any]] = []
-    for row in load_facts(include_history=True):
-        if not str(row.get("valid_to") or "").strip():
+    facts = load_facts(include_history=True)
+    by_id = {str(row.get("id") or ""): row for row in facts}
+    live_by_slot: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for row in facts:
+        if not row.get("valid_to"):
+            slot = (str(row.get("subject") or ""), str(row.get("predicate") or ""))
+            live_by_slot.setdefault(slot, []).append(row)
+    result = []
+    for row in facts:
+        if not row.get("valid_to") or row.get("closed_reason") != "superseded":
             continue
-        subject = str(row.get("subject") or "")
-        # Successor = the explicit superseded_by pointer when it still points
-        # at a live row, else any live row of the subject sorted after the
-        # closed one by (observed_at, id): ids embed a ms clock, so a close and
-        # its replacement written within the same second still order correctly.
-        sort_key = (str(row.get("observed_at") or ""), str(row.get("id") or ""))
-        superseded_by = str(row.get("superseded_by") or "")
-        if superseded_by and superseded_by in live_ids:
-            successors = [
-                succ for succ in open_by_subject.get(subject, [])
-                if str(succ.get("id") or "") == superseded_by
-            ]
+        slot = (str(row.get("subject") or ""), str(row.get("predicate") or ""))
+        successor = row
+        seen = set()
+        while successor.get("superseded_by"):
+            pointer = str(successor["superseded_by"])
+            if pointer in seen or pointer not in by_id:
+                break
+            seen.add(pointer)
+            successor = by_id[pointer]
+        live = live_by_slot.get(slot, [])
+        if successor is not row and successor in live:
+            successors = [successor]
+        elif not row.get("superseded_by"):
+            successors = [item for item in live
+                          if str(item.get("observed_at") or "") > str(row.get("observed_at") or "")]
         else:
-            successors = [
-                succ for succ in open_by_subject.get(subject, [])
-                if (str(succ.get("observed_at") or ""), str(succ.get("id") or "")) > sort_key
-            ]
-        if not successors:
-            continue
-        rows.append({
-            "subject": subject,
-            "old_content": str(row.get("content") or ""),
-            "current_contents": [str(succ.get("content") or "") for succ in successors],
-        })
-    return rows
+            successors = []
+        if successors:
+            result.append({"subject": slot[0], "old_content": str(row.get("content") or ""),
+                           "current_contents": [str(item.get("content") or "") for item in successors]})
+    return result
 
 
 def fact_history(subject: str) -> list[dict[str, Any]]:

@@ -660,35 +660,47 @@ def _superseded_value_tokens(old_content: str, current_contents: list[str]) -> l
 # and subject signals for 1000 closed facts dominated gate latency; the derived
 # index is invalidated by the FACTS.json (mtime_ns, size) signature so a store
 # write can never serve a stale gate.
-_gate_index_cache: dict[str, Any] = {}
-_gate_index_signature: tuple[str, int, int] | None = None
+_gate_index_cache: tuple[Any, dict[str, Any]] | None = None
 # Derived identity fields per topic (norm/signals/stems are pure functions of
 # key+title+keywords; bounded and rebuilt on any change to those fields).
 _gate_topic_cache: dict[tuple, tuple[str, set[str], frozenset[str]]] = {}
 
 
-def _closed_value_gate(topics: list[dict[str, Any]]) -> set[str]:
-    """Keys of candidate topics that state a superseded value (DL-P2.9b).
+_gate_result_cache: tuple[Any, dict[str, str]] | None = None
 
-    Zep/Graphiti excludes invalidated edges from retrieval by default; this is
-    the topic-layer equivalent, gated on ``memory.fact_pipeline`` (flag OFF /
-    empty store / no closed facts returns an empty set and recall is
-    unchanged). For every closed fact superseded by a newer open fact, a
-    candidate topic is suppressed when
 
-    * its key/title/keywords are linked to the fact subject — normalized
-      substring (``phone`` inside ``phone-old``) or CJK signal overlap
-      (``牙医`` vs ``牙医 Rossi（旧）``); latin signals never compare as
-      whole tokens because ``_signals`` keeps ``phone-old`` unsplit,
-    * the topic text carries an OLD value token (see
-      ``_superseded_value_tokens``), and
-    * the topic does NOT also carry a CURRENT value of that subject (a line
-      that states the current value is not presenting the old one as current,
-      even when the current value embeds the old token).
+def _closed_value_gate(topics: list[dict[str, Any]]) -> dict[str, str]:
+    """Cache one derived injected view, keyed by home, fact file and topic bytes."""
+    from tools.fact_store import fact_pipeline_enabled, fact_store_path
 
-    Matching is deterministic and cheap (NFKC + lowercase, substring or signal
-    set ops, no model calls). Suppressed rows are dropped at recall time only
-    — stored topic files are never edited.
+    if not fact_pipeline_enabled():
+        return {}
+    path = fact_store_path()
+    try:
+        stat = path.stat()
+    except OSError:
+        return {}
+    signature = (str(path), stat.st_mtime_ns, stat.st_size, tuple(
+        (str(t.get("key") or ""), str(t.get("title") or ""),
+         str(t.get("summary") or ""), tuple(t.get("keywords") or [])) for t in topics
+    ))
+    global _gate_result_cache
+    cached = _gate_result_cache
+    if cached is not None and cached[0] == signature:
+        return cached[1]
+    result = _compute_closed_value_gate(topics)
+    _gate_result_cache = (signature, result)
+    return result
+
+
+def _compute_closed_value_gate(topics: list[dict[str, Any]]) -> dict[str, str]:
+    """Injected summary replacements; empty values drop wholly stale topics.
+
+    Reuse closed fact history only under memory.fact_pipeline. Subject linkage
+    uses topic identity signals/stems; normalized old-value matches remove
+    sentences from a copy, never from TOPICS.json. An unrelated topic carrying
+    the same value remains eligible. Current sentences cannot whitelist old
+    sentences elsewhere in the summary.
     """
     try:
         from tools.fact_store import (
@@ -697,9 +709,9 @@ def _closed_value_gate(topics: list[dict[str, Any]]) -> set[str]:
             fact_store_path,
         )
     except Exception:
-        return set()
+        return {}
     if not fact_pipeline_enabled():
-        return set()
+        return {}
 
     # Per-entry precomputation, cached on the FACTS.json (mtime_ns, size)
     # signature (a cache hit skips reading the store at all): a signal ->
@@ -707,34 +719,35 @@ def _closed_value_gate(topics: list[dict[str, Any]]) -> set[str]:
     # inspects the supersessions its identity signals hit. Latin subjects
     # additionally store their stem set; the substring fallback then reduces to
     # subset checks against the topic's identity stem set.
-    global _gate_index_cache, _gate_index_signature
+    global _gate_index_cache
     try:
         stat = fact_store_path().stat()
-        signature = (str(stat), stat.st_mtime_ns, stat.st_size)
+        signature = (str(fact_store_path()), stat.st_mtime_ns, stat.st_size)
     except OSError:
         signature = None
-    if signature is not None and _gate_index_signature == signature and _gate_index_cache is not None:
-        entries_by_signal = _gate_index_cache["by_signal"]
-        entries_by_stem = _gate_index_cache["by_stem"]
-        entries = _gate_index_cache["entries"]
+    cached_index = _gate_index_cache
+    if signature is not None and cached_index is not None and cached_index[0] == signature:
+        entries_by_signal = cached_index[1]["by_signal"]
+        entries_by_stem = cached_index[1]["by_stem"]
+        entries = cached_index[1]["entries"]
     else:
         try:
             if not fact_store_has_rows():
-                return set()
+                return {}
             supersessions = closed_fact_supersessions()
             if not supersessions:
-                return set()
+                return {}
         except Exception:
             logger.debug("closed-fact gate unavailable; recall unchanged", exc_info=True)
-            return set()
+            return {}
 
         def _stems(text: str) -> set[str]:
             return {stem for stem in re.findall(r"[a-z0-9]+", text)
-                    if len(stem) >= 3 and not stem.isdigit()}
+                    if len(stem) >= 3 or stem.isdigit()}
 
         entries_by_signal: dict[str, list[int]] = {}
         entries_by_stem: dict[str, list[int]] = {}
-        entries: list[tuple[str, frozenset[str], list[str]]] = []  # (subject_norm, subject_stems, pairs)
+        entries: list[tuple[str, frozenset[str], list[tuple[str, list[str]]]]] = []
         for entry in supersessions:
             subject_norm = _norm(entry["subject"])
             currents_norm = [_norm(c) for c in entry["current_contents"] if _norm(c)]
@@ -753,14 +766,15 @@ def _closed_value_gate(topics: list[dict[str, Any]]) -> set[str]:
             for stem in subject_stems:
                 entries_by_stem.setdefault(stem, []).append(index)
         if signature is not None:
-            _gate_index_cache = {
+            _gate_index_cache = (signature, {
                 "by_signal": entries_by_signal,
                 "by_stem": entries_by_stem,
                 "entries": entries,
-            }
-            _gate_index_signature = signature
+            })
 
-    suppressed: set[str] = set()
+    if len(_gate_topic_cache) > 512:
+        _gate_topic_cache.clear()
+    suppressed: dict[str, str] = {}
     for topic in topics:
         key = str(topic.get("key") or "")
         if not key or key in suppressed:
@@ -777,7 +791,7 @@ def _closed_value_gate(topics: list[dict[str, Any]]) -> set[str]:
             identity_signals = _signals(identity)
             identity_stems = frozenset(
                 stem for stem in re.findall(r"[a-z0-9]+", identity)
-                if len(stem) >= 3 and not stem.isdigit())
+                if len(stem) >= 3 or stem.isdigit())
             cached_identity = (identity, identity_signals, identity_stems)
             _gate_topic_cache[cache_key] = cached_identity
         identity, identity_signals, identity_stems = cached_identity
@@ -787,6 +801,10 @@ def _closed_value_gate(topics: list[dict[str, Any]]) -> set[str]:
         # Substring fallback through the stem index: a latin subject links to
         # the topic only when every subject stem appears in the identity stem
         # set — exactly when the full subject can be a substring of identity.
+        for index in tuple(candidates):
+            _subject_norm, subject_stems, _pairs = entries[index]
+            if subject_stems and not subject_stems <= identity_stems:
+                candidates.discard(index)
         stem_candidates: set[int] = set()
         for stem in identity_stems:
             stem_candidates.update(entries_by_stem.get(stem, ()))
@@ -796,23 +814,32 @@ def _closed_value_gate(topics: list[dict[str, Any]]) -> set[str]:
                 candidates.add(index)
         if not candidates:
             continue
-        text = _norm(" ".join([
-            key,
-            str(topic.get("title") or ""),
-            str(topic.get("summary") or ""),
-            " ".join(str(x) for x in topic.get("keywords") or []),
-        ]))
-        for index in candidates:
-            _subject_norm, _stems_set, pairs = entries[index]
-            currents_norm = pairs[0][1]
-            if any(c in text for c in currents_norm):
-                continue  # line already states the current value
-            for token_norm, _ in pairs:
-                if token_norm in text:
-                    suppressed.add(key)
-                    break
-            if key in suppressed:
-                break
+        def stale(text: str) -> bool:
+            normalized = _norm(text)
+            for index in candidates:
+                _subject_norm, _stems_set, pairs = entries[index]
+                for token, _currents in pairs:
+                    # Latin value boundaries distinguish Pixel 8 from Pixel 80.
+                    pattern = re.escape(token)
+                    if token[0].isascii() and token[0].isalnum():
+                        pattern = r"(?<![a-z0-9])" + pattern
+                    if token[-1].isascii() and token[-1].isalnum():
+                        pattern += r"(?![a-z0-9])"
+                    if re.search(pattern, normalized):
+                        return True
+            return False
+
+        # A stale title would still be injected even after cleaning the body.
+        if stale(str(topic.get("title") or "")):
+            suppressed[key] = ""
+            continue
+        summary = str(topic.get("summary") or "")
+        # Keep sentence delimiters and all unaffected bytes; only the injected
+        # copy changes. A current sentence elsewhere cannot excuse a stale one.
+        sentences = re.split(r"(?<=[。！？!?\n])|(?<=\.)(?=[ \t])", summary)
+        kept = [sentence for sentence in sentences if not stale(sentence)]
+        if len(kept) != len(sentences):
+            suppressed[key] = "".join(kept).strip()
     return suppressed
 
 
@@ -840,13 +867,15 @@ def recall_topic_summaries(
     # Hybrid rank admission (DL-P2.8b): every non-expired topic is a fusion
     # candidate; the lexical gate still ranks the lexical list.
     eligible = [topic for topic in topics if not (provenance and _expired(topic, now))]
-    # Superseded-value gate (DL-P2.9b): flag ON + closed facts with recorded
-    # successors drop candidate topics that state the old value as current.
-    # Applied to the candidate list BEFORE scoring so gated rows can never
-    # surface through the lexical, hybrid-fusion, or sidecar backfill paths.
+    # Clean injected copies before all lexical/hybrid/semantic admission.
+    # Whole-topic removal is reserved for stale titles or empty cleaned bodies.
     gate = _closed_value_gate(eligible)
     if gate:
-        eligible = [topic for topic in eligible if str(topic.get("key") or "") not in gate]
+        eligible = [
+            {**topic, "summary": gate[key]} if key in gate else topic
+            for topic in eligible
+            if (key := str(topic.get("key") or "")) not in gate or gate[key]
+        ]
     summary_signals = _summary_signals_for(topics, store_sig) if hybrid else None
     scored = []
     for topic in eligible:
@@ -856,7 +885,7 @@ def recall_topic_summaries(
                 clean_query,
                 query_signals,
                 topic,
-                summary_signals=summary_signals.get(key) if summary_signals else None,
+                summary_signals=(summary_signals.get(key) if summary_signals and key not in gate else None),
             )
         else:
             score = _score(clean_query, query_signals, topic)
