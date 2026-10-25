@@ -2,6 +2,7 @@
 
 import concurrent.futures
 import threading
+import time
 
 import pytest
 
@@ -17,6 +18,14 @@ class Embeddings:
 
 
 ROWS = [{"key": key, "title": key} for key in ("alpha", "beta")]
+
+
+def ensure_ready(index, rows, signature):
+    deadline = time.monotonic() + 5
+    while not index.ensure(rows, signature):
+        assert time.monotonic() < deadline, "index never became ready"
+        time.sleep(.001)
+    return True
 
 
 @pytest.fixture
@@ -50,21 +59,21 @@ def test_rebuild_after_search_unlock_keeps_scores_with_original_keys(index):
     index._lock = lock
     wrong = 0
     for i in range(120):
-        assert index.ensure(ROWS, (i * 2, 0, 2))
-        lock.rebuild = lambda i=i: index.ensure(ROWS[::-1], (i * 2 + 1, 0, 2))
+        assert ensure_ready(index, ROWS, (i * 2, 0, 2))
+        lock.rebuild = lambda i=i: ensure_ready(index, ROWS[::-1], (i * 2 + 1, 0, 2))
         result = index.search("alpha")
         wrong += result != [("alpha", 1.0), ("beta", 0.0)]
     assert wrong == 0, f"wrong-key results: {wrong}/120"
 
 
 def test_unforced_concurrent_search_and_rebuild(index):
-    assert index.ensure(ROWS, (0, 0, 2))
+    assert ensure_ready(index, ROWS, (0, 0, 2))
     start = threading.Barrier(2)
 
     def rebuild():
         start.wait(timeout=10)
         for i in range(1200):
-            assert index.ensure(ROWS if i % 2 else ROWS[::-1], (i + 1, 0, 2))
+            assert ensure_ready(index, ROWS if i % 2 else ROWS[::-1], (i + 1, 0, 2))
 
     def search():
         start.wait(timeout=10)
@@ -79,14 +88,14 @@ def test_unforced_concurrent_search_and_rebuild(index):
 
 
 def test_published_generation_survives_rebuild_failure_empty_and_close(index):
-    assert index.ensure(ROWS, (1, 0, 2))
+    assert ensure_ready(index, ROWS, (1, 0, 2))
     original = index._snapshot
     assert original.keys == ("alpha", "beta")
     assert original.generation == (1, 0, 2)
     with pytest.raises(ValueError):
         original.matrix[0, 0] = 0
 
-    assert index.ensure(ROWS[::-1], (2, 0, 2))
+    assert ensure_ready(index, ROWS[::-1], (2, 0, 2))
     assert index._snapshot.keys == ("beta", "alpha")
     assert original.keys == ("alpha", "beta")
     assert original.matrix.tolist() == [[1.0, 0.0], [0.0, 1.0]]
@@ -98,6 +107,9 @@ def test_published_generation_survives_rebuild_failure_empty_and_close(index):
     published = index._snapshot
     index._model = Broken()
     assert not index.ensure([{"key": "new", "title": "new"}], (3, 0, 1))
+    worker = index._worker
+    if worker is not None:
+        worker.join(5)
     assert index._snapshot is published
     assert index.search("alpha")[0] == ("alpha", 1.0)
     assert not index.ensure([], (4, 0, 0))
