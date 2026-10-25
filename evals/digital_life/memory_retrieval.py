@@ -430,6 +430,10 @@ def main(argv=None):
     parser.add_argument('--hybrid', action='store_true',
                         help='flag-on variant: set memory.hybrid_recall=true in the home config '
                              '(summary-body scoring + same-domain decay + BM25/RRF fusion)')
+    parser.add_argument('--semantic', action='store_true',
+                        help='flag-on variant: additionally set memory.semantic_recall=true '
+                             '(local embedding fill-in leg on starved lexical gates; requires '
+                             'fastembed, downloads bge-small-zh-v1.5 on first starved recall)')
     parser.add_argument('--fact-pipeline', action='store_true',
                         help='flag-on variant: set memory.fact_pipeline=true and seed FACTS.json '
                              'from the corpus (stale forks closed, current values open)')
@@ -441,7 +445,7 @@ def main(argv=None):
     output = args.output.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    if args.provenance or args.hybrid or args.fact_pipeline:
+    if args.provenance or args.hybrid or args.semantic or args.fact_pipeline:
         # The agent reads memory.* flags through the normal config path; write
         # them into the isolated home before corpus write.
         cfg = home / 'config.yaml'
@@ -450,8 +454,10 @@ def main(argv=None):
         flags = []
         if args.provenance:
             flags.append('  topic_provenance_enabled: true')
-        if args.hybrid:
+        if args.hybrid or args.semantic:
             flags.append('  hybrid_recall: true')
+        if args.semantic:
+            flags.append('  semantic_recall: true')
         if args.fact_pipeline:
             flags.append('  fact_pipeline: true')
         cfg.write_text('memory:\n' + '\n'.join(flags) + '\n', encoding='utf-8')
@@ -489,7 +495,8 @@ def main(argv=None):
             'tokenizer': tokenizer_label,
             'topic_recall_limit': TOPIC_RECALL_LIMIT,
             'provenance': bool(args.provenance),
-            'hybrid': bool(args.hybrid),
+            'hybrid': bool(args.hybrid) or bool(args.semantic),
+            'semantic': bool(args.semantic),
             'timestamp_utc': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
         },
         'retrieval': summary,
