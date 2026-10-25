@@ -83,3 +83,54 @@ def test_flag_off_keeps_original_prompt_and_results(selective_home, monkeypatch)
         assert kwargs["messages"][1]["content"] == "Conversation:\nuser: 你好\n\nExtract facts."
         return {"facts": []}
     assert fact_pipeline.run_fact_extraction([{"role": "user", "content": "你好"}], call_llm=model)["skipped"] == "no-facts"
+
+
+@pytest.mark.parametrize("reply", [None, "not JSON", {"facts": {}}, {"choices": []}])
+def test_malformed_reply_leaves_store_unchanged(selective_home, reply):
+    fact_store.add_fact("city", "location", "用户住在米兰。")
+    path = selective_home / "memories" / "FACTS.json"
+    before = path.read_bytes()
+    fact_pipeline.run_fact_extraction([{"role": "user", "content": "我现在住在罗马。"}], call_llm=lambda **kw: reply)
+    assert path.read_bytes() == before
+
+
+def test_same_subject_correction_updates_instead_of_adding(selective_home):
+    fact_store.add_fact("city", "location", "用户住在米兰。")
+    fid = fact_store.load_facts()[0]["id"]
+    result = fact_pipeline.run_fact_extraction([{"role": "user", "content": "我现在长期住在罗马。"}], call_llm=lambda **kw: {"facts": [
+        {"subject": "city", "predicate": "location", "content": "用户住在罗马。", "category": "correction-of-existing", "action": "UPDATE", "target_id": fid},
+    ]})
+    assert result["counts"] == {"UPDATE": 1}
+    current = fact_store.load_facts()
+    assert len(current) == 1 and current[0]["content"] == "用户住在罗马。"
+    assert len(fact_store.load_facts(include_history=True)) == 2
+
+
+@pytest.mark.parametrize("reply", [
+    {"choices": [{"message": {"content": '{"facts": [{"subject": "language", "content": "用户偏好中文。", "category": "durable", "action": "ADD"}]}'}}]},
+    {"output_text": '{"facts": [{"subject": "language", "content": "用户偏好中文。", "category": "durable", "action": "ADD"}]}'},
+])
+
+def test_provider_envelopes_store_facts(selective_home, reply):
+    fact_pipeline.run_fact_extraction([{"role": "user", "content": "我长期偏好中文。"}], call_llm=lambda **kw: reply)
+    assert [r["content"] for r in fact_store.load_facts()] == ["用户偏好中文。"]
+
+
+def test_exact_content_across_subjects_is_noop(selective_home):
+    fact_store.add_fact("language", "preference", "用户偏好中文。")
+    result = fact_pipeline.run_fact_extraction([{"role": "user", "content": "我偏好中文。"}], call_llm=lambda **kw: {"facts": [
+        {"subject": "reply_language", "content": "用户偏好中文。", "category": "durable", "action": "ADD"},
+    ]})
+    assert result["counts"] == {"NOOP": 1}
+    assert len(fact_store.load_facts()) == 1
+
+
+def test_repeated_update_target_has_one_current_value(selective_home):
+    fact_store.add_fact("city", "location", "用户住在米兰。")
+    fid = fact_store.load_facts()[0]["id"]
+    result = fact_pipeline.run_fact_extraction([{"role": "user", "content": "我已搬到罗马，更正，现在住在都灵。"}], call_llm=lambda **kw: {"facts": [
+        {"subject": "city", "content": "用户住在罗马。", "category": "durable", "action": "UPDATE", "target_id": fid},
+        {"subject": "city", "content": "用户住在都灵。", "category": "durable", "action": "UPDATE", "target_id": fid},
+    ]})
+    assert result["counts"] == {"UPDATE": 1}
+    assert [r["content"] for r in fact_store.load_facts()] == ["用户住在都灵。"]

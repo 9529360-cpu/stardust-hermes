@@ -63,9 +63,10 @@ def classify_text(text: str) -> str | None:
 
 
 def _reply_items(reply):
-    if not isinstance(reply, (str, dict)):
-        choices = getattr(reply, "choices", None)
-        reply = getattr(choices[0].message, "content", "") if choices else getattr(reply, "content", "")
+    from tools.fact_pipeline import _model_reply_text
+
+    if not (isinstance(reply, dict) and "facts" in reply):
+        reply = _model_reply_text(reply)
     if isinstance(reply, str):
         match = re.search(r"\{.*\}", reply, re.S)
         if not match:
@@ -138,12 +139,20 @@ def extract(messages, *, source_session_id="", call_llm=None):
             if action == "UPDATE" and isinstance(target, str) and target in allowed:
                 candidate["subject"] = allowed[target]["subject"]
                 op = dict(candidate, action="UPDATE", target_id=target, reason="selective-superseded")
+                # A batch can contain successive corrections to one shown row.
+                # Apply only its final value; the original id closes once.
+                ops = [prior for prior in ops if not (
+                    prior["action"] == "UPDATE" and prior.get("target_id") == target
+                )]
             elif action == "NOOP":
                 op = dict(candidate, action="NOOP", reason="selective-noop")
             elif action == "ADD":
                 # Reuse deterministic exact duplicate checks, but a model ADD
                 # must never overwrite another attribute with the same domain.
-                decided = decide_fact_ops([candidate], source_session_id=source_session_id)
+                exact = next((row for row in fact_store.find_candidate_facts(candidate["content"], top_k=20)
+                              if fact_store._same_fact(candidate["content"], row["content"])), None)
+                decided = ([dict(candidate, action="NOOP", target_id=exact["id"], reason="duplicate")]
+                           if exact else decide_fact_ops([candidate], source_session_id=source_session_id))
                 if not decided:
                     continue
                 op = decided[0]
