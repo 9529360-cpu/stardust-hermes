@@ -287,6 +287,10 @@ def run_fact_extraction(
 
     if not fact_pipeline_enabled():
         return {"skipped": "flag-off"}
+    from tools.fact_selectivity import enabled, extract
+
+    if enabled():
+        return extract(messages, source_session_id=source_session_id, call_llm=call_llm)
     text = _conversation_text(messages)
     if not text:
         return {"skipped": "empty-conversation"}
