@@ -77,7 +77,7 @@ HOME_VARS = ('HOME', 'USERPROFILE', 'STARDUST_HOME', 'HERMES_HOME', 'TEMP', 'TMP
 FORBIDDEN_HOME = Path('D:/Stardust/home').resolve()
 
 PERSONA_FILES = ('SOUL.md', 'AGENTS.md', 'USER.md')
-MAX_AGENT_API_CALLS = 2   # spec: at most 2 agent calls per case per run
+MAX_AGENT_API_CALLS = 4   # main-agent calls per arm; paired admission reserves judge separately
 JUDGE_MAX_CALLS = 30      # one judge call per case maximum
 
 DEFAULT_GATEWAY = 'http://127.0.0.1:3425/v1'

@@ -1,10 +1,10 @@
 """Budgeted paired understand-user eval; subprocess isolation per arm/case.
 
-Each arm reserves two main requests + one paraphrase judge (+ one intent
+Each arm reserves four main requests + one paraphrase judge (+ one intent
 sidecar if enabled). Title, background review, compression and exhaustion
-summary are disabled identically. Only completed pairs enter raw aggregates.
-The inference relay enforces both the reservation and the global wire cap,
-including SDK retries. A stopped/failed arm invalidates its entire pair.
+summary are disabled identically. Incomplete answers count as failed rows.
+Pairs reserve their worst-case cost before either arm starts, then release
+unused capacity. Transport failures invalidate the run; wire caps include retries.
 """
 from __future__ import annotations
 
@@ -60,23 +60,28 @@ def flag_config(arm, profile):
 
 
 def case_cost(config):
-    return 3 + int(bool(config.get('agent', {}).get('turn_intent_llm')))
+    return uu.MAX_AGENT_API_CALLS + 1 + int(bool(config.get('agent', {}).get('turn_intent_llm')))
 
 
 def run_pairs(cases, run, *, cap, configs=None):
     configs = configs or {'off': {}, 'on': {}}
     costs = {arm: case_cost(configs[arm]) for arm in ('off', 'on')}
-    result = {'pairs': [], 'reserved': 0, 'per_arm_cost': costs, 'stop_reason': 'complete'}
+    result = {'pairs': [], 'reserved': 0, 'consumed': 0, 'per_arm_cost': costs, 'stop_reason': 'complete'}
     for case in cases:
         cost = sum(costs.values())
-        if result['reserved'] + cost > cap:
+        if result['consumed'] + cost > cap:
             result['stop_reason'] = 'budget'
             break
         result['reserved'] += cost
         pair = {'id': case['id'], 'reservation': cost}
         try:
             for arm in ('off', 'on'):
-                pair[arm] = run(case, arm, costs[arm])
+                row = run(case, arm, costs[arm])
+                if row.get('run_completed') is False:
+                    row['passed'] = False
+                    row['failure_reason'] = row.get('turn_exit_reason') or 'agent incomplete'
+                pair[arm] = row
+                result['consumed'] += row.get('inference_posts', costs[arm])
         except Exception as exc:
             result.update(stop_reason=type(exc).__name__, incomplete={'id': case['id']})
             break
@@ -128,11 +133,12 @@ class CountingRelay:
                     with owner.lock:
                         owner.calls.append({'method': self.command, 'path': urlsplit(self.path).path,
                                             'status': response.status, 'forwarded': True})
-                        if response.status == 429:
+                        if inference and response.status >= 400:
                             owner.stopped.set()
-                    # Do not expose a retryable 429 to the SDK; controller also
-                    # terminates the owned worker and writes an incomplete result.
-                    self.send_response(400 if response.status == 429 else response.status)
+                    # Do not expose retryable inference failures to the SDK;
+                    # metadata discovery preserves the upstream status.
+                    self.send_response(400 if inference and response.status >= 400
+                                       else response.status)
                     for key, value in response.getheaders():
                         if key.lower() not in ('transfer-encoding', 'connection', 'content-length'):
                             self.send_header(key, value)
@@ -167,7 +173,7 @@ class CountingRelay:
 def bind_fixture(agent, case, user_turn):
     """File-only contract v2: expose fixture paths, never host process tools.
 
-    Two calls suffice for a direct file action followed by a normal answer.
+    Four calls allow search, read, and a normal final answer.
     The old unrestricted terminal/discovery surface spent those calls inspecting
     the host or discovering tools; its finalizer then made an unplanned summary.
     This contract changes task setup, never expected constraints or score rules.
@@ -261,6 +267,7 @@ def main(argv=None):
                        OPENAI_API_KEY='local-gateway', OPENAI_BASE_URL=endpoint)
             row_path = case_home / 'row.json'
             relay.allowance, relay.arm_calls = reservation, 0
+            failure_reason = None
             with (case_home / 'worker.log').open('w', encoding='utf-8') as log:
                 proc = subprocess.Popen([sys.executable, '-B', '-m',
                     'evals.digital_life.understand_user_paired', '--home',
@@ -275,16 +282,19 @@ def main(argv=None):
                             if relay.stopped.is_set():
                                 raise RuntimeError('inference transport stopped')
                     else:
-                        raise TimeoutError('case exceeded 300 seconds')
+                        failure_reason = 'case exceeded 300 seconds'
                 finally:
                     if proc.poll() is None:
                         proc.terminate()
                         proc.wait(timeout=10)
-            if relay.stopped.is_set() or proc.returncode or not row_path.exists():
-                raise RuntimeError('incomplete arm')
-            row = json.loads(row_path.read_text(encoding='utf-8'))
-            if not row.pop('run_completed', False):
-                raise RuntimeError('agent failed')
+            if relay.stopped.is_set():
+                raise RuntimeError('inference transport stopped')
+            if failure_reason or proc.returncode or not row_path.exists():
+                row = uu.score_case(case, [], '')
+                row.update(run_completed=False, turn_exit_reason=failure_reason or
+                           f'worker exit {proc.returncode}; no completed row')
+            else:
+                row = json.loads(row_path.read_text(encoding='utf-8'))
             row['inference_posts'] = relay.arm_calls
             print(json.dumps({'case': case['id'], 'arm': arm, 'reserved': reservation,
                               'actual': relay.arm_calls, 'passed': row['passed']}), flush=True)
