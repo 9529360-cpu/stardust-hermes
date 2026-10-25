@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import sys
 import threading
+import time
 
 import pytest
 
@@ -77,7 +78,7 @@ def _fake_sem(monkeypatch, ranking):
     stub = ms.SemanticTopicIndex()
     captured = {}
 
-    def fake_search(query, limit=ms.SEMANTIC_FETCH):
+    def fake_search(query, limit=ms.SEMANTIC_FETCH, **kwargs):
         captured["query"] = query
         return list(ranking)
 
@@ -89,6 +90,16 @@ def _fake_sem(monkeypatch, ranking):
     stub.search = fake_search
     monkeypatch.setattr(ms, "global_index", lambda: stub)
     return captured
+
+
+def _wait_for_rank(query, topics):
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        rank = ms.semantic_rank(query, topics)
+        if rank:
+            return rank
+        time.sleep(.001)
+    pytest.fail("semantic index did not warm")
 
 
 def _flag_on(monkeypatch):
@@ -205,7 +216,7 @@ def test_fallback_first_recall_degrades_while_downloading(topic_home, monkeypatc
     monkeypatch.setattr(ms.SemanticTopicIndex, "_load_model", slow_load)
     keys = _hybrid_ranked_keys(_topics(), "家里养了什么动物", [])
     assert isinstance(keys, list)  # first recall served (BM25 fill), no block
-    assert started.is_set()  # model loads on the daemon thread, not inline
+    assert started.wait(2)  # model loads on the daemon thread, not inline
     release.set()
     # The thread flips to FAILED; a second recall stays on the BM25 fill.
     keys2 = _hybrid_ranked_keys(_topics(), "家里养了什么动物", [])
@@ -240,6 +251,7 @@ def test_vector_cache_reused_across_singleton_reset(topic_home, monkeypatch):
     )
 
     topics = _topics()
+    _wait_for_rank("什么动物", topics)
     rank1 = ms.semantic_rank("什么动物", topics)
     assert rank1, "expected a ranked result"
 
@@ -249,7 +261,7 @@ def test_vector_cache_reused_across_singleton_reset(topic_home, monkeypatch):
     monkeypatch.setattr(
         ms.SemanticTopicIndex, "_get_model", lambda self: real_model
     )
-    rank2 = ms.semantic_rank("什么颜色", topics)
+    rank2 = _wait_for_rank("什么颜色", topics)
     assert len(calls) == 1, f"docs re-embedded despite cache: {calls}"
     assert rank2
 
@@ -287,6 +299,7 @@ def zero_bm25_adapter(topic_home, monkeypatch):
 
     monkeypatch.setattr(ms.SemanticTopicIndex, "_get_model", lambda self: Adapter())
     _flag_on(monkeypatch)
+    _wait_for_rank("休憩时爱去沙滩吹风吗", rows)
     return rows
 
 
