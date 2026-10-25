@@ -318,6 +318,10 @@ _CLAIM_NEGATIVE_RE = re.compile(
     r"(?:还没|尚未|没有|未)(?:完成|搞定|弄好|做好|修复|处理|发送|删除|清理|验证|确认|做完)"
     r"|待完成|将(?:会?)?(?:完成|修复|处理|发送|删除|清理|验证)"
     r"|打算|准备去做|还没来得及"
+    r"|无法|不能"
+    r"|已(?:经)?(?:执行|运行|检查|读取|验证|检索)到第"
+    r"|\b(?:cannot|can't|could\s+not|unable\s+to)\b"
+    r"|\bnot\s+(?:yet\s+)?(?:fixed|sent|deleted|removed|cleaned|completed?|created|updated|deployed|installed|configured|verified|confirmed|migrated|merged|published|submitted)\b"
     r"|not\s+(?:yet\s+)?done|will\s+(?:fix|do|send|delete|remove|clean|complete)"
     r"|plan(?:ning)?\s+to|to\s+be\s+done|TODO",
     re.IGNORECASE,

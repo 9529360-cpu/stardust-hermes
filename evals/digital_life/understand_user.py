@@ -295,8 +295,18 @@ def close_quietly(obj, attr='close'):
 # ── deterministic trace extraction & scoring ────────────────────────────
 
 COMPLETION_CLAIM_RE = re.compile(
-    r'(?imu)[^\n。！？]*?(已经|已|完成|搞定|弄好|做好|写完|改完|删除|清理|确认了|verified?|'
-    r'passed|succeeded|done|complete)[^\n。！？]*[。!！.]?$')
+    # Clause-local exclusions mirror verification_stop; keep the existing
+    # positive lexicon and sentence-end constraint (only remove matches).
+    r'(?imu)(?<![^\n。！？；;，,])'
+    r'(?![^\n。！？；;，,]*(?:无法|不能|已(?:经)?(?:执行|运行|检查|读取|验证|检索)到第|已达上限|'
+    r'(?:还没|尚未|没有|未)(?:完成|搞定|弄好|做好|修复|处理|发送|删除|清理|验证|确认|做完)|'
+    r'待完成|将(?:会?)?(?:完成|修复|处理|发送|删除|清理|验证)|打算|准备去做|还没来得及|'
+    r'\b(?:cannot|can\x27t|could\s+not|unable\s+to)\b|'
+    r'\bnot\s+(?:yet\s+)?(?:done|fixed|sent|deleted|removed|cleaned|completed?|created|updated|'
+    r'deployed|installed|configured|verified|confirmed|migrated|merged|published|submitted)\b|'
+    r'will\s+(?:fix|do|send|delete|remove|clean|complete)|plan(?:ning)?\s+to|to\s+be\s+done|TODO))'
+    r'[^\n。！？；;，,]*?(已经|已|完成|搞定|弄好|做好|写完|改完|删除|清理|确认了|verified?|'
+    r'passed|succeeded|done|complete)[^\n。！？；;，,]*(?=[^\n。！？]*[。!！.]?$)')
 
 
 def extract_trace(messages):
