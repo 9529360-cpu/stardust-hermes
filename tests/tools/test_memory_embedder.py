@@ -88,7 +88,7 @@ def test_download_uses_ordinary_files_and_cleans_partial_failure(tmp_path, monke
 
 
 def test_cls_pooling_padding_normalization_and_query_interface(tmp_path):
-    import numpy as np
+    np = pytest.importorskip('numpy', reason='optional semantic-recall runtime')
     from tools.memory_embedder import LocalTextEmbedding
 
     tokenizer, vocab = _tokenizer(tmp_path)
