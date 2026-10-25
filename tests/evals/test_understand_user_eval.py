@@ -241,5 +241,5 @@ def test_product_files_untouched_by_eval():
     # the only config write goes to the isolated eval HOME
     assert "cfg_path = home / 'config.yaml'" in source
     # agent call budget and judge budget are enforced constants
-    assert uu.MAX_AGENT_API_CALLS == 2
+    assert uu.MAX_AGENT_API_CALLS == 4
     assert uu.JUDGE_MAX_CALLS == 30

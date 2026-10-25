@@ -77,7 +77,7 @@ HOME_VARS = ('HOME', 'USERPROFILE', 'STARDUST_HOME', 'HERMES_HOME', 'TEMP', 'TMP
 FORBIDDEN_HOME = Path('D:/Stardust/home').resolve()
 
 PERSONA_FILES = ('SOUL.md', 'AGENTS.md', 'USER.md')
-MAX_AGENT_API_CALLS = 2   # spec: at most 2 agent calls per case per run
+MAX_AGENT_API_CALLS = 4   # main-agent calls per arm; paired admission reserves judge separately
 JUDGE_MAX_CALLS = 30      # one judge call per case maximum
 
 DEFAULT_GATEWAY = 'http://127.0.0.1:3425/v1'
@@ -480,27 +480,41 @@ FAKE_RULES = [
 
 
 def run_case(case, home: Path, *, model_endpoint: str, endpoint: str, model: str,
-             api_key: str, run_tag: str, offline: bool):
+             api_key: str, run_tag: str, offline: bool, fixture_contract: bool = False):
     """Run ONE case on the REAL agent path and score it."""
     from agent.conversation_loop import run_conversation
 
     ws = prepare_case_home(home, case)
     prev_cwd = os.getcwd()
     os.chdir(ws)
-    agent, ep, db = make_agent(
-        f'understand-eval-{run_tag}-{case["id"]}',
-        model_endpoint=model_endpoint, model=model, endpoint=endpoint,
-        api_key=api_key,
-    )
+    agent = ep = db = cwd_token = None
     try:
+        if fixture_contract:
+            from agent.runtime_cwd import set_session_cwd, _SESSION_CWD
+            from tools.terminal_tool import record_session_cwd, clear_session_cwd
+            cwd_token = set_session_cwd(str(ws))
+        agent, ep, db = make_agent(
+            f'understand-eval-{run_tag}-{case["id"]}',
+            model_endpoint=model_endpoint, model=model, endpoint=endpoint,
+            api_key=api_key,
+        )
         history = case.get('history') or []
+        user_turn = case['user_turn']
+        if fixture_contract:
+            from evals.digital_life.understand_user_paired import bind_fixture
+            record_session_cwd(agent.session_id, str(ws))
+            user_turn = bind_fixture(agent, case, user_turn)
         result = run_conversation(
-            agent, case['user_turn'],
+            agent, user_turn,
             conversation_history=history if history else None,
         )
         response = result.get('final_response') or ''
         messages = result.get('messages') or []
     finally:
+        if cwd_token is not None:
+            _SESSION_CWD.reset(cwd_token)
+        if fixture_contract and agent is not None:
+            clear_session_cwd(agent.session_id)
         os.chdir(prev_cwd)
         close_quietly(agent)
         if ep:
@@ -522,8 +536,14 @@ def run_case(case, home: Path, *, model_endpoint: str, endpoint: str, model: str
 
     row = score_case(case, trace, response, judge_verdict=judge_verdict)
     row['response_head'] = response[:500]
+    if fixture_contract:
+        # Preserve exact scoring inputs so raw scores can be recomputed offline.
+        row['scoring_inputs'] = {'trace': trace, 'response': response,
+                                 'judge_verdict': judge_verdict}
     row['workspace'] = str(ws)
     row['judge_used'] = judge_verdict is not None
+    row['run_completed'] = bool(result.get('completed')) and not result.get('failed')
+    row['turn_exit_reason'] = result.get('turn_exit_reason')
     return row
 
 
