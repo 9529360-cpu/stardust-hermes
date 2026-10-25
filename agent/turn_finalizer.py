@@ -149,6 +149,18 @@ def _resolve_budget_fallback(
             # instead of letting it read as a normal answer (F5.1).
             if _unverified_fallback_notice_enabled(agent):
                 final_response = _append_unverified_fallback_notice(final_response)
+                # The preview contained only the candidate, not this new notice.
+                agent._response_was_previewed = False
+                tail = next((
+                    msg for msg in reversed(messages)
+                    if isinstance(msg, dict)
+                    and not any(msg.get(flag) for flag in _VERIFICATION_CONTINUATION_FLAGS)
+                ), None)
+                if tail is not None and tail.get("role") == "assistant":
+                    # The candidate may already be durable and part of the cached prompt.
+                    # Append a receipt instead of rewriting it; a tool/user tail gets the
+                    # full restored answer and notice from _close_transcript_tail.
+                    append_message(messages, {"role": "assistant", "content": final_response})
         else:
             # _handle_max_iterations makes one extra toolless request for a summary.
             agent._emit_status(

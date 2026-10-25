@@ -164,8 +164,66 @@ def test_previewed_streamed_candidate_also_gets_notice(monkeypatch):
     result = _finalize(agent, final_response=None,
                        pending_verification_response=CLAIM, pending_previewed=True)
     assert result["final_response"].endswith(_UNVERIFIED_FALLBACK_NOTICE)
-    assert result["response_previewed"] is True
+    # The streamed candidate did not include the newly added notice.
+    assert result["response_previewed"] is False
     assert result["completed"] is False
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+@pytest.mark.parametrize("tool_tail", [False, True])
+def test_notice_survives_sqlite_reload_without_rewriting_candidate(
+    monkeypatch, tmp_path, enabled, tool_tail,
+):
+    from agent.session_persistence import SessionPersistenceMixin
+    from hermes_state import SessionDB
+
+    class DurableFallbackAgent(_FallbackAgent, SessionPersistenceMixin):
+        def _persist_session(self, messages, conversation_history):
+            return self._flush_messages_to_session_db(messages, conversation_history)
+
+    monkeypatch.setenv("STARDUST_UNVERIFIED_FALLBACK_NOTICE", "1" if enabled else "0")
+    monkeypatch.setattr("hermes_cli.plugins.invoke_hook", lambda *_a, **_kw: [])
+    agent = DurableFallbackAgent()
+    with SessionDB(tmp_path / "state.db") as db:
+        db.create_session(agent.session_id, source="cli")
+        agent._session_db, agent._session_db_created = db, True
+        candidate = {"role": "assistant", "content": CLAIM,
+                     "finish_reason": "verification_required"}
+        messages = [{"role": "user", "content": "task"}, candidate,
+                    {"role": "user", "content": "verify now",
+                     "_verification_stop_synthetic": True}]
+        if tool_tail:
+            messages.extend([
+                {"role": "assistant", "content": "", "tool_calls": [
+                    {"id": "v1", "type": "function", "function": {
+                        "name": "terminal", "arguments": "{}"}}]},
+                {"role": "tool", "tool_name": "terminal", "tool_call_id": "v1",
+                 "content": '{"exit_code": 1, "output": "verification failed"}'},
+            ])
+        assert agent._flush_messages_to_session_db(messages, []) is True
+        result = finalize_turn(
+            agent, final_response=None, api_call_count=2, interrupted=False, failed=False,
+            messages=messages, conversation_history=[], effective_task_id="task", turn_id="turn",
+            user_message="task", original_user_message="task", _should_review_memory=False,
+            _turn_exit_reason="unknown", _pending_verification_response=CLAIM,
+            _pending_verification_response_previewed=True,
+        )
+        durable = db.get_messages(agent.session_id)
+        replay = db.get_messages_as_conversation(agent.session_id)
+        assert result["persistence_status"] == "saved"
+        assert result["completed"] is False
+        assert candidate["content"] == CLAIM  # preserve the already-sent prompt prefix
+        assert sum(_UNVERIFIED_FALLBACK_NOTICE in (row.get("content") or "")
+                   for row in durable) == int(enabled)
+        assert any(_UNVERIFIED_FALLBACK_NOTICE in (row.get("content") or "")
+                   for row in replay) is enabled
+        if enabled:
+            assert any(row.get("content") == result["final_response"] for row in durable)
+            assert any(row.get("content") == result["final_response"] for row in replay)
+        assert not any(row["role"] == "user" and row["content"] == "verify now"
+                       for row in durable)
+        assert agent._persist_session(messages, []) is True
+        assert len(db.get_messages(agent.session_id)) == len(durable)
 
 
 def test_normal_text_response_never_gains_notice_with_flag_on(monkeypatch):
