@@ -365,6 +365,62 @@ def update_fact(
     }
 
 
+def closed_fact_supersessions() -> list[dict[str, Any]]:
+    """Closed facts superseded by a newer open fact, with old/current values.
+
+    Read helper for recall-time suppression (DL-P2.9b): the topic sidecar can
+    only suppress lines, never rewrite stored topics. A closed row counts as
+    superseded when the same subject has a currently-open fact observed later
+    (the UPDATE path records ``superseded_by``; the seed/close-then-add path
+    lands in the same state without the pointer, so the check is on subject +
+    recency, not on the pointer alone). Rows without such a successor (plain
+    close/retraction) carry no replacement value and are skipped: retracted
+    facts are already excluded from recall and a bare close is not a knowledge
+    update.
+
+    Each row carries ``subject``, ``old_content`` and the successor
+    ``current_contents``; value extraction (latin runs vs CJK difference) is
+    the caller's choice, kept out of the store layer.
+    """
+    open_by_subject: dict[str, list[dict[str, Any]]] = {}
+    for row in load_facts():
+        open_by_subject.setdefault(str(row.get("subject") or ""), []).append(row)
+    live_ids = {
+        str(row.get("id") or "")
+        for rows in open_by_subject.values()
+        for row in rows
+    }
+    rows: list[dict[str, Any]] = []
+    for row in load_facts(include_history=True):
+        if not str(row.get("valid_to") or "").strip():
+            continue
+        subject = str(row.get("subject") or "")
+        # Successor = the explicit superseded_by pointer when it still points
+        # at a live row, else any live row of the subject sorted after the
+        # closed one by (observed_at, id): ids embed a ms clock, so a close and
+        # its replacement written within the same second still order correctly.
+        sort_key = (str(row.get("observed_at") or ""), str(row.get("id") or ""))
+        superseded_by = str(row.get("superseded_by") or "")
+        if superseded_by and superseded_by in live_ids:
+            successors = [
+                succ for succ in open_by_subject.get(subject, [])
+                if str(succ.get("id") or "") == superseded_by
+            ]
+        else:
+            successors = [
+                succ for succ in open_by_subject.get(subject, [])
+                if (str(succ.get("observed_at") or ""), str(succ.get("id") or "")) > sort_key
+            ]
+        if not successors:
+            continue
+        rows.append({
+            "subject": subject,
+            "old_content": str(row.get("content") or ""),
+            "current_contents": [str(succ.get("content") or "") for succ in successors],
+        })
+    return rows
+
+
 def fact_history(subject: str) -> list[dict[str, Any]]:
     """Full history (open + closed) for one subject, newest-first."""
     norm = _normalize_subject(subject)
@@ -501,5 +557,5 @@ def fact_pipeline_enabled() -> bool:
 __all__ = [
     "fact_store_path", "load_facts", "add_fact", "update_fact", "close_fact",
     "fact_history", "recall_facts", "format_fact_recall", "find_candidate_facts",
-    "reset_fact_store", "fact_pipeline_enabled",
+    "reset_fact_store", "fact_pipeline_enabled", "closed_fact_supersessions",
 ]
