@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
+import { setRuntimeI18nLocale } from '@/i18n'
+import { SLASH_PALETTE_COMMANDS, SLASH_PALETTE_LOCALES, SLASH_PALETTE_SECTIONS } from '@/i18n/slash-palette'
+
 import {
   type CommandCatalogMeta,
   type CommandsCatalogLike,
@@ -506,5 +509,81 @@ describe('registry-derived block-list (contract with hermes_cli/commands.py)', (
         expect(isDesktopSlashCommand(name)).toBe(false)
       }
     }
+  })
+})
+
+describe('slash palette locale', () => {
+  afterEach(() => setRuntimeI18nLocale('en'))
+
+  it('keeps English descriptions and section names for the en locale', () => {
+    setRuntimeI18nLocale('en')
+    expect(desktopSlashDescription('/new', 'ignored')).toBe('Start a new desktop chat')
+    expect(desktopSlashDescription('/retry', 'Retry the last message (resend to agent)')).toBe(
+      'Retry the last message (resend to agent)'
+    )
+
+    const filtered = filterDesktopCommandsCatalog({
+      categories: [{ name: 'Session', pairs: [['/retry', 'Retry the last message (resend to agent)']] }]
+    })
+
+    expect(filtered.categories?.[0]?.name).toBe('Session')
+  })
+
+  it('translates descriptions and section headers for Chinese locales without renaming commands', () => {
+    for (const locale of SLASH_PALETTE_LOCALES) {
+      expect(Object.keys(SLASH_PALETTE_COMMANDS[locale]).sort()).toEqual(Object.keys(SLASH_PALETTE_COMMANDS.zh).sort())
+      expect(Object.keys(SLASH_PALETTE_SECTIONS[locale]).sort()).toEqual(Object.keys(SLASH_PALETTE_SECTIONS.zh).sort())
+    }
+
+    setRuntimeI18nLocale('zh')
+    expect(desktopSlashDescription('/new', 'Start a new session')).toBe('开始一段新的桌面对话')
+    expect(desktopSlashDescription('/retry', 'Retry the last message (resend to agent)')).toBe(
+      '重试上一条消息（重新发给智能体）'
+    )
+    expect(desktopSlashDescription('/ship-it', 'Run release checklist')).toBe('Run release checklist')
+
+    const filtered = filterDesktopCommandsCatalog({
+      categories: [
+        {
+          name: 'Session',
+          pairs: [
+            ['/new', 'Start a new session'],
+            ['/save', 'Export the current conversation'],
+            ['/title', 'Set a title for the current session'],
+            ['/handoff', 'Hand off this session'],
+            ['/stop', 'Kill all running background processes']
+          ]
+        },
+        { name: 'Tools & Skills', pairs: [['/tools', 'Manage tools']] }
+      ]
+    })
+
+    expect(filtered.categories?.map(section => section.name)).toEqual(['会话', '工具与技能'])
+    expect(filtered.categories?.[0]?.pairs).toEqual([
+      ['/new', '开始一段新的桌面对话'],
+      ['/save', '把当前对话保存为 JSON'],
+      ['/title', '重命名当前会话'],
+      ['/handoff', '把此会话转交到消息平台'],
+      ['/stop', '停止当前回合和后台进程']
+    ])
+
+    setRuntimeI18nLocale('zh-hant')
+    expect(desktopSlashDescription('/new', 'Start a new session')).toBe('開始一段新的桌面對話')
+    expect(
+      filterDesktopCommandsCatalog({
+        categories: [{ name: 'Session', pairs: [['/new', 'Start a new session']] }]
+      }).categories?.[0]?.name
+    ).toBe('工作階段')
+  })
+
+  it('translates /skin argument labels for the zh locale', () => {
+    setRuntimeI18nLocale('zh')
+    expect(
+      desktopSkinSlashCompletions([{ name: 'mono', label: 'Mono', description: 'Clean grayscale' }], 'mono', '')
+    ).toEqual([
+      { text: '/skin list', display: '/skin list', meta: '显示可用的桌面主题' },
+      { text: '/skin next', display: '/skin next', meta: '切换到下一个桌面主题' },
+      { text: '/skin mono', display: '/skin mono', meta: 'Mono（当前） - Clean grayscale' }
+    ])
   })
 })

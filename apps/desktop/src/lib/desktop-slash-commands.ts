@@ -1,3 +1,10 @@
+import {
+  slashCommandDescription,
+  slashSectionLabel,
+  slashSkinCurrentMark,
+  slashSkinListLabel,
+  slashSkinNextLabel
+} from '@/i18n/slash-palette'
 import { peekCachedSlashCompletion } from '@/lib/slash-completion-cache'
 
 import desktopSlashRegistry from './desktop-slash-registry.json'
@@ -585,7 +592,10 @@ export function desktopSlashUnavailableMessage(command: string): string | null {
 }
 
 export function desktopSlashDescription(command: string, fallback = ''): string {
-  return SPEC_BY_NAME.get(canonicalDesktopSlashCommand(command))?.description || fallback
+  const canonical = canonicalDesktopSlashCommand(command)
+  const english = SPEC_BY_NAME.get(canonical)?.description || fallback
+
+  return slashCommandDescription(canonical, english)
 }
 
 export function desktopSlashCommandArgumentMode(command: string): DesktopSlashArgumentMode | null {
@@ -599,21 +609,23 @@ export function desktopSkinSlashCompletions(
 ): DesktopSlashCompletion[] {
   const prefix = argPrefix.trim().toLowerCase()
 
+  const currentMark = slashSkinCurrentMark()
+
   const commands: DesktopSlashCompletion[] = [
     {
       text: '/skin list',
       display: '/skin list',
-      meta: 'Show available desktop themes'
+      meta: slashSkinListLabel()
     },
     {
       text: '/skin next',
       display: '/skin next',
-      meta: 'Cycle to the next desktop theme'
+      meta: slashSkinNextLabel()
     },
     ...themes.map(theme => ({
       text: `/skin ${theme.name}`,
       display: `/skin ${theme.name}`,
-      meta: `${theme.label}${theme.name === activeThemeName ? ' (current)' : ''} - ${theme.description}`
+      meta: `${theme.label}${theme.name === activeThemeName ? currentMark : ''} - ${theme.description}`
     }))
   ]
 
@@ -667,6 +679,7 @@ export function filterDesktopCommandsCatalog(catalog: CommandsCatalogLike): Comm
   const categories = catalog.categories
     ?.map(section => ({
       ...section,
+      name: slashSectionLabel(section.name),
       pairs: section.pairs
         .filter(([command]) => isDesktopSlashSuggestion(command))
         .map(([command, description]) => [command, desktopSlashDescription(command, description)] as [string, string])

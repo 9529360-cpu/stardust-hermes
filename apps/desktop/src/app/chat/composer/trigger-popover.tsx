@@ -6,6 +6,7 @@ import { Codicon } from '@/components/ui/codicon'
 import { GlyphSpinner } from '@/components/ui/glyph-spinner'
 import { Tip } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
+import { slashSectionLabel } from '@/i18n/slash-palette'
 import { cn } from '@/lib/utils'
 
 import { COMPLETION_DRAWER_BELOW_CLASS, COMPLETION_DRAWER_CLASS, CompletionDrawerEmpty } from './completion-drawer'
@@ -199,7 +200,11 @@ export function ComposerTriggerPopover({
 
           return (
             <Fragment key={item.id}>
-              {showHeader && <div className={cn(GROUP_HEADER_CLASS, isFirstHeader ? 'pt-0.5' : 'pt-2')}>{group}</div>}
+              {showHeader && (
+                <div className={cn(GROUP_HEADER_CLASS, isFirstHeader ? 'pt-0.5' : 'pt-2')}>
+                  {slashSectionLabel(group)}
+                </div>
+              )}
               <Tip
                 className="max-w-[calc(100vw-2rem)] wrap-anywhere"
                 collisionPadding={16}
