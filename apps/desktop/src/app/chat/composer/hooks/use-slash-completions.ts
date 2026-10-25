@@ -3,6 +3,7 @@ import { useStore } from '@nanostores/react'
 import { useCallback, useEffect } from 'react'
 
 import type { HermesGateway } from '@/hermes'
+import { slashBrowseSessionsLabel } from '@/i18n/slash-palette'
 import { sessionTitle } from '@/lib/chat-runtime'
 import {
   type CommandsCatalogLike,
@@ -142,7 +143,7 @@ export function useSlashCompletions(options: {
         // submitting it (Enter) still opens the overlay if the action is skipped.
         items.push({
           text: '/resume',
-          display: 'Browse all sessions…',
+          display: slashBrowseSessionsLabel(),
           meta: '',
           group: 'Sessions',
           action: 'session-picker'
