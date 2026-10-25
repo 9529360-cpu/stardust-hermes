@@ -199,7 +199,10 @@ def finish_text_response(
             _turn_exit_reason = "session_persistence_failed"
             return _verdict("break")
         codex_ack_continuations += 1
-        append_message(messages, {"role": "user", "content": _CODEX_ACK_CONTINUATION_NUDGE})
+        append_message(messages, {
+            "role": "user", "content": _CODEX_ACK_CONTINUATION_NUDGE,
+            "_verification_stop_synthetic": True,
+        })
         agent._session_messages = messages
         # An acknowledgment is non-final: its text must not suppress iteration-limit
         # summarization if the continuation exhausts budget.
@@ -255,7 +258,10 @@ def finish_text_response(
         )
         append_message(
             messages,
-            {"role": "user", "content": build_capability_refusal_nudge(_guard_tool, user_message)},
+            {
+                "role": "user", "content": build_capability_refusal_nudge(_guard_tool, user_message),
+                "_verification_stop_synthetic": True,
+            },
         )
         agent._session_messages = messages
         # The refusal is non-final: its text must not suppress iteration-limit

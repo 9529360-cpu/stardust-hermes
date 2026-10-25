@@ -313,12 +313,9 @@ def _run(loopback, request, script, toolsets):
         save_trajectories=False,
     )
     result = agent.run_conversation(request)
-    nudges = sum(
-        1
-        for m in agent._session_messages
-        if isinstance(m, dict)
-        and str(m.get("content", "")).startswith("[capability note]")
-    )
+    # Internal nudges are removed from the final transcript; count the gate's
+    # actual admissions rather than requiring synthetic user messages to survive.
+    nudges = agent._capability_refusal_continuations
     return {
         "request": request,
         "calls": state["calls"],
