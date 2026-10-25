@@ -46,7 +46,7 @@ _ADD_FLOOR = 0.20
 def _conversation_text(messages: List[Dict]) -> str:
     parts: List[str] = []
     used = 0
-    for message in messages:
+    for message in reversed(messages):
         if not isinstance(message, dict) or message.get("role") not in {"user", "assistant"}:
             continue
         content = message.get("content")
@@ -54,15 +54,16 @@ def _conversation_text(messages: List[Dict]) -> str:
         text = text.strip()
         if not text:
             continue
-        parts.append(f"{message.get('role')}: {text}")
-        used += len(text)
+        # Newest turns matter most; include role labels and separators in the budget.
+        part = f"{message.get('role')}: {text}"
+        remaining = _MAX_CONVERSATION_CHARS - used - int(bool(parts))
+        if remaining <= 0:
+            break
+        parts.append(part[-remaining:])
+        used += min(len(part), remaining) + int(len(parts) > 1)
         if used >= _MAX_CONVERSATION_CHARS:
             break
-    # Newest turns matter most; keep the tail if over budget.
-    joined = "\n".join(parts)
-    if len(joined) > _MAX_CONVERSATION_CHARS:
-        joined = joined[-_MAX_CONVERSATION_CHARS:]
-    return joined
+    return "\n".join(reversed(parts))
 
 
 def _model_reply_text(raw: Any, *, _depth: int = 0) -> str:

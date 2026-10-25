@@ -1,8 +1,6 @@
 """Closed facts suppress stale injected sentences without changing stored topics."""
 from __future__ import annotations
 
-import uuid
-
 import pytest
 
 from tools import fact_store as fs
@@ -13,9 +11,6 @@ from tools import topic_memory_store as ts
 def home(tmp_path, monkeypatch):
     for key in ("HOME", "USERPROFILE", "STARDUST_HOME", "HERMES_HOME"):
         monkeypatch.setenv(key, str(tmp_path))
-    # The existing millisecond ID generator can collide during fast Linux
-    # fixture writes; this suite exercises recall, with distinct fact identities.
-    monkeypatch.setattr(fs, "_new_id", lambda: "f" + uuid.uuid4().hex)
     from tools import memory_tool
     monkeypatch.setattr(memory_tool, "get_builtin_memory_config",
                         lambda config=None: {"fact_pipeline": True})

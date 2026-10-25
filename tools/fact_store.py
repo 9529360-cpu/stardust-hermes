@@ -18,6 +18,7 @@ file's earliest known write time.
 """
 from __future__ import annotations
 
+from copy import deepcopy
 import json
 import logging
 import math
@@ -25,6 +26,7 @@ import os
 import re
 import threading
 import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Optional
@@ -95,7 +97,7 @@ def _read_payload(*, strict: bool = False) -> dict[str, Any]:
     if cache_key is not None:
         with _CACHE_LOCK:
             if _CACHE["key"] == cache_key:
-                return _CACHE["payload"]
+                return deepcopy(_CACHE["payload"])
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError:
@@ -122,7 +124,7 @@ def _read_payload(*, strict: bool = False) -> dict[str, Any]:
     if cache_key is not None:
         with _CACHE_LOCK:
             _CACHE["key"] = cache_key
-            _CACHE["payload"] = raw
+            _CACHE["payload"] = deepcopy(raw)
     return raw
 
 
@@ -130,10 +132,18 @@ def _write_payload(payload: dict[str, Any]) -> None:
     path = fact_store_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + f".tmp-{os.getpid()}-{threading.get_ident()}")
-    tmp.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8"
-    )
-    os.replace(tmp, path)
+    try:
+        tmp.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8"
+        )
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
+    # Publish only committed disk state; failed writers keep the old snapshot.
+    with _CACHE_LOCK:
+        _CACHE["key"] = None
+        _CACHE["payload"] = None
+        _SIG_CACHE["key"] = None
 
 
 def load_facts(*, include_history: bool = False) -> list[dict[str, Any]]:
@@ -198,7 +208,7 @@ def find_candidate_facts(
 
 
 def _new_id() -> str:
-    return f"f{int(time.time() * 1000):013d}-{os.getpid():05d}-{threading.get_ident() % 100000:05d}"
+    return "f" + uuid.uuid4().hex
 
 
 def add_fact(
@@ -410,8 +420,9 @@ def closed_fact_supersessions() -> list[dict[str, Any]]:
 def fact_history(subject: str) -> list[dict[str, Any]]:
     """Full history (open + closed) for one subject, newest-first."""
     norm = _normalize_subject(subject)
-    rows = [r for r in load_facts(include_history=True) if str(r.get("subject") or "") == norm]
-    rows.sort(key=lambda r: (str(r.get("observed_at") or ""), str(r.get("id") or "")), reverse=True)
+    rows = [r for r in reversed(load_facts(include_history=True)) if str(r.get("subject") or "") == norm]
+    # Preserve newest insertion first when observations share a timestamp; IDs are opaque.
+    rows.sort(key=lambda r: str(r.get("observed_at") or ""), reverse=True)
     return rows
 
 
