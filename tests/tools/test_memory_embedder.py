@@ -113,4 +113,3 @@ def test_cls_pooling_padding_normalization_and_query_interface(tmp_path):
     assert not captured[0]['token_type_ids'].any()
     assert np.allclose(next(model.query_embed('Hello')), [.6, .8])
     assert list(model.embed([])) == []
-
