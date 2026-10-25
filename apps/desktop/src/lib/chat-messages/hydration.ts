@@ -26,6 +26,12 @@ const isAutoContinuation = (message: SessionMessage | undefined): boolean =>
   (message.display_kind === 'auto_continue' ||
     (message.display_kind == null && message.content === LEGACY_ACK_CONTINUATION))
 
+// Intent-ack / capability-refusal commentary is durable. The nudge after it is not,
+// so interim-ness has to live on this assistant row (`display_metadata.interim_commentary`).
+function isPersistedInterimCommentary(message: SessionMessage | undefined): boolean {
+  return parseDisplayMetadata(message?.display_metadata)?.interim_commentary === true
+}
+
 const ATTACHED_CONTEXT_MARKER_RE = /(?:^|\n)--- Attached Context ---\s*\n/
 const CONTEXT_WARNINGS_MARKER_RE = /(?:^|\n)--- Context Warnings ---[\s\S]*$/
 const CONTEXT_REF_RE = /@(file|folder|url|image|tool|terminal):(?:"[^"\n]+"|'[^'\n]+'|`[^`\n]+`|\S+)/g
@@ -450,11 +456,14 @@ export function toChatMessages(messages: SessionMessage[]): ChatMessage[] {
     }
 
     if (message.role === 'assistant') {
-      // A persisted continuation nudge explicitly marks this text as interim.
-      // When a preceding assistant produced only tools, keep those tools in
-      // their own bubble instead of absorbing this separate text-only row.
+      // A following continuation nudge, or the row's own interim_commentary mark,
+      // means this text is scaffolding. When a preceding assistant produced only
+      // tools, keep those tools in their own bubble instead of absorbing this
+      // separate text-only row. The nudge itself is no longer durable.
       const continuationAfterText =
-        parts.length > 0 && parts.every(part => part.type === 'text') && isAutoContinuation(messages[index + 1])
+        parts.length > 0 &&
+        parts.every(part => part.type === 'text') &&
+        (isAutoContinuation(messages[index + 1]) || isPersistedInterimCommentary(message))
 
       if (continuationAfterText && pendingToolParts.length) {
         flushPendingTools(index, true)
@@ -508,9 +517,9 @@ export function toChatMessages(messages: SessionMessage[]): ChatMessage[] {
       timestamp: earliestTimestamp(message.timestamp, ...parts.map(part => part.timestamp)),
       ...(rowId !== undefined ? { rowId } : {}),
       ...(message.role === 'assistant' &&
-      isAutoContinuation(messages[index + 1]) &&
       parts.length > 0 &&
-      parts.every(part => part.type === 'text')
+      parts.every(part => part.type === 'text') &&
+      (isAutoContinuation(messages[index + 1]) || isPersistedInterimCommentary(message))
         ? { interim: true }
         : {}),
       ...(reactions.length ? { reactions } : {}),
