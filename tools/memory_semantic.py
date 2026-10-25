@@ -8,7 +8,7 @@ Measured on the DL-P2.6 benchmark: top-2 0.92->0.94, paraphrase 0.85->0.95,
 irrelevant 0.05->0.04 (D:\\wt\\logs\\DL-P2.10-INV.md).
 
 Process-level singleton mirroring ``tools/memory_hybrid.HybridTopicIndex``:
-fastembed is imported lazily on the first starved recall with the flag ON;
+fastembed is imported by the background worker with the flag ON;
 model files are cached under ``<home>/cache/fastembed``; topic vectors are
 cached persistently keyed by content hash (``vectors.npz``) so a store
 rewrite or process restart re-embeds only new entries. Every failure mode
@@ -18,7 +18,8 @@ unchanged; nothing ever raises into the turn.
 
 The first starved recall never blocks the reply on a model download: when
 the model files are absent, a background thread downloads/loads them and
-that one recall degrades to the hybrid result (≤2 s budget).
+that recall degrades immediately to the hybrid result. Index refresh and
+vector-cache IO also run off-turn; readers use complete immutable snapshots.
 """
 
 from __future__ import annotations
@@ -91,10 +92,17 @@ class SemanticTopicIndex:
         self._lock = threading.Lock()
         self._model: Any = None
         self._model_state = _UNATTEMPTED
+        self._model_loaded = threading.Event()
         self._warned: set[str] = set()
         self._snapshot = _IndexSnapshot((), None, None)
         self._vec_cache: dict[str, Any] = {}  # sha256(text) -> ndarray
         self.available = False
+        self._worker: threading.Thread | None = None
+        self._pending: tuple[Any, Any] | None = None
+        self._requested: tuple[Any, str, int] | None = None
+        self._published: tuple[Any, str, int] | None = None
+        self._epoch = 0
+        self._closed = False
 
     # ── warnings (once per failure class, never per turn) ───────────────
 
@@ -136,10 +144,12 @@ class SemanticTopicIndex:
                     f"({MODEL_NAME}); keeping hybrid BM25 fill",
                 )
                 logger.debug("fastembed load failure detail", exc_info=True)
+                self._model_loaded.set()
                 return
             with _STATE_LOCK:
                 self._model = model
                 self._model_state = _READY
+            self._model_loaded.set()
 
         logger.info(
             "semantic recall model loading %s in background (hybrid BM25 fill serves until ready)",
@@ -208,54 +218,106 @@ class SemanticTopicIndex:
     # ── index build / search ────────────────────────────────────────────
 
     def ensure(self, rows: list[dict[str, Any]], signature: tuple[int, int, int]) -> bool:
-        """Rebuild when ``signature`` changed; True when the index is usable."""
-        model = self._get_model()
-        if model is None:
-            return False
+        """Queue the latest immutable input; never build or wait on the caller.
+
+        Text participates in identity because provenance/closed-value filtering
+        can change the admitted rows without changing the on-disk signature.
+        Failed builds keep lexical fallback and retry only when this input
+        identity changes; identical requests never spin or retry the failure.
+        """
+        documents = tuple((str(row.get("key") or ""), _doc_text(row)) for row in rows)
+        fingerprint = _text_hash(repr(documents))
         with self._lock:
-            if self._snapshot.matrix is not None and signature == self._snapshot.generation:
-                return True
-            if not rows:
-                # Same contract as HybridTopicIndex.ensure: nothing to
-                # index is not an error, simply unusable.
-                self._snapshot = _IndexSnapshot((), None, signature)
+            if self._closed:
                 return False
+            request = (signature, fingerprint, self._epoch)
+            if request == self._published:
+                return self._snapshot.matrix is not None
+            if request != self._requested:
+                self._requested = request
+                self._pending = (documents, request)
+            if not documents:
+                self._snapshot = _IndexSnapshot((), None, signature)
+                self._published = request
+                self._pending = None
+                return False
+            if self._pending is not None and (self._worker is None or not self._worker.is_alive()):
+                self._worker = threading.Thread(
+                    target=self._build_pending, name="memory-semantic-index", daemon=True,
+                )
+                self._worker.start()
+        return False
+
+    def _build_pending(self) -> None:
+        """Single writer: model loading, embeddings and cache IO stay off-turn."""
+        while True:
+            with self._lock:
+                pending = self._pending
+                self._pending = None
+                if pending is None or self._closed:
+                    self._worker = None
+                    return
+            documents, request = pending
+            signature, fingerprint, epoch = request
             try:
+                # Model initialization and index construction share this worker.
+                # _get_model remains a nonblocking public/test seam.
+                # A new input also permits recovery from a failed model load.
+                with _STATE_LOCK:
+                    if self._model_state == _FAILED:
+                        self._model_loaded.clear()
+                        self._model_state = _UNATTEMPTED
+                model = self._get_model()
+                if model is None:
+                    with _STATE_LOCK:
+                        state = self._model_state
+                    if state == _LOADING:
+                        # Existing loader owns initialization; it signals us
+                        # when ready rather than making a recall poll for it.
+                        self._model_loaded.wait()
+                        model = self._get_model()
+                if model is None:
+                    continue
                 import numpy as np
 
                 if not self._vec_cache:
                     self._vec_cache = self._load_vec_cache()
-                keys = [str(row.get("key") or "") for row in rows]
-                texts = [_doc_text(row) for row in rows]
-                missing = [text for text in texts if _text_hash(text) not in self._vec_cache]
+                keys, texts = zip(*documents)
+                hashes = [_text_hash(text) for text in texts]
+                missing = list(dict.fromkeys(text for text, h in zip(texts, hashes) if h not in self._vec_cache))
                 if missing:
-                    # Batch-embed every new entry in one pass (INV: 30 docs
-                    # = 0.14 s); per-item failures abandon the leg.
-                    fresh = list(model.embed(missing, batch_size=32))
-                    if len(fresh) != len(missing):
-                        raise RuntimeError(f"embedder returned {len(fresh)} of {len(missing)}")
-                    for text, vector in zip(missing, fresh):
-                        self._vec_cache[_text_hash(text)] = np.asarray(vector, dtype=np.float32)
+                    # Bound ONNX working sets to one document at a time. Do not
+                    # materialize an additional batch of output vectors.
+                    fresh = iter(model.embed(missing, batch_size=1))
+                    for text in missing:
+                        self._vec_cache[_text_hash(text)] = np.asarray(next(fresh), dtype=np.float32)
+                    if next(fresh, None) is not None:
+                        raise RuntimeError("embedder returned too many vectors")
                     self._save_vec_cache()
-                matrix = np.stack([self._vec_cache[_text_hash(text)] for text in texts]).astype(np.float32)
+                matrix = np.stack([self._vec_cache[h] for h in hashes]).astype(np.float32)
                 norms = np.linalg.norm(matrix, axis=1, keepdims=True)
                 norms[norms == 0] = 1.0
-                matrix = matrix / norms
+                matrix /= norms
                 matrix.setflags(write=False)
-                # Copy-on-write publication: readers retain their entire generation.
-                self._snapshot = _IndexSnapshot(tuple(keys), matrix, signature)
-                return True
+                with self._lock:
+                    if not self._closed and epoch == self._epoch and request == self._requested:
+                        self._snapshot = _IndexSnapshot(tuple(keys), matrix, signature)
+                        self._published = request
             except Exception:
                 self._warn_once("index-build", "semantic recall disabled: index build failed; keeping hybrid BM25 fill")
                 logger.debug("semantic index build failure detail", exc_info=True)
-                return False
 
-    def search(self, query: str, limit: int = SEMANTIC_FETCH) -> list[tuple[str, float]]:
+    def search(
+        self, query: str, limit: int = SEMANTIC_FETCH,
+        *, expected: tuple[Any, str, int] | None = None,
+    ) -> list[tuple[str, float]]:
         """Return ``[(key, cosine)]`` best-first; empty on any failure.
 
         Use the latest complete generation captured after query embedding.
         A rebuild or close after capture cannot change this search's pairing.
         """
+        if self._closed or self._snapshot.matrix is None:
+            return []
         model = self._get_model()
         if model is None:
             return []
@@ -268,6 +330,8 @@ class SemanticTopicIndex:
                 return []
             qvec = qvec / norm
             with self._lock:
+                if expected is not None and expected != self._published:
+                    return []
                 snapshot = self._snapshot
             if snapshot.matrix is None or not snapshot.keys:
                 return []
@@ -281,7 +345,11 @@ class SemanticTopicIndex:
 
     def close(self) -> None:
         with self._lock:
+            self._closed = True
+            self._epoch += 1
+            self._pending = None
             self._snapshot = _IndexSnapshot((), None, None)
+            self._model_loaded.set()
 
 
 _GLOBAL_INDEX = SemanticTopicIndex()
@@ -291,10 +359,29 @@ def global_index() -> SemanticTopicIndex:
     return _GLOBAL_INDEX
 
 
+def schedule_session_warm() -> None:
+    """Schedule store IO and index admission off the session-init caller."""
+    index = global_index()
+
+    def warm() -> None:
+        try:
+            from tools.memory_hybrid import store_signature
+            from tools.topic_memory_store import load_topics, topic_memory_path
+
+            rows = load_topics()
+            stat = topic_memory_path().stat()
+            index.ensure(rows, store_signature(rows, mtime_ns=stat.st_mtime_ns, size=stat.st_size))
+        except Exception:
+            logger.debug("semantic session warm unavailable; keeping hybrid BM25 fill", exc_info=True)
+
+    threading.Thread(target=warm, name="memory-semantic-warm", daemon=True).start()
+
+
 def reset_global_index() -> None:
     """Test seam: replace the singleton (model, vectors, warnings) entirely."""
     global _GLOBAL_INDEX
     with _STATE_LOCK:
+        _GLOBAL_INDEX.close()
         _GLOBAL_INDEX = SemanticTopicIndex()
 
 
@@ -324,4 +411,6 @@ def semantic_rank(
     index = global_index()
     if not index.ensure(topics, signature):
         return []
-    return index.search(clean, limit=top_k)
+    documents = tuple((str(row.get("key") or ""), _doc_text(row)) for row in topics)
+    expected = (signature, _text_hash(repr(documents)), index._epoch)
+    return index.search(clean, limit=top_k, expected=expected)
