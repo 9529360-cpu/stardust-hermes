@@ -209,6 +209,8 @@ _PLATFORM_OVERRIDES: dict[str, dict[str, Any]] = {
         "name": "WhatsApp Cloud API",
         "description": "Use Hermes via Meta's hosted WhatsApp Cloud API (no local bridge).",
         "docs_url": "https://github.com/9529360-cpu/stardust-hermes/blob/main/website/docs/user-guide/messaging/whatsapp-cloud.md",
+        "env_vars": ("WHATSAPP_CLOUD_PHONE_NUMBER_ID", "WHATSAPP_CLOUD_ACCESS_TOKEN"),
+        "required_env": ("WHATSAPP_CLOUD_PHONE_NUMBER_ID", "WHATSAPP_CLOUD_ACCESS_TOKEN"),
     },
     "relay": {
         "name": "Relay (experimental)",
@@ -233,7 +235,7 @@ def _messaging_platform_catalog() -> tuple[dict[str, Any], ...]:
     ``platform_registry.plugin_entries()`` so new adapters appear without a code change here.
     UI metadata lives in :data:`_PLATFORM_OVERRIDES`; the rest is derived from id/required_env.
     """
-    from gateway.config import Platform
+    from gateway.config import Platform, RETIRED_PLATFORMS
 
     # Resolve plugin entries FIRST: plugin platforms leak into ``Platform.__members__`` as
     # pseudo-members once anything calls ``Platform("<plugin id>")``, and iterating the enum
@@ -254,7 +256,10 @@ def _messaging_platform_catalog() -> tuple[dict[str, Any], ...]:
     entries: list[dict[str, Any]] = []
     builtin = [m.value for m in Platform.__members__.values() if m.value != "local"]
     for pid in builtin + list(plugin_map):
-        if pid in seen:
+        # Legacy enum values remain readable for saved sessions/configuration,
+        # but their removed native adapters must not reappear as setup cards.
+        # Relay retains its own card and platform-specific configuration.
+        if pid in seen or pid in RETIRED_PLATFORMS:
             continue
         seen.add(pid)
         entries.append(_build_catalog_entry(pid, plugin_map.get(pid)))

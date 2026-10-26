@@ -495,9 +495,11 @@ class CLIInfoMixin:
             print("  " + "-" * 55)
             platform_status = {
                 Platform.TELEGRAM: ("Telegram", "TELEGRAM_BOT_TOKEN"),
-                Platform.DISCORD: ("Discord", "DISCORD_BOT_TOKEN"),
-                Platform.SLACK: ("Slack", "SLACK_BOT_TOKEN"),
-                Platform.WHATSAPP: ("WhatsApp", "WHATSAPP_ENABLED")}
+                Platform.WHATSAPP: ("WhatsApp", "WHATSAPP_ENABLED"),
+                Platform.WHATSAPP_CLOUD: (
+                    "WhatsApp Cloud", "WHATSAPP_CLOUD_PHONE_NUMBER_ID + WHATSAPP_CLOUD_ACCESS_TOKEN"),
+                Platform.WEIXIN: ("Weixin / WeChat", "WEIXIN_ACCOUNT_ID + WEIXIN_TOKEN"),
+            }
             for platform, (name, env_var) in platform_status.items():
                 pconfig = config.platforms.get(platform)
                 if pconfig and pconfig.enabled:
@@ -521,7 +523,11 @@ class CLIInfoMixin:
             print("  To configure the gateway:")
             print("    1. Set environment variables:")
             print("       TELEGRAM_BOT_TOKEN=your_token")
-            print("       DISCORD_BOT_TOKEN=your_token")
+            print("       WHATSAPP_ENABLED=true")
+            print("       WHATSAPP_CLOUD_PHONE_NUMBER_ID=your_phone_number_id")
+            print("       WHATSAPP_CLOUD_ACCESS_TOKEN=your_access_token")
+            print("       WEIXIN_ACCOUNT_ID=your_account_id")
+            print("       WEIXIN_TOKEN=your_token")
             print(f"    2. Or configure settings in {display_hermes_home()}/config.yaml")
             print()
 

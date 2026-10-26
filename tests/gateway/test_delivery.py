@@ -62,10 +62,10 @@ class TestPlatformNameCaseInsensitivity:
     
 
 class _RelayDeliveryTransport:
-    """Relay transport that advertises Slack and records outbound wire frames."""
+    """Relay transport that advertises a logical platform and records outbound frames."""
 
-    def __init__(self):
-        self._identities = [("slack", "bot-1")]
+    def __init__(self, platform="slack"):
+        self._identities = [(platform, "bot-1")]
         self.sent = []
 
     async def send_outbound(self, action, *, platform=None):
@@ -75,18 +75,18 @@ class _RelayDeliveryTransport:
         return {"success": True, "message_id": "relay-message-1"}
 
 
-def _make_relay(transport):
+def _make_relay(transport, platform="slack"):
     return RelayAdapter(
         PlatformConfig(enabled=True),
         CapabilityDescriptor(
             contract_version=CONTRACT_VERSION,
-            platform="slack",
-            label="Slack",
+            platform=platform,
+            label=platform.title(),
             max_message_length=4000,
             supports_draft_streaming=False,
             supports_edit=True,
             supports_threads=True,
-            markdown_dialect="slack",
+            markdown_dialect="plain",
             len_unit="chars",
         ),
         transport=cast(Any, transport),
@@ -149,27 +149,27 @@ class RecordingAdapter:
 async def test_native_adapter_wins_when_relay_also_fronts_platform(tmp_path, monkeypatch):
     monkeypatch.setattr("gateway.delivery.get_hermes_home", lambda: tmp_path)
     native = RecordingAdapter()
-    transport = _RelayDeliveryTransport()
-    relay = _make_relay(transport)
+    transport = _RelayDeliveryTransport("telegram")
+    relay = _make_relay(transport, "telegram")
     config = GatewayConfig(
         platforms={
-            Platform.SLACK: PlatformConfig(enabled=True),
+            Platform.TELEGRAM: PlatformConfig(enabled=True),
             Platform.RELAY: PlatformConfig(enabled=True),
         },
     )
     router = DeliveryRouter(
         config,
-        adapters={Platform.SLACK: native, Platform.RELAY: relay},
+        adapters={Platform.TELEGRAM: native, Platform.RELAY: relay},
     )
 
     await router._deliver_to_platform(
-        DeliveryTarget(platform=Platform.SLACK, chat_id="D123"),
+        DeliveryTarget(platform=Platform.TELEGRAM, chat_id="12345"),
         "native result",
         metadata=None,
     )
 
     assert native.calls == [
-        {"chat_id": "D123", "content": "native result", "metadata": None}
+        {"chat_id": "12345", "content": "native result", "metadata": None}
     ]
     assert transport.sent == []
 

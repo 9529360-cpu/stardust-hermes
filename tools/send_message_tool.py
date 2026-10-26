@@ -11,12 +11,11 @@ from agent.secret_scope import get_secret
 
 logger = logging.getLogger(__name__)
 
-from tools.send_message_targets import _HOME_CHANNEL_ENV_OVERRIDES, _SLACK_USER_ID_RE, resolve_send_target
+from tools.send_message_targets import _HOME_CHANNEL_ENV_OVERRIDES, resolve_send_target
 from tools.send_message_senders import (
     _AUDIO_EXTS, _DEFAULT_CAPTION_LIMIT, _IMAGE_EXTS, _NO_DELIVERABLE, _VIDEO_EXTS, _VOICE_EXTS,
     _adapter_media_method, _error, _live_adapter, _media_caption_split, _plugin_standalone_sender,
-    _registry_standalone_send, _resolve_slack_user_target, _sanitize_error_text, _send_bluebubbles,
-    _send_matrix_via_adapter, _send_qqbot, _send_signal, _send_telegram, _send_weixin, _send_yuanbao)
+    _registry_standalone_send, _sanitize_error_text, _send_telegram, _send_weixin)
 from tools.registry import tool_error
 
 # NOTE: ``send_message`` is intentionally NOT registered as an agent-callable model tool
@@ -74,7 +73,7 @@ _TOKEN_UNSET = object()
 
 
 def _authorize_relay_target(platform_name: str, chat_id, thread_id=None, *,
-                            native_token=_TOKEN_UNSET) -> str | None:
+                            native_token=_TOKEN_UNSET, relay_adapter=_TOKEN_UNSET) -> str | None:
     """Relay egress-authorization guard (P5a); None when the send may proceed.
 
     Thin delegate to ``gateway.relay.egress`` so the tool keeps working in
@@ -141,12 +140,11 @@ def _authorize_relay_target(platform_name: str, chat_id, thread_id=None, *,
         # config independently allowed a transition where authorization saw a
         # connector-only setup (exemption granted) while dispatch still held a
         # native token and sent the unattested handle itself.
+        snapshot_kwargs = {} if relay_adapter is _TOKEN_UNSET else {"relay_adapter": relay_adapter}
         if native_token is _TOKEN_UNSET:
-            # A caller that forgets the snapshot must NOT silently look like
-            # "no native token", which would grant the @handle exemption.
-            return authorize_relay_target(platform_name, chat_id, thread_id)
+            return authorize_relay_target(platform_name, chat_id, thread_id, **snapshot_kwargs)
         return authorize_relay_target(
-            platform_name, chat_id, thread_id, native_token=native_token
+            platform_name, chat_id, thread_id, native_token=native_token, **snapshot_kwargs
         )
     except Exception:  # noqa: BLE001 - the guard faulted; FAIL CLOSED
         logger.exception(
@@ -240,25 +238,10 @@ def _handle_send(args):
             return tool_error(err)
     if duplicate_skip := _maybe_skip_cron_duplicate_send(platform_name, chat_id, thread_id):
         return json.dumps(duplicate_skip)
-    # Slack: resolve user targets to DM channel IDs before sending. _parse_target_ref emits internal
-    # ``user:U...`` / ``user_name:@handle`` targets; a bare U... id can also arrive from session metadata or
-    # the home-channel config. All are opened via conversations.open (fixes #19236).
-    if platform_name == "slack" and chat_id:
-        chat_id, resolve_err = _slack_dm_chat_id(pconfig, chat_id)
-        if resolve_err:
-            return json.dumps(resolve_err)
-    # POSITION IS LOAD-BEARING — this must stay BELOW Slack user→DM resolution.
-    # `_parse_target_ref` emits internal pseudo-ids (`user_name:ben`,
-    # `user:U...`) that no provenance can ever contain, because provenances
-    # record RESOLVED conversation ids. Authorizing above the resolver compared
-    # a handle against a set of `D...` ids and refused every Slack DM — a fix
-    # that caused the outage it was meant to prevent. Pinned by
-    # test_slack_user_targets_resolve_then_authorize; moving this call back up
-    # turns those cases red.
-    # thread_id is part of the DESTINATION: on Discord the thread is the literal
-    # REST target, so an attested parent must not vouch for an arbitrary thread.
+    relay_snapshot = getattr(pconfig, "_relay_transport_snapshot", None)
+    snapshot_kwargs = {"relay_adapter": relay_snapshot[1]} if relay_snapshot else {}
     _relay_denial = _authorize_relay_target(platform_name, chat_id, thread_id,
-                                            native_token=getattr(pconfig, "token", None))
+                                            native_token=getattr(pconfig, "token", None), **snapshot_kwargs)
     if _relay_denial:
         return tool_error(_relay_denial)
 
@@ -290,10 +273,35 @@ def _platform_enum(platform_name):
         return None, f"Unknown platform: {platform_name}"
 
 
+def _relay_front(platform, config=None):
+    """The active profile's enabled relay, only when it explicitly fronts this destination."""
+    from gateway.config import Platform
+    if config is not None:
+        relay_config = config.platforms.get(Platform.RELAY)
+        if relay_config is not None and not relay_config.enabled:
+            return None, None
+    runner, relay = _live_adapter(Platform.RELAY)
+    if relay is None or getattr(getattr(relay, "config", None), "enabled", True) is False:
+        return runner, None
+    fronts = getattr(relay, "fronts_platform", None)
+    return (runner, relay) if callable(fronts) and fronts(platform) is True else (runner, None)
+
+
 def _resolve_platform_config(platform_name, config):
     """``(platform, pconfig, registry_entry, error)``. Plugin platforms must be registered;
     disabled/missing platforms error, except Weixin, which may be configured purely via .env."""
-    from gateway.config import Platform
+    from gateway.config import Platform, RETIRED_PLATFORMS
+    if platform_name in RETIRED_PLATFORMS:
+        platform = Platform(platform_name)
+        runner, relay = _relay_front(platform, config)
+        if relay is None:
+            return None, None, None, f"Platform '{platform_name}' is no longer supported by Stardust."
+        from gateway.config import PlatformConfig
+        old = config.platforms.get(platform)
+        # Native credentials must never exempt a relay route from egress authorization.
+        pconfig = PlatformConfig(enabled=True, home_channel=getattr(old, "home_channel", None))
+        pconfig._relay_transport_snapshot = (runner, relay)
+        return platform, pconfig, None, None
     from gateway.platform_registry import platform_registry
     entry = platform_registry.get(platform_name)
     if entry is None and platform_name not in {member.value for member in Platform}:
@@ -307,6 +315,11 @@ def _resolve_platform_config(platform_name, config):
     if pconfig is None:
         return None, None, None, (f"Platform '{platform_name}' is not configured. Set up credentials in "
                                   "~/.stardust/config.yaml or environment variables.")
+    if platform == Platform.RELAY:
+        runner, relay = _live_adapter(Platform.RELAY)
+        if relay is None:
+            return None, None, None, "Relay requires an active gateway connection."
+        pconfig._relay_transport_snapshot = (runner, relay)
     return platform, pconfig, entry, None
 
 
@@ -324,16 +337,6 @@ def _home_chat_id(config, platform, platform_name):
     return None, (f"No home channel set for {platform_name} to determine where to send the message. "
                   f"Either specify a channel directly with '{platform_name}:CHANNEL_NAME', "
                   f"or set a home channel via: stardust config set {home_env} <channel_id>")
-
-
-def _slack_dm_chat_id(pconfig, chat_id):
-    """Open Slack user targets (``user:``/``user_name:`` from the parser, or a bare U... id from
-    session metadata / home-channel config) as DM conversations. ``(chat_id, None)`` or ``(None, error_dict)``."""
-    dm_target = f"user:{chat_id}" if chat_id.startswith("U") and _SLACK_USER_ID_RE.fullmatch(chat_id) else chat_id
-    if not dm_target.startswith(("user:", "user_name:")):
-        return chat_id, None
-    from model_tools import _run_async
-    return _run_async(_resolve_slack_user_target(pconfig.token, dm_target))
 
 
 def _mirror_sent_message(platform_name, chat_id, mirror_text, thread_id):
@@ -521,15 +524,7 @@ async def _send_chunks(chunks, send_one):
 
 
 def _platform_max_length(platform):
-    """Chunking limit: Signal's adapter constant (its raw JSON-RPC path bypasses the adapter's
-    chunking), the registry's ``max_message_length`` for plugins, else None (no chunking)."""
-    from gateway.config import Platform
-    if platform == Platform.SIGNAL:
-        try:
-            from gateway.platforms.signal import MAX_MESSAGE_LENGTH
-            return MAX_MESSAGE_LENGTH
-        except ImportError:
-            return 8000
+    """Plugin-declared chunking limit, or None for adapters that chunk internally."""
     try:
         from gateway.platform_registry import platform_registry
         entry = platform_registry.get(platform.value)
@@ -542,8 +537,7 @@ def _platform_max_length(platform):
 # registry ``standalone_sender_fn`` (Discord: forums/threads/multipart; Slack: files_upload_v2;
 # WhatsApp: Baileys /send-media). platform -> (error label, run discover_plugins first,
 # caption-capable, media_files sentinel for non-final chunks, forward force_document)
-_PLUGIN_STANDALONE_MEDIA = {"discord": ("Discord", False, True, [], False), "feishu": ("Feishu", True, False, None, False),
-                            "slack": ("Slack", True, True, [], False), "whatsapp": ("WhatsApp", True, True, None, True)}
+_PLUGIN_STANDALONE_MEDIA = {"whatsapp": ("WhatsApp", True, True, None, True)}
 
 
 async def _send_plugin_standalone(platform_name, pconfig, chat_id, message, chunks, media_files, *, thread_id,
@@ -569,40 +563,50 @@ def _via_adapter_route(p, pc, cid, chunk, media, tid, fd):
     return _send_via_adapter(p, pc, cid, chunk, thread_id=tid, media_files=media, force_document=fd)
 
 
-# Native-media chunked routes for built-in platforms; media rides on the final chunk, non-final
-# chunks get the sentinel. platform -> (media required, sentinel, sender(platform, pconfig,
-# chat_id, chunk, media, thread_id, force_document)). Matrix: ALL sends use the native adapter
-# (E2EE text). Signal: attachments ride the JSON-RPC param. Yuanbao / WeCom: media needs the
-# running gateway. Slack text: live adapter (multi-workspace, ignored_channels gates) else the
-# plugin's standalone sender. Names resolve at call time so tests can monkeypatch ``_send_signal``.
-_CHUNKED_ROUTES = {
-    "matrix": (False, [], lambda p, pc, cid, chunk, media, tid, fd: _send_matrix_via_adapter(
-        pc, cid, chunk, media_files=media, thread_id=tid)),
-    "signal": (True, [], lambda p, pc, cid, chunk, media, tid, fd: _send_signal(
-        pc.extra, cid, chunk, media_files=media)),
-    "yuanbao": (True, None, lambda p, pc, cid, chunk, media, tid, fd: _send_yuanbao(cid, chunk, media_files=media)),
-    "slack": (False, [], _via_adapter_route),
-    "wecom": (True, None, _via_adapter_route)}
+# WhatsApp text delivery uses its plugin standalone bridge.
+_TEXT_SENDERS = {"whatsapp": partial(_registry_standalone_send, "whatsapp")}
 
-# Text-only senders for built-in platforms (generic path; media is dropped with a
-# warning). Signature: (pconfig, chat_id, chunk, thread_id) -> result.
-_TEXT_SENDERS = {
-    **{name: partial(_registry_standalone_send, name)
-       for name in ("whatsapp", "email", "sms", "dingtalk", "feishu", "wecom")},
-    "signal": lambda pc, cid, chunk, tid: _send_signal(pc.extra, cid, chunk),
-    "bluebubbles": lambda pc, cid, chunk, tid: _send_bluebubbles(pc.extra, cid, chunk),
-    "qqbot": lambda pc, cid, chunk, tid: _send_qqbot(pc, cid, chunk),
-    "yuanbao": lambda pc, cid, chunk, tid: _send_yuanbao(cid, chunk)}
-
-_MEDIA_PLATFORMS_NOTE = "telegram, discord, matrix, weixin, signal, yuanbao, feishu, whatsapp and slack"
+_MEDIA_PLATFORMS_NOTE = "telegram, weixin and whatsapp"
 
 
 async def _send_to_platform(platform, pconfig, chat_id, message, thread_id=None, media_files=None, force_document=False, args=None):
     """Route to the platform sender, chunking long text with the adapters' splitter. Order matters:
     Weixin first (its native helper must not be blocked by unrelated optional imports such as
     lark-oapi), Telegram (chunks itself), plugin standalone media, native chunked, generic text."""
-    from gateway.config import Platform
+    from gateway.config import Platform, RETIRED_PLATFORMS
     platform_name = platform.value if hasattr(platform, "value") else str(platform)
+    snapshot = getattr(pconfig, "_relay_transport_snapshot", None)
+    if platform == Platform.RELAY and snapshot:
+        runner, relay = snapshot
+        if media_files:
+            make_coro = lambda: _send_live_adapter_media(  # noqa: E731
+                relay, chat_id, message, media_files, thread_id=thread_id,
+                metadata={"thread_id": thread_id} if thread_id else None, force_document=force_document)
+        else:
+            make_coro = lambda: relay.send(  # noqa: E731
+                chat_id=chat_id, content=message,
+                metadata={"thread_id": thread_id} if thread_id else None)
+        result = await _dispatch_on_gateway_loop(
+            runner, make_coro, "send_message: failed to schedule generic relay send")
+        if isinstance(result, dict):
+            return result
+        return ({"success": True, "message_id": result.message_id} if result.success
+                else {"error": _bounded_send_error(result.error)})
+    if platform_name in RETIRED_PLATFORMS:
+        snapshot = getattr(pconfig, "_relay_transport_snapshot", None)
+        runner, relay = snapshot if snapshot else _relay_front(platform)
+        if relay is None:
+            return {"error": f"Platform '{platform_name}' is no longer supported by Stardust."}
+        if media_files:
+            return {"error": "Explicit relay platform delivery currently supports text only; no media was sent."}
+        result = await _dispatch_on_gateway_loop(
+            runner, lambda: relay.send_for_platform(platform, chat_id, message,
+                metadata={"thread_id": thread_id} if thread_id else None),
+            "send_message: failed to schedule explicit relay send")
+        if isinstance(result, dict):
+            return result
+        return ({"success": True, "message_id": result.message_id} if result.success
+                else {"error": _bounded_send_error(result.error)})
     media_files = media_files or []
     if platform == Platform.WEIXIN:
         return await _send_weixin(pconfig, chat_id, message, media_files=media_files)
@@ -614,18 +618,12 @@ async def _send_to_platform(platform, pconfig, chat_id, message, thread_id=None,
     from gateway.platforms.base import BasePlatformAdapter
     max_len = _platform_max_length(platform)
     chunks = BasePlatformAdapter.truncate_message(message, max_len) if max_len else [message]
-    if platform_name == "discord" or (media_files and platform_name in _PLUGIN_STANDALONE_MEDIA):
+    if media_files and platform_name in _PLUGIN_STANDALONE_MEDIA:
         return await _send_plugin_standalone(platform_name, pconfig, chat_id, message, chunks, media_files,
                                              thread_id=thread_id, max_len=max_len, force_document=force_document)
-    route = _CHUNKED_ROUTES.get(platform_name)
-    if route is not None and (media_files or not route[0]):
-        _, empty_media, sender = route
-        return await _send_chunks(chunks, lambda chunk, is_last: sender(
-            platform, pconfig, chat_id, chunk, media_files if is_last else empty_media, thread_id, force_document))
-
-    # Generic path: text only. Buzz delivers media natively via _send_via_adapter, so no warning.
+    # Generic plugin delivery retains native adapter media support.
     warning = None
-    if media_files and platform_name != "buzz":
+    if media_files:
         if not message.strip():
             return {"error": (f"send_message MEDIA delivery is currently only supported for {_MEDIA_PLATFORMS_NOTE}; "
                               f"target {platform_name} had only media attachments")}

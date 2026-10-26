@@ -8,9 +8,9 @@ adapter binds no port of its own.
 """
 from __future__ import annotations
 
-import base64
 import hashlib
 import hmac
+import json
 from pathlib import Path
 from typing import Any
 
@@ -23,8 +23,17 @@ from aiohttp.test_utils import TestClient, TestServer  # noqa: E402
 from gateway.config import GatewayConfig, Platform, PlatformConfig  # noqa: E402
 
 
-def _line_sig(body: bytes, secret: str) -> str:
-    return base64.b64encode(hmac.new(secret.encode(), body, hashlib.sha256).digest()).decode()
+def _cloud_sig(body: bytes, secret: str) -> str:
+    return "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+
+
+def _cloud_body() -> bytes:
+    return json.dumps({
+        "object": "whatsapp_business_account",
+        "entry": [{"changes": [{"field": "messages", "value": {
+            "messages": [{"id": "probe", "type": "text", "text": {"body": "probe"}}],
+        }}]}],
+    }).encode()
 
 
 class _Runner:
@@ -36,30 +45,38 @@ class _Runner:
         self.adapters: dict = {}
 
 
-def _line_adapter(secret: str, profile: str):
-    from plugins.platforms.line.adapter import LineAdapter
-    adapter = LineAdapter(PlatformConfig(enabled=True, extra={
-        "channel_access_token": f"tok-{profile}", "channel_secret": secret, "port": 1}))
+def _cloud_adapter(secret: str, profile: str):
+    from gateway.platforms.whatsapp_cloud import WhatsAppCloudAdapter
+    adapter = WhatsAppCloudAdapter(PlatformConfig(enabled=True, extra={
+        "phone_number_id": f"phone-{profile}", "access_token": f"tok-{profile}",
+        "app_secret": secret, "verify_token": f"verify-{profile}", "webhook_port": 1,
+    }))
     adapter._shared_listener_profile = profile
     adapter.set_owner_profile(profile)
     return adapter
 
 
-async def _publish_line(adapter, runner) -> list[tuple[str, Path]]:
-    """Wire the LINE webhook app the way ``connect()`` does, without the LINE API or a bind, and
-    record the STARDUST_HOME the handler ran under."""
+async def _publish_cloud(adapter, runner) -> list[tuple[str, Path]]:
+    """Wire the real Cloud handlers without Graph API access or a dedicated port.
+
+    Stop at message ingestion, after the adapter has verified and decoded the request,
+    and record the runtime home and secret scope used by the forwarded handler.
+    """
+    from agent.secret_scope import get_secret
     from gateway.platforms.shared_ingress import bind_listener
     from hermes_constants import get_hermes_home
     seen: list[tuple[str, Path]] = []
     adapter.gateway_runner = runner
 
-    async def dispatch(event):
-        seen.append((event.get("type"), Path(get_hermes_home())))
+    async def ingest(message, contacts, metadata):
+        assert get_secret("WHATSAPP_CLOUD_APP_SECRET") == f"secret-{adapter._shared_listener_profile}"
+        seen.append((message["text"]["body"], Path(get_hermes_home())))
 
-    adapter._dispatch_event = dispatch
+    adapter._ingest_message = ingest
     app = web.Application(client_max_size=1024)
-    app.router.add_post(adapter.webhook_path, adapter._handle_webhook)
-    bound = await bind_listener(adapter, app, "127.0.0.1", 1, adapter.webhook_path)
+    app.router.add_get(adapter._webhook_path, adapter._handle_verify)
+    app.router.add_post(adapter._webhook_path, adapter._handle_webhook)
+    bound = await bind_listener(adapter, app, "127.0.0.1", 1, adapter._webhook_path)
     assert bound is None  # shared-listener mode never binds
     return seen
 
@@ -69,7 +86,7 @@ def mux_home(tmp_path, monkeypatch):
     root = tmp_path / "hermes"
     for name in ("coder", "ops"):
         (root / "profiles" / name).mkdir(parents=True)
-        (root / "profiles" / name / ".env").write_text(f"LINE_CHANNEL_SECRET=secret-{name}\n")
+        (root / "profiles" / name / ".env").write_text(f"WHATSAPP_CLOUD_APP_SECRET=secret-{name}\n")
     monkeypatch.setenv("STARDUST_HOME", str(root))
     import hermes_constants
     monkeypatch.setattr(hermes_constants, "_default_hermes_root_memo", None)
@@ -95,43 +112,71 @@ async def _shared_listener(runner) -> TestClient:
 
 
 @pytest.mark.asyncio
-async def test_prefixed_line_webhook_is_verified_by_the_named_profiles_secret_under_its_scope(mux_home):
-    coder, ops = _line_adapter("secret-coder", "coder"), _line_adapter("secret-ops", "ops")
-    runner = _Runner({"coder": {Platform("line"): coder}, "ops": {Platform("line"): ops}})
-    coder_seen, ops_seen = await _publish_line(coder, runner), await _publish_line(ops, runner)
-    body = b'{"events":[{"type":"probe"}]}'
+async def test_prefixed_cloud_webhook_is_verified_by_the_named_profiles_secret_under_its_scope(mux_home):
+    coder, ops = _cloud_adapter("secret-coder", "coder"), _cloud_adapter("secret-ops", "ops")
+    runner = _Runner({"coder": {Platform.WHATSAPP_CLOUD: coder}, "ops": {Platform.WHATSAPP_CLOUD: ops}})
+    coder_seen, ops_seen = await _publish_cloud(coder, runner), await _publish_cloud(ops, runner)
+    body = _cloud_body()
     async with await _shared_listener(runner) as client:
-        ok = await client.post("/p/coder/line/webhook", data=body,
-                               headers={"X-Line-Signature": _line_sig(body, "secret-coder")})
-        assert ok.status == 200
-        # ops' secret is rejected at coder's URL — the adapter is per profile, so is the secret.
-        wrong = await client.post("/p/coder/line/webhook", data=body,
-                                  headers={"X-Line-Signature": _line_sig(body, "secret-ops")})
-        assert wrong.status == 401
+        for profile, secret in (("coder", "secret-coder"), ("ops", "secret-ops")):
+            url = f"/p/{profile}/whatsapp/webhook"
+            ok = await client.post(url, data=body, headers={"X-Hub-Signature-256": _cloud_sig(body, secret)})
+            assert ok.status == 200
+            # Another profile's secret and unsigned/tampered bodies must not reach ingestion.
+            wrong_secret = "secret-ops" if profile == "coder" else "secret-coder"
+            wrong = await client.post(url, data=body,
+                                      headers={"X-Hub-Signature-256": _cloud_sig(body, wrong_secret)})
+            assert wrong.status == 401
+            assert (await client.post(url, data=body)).status == 401
+            tampered = await client.post(url, data=body + b" ",
+                                         headers={"X-Hub-Signature-256": _cloud_sig(body, secret)})
+            assert tampered.status == 401
         # The un-prefixed path keeps serving only the default profile's own routes.
-        bare = await client.post("/line/webhook", data=body,
-                                 headers={"X-Line-Signature": _line_sig(body, "secret-coder")})
+        bare = await client.post("/whatsapp/webhook", data=body,
+                                 headers={"X-Hub-Signature-256": _cloud_sig(body, "secret-coder")})
         assert bare.status == 404
-        # An unserved profile, and a served profile without that platform, are 404 — never another adapter.
-        assert (await client.post("/p/nope/line/webhook", data=body)).status == 404
+        # Unknown/default profiles and a profile without that platform never borrow another adapter.
+        assert (await client.post("/p/nope/whatsapp/webhook", data=body)).status == 404
+        assert (await client.post("/p/default/whatsapp/webhook", data=body)).status == 404
         runner._profile_adapters["ops"] = {}
-        assert (await client.post("/p/ops/line/webhook", data=body,
-                                  headers={"X-Line-Signature": _line_sig(body, "secret-ops")})).status == 404
-    assert [t for t, _ in coder_seen] == ["probe"] and ops_seen == []
-    assert coder_seen[0][1] == mux_home / "profiles" / "coder"
+        assert (await client.post("/p/ops/whatsapp/webhook", data=body,
+                                  headers={"X-Hub-Signature-256": _cloud_sig(body, "secret-ops")})).status == 404
+    assert coder_seen == [("probe", mux_home / "profiles" / "coder")]
+    assert ops_seen == [("probe", mux_home / "profiles" / "ops")]
 
 
 @pytest.mark.asyncio
 async def test_shared_listener_adapter_records_its_public_ingress_url(mux_home, monkeypatch):
-    """Runtime status carries the /p/<profile>/ URL so `gateway status` / the dashboard can show it."""
+    """Status reports the prefixed URL; Meta's verification query reaches that same profile."""
     writes: list[dict] = []
     monkeypatch.setattr("gateway.status.write_runtime_status", lambda **kw: writes.append(kw))
-    coder = _line_adapter("secret-coder", "coder")
-    coder._runtime_status_platform_key = "coder:line"
-    runner = _Runner({"coder": {Platform("line"): coder}})
+    coder = _cloud_adapter("secret-coder", "coder")
+    coder._runtime_status_platform_key = "coder:whatsapp_cloud"
+    runner = _Runner({"coder": {Platform.WHATSAPP_CLOUD: coder}})
     runner.adapters = {Platform.API_SERVER: type("L", (), {"_host": "0.0.0.0", "_port": 8642})()}
-    await _publish_line(coder, runner)
-    assert coder._shared_ingress_url == "http://127.0.0.1:8642/p/coder/line/webhook"
-    assert {"platform": "coder:line", "ingress_url": coder._shared_ingress_url} == {
+    await _publish_cloud(coder, runner)
+    assert coder._shared_ingress_url == "http://127.0.0.1:8642/p/coder/whatsapp/webhook"
+    assert {"platform": "coder:whatsapp_cloud", "ingress_url": coder._shared_ingress_url} == {
         k: v for k, v in writes[-1].items() if k in ("platform", "ingress_url")}
-    assert coder._media_url("tok", "a.png").startswith("http://127.0.0.1:8642/p/coder/line/media/")
+    async with await _shared_listener(runner) as client:
+        params = {"hub.mode": "subscribe", "hub.verify_token": "verify-coder", "hub.challenge": "profile challenge"}
+        response = await client.get("/p/coder/whatsapp/webhook", params=params)
+        assert response.status == 200
+        assert await response.text() == "profile challenge"
+        params["hub.verify_token"] = "verify-ops"
+        assert (await client.get("/p/coder/whatsapp/webhook", params=params)).status == 403
+
+
+@pytest.mark.asyncio
+async def test_shared_listener_without_app_secret_fails_closed(mux_home, monkeypatch):
+    """A profile without its own app secret cannot authenticate using the default process env."""
+    monkeypatch.setenv("WHATSAPP_CLOUD_APP_SECRET", "default-process-secret")
+    coder = _cloud_adapter("", "coder")
+    runner = _Runner({"coder": {Platform.WHATSAPP_CLOUD: coder}})
+    seen = await _publish_cloud(coder, runner)
+    body = _cloud_body()
+    async with await _shared_listener(runner) as client:
+        response = await client.post("/p/coder/whatsapp/webhook", data=body,
+                                     headers={"X-Hub-Signature-256": _cloud_sig(body, "default-process-secret")})
+        assert response.status == 503
+    assert seen == []

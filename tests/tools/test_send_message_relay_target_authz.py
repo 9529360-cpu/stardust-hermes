@@ -23,6 +23,16 @@ ARBITRARY_CHAT = "999999999999999999"
 HOME_CHAT = "222222222222222222"
 
 
+def _relay_runner(platform_name):
+    from types import SimpleNamespace
+
+    relay = SimpleNamespace(
+        config=SimpleNamespace(enabled=True),
+        fronts_platform=lambda platform: getattr(platform, "value", platform) == platform_name,
+    )
+    return SimpleNamespace(adapters={Platform.RELAY: relay})
+
+
 @pytest.fixture
 def relay_env(tmp_path, monkeypatch):
     """A gateway whose ONLY reachable Discord destinations are attested.
@@ -68,17 +78,24 @@ def _send(target: str, sent):
 
     import asyncio
 
-    discord_cfg = SimpleNamespace(enabled=True, token="t", extra={})
+    import gateway.run as gr_run
+
+    platform_name = target.partition(":")[0]
+    platform_cfg = SimpleNamespace(enabled=True, token="t", extra={})
+    relay_cfg = SimpleNamespace(enabled=True, token=None, extra={})
     config = SimpleNamespace(
-        platforms={Platform.DISCORD: discord_cfg},
+        platforms={Platform(platform_name): platform_cfg, Platform.RELAY: relay_cfg},
         get_home_channel=lambda _p: SimpleNamespace(chat_id=HOME_CHAT),
     )
+    runner = gr_run._gateway_runner_ref() or _relay_runner(platform_name)
 
     async def _record(platform, pconfig, chat_id, message, **kwargs):
         sent.append(chat_id)
         return {"success": True, "message_id": "m1"}
 
-    with patch("gateway.config.load_gateway_config", return_value=config), patch(
+    with patch("gateway.run._gateway_runner_ref", return_value=runner), patch(
+        "gateway.config.load_gateway_config", return_value=config
+    ), patch(
         "tools.interrupt.is_interrupted", return_value=False
     ), patch("model_tools._run_async", side_effect=lambda c: asyncio.run(c)), patch(
         "tools.send_message_tool._send_to_platform", side_effect=_record
@@ -147,12 +164,17 @@ def test_session_origin_chat_is_attested(relay_env, monkeypatch):
 
 def test_platform_not_fronted_by_relay_is_untouched(relay_env, monkeypatch):
     """Non-relay platforms keep their own adapters' authorization, unchanged."""
-    monkeypatch.setenv("GATEWAY_RELAY_PLATFORMS", "telegram")
+    monkeypatch.setenv("GATEWAY_RELAY_PLATFORMS", "discord")
     monkeypatch.setenv(
-        "GATEWAY_RELAY_BOT_IDS", json.dumps({"telegram": {"botId": "b1"}})
+        "GATEWAY_RELAY_BOT_IDS", json.dumps({"discord": {"botId": "b1"}})
     )
+    import gateway.run as gr_run
+    from types import SimpleNamespace
+
+    # A live native Telegram transport is outside the connector's fronted set.
+    monkeypatch.setattr(gr_run, "_gateway_runner_ref", lambda: SimpleNamespace(adapters={Platform.TELEGRAM: object()}))
     sent: list[str] = []
-    result = _send(f"discord:{ARBITRARY_CHAT}", sent)
+    result = _send(f"telegram:{ARBITRARY_CHAT}", sent)
 
     assert result["success"] is True
     assert sent == [ARBITRARY_CHAT]
@@ -171,10 +193,10 @@ def test_live_native_adapter_takes_precedence_over_the_relay_guard(
 
     import gateway.run
 
-    runner = SimpleNamespace(adapters={Platform.DISCORD: object()})
+    runner = SimpleNamespace(adapters={Platform.TELEGRAM: object()})
     monkeypatch.setattr(gateway.run, "_gateway_runner_ref", lambda: runner)
     sent: list[str] = []
-    result = _send(f"discord:{ARBITRARY_CHAT}", sent)
+    result = _send(f"telegram:{ARBITRARY_CHAT}", sent)
 
     assert result["success"] is True
     assert sent == [ARBITRARY_CHAT]
@@ -198,128 +220,6 @@ def test_react_refuses_an_arbitrary_relay_target(relay_env):
             "send_message(action='list') to see the targets it can reach."
         )
     }
-
-# ── B-1: the guard must authorize the RESOLVED destination ──────────────────
-#
-# Slack `@handle` / `U...` targets are internal PSEUDO-ids
-# (`user_name:ben`, `user:U...`) until `_resolve_slack_user_target` opens the
-# DM and returns the real `D...` conversation. Provenances only ever hold
-# resolved ids, so authorizing the pseudo-id compares a handle against a set
-# of channel ids and refuses every Slack DM — an OUTAGE caused by a security
-# fix. Review round 1 found this; reproduced before fixing.
-#
-# These tests are the falsifiable floor for the guard's POSITION: they pass
-# only while authorization happens AFTER resolution.
-
-SLACK_DM = "D01234567AB"
-SLACK_USER = "U01234567AB"
-
-
-@pytest.fixture
-def slack_relay_env(tmp_path, monkeypatch):
-    """A relay-fronted Slack gateway whose attested destination is a DM id."""
-    import gateway.channel_directory as cd
-
-    monkeypatch.setenv("GATEWAY_RELAY_URL", "wss://connector.example/relay")
-    monkeypatch.setenv("GATEWAY_RELAY_PLATFORMS", "slack")
-    monkeypatch.setenv("GATEWAY_RELAY_BOT_IDS", json.dumps({"slack": {"botId": "b1"}}))
-
-    directory = tmp_path / "channel_directory.json"
-    directory.write_text(
-        json.dumps(
-            {
-                "updated_at": None,
-                # The DM conversation id — what resolution produces, and the
-                # only form any provenance ever stores.
-                "platforms": {"slack": [{"id": SLACK_DM, "name": "ben", "type": "im"}]},
-            }
-        ),
-        encoding="utf-8",
-    )
-    monkeypatch.setattr(cd, "DIRECTORY_PATH", directory)
-    monkeypatch.setattr(cd, "CHANNEL_ALIASES_PATH", tmp_path / "channel_aliases.json")
-    monkeypatch.setattr(cd, "_build_from_sessions", lambda _platform: [])
-    return directory
-
-
-def _send_slack(target: str, sent, *, resolves_to: str | None = SLACK_DM):
-    """Invoke the real tool with the REAL Slack resolution step in the path.
-
-    Only `conversations.open` is faked (a network call). The ordering of the
-    guard against the resolver is production's.
-    """
-    import asyncio
-    from types import SimpleNamespace
-    from unittest.mock import patch
-
-    slack_cfg = SimpleNamespace(enabled=True, token="xoxb-t", extra={})
-    config = SimpleNamespace(
-        platforms={Platform.SLACK: slack_cfg},
-        get_home_channel=lambda _p: SimpleNamespace(chat_id=SLACK_DM),
-    )
-
-    async def _record(platform, pconfig, chat_id, message, **kwargs):
-        sent.append(chat_id)
-        return {"success": True, "message_id": "m1"}
-
-    async def _resolve(_token, target_ref):
-        # Stands in for the Slack API call only; returns what production's
-        # resolver returns — the opened DM channel id.
-        return (resolves_to, None)
-
-    with patch("gateway.config.load_gateway_config", return_value=config), patch(
-        "tools.interrupt.is_interrupted", return_value=False
-    ), patch("model_tools._run_async", side_effect=lambda c: asyncio.run(c)), patch(
-        "tools.send_message_tool._send_to_platform", side_effect=_record
-    ), patch(
-        "tools.send_message_tool._resolve_slack_user_target", side_effect=_resolve
-    ), patch(
-        "gateway.mirror.mirror_to_session", return_value=False
-    ):
-        return json.loads(
-            send_message_tool({"action": "send", "target": target, "message": "hello"})
-        )
-
-
-@pytest.mark.parametrize(
-    "target",
-    [f"slack:@ben", f"slack:{SLACK_USER}", f"slack:<@{SLACK_USER}>"],
-)
-def test_slack_user_targets_resolve_then_authorize(slack_relay_env, target):
-    """An attested DM must SEND regardless of which alias names it.
-
-    Fails if the guard runs before resolution: the pseudo-id
-    (`user_name:ben` / `user:U...`) is not in any provenance, so the send is
-    refused and `sent` stays empty.
-    """
-    sent: list[str] = []
-    result = _send_slack(target, sent)
-
-    assert result == {"success": True, "message_id": "m1"}
-    # The whole observable: it egressed, and to the RESOLVED destination.
-    assert sent == [SLACK_DM]
-
-
-def test_slack_user_target_resolving_to_unattested_dm_is_refused(slack_relay_env):
-    """Moving the guard must not disable it.
-
-    A handle that resolves to a DM this gateway cannot attest is still
-    refused — and the refusal names the RESOLVED id, which is the destination
-    that was actually authorized.
-    """
-    sent: list[str] = []
-    unattested = "D99999999XX"
-    result = _send_slack("slack:@stranger", sent, resolves_to=unattested)
-
-    assert result == {
-        "error": (
-            f"Refusing to send to unattested relay target 'slack:{unattested}': "
-            "this gateway has no record of that destination. Use "
-            "send_message(action='list') to see the targets it can reach."
-        )
-    }
-    assert sent == []
-
 
 # ── the guard must FAIL CLOSED on its own fault ─────────────────────────────
 #
@@ -1421,3 +1321,218 @@ def test_tool_guard_forwards_thread_id(monkeypatch):
     smt._handle_send({"target": "discord:C1:T99", "message": "hi"})
 
     assert seen.get("thread_id") == "T99", "the tool dropped thread_id before the guard"
+
+
+@pytest.fixture
+def scoped_relay_gateway(tmp_path, monkeypatch):
+    """A secondary relay owns different destinations from the primary profile's bot."""
+    import gateway.channel_directory as cd
+    import gateway.run as gr_run
+    import hermes_constants
+    from gateway.authz_mixin import GatewayAuthorizationMixin
+    from gateway.config import GatewayConfig
+
+    from gateway.platforms.base import SendResult
+
+    class Relay:
+        def __init__(self, name):
+            self.name = name
+            self.sent = []
+
+        def fronts_platform(self, platform):
+            return getattr(platform, "value", platform) in {"telegram", "discord", "relay"}
+
+        async def send(self, chat_id, content, metadata=None):
+            self.sent.append(("relay", chat_id, content))
+            return SendResult(success=True, message_id=f"{self.name}-generic")
+
+        async def send_for_platform(self, platform, chat_id, content, metadata=None):
+            value = getattr(platform, "value", platform)
+            self.sent.append((str(value), chat_id, content))
+            return SendResult(success=True, message_id=f"{self.name}-{value}")
+
+    class Runner(GatewayAuthorizationMixin):
+        pass
+
+    root = tmp_path / "scope-home"
+    secondary = root / "profiles" / "coder"
+    secondary.mkdir(parents=True)
+    for home, chat in ((root, HOME_CHAT), (secondary, ATTESTED_CHAT)):
+        (home / "channel_directory.json").write_text(json.dumps({
+            "platforms": {
+                "telegram": [{"id": chat, "name": "owned", "type": "dm"}],
+                "discord": [{"id": chat, "name": "owned", "type": "channel"}],
+            },
+        }), encoding="utf-8")
+        (home / "config.yaml").write_text("platforms:\n  relay:\n    enabled: true\n", encoding="utf-8")
+    monkeypatch.setenv("STARDUST_HOME", str(root))
+    monkeypatch.setattr(hermes_constants, "_default_hermes_root_memo", None)
+    monkeypatch.setattr(cd, "DIRECTORY_PATH", None)
+    monkeypatch.setattr(cd, "CHANNEL_ALIASES_PATH", None)
+    runner = Runner()
+    runner.config = GatewayConfig(multiplex_profiles=True)
+    runner._primary_profile_name = "default"
+    primary, secondary_relay = Relay("primary"), Relay("coder")
+    runner.adapters = {Platform.RELAY: primary, Platform.TELEGRAM: object()}
+    runner._profile_adapters = {"coder": {Platform.RELAY: secondary_relay}}
+    monkeypatch.setattr(gr_run, "_gateway_runner_ref", lambda: runner)
+    return runner, secondary, primary, secondary_relay
+
+
+def test_secondary_relay_authorization_uses_its_scope_not_primary_native(scoped_relay_gateway):
+    from gateway.relay.egress import authorize_relay_target, relay_routed_platform
+    from gateway.run import _profile_runtime_scope
+    from hermes_cli.profiles import get_active_profile_name
+
+    runner, secondary, primary, relay = scoped_relay_gateway
+    with _profile_runtime_scope(secondary):
+        assert get_active_profile_name() == "coder"
+        assert runner._authorization_adapter(Platform.RELAY, "coder") is relay
+        assert relay_routed_platform("telegram") is True
+        assert authorize_relay_target("telegram", ARBITRARY_CHAT) is not None
+        assert authorize_relay_target("telegram", HOME_CHAT) is not None
+        assert authorize_relay_target("telegram", ATTESTED_CHAT) is None
+
+
+def _real_send_under_profile(profile_home, target, monkeypatch):
+    """Run the real tool/authorization/adapter path with only network transport faked."""
+    import asyncio
+    from types import SimpleNamespace
+    from unittest.mock import patch
+
+    from gateway.config import Platform
+    from gateway.run import _profile_runtime_scope
+    from tools.send_message_tool import send_message_tool
+
+    config = SimpleNamespace(
+        platforms={
+            Platform.RELAY: SimpleNamespace(enabled=True, token=None, extra={}),
+            Platform.DISCORD: SimpleNamespace(enabled=True, token="legacy-native-token", extra={}),
+        },
+        get_home_channel=lambda _platform: None,
+    )
+    monkeypatch.setattr("gateway.config.load_gateway_config", lambda: config)
+    with _profile_runtime_scope(profile_home), patch(
+        "tools.interrupt.is_interrupted", return_value=False
+    ), patch("model_tools._run_async", side_effect=lambda coro: asyncio.run(coro)), patch(
+        "gateway.mirror.mirror_to_session", return_value=False
+    ):
+        return json.loads(send_message_tool({"action": "send", "target": target, "message": "hello"}))
+
+
+def test_real_send_message_uses_only_the_active_profiles_explicit_relay_front(scoped_relay_gateway, monkeypatch):
+    runner, secondary, primary, secondary_relay = scoped_relay_gateway
+
+    secondary_result = _real_send_under_profile(secondary, f"discord:{ATTESTED_CHAT}", monkeypatch)
+    assert secondary_result == {"success": True, "message_id": f"coder-discord"}
+    assert secondary_relay.sent == [("discord", ATTESTED_CHAT, "hello")]
+    assert primary.sent == []
+
+    # The same recorded destination is not borrowed after switching to primary.
+    primary_result = _real_send_under_profile(secondary.parent.parent, f"discord:{ATTESTED_CHAT}", monkeypatch)
+    assert "error" in primary_result
+    assert primary.sent == []
+    assert secondary_relay.sent == [("discord", ATTESTED_CHAT, "hello")]
+
+    # A secondary profile with no relay transport cannot borrow either the
+    # primary or coder relay, even if its requested id exists in their stores.
+    other = secondary.parent / "other"
+    other.mkdir()
+    other_result = _real_send_under_profile(other, f"discord:{HOME_CHAT}", monkeypatch)
+    assert "error" in other_result
+    assert primary.sent == []
+    assert secondary_relay.sent == [("discord", ATTESTED_CHAT, "hello")]
+
+
+def test_real_generic_relay_plane_uses_the_selected_profile_adapter(scoped_relay_gateway, monkeypatch):
+    runner, secondary, primary, secondary_relay = scoped_relay_gateway
+
+    result = _real_send_under_profile(secondary, f"relay:{ATTESTED_CHAT}", monkeypatch)
+
+    assert result == {"success": True, "message_id": "coder-generic"}
+    assert secondary_relay.sent == [("relay", ATTESTED_CHAT, "hello")]
+    assert primary.sent == []
+
+    switched = _real_send_under_profile(secondary.parent.parent, f"relay:{ATTESTED_CHAT}", monkeypatch)
+    assert "error" in switched
+    assert primary.sent == []
+    assert secondary_relay.sent == [("relay", ATTESTED_CHAT, "hello")]
+
+
+def test_egress_route_classification_matches_delivery_transport_precedence(scoped_relay_gateway, monkeypatch):
+    from gateway.config import GatewayConfig, Platform, PlatformConfig
+    from gateway.delivery import resolve_delivery_transport
+    from gateway.relay.egress import authorize_relay_target, relay_routed_platform
+    from gateway.run import _profile_runtime_scope
+
+    runner, secondary, _primary, _relay = scoped_relay_gateway
+    secondary_config = GatewayConfig(platforms={
+        Platform.TELEGRAM: PlatformConfig(enabled=False),
+        Platform.RELAY: PlatformConfig(enabled=True),
+    }, multiplex_profiles=True)
+    monkeypatch.setattr("gateway.config.load_gateway_config", lambda: secondary_config)
+
+    with _profile_runtime_scope(secondary):
+        selected = runner._adapters_for_profile("coder")
+        route = resolve_delivery_transport(Platform.TELEGRAM, secondary_config, selected)
+        assert route is not None and route.is_relay
+        assert relay_routed_platform("telegram") is True
+        assert authorize_relay_target("telegram", ATTESTED_CHAT) is None
+        assert authorize_relay_target("telegram", ARBITRARY_CHAT) is not None
+
+    primary_config = GatewayConfig(platforms={
+        Platform.TELEGRAM: PlatformConfig(enabled=True),
+        Platform.RELAY: PlatformConfig(enabled=True),
+    }, multiplex_profiles=True)
+    monkeypatch.setattr("gateway.config.load_gateway_config", lambda: primary_config)
+    with _profile_runtime_scope(secondary.parent.parent):
+        selected = runner._adapters_for_profile("default")
+        route = resolve_delivery_transport(Platform.TELEGRAM, primary_config, selected)
+        assert route is not None and route.is_relay is False
+        assert relay_routed_platform("telegram") is False
+        assert authorize_relay_target("telegram", ARBITRARY_CHAT) is None
+
+
+def test_selected_relay_snapshot_cannot_use_primary_native_or_foreign_profile(scoped_relay_gateway):
+    from gateway.relay.egress import authorize_relay_target
+    from gateway.run import _profile_runtime_scope
+
+    runner, secondary, primary, relay = scoped_relay_gateway
+    with _profile_runtime_scope(secondary):
+        assert authorize_relay_target("telegram", ARBITRARY_CHAT, relay_adapter=relay) is not None
+        assert authorize_relay_target("telegram", HOME_CHAT, relay_adapter=relay) is not None
+        assert authorize_relay_target("telegram", ATTESTED_CHAT, relay_adapter=relay) is None
+        assert authorize_relay_target("telegram", ATTESTED_CHAT, relay_adapter=primary) is not None
+        runner._profile_adapters["coder"][Platform.RELAY] = primary
+        assert authorize_relay_target("telegram", ATTESTED_CHAT, relay_adapter=relay) is not None
+
+
+@pytest.mark.parametrize("fault", ["unfronted", "truthy", "raising", "missing"])
+def test_selected_relay_snapshot_fails_closed_on_invalid_front(scoped_relay_gateway, fault):
+    from gateway.relay.egress import authorize_relay_target
+    from gateway.run import _profile_runtime_scope
+
+    runner, secondary, primary, relay = scoped_relay_gateway
+    if fault == "raising":
+        def fronts(platform):
+            raise RuntimeError("transport descriptor unavailable")
+        relay.fronts_platform = fronts
+    elif fault == "missing":
+        relay = object()
+        runner._profile_adapters["coder"][Platform.RELAY] = relay
+    else:
+        relay.fronts_platform = lambda platform: False if fault == "unfronted" else "yes"
+    with _profile_runtime_scope(secondary):
+        assert authorize_relay_target("telegram", ATTESTED_CHAT, relay_adapter=relay) is not None
+        assert authorize_relay_target("relay", ATTESTED_CHAT, relay_adapter=relay) is not None
+
+
+def test_generic_selected_relay_rejects_non_boolean_fronting_result(scoped_relay_gateway):
+    from gateway.relay.egress import authorize_relay_target
+    from gateway.run import _profile_runtime_scope
+
+    _runner, secondary, _primary, relay = scoped_relay_gateway
+    relay.fronts_platform = lambda _platform: "yes"
+    with _profile_runtime_scope(secondary):
+        denial = authorize_relay_target("relay", ATTESTED_CHAT, relay_adapter=relay)
+    assert denial is not None and "could not be determined" in denial

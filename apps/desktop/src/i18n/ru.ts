@@ -24,6 +24,83 @@ const RU_NOUN = (count: number | string, one: string, few: string, many: string)
 }
 
 export const ru = defineLocale({
+  taskCenter: {
+    title: 'Задачи',
+    activity: 'Активность',
+    automation: 'Автоматизация',
+    sessionUnavailable: 'Чат недоступен',
+    recoveryAvailable: 'Доступно восстановление',
+    approvalRequired: 'Требуется подтверждение',
+    loadFailed: 'Не удалось загрузить задачи',
+    someUnavailable: 'Некоторые задачи недоступны',
+    loading: 'Загрузка задач',
+    emptyTitle: 'Нет активных задач',
+    emptyDescription: 'Здесь отображаются подтверждения, фоновые команды и ход работы субагентов из ваших чатов.',
+    groups: {
+      attention: 'Требует внимания',
+      running: 'Выполняется',
+      upcoming: 'Скоро',
+      recent: 'Недавно',
+      other: 'Другие'
+    },
+    states: {
+      blocked: 'Заблокировано',
+      cancelled: 'Отменено',
+      completed: 'Завершено',
+      failed: 'Ошибка',
+      interrupted: 'Прервано',
+      paused: 'Приостановлено',
+      queued: 'В очереди',
+      running: 'Выполняется',
+      waiting_for_user: 'Ожидает вас'
+    },
+    load: {
+      degraded: 'Не удалось прочитать некоторые источники задач. Показаны доступные задачи.',
+      error: 'Не удалось загрузить сохранённое состояние задач. Проверьте подключение и повторите попытку.',
+      loading: 'Загрузка сохранённого состояния задач…',
+      retrying: 'Показано последнее сохранённое состояние. Последнее обновление не удалось.'
+    },
+    rails: {
+      approval: 'Подтверждение',
+      clarify: 'Вопрос',
+      sudo: 'Права администратора',
+      secret: 'Требуется секрет',
+      'vault-unlock': 'Разблокировать менеджер паролей',
+      'vault-save': 'Сохранить вход',
+      'vault-code': 'Код подтверждения',
+      process: 'Фоновая команда',
+      delegation: 'Делегированная работа',
+      cron: 'Запланированная работа',
+      goal: 'Постоянная цель'
+    },
+    phases: {
+      active: 'Активна',
+      waiting: 'Ожидание',
+      scheduled: 'Запланирована',
+      last_failed: 'Последний запуск не удался',
+      stalling: 'Ожидание прогресса',
+      finalizing: 'Завершение',
+      timeout: 'Время ожидания истекло',
+      stalled: 'Нет прогресса',
+      unknown: 'Статус недоступен',
+      claimed: 'Назначена на выполнение',
+      delivery_failed: 'Ошибка доставки',
+      skipped: 'Пропущена'
+    },
+    recoveryActions: {
+      retry: 'Повторить',
+      review_or_retry: 'Проверить или повторить',
+      resume: 'Продолжить'
+    },
+    summary: (running: number, attention: number) => `Выполняется: ${running} · Требуют внимания: ${attention}`,
+    workingOn: (tool: string) => `Используется ${tool}`,
+    exitCode: (code: number) => `Код выхода ${code}`,
+    needsSecret: (name: string) => `Требуется секрет: ${name}`,
+    needsVault: (name: string) => `Разблокировать менеджер паролей: ${name}`,
+    unknownStatus: (value: string) => `Неизвестный статус (${value})`,
+    unknownRecovery: (value: string) => `Другой способ восстановления (${value})`,
+    unknownRail: (value: string) => `Задача (${value})`
+  },
   sessionImport: {
     title: 'Продолжить из другого приложения',
     subtitle: 'Перенесите разговор в Stardust и продолжите с того места, где остановились.',
@@ -2242,9 +2319,9 @@ export const ru = defineLocale({
     deliverOptions: {
       log: 'Журнал',
       telegram: 'Telegram',
-      discord: 'Discord',
-      slack: 'Slack',
-      email: 'Email',
+      whatsapp: 'WhatsApp',
+      whatsapp_cloud: 'WhatsApp Business (облако)',
+      weixin: 'Weixin / WeChat (微信)',
       github_comment: 'Комментарий GitHub'
     }
   },

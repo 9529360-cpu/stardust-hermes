@@ -208,6 +208,8 @@ class Platform(Enum):
         value = value.strip().lower()
         if value in cls._value2member_map_:
             return cls._value2member_map_[value]
+        if value in RETIRED_PLATFORMS:
+            return cls._add_pseudo_member(value)
         global _Platform__bundled_plugin_names
         if _Platform__bundled_plugin_names is None:
             _Platform__bundled_plugin_names = cls._scan_bundled_plugin_platforms()
@@ -243,6 +245,15 @@ class Platform(Enum):
 
 
 # Built-in values snapshotted before any dynamic _missing_ lookup.
+# Historical values remain readable in persisted sessions and configuration. Their
+# bundled adapters have been removed from Stardust's supported messaging surface.
+RETIRED_PLATFORMS = frozenset({
+    "a2a", "bluebubbles", "buzz", "dingtalk", "discord", "email", "feishu",
+    "google_chat", "homeassistant", "irc", "line", "matrix", "mattermost",
+    "msgraph_webhook", "ntfy", "photon", "qqbot", "raft", "signal", "simplex",
+    "slack", "sms", "teams", "wecom", "wecom_callback", "yuanbao",
+})
+
 _BUILTIN_PLATFORM_VALUES = frozenset(m.value for m in Platform.__members__.values())
 
 # Platforms that bind a host TCP port. In a multiplexer only the default profile binds: a SECONDARY
@@ -324,10 +335,6 @@ class ChannelOverride:
 # api_key-only) and must never be skipped for a missing token. See #64674.
 PLATFORM_TOKEN_ENV_NAMES: dict["Platform", str] = {
     Platform.TELEGRAM: "TELEGRAM_BOT_TOKEN",
-    Platform.DISCORD: "DISCORD_BOT_TOKEN",
-    Platform.SLACK: "SLACK_BOT_TOKEN",
-    Platform.MATTERMOST: "MATTERMOST_TOKEN",
-    Platform.MATRIX: "MATRIX_ACCESS_TOKEN",
     Platform.WEIXIN: "WEIXIN_TOKEN",
 }
 
@@ -476,13 +483,8 @@ def _needs_extra(*keys: str) -> Callable[[PlatformConfig], bool]:
 _PLATFORM_CONNECTED_CHECKERS: dict[Platform, Callable[[PlatformConfig], bool]] = {
     Platform.WEIXIN: lambda cfg: bool(cfg.extra.get("account_id") and (cfg.token or cfg.extra.get("token"))),
     Platform.WHATSAPP_CLOUD: _needs_extra("phone_number_id", "access_token"),
-    Platform.SIGNAL: _needs_extra("http_url"),
     Platform.API_SERVER: lambda cfg: _has_usable_api_server_key(cfg.extra.get("key") if cfg else None),
     Platform.WEBHOOK: lambda cfg: True,
-    Platform.MSGRAPH_WEBHOOK: lambda cfg: bool(str(cfg.extra.get("client_state") or "").strip()),
-    Platform.BLUEBUBBLES: _needs_extra("server_url", "password"),
-    Platform.QQBOT: _needs_extra("app_id", "client_secret"),
-    Platform.YUANBAO: _needs_extra("app_id", "app_secret"),
     # Relay dials OUT: "connected" once an endpoint URL is configured. EXPERIMENTAL.
     Platform.RELAY: lambda cfg: bool(cfg.extra.get("relay_url") or cfg.extra.get("url")),
 }
@@ -556,6 +558,14 @@ class GatewayConfig:
 
     def __post_init__(self) -> None:
         self.systemd_watchdog_seconds = coerce_systemd_watchdog_seconds(self.systemd_watchdog_seconds)
+        for platform, config in self.platforms.items():
+            if platform.value in RETIRED_PLATFORMS and config.enabled:
+                logger.warning(
+                    "Platform '%s' is no longer supported by Stardust; its configuration "
+                    "is preserved but its adapter will not start. Use Telegram, WhatsApp or Weixin.",
+                    platform.value,
+                )
+                config.enabled = False
 
     def get_connected_platforms(self) -> List[Platform]:
         """Enabled + configured platforms, sorted by value so the rendered "Connected
@@ -564,6 +574,8 @@ class GatewayConfig:
         return sorted(connected, key=lambda p: str(p.value))
 
     def _is_platform_connected(self, platform: Platform, config: PlatformConfig) -> bool:
+        if platform.value in RETIRED_PLATFORMS:
+            return False
         checker = _PLATFORM_CONNECTED_CHECKERS.get(platform)
         # Weixin needs token AND account_id, so it must bypass the generic token branch.
         if platform == Platform.WEIXIN:

@@ -1,153 +1,15 @@
-"""Integration tests for Home Assistant (tool + gateway).
-
-Spins up a real in-process fake HA server (HTTP + WebSocket) and exercises
-the full adapter and tool handler paths over real TCP connections.
-No mocks -- only real async I/O against a fake server.
-
-Run with:  uv run pytest tests/integration/test_ha_integration.py -v
-"""
-
-import asyncio
+"""Home Assistant tool integration over real HTTP against a local fake server."""
 
 import pytest
 
 pytestmark = pytest.mark.integration
 
-from unittest.mock import AsyncMock
-
-from gateway.config import Platform, PlatformConfig
-from plugins.platforms.homeassistant.adapter import HomeAssistantAdapter
 from tests.fakes.fake_ha_server import FakeHAServer, ENTITY_STATES
 from tools.homeassistant_tool import (
     _async_call_service,
     _async_get_state,
     _async_list_entities,
 )
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _adapter_for(server: FakeHAServer, **extra) -> HomeAssistantAdapter:
-    """Create an adapter pointed at the fake server."""
-    config = PlatformConfig(
-        enabled=True,
-        token=server.token,
-        extra={"url": server.url, **extra},
-    )
-    return HomeAssistantAdapter(config)
-
-
-# ---------------------------------------------------------------------------
-# 1. Gateway -- WebSocket lifecycle
-# ---------------------------------------------------------------------------
-
-
-class TestGatewayWebSocket:
-    @pytest.mark.asyncio
-    async def test_connect_auth_subscribe(self):
-        """Full WS handshake succeeds: auth_required -> auth -> auth_ok -> subscribe -> ACK."""
-        async with FakeHAServer() as server:
-            adapter = _adapter_for(server)
-            connected = await adapter.connect()
-            assert connected is True
-            assert adapter._running is True
-            assert adapter._ws is not None
-            assert not adapter._ws.closed
-            await adapter.disconnect()
-
-    @pytest.mark.asyncio
-    async def test_connect_auth_rejected(self):
-        """connect() returns False when the server rejects auth."""
-        async with FakeHAServer() as server:
-            server.reject_auth = True
-            adapter = _adapter_for(server)
-            connected = await adapter.connect()
-            assert connected is False
-
-    @pytest.mark.asyncio
-    async def test_event_received_and_forwarded(self):
-        """Server pushes event -> adapter calls handle_message with correct MessageEvent."""
-        async with FakeHAServer() as server:
-            adapter = _adapter_for(server)
-            adapter.handle_message = AsyncMock()
-
-            await adapter.connect()
-
-            # Push a state_changed event
-            await server.push_event({
-                "data": {
-                    "entity_id": "light.bedroom",
-                    "old_state": {"state": "off", "attributes": {}},
-                    "new_state": {
-                        "state": "on",
-                        "attributes": {"friendly_name": "Bedroom Light"},
-                    },
-                }
-            })
-
-            # Wait for the adapter to process it
-            for _ in range(50):
-                if adapter.handle_message.call_count > 0:
-                    break
-                await asyncio.sleep(0.05)
-
-            assert adapter.handle_message.call_count == 1
-            msg_event = adapter.handle_message.call_args[0][0]
-            assert "Bedroom Light" in msg_event.text
-            assert "turned on" in msg_event.text
-            assert msg_event.source.platform == Platform.HOMEASSISTANT
-
-            await adapter.disconnect()
-
-    @pytest.mark.asyncio
-    async def test_event_filtering_ignores_unwatched(self):
-        """Events outside watch_domains are silently dropped."""
-        async with FakeHAServer() as server:
-            adapter = _adapter_for(server, watch_domains=["climate"])
-            adapter.handle_message = AsyncMock()
-
-            await adapter.connect()
-
-            # Push a light event (not in watch_domains)
-            await server.push_event({
-                "data": {
-                    "entity_id": "light.bedroom",
-                    "old_state": {"state": "off", "attributes": {}},
-                    "new_state": {
-                        "state": "on",
-                        "attributes": {"friendly_name": "Bedroom Light"},
-                    },
-                }
-            })
-
-            await asyncio.sleep(0.5)
-            assert adapter.handle_message.call_count == 0
-
-            await adapter.disconnect()
-
-    @pytest.mark.asyncio
-    async def test_disconnect_closes_cleanly(self):
-        """disconnect() cancels listener and closes WebSocket."""
-        async with FakeHAServer() as server:
-            adapter = _adapter_for(server)
-            await adapter.connect()
-            ws_ref = adapter._ws
-
-            await adapter.disconnect()
-
-            assert adapter._running is False
-            assert adapter._listen_task is None
-            assert adapter._ws is None
-            # The original WS reference should be closed
-            assert ws_ref.closed
-
-
-# ---------------------------------------------------------------------------
-# 2. REST tool handlers (real HTTP against fake server)
-# ---------------------------------------------------------------------------
 
 
 class TestToolRest:
@@ -240,48 +102,6 @@ class TestToolRest:
             assert call["service"] == "turn_on"
             assert call["data"]["entity_id"] == "light.bedroom"
             assert call["data"]["brightness"] == 255
-
-
-# ---------------------------------------------------------------------------
-# 3. send() -- REST notification
-# ---------------------------------------------------------------------------
-
-
-class TestSendNotification:
-    @pytest.mark.asyncio
-    async def test_send_notification_delivered(self):
-        """Adapter send() delivers notification to fake server REST endpoint."""
-        async with FakeHAServer() as server:
-            adapter = _adapter_for(server)
-
-            result = await adapter.send("ha_events", "Test notification from agent")
-
-            assert result.success is True
-            assert len(server.received_notifications) == 1
-            notif = server.received_notifications[0]
-            assert notif["title"] == "Hermes Agent"
-            assert notif["message"] == "Test notification from agent"
-
-    @pytest.mark.asyncio
-    async def test_send_auth_failure(self):
-        """send() returns failure when token is wrong."""
-        async with FakeHAServer() as server:
-            config = PlatformConfig(
-                enabled=True,
-                token="wrong-token",
-                extra={"url": server.url},
-            )
-            adapter = HomeAssistantAdapter(config)
-
-            result = await adapter.send("ha_events", "Should fail")
-
-            assert result.success is False
-            assert "401" in result.error
-
-
-# ---------------------------------------------------------------------------
-# 4. Auth and error cases
-# ---------------------------------------------------------------------------
 
 
 class TestAuthAndErrors:

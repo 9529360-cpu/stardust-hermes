@@ -167,6 +167,20 @@ def _is_missing_gateway_relay(exc: ImportError) -> bool:
     )
 
 
+def _active_adapter_registry(runner: Any) -> Any:
+    """Use the same profile-owned adapter map as tool delivery, never the primary's by accident."""
+    try:
+        resolve = getattr(runner, "_adapters_for_profile", None)
+        if callable(resolve):
+            from hermes_cli.profiles import get_active_profile_name
+
+            return resolve(get_active_profile_name())
+        # Minimal/standalone runner doubles have no profile resolver.
+        return getattr(runner, "adapters", None)
+    except Exception as exc:
+        raise RelayRouteUnknown("the active profile's adapter registry could not be read") from exc
+
+
 def _live_relay_fronted() -> Optional[Set[str]]:
     """The connected relay adapter's OWN fronted set.
 
@@ -208,7 +222,7 @@ def _live_relay_fronted() -> Optional[Set[str]]:
         if runner is None:
             return None  # no gateway runner in this process (CLI, cron)
 
-        registry = getattr(runner, "adapters", None)
+        registry = _active_adapter_registry(runner)
         if not registry:
             return None  # a runner with no adapters at all
 
@@ -294,7 +308,7 @@ def _has_live_native_adapter(platform_name: str) -> bool:
         runner = _gateway_runner_ref()
         if runner is None:
             return False
-        adapters = getattr(runner, "adapters", None) or {}
+        adapters = _active_adapter_registry(runner) or {}
         platform = Platform(platform_name)
         if adapters.get(platform) is None:
             return False
@@ -482,8 +496,46 @@ def _is_unresolved_handle(platform_name: str, target: str, native_token: Any = _
     return not _has_native_credential(platform_name)
 
 
+def _selected_relay_routed(platform_name: str, relay_adapter: Any) -> bool:
+    """Attest the exact active-profile transport selected by the sender; stale/foreign snapshots refuse."""
+    try:
+        from gateway.config import Platform
+        from gateway.run import _gateway_runner_ref
+
+        runner = _gateway_runner_ref()
+        registry = _active_adapter_registry(runner) if runner is not None else None
+        if relay_adapter is None or not registry or registry.get(Platform.RELAY) is not relay_adapter:
+            raise RelayRouteUnknown("the selected relay is not the active profile's transport")
+        fronts = relay_adapter.fronts_platform
+        name = str(platform_name or "").strip().lower()
+        if name == "relay":
+            # The generic plane uses the connector's negotiated default platform.
+            # It is valid when this exact active-profile transport advertises at
+            # least one identity (including the explicit generic `relay` identity).
+            # Query the adapter itself so stale environment/config snapshots never
+            # stand in for the selected connection's routing declaration.
+            routed = False
+            for candidate in Platform:
+                answer = fronts(candidate)
+                if answer is True:
+                    routed = True
+                    break
+                if answer is not False:
+                    raise RelayRouteUnknown("the selected relay returned an invalid fronting result")
+        else:
+            routed = fronts(Platform(platform_name))
+        if routed is not True:
+            raise RelayRouteUnknown("the selected relay does not front this platform")
+        return True
+    except RelayRouteUnknown:
+        raise
+    except Exception as exc:
+        raise RelayRouteUnknown("the selected relay transport could not be verified") from exc
+
+
 def authorize_relay_target(
-    platform_name: str, chat_id: Any, thread_id: Any = None, *, native_token: Any = _UNSET
+    platform_name: str, chat_id: Any, thread_id: Any = None, *, native_token: Any = _UNSET,
+    relay_adapter: Any = _UNSET,
 ) -> Optional[str]:
     """Return an error string when this relay destination may not be named.
 
@@ -498,7 +550,8 @@ def authorize_relay_target(
     is not evidence of a session in the thread.
     """
     try:
-        routed = relay_routed_platform(platform_name)
+        routed = (relay_routed_platform(platform_name) if relay_adapter is _UNSET
+                  else _selected_relay_routed(platform_name, relay_adapter))
     except RelayRouteUnknown as exc:
         # Routing could not be determined. "Not relay-routed" would skip this
         # guard entirely, so an unknown route must refuse rather than assume

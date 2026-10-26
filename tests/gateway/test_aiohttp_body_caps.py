@@ -8,13 +8,3 @@ bluebubbles, teams, and the ``stardust proxy`` server.
 """
 
 import inspect
-
-
-def test_bluebubbles_app_sets_client_max_size():
-    import gateway.platforms.bluebubbles as bb
-
-    assert bb._WEBHOOK_MAX_BODY_BYTES > 0
-    src = inspect.getsource(bb.BlueBubblesAdapter.connect)
-    assert "client_max_size=_WEBHOOK_MAX_BODY_BYTES" in src
-
-

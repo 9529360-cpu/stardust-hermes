@@ -23,7 +23,7 @@ async def test_config_saved_during_connect_is_rescanned(tmp_path, monkeypatch, s
     )
     (profile / "config.yaml").write_text("model: {default: test}\n", encoding="utf-8")
     secrets = profile / ".env"
-    secrets.write_text("DISCORD_BOT_TOKEN=discord-test\n", encoding="utf-8")
+    secrets.write_text("TELEGRAM_BOT_TOKEN=telegram-test\n", encoding="utf-8")
     runner = object.__new__(GatewayRunner)
     runner.config = GatewayConfig(multiplex_profiles=True)
     runner._running = True
@@ -41,18 +41,17 @@ async def test_config_saved_during_connect_is_rescanned(tmp_path, monkeypatch, s
     runner._sync_voice_mode_state_to_adapter = lambda *a: None
     runner._restore_secondary_completion_ledgers = lambda *a: None
     runner._adapter_credential_claim = lambda *a: None
-    runner._adapter_listener_claim = lambda *a: None
     runner._create_adapter = lambda platform, config: SimpleNamespace(platform=platform)
     runner._note_served_profiles([("default", home)])
     connected = []
 
     async def connect(adapter, platform):
         connected.append(platform)
-        if platform == Platform.DISCORD:
+        if platform == Platform.TELEGRAM:
             # Configuration was already read; a second setup operation finishes while
             # the first adapter is awaiting its transport handshake.
             secrets.write_text(
-                "DISCORD_BOT_TOKEN=discord-test\nTELEGRAM_BOT_TOKEN=telegram-test\n",
+                "TELEGRAM_BOT_TOKEN=telegram-test\nWEIXIN_ACCOUNT_ID=wx-account\nWEIXIN_TOKEN=wx-token\n",
                 encoding="utf-8",
             )
         return True
@@ -66,8 +65,8 @@ async def test_config_saved_during_connect_is_rescanned(tmp_path, monkeypatch, s
         await runner._start_secondary_profile_adapters()
     else:
         await runner.reconcile_served_profiles()
-    assert connected == [Platform.DISCORD]
+    assert connected == [Platform.TELEGRAM]
     await runner.reconcile_served_profiles()
-    assert connected == [Platform.DISCORD, Platform.TELEGRAM]
+    assert connected == [Platform.TELEGRAM, Platform.WEIXIN]
     await runner.reconcile_served_profiles()
-    assert connected == [Platform.DISCORD, Platform.TELEGRAM]
+    assert connected == [Platform.TELEGRAM, Platform.WEIXIN]

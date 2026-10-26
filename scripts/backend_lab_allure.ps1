@@ -1,9 +1,8 @@
 $ErrorActionPreference = "Continue"
 $Repo = Split-Path -Parent $PSScriptRoot
-$Workspace = Split-Path -Parent $Repo
 $Node = "D:\DevTools\Node26\node.exe"
 $Allure = "D:\DevTools\Allure3\node_modules\allure\cli.js"
-$Root = Join-Path $Workspace "artifacts\backend-lab"
+$Root = if ($env:STARDUST_BACKEND_LAB_ARTIFACTS) { $env:STARDUST_BACKEND_LAB_ARTIFACTS } else { Join-Path $Repo "Reports\backend-lab" }
 $Results = Join-Path $Root "allure-results"
 $AllureRoot = Join-Path $Root "allure"
 $LiveConfig = Join-Path $AllureRoot "allurerc-live.json"

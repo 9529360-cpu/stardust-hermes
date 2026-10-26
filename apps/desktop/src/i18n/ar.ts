@@ -1,6 +1,83 @@
 import { defineLocale } from './define-locale'
 
 export const ar = defineLocale({
+  taskCenter: {
+    title: 'المهام',
+    activity: 'النشاط',
+    automation: 'الأتمتة',
+    sessionUnavailable: 'المحادثة غير متاحة',
+    recoveryAvailable: 'الاستعادة متاحة',
+    approvalRequired: 'الموافقة مطلوبة',
+    loadFailed: 'تعذر تحميل المهام',
+    someUnavailable: 'بعض المهام غير متاحة',
+    loading: 'جارٍ تحميل المهام',
+    emptyTitle: 'لا توجد مهام نشطة',
+    emptyDescription: 'تظهر هنا الموافقات والأوامر الخلفية وتقدم الوكلاء الفرعيين من محادثاتك.',
+    groups: {
+      attention: 'يتطلب انتباهك',
+      running: 'قيد التنفيذ',
+      upcoming: 'قريبًا',
+      recent: 'حديثًا',
+      other: 'أخرى'
+    },
+    states: {
+      blocked: 'محظور',
+      cancelled: 'ملغى',
+      completed: 'مكتمل',
+      failed: 'فشل',
+      interrupted: 'متوقف',
+      paused: 'متوقف مؤقتًا',
+      queued: 'في الانتظار',
+      running: 'قيد التنفيذ',
+      waiting_for_user: 'بانتظارك'
+    },
+    load: {
+      degraded: 'تعذرت قراءة بعض مصادر المهام المحفوظة. تُعرض المهام المتاحة.',
+      error: 'تعذر تحميل حالة المهام المحفوظة. تحقق من الاتصال ثم أعد المحاولة.',
+      loading: 'جارٍ تحميل حالة المهام المحفوظة…',
+      retrying: 'تُعرض آخر حالة محفوظة. فشل آخر تحديث.'
+    },
+    rails: {
+      approval: 'موافقة',
+      clarify: 'سؤال',
+      sudo: 'إذن المسؤول',
+      secret: 'مطلوب سر',
+      'vault-unlock': 'فتح مدير كلمات المرور',
+      'vault-save': 'حفظ تسجيل الدخول',
+      'vault-code': 'رمز التحقق',
+      process: 'أمر خلفي',
+      delegation: 'عمل مفوّض',
+      cron: 'عمل مجدول',
+      goal: 'هدف مستمر'
+    },
+    phases: {
+      active: 'نشطة',
+      waiting: 'انتظار',
+      scheduled: 'مجدولة',
+      last_failed: 'فشل التشغيل الأخير',
+      stalling: 'بانتظار التقدم',
+      finalizing: 'جارٍ الإنهاء',
+      timeout: 'انتهت المهلة',
+      stalled: 'لا يوجد تقدم',
+      unknown: 'الحالة غير متاحة',
+      claimed: 'تم استلامها للتنفيذ',
+      delivery_failed: 'فشل التسليم',
+      skipped: 'تم التخطي'
+    },
+    recoveryActions: {
+      retry: 'إعادة المحاولة',
+      review_or_retry: 'مراجعة أو إعادة المحاولة',
+      resume: 'استئناف'
+    },
+    summary: (running: number, attention: number) => `${running} قيد التنفيذ · ${attention} تتطلب انتباهك`,
+    workingOn: (tool: string) => `جارٍ استخدام ${tool}`,
+    exitCode: (code: number) => `رمز الخروج ${code}`,
+    needsSecret: (name: string) => `مطلوب سر: ${name}`,
+    needsVault: (name: string) => `فتح مدير كلمات المرور: ${name}`,
+    unknownStatus: (value: string) => `حالة غير معروفة (${value})`,
+    unknownRecovery: (value: string) => `استعادة أخرى (${value})`,
+    unknownRail: (value: string) => `مهمة (${value})`
+  },
   sessionImport: {
     title: 'المتابعة من تطبيق آخر',
     subtitle: 'انقل محادثة إلى Stardust وتابع من حيث توقفت.',
@@ -1707,6 +1784,18 @@ export const ar = defineLocale({
     platformDescriptions: {},
     platformIntro: {}
   },
+
+  webhooks: {
+    deliverOptions: {
+      log: 'السجل',
+      telegram: 'Telegram',
+      whatsapp: 'WhatsApp',
+      whatsapp_cloud: 'WhatsApp Business (السحابة)',
+      weixin: 'ويكسين (وي تشات)',
+      github_comment: 'تعليق GitHub'
+    }
+  },
+
   profiles: {
     close: 'إغلاق',
     nameHint: 'اسم الملف الشخصي',

@@ -12,12 +12,14 @@ Dedicated backend-workstation validation loop. No model/API agent is involved.
 
 ## Evidence
 
-- Current stage/heartbeat: `D:\远程工作区\artifacts\backend-lab\current.json`.
-- Latest aggregate status: `D:\远程工作区\artifacts\backend-lab\latest.json`.
-- Open failures: `D:\远程工作区\artifacts\backend-lab\needs_attention.json`.
-- Per-run logs/history: `D:\远程工作区\artifacts\backend-lab\runs` and `history`.
-- Allure raw results: `D:\远程工作区\artifacts\backend-lab\allure-results`.
-- Allure trend history: `D:\远程工作区\artifacts\backend-lab\allure\history.jsonl`.
+Evidence lives in the repository-convention directory `Reports/backend-lab/` (git-ignored; see `.gitignore` `/Reports/`), replacing the former external `D:\远程工作区\artifacts` location.
+
+- Current stage/heartbeat: `Reports/backend-lab/current.json`.
+- Latest aggregate status: `Reports/backend-lab/latest.json`.
+- Open failures: `Reports/backend-lab/needs_attention.json`.
+- Per-run logs/history: `Reports/backend-lab/runs` and `history`.
+- Allure raw results: `Reports/backend-lab/allure-results`.
+- Allure trend history: `Reports/backend-lab/allure/history.jsonl`.
 
 ## Lanes
 

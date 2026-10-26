@@ -31,7 +31,7 @@ _KNOWN_DELIVERY_PLATFORMS = frozenset({
     "telegram", "discord", "slack", "whatsapp", "signal",
     "matrix", "mattermost", "homeassistant", "dingtalk", "feishu",
     "wecom", "wecom_callback", "weixin", "sms", "email", "webhook", "bluebubbles",
-    "qqbot", "yuanbao"})
+    "qqbot", "yuanbao", "whatsapp_cloud", "api_server", "relay"})
 
 # Platforms supporting a cron/notification home target -> env var used by gateway config.
 _HOME_TARGET_ENV_VARS = {
@@ -370,8 +370,23 @@ def _plugin_cron_env_var(platform_name: str) -> str:
     return ""
 
 
+def _retired_native_delivery_platform(platform_name: str, adapters=None) -> bool:
+    """Retired adapters cannot send natively; declared relay fronts keep their own transport."""
+    from gateway.config import Platform, RETIRED_PLATFORMS
+    name = platform_name.lower()
+    if name not in RETIRED_PLATFORMS:
+        return False
+    if isinstance(adapters, dict):
+        relay = adapters.get(Platform.RELAY)
+        fronts_platform = getattr(relay, "fronts_platform", None)
+        if callable(fronts_platform) and fronts_platform(Platform(name)):
+            return False
+    from gateway.relay import relay_fronted_platforms
+    return name not in relay_fronted_platforms()
+
+
 def _is_known_delivery_platform(platform_name: str) -> bool:
-    """Valid cron delivery platform: built-in, or plugin with a ``cron_deliver_env_var``."""
+    """Recognize current and legacy target syntax; the send boundary enforces retirement."""
     name = platform_name.lower()
     return name in _KNOWN_DELIVERY_PLATFORMS or bool(_plugin_cron_env_var(name))
 
@@ -469,13 +484,15 @@ def _get_home_target_thread_id(platform_name: str) -> Optional[str]:
 
 def _iter_home_target_platforms():
     """Iterate built-in + plugin platform names that expose a home channel."""
-    yield from _HOME_TARGET_ENV_VARS
+    yield from (name for name in _HOME_TARGET_ENV_VARS
+                if not _retired_native_delivery_platform(name))
     with contextlib.suppress(Exception):
         from hermes_cli.plugins import discover_plugins
         discover_plugins()  # idempotent
         from gateway.platform_registry import platform_registry
         for entry in platform_registry.plugin_entries():
-            if entry.cron_deliver_env_var and entry.name not in _HOME_TARGET_ENV_VARS:
+            if (entry.cron_deliver_env_var and entry.name not in _HOME_TARGET_ENV_VARS
+                    and not _retired_native_delivery_platform(entry.name)):
                 yield entry.name
 
 
@@ -1166,9 +1183,14 @@ def _resolve_target_transport(
     ``(None, error)`` when it cannot be served (relay-fronted with no live transport, or not
     configured/enabled)."""
     from gateway.delivery import DeliveryTransport, resolve_delivery_transport
+    from gateway.config import RETIRED_PLATFORMS
+    retired_native = platform_name in RETIRED_PLATFORMS
     target_adapters = adapters
+    if retired_native:
+        target_adapters = ({key: value for key, value in adapters.items() if key != platform}
+                           if isinstance(adapters, dict) else {})
     transport = None
-    if isinstance(adapters, _preflight.SharedRouteAdapters):
+    if isinstance(adapters, _preflight.SharedRouteAdapters) and not retired_native:
         # Credentialless satellite: the primary adapter serves THIS target only when an exact
         # primary route maps it to this profile; a miss fails closed below.
         # See #101113.
@@ -1201,6 +1223,8 @@ def _resolve_target_transport(
                 "owns relay-fronted delivery and will fire the job on "
                 "schedule)"
             )
+        if retired_native:
+            return None, f"platform '{platform_name}' retired; an enabled live relay transport is required"
         pconfig = config.platforms.get(platform)
         runtime_adapter = None
 
@@ -1707,6 +1731,31 @@ def _unresolved_delivery_outcome(job: dict, for_failure: bool) -> Optional[str]:
     return msg
 
 
+def _retired_delivery_error(job: dict, *, for_failure: bool = False, adapters=None) -> Optional[str]:
+    """Validate the requested lane before target lookup can load a removed adapter.
+
+    Keep persisted jobs intact. A lane mixing supported and retired targets is
+    rejected as a whole so it cannot partially send and duplicate on a retry.
+    Relay-fronted logical platforms still pass through the existing relay guards.
+    """
+    deliver = _normalize_deliver_value(_delivery_lane_value(job, for_failure=for_failure))
+    origin = _resolve_origin(job)
+    retired = set()
+    for part in deliver.split(","):
+        platform_name = part.strip().split(":", 1)[0].lower()
+        if platform_name == "origin":
+            platform_name = str((origin or {}).get("platform") or "").lower()
+        if _retired_native_delivery_platform(platform_name, adapters):
+            retired.add(platform_name)
+    if not retired:
+        return None
+    return (
+        f"delivery platform(s) {', '.join(sorted(retired))} retired from Stardust; "
+        "update this job's delivery target to Telegram, WhatsApp, WeChat (weixin), "
+        "local, or an explicitly configured relay front; saved job output is preserved"
+    )
+
+
 def _deliver_result(
     job: dict, content: str, adapters=None, loop=None, *, for_failure: bool = False
 ) -> Optional[str]:
@@ -1715,6 +1764,11 @@ def _deliver_result(
     standalone fallback. ``for_failure=True`` routes failure-category notices through the job's
     ``failure_deliver`` override when present (NS-788). Returns None on success, else an error."""
     job.pop("_bot_chat_delivery_receipts", None)
+    retired_error = _retired_delivery_error(job, for_failure=for_failure, adapters=adapters)
+    if retired_error:
+        _record_delivery_verification(job, [])
+        logger.warning("Job '%s': %s", job.get("id", "?"), retired_error)
+        return retired_error
     targets = _resolve_delivery_targets(job, for_failure=for_failure)
     if not targets:
         _record_delivery_verification(job, [])

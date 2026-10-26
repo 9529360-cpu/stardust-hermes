@@ -10,7 +10,6 @@ from gateway.config import PlatformConfig
 from gateway.relay.adapter import RelayAdapter
 from gateway.relay.descriptor import CONTRACT_VERSION, CapabilityDescriptor
 from gateway.run_turn_runner import TurnRunner
-from plugins.platforms.slack.adapter import SlackAdapter
 
 
 class CardTransport:
@@ -26,16 +25,6 @@ class CardTransport:
 
 
 def make_adapter(kind, monkeypatch, *, error="relay outbound timed out"):
-    if kind == "native":
-        adapter = SlackAdapter(PlatformConfig(extra={"reply_in_thread": False}))
-        client = SimpleNamespace(
-            api_call=AsyncMock(side_effect=lambda *a, **kw: {"ts": "900.1"}),
-            chat_postMessage=AsyncMock(return_value={"ts": "900.2"}),
-            chat_update=AsyncMock(return_value={"ts": "900.2"}),
-        )
-        monkeypatch.setattr(adapter, "_get_client", Mock(return_value=client))
-        adapter._app = None
-        return adapter, client
     descriptor = CapabilityDescriptor(
         contract_version=CONTRACT_VERSION, platform="slack", label="Slack",
         max_message_length=39000, supports_draft_streaming=True, supports_edit=True,
@@ -72,10 +61,6 @@ async def run_progress(adapter, metadata, reply_to, after_first=None):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("kind,metadata,reply_to,eligible", [
-    ("native", {}, None, False),
-    ("native", {"thread_id": "100.1"}, "100.1", False),
-    ("native", {"thread_id": "100.1"}, "100.2", True),
-    ("native", {"thread_ts": "100.1"}, None, True),
     ("relay", {}, None, False),
     ("relay", {"message_id": "100.2", "reply_to_message_id": "100.2"}, None, False),
     ("relay", {"thread_id": "100.1"}, "100.2", True),

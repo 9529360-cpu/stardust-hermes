@@ -1,4 +1,4 @@
-"""E2E tests for gateway slash commands (Telegram, Discord).
+"""E2E tests for gateway slash commands (Telegram).
 
 Each test drives a message through the full async pipeline:
     adapter.handle_message(event)
@@ -58,7 +58,7 @@ class TestSlashCommands:
 
     @pytest.mark.asyncio
     async def test_leading_space_stop_is_still_a_command(self, adapter, platform):
-        """Slack users type `` /stop`` to avoid native Slack slash interception."""
+        """Leading whitespace must not bypass command dispatch."""
         send = await send_and_capture(adapter, " /stop", platform)
 
         send.assert_called_once()

@@ -4,20 +4,18 @@ import asyncio
 import json
 import os
 import threading
+from contextlib import ExitStack
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
-from gateway.config import Platform
+from gateway.config import Platform, RETIRED_PLATFORMS
 from gateway.channel_directory import (
     build_channel_directory,
     lookup_channel_type,
     resolve_channel_name,
     format_directory_for_display,
     load_directory,
-    _apply_channel_aliases,
     _build_from_sessions,
-    _build_slack,
-    _slack_directory_warning_last,
 )
 
 
@@ -96,20 +94,18 @@ class TestBuildChannelDirectoryWrites:
 
 
 class TestBuildChannelDirectoryOffload:
-    def test_discord_builder_runs_off_event_loop_thread(self, tmp_path):
-        from gateway.config import Platform
-
+    def test_session_discovery_runs_off_event_loop_thread(self, tmp_path):
         cache_file = tmp_path / "channel_directory.json"
         loop_thread = threading.get_ident()
         builder_threads = []
 
-        def fake_build_discord(_adapter):
+        def fake_build_from_sessions(_platform):
             builder_threads.append(threading.get_ident())
             return []
 
-        with patch("gateway.channel_directory._build_discord", side_effect=fake_build_discord), \
+        with patch("gateway.channel_directory._build_from_sessions", side_effect=fake_build_from_sessions), \
              patch("gateway.channel_directory.DIRECTORY_PATH", cache_file):
-            asyncio.run(build_channel_directory({Platform.DISCORD: object()}))
+            asyncio.run(build_channel_directory({Platform.WEIXIN: object()}))
 
         assert builder_threads
         assert all(tid != loop_thread for tid in builder_threads)
@@ -118,8 +114,6 @@ class TestBuildChannelDirectoryOffload:
         """The persist step calls os.fsync, which blocks the loop until the write
         reaches stable storage. #60794 moved the builders off the loop; the write
         stayed on it."""
-        from gateway.config import Platform
-
         cache_file = tmp_path / "channel_directory.json"
         loop_thread = threading.get_ident()
         write_threads = []
@@ -128,9 +122,8 @@ class TestBuildChannelDirectoryOffload:
             write_threads.append(threading.get_ident())
 
         with patch("gateway.channel_directory.atomic_json_write", side_effect=fake_write), \
-             patch("gateway.channel_directory._build_discord", return_value=[]), \
              patch("gateway.channel_directory.DIRECTORY_PATH", cache_file):
-            asyncio.run(build_channel_directory({Platform.DISCORD: object()}))
+            asyncio.run(build_channel_directory({}))
 
         assert write_threads
         assert all(tid != loop_thread for tid in write_threads)
@@ -139,7 +132,16 @@ class TestBuildChannelDirectoryOffload:
 class TestResolveChannelName:
     def _setup(self, tmp_path, platforms):
         cache_file = _write_directory(tmp_path, platforms)
-        return patch("gateway.channel_directory.DIRECTORY_PATH", cache_file)
+        stack = ExitStack()
+        stack.enter_context(patch("gateway.channel_directory.DIRECTORY_PATH", cache_file))
+        retired_fronts = set(platforms) & RETIRED_PLATFORMS
+        if retired_fronts:
+            relay = SimpleNamespace(
+                fronts_platform=lambda platform: getattr(platform, "value", platform) in retired_fronts
+            )
+            runner = SimpleNamespace(adapters={Platform.RELAY: relay})
+            stack.enter_context(patch("gateway.run._gateway_runner_ref", lambda: runner))
+        return stack
 
     def test_exact_match(self, tmp_path):
         platforms = {
@@ -251,7 +253,16 @@ class TestFormatDirectoryForDisplay:
 class TestLookupChannelType:
     def _setup(self, tmp_path, platforms):
         cache_file = _write_directory(tmp_path, platforms)
-        return patch("gateway.channel_directory.DIRECTORY_PATH", cache_file)
+        stack = ExitStack()
+        stack.enter_context(patch("gateway.channel_directory.DIRECTORY_PATH", cache_file))
+        retired_fronts = set(platforms) & RETIRED_PLATFORMS
+        if retired_fronts:
+            relay = SimpleNamespace(
+                fronts_platform=lambda platform: getattr(platform, "value", platform) in retired_fronts
+            )
+            runner = SimpleNamespace(adapters={Platform.RELAY: relay})
+            stack.enter_context(patch("gateway.run._gateway_runner_ref", lambda: runner))
+        return stack
 
     def test_forum_channel(self, tmp_path):
         platforms = {
@@ -273,106 +284,46 @@ class TestLookupChannelType:
             assert lookup_channel_type("discord", "999") is None
 
 
-def _make_slack_adapter(team_clients):
-    """Build a stand-in for SlackAdapter exposing only ``_team_clients``."""
-    return SimpleNamespace(_team_clients=team_clients)
-
-
-def _make_slack_client(pages):
-    """Build an AsyncWebClient mock whose ``users_conversations`` returns pages."""
-    client = MagicMock()
-    client.users_conversations = AsyncMock(side_effect=pages)
-    return client
-
-
-class TestBuildSlack:
-    """_build_slack actually calls users.conversations on each workspace client."""
-
-    def test_no_team_clients_falls_back_to_sessions(self, tmp_path):
-        sessions_path = tmp_path / "sessions" / "sessions.json"
-        sessions_path.parent.mkdir(parents=True)
-        sessions_path.write_text(json.dumps({
-            "s1": {"origin": {"platform": "slack", "chat_id": "D123", "chat_name": "Alice"}},
-        }))
-
-        with patch.dict(os.environ, {"STARDUST_HOME": str(tmp_path)}):
-            entries = asyncio.run(_build_slack(_make_slack_adapter({})))
-
-        assert len(entries) == 1
-        assert entries[0]["id"] == "D123"
-
-    def test_lists_channels_from_users_conversations(self, tmp_path):
-        client = _make_slack_client([
-            {
-                "ok": True,
-                "channels": [
-                    {"id": "C0B0QV5434G", "name": "engineering", "is_private": False},
-                    {"id": "G123ABCDEF", "name": "secret-chat", "is_private": True},
-                ],
-                "response_metadata": {},
-            },
-        ])
-        with patch.dict(os.environ, {"STARDUST_HOME": str(tmp_path)}):
-            entries = asyncio.run(_build_slack(_make_slack_adapter({"T1": client})))
-
-        ids = {e["id"] for e in entries}
-        assert ids == {"C0B0QV5434G", "G123ABCDEF"}
-        types = {e["id"]: e["type"] for e in entries}
-        assert types["C0B0QV5434G"] == "channel"
-        assert types["G123ABCDEF"] == "private"
-        client.users_conversations.assert_awaited_once()
-
-    def test_paginates_via_response_metadata_cursor(self, tmp_path):
-        client = _make_slack_client([
-            {
-                "ok": True,
-                "channels": [{"id": "C001", "name": "first", "is_private": False}],
-                "response_metadata": {"next_cursor": "cur1"},
-            },
-            {
-                "ok": True,
-                "channels": [{"id": "C002", "name": "second", "is_private": False}],
-                "response_metadata": {"next_cursor": ""},
-            },
-        ])
-        with patch.dict(os.environ, {"STARDUST_HOME": str(tmp_path)}):
-            entries = asyncio.run(_build_slack(_make_slack_adapter({"T1": client})))
-
-        assert {e["id"] for e in entries} == {"C001", "C002"}
-        assert client.users_conversations.await_count == 2
-
-    def test_thread_ids_use_base_conversation_and_dedupe_info_calls(self, tmp_path, monkeypatch):
-        client = _make_slack_client([{"ok": True, "channels": [], "response_metadata": {}}])
-        client.conversations_info = AsyncMock(side_effect=[
-            {"ok": True, "channel": {"name": "engineering"}},
-            {"ok": True, "channel": {"name": "support"}},
-        ])
-        monkeypatch.setattr(
-            "gateway.channel_directory._build_from_sessions",
-            lambda platform: [
-                {"id": "C001:111", "name": "C001:111", "type": "channel"},
-                {"id": "C001:222", "name": "C001:222", "type": "channel"},
-                {"id": "C002:333", "name": "C002:333", "type": "channel"},
-            ],
-        )
-
-        with patch.dict(os.environ, {"STARDUST_HOME": str(tmp_path)}):
-            entries = asyncio.run(_build_slack(_make_slack_adapter({"T1": client})))
-
-        assert {entry["name"] for entry in entries} == {"engineering", "support"}
-        assert client.conversations_info.await_count == 2
-        assert [call.kwargs["channel"] for call in client.conversations_info.await_args_list] == ["C001", "C002"]
-
-
 class TestChannelAliases:
-    """The user-maintained alias overlay (channel_aliases.json) gives durable
-    friendly names that survive the timed directory rebuild."""
+    """The user-maintained alias overlay is retained but scoped to supported/live targets."""
 
     def _setup_aliases(self, tmp_path, aliases):
         alias_file = tmp_path / "channel_aliases.json"
         alias_file.write_text(json.dumps(aliases))
         return patch("gateway.channel_directory.CHANNEL_ALIASES_PATH", alias_file)
 
+    def test_retired_aliases_are_filtered_but_file_is_preserved(self, tmp_path):
+        cache_file = _write_directory(tmp_path, {
+            "discord": [{"id": "old-discord", "name": "Old", "type": "channel"}],
+            "slack": [{"id": "old-slack", "name": "Old", "type": "channel"}],
+        })
+        aliases = {"discord": {"D1": "old discord"}, "slack": {"C1": "old slack"}}
+        with patch("gateway.channel_directory.DIRECTORY_PATH", cache_file), \
+             self._setup_aliases(tmp_path, aliases):
+            result = load_directory()
+            saved_aliases = json.loads((tmp_path / "channel_aliases.json").read_text())
+
+        assert "discord" not in result["platforms"]
+        assert "slack" not in result["platforms"]
+        assert saved_aliases == aliases
+
+    def test_live_relay_front_keeps_its_retired_platform_alias(self, tmp_path, monkeypatch):
+        cache_file = tmp_path / "channel_directory.json"
+        aliases = {"discord": {"D1": "old discord"}, "slack": {"C1": "relay slack"}}
+        relay = SimpleNamespace(fronts_platform=lambda platform: platform == "slack")
+        runner = SimpleNamespace(adapters={Platform.RELAY: relay})
+        monkeypatch.setattr("gateway.run._gateway_runner_ref", lambda: runner)
+        monkeypatch.setattr("gateway.channel_directory._build_from_sessions", lambda _platform: [])
+
+        with patch("gateway.channel_directory.DIRECTORY_PATH", cache_file), \
+             self._setup_aliases(tmp_path, aliases):
+            directory = asyncio.run(build_channel_directory({Platform.RELAY: relay}))
+            reloaded = load_directory()
+
+        assert directory["platforms"]["slack"][0]["name"] == "relay slack"
+        assert "discord" not in directory["platforms"]
+        assert reloaded["platforms"]["slack"][0]["name"] == "relay slack"
+        assert "discord" not in reloaded["platforms"]
 
     def test_alias_injects_undiscovered_group(self, tmp_path):
         """A group named in the alias file but not yet seen in any session is
@@ -384,7 +335,6 @@ class TestChannelAliases:
             entries = load_directory()["platforms"]["whatsapp"]
             injected = [e for e in entries if e["id"] == "999@g.us"]
             assert injected and injected[0]["type"] == "group"
-
 
     def test_alias_persists_through_rebuild(self, tmp_path, monkeypatch):
         """build_channel_directory must bake aliases into the written file so
@@ -400,5 +350,127 @@ class TestChannelAliases:
             on_disk = json.loads(cache_file.read_text())
         names = [e["name"] for e in on_disk["platforms"]["whatsapp"]
                  if e["id"] == "120363@g.us"]
-        assert names == ["general"]
+
+
+class TestActiveProfileRelayDirectoryAliases:
+    @staticmethod
+    def _install_profile_context(monkeypatch, tmp_path, primary_fronts, secondary_fronts):
+        from gateway.run import GatewayRunner
+
+        class Relay:
+            def __init__(self, fronts):
+                self.fronts = set(fronts)
+
+            def fronts_platform(self, platform):
+                return str(getattr(platform, "value", platform)).lower() in self.fronts
+
+        primary_relay = Relay(primary_fronts) if primary_fronts is not None else None
+        secondary_relay = Relay(secondary_fronts) if secondary_fronts is not None else None
+        runner = GatewayRunner.__new__(GatewayRunner)
+        runner.adapters = {Platform.RELAY: primary_relay} if primary_relay else {}
+        runner._profile_adapters = {
+            "secondary": ({Platform.RELAY: secondary_relay} if secondary_relay else {})
+        }
+        runner._primary_profile_name = "primary"
+        runner._profile_failed_platforms = {}
+        runner.config = SimpleNamespace(multiplex_profiles=False)
+        active = {"name": "secondary"}
+        homes = {name: tmp_path / name for name in ("primary", "secondary", "foreign")}
+        for home in homes.values():
+            home.mkdir()
+
+        monkeypatch.setattr("gateway.run._gateway_runner_ref", lambda: runner)
+        monkeypatch.setattr("hermes_cli.profiles.get_active_profile_name", lambda: active["name"])
+        monkeypatch.setattr("gateway.channel_directory.get_hermes_home", lambda: homes[active["name"]])
+        monkeypatch.setattr("gateway.channel_directory.CHANNEL_ALIASES_PATH", None)
+        monkeypatch.setattr("gateway.relay.egress._home_channel_id", lambda _platform: None)
+        monkeypatch.setattr("gateway.relay.egress._session_ids", lambda _platform: set())
+        return runner, active, homes, primary_relay, secondary_relay
+
+    @staticmethod
+    def _write_aliases(home, aliases):
+        (home / "channel_aliases.json").write_text(json.dumps(aliases))
+
+    def test_secondary_front_owns_alias_attestation_across_profile_switch(self, tmp_path, monkeypatch):
+        from gateway.relay.egress import _directory_ids, authorize_relay_target
+
+        _runner, active, homes, primary_relay, secondary_relay = self._install_profile_context(
+            monkeypatch, tmp_path, {"discord"}, {"slack"}
+        )
+        self._write_aliases(homes["primary"], {"discord": {"D-P": "primary discord"}})
+        self._write_aliases(homes["secondary"], {"slack": {"C-S": "secondary slack"}})
+
+        assert _directory_ids("slack") == {"C-S"}
+        assert authorize_relay_target("slack", "C-S", relay_adapter=secondary_relay) is None
+
+        active["name"] = "primary"
+        assert _directory_ids("discord") == {"D-P"}
+        assert _directory_ids("slack") == set()
+        assert authorize_relay_target("discord", "D-P", relay_adapter=primary_relay) is None
+
+    def test_secondary_does_not_borrow_primary_front_or_alias(self, tmp_path, monkeypatch):
+        from gateway.relay.egress import _directory_ids, authorize_relay_target
+
+        _runner, _active, homes, primary_relay, secondary_relay = self._install_profile_context(
+            monkeypatch, tmp_path, {"slack"}, {"discord"}
+        )
+        self._write_aliases(homes["primary"], {"slack": {"C-P": "primary slack"}})
+        self._write_aliases(homes["secondary"], {
+            "slack": {"C-S": "foreign slack"},
+            "discord": {"D-S": "secondary discord"},
+        })
+
+        assert _directory_ids("slack") == set()
+        assert _directory_ids("discord") == {"D-S"}
+        refusal = authorize_relay_target("slack", "C-S", relay_adapter=secondary_relay)
+        assert refusal and "refusing" in refusal.lower()
+        assert authorize_relay_target("slack", "C-P", relay_adapter=secondary_relay)
+
+    def test_secondary_without_relay_fails_closed_instead_of_using_primary(self, tmp_path, monkeypatch):
+        from gateway.relay.egress import _directory_ids, authorize_relay_target
+
+        _runner, _active, homes, primary_relay, _secondary_relay = self._install_profile_context(
+            monkeypatch, tmp_path, {"slack"}, None
+        )
+        self._write_aliases(homes["primary"], {"slack": {"C-P": "primary slack"}})
+        self._write_aliases(homes["secondary"], {"slack": {"C-S": "secondary stale alias"}})
+
+        assert _directory_ids("slack") == set()
+        refusal = authorize_relay_target("slack", "C-P", relay_adapter=primary_relay)
+        assert refusal and "refusing" in refusal.lower()
+
+    def test_active_profile_query_error_drops_retired_aliases(self, tmp_path, monkeypatch):
+        from gateway.relay.egress import _directory_ids
+
+        runner, active, homes, _primary_relay, _secondary_relay = self._install_profile_context(
+            monkeypatch, tmp_path, {"slack"}, {"discord"}
+        )
+        self._write_aliases(homes["secondary"], {"slack": {"C-S": "must fail closed"}})
+        monkeypatch.setattr("hermes_cli.profiles.get_active_profile_name", lambda: (_ for _ in ()).throw(RuntimeError("scope failed")))
+
+        assert _directory_ids("slack") == set()
+        assert runner.adapters[Platform.RELAY].fronts_platform("slack") is True
+        assert active["name"] == "secondary"
+
+    def test_unknown_active_profile_cannot_borrow_primary_relay(self, tmp_path, monkeypatch):
+        from gateway.relay.egress import _directory_ids
+
+        _runner, active, homes, _primary_relay, _secondary_relay = self._install_profile_context(
+            monkeypatch, tmp_path, {"slack"}, {"discord"}
+        )
+        self._write_aliases(homes["foreign"], {"slack": {"C-F": "foreign profile"}})
+        active["name"] = "foreign"
+
+        assert _directory_ids("slack") == set()
+
+    def test_missing_runner_drops_retired_aliases(self, tmp_path, monkeypatch):
+        from gateway.relay.egress import _directory_ids
+
+        _runner, _active, homes, _primary_relay, _secondary_relay = self._install_profile_context(
+            monkeypatch, tmp_path, {"slack"}, {"discord"}
+        )
+        self._write_aliases(homes["secondary"], {"slack": {"C-S": "no runner"}})
+        monkeypatch.setattr("gateway.run._gateway_runner_ref", lambda: None)
+
+        assert _directory_ids("slack") == set()
 

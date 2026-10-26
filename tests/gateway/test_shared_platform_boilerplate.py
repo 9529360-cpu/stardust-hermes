@@ -81,28 +81,6 @@ def test_home_channel_name_defaults_to_home_everywhere(monkeypatch):
     assert "home_channel" not in shared.seed_extra_from_env((), home_env="X_HOME")
 
 
-def test_buzz_yaml_bridge_seeds_extra_for_a_secondary_profile(monkeypatch):
-    """Under a secondary profile's scope the env write is skipped, so the hook MUST return the values for
-    ``PlatformConfig.extra`` — a ``None`` return left a secondary Buzz profile with neither."""
-    import plugins.platforms.buzz.adapter as buzz
-
-    for var in ("BUZZ_RELAY_URL", "BUZZ_REPLY_TO_MODE", "BUZZ_CHANNELS", "BUZZ_REQUIRE_MENTION"):
-        monkeypatch.delenv(var, raising=False)
-    monkeypatch.setattr(shared, "profile_scoped", lambda: True)
-    seeded = buzz._apply_yaml_config({}, {"extra": {
-        "relay_url": "wss://p.relay", "reply_to_mode": "off", "channels": ["a", "b"], "require_mention": False}})
-    assert seeded == {"relay_url": "wss://p.relay", "reply_to_mode": "off", "channels": ["a", "b"], "require_mention": False}
-    assert not any(v in os.environ for v in ("BUZZ_RELAY_URL", "BUZZ_REPLY_TO_MODE", "BUZZ_CHANNELS", "BUZZ_REQUIRE_MENTION"))
-
-    monkeypatch.setattr(shared, "profile_scoped", lambda: False)
-    buzz._apply_yaml_config({}, {"extra": {"reply_to_mode": "off", "channels": ["a", "b"], "require_mention": False}})
-    assert os.environ["BUZZ_REPLY_TO_MODE"] == "off"
-    assert os.environ["BUZZ_CHANNELS"] == "a,b"
-    assert os.environ["BUZZ_REQUIRE_MENTION"] == "false"
-    for var in ("BUZZ_REPLY_TO_MODE", "BUZZ_CHANNELS", "BUZZ_REQUIRE_MENTION"):
-        monkeypatch.delenv(var, raising=False)
-
-
 def test_extra_or_secret_precedence_env_then_yaml_then_default(monkeypatch):
     """Explicit scoped env → the profile's YAML → default; a blank env value is unset (#108440, #109032)."""
     env: dict = {}

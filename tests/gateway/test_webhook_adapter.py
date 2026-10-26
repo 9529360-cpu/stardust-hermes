@@ -826,6 +826,20 @@ class TestRawTemplateToken:
         assert '"number": 7' in result
 
 
+# Retired adapters may remain in old registry snapshots, but are not valid webhook targets.
+def test_webhook_cross_platform_targets_exclude_retired_adapters(monkeypatch):
+    from gateway.config import RETIRED_PLATFORMS
+    from gateway.platform_registry import platform_registry
+    from gateway.platforms.webhook import _BUILTIN_DELIVER_PLATFORMS, _is_known_platform
+
+    monkeypatch.setattr(platform_registry, "is_registered", lambda _name: True)
+    assert {"telegram", "whatsapp", "whatsapp_cloud", "weixin"} <= _BUILTIN_DELIVER_PLATFORMS
+    assert not RETIRED_PLATFORMS.intersection(_BUILTIN_DELIVER_PLATFORMS)
+    for name in ("discord", "slack", "email", "signal", "yuanbao"):
+        assert not _is_known_platform(name)
+    assert _is_known_platform("custom_plugin")
+
+
 # ===================================================================
 # Cross-platform delivery thread_id passthrough
 # ===================================================================
