@@ -3373,6 +3373,42 @@
       }
     },
     {
+      "name": "setup.inference_test",
+      "summary": "Explicit one-request inference test for the selected route; never called by readiness polling.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/ModelInferenceTestParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/ModelInferenceTestResult"
+        }
+      }
+    },
+    {
+      "name": "setup.inference_test_cancel",
+      "summary": "Cancel one in-flight inference test owned by this exact RPC transport, profile, and session.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/ModelInferenceTestCancelParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/ModelInferenceTestCancelResult"
+        }
+      }
+    },
+    {
       "name": "setup.runtime_check",
       "summary": "Strict provider check through the same runtime resolution the agent uses on session creation.",
       "params": [
@@ -16449,6 +16485,265 @@
           "disconnected"
         ],
         "title": "ModelDisconnectResult",
+        "type": "object"
+      },
+      "ModelInferenceTestCancelParams": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "default": "",
+            "maxLength": 128,
+            "title": "Profile",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Session Id",
+            "type": "string"
+          },
+          "probe_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Probe Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "probe_id"
+        ],
+        "title": "ModelInferenceTestCancelParams",
+        "type": "object"
+      },
+      "ModelInferenceTestCancelResult": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "enum": [
+              "cancel_requested",
+              "not_running",
+              "cancel_not_supported",
+              "forbidden"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "message": {
+            "maxLength": 160,
+            "title": "Message",
+            "type": "string"
+          },
+          "cancel_supported": {
+            "title": "Cancel Supported",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "status",
+          "message",
+          "cancel_supported"
+        ],
+        "title": "ModelInferenceTestCancelResult",
+        "type": "object"
+      },
+      "ModelInferenceTestParams": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "default": "",
+            "maxLength": 128,
+            "title": "Profile",
+            "type": "string"
+          },
+          "session_id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Session Id",
+            "type": "string"
+          },
+          "probe_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Probe Id",
+            "type": "string"
+          },
+          "provider": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Provider",
+            "type": "string"
+          },
+          "model": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Model",
+            "type": "string"
+          },
+          "timeout_s": {
+            "default": 20,
+            "exclusiveMinimum": 0,
+            "maximum": 30,
+            "title": "Timeout S",
+            "type": "number"
+          }
+        },
+        "required": [
+          "session_id",
+          "probe_id",
+          "provider",
+          "model"
+        ],
+        "title": "ModelInferenceTestParams",
+        "type": "object"
+      },
+      "ModelInferenceTestResult": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "enum": [
+              "success",
+              "failed",
+              "unsupported",
+              "canceled",
+              "cancel_not_supported",
+              "timed_out"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "inference_ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inference Ok"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Provider"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Model"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Latency Ms"
+          },
+          "error_kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "auth",
+                  "rate_limit",
+                  "timeout",
+                  "network",
+                  "server",
+                  "empty_response",
+                  "unknown"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error Kind"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error"
+          },
+          "response_summary": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Response Summary"
+          },
+          "nonempty_response": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Nonempty Response"
+          },
+          "cancel_supported": {
+            "default": false,
+            "title": "Cancel Supported",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "status",
+          "inference_ok"
+        ],
+        "title": "ModelInferenceTestResult",
         "type": "object"
       },
       "ModelOptionProvider": {

@@ -1,17 +1,21 @@
+import { useStore } from '@nanostores/react'
 import type { ModelOptionProvider } from '@stardust/shared'
 import { DEFAULT_REASONING_EFFORT, REASONING_EFFORT_VALUES } from '@stardust/shared'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { useGatewayRequest } from '@/app/gateway/hooks/use-gateway-request'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import {
+  cancelSelectedModelInferenceTest,
   getAuxiliaryModels,
   getGlobalModelInfo,
   getGlobalModelOptions,
   getMoaModels,
+  runSelectedModelInferenceTest,
   saveHermesConfig,
   saveMoaModels,
   setModelAssignment
@@ -19,8 +23,10 @@ import {
 import type {
   AuxiliaryModelsResponse,
   AuxiliaryTaskAssignment,
+  HermesGateway,
   MoaConfigResponse,
   MoaModelSlot,
+  ModelInferenceTestResult,
   StaleAuxAssignment
 } from '@/hermes'
 import { useI18n } from '@/i18n'
@@ -30,6 +36,8 @@ import { modelCatalogLabel } from '@/lib/model-status-label'
 import { cn } from '@/lib/utils'
 import { $localModelsEnabled } from '@/store/local-models-flag'
 import { notifyError, readableError } from '@/store/notifications'
+import { $activeGatewayProfile } from '@/store/profile'
+import { $activeSessionId } from '@/store/session'
 
 import { hermesConfigCacheWriter, invalidateHermesConfig, useHermesConfigRecord } from '../hooks/use-config-record'
 import { useOnProfileSwitch } from '../hooks/use-on-profile-switch'
@@ -114,6 +122,26 @@ const AUX_TASKS: readonly AuxTaskMeta[] = [
 ]
 
 const NO_PROVIDERS: readonly ModelOptionProvider[] = [{ name: '—', slug: '', models: [] }]
+
+const MODEL_TEST_TIMEOUT_S = 20
+
+type ModelTestUiState =
+  | { kind: 'running' }
+  | { kind: 'stopping' }
+  | { kind: 'stopped_waiting' }
+  | { kind: 'result'; result: ModelInferenceTestResult }
+
+type ActiveModelProbe = {
+  gateway: HermesGateway
+  profile: string
+  sessionId: string
+  probeId: string
+  provider: string
+  model: string
+  generation: number
+  profileEpoch: number
+  cancelRequested?: boolean
+}
 
 const isModelServiceReady = (provider?: ModelOptionProvider) =>
   !!provider && (provider.authenticated !== false || (provider.models?.length ?? 0) > 0)
@@ -221,6 +249,15 @@ interface ModelSettingsProps {
 export function ModelSettings({ onConfigSaved, onMainModelChanged, scopeProfile }: ModelSettingsProps) {
   const { t } = useI18n()
   const m = t.settings.model
+  const { gateway, gatewayRef } = useGatewayRequest()
+  const activeSessionId = useStore($activeSessionId)
+  const activeGatewayProfile = useStore($activeGatewayProfile)
+  const [modelTest, setModelTest] = useState<ModelTestUiState | null>(null)
+  const activeProbeRef = useRef<ActiveModelProbe | null>(null)
+  const modelTestGeneration = useRef(0)
+  const testProfile = scopeProfile || activeGatewayProfile || ''
+  const rpcProfile = testProfile === 'default' ? '' : testProfile
+  const currentModelRef = useRef<{ model: string; provider: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [skewRestart, setSkewRestart] = useState(false)
@@ -273,6 +310,158 @@ export function ModelSettings({ onConfigSaved, onMainModelChanged, scopeProfile 
     moaSaveGeneration.current += 1
   }, [])
 
+  const requestProbeCancellation = useCallback(async (probe: ActiveModelProbe) => {
+    try {
+      return await cancelSelectedModelInferenceTest(probe.gateway, {
+        profile: probe.profile,
+        session_id: probe.sessionId,
+        probe_id: probe.probeId
+      })
+    } catch {
+      return null
+    }
+  }, [])
+
+  const invalidateActiveProbe = useCallback(
+    (probe = activeProbeRef.current) => {
+      if (!probe) {
+        return
+      }
+
+      modelTestGeneration.current += 1
+      activeProbeRef.current = null
+      setModelTest(null)
+      void requestProbeCancellation(probe)
+    },
+    [requestProbeCancellation]
+  )
+
+  const stopWaitingForModelTest = useCallback(async () => {
+    const probe = activeProbeRef.current
+
+    if (!probe) {
+      return
+    }
+
+    probe.cancelRequested = true
+    setModelTest({ kind: 'stopping' })
+    const response = await requestProbeCancellation(probe)
+
+    if (activeProbeRef.current !== probe) {
+      return
+    }
+
+    if (response?.status === 'cancel_requested') {
+      return
+    }
+
+    modelTestGeneration.current += 1
+    activeProbeRef.current = null
+    setModelTest({ kind: 'stopped_waiting' })
+  }, [requestProbeCancellation])
+
+  const startModelInferenceTest = useCallback(async () => {
+    const selected = currentModelRef.current
+    const ownerGateway = gatewayRef.current
+    const sessionId = $activeSessionId.get()
+    const activeProfile = $activeGatewayProfile.get()
+    const normalizedActiveProfile = activeProfile === 'default' ? '' : activeProfile
+    const profileMatches = rpcProfile === normalizedActiveProfile
+
+    if (!selected?.provider || !selected.model || !ownerGateway || !sessionId || !profileMatches) {
+      return
+    }
+
+    const generation = ++modelTestGeneration.current
+
+    const probe: ActiveModelProbe = {
+      gateway: ownerGateway,
+      profile: rpcProfile,
+      sessionId,
+      probeId: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      provider: selected.provider,
+      model: selected.model,
+      generation,
+      profileEpoch: profileEpoch.current
+    }
+
+    activeProbeRef.current = probe
+    setModelTest({ kind: 'running' })
+
+    const isCurrentProbe = () => {
+      const currentProfile = $activeGatewayProfile.get()
+      const currentSessionId = $activeSessionId.get()
+      const currentRpcProfile = currentProfile === 'default' ? '' : currentProfile
+
+      return activeProbeRef.current === probe &&
+        modelTestGeneration.current === generation &&
+        profileEpoch.current === probe.profileEpoch &&
+        currentRpcProfile === probe.profile &&
+        currentSessionId === probe.sessionId &&
+        gatewayRef.current === ownerGateway &&
+        currentModelRef.current?.provider === selected.provider &&
+        currentModelRef.current?.model === selected.model
+    }
+
+    try {
+      const result = await runSelectedModelInferenceTest(
+        ownerGateway,
+        {
+          profile: rpcProfile,
+          session_id: sessionId,
+          probe_id: probe.probeId,
+          provider: selected.provider,
+          model: selected.model,
+          timeout_s: MODEL_TEST_TIMEOUT_S
+        },
+        (MODEL_TEST_TIMEOUT_S + 10) * 1000
+      )
+
+      if (isCurrentProbe()) {
+        setModelTest({ kind: 'result', result })
+      }
+    } catch {
+      if (isCurrentProbe()) {
+        setModelTest(probe.cancelRequested
+          ? { kind: 'stopped_waiting' }
+          : { kind: 'result', result: {
+              status: 'failed', inference_ok: false, provider: selected.provider, model: selected.model,
+              error_kind: 'unknown', error: 'The model request could not be completed.', cancel_supported: false
+            } })
+      }
+    } finally {
+      if (activeProbeRef.current === probe) {
+        activeProbeRef.current = null
+      }
+    }
+  }, [gatewayRef, rpcProfile])
+
+  useEffect(() => {
+    const probe = activeProbeRef.current
+
+    if (!probe) {
+      return
+    }
+
+    const activeProfile = activeGatewayProfile === 'default' ? '' : activeGatewayProfile
+
+    if (probe.profile !== rpcProfile || probe.profile !== activeProfile ||
+        probe.sessionId !== activeSessionId || probe.gateway !== gateway) {
+      invalidateActiveProbe(probe)
+    }
+  }, [activeGatewayProfile, activeSessionId, gateway, invalidateActiveProbe, rpcProfile])
+
+  useEffect(
+    () => () => {
+      const probe = activeProbeRef.current
+
+      if (probe) {
+        void requestProbeCancellation(probe)
+      }
+    },
+    [requestProbeCancellation]
+  )
+
   const setCaughtError = useCallback(
     (err: unknown, fallback: string) => {
       const skew = isCodeSkewRestartRequired(err)
@@ -283,6 +472,7 @@ export function ModelSettings({ onConfigSaved, onMainModelChanged, scopeProfile 
   )
 
   const refresh = useCallback(async () => {
+    invalidateActiveProbe()
     const epoch = profileEpoch.current
     setLoading(true)
     setError('')
@@ -300,7 +490,9 @@ export function ModelSettings({ onConfigSaved, onMainModelChanged, scopeProfile 
         return
       }
 
-      setMainModel({ model: modelInfo.model, provider: modelInfo.provider })
+      const refreshedMainModel = { model: modelInfo.model, provider: modelInfo.provider }
+      currentModelRef.current = refreshedMainModel
+      setMainModel(refreshedMainModel)
       setProviders(modelOptions.providers || [])
       setAuxiliary(auxiliaryModels)
       setMoa(moaModels)
@@ -321,7 +513,7 @@ export function ModelSettings({ onConfigSaved, onMainModelChanged, scopeProfile 
         setLoading(false)
       }
     }
-  }, [m.loadFailed, scopeProfile, setCaughtError])
+  }, [m.loadFailed, scopeProfile, setCaughtError, invalidateActiveProbe])
 
   // eslint-disable-next-line no-restricted-syntax -- scope identity ref guards cross-profile async writes
   useEffect(() => {
@@ -687,7 +879,62 @@ export function ModelSettings({ onConfigSaved, onMainModelChanged, scopeProfile 
 
   // Setup may offer a local model as the new-chat default only when the backend
   // has confirmed there is none to replace. An unknown default counts as set.
+
   const noDefaultModel = mainModel !== null && !mainModel.model
+  const activeProfile = activeGatewayProfile ?? ''
+
+  const profileMatches = (testProfile === 'default' ? '' : testProfile) === (activeProfile === 'default' ? '' : activeProfile)
+  const modelTestBusy = modelTest?.kind === 'running' || modelTest?.kind === 'stopping'
+
+  const modelTestStatusText = (() => {
+    if (!modelTest) {
+      return ''
+    }
+
+    if (modelTest.kind === 'running') {
+      return m.testingModel
+    }
+
+    if (modelTest.kind === 'stopping') {
+      return m.modelTestStopping
+    }
+
+    if (modelTest.kind === 'stopped_waiting') {
+      return m.modelTestStoppedWaiting
+    }
+
+    const result = modelTest.result
+
+    if (result.status === 'success') {
+      return m.modelTestSuccess
+    }
+
+    if (result.status === 'unsupported') {
+      return m.modelTestUnsupported
+    }
+
+    if (result.status === 'canceled') {
+      return m.modelTestCanceled
+    }
+
+    if (result.status === 'cancel_not_supported') {
+      return m.modelTestStoppedWaiting
+    }
+
+    if (result.status === 'timed_out' || result.error_kind === 'timeout') {
+      return result.cancel_supported ? m.modelTestTimedOut : m.modelTestStoppedWaiting
+    }
+
+    return ({
+      auth: m.modelTestAuthError,
+      rate_limit: m.modelTestRateLimitError,
+      timeout: m.modelTestTimedOut,
+      network: m.modelTestNetworkError,
+      server: m.modelTestServerError,
+      empty_response: m.modelTestEmptyResponse,
+      unknown: m.modelTestFailed
+    } as const)[result.error_kind ?? 'unknown']
+  })()
 
   return (
     <div className="grid gap-6">
@@ -699,6 +946,30 @@ export function ModelSettings({ onConfigSaved, onMainModelChanged, scopeProfile 
         onMainModelChanged={onMainModelChanged}
         scopeProfile={scopeProfile}
       />
+      {mainModel && (
+        <section className="grid gap-2" data-slot="model-inference-test">
+          <SectionHeading icon={Cpu} title={m.testModel} />
+          <p className="text-xs text-muted-foreground">{m.modelTestDisclosure}</p>
+          {(!activeSessionId || !profileMatches) && <p className="text-xs text-muted-foreground">{m.modelTestNeedSession}</p>}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              disabled={!mainModel.model || !mainModel.provider || !gateway || !activeSessionId || !profileMatches || modelTestBusy}
+              onClick={() => void startModelInferenceTest()}
+              size="sm"
+              variant="textStrong"
+            >
+              {modelTest?.kind === 'running' ? <Loader2 className="size-3.5 animate-spin" /> : null}
+              {modelTest?.kind === 'running' || modelTest?.kind === 'stopping' ? m.testingModel : m.testModel}
+            </Button>
+            {modelTest?.kind === 'running' && (
+              <Button onClick={() => void stopWaitingForModelTest()} size="sm" variant="text">
+                {m.stopModelTest}
+              </Button>
+            )}
+          </div>
+          {modelTestStatusText && <p aria-live="polite" className="text-xs text-muted-foreground" role="status">{modelTestStatusText}</p>}
+        </section>
+      )}
       {$localModelsEnabled.get() ? <LocalModelsSettings noDefaultModel={noDefaultModel} /> : null}
 
       {config && mainModel && (reasoningSupported || fastSupported) && (

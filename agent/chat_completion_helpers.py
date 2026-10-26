@@ -679,7 +679,7 @@ def _bedrock_converse_call(api_kwargs: dict, *, stream: bool, on_stream_denied=N
     return finish(raw_response)
 
 
-def _dispatch_nonstreaming_api_request(agent, api_kwargs: dict, *, make_client):
+def _dispatch_nonstreaming_api_request(agent, api_kwargs: dict, *, make_client, request_guard=None):
     """Run one non-streaming LLM request for the active api_mode and return it.
 
     Shared by ``interruptible_api_call`` and ``direct_api_call``. ``make_client(reason,
@@ -707,7 +707,10 @@ def _dispatch_nonstreaming_api_request(agent, api_kwargs: dict, *, make_client):
         if not callable(getattr(_completions, "prepare", None)):
             api_kwargs.pop("_moa_prepared_request", None)
         return agent.client.chat.completions.create(**api_kwargs)
-    return make_client("chat_completion_request").chat.completions.create(**api_kwargs)
+    client = make_client("chat_completion_request")
+    if request_guard is not None and not request_guard():
+        raise InterruptedError("Model probe request was closed before dispatch")
+    return client.chat.completions.create(**api_kwargs)
 
 
 def should_use_direct_api_call(agent) -> bool:
@@ -815,6 +818,7 @@ class _InlineRequest:
         self.cancelled = False
         self.lock = threading.Lock()
         self.abort_hook = self.abort  # single bound object: identity-checked on cleanup
+        self.abort_succeeded = False
         self._hb_stop = threading.Event()
         self._hb = threading.Thread(target=self._activity_heartbeat, name="direct-api-activity-hb", daemon=True)
         self._watchdog = None
@@ -851,18 +855,16 @@ class _InlineRequest:
         self._hb_stop.set()
         self._hb.join(timeout=2.0)
 
-    def _abort_client(self, client, reason: str, log_msg: str) -> None:
+    def _abort_client(self, client, reason: str, log_msg: str) -> int:
         try:
-            self.agent._abort_request_openai_client(client, reason=reason)
+            return int(self.agent._abort_request_openai_client(client, reason=reason) or 0)
         except Exception:
             logger.debug(log_msg, exc_info=True)
+            return 0
 
     def abort(self, reason: str) -> bool:
-        """Abort the inline request from a watchdog/interrupt thread. Returns True
-        when this call owned the stale transition (the timer reports/bumps once,
-        never after an interrupt or a completed request). Aborts under the lock
-        (same contract as _RequestClientRegistry): once released the finally may
-        cache the client and the NEXT call check it out."""
+        """Abort the inline request. Stale-watchdog callers receive the transition result;
+        interrupt callers receive True only when an active provider socket was shut down."""
         with self.lock:
             if self.done:
                 return False
@@ -880,27 +882,31 @@ class _InlineRequest:
                 # must not count it as staleness.
                 self.cancelled = True
                 newly_stale = False
-            if self.client is not None:
-                self._abort_client(self.client, reason, f"Inline request abort failed ({reason})")
+            abort_count = self._abort_client(
+                self.client, reason, f"Inline request abort failed ({reason})"
+            ) if self.client is not None else 0
+            if reason != "stale_call_kill":
+                # No request client means make_client has not reached dispatch; the canceled flag is
+                # checked before the SDK call, so cancellation is confirmed without a provider request.
+                self.abort_succeeded = self.client is None or abort_count > 0
             return newly_stale
 
     def make_client(self, reason: str, kind: str = "openai"):
         # Only OpenAI-wire requests reach direct_api_call; ``kind`` exists
         # for signature parity with the dispatch helper.
         client = self.agent._create_request_openai_client(reason=reason, api_kwargs=self.api_kwargs)
+        self.agent._active_request_abort = self.abort_hook
         with self.lock:
             self.client = client
             stale_before_dispatch = self.stale
+            interrupted_before_dispatch = self.cancelled or bool(self.agent._interrupt_requested)
             if stale_before_dispatch:
-                # Timer fired during client construction: the abort found no
-                # socket, so dispatching now would open one AFTER the only
-                # watchdog fired. Fail here instead. (Residual ms-scale window
-                # before httpx opens its socket is accepted.)
                 self._abort_client(client, "stale_call_kill", "Inline abort after late client registration failed")
         if stale_before_dispatch:
             raise TimeoutError(
                 f"Non-streaming API call timed out before request dispatch (threshold: {int(self.stale_timeout)}s)")
-        self.agent._active_request_abort = self.abort_hook
+        if interrupted_before_dispatch:
+            raise InterruptedError("Agent interrupted before API request dispatch")
         return client
 
     def mark_done(self) -> None:
@@ -913,7 +919,7 @@ class _InlineRequest:
         return client
 
 
-def direct_api_call(agent, api_kwargs: dict):
+def direct_api_call(agent, api_kwargs: dict, *, request_guard=None, on_response_received=None):
     """Run a non-streaming LLM call inline on the conversation thread (cron turns,
     delegated children — see ``should_use_direct_api_call``): no interrupt worker,
     so the nested-pool deadlock cannot occur. An activity heartbeat keeps
@@ -940,7 +946,11 @@ def direct_api_call(agent, api_kwargs: dict):
     # close the client so the retry builds a fresh pool.
     succeeded = False
     try:
-        response = _dispatch_nonstreaming_api_request(agent, api_kwargs, make_client=request.make_client)
+        response = _dispatch_nonstreaming_api_request(
+            agent, api_kwargs, make_client=request.make_client, request_guard=request_guard,
+        )
+        if on_response_received is not None and not on_response_received():
+            raise InterruptedError("Model probe result was superseded")
     except Exception:
         if getattr(agent, "_interrupt_requested", False):
             raise InterruptedError("Agent interrupted during API call") from None

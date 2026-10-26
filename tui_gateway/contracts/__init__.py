@@ -10,6 +10,7 @@ from . import (  # noqa: F401
     groups_bot_relay,
     liveness,
     memory,
+    model_inference,
     profiles_vault_complete_foreign_subagents,
     projects_pets,
     prompt_voice,

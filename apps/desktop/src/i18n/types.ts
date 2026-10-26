@@ -1433,6 +1433,23 @@ export interface Translations {
       reasoning: string
       reasoningOff: string
       defaultsFailed: string
+      testModel: string
+      testingModel: string
+      stopModelTest: string
+      modelTestDisclosure: string
+      modelTestNeedSession: string
+      modelTestSuccess: string
+      modelTestFailed: string
+      modelTestUnsupported: string
+      modelTestCanceled: string
+      modelTestTimedOut: string
+      modelTestStopping: string
+      modelTestStoppedWaiting: string
+      modelTestAuthError: string
+      modelTestRateLimitError: string
+      modelTestNetworkError: string
+      modelTestServerError: string
+      modelTestEmptyResponse: string
       loadFailed: string
       restartRequired: string
       restartBackend: string
