@@ -426,6 +426,7 @@ export const zh = defineLocale({
     doneTitle: '诊断信息已保存',
     doneDescription: '脱敏诊断包已保存到您的电脑。如需支持，可将该文件附加到 Stardust 的 GitHub Issue。',
     failedTitle: '无法保存诊断信息',
+    gatewayUnavailable: '请先连接网关，然后重试。',
     failedHint: '请更新 Stardust 及后端后重试。此流程不会退回到把日志上传到支持服务的旧路径。',
     handoffLead: '需要帮助？',
     links: {

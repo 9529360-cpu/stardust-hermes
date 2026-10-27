@@ -338,6 +338,7 @@ export const ja = defineLocale({
     doneDescription:
       'マスク済みの診断バンドルをコンピューターに保存しました。サポートが必要な場合は Stardust の GitHub Issue に添付してください。',
     failedTitle: '診断情報を保存できませんでした',
+    gatewayUnavailable: 'ゲートウェイに接続してから、もう一度お試しください。',
     failedHint:
       'Stardust とバックエンドを更新してから再試行してください。このフローがログをサポートサービスへアップロードする旧経路へフォールバックすることはありません。',
     handoffLead: 'サポートが必要ですか？',

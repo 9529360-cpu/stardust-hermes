@@ -98,6 +98,23 @@ describe('send-diagnostics store', () => {
     }
   })
 
+  it('records a typed error when no gateway is available', async () => {
+    const original = $gateway.get()
+    $gateway.set(null)
+
+    try {
+      requestSendDiagnostics()
+      await confirmSendDiagnostics()
+
+      expect($sendDiagnostics.get()).toMatchObject({
+        errorCode: 'gateway-unavailable',
+        phase: 'error'
+      })
+    } finally {
+      $gateway.set(original)
+    }
+  })
+
   it('prepares locally, saves through the desktop bridge, then discards the backend copy', async () => {
     const request = localBundleRequest()
     const restoreGateway = stubGateway(request)

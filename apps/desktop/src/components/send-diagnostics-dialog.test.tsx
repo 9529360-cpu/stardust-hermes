@@ -27,6 +27,14 @@ describe('SendDiagnosticsHost', () => {
     expect(dialog.textContent).not.toMatch(/nous|portal|discord/i)
   })
 
+  it('shows localized recovery copy when no gateway is connected', () => {
+    $sendDiagnostics.set({ phase: 'error', errorCode: 'gateway-unavailable' })
+    render(<SendDiagnosticsHost />)
+
+    expect(screen.getByText('Connect to a gateway, then try again.')).toBeTruthy()
+    expect(screen.queryByText(/Hermes/i)).toBeNull()
+  })
+
   it('shows the saved local path and only Stardust GitHub as the support handoff', () => {
     requestSendDiagnostics()
     $sendDiagnostics.set({
