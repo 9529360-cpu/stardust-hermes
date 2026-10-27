@@ -35,6 +35,9 @@ export interface MockServerOptions {
   replyForPrompt?: (prompt: string) => string
   /** Reasoning to stream ahead of the reply for a prompt, so the thinking row has a live block to show. */
   reasoningForPrompt?: (prompt: string) => string | undefined
+  /** Override reasoning chunk size and cadence for focused streaming E2E scenarios. */
+  reasoningChunkSize?: number
+  reasoningChunkDelayMs?: number
 
   /** Pause the matching stream after its first token for session-switch E2E coverage. */
   holdFirstStreamForPrompt?: string
@@ -670,6 +673,7 @@ export function startMockServer(options: MockServerOptions = {}): Promise<MockSe
           } catch {
             // malformed JSON — treat as non-streaming with defaults
           }
+
           receivedCompletions.push({ path: req.url ?? '', body: parsed as Record<string, unknown> })
 
           const lastUserMessage = [...(parsed.messages ?? [])]
@@ -717,9 +721,11 @@ export function startMockServer(options: MockServerOptions = {}): Promise<MockSe
           }
 
           const isInterimTrigger = userText.includes('E2E_INTERIM_TRIGGER')
+
           const isWorkProgressTrigger = messages.some(
             message => typeof message?.content === 'string' && message.content.includes(WORK_PROGRESS_TRIGGER),
           )
+
           const isSidebarTrigger = userText.includes('E2E_SIDEBAR_TRIGGER')
           const isSidebarCrossTrigger = userText.includes('E2E_SIDEBAR_CROSS')
           const isQueueStopTrigger = userText.includes('E2E_QUEUE_STOP_TRIGGER')
@@ -785,6 +791,7 @@ export function startMockServer(options: MockServerOptions = {}): Promise<MockSe
             // First completion asks to connect; once the tool result is in the history, close the turn.
             const hasToolResult = Array.isArray(parsed.messages)
               && parsed.messages.some((message: { role?: string }) => message?.role === 'tool')
+
             const turn = hasToolResult ? CHROME_CONNECT_REPLY_TURN : CHROME_CONNECT_TURN
 
             if (stream) {
@@ -801,6 +808,7 @@ export function startMockServer(options: MockServerOptions = {}): Promise<MockSe
             // trigger text stays put, so the next completion is the closing reply.
             const hasToolResult = Array.isArray(parsed.messages)
               && parsed.messages.some((message: { role?: string }) => message?.role === 'tool')
+
             const turn = hasToolResult ? CRON_ROUTINE_REPLY_TURN : CRON_ROUTINE_TURN
 
             if (stream) {
@@ -966,7 +974,7 @@ export function startMockServer(options: MockServerOptions = {}): Promise<MockSe
               resolveHeldStreamStarted?.()
 
               return heldStreamReleased
-            } : undefined, options.reasoningForPrompt?.(userText))
+            } : undefined, options.reasoningForPrompt?.(userText), options.reasoningChunkSize, options.reasoningChunkDelayMs)
           } else {
             if (holdThisCompletion) {
               heldCompletionCount++
@@ -1054,6 +1062,8 @@ function streamTextResponse(
   text: string,
   waitForRelease?: () => Promise<void>,
   reasoning?: string,
+  reasoningChunkSize = 4,
+  reasoningChunkDelayMs = 150,
 ): void {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
@@ -1066,8 +1076,8 @@ function streamTextResponse(
   const thinking: string[] = []
   const reasoningCharacters = Array.from(reasoning ?? '')
 
-  for (let index = 0; index < reasoningCharacters.length; index += 4) {
-    thinking.push(reasoningCharacters.slice(index, index + 4).join(''))
+  for (let index = 0; index < reasoningCharacters.length; index += reasoningChunkSize) {
+    thinking.push(reasoningCharacters.slice(index, index + reasoningChunkSize).join(''))
   }
 
   let thoughtIndex = 0
@@ -1082,7 +1092,7 @@ function streamTextResponse(
     if (thoughtIndex < thinking.length) {
       res.write(sseChunk(model, { reasoning_content: thinking[thoughtIndex] }))
       thoughtIndex++
-      setTimeout(sendChunk, 150)
+      setTimeout(sendChunk, reasoningChunkDelayMs)
 
       return
     }
