@@ -314,7 +314,6 @@ class TestPosixEquivalence:
         "AWS_SECRET_ACCESS_KEY": "yyy",
         "MY_PASSWORD": "hunter2",
         "SENTRY_DSN": "https://abc@sentry.io/1",     # DSN substring → blocked
-        "SLACK_WEBHOOK": "https://hooks.slack/x",    # WEBHOOK substring → blocked
         # Uncategorized — must be dropped
         "RANDOM_UNKNOWN": "drop-me",
         "DISPLAY": ":0",
@@ -369,6 +368,19 @@ class TestPosixEquivalence:
             f"  value diffs:    {[k for k in expected if k in actual and expected[k] != actual[k]]}"
         )
 
+
+    @pytest.mark.parametrize(
+        "name",
+        ["SLACK_WEBHOOK", "TWILIO_AUTH_TOKEN", "HASS_TOKEN", "MSGRAPH_CLIENT_SECRET"],
+    )
+    def test_retired_or_shared_tool_credentials_never_enter_execute_code(self, name):
+        child_env = _scrub_child_env(
+            {name: "credential", "PATH": "/usr/bin"},
+            is_passthrough=lambda candidate: candidate == name,
+            is_windows=False,
+        )
+        assert name not in child_env
+        assert child_env["PATH"] == "/usr/bin"
 
     def test_windows_mode_is_strict_superset_of_posix_mode(self):
         """Correctness check on the NEW behavior: is_windows=True must

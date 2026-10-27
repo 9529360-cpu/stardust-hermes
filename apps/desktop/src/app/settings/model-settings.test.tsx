@@ -5,6 +5,8 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { I18nProvider } from '@/i18n'
+import { $activeGatewayProfile } from '@/store/profile'
+import { $activeSessionId } from '@/store/session'
 
 // Radix Select calls scrollIntoView on its items when the content opens; jsdom
 // doesn't implement it (nor hasPointerCapture / releasePointerCapture), so stub
@@ -27,6 +29,10 @@ const saveMoaModels = vi.fn()
 const setEnvVar = vi.fn()
 const getHermesConfigRecord = vi.fn()
 const saveHermesConfig = vi.fn()
+const runSelectedModelInferenceTest = vi.fn()
+const cancelSelectedModelInferenceTest = vi.fn()
+const modelTestGateway = { request: vi.fn() }
+const modelTestGatewayRef = { current: modelTestGateway }
 const profileSwitchHandlers = new Set<() => void>()
 
 vi.mock('@/hermes', () => ({
@@ -44,7 +50,13 @@ vi.mock('@/hermes', () => ({
   setEnvVar: (key: string, value: string) => setEnvVar(key, value),
   getHermesConfigRecord: () => getHermesConfigRecord(),
   saveHermesConfig: (config: unknown) => saveHermesConfig(config),
+  runSelectedModelInferenceTest: (...args: unknown[]) => runSelectedModelInferenceTest(...args),
+  cancelSelectedModelInferenceTest: (...args: unknown[]) => cancelSelectedModelInferenceTest(...args),
   setApiRequestProfile: () => {}
+}))
+
+vi.mock('@/app/gateway/hooks/use-gateway-request', () => ({
+  useGatewayRequest: () => ({ gateway: modelTestGateway, gatewayRef: modelTestGatewayRef })
 }))
 
 vi.mock('../hooks/use-on-profile-switch', () => ({
@@ -60,6 +72,14 @@ vi.mock('../hooks/use-on-profile-switch', () => ({
 }))
 
 beforeEach(() => {
+  $activeSessionId.set('model-test-session')
+  $activeGatewayProfile.set('default')
+  runSelectedModelInferenceTest.mockResolvedValue({
+    status: 'success', inference_ok: true, nonempty_response: true, cancel_supported: true
+  })
+  cancelSelectedModelInferenceTest.mockResolvedValue({
+    status: 'cancel_requested', message: 'cancel requested', cancel_supported: true
+  })
   getGlobalModelInfo.mockResolvedValue({ provider: 'nous', model: 'hermes-4' })
   getCustomEndpoints.mockResolvedValue({ endpoints: [] })
   activateCustomEndpoint.mockResolvedValue({ ok: true, provider: 'custom:magpie', model: 'magpie/model' })
@@ -160,10 +180,111 @@ describe('ModelSettings profile scope', () => {
 })
 
 describe('ModelSettings', () => {
+  it('sends one inference request only after an explicit click, using the applied model', async () => {
+    await renderModelSettings()
+    await screen.findByRole('button', { name: 'Test selected model' })
+
+    expect(runSelectedModelInferenceTest).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Test selected model' }))
+
+    await waitFor(() => expect(runSelectedModelInferenceTest).toHaveBeenCalledTimes(1))
+    expect(runSelectedModelInferenceTest).toHaveBeenCalledWith(modelTestGateway, expect.objectContaining({
+      profile: '',
+      session_id: 'model-test-session',
+      provider: 'nous',
+      model: 'hermes-4',
+      timeout_s: 20,
+      probe_id: expect.any(String)
+    }), 30000)
+    expect((await screen.findByRole('status')).textContent).toContain('The model returned a response.')
+  })
+
+  it('drops a slow model result after the active profile changes', async () => {
+    let resolveProbe!: (result: unknown) => void
+    runSelectedModelInferenceTest.mockImplementationOnce(() => new Promise(resolve => {
+      resolveProbe = resolve
+    }))
+
+    await renderModelSettings()
+    fireEvent.click(await screen.findByRole('button', { name: 'Test selected model' }))
+    await waitFor(() => expect(runSelectedModelInferenceTest).toHaveBeenCalledTimes(1))
+
+    act(() => {
+      $activeGatewayProfile.set('research')
+    })
+    await waitFor(() => expect(cancelSelectedModelInferenceTest).toHaveBeenCalledWith(
+      modelTestGateway,
+      expect.objectContaining({ profile: '', session_id: 'model-test-session', probe_id: expect.any(String) })
+    ))
+
+    await act(async () => {
+      resolveProbe({ status: 'success', inference_ok: true, nonempty_response: true, cancel_supported: true })
+      await Promise.resolve()
+    })
+
+    expect(screen.queryByText('The model returned a response.')).toBeNull()
+  })
+
+  it('does not surface a late probe exception after the active profile changes', async () => {
+    let rejectProbe!: (error: Error) => void
+    runSelectedModelInferenceTest.mockImplementationOnce(() => new Promise((_resolve, reject) => {
+      rejectProbe = reject
+    }))
+
+    await renderModelSettings()
+    fireEvent.click(await screen.findByRole('button', { name: 'Test selected model' }))
+    await waitFor(() => expect(runSelectedModelInferenceTest).toHaveBeenCalledTimes(1))
+
+    act(() => {
+      $activeGatewayProfile.set('research')
+    })
+    await waitFor(() => expect(cancelSelectedModelInferenceTest).toHaveBeenCalledTimes(1))
+
+    await act(async () => {
+      rejectProbe(new Error('https://provider.invalid?key=must-not-display'))
+      await Promise.resolve()
+    })
+
+    expect(screen.queryByText('The model request failed.')).toBeNull()
+    expect(screen.queryByText(/provider\.invalid|must-not-display/)).toBeNull()
+  })
+
+  it('does not surface a late probe exception after another model is applied in the same profile', async () => {
+    let rejectProbe!: (error: Error) => void
+    runSelectedModelInferenceTest.mockImplementationOnce(() => new Promise((_resolve, reject) => {
+      rejectProbe = reject
+    }))
+    getGlobalModelInfo
+      .mockResolvedValueOnce({ provider: 'nous', model: 'hermes-4' })
+      .mockResolvedValueOnce({ provider: 'openai', model: 'gpt-5.5' })
+    getCustomEndpoints.mockResolvedValue({
+      current: { provider: 'nous', model: 'hermes-4', base_url: '' },
+      endpoints: [{
+        id: 'new-model', name: 'New model', base_url: 'http://127.0.0.1:3425/v1',
+        model: 'gpt-5.5', models: ['gpt-5.5'], discover_models: true,
+        is_current: false, has_api_key: false, source: 'providers'
+      }]
+    })
+
+    await renderModelSettings()
+    fireEvent.click(await screen.findByRole('button', { name: 'Test selected model' }))
+    await waitFor(() => expect(runSelectedModelInferenceTest).toHaveBeenCalledTimes(1))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Set as default' }))
+    await waitFor(() => expect(getGlobalModelInfo).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(screen.getByText('gpt-5.5')).toBeTruthy())
+
+    await act(async () => {
+      rejectProbe(new Error('https://provider.invalid?key=must-not-display'))
+      await Promise.resolve()
+    })
+
+    expect(screen.queryByText('The model request failed.')).toBeNull()
+    expect(screen.queryByText(/provider\.invalid|must-not-display/)).toBeNull()
+  })
+
   it('uses the direct model-service editor without provider account controls', async () => {
     await renderModelSettings()
-
-    await waitFor(() => expect(getGlobalModelOptions).toHaveBeenCalled())
     expect(await screen.findByText('Add model service')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Choose another service' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Advanced connection settings' })).toBeNull()

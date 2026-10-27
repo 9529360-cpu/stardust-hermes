@@ -288,10 +288,10 @@ def test_serves_profile_prefix_is_read_from_adapter_classes():
     assert APIServerAdapter.serves_profile_prefix and WebhookAdapter.serves_profile_prefix
     assert gm.platform_serves_profile_prefix("api_server") is True
     assert gm.platform_serves_profile_prefix("webhook") is True
-    # Every adapter that binds through shared_ingress.bind_listener is served at /p/<profile>/
-    # for a secondary, so migrate must report it as a notice, never a blocker.
-    for platform in ("sms", "line", "teams", "bluebubbles", "whatsapp_cloud", "msgraph_webhook"):
-        assert gm.platform_serves_profile_prefix(platform) is True, platform
+    assert gm.platform_serves_profile_prefix("whatsapp_cloud") is True
+    # Retired adapters no longer own profile-prefixed ingress routes.
+    for platform in ("sms", "line", "teams", "bluebubbles", "msgraph_webhook"):
+        assert gm.platform_serves_profile_prefix(platform) is False, platform
     # An outbound-only adapter never declares it (and never needs to).
     assert gm.platform_serves_profile_prefix("telegram") is False
 

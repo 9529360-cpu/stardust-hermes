@@ -59,6 +59,20 @@ def client(monkeypatch, isolated_profiles):
     return c
 
 
+def test_channels_catalog_hides_retired_native_platforms_and_keeps_shared_services(client):
+    from gateway.config import RETIRED_PLATFORMS
+
+    response = client.get("/api/messaging/platforms")
+    assert response.status_code == 200
+    platforms_by_id = {entry["id"]: entry for entry in response.json()["platforms"]}
+    platforms = set(platforms_by_id)
+    assert not platforms.intersection(RETIRED_PLATFORMS)
+    assert {"telegram", "whatsapp", "whatsapp_cloud", "weixin", "api_server", "webhook", "relay"} <= platforms
+    cloud_fields = {field["key"]: field for field in platforms_by_id["whatsapp_cloud"]["env_vars"]}
+    for key in ("WHATSAPP_CLOUD_PHONE_NUMBER_ID", "WHATSAPP_CLOUD_ACCESS_TOKEN"):
+        assert cloud_fields[key]["required"] is True
+
+
 def _telegram(payload):
     return next(p for p in payload["platforms"] if p["id"] == "telegram")
 

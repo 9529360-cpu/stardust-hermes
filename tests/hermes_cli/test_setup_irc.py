@@ -58,8 +58,8 @@ def _unregister_irc_platform():
 class TestIRCFreshInstallDiscovery:
     """IRC appears in the setup menu on a brand-new Hermes install."""
 
-    def test_irc_appears_in_all_platforms(self, monkeypatch):
-        """When the IRC plugin is registered, _all_platforms() surfaces it."""
+    def test_retired_irc_is_not_in_all_platforms(self, monkeypatch):
+        """A manually registered legacy IRC plugin remains hidden by the retired-platform policy."""
         import hermes_cli.gateway as gateway_mod
 
         _register_irc_platform()
@@ -70,11 +70,7 @@ class TestIRCFreshInstallDiscovery:
 
             platforms = gateway_mod._all_platforms()
             keys = {p["key"] for p in platforms}
-            assert "irc" in keys
-
-            irc_plat = next(p for p in platforms if p["key"] == "irc")
-            assert irc_plat["label"] == "IRC"
-            assert irc_plat["emoji"] == "💬"
+            assert "irc" not in keys
         finally:
             _unregister_irc_platform()
 
@@ -143,8 +139,8 @@ class TestIRCInteractiveSetup:
 class TestIRCGatewaySetupFreshInstall:
     """Simulate the full `stardust setup gateway` experience with IRC present."""
 
-    def test_setup_gateway_shows_irc_in_platform_menu(self, monkeypatch, capsys, tmp_path):
-        """The gateway setup menu lists IRC among the available platforms."""
+    def test_setup_gateway_hides_retired_irc_from_platform_menu(self, monkeypatch, capsys, tmp_path):
+        """The gateway setup menu omits retired IRC, even when a stale plugin entry is registered."""
         import hermes_cli.gateway as gateway_mod
         from hermes_cli import setup as setup_mod
 
@@ -154,10 +150,9 @@ class TestIRCGatewaySetupFreshInstall:
             for key in ("IRC_SERVER", "IRC_CHANNEL", "IRC_NICKNAME"):
                 monkeypatch.delenv(key, raising=False)
 
-            # Sanity-check: IRC must be visible to _all_platforms()
+            # A retired plugin id must not be exposed by the current setup menu.
             platforms = gateway_mod._all_platforms()
-            assert any(p["key"] == "irc" for p in platforms), \
-                f"IRC not in platforms: {[p['key'] for p in platforms]}"
+            assert not any(p["key"] == "irc" for p in platforms)
 
             # Capture what prompt_checklist is asked to display
             checklist_calls = []
@@ -183,14 +178,12 @@ class TestIRCGatewaySetupFreshInstall:
             assert platform_prompt is not None, \
                 f"No platform prompt found in {checklist_calls}"
             choices_text = "\n".join(platform_prompt["choices"])
-            assert "IRC" in choices_text
-            assert "💬" in choices_text
-            assert "not configured" in choices_text.lower()
+            assert "IRC" not in choices_text
         finally:
             _unregister_irc_platform()
 
-    def test_setup_gateway_irc_counts_as_messaging_platform(self, monkeypatch, capsys, tmp_path):
-        """When IRC is configured, setup_gateway counts it as a messaging platform."""
+    def test_retired_irc_does_not_count_as_configured_channel(self, monkeypatch, capsys, tmp_path):
+        """Retired IRC cannot be selected or reported as an active messaging channel."""
         import hermes_cli.gateway as gateway_mod
         from hermes_cli import setup as setup_mod
 
@@ -223,6 +216,7 @@ class TestIRCGatewaySetupFreshInstall:
             setup_mod.setup_gateway({})
 
             out = capsys.readouterr().out
-            assert "Messaging platforms configured!" in out
+            assert "Messaging platforms configured!" not in out
+            assert "IRC" not in out
         finally:
             _unregister_irc_platform()

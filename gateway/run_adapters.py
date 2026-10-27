@@ -203,7 +203,6 @@ class GatewayAdapterLifecycleMixin:
             "config": platform_config, "attempts": attempts, "next_retry": now + delay,
             **({"queued_at": now} if queued else {}),
             "credential_claim": self._adapter_credential_claim(platform, adapter),
-            "listener_claim": self._adapter_listener_claim(platform, adapter),
         }
 
     def _queue_retryable_fatal_platform(self, adapter: BasePlatformAdapter) -> bool:
@@ -861,19 +860,16 @@ class GatewayAdapterLifecycleMixin:
         return connected
 
     def _primary_resource_claims(self, active: str) -> Dict[tuple, str]:
-        """Resource claim -> owning profile for every live or queued primary adapter (credential:
-        one account polled once; listener: one bind+port). A queued retryable primary owns both."""
+        """Credential claim -> owning profile for every live or queued primary adapter."""
         claimed: Dict[tuple, str] = {}
-        for _plat, _ad in self.adapters.items():
-            fp = self._adapter_credential_fingerprint(_ad)
-            for claim in ((_plat, fp) if fp is not None else None, self._adapter_listener_claim(_plat, _ad)):
-                if claim is not None:
-                    claimed[claim] = active
+        for platform, adapter in self.adapters.items():
+            claim = self._adapter_credential_claim(platform, adapter)
+            if claim is not None:
+                claimed[claim] = active
         for retry_info in getattr(self, "_failed_platforms", {}).values():
-            for claim_name in ("credential_claim", "listener_claim"):
-                retry_claim = retry_info.get(claim_name)
-                if isinstance(retry_claim, tuple):
-                    claimed[retry_claim] = active
+            retry_claim = retry_info.get("credential_claim")
+            if isinstance(retry_claim, tuple):
+                claimed[retry_claim] = active
         return claimed
 
     def _record_served_profiles(self, active: str, profile_homes) -> None:
@@ -924,34 +920,23 @@ class GatewayAdapterLifecycleMixin:
         return profile_cfg
 
     def _refuse_duplicate_claim(
-        self, claim, claimed: Dict[tuple, str], profile_name: str, platform: Platform, kind: str
+        self, claim, claimed: Dict[tuple, str], profile_name: str, platform: Platform
     ) -> bool:
-        """Log + park a secondary adapter whose credential/listener another profile owns (True when
-        refused). NOT disconnected: it never connected, and for a same-credential Photon adapter
-        disconnect() would shut down the primary profile's live sidecar."""
+        """Log + park a secondary adapter whose credential another profile owns (True when refused)."""
         owner = claimed.get(claim) if claim is not None else None
         if owner is None:
             return False
         pv = platform.value
-        head = f"Profile '{owner}' and '{profile_name}' both configure {pv} "
-        if kind == "credential":
-            message = head + f"with the same credential. Give each profile its own {pv} credential."
-            logger.error(
-                "Profile '%s' and '%s' both configure %s with the same credential — refusing to start the "
-                "duplicate (one credential cannot be consumed twice). Give each profile its own %s credential.",
-                owner, profile_name, pv, pv,
-            )
-        else:
-            bind, port = claim[-2:]
-            message = head + f"sidecars on the same listener. Configure a distinct listener for profile '{profile_name}'."
-            logger.error(
-                "Profile '%s' and '%s' both configure %s sidecars on %s:%s — refusing to start the duplicate "
-                "listener. Set platforms.%s.extra.sidecar_port to a distinct port for profile '%s'.",
-                owner, profile_name, pv, bind, port, pv, profile_name,
-            )
+        message = f"Profile '{owner}' and '{profile_name}' both configure {pv} with the same credential. " \
+            f"Give each profile its own {pv} credential."
+        logger.error(
+            "Profile '%s' and '%s' both configure %s with the same credential — refusing to start the "
+            "duplicate (one credential cannot be consumed twice). Give each profile its own %s credential.",
+            owner, profile_name, pv, pv,
+        )
         self._update_platform_runtime_status(
             f"{profile_name}:{platform.value}", platform_state="fatal",
-            error_code=f"duplicate_{kind}", error_message=message,
+            error_code="duplicate_credential", error_message=message,
         )
         return True
 
@@ -1045,12 +1030,8 @@ class GatewayAdapterLifecycleMixin:
                     )
             if not adapter:
                 continue
-            # Same-token / same-listener conflict detection — refuse a duplicate poll or bind.
             credential_claim = self._adapter_credential_claim(platform, adapter)
-            listener_claim = self._adapter_listener_claim(platform, adapter)
-            if self._refuse_duplicate_claim(
-                credential_claim, claimed, profile_name, platform, "credential"
-            ) or self._refuse_duplicate_claim(listener_claim, claimed, profile_name, platform, "listener"):
+            if self._refuse_duplicate_claim(credential_claim, claimed, profile_name, platform):
                 continue
             self._configure_profile_adapter(adapter, profile_name, platform)
             try:
@@ -1069,9 +1050,8 @@ class GatewayAdapterLifecycleMixin:
             # Restore persisted /voice state for this bot (primary startup and reconnects do too).
             # See #84872.
             self._sync_voice_mode_state_to_adapter(adapter)
-            for claim in (credential_claim, listener_claim):
-                if claim is not None:
-                    claimed[claim] = profile_name
+            if credential_claim is not None:
+                claimed[credential_claim] = profile_name
             connected += 1
             logger.info("✓ %s connected (profile: %s)", platform.value, profile_name)
         return connected
@@ -1489,19 +1469,6 @@ class GatewayAdapterLifecycleMixin:
         return None if fingerprint is None else (platform, fingerprint)
 
     @staticmethod
-    def _adapter_listener_claim(platform: Platform, adapter: Any) -> Optional[tuple]:
-        """Exclusive listener claim (Photon sidecar bind+port): distinct credentials still cannot
-        share a port, so the later adapter is rejected before connect() disturbs the first."""
-        bind = getattr(adapter, "_sidecar_bind", None)
-        if getattr(platform, "value", None) != "photon" or not isinstance(bind, str) or not bind.strip():
-            return None
-        try:
-            port = int(getattr(adapter, "_sidecar_port", None))
-        except (TypeError, ValueError):
-            return None
-        return ("listener", "photon", bind.strip().lower(), port)
-
-    @staticmethod
     def _adapter_credential_fingerprint(adapter: Any) -> Optional[str]:
         """Salted, log-safe hash of an adapter's credential; None when none is discoverable
         (conflict detection is then skipped)."""
@@ -1509,7 +1476,7 @@ class GatewayAdapterLifecycleMixin:
         candidates = [
             (adapter, attr) for attr in (
                 "token", "bot_token", "_token", "api_token", "_bot_token",
-                "_project_secret",  # Photon/Spectrum: project credentials, not a bot token
+                "_project_secret",  # project-scoped adapter credential, not a bearer token
                 "_app_id",  # Feishu/Lark app_id — stable, log-safe, already the _app_lock_identity
                 "_client_id", "_bot_id",  # Teams / WeCom app-style id pairs
             )
@@ -1532,6 +1499,10 @@ class GatewayAdapterLifecycleMixin:
     def _instantiate_adapter(self, platform: Platform, config: Any) -> Optional[BasePlatformAdapter]:
         """Instantiate the adapter for a platform: plugin registry first, then built-ins."""
         from gateway.run import _instantiate_builtin_adapter
+        from gateway.config import RETIRED_PLATFORMS
+        if platform.value in RETIRED_PLATFORMS:
+            logger.warning("Platform '%s' is no longer supported by Stardust", platform.value)
+            return None
         if hasattr(config, "extra") and isinstance(config.extra, dict):
             config.extra.setdefault("group_sessions_per_user", self.config.group_sessions_per_user)
             config.extra.setdefault(

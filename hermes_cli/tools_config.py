@@ -644,13 +644,17 @@ def _save_platform_tools(config: dict, platform: str, enabled_toolset_keys: Set[
     config.setdefault("platform_toolsets", {})
     # Drop platform-scoped toolsets that don't apply here, so the "Configure all platforms" checklist (or a
     # hand-edited config.yaml) can't turn on `discord` for Telegram.
-    enabled_toolset_keys = {ts for ts in enabled_toolset_keys if _toolset_allowed_for_platform(ts, platform)}
+    platform_default_keys = _platform_default_keys() | {_platform_default_toolset(platform)}
+    enabled_toolset_keys = {
+        ts for ts in enabled_toolset_keys
+        if ts not in platform_default_keys and _toolset_allowed_for_platform(ts, platform)
+    }
     plugin_keys = _get_plugin_toolset_keys()
     # Preserve only existing entries that are neither configurable nor platform defaults (i.e. MCP server
     # names): platform defaults (hermes-cli, ...) resolve to ALL tools and would silently override the user's
     # unchecked selections on the next read. Saving from the picker is consent to clear the "no_mcp" sentinel
     # (no checkbox for it; users who once set it by hand could otherwise never re-enable MCP via the UI).
-    drop = _configurable_keys() | plugin_keys | _platform_default_keys() | {"no_mcp"}
+    drop = _configurable_keys() | plugin_keys | platform_default_keys | {"no_mcp"}
     existing_toolsets = cfg_get(config, "platform_toolsets", platform, default=[])
     preserved_entries = {str(e) for e in (existing_toolsets if isinstance(existing_toolsets, list) else [])
                          if str(e) not in drop}

@@ -58,14 +58,19 @@ def _ic_codex_method(agent, name: str):
     return method if callable(method) else None
 
 
-def _ic_abort_active_request(agent, reason: str, failure_log: str) -> None:
-    """Shut the registered in-flight request's sockets (cron turns register their client here)."""
+def _ic_abort_active_request(agent, reason: str, failure_log: str) -> bool:
+    """Shut the registered in-flight request's sockets and report confirmed abort success."""
     abort = getattr(agent, "_active_request_abort", None)
     if callable(abort):
         try:
-            abort(reason)
+            result = abort(reason)
+            owner = getattr(abort, "__self__", None)
+            if hasattr(owner, "abort_succeeded"):
+                return bool(owner.abort_succeeded)
+            return bool(result)
         except Exception:
             logger.debug(failure_log, exc_info=True)
+    return False
 
 
 def _ic_signal_tool_workers(agent, active: bool, **kw) -> None:
@@ -163,7 +168,9 @@ class InterruptControlMixin:
 
         # Cron turns request on the conversation thread (no nested interrupt-worker deadlock); their client
         # is registered here so this cross-thread interrupt can still shut the sockets.
-        _ic_abort_active_request(self, "interrupt_abort", "Failed to abort active inline request")
+        abort_succeeded = _ic_abort_active_request(self, "interrupt_abort", "Failed to abort active inline request")
+        if hard_cancel:
+            self._last_interrupt_abort_succeeded = abort_succeeded
         # Scope the tool interrupt to this agent's execution thread so other in-process agents are unaffected.
         if self._execution_thread_id is not None:
             _set_interrupt(True, self._execution_thread_id, reason=tool_interrupt_reason)
@@ -188,11 +195,10 @@ class InterruptControlMixin:
             print("\n⚡ Interrupt requested" + (f": '{message[:40]}...'" if message and len(message) > 40 else f": '{message}'" if message else ""))
         return True
 
-    def hard_interrupt(self, message: Optional[str] = None, *, tool_reason: Optional[str] = None) -> None:
-        """Explicit stop preserving the ``interrupt()`` ABI (frontends feature-detect this and fall back to
-        legacy ``interrupt()`` for third-party agents). Bypasses dynamic dispatch: legacy subclasses may
-        override interrupt(message=None) without hard_cancel."""
+    def hard_interrupt(self, message: Optional[str] = None, *, tool_reason: Optional[str] = None) -> bool:
+        """Explicit stop preserving the ``interrupt()`` ABI and reporting confirmed socket abort."""
         InterruptControlMixin.interrupt(self, message, hard_cancel=True, tool_reason=tool_reason)
+        return bool(getattr(self, "_last_interrupt_abort_succeeded", False))
 
     def clear_interrupt(self, *, preserve_redirect: bool = False) -> bool:
         """Clear the interrupt request and per-thread tool signal. ``preserve_redirect`` is only for the

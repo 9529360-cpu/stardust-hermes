@@ -32,17 +32,11 @@ def _bitrate(argv):
 
 def test_all_sites_share_one_ffmpeg_invocation(monkeypatch, tmp_path):
     from gateway.platforms import whatsapp_cloud
-    from plugins.platforms.matrix import adapter as matrix
     from tools import tts_tool_delivery as tts
 
     calls = _capture_ffmpeg(monkeypatch)
     src = tmp_path / "speech.mp3"
     src.write_bytes(b"ID3")
-
-    # Matrix: temp output at 48k.
-    matrix_out = asyncio.run(asyncio.to_thread(matrix.transcode_to_ogg_opus, str(src), bitrate="48k", timeout=30))
-    assert matrix_out and matrix_out.endswith(".ogg") and _bitrate(calls[-1][0]) == "48k"
-    assert calls[-1][1]["timeout"] == 30
 
     # WhatsApp Cloud: sibling .ogg at the 32k default, warn-once on missing ffmpeg untouched.
     monkeypatch.setattr(whatsapp_cloud, "_FFMPEG_PATH", "/usr/bin/ffmpeg")

@@ -1765,6 +1765,13 @@ def _resolve_context_length(agent, _agent_cfg, base_url):
             )
             _config_context_length = None
 
+    # An explicit one-shot probe override avoids metadata I/O before the probe's
+    # single inference request; the probe never assembles a conversation context.
+    _context_length_override = getattr(agent, "context_length_override", None)
+    if (isinstance(_context_length_override, int) and not isinstance(_context_length_override, bool)
+            and _context_length_override > 0):
+        _config_context_length = _context_length_override
+
     # Resolve custom_providers before route-scoping: a named provider may keep its URL here.
     try:
         from hermes_cli.config import get_compatible_custom_providers
@@ -2284,7 +2291,7 @@ _PASSTHROUGH_PARAMS = (
     # Toolset filtering
     "enabled_toolsets", "disabled_toolsets",
     # Model response configuration (None = provider/model default)
-    "max_tokens", "reasoning_config", "service_tier",
+    "max_tokens", "reasoning_config", "service_tier", "context_length_override",
 )
 # Gateway identity params stored as ``agent._<name>``. gateway_session_key is the stable
 # per-chat key (e.g. agent:main:telegram:dm:123).
@@ -2344,6 +2351,7 @@ def init_agent(
     load_soul_identity: bool = False, skip_memory: bool = False,
     skip_background_review: bool = False, session_db=None, parent_session_id: str = None,
     iteration_budget: "IterationBudget" = None, run_budget_seconds: Optional[float] = None,
+    context_length_override: Optional[int] = None,
     fallback_model: Dict[str, Any] = None, credential_pool=None, checkpoints_enabled: bool = False,
     checkpoint_max_snapshots: int = 20, checkpoint_max_total_size_mb: int = 500,
     checkpoint_max_file_size_mb: int = 10, pass_session_id: bool = False,

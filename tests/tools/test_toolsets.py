@@ -237,6 +237,18 @@ class TestDefaultToolSurfaceTaxonomy:
 class TestToolsetConsistency:
     """Verify structural integrity of the built-in TOOLSETS dict."""
 
+    def test_removed_yuanbao_adapter_has_no_builtin_toolset_or_gateway_tools(self):
+        assert get_toolset("yuanbao", include_registry=False) is None
+        assert get_toolset("hermes-yuanbao", include_registry=False) is None
+        gateway_tools = resolve_toolset("hermes-gateway", include_registry=False)
+        assert not any(name.startswith("yb_") for name in gateway_tools)
+
+    def test_native_adapter_retirement_preserves_generic_service_tools(self):
+        assert {"discord", "discord_admin", "feishu_doc", "feishu_drive", "homeassistant"} <= TOOLSETS.keys()
+        for name in ("hermes-telegram", "hermes-whatsapp", "hermes-weixin"):
+            tools = resolve_toolset(name, include_registry=False)
+            assert {"terminal", "web_search", "cronjob_manage", "manage_connections"} <= set(tools)
+
     def test_all_toolsets_have_required_keys(self):
         for name, ts in TOOLSETS.items():
             assert "description" in ts, f"{name} missing description"

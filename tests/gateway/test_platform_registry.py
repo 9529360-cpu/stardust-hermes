@@ -683,11 +683,7 @@ class TestMigratedPlatformWiring:
 
     @_pytest.mark.parametrize(
         "platform_name",
-        [
-            "teams", "telegram", "discord", "slack",
-            "matrix", "dingtalk", "feishu", "wecom_callback",
-            "google_chat",
-        ],
+        ["telegram"],
     )
     def test_lazy_installable_platform_has_split_wiring(self, platform_name):
         from hermes_cli.plugins import discover_plugins

@@ -408,8 +408,6 @@ def test_cli_docs_urls_point_to_stardust_repository() -> None:
         "hermes_cli/tools_config.py",
         "hermes_cli/update_cmd_maint.py",
         "hermes_cli/web_server_oauth.py",
-        "plugins/platforms/discord/adapter.py",
-        "plugins/platforms/slack/adapter.py",
         "setup.py",
     )
     for path in docs_link_files:
@@ -442,8 +440,6 @@ def test_cli_docs_urls_point_to_stardust_repository() -> None:
         "user-guide/features/tools.md": ("hermes_cli/tools_config.py",),
         "user-guide/features/curator.md": ("hermes_cli/update_cmd_maint.py",),
         "guides/xai-grok-oauth.md": ("hermes_cli/web_server_oauth.py",),
-        "user-guide/messaging/discord.md": ("plugins/platforms/discord/adapter.py",),
-        "user-guide/messaging/slack.md": ("plugins/platforms/slack/adapter.py",),
         "getting-started/installation.md": ("setup.py",),
     }
     for relative_page, referencing_files in referenced_pages.items():

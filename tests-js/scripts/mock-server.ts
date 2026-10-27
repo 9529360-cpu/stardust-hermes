@@ -38,8 +38,13 @@ export interface MockServerOptions {
 
   /** Pause the matching stream after its first token for session-switch E2E coverage. */
   holdFirstStreamForPrompt?: string
-  /** Fail the first matching completions to exercise the explicit Retry action. */
-  failCompletionsContaining?: { prompt: string; count: number }
+  /** Fail matching completions to exercise stable provider error handling. */
+  failCompletionsContaining?: {
+    prompt: string
+    count: number
+    status?: number
+    errorMessage?: string
+  }
 /** Pause the first completion whose request JSON contains this text. */
 holdFirstCompletionContaining?: string
 /** Absolute sandbox path written by the verify-on-stop scripted tool call. */
@@ -60,6 +65,8 @@ export interface MockServer {
   port: number
   url: string
   receivedPrompts: string[]
+  receivedCompletions: Array<{ path: string; body: Record<string, unknown> }>
+  receivedModelListResponses: number[]
   waitForHeldStream: () => Promise<void>
   waitForHeldCompletion: () => Promise<void>
   releaseHeldStream: () => void
@@ -597,6 +604,8 @@ export function startMockServer(options: MockServerOptions = {}): Promise<MockSe
 
   return new Promise((resolve, reject) => {
     const receivedPrompts: string[] = []
+    const receivedCompletions: Array<{ path: string; body: Record<string, unknown> }> = []
+    const receivedModelListResponses: number[] = []
     let resolveHeldStreamStarted: (() => void) | null = null
     let releaseHeldStream: (() => void) | null = null
     let heldCompletionCount = 0
@@ -626,6 +635,7 @@ export function startMockServer(options: MockServerOptions = {}): Promise<MockSe
 
       // GET /v1/models — return a single fake model.
       if (req.method === 'GET' && req.url === '/v1/models') {
+        receivedModelListResponses.push(200)
         res.writeHead(200, { 'Content-Type': 'application/json' })
         res.end(
           JSON.stringify({
@@ -660,6 +670,7 @@ export function startMockServer(options: MockServerOptions = {}): Promise<MockSe
           } catch {
             // malformed JSON — treat as non-streaming with defaults
           }
+          receivedCompletions.push({ path: req.url ?? '', body: parsed as Record<string, unknown> })
 
           const lastUserMessage = [...(parsed.messages ?? [])]
             .reverse()
@@ -693,8 +704,10 @@ export function startMockServer(options: MockServerOptions = {}): Promise<MockSe
           if (failurePlan && userText.includes(failurePlan.prompt) && failedCompletionCount < failurePlan.count) {
             failedCompletionCount++
 
-            res.writeHead(503, { 'Content-Type': 'application/json' })
-            res.end(JSON.stringify({ error: { message: 'Injected E2E provider failure' } }))
+            res.writeHead(failurePlan.status ?? 503, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({
+              error: { message: failurePlan.errorMessage ?? 'Injected E2E provider failure' },
+            }))
 
             return
           }
@@ -996,6 +1009,8 @@ export function startMockServer(options: MockServerOptions = {}): Promise<MockSe
         port,
         url,
         receivedPrompts,
+        receivedCompletions,
+        receivedModelListResponses,
         waitForHeldStream: () => heldStreamStarted,
         waitForHeldCompletion: () => heldStreamStarted,
         releaseHeldStream: () => releaseHeldStream?.(),

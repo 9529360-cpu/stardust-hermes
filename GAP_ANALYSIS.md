@@ -1,6 +1,6 @@
 # Stardust gap analysis (vs. product-grade personal assistant)
 
-Snapshot: `main` @ `cb71b79c67` (imported 2026-10-09). Reference: JARVIS-PROGRAM.md phase-1 acceptance,
+Snapshot: `main` @ `cb71b79c67` (imported 2026-10-09). Reference: ROADMAP.md phase-1 acceptance,
 README.zh-CN.md, STARDUST.md, AGENTS.md, SOUL.md, and a Muse / Grok Bot style capability list
 (own computer, connectors, background long tasks, routines, memory, approvals before send/buy,
 multi-agent delegation, chat-first UX).
@@ -45,7 +45,7 @@ multi-agent delegation, chat-first UX).
    `work.cancel` (async delegation / background process), surviving restart via the existing SQLite
    records. Tests: seeded durable delegation shows up after re-init; cancel transitions status.
 5. **Scoped standing authorizations (phase-1 #5 nuance, Grok Bot "approve before send/buy").**
-   JARVIS-PROGRAM requires *not* re-prompting when an authorization already covers the action, and
+   ROADMAP.md requires *not* re-prompting when an authorization already covers the action, and
    re-prompting when scope/recipient/amount changes. Today there are only per-session pattern approvals,
    a permanent allowlist and yolo. Add explicit grants `{action_kind, target/recipient, max_amount, expires_at}`
    checked before prompting, persisted, revocable, and audited (depends on #1). Tests: in-scope → no prompt;

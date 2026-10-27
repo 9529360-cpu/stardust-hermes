@@ -34,5 +34,15 @@ describe('desktop locale bundles', () => {
       expect(copy.skills.pageTitles.toolsets).not.toBe(english.skills.pageTitles.toolsets)
       expect(copy.skills.pageTitles.plugins).not.toBe(english.skills.pageTitles.plugins)
     })
+
+    it(`${locale} translates the retained Webhook delivery targets`, () => {
+      const options = TRANSLATIONS[locale].webhooks.deliverOptions
+      const englishOptions = english.webhooks.deliverOptions
+
+      for (const key of ['whatsapp_cloud', 'weixin', 'github_comment'] as const) {
+        expect(options[key]).not.toBe(key)
+        expect(options[key]).not.toBe(englishOptions[key])
+      }
+    })
   }
 })

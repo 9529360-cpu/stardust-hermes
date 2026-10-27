@@ -92,8 +92,9 @@ def _registry_entries() -> list:
 def platform_ids(source_dir: Optional[Path] = None) -> List[str]:
     """Every messaging platform id: built-in ``Platform`` members plus the plugin adapters registered
     in ``source_dir``'s scope (ambient scope when ``None``)."""
-    from gateway.config import Platform
+    from gateway.config import Platform, RETIRED_PLATFORMS
     ids = {m.value for m in Platform.__members__.values() if m.value != "local"}
+    ids.update(RETIRED_PLATFORMS)
     with _plugin_scope(source_dir):
         ids.update(entry.name for entry in _registry_entries())
     return sorted(ids)

@@ -27,26 +27,26 @@ def _run_fallback_with_failed_extra(monkeypatch, capsys, *, extra_fails: str, mi
 
 def test_fallback_names_configured_platform_whose_extra_failed(monkeypatch, capsys):
     out = _run_fallback_with_failed_extra(
-        monkeypatch, capsys, extra_fails="feishu",
-        missing_features=[("Feishu / Lark", "Run `stardust setup` to install Feishu support.")])
+        monkeypatch, capsys, extra_fails="messaging",
+        missing_features=[("Telegram", "Run `stardust setup` to install Telegram support.")])
     assert "fail to load them on restart" in out
-    assert "Feishu / Lark" in out and "stardust setup" in out
+    assert "Telegram" in out and "stardust setup" in out
     # Unconfigured features that failed stay a plain "skipped" line, no scary warning.
-    quiet = _run_fallback_with_failed_extra(monkeypatch, capsys, extra_fails="feishu", missing_features=[])
-    assert "Skipped optional extras that still failed: feishu" in quiet
+    quiet = _run_fallback_with_failed_extra(monkeypatch, capsys, extra_fails="messaging", missing_features=[])
+    assert "Skipped optional extras that still failed: messaging" in quiet
     assert "fail to load them on restart" not in quiet
 
 
 def test_configured_features_probe_reads_the_fresh_target_interpreter(tmp_path, monkeypatch):
     """The check runs in the TARGET interpreter with a real config, so it sees the post-install
-    truth rather than the updater's own pre-install import caches. Positive: the SDK is absent →
+    truth rather than the updater's own pre-install import caches. Positive: the Telegram SDK is absent →
     the configured platform is named. Negative: only the child interpreter is told the dependency
     is present (the parent is untouched) → nothing is reported, proving the verdict comes from the
     fresh process."""
     home = tmp_path / "home"
     home.mkdir()
     (home / "config.yaml").write_text(
-        "platforms:\n  feishu:\n    enabled: true\n    extra:\n      app_id: cli_x\n      app_secret: y\n",
+        "platforms:\n  telegram:\n    enabled: true\n    token: 123:fake-token\n",
         encoding="utf-8")
     env = {**os.environ, "STARDUST_HOME": str(home)}
     monkeypatch.setattr(main_install_repair, "_resolve_install_target_python", lambda *a, **k: Path(sys.executable))
@@ -56,11 +56,16 @@ def test_configured_features_probe_reads_the_fresh_target_interpreter(tmp_path, 
         return real_probe(python, prelude + script, *args, env=env)
 
     monkeypatch.setattr(main_install_repair, "_venv_probe",
-                        lambda p, s, *a, env=None: probe(p, s, *a, env=env, prelude="import sys; sys.modules['lark_oapi'] = None\n"))
+                        lambda p, s, *a, env=None: probe(p, s, *a, env=env, prelude="import sys; sys.modules['telegram'] = None\n"))
     missing = main_install_repair._configured_features_missing_deps(["uv", "pip"], env=env)
-    assert [feature for feature, _hint in missing] == ["Feishu / Lark"]
+    assert [feature for feature, _hint in missing] == ["Telegram"]
 
-    child_only_present = "import tools.lazy_deps as ld; ld.is_available = lambda *_a, **_k: True\n"
+    child_only_present = (
+        "from hermes_cli.plugins import discover_plugins\n"
+        "discover_plugins()\n"
+        "from gateway.platform_registry import platform_registry\n"
+        "platform_registry.get('telegram').check_fn = lambda: True\n"
+    )
     monkeypatch.setattr(main_install_repair, "_venv_probe",
                         lambda p, s, *a, env=None: probe(p, s, *a, env=env, prelude=child_only_present))
     assert main_install_repair._configured_features_missing_deps(["uv", "pip"], env=env) == []

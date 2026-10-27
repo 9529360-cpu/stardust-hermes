@@ -187,7 +187,7 @@ async def create_webhook(body: WebhookCreate):
         )
     if body.deliver_only and body.deliver == "log":
         raise HTTPException(
-            status_code=400, detail="Direct delivery requires a real target (telegram, discord, …), not 'log'.",
+            status_code=400, detail="Direct delivery requires a real target (telegram, whatsapp, weixin, etc.), not 'log'.",
         )
 
     secret = body.secret or secrets.token_urlsafe(32)

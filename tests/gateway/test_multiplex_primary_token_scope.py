@@ -119,14 +119,8 @@ class TestPlatformHasBotCredential:
             Platform.TELEGRAM, PlatformConfig(enabled=True, token=None)
         ) is False
 
-    def test_matrix_password_login_is_a_credential(self):
-        """Matrix password auth has no .token but is fully reconnectable.
-
-        MATRIX_USER_ID + MATRIX_PASSWORD with no MATRIX_ACCESS_TOKEN is a
-        supported setup (build_config puts it on extra). Treating it as
-        credential-less evicted it from the reconnect queue on the first
-        transient failure, so a momentary DNS blip took Matrix down until
-        the gateway was restarted by hand.
+    def test_retired_matrix_password_config_never_reconnects(self):
+        """Persisted Matrix password credentials remain readable but cannot reconnect a retired adapter.
         """
         from gateway.run import _platform_has_bot_credential
 
@@ -136,7 +130,7 @@ class TestPlatformHasBotCredential:
             "user_id": "@bot:matrix.example.org",
             "password": "hunter2",
         }
-        assert _platform_has_bot_credential(Platform.MATRIX, cfg) is True
+        assert _platform_has_bot_credential(Platform.MATRIX, cfg) is False
 
     @pytest.mark.parametrize(
         "extra",

@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 REPO = Path(__file__).resolve().parents[1]
-ARTIFACTS = Path(os.environ.get("STARDUST_BACKEND_LAB_ARTIFACTS", r"D:\\远程工作区\\artifacts\\backend-lab"))
+ARTIFACTS = Path(os.environ.get("STARDUST_BACKEND_LAB_ARTIFACTS") or REPO / "Reports" / "backend-lab")
 GIT = Path(os.environ.get("STARDUST_BACKEND_LAB_GIT", r"D:\\DevTools\\Git\\cmd\\git.exe"))
 BASH = Path(os.environ.get("STARDUST_BACKEND_LAB_BASH", r"D:\\DevTools\\Git\\bin\\bash.exe"))
 NODE = Path(os.environ.get("STARDUST_BACKEND_LAB_NODE", r"D:\\DevTools\\Node26\\node.exe"))

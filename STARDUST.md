@@ -6,25 +6,7 @@ Stardust 是一个以 Hermes Agent 开源代码为技术底座、但独立维护
 
 ## Product direction / 产品方向
 
-The goal is not to mirror Hermes or stay aligned with upstream releases. The goal is to keep reshaping the codebase into a personal assistant optimized for long-term individual use.
-
-本项目的目标不是继续作为 Hermes 的镜像，也不是保持与上游版本同步，而是持续把现有底座改造成更适合个人长期使用的专属助理。
-
-Current priorities include:
-
-- a calmer, Chinese-first personal-assistant desktop and navigation hierarchy;
-- persistent health tracking and circuit-breaker behavior for arbitrary model-route fallback chains;
-- credential-pool rotation before route-level fallback;
-- repository-owned install, recovery, update, and release paths;
-- focused regression coverage for assistant UI and model-routing behavior.
-
-当前重点包括：
-
-- 更安静、中文优先的个人助理桌面首页与导航层级；
-- 面向任意数量模型路由的持久化健康状态、冷却、半开探测和故障切换；
-- 路由降级前的凭据池轮换；
-- 由本仓库自行控制的安装、恢复、更新与发布路径；
-- 面向助理界面和模型路由行为的回归测试。
+产品定位、保留平台与 v0.1 验收主线统一见 [ROADMAP.md](ROADMAP.md)。维护、隐私与源码权威规则仍以本文为准。
 
 ## Source authority / 源码权威
 

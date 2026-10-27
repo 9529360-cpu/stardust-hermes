@@ -2763,6 +2763,12 @@ OPTIONAL_ENV_VARS = {
     "TELEGRAM_PROXY": _msg(
         "Proxy URL for Telegram connections (overrides HTTPS_PROXY). Supports http://, "
         "https://, socks5://", "Telegram proxy URL (optional)"),
+    "WHATSAPP_CLOUD_PHONE_NUMBER_ID": _msg(
+        "Phone Number ID for the Meta WhatsApp Cloud API sender", "WhatsApp Cloud phone number ID",
+        "https://developers.facebook.com/docs/whatsapp/cloud-api", password=False),
+    "WHATSAPP_CLOUD_ACCESS_TOKEN": _msg(
+        "Access token for the Meta WhatsApp Cloud API sender", "WhatsApp Cloud access token",
+        "https://developers.facebook.com/docs/whatsapp/cloud-api", password=True),
     "DISCORD_BOT_TOKEN": _msg("Discord bot token from Developer Portal", "Discord bot token",
         "https://discord.com/developers/applications", password=True),
     "DISCORD_ALLOWED_USERS": _msg("Comma-separated Discord user IDs allowed to use the bot",

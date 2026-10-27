@@ -22,7 +22,8 @@ def build_webhook_parser(subparsers, *, cmd_webhook: Callable) -> None:
     wh_sub.add_argument("--description", default="", help="What this subscription does")
     wh_sub.add_argument("--skills", default="", help="Comma-separated skill names to load")
     wh_sub.add_argument(
-        "--deliver", default="log", help="Delivery target: log, telegram, discord, slack, etc.")
+        "--deliver", default="log",
+        help="Delivery target: log, telegram, whatsapp, whatsapp_cloud, weixin, or github_comment.")
     wh_sub.add_argument(
         "--deliver-chat-id", default="", help="Target chat ID for cross-platform delivery")
     wh_sub.add_argument("--secret", default="", help="HMAC secret (auto-generated if omitted)")

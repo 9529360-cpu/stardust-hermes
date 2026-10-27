@@ -108,10 +108,10 @@ def test_base_adapter_defaults_to_not_owning_access_policy():
 @pytest.mark.parametrize(
     "module_path, class_name",
     [
-        ("plugins.platforms.wecom.adapter", "WeComAdapter"),
+
         ("gateway.platforms.weixin", "WeixinAdapter"),
-        ("gateway.platforms.yuanbao", "YuanbaoAdapter"),
-        ("gateway.platforms.qqbot.adapter", "QQAdapter"),
+
+
         ("plugins.platforms.whatsapp.adapter", "WhatsAppAdapter"),
     ],
 )
@@ -243,9 +243,9 @@ def test_own_policy_open_group_not_authorized_without_allowlist(monkeypatch, pla
     "module_path, class_name, dm_helper",
     [
         ("plugins.platforms.whatsapp.adapter", "WhatsAppAdapter", "_is_dm_allowed"),
-        ("plugins.platforms.wecom.adapter", "WeComAdapter", "_is_dm_allowed"),
+
         ("gateway.platforms.weixin", "WeixinAdapter", "_is_dm_allowed"),
-        ("gateway.platforms.qqbot.adapter", "QQAdapter", "_is_dm_allowed"),
+
     ],
 )
 def test_pairing_dm_policy_strict_intake_auth_denies_unknown(
@@ -261,46 +261,6 @@ def test_pairing_dm_policy_strict_intake_auth_denies_unknown(
     adapter_cls = getattr(module, class_name)
     adapter = adapter_cls(PlatformConfig(enabled=True, extra={"dm_policy": "pairing"}))
     assert getattr(adapter, dm_helper)("unknown-user") is False
-
-
-@pytest.mark.parametrize("blank_sender", ["", "   ", None])
-def test_yuanbao_pairing_dm_intake_denies_blank_principal(monkeypatch, blank_sender):
-    """Yuanbao pairing intake must not forward senderless C2C callbacks."""
-    _clear_auth_env(monkeypatch)
-    from gateway.platforms.yuanbao import AccessPolicy
-
-    policy = AccessPolicy(
-        dm_policy="pairing",
-        dm_allow_from=[],
-        group_policy="pairing",
-        group_allow_from=[],
-    )
-    assert policy.is_dm_intake_allowed(blank_sender) is False
-    assert policy.is_dm_intake_allowed("user-1") is True
-
-
-def test_wecom_open_group_with_per_group_sender_allowlist_is_authorized(monkeypatch):
-    """WeCom ``groups.<id>.allow_from`` is an adapter-enforced restriction.
-
-    The top-level group policy is still ``open`` for the chat ID, but the
-    adapter has already checked the sender allowlist before dispatching to the
-    gateway. That is not the fail-open case and must not be double-denied.
-    """
-    _clear_auth_env(monkeypatch)
-    config = GatewayConfig(
-        platforms={
-            Platform.WECOM: PlatformConfig(
-                enabled=True,
-                extra={
-                    "group_policy": "open",
-                    "groups": {"some-chat": {"allow_from": ["some-user"]}},
-                },
-            )
-        }
-    )
-    runner, _adapter = _make_runner(Platform.WECOM, config, enforces=True)
-
-    assert runner._is_user_authorized(_source(Platform.WECOM, chat_type="group")) is True
 
 
 # ---------------------------------------------------------------------------

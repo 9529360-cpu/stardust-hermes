@@ -226,6 +226,30 @@ def test_save_platform_tools_preserves_mcp_server_names():
 
 
 
+def test_save_platform_default_toolset_is_not_persisted_but_user_mcp_and_plugin_selections_roundtrip(monkeypatch):
+    """Saving a plugin platform never stores its implicit composite default as a user's selection."""
+    import hermes_cli.tools_config as tools_config
+
+    plugin_key = "custom-plugin-toolset"
+    mcp_key = "custom-mcp-server"
+    platform = "future_platform"
+    default_key = "hermes-future_platform"
+    monkeypatch.setattr(tools_config, "_get_plugin_toolset_keys", lambda: {plugin_key})
+    config = {"platform_toolsets": {platform: [default_key, "web", mcp_key]}}
+    selected = {"web", plugin_key}
+
+    with patch("hermes_cli.tools_config.save_config"):
+        _save_platform_tools(config, platform, selected)
+
+    saved = set(config["platform_toolsets"][platform])
+    assert default_key not in saved
+    assert {"web", plugin_key, mcp_key} <= saved
+
+    reopened = _get_platform_tools(config, platform, include_default_mcp_servers=False)
+    assert default_key not in reopened
+    assert {"web", plugin_key, mcp_key} <= reopened
+
+
 def test_first_install_never_auto_configures_nous_video_gen(monkeypatch):
     """Even legacy Nous state cannot bypass explicit backend setup on a fresh Stardust install."""
     config = {

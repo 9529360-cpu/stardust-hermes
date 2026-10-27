@@ -78,23 +78,3 @@ async def test_server_retry_after_is_honoured_by_every_adapter(monkeypatch):
 
 def _http_date_in(seconds: int) -> str:
     return format_datetime(datetime.now(timezone.utc) + timedelta(seconds=seconds), usegmt=True)
-
-
-def test_slack_retry_after_understands_http_date():
-    from plugins.platforms.slack.adapter import SlackAdapter
-    exc = SimpleNamespace(response=SimpleNamespace(headers={"Retry-After": _http_date_in(90)}))
-    seconds = SlackAdapter._retry_after_from_exc(exc)
-    assert seconds is not None and 80 <= seconds <= 90
-    assert SlackAdapter._retry_after_from_exc(SimpleNamespace(response=None)) is None
-
-
-def test_discord_retry_after_understands_http_date_and_reset_after():
-    from plugins.platforms.discord.adapter import DiscordAdapter
-    extract = DiscordAdapter._extract_discord_retry_after
-    dated = SimpleNamespace(response=SimpleNamespace(headers={"retry-after": _http_date_in(90)}))
-    seconds = extract(dated)
-    assert seconds is not None and 80 <= seconds <= 90
-    reset = SimpleNamespace(response=SimpleNamespace(headers={"X-RateLimit-Reset-After": "0.25"}))
-    assert extract(reset) == 1.0  # floored: a sub-second hint must not hot-loop
-    assert extract(SimpleNamespace(retry_after=12)) == 12.0
-    assert extract(SimpleNamespace()) is None

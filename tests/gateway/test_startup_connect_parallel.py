@@ -27,6 +27,8 @@ wall-clock comparison. Event ordering cannot be defeated by a coarse clock.
 
 import asyncio
 
+from unittest.mock import AsyncMock
+
 import pytest
 
 from gateway.config import GatewayConfig, Platform, PlatformConfig
@@ -83,7 +85,7 @@ async def test_startup_connects_platforms_concurrently(monkeypatch, tmp_path):
     """A slow platform must not block a later platform at startup (#83791).
 
     "slow" (Telegram) is listed first so a serial loop would fully block
-    "fast" (Discord). We prove the connect calls overlap by recording the
+    "fast" (Weixin). We prove the connect calls overlap by recording the
     order in which connects finish: under a serial loop the slow platform's
     connect ends *before* the fast one even begins, so the fast platform's
     end can never precede the slow platform's end. Only parallel execution
@@ -95,7 +97,7 @@ async def test_startup_connects_platforms_concurrently(monkeypatch, tmp_path):
     config = GatewayConfig(
         platforms={
             Platform.TELEGRAM: PlatformConfig(enabled=True, token="***"),
-            Platform.DISCORD: PlatformConfig(enabled=True, token="***"),
+            Platform.WEIXIN: PlatformConfig(enabled=True, token="wx-test-token", extra={"account_id": "acct-1"}),
         },
         sessions_dir=tmp_path / "sessions",
     )
@@ -107,14 +109,14 @@ async def test_startup_connects_platforms_concurrently(monkeypatch, tmp_path):
 
     monkeypatch.setattr(runner, "_create_adapter", _make_adapter)
     # Keep the rest of startup lightweight / non-fatal.
-    monkeypatch.setattr(runner, "_start_secondary_profile_adapters", lambda: 0)
+    monkeypatch.setattr(runner, "_start_secondary_profile_adapters", AsyncMock(return_value=0))
 
     await runner.start()
 
     events = _OrderRecorder.events
     assert events, "no connect() event was recorded"
 
-    fast_end = _OrderRecorder.index_of(Platform.DISCORD.value, "end")
+    fast_end = _OrderRecorder.index_of(Platform.WEIXIN.value, "end")
     slow_end = _OrderRecorder.index_of(Platform.TELEGRAM.value, "end")
     assert fast_end != -1 and slow_end != -1, f"missing end events: {events}"
 
@@ -125,16 +127,16 @@ async def test_startup_connects_platforms_concurrently(monkeypatch, tmp_path):
     )
     # Both platforms should be registered once startup settles.
     assert Platform.TELEGRAM in runner.adapters
-    assert Platform.DISCORD in runner.adapters
+    assert Platform.WEIXIN in runner.adapters
 
 
 @pytest.mark.asyncio
 async def test_startup_one_failing_platform_does_not_block_others(monkeypatch, tmp_path):
     """A failing/slow platform must not prevent others from connecting (#83791).
 
-    Mirrors the reported Windows symptom: Telegram (dead proxy) must not keep
-    WeChat/QQ offline. Here Telegram fails (returns False after a sleep) while
-    Discord connects successfully and is registered.
+    Mirrors the reported Windows symptom: a slow Telegram connection must not keep
+    Weixin offline. Here Telegram fails (returns False after a sleep) while
+    Weixin connects successfully and is registered.
     """
 
     class _FailingSlowAdapter(BasePlatformAdapter):
@@ -161,7 +163,7 @@ async def test_startup_one_failing_platform_does_not_block_others(monkeypatch, t
     config = GatewayConfig(
         platforms={
             Platform.TELEGRAM: PlatformConfig(enabled=True, token="***"),
-            Platform.DISCORD: PlatformConfig(enabled=True, token="***"),
+            Platform.WEIXIN: PlatformConfig(enabled=True, token="wx-test-token", extra={"account_id": "acct-1"}),
         },
         sessions_dir=tmp_path / "sessions",
     )
@@ -173,12 +175,12 @@ async def test_startup_one_failing_platform_does_not_block_others(monkeypatch, t
         return _TimingAdapter(platform, 0.0)
 
     monkeypatch.setattr(runner, "_create_adapter", _make_adapter)
-    monkeypatch.setattr(runner, "_start_secondary_profile_adapters", lambda: 0)
+    monkeypatch.setattr(runner, "_start_secondary_profile_adapters", AsyncMock(return_value=0))
 
     await runner.start()
 
     # The healthy platform connected and is registered despite Telegram failing.
-    assert Platform.DISCORD in runner.adapters
+    assert Platform.WEIXIN in runner.adapters
     # The failed platform is queued for retry, not silently dropped.
     assert Platform.TELEGRAM in runner._failed_platforms
 
@@ -216,8 +218,8 @@ class TestTelegramColdStartCap:
         monkeypatch.delenv("STARDUST_GATEWAY_PLATFORM_CONNECT_TIMEOUT", raising=False)
         runner = self._runner(tmp_path)
         assert runner._platform_connect_timeout_secs(
-            Platform.DISCORD, initial=True
-        ) == runner._platform_connect_timeout_secs(Platform.DISCORD)
+            Platform.WEIXIN, initial=True
+        ) == runner._platform_connect_timeout_secs(Platform.WEIXIN)
 
     def test_env_override_applies_to_initial(self, tmp_path, monkeypatch):
         monkeypatch.setenv("STARDUST_GATEWAY_PLATFORM_CONNECT_TIMEOUT", "12")
@@ -257,7 +259,7 @@ class TestTelegramColdStartCap:
         config = GatewayConfig(
             platforms={
                 Platform.TELEGRAM: PlatformConfig(enabled=True, token="***"),
-                Platform.DISCORD: PlatformConfig(enabled=True, token="***"),
+                Platform.WEIXIN: PlatformConfig(enabled=True, token="wx-test-token", extra={"account_id": "acct-1"}),
             },
             sessions_dir=tmp_path / "sessions",
         )
@@ -278,11 +280,11 @@ class TestTelegramColdStartCap:
             return _TimingAdapter(platform, 0.0)
 
         monkeypatch.setattr(runner, "_create_adapter", _make_adapter)
-        monkeypatch.setattr(runner, "_start_secondary_profile_adapters", lambda: 0)
+        monkeypatch.setattr(runner, "_start_secondary_profile_adapters", AsyncMock(return_value=0))
 
         await asyncio.wait_for(runner.start(), timeout=30)
 
-        # Discord served; Telegram queued for the watcher's full-budget retry.
-        assert Platform.DISCORD in runner.adapters
+        # Weixin served; Telegram queued for the watcher's full-budget retry.
+        assert Platform.WEIXIN in runner.adapters
         assert Platform.TELEGRAM not in runner.adapters
         assert Platform.TELEGRAM in runner._failed_platforms

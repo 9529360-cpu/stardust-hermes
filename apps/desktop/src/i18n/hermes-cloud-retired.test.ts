@@ -19,7 +19,7 @@ function cloudKeyPaths(node: unknown, path: string[] = []): string[] {
   return Object.entries(node).flatMap(([key, value]) => {
     const keyPath = [...path, key]
 
-    return [...(/cloud/i.test(key) ? [keyPath.join('.')] : []), ...cloudKeyPaths(value, keyPath)]
+    return [...(/(?:hermes|nous)[_-]?cloud/i.test(key) ? [keyPath.join('.')] : []), ...cloudKeyPaths(value, keyPath)]
   })
 }
 

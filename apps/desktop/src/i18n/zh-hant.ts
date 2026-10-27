@@ -3,6 +3,83 @@ import { defineFieldCopy } from '@/app/settings/field-copy'
 import { defineLocale } from './define-locale'
 
 export const zhHant = defineLocale({
+  taskCenter: {
+    title: '任務中心',
+    activity: '活動',
+    automation: '自動化',
+    sessionUnavailable: '對話無法使用',
+    recoveryAvailable: '可恢復',
+    approvalRequired: '需要核准',
+    loadFailed: '任務讀取失敗',
+    someUnavailable: '部分任務狀態無法使用',
+    loading: '正在載入任務',
+    emptyTitle: '暫時沒有活動任務',
+    emptyDescription: '對話中的確認、背景命令和子代理進度會顯示在這裡。',
+    groups: {
+      attention: '需要你處理',
+      running: '進行中',
+      upcoming: '即將開始',
+      recent: '最近完成',
+      other: '其他狀態'
+    },
+    states: {
+      blocked: '受阻',
+      cancelled: '已取消',
+      completed: '已完成',
+      failed: '失敗',
+      interrupted: '已中斷',
+      paused: '已暫停',
+      queued: '排隊中',
+      running: '執行中',
+      waiting_for_user: '等待你處理'
+    },
+    load: {
+      degraded: '部分已儲存任務來源讀取失敗；下方顯示可讀取來源的任務。',
+      error: '無法讀取已儲存的任務狀態。請檢查連線後重試。',
+      loading: '正在讀取已儲存的任務狀態…',
+      retrying: '目前顯示上次成功讀取的任務狀態；最近一次更新失敗。'
+    },
+    rails: {
+      approval: '核准請求',
+      clarify: '待回答的問題',
+      sudo: '管理員權限',
+      secret: '需要密鑰',
+      'vault-unlock': '解鎖密碼管理員',
+      'vault-save': '儲存登入資訊',
+      'vault-code': '驗證碼',
+      process: '背景命令',
+      delegation: '委派任務',
+      cron: '排程任務',
+      goal: '持續目標'
+    },
+    phases: {
+      active: '進行中',
+      waiting: '等待中',
+      scheduled: '已排程',
+      last_failed: '上次執行失敗',
+      stalling: '等待進展',
+      finalizing: '正在收尾',
+      timeout: '已逾時',
+      stalled: '進展停滯',
+      unknown: '狀態無法使用',
+      claimed: '已領取待執行',
+      delivery_failed: '結果傳送失敗',
+      skipped: '已略過'
+    },
+    recoveryActions: {
+      retry: '重試',
+      review_or_retry: '檢查或重試',
+      resume: '恢復'
+    },
+    summary: (running: number, attention: number) => `${running} 項進行中 · ${attention} 項需要處理`,
+    workingOn: (tool: string) => `正在使用 ${tool}`,
+    exitCode: (code: number) => `結束代碼 ${code}`,
+    needsSecret: (name: string) => `需要密鑰：${name}`,
+    needsVault: (name: string) => `解鎖密碼管理員：${name}`,
+    unknownStatus: (value: string) => `未知狀態（${value}）`,
+    unknownRecovery: (value: string) => `其他恢復方式（${value}）`,
+    unknownRail: (value: string) => `任務（${value}）`
+  },
   personalization: {
     opacityLabel: '圖片不透明度'
   },
@@ -1309,6 +1386,23 @@ export const zhHant = defineLocale({
       defaultsLabel: '回答偏好',
       reasoning: '推理',
       reasoningOff: '關閉',
+      testModel: '測試所選模型',
+      testingModel: '正在測試模型…',
+      stopModelTest: '停止等待',
+      modelTestDisclosure: '此操作會真實呼叫所選模型，可能產生費用。',
+      modelTestNeedSession: '請先在所選設定檔中開啟聊天，再測試模型。',
+      modelTestSuccess: '模型已回傳回應。',
+      modelTestFailed: '模型請求失敗。',
+      modelTestUnsupported: '此提供者路由暫不支援推理測試。',
+      modelTestCanceled: '模型測試已停止；若請求已送出，提供者仍可能完成處理。',
+      modelTestTimedOut: '模型請求逾時。',
+      modelTestStopping: '正在傳送中斷請求…',
+      modelTestStoppedWaiting: '此面板已停止等待；伺服器請求可能持續到逾時。',
+      modelTestAuthError: '提供者拒絕了驗證。',
+      modelTestRateLimitError: '已達到提供者速率限制。',
+      modelTestNetworkError: '無法連線至所選模型路由。',
+      modelTestServerError: '提供者回傳伺服器錯誤。',
+      modelTestEmptyResponse: '模型回傳空回應。',
       loadFailed: '無法載入模型',
       restartRequired: '更新後此後端仍在執行舊程式碼。請重新啟動以載入新程式碼。',
       restartBackend: '重新啟動後端',
@@ -2271,6 +2365,17 @@ export const zhHant = defineLocale({
       qqbot: '在 QQ 開放平台（q.qq.com）註冊應用程式，然後複製 App ID 和 Client Secret。',
       api_server: '把助理公開為相容 OpenAI 的 API。設定驗證金鑰，再讓 Open WebUI / LobeChat 等指向 host:port。',
       webhook: '執行 HTTP 伺服器供 GitHub、GitLab 或自訂應用程式 POST，並使用 secret 驗證簽章。'
+    }
+  },
+
+  webhooks: {
+    deliverOptions: {
+      log: '記錄',
+      telegram: 'Telegram',
+      whatsapp: 'WhatsApp',
+      whatsapp_cloud: 'WhatsApp Business（雲端）',
+      weixin: '微信',
+      github_comment: 'GitHub 留言'
     }
   },
 

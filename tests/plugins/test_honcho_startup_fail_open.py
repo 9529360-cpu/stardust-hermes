@@ -330,7 +330,7 @@ def test_honcho_unresolved_peer_notices_once_and_stops_retrying(monkeypatch, pla
 
 @pytest.mark.parametrize("platform, present, absent", [
     ("cli", "stardust honcho peer --user", "could not be initialized"),
-    ("discord", "supplied no user id", "stardust honcho peer --user"),
+    ("telegram", "supplied no user id", "stardust honcho peer --user"),
 ])
 def test_honcho_unresolved_peer_tool_error_names_the_fix_for_the_platform(monkeypatch, platform, present, absent):
     cfg = _configured_tools_config(init_on_session_start=True)

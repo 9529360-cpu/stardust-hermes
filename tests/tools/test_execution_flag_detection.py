@@ -11,12 +11,37 @@ import pytest
 from tools.approval import detect_dangerous_command, detect_hardline_command
 
 
+def _has_gnu_sort() -> bool:
+    """The sort probes below model GNU coreutils, not Windows/BSD sort variants."""
+    sort = shutil.which("sort")
+    if sort is None:
+        return False
+    try:
+        result = subprocess.run([sort, "--version"], capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return result.returncode == 0 and "GNU coreutils" in result.stdout
+
+
+@pytest.mark.linux_only
+def test_gnu_sort_option_ownership_matches_optional_argument_grammar():
+    if not _has_gnu_sort():
+        pytest.skip("requires GNU coreutils sort")
+    completed = subprocess.run(
+        ["sort", "--", "--compress-program"],
+        input="",
+        text=True,
+        capture_output=True,
+    )
+    assert completed.returncode == 2
+    assert completed.stdout == ""
+
+
 @pytest.mark.parametrize(
     ("argv", "stdin", "expected_returncode", "expected_output"),
     [
-        (["rg", "--", "--pre"], "ordinary text\n", 1, ""),
-        (["sort", "--", "--compress-program"], "", 2, ""),
-        (["rg", "--pre-glob", "--pre", "needle"], "needle\n", 0, "needle\n"),
+        (['rg', '--', '--pre'], "ordinary text\n", 1, ""),
+        (['rg', '--pre-glob', '--pre', 'needle'], "needle\n", 0, "needle\n"),
     ],
 )
 def test_real_read_tool_binaries_confirm_option_ownership(
@@ -25,6 +50,8 @@ def test_real_read_tool_binaries_confirm_option_ownership(
     """Pin the CLI grammar that the approval detector models."""
     if shutil.which(argv[0]) is None:
         pytest.skip(f"{argv[0]} is not installed")
+    if argv[0] == "sort" and not _has_gnu_sort():
+        pytest.skip("sort option grammar probe requires GNU coreutils sort")
 
     completed = subprocess.run(argv, input=stdin, text=True, capture_output=True)
 
@@ -37,7 +64,6 @@ def test_real_read_tool_binaries_confirm_option_ownership(
     [
         ("rg", ["--pre", "-payload-marker", "needle", "{input}"], None, False),
         ("rg", ["--hostname-bin=-payload-marker", "needle", "{input}"], None, False),
-        ("sort", ["--buffer-size=1K", "--compress-program", "-payload-marker"], "{bulk}", False),
         ("ag", ["--pager=-payload-marker", "needle", "{input}"], None, True),
         ("man", ["--pager", "-payload-marker", "ls"], None, True),
         ("man", ["-P", "-payload-marker", "ls"], None, True),
@@ -75,6 +101,35 @@ def test_real_binaries_execute_leading_dash_program_payload(
     subprocess.run(argv, input=input_text, text=True, capture_output=True, env=env, timeout=20)
 
     assert marker.read_text() == "executed"
+
+
+@pytest.mark.linux_only
+def test_gnu_sort_executes_a_separate_leading_dash_compress_program(tmp_path):
+    """GNU sort must be treated as an execution-bearing argument even when it starts with '-'."""
+    if not _has_gnu_sort():
+        pytest.skip("requires GNU coreutils sort")
+
+    marker = tmp_path / "executed"
+    payload = tmp_path / "-payload-marker"
+    payload.write_text("#!/bin/sh\nprintf executed > \"$MARKER\"\ncat\n")
+    payload.chmod(0o755)
+    env = {
+        **os.environ,
+        "PATH": f"{tmp_path}{os.pathsep}{os.environ['PATH']}",
+        "MARKER": str(marker),
+    }
+    input_text = "\n".join(str(number) for number in range(10_000, 0, -1)) + "\n"
+
+    subprocess.run(
+        ["sort", "--buffer-size=1K", "--batch-size=2", "--compress-program", "-payload-marker"],
+        input=input_text,
+        text=True,
+        capture_output=True,
+        env=env,
+        timeout=20,
+    )
+
+    assert marker.read_text() == "executed", "GNU sort did not execute its separate compressor argument"
 
 
 @pytest.mark.parametrize(
@@ -142,6 +197,13 @@ def test_ag_pager_less_is_an_executable_option_and_requires_approval():
         "arbitrary program execution via ag --pager",
         "arbitrary program execution via ag --pager",
     )
+
+
+def test_sort_compress_program_separate_leading_dash_is_an_exec_payload():
+    command = "sort --compress-program -payload-marker names"
+    description = "arbitrary program execution via sort --compress-program"
+    assert detect_dangerous_command(command) == (True, description, description)
+    assert detect_hardline_command(command) == (False, None)
 
 
 @pytest.mark.parametrize(

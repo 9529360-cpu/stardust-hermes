@@ -95,23 +95,19 @@ def test_dockerfile_redirects_lazy_installs_to_durable_target() -> None:
     )
 
 
-def test_dockerfile_bakes_photon_sidecar_deps() -> None:
-    """The Photon sidecar's node_modules must be baked at build time (NS-606).
-
-    The install tree is immutable at runtime, so a lazy `npm ci` on first
-    connect would hit EROFS. Baking the deps (from the committed lockfile,
-    which also runs the spectrum-ts postinstall patch) makes the hosted
-    happy path install-free. Guards the contract between the Dockerfile
-    and plugins/platforms/photon/sidecar_paths.resolve_sidecar_dir, which
-    runs in place only when the baked deps exist and match the lockfile.
-    """
+def test_container_build_and_scan_inputs_omit_retired_photon_sidecar() -> None:
     text = _dockerfile_text()
 
-    assert "plugins/platforms/photon/sidecar/package-lock.json" in text
-    assert re.search(
-        r"RUN cd plugins/platforms/photon/sidecar && \\\n\s+npm ci", text
-    ), "sidecar deps must be installed with `npm ci` (deterministic, runs postinstall patch)"
-    # Immutability contract: never chown the sidecar tree to the runtime user.
-    assert not re.search(
-        r"chown\s+-R\s+hermes:hermes\s+/opt/hermes/plugins", text
-    )
+    # Platform v5 retires Photon, so the immutable image and workflows must
+    # not reference its removed sidecar or lockfile. Other Node layers remain
+    # active and must continue to build normally.
+    assert "plugins/platforms/photon/sidecar" not in text
+    for workflow in (
+        REPO_ROOT / ".github" / "workflows" / "osv-scanner.yml",
+        REPO_ROOT / ".github" / "workflows" / "stardust-docker-smoke.yml",
+    ):
+        assert "plugins/platforms/photon/sidecar" not in workflow.read_text()
+
+    assert "RUN npm install --prefer-offline" in text
+    assert "COPY web/ web/" in text
+    assert "COPY ui-tui/ ui-tui/" in text

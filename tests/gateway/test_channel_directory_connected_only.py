@@ -33,3 +33,25 @@ def test_does_not_resurrect_disconnected_platforms_from_session_history(tmp_path
     assert set(calls) <= {"telegram"}
 
 
+def test_ignores_retired_adapters_before_enumeration_or_session_discovery(tmp_path):
+    cache_file = tmp_path / "channel_directory.json"
+    session_calls = []
+    enumerate_calls = []
+
+    class RetiredAdapter:
+        async def list_channels(self):
+            enumerate_calls.append("called")
+            return [{"id": "old", "name": "Old target"}]
+
+    with patch("gateway.channel_directory._build_from_sessions", side_effect=session_calls.append), \
+         patch("gateway.channel_directory.DIRECTORY_PATH", cache_file):
+        directory = asyncio.run(build_channel_directory({
+            Platform.DISCORD: RetiredAdapter(),
+            Platform.SLACK: RetiredAdapter(),
+        }))
+
+    assert directory["platforms"] == {}
+    assert enumerate_calls == []
+    assert session_calls == []
+
+

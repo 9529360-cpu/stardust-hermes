@@ -403,14 +403,15 @@ class ClientLifecycleMixin:
                 _reset_slot(cache)
         return client, in_use
 
-    def _abort_request_slot_client(self, slot_attr: str, client: Any, *, reason: str) -> None:
+    def _abort_request_slot_client(self, slot_attr: str, client: Any, *, reason: str) -> int:
         """Cross-thread abort (interrupt loop, stale detector): ``shutdown(SHUT_RDWR)`` without releasing FDs.
 
         ``close()`` from a non-owning thread races the live SSL BIO and corrupts unrelated FDs; shutdown unblocks
         the owner's recv/send so it closes from its own context. The slot is poisoned so the pool is never reused.
+        Returns the number of sockets actually shut down; zero means the provider request may still be active.
         """
         if client is None:
-            return
+            return 0
         anthropic = slot_attr == _ANTHROPIC_SLOT
         label = "Anthropic" if anthropic else "OpenAI"
         context = self._anthropic_log_context() if anthropic else self._client_log_context()
@@ -418,6 +419,7 @@ class ClientLifecycleMixin:
             cache = self._request_slot(slot_attr)
             if cache["client"] is client:
                 cache["poisoned"] = True
+        shutdown_count = 0
         try:
             shutdown_count = self._force_close_tcp_sockets(client)
             # Zero sockets shut down means the worker stays blocked — WARN, not success.
@@ -432,6 +434,7 @@ class ClientLifecycleMixin:
             )
         except Exception as exc:
             logger.debug("%s client abort failed (%s, shared=False) %s error=%s", label, reason, context, exc)
+        return shutdown_count
 
     def _create_request_openai_client(self, *, reason: str, api_kwargs: Optional[dict] = None) -> Any:
         from unittest.mock import Mock
@@ -474,8 +477,8 @@ class ClientLifecycleMixin:
         else:
             self._close_openai_client(client, reason=reason, shared=False)
 
-    def _abort_request_openai_client(self, client: Any, *, reason: str) -> None:
-        self._abort_request_slot_client(_OPENAI_SLOT, client, reason=reason)
+    def _abort_request_openai_client(self, client: Any, *, reason: str) -> int:
+        return self._abort_request_slot_client(_OPENAI_SLOT, client, reason=reason)
 
     def _request_anthropic_client_key(self) -> tuple:
         """Cache key over everything forcing a fresh client: credential, base URL/region, timeout, 1M-beta flag."""

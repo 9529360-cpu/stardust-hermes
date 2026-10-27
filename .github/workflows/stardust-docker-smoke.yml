@@ -14,7 +14,6 @@ on:
       - 'ui-tui/package.json'
       - 'ui-tui/packages/hermes-ink/**'
       - 'apps/shared/**'
-      - 'plugins/platforms/photon/sidecar/**'
       - '.github/workflows/stardust-docker-smoke.yml'
   push:
     branches: [main]
@@ -30,7 +29,6 @@ on:
       - 'ui-tui/package.json'
       - 'ui-tui/packages/hermes-ink/**'
       - 'apps/shared/**'
-      - 'plugins/platforms/photon/sidecar/**'
       - '.github/workflows/stardust-docker-smoke.yml'
   workflow_dispatch:
 

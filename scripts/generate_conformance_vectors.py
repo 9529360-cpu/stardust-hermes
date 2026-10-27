@@ -11,21 +11,17 @@ drift breaks a test instead of a user's formatting.
 Oracles (all imported, never reimplemented):
   telegram  plugins.platforms.telegram.adapter.TelegramAdapter.format_message
             (standard markdown → Telegram MarkdownV2)
-  slack     plugins.platforms.slack.adapter.SlackAdapter.format_message
-            (standard markdown → Slack mrkdwn)
   whatsapp  gateway.platforms.whatsapp_common.WhatsAppBehaviorMixin
             .format_message (standard markdown → WhatsApp formatting)
-  discord   plugins.platforms.discord.adapter.DiscordAdapter.format_message
-            (GFM tables → bullet groups; otherwise identity)
 
 Expect semantics (consumed by the gg runner):
   parity    connector render must BYTE-EQUAL native_output
-            (Slack / WhatsApp — same-dialect ports; most Discord).
+            (WhatsApp — same-dialect port).
   semantic  connector renders a DIFFERENT representation on purpose
             (Telegram: connector sends HTML, native sends MarkdownV2);
             the runner asserts plain-text content equivalence instead.
-  divergent documented no-parity (e.g. Discord tables: native converts to
-            bullets, connector passes raw markdown through). The runner
+  divergent documented no-parity (e.g. Telegram tables: native groups rows,
+            connector renders a preformatted block). The runner
             asserts the DOCUMENTED connector behavior named in `note`.
 
 Run:  python scripts/generate_conformance_vectors.py [--out DIR]
@@ -139,8 +135,6 @@ def corpus() -> List[Dict[str, str]]:
 
 def _oracles() -> Dict[str, Callable[[str], str]]:
     from plugins.platforms.telegram.adapter import TelegramAdapter
-    from plugins.platforms.slack.adapter import SlackAdapter
-    from plugins.platforms.discord.adapter import DiscordAdapter
     from gateway.platforms.whatsapp_common import WhatsAppBehaviorMixin
 
     wa = object.__new__(WhatsAppBehaviorMixin)  # format_message needs no __init__
@@ -149,8 +143,6 @@ def _oracles() -> Dict[str, Callable[[str], str]]:
         # These format_message implementations are self-free (asserted by
         # tests/conformance/test_vector_generator.py) — invoked unbound.
         "telegram": lambda s: TelegramAdapter.format_message(None, s),  # type: ignore[arg-type]
-        "slack": lambda s: SlackAdapter.format_message(None, s),  # type: ignore[arg-type]
-        "discord": lambda s: DiscordAdapter.format_message(None, s),  # type: ignore[arg-type]
         "whatsapp": wa.format_message,
     }
 
@@ -168,17 +160,9 @@ _EXPECT_OVERRIDES: Dict[str, Dict[str, tuple]] = {
         "placeholder-injection": ("divergent", "NUL placeholder tokens are renderer-internal; each side neutralizes its own pattern"),
         "whitespace-only": ("divergent", "native collapses to empty-ish prose, connector HTML preserves — cosmetic"),
     },
-    "slack": {
-        "placeholder-injection": ("divergent", "\\x00SL tokens are the native renderer's own placeholder alphabet; connector uses a different scheme"),
-        "unclosed-fence": ("divergent", "unterminated fence handling differs; both degrade without dropping content"),
-    },
     "whatsapp": {
         "placeholder-injection": ("divergent", "placeholder alphabets are renderer-internal"),
         "unclosed-fence": ("divergent", "unterminated fence handling differs; both degrade without dropping content"),
-    },
-    "discord": {
-        "table-simple": ("divergent", "native converts GFM tables to bullet groups; connector passes raw markdown through (port deferred — parity report Phase 4/oracle section)"),
-        "table-cjk": ("divergent", "same as table-simple"),
     },
 }
 

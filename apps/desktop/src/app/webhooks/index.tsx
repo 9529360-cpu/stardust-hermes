@@ -54,7 +54,14 @@ import {
 } from '../overlays/panel'
 import { ListRow } from '../settings/primitives'
 
-const DELIVER_OPTIONS: readonly string[] = ['log', 'telegram', 'discord', 'slack', 'email', 'github_comment']
+const DELIVER_OPTIONS: readonly string[] = [
+  'log',
+  'telegram',
+  'whatsapp',
+  'whatsapp_cloud',
+  'weixin',
+  'github_comment'
+]
 
 interface CreatedWebhook {
   secret: string

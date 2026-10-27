@@ -3,6 +3,83 @@ import { FIELD_DESCRIPTIONS, FIELD_LABELS } from '@/app/settings/constants'
 import type { Translations } from './types'
 
 export const en: Translations = {
+  taskCenter: {
+    title: 'Tasks',
+    activity: 'Activity',
+    automation: 'Automation',
+    sessionUnavailable: 'Session unavailable',
+    recoveryAvailable: 'Recovery available',
+    approvalRequired: 'Approval required',
+    loadFailed: 'Could not load tasks',
+    someUnavailable: 'Some tasks are unavailable',
+    loading: 'Loading tasks',
+    emptyTitle: 'No active tasks',
+    emptyDescription: 'Approvals, background commands, and subagent progress from your sessions appear here.',
+    groups: {
+      attention: 'Needs your attention',
+      running: 'In progress',
+      upcoming: 'Upcoming',
+      recent: 'Recent',
+      other: 'Other'
+    },
+    states: {
+      blocked: 'Blocked',
+      cancelled: 'Cancelled',
+      completed: 'Completed',
+      failed: 'Failed',
+      interrupted: 'Interrupted',
+      paused: 'Paused',
+      queued: 'Queued',
+      running: 'Running',
+      waiting_for_user: 'Waiting for you'
+    },
+    load: {
+      degraded: 'Some saved task sources could not be read. Tasks from available sources are shown.',
+      error: 'Could not load saved task status. Check the connection and try again.',
+      loading: 'Loading saved task status…',
+      retrying: 'Showing the last saved task status. The latest refresh failed.'
+    },
+    rails: {
+      approval: 'Approval',
+      clarify: 'Question',
+      sudo: 'Administrator permission',
+      secret: 'Secret required',
+      'vault-unlock': 'Unlock password manager',
+      'vault-save': 'Save login',
+      'vault-code': 'Verification code',
+      process: 'Background command',
+      delegation: 'Delegated work',
+      cron: 'Scheduled work',
+      goal: 'Standing goal'
+    },
+    phases: {
+      active: 'Active',
+      waiting: 'Waiting',
+      scheduled: 'Scheduled',
+      last_failed: 'Last run failed',
+      stalling: 'Waiting for progress',
+      finalizing: 'Finalizing',
+      timeout: 'Timed out',
+      stalled: 'Stalled',
+      unknown: 'Status unavailable',
+      claimed: 'Claimed for execution',
+      delivery_failed: 'Delivery failed',
+      skipped: 'Skipped'
+    },
+    recoveryActions: {
+      retry: 'Retry',
+      review_or_retry: 'Review or retry',
+      resume: 'Resume'
+    },
+    summary: (running: number, attention: number) => `${running} running · ${attention} need attention`,
+    workingOn: (tool: string) => `Working on ${tool}`,
+    exitCode: (code: number) => `Exit code ${code}`,
+    needsSecret: (name: string) => `Secret required: ${name}`,
+    needsVault: (name: string) => `Unlock password manager: ${name}`,
+    unknownStatus: (value: string) => `Unknown status (${value})`,
+    unknownRecovery: (value: string) => `Other recovery (${value})`,
+    unknownRail: (value: string) => `Task (${value})`
+  },
   personalization: {
     opacityLabel: 'Image opacity'
   },
@@ -1526,6 +1603,23 @@ export const en: Translations = {
       reasoning: 'Reasoning',
       reasoningOff: 'Off',
       defaultsFailed: 'Failed to save model defaults',
+      testModel: 'Test selected model',
+      testingModel: 'Testing model…',
+      stopModelTest: 'Stop waiting',
+      modelTestDisclosure: 'This sends a real request to the selected model and may incur charges.',
+      modelTestNeedSession: 'Open a chat in the selected profile before testing the model.',
+      modelTestSuccess: 'The model returned a response.',
+      modelTestFailed: 'The model request failed.',
+      modelTestUnsupported: 'Testing is not supported for this provider route.',
+      modelTestCanceled: 'The test was stopped. If its request had started, the provider may still finish processing.',
+      modelTestTimedOut: 'The model request timed out.',
+      modelTestStopping: 'Sending an interruption request…',
+      modelTestStoppedWaiting: 'Stopped waiting in this panel. The server request may continue until its timeout.',
+      modelTestAuthError: 'The provider rejected authentication.',
+      modelTestRateLimitError: 'The provider rate limit was reached.',
+      modelTestNetworkError: 'Could not connect to the selected model route.',
+      modelTestServerError: 'The provider returned a server error.',
+      modelTestEmptyResponse: 'The model returned an empty response.',
       loadFailed: 'Could not load models',
       restartRequired: 'This backend is running old code after an update. Restart it to load the new code.',
       restartBackend: 'Restart backend',
@@ -2600,9 +2694,9 @@ export const en: Translations = {
     deliverOptions: {
       log: 'Log',
       telegram: 'Telegram',
-      discord: 'Discord',
-      slack: 'Slack',
-      email: 'Email',
+      whatsapp: 'WhatsApp',
+      whatsapp_cloud: 'WhatsApp Business (Cloud)',
+      weixin: 'Weixin / WeChat',
       github_comment: 'GitHub comment'
     }
   },

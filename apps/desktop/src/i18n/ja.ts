@@ -3,6 +3,83 @@ import { defineFieldCopy } from '@/app/settings/field-copy'
 import { defineLocale } from './define-locale'
 
 export const ja = defineLocale({
+  taskCenter: {
+    title: 'タスク',
+    activity: 'アクティビティ',
+    automation: '自動化',
+    sessionUnavailable: 'チャットを利用できません',
+    recoveryAvailable: '復旧可能',
+    approvalRequired: '承認が必要',
+    loadFailed: 'タスクを読み込めません',
+    someUnavailable: '一部のタスクを利用できません',
+    loading: 'タスクを読み込み中',
+    emptyTitle: '実行中のタスクはありません',
+    emptyDescription: 'チャットの承認待ち、バックグラウンドコマンド、サブエージェントの進捗をここに表示します。',
+    groups: {
+      attention: '要対応',
+      running: '進行中',
+      upcoming: '近日',
+      recent: '最近完了',
+      other: 'その他'
+    },
+    states: {
+      blocked: 'ブロック中',
+      cancelled: 'キャンセル済み',
+      completed: '完了',
+      failed: '失敗',
+      interrupted: '中断',
+      paused: '一時停止',
+      queued: '待機中',
+      running: '実行中',
+      waiting_for_user: '対応待ち'
+    },
+    load: {
+      degraded: '一部の保存済みタスクを読み込めませんでした。読み込み可能なタスクを表示しています。',
+      error: '保存済みタスク状態を読み込めません。接続を確認して再試行してください。',
+      loading: '保存済みタスク状態を読み込み中…',
+      retrying: '前回取得したタスク状態を表示しています。最新の更新に失敗しました。'
+    },
+    rails: {
+      approval: '承認',
+      clarify: '質問',
+      sudo: '管理者権限',
+      secret: 'シークレットが必要',
+      'vault-unlock': 'パスワード管理を解除',
+      'vault-save': 'ログインを保存',
+      'vault-code': '認証コード',
+      process: 'バックグラウンドコマンド',
+      delegation: '委任された作業',
+      cron: '定期タスク',
+      goal: '継続目標'
+    },
+    phases: {
+      active: '進行中',
+      waiting: '待機中',
+      scheduled: '実行予定',
+      last_failed: '前回の実行に失敗',
+      stalling: '進捗を待機中',
+      finalizing: '終了処理中',
+      timeout: 'タイムアウト',
+      stalled: '進捗なし',
+      unknown: '状態を利用できません',
+      claimed: '実行の割り当て済み',
+      delivery_failed: '結果の送信に失敗',
+      skipped: 'スキップ済み'
+    },
+    recoveryActions: {
+      retry: '再試行',
+      review_or_retry: '確認または再試行',
+      resume: '再開'
+    },
+    summary: (running: number, attention: number) => `実行中 ${running} 件 · 要対応 ${attention} 件`,
+    workingOn: (tool: string) => `${tool} を使用中`,
+    exitCode: (code: number) => `終了コード ${code}`,
+    needsSecret: (name: string) => `必要なシークレット: ${name}`,
+    needsVault: (name: string) => `パスワード管理を解除: ${name}`,
+    unknownStatus: (value: string) => `不明な状態 (${value})`,
+    unknownRecovery: (value: string) => `その他の復旧方法 (${value})`,
+    unknownRail: (value: string) => `タスク (${value})`
+  },
   personalization: {
     opacityLabel: '画像の不透明度'
   },
@@ -1206,6 +1283,23 @@ export const ja = defineLocale({
       model: 'モデル',
       applying: '適用中...',
       loadFailed: 'モデルを読み込めませんでした',
+      testModel: '選択したモデルをテスト',
+      testingModel: 'モデルをテスト中…',
+      stopModelTest: '待機を停止',
+      modelTestDisclosure: '選択したモデルに実際のリクエストを送信します。料金が発生する場合があります。',
+      modelTestNeedSession: 'モデルをテストする前に、選択したプロファイルでチャットを開いてください。',
+      modelTestSuccess: 'モデルから応答がありました。',
+      modelTestFailed: 'モデルリクエストに失敗しました。',
+      modelTestUnsupported: 'このプロバイダールートでは推論テストを利用できません。',
+      modelTestCanceled: 'モデルテストを停止しました。リクエスト送信後の場合、プロバイダー側で処理が続くことがあります。',
+      modelTestTimedOut: 'モデルリクエストがタイムアウトしました。',
+      modelTestStopping: '中断リクエストを送信中…',
+      modelTestStoppedWaiting: 'このパネルでの待機を停止しました。サーバー側のリクエストはタイムアウトまで続く場合があります。',
+      modelTestAuthError: 'プロバイダーが認証を拒否しました。',
+      modelTestRateLimitError: 'プロバイダーのレート制限に達しました。',
+      modelTestNetworkError: '選択したモデルルートに接続できませんでした。',
+      modelTestServerError: 'プロバイダーでサーバーエラーが発生しました。',
+      modelTestEmptyResponse: 'モデルから空の応答が返されました。',
       restartRequired:
         'アップデート後、このバックエンドは古いコードのままです。再起動して新しいコードを読み込んでください。',
       restartBackend: 'バックエンドを再起動',
@@ -2031,6 +2125,17 @@ export const ja = defineLocale({
     },
     platformDescriptions: { email: 'メールで Stardust と会話し、返信や通知を受け取ります。' },
     platformIntro: {}
+  },
+
+  webhooks: {
+    deliverOptions: {
+      log: 'ログ',
+      telegram: 'Telegram',
+      whatsapp: 'WhatsApp',
+      whatsapp_cloud: 'WhatsApp Business（クラウド）',
+      weixin: 'Weixin（微信）',
+      github_comment: 'GitHub コメント'
+    }
   },
 
   profiles: {

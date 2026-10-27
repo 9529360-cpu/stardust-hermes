@@ -81,12 +81,12 @@ class TestStartupPlatformIsolation:
 
     @pytest.mark.asyncio
     async def test_start_continues_after_platform_connect_timeout(self, tmp_path):
-        """A timeout on Telegram should queue it and still connect Feishu."""
+        """A timeout on Telegram should queue it and still connect WhatsApp."""
         runner = _make_runner()
         runner.config = GatewayConfig(
             platforms={
                 Platform.TELEGRAM: PlatformConfig(enabled=True, token="test"),
-                Platform.FEISHU: PlatformConfig(enabled=True, token="test"),
+                Platform.WHATSAPP: PlatformConfig(enabled=True, token="test"),
             },
             sessions_dir=tmp_path,
         )
@@ -102,7 +102,7 @@ class TestStartupPlatformIsolation:
 
         adapters = {
             Platform.TELEGRAM: StubAdapter(platform=Platform.TELEGRAM),
-            Platform.FEISHU: StubAdapter(platform=Platform.FEISHU),
+            Platform.WHATSAPP: StubAdapter(platform=Platform.WHATSAPP),
         }
         runner._create_adapter = MagicMock(
             side_effect=lambda platform, _config: adapters[platform]
@@ -134,7 +134,7 @@ class TestStartupPlatformIsolation:
                                     assert await runner.start() is True
 
         assert Platform.TELEGRAM in runner._failed_platforms
-        assert Platform.FEISHU in runner.adapters
+        assert Platform.WHATSAPP in runner.adapters
         assert Platform.TELEGRAM not in runner.adapters
         assert runner._create_adapter.call_count == 2
 
@@ -464,7 +464,7 @@ class TestPlatformSlashCommand:
     @pytest.mark.asyncio
     async def test_list_shows_connected_and_paused(self):
         runner = _make_runner()
-        runner.adapters[Platform.DISCORD] = StubAdapter(platform=Platform.DISCORD)
+        runner.adapters[Platform.TELEGRAM] = StubAdapter(platform=Platform.TELEGRAM)
         runner._failed_platforms[Platform.WHATSAPP] = {
             "config": PlatformConfig(enabled=True, token="t"),
             "attempts": 10,
@@ -473,7 +473,7 @@ class TestPlatformSlashCommand:
             "pause_reason": "not paired",
         }
         out = await runner._handle_platform_command(self._make_event("/platform list"))
-        assert "discord" in out
+        assert "telegram" in out
         assert "whatsapp" in out
         assert "PAUSED" in out
         assert "not paired" in out
@@ -568,7 +568,7 @@ class TestFatalHandoffCancellationProof:
         runner.adapters[Platform.TELEGRAM] = adapter
         # A healthy peer keeps self.adapters non-empty, so the existing
         # "no platforms remain" shutdown branches do not fire.
-        runner.adapters[Platform.FEISHU] = StubAdapter(platform=Platform.FEISHU)
+        runner.adapters[Platform.WHATSAPP] = StubAdapter(platform=Platform.WHATSAPP)
 
         await runner._handle_adapter_fatal_error(adapter)
 
@@ -866,11 +866,11 @@ _REAL_ASYNCIO_SLEEP = asyncio.sleep
 
 
 class TestVoiceInputCallbackWiring:
-    """Startup and reconnect must wire _voice_input_callback on Discord."""
+    """Startup and reconnect must wire the voice input callback."""
 
     @staticmethod
-    def _make_discord_voice_adapter():
-        """A minimal Discord adapter stub with voice attributes."""
+    def _make_telegram_voice_adapter():
+        """A minimal retained-platform adapter stub with voice attributes."""
         adapter = MagicMock()
         adapter._voice_input_callback = None
         adapter._voice_text_channels = {}
@@ -879,10 +879,10 @@ class TestVoiceInputCallbackWiring:
         adapter.disconnect = AsyncMock()
         return adapter
 
-    def _make_runner_with_discord(self):
+    def _make_runner_with_telegram(self):
         runner = _make_runner()
         runner.config = GatewayConfig(
-            platforms={Platform.DISCORD: PlatformConfig(enabled=True, token="test")}
+            platforms={Platform.TELEGRAM: PlatformConfig(enabled=True, token="test")}
         )
         runner._update_runtime_status = MagicMock()
         runner._update_platform_runtime_status = MagicMock()
@@ -897,9 +897,9 @@ class TestVoiceInputCallbackWiring:
 
     @pytest.mark.asyncio
     async def test_startup_wires_voice_input_callback(self, tmp_path):
-        """Cold-start connect must wire _voice_input_callback on Discord adapter."""
-        runner = self._make_runner_with_discord()
-        adapter = self._make_discord_voice_adapter()
+        """Cold-start connect must wire _voice_input_callback on Telegram adapter."""
+        runner = self._make_runner_with_telegram()
+        adapter = self._make_telegram_voice_adapter()
         runner.config.sessions_dir = tmp_path
 
         def fake_create_task(coro):
@@ -975,7 +975,6 @@ class TestRequeueHealsDeadReconnectWatcher:
             "next_retry": time.monotonic() + 300,
             "queued_at": time.monotonic() - 3600,
             "credential_claim": None,
-            "listener_claim": None,
         }
 
     @staticmethod
@@ -1137,7 +1136,6 @@ class TestSupervisionExhaustionHasAnOwner:
             "next_retry": time.monotonic() + 300,
             "queued_at": time.monotonic() - 7200,
             "credential_claim": None,
-            "listener_claim": None,
         }
 
     @staticmethod

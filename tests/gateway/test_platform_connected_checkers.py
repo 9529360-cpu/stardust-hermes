@@ -8,7 +8,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from gateway.config import Platform, _PLATFORM_CONNECTED_CHECKERS, _BUILTIN_PLATFORM_VALUES
+from gateway.config import (
+    Platform, RETIRED_PLATFORMS, _PLATFORM_CONNECTED_CHECKERS, _BUILTIN_PLATFORM_VALUES,
+)
 
 
 def test_all_builtins_have_checker_or_generic_token_path():
@@ -50,7 +52,7 @@ def test_all_builtins_have_checker_or_generic_token_path():
         pass
 
     # Every built-in should be in one of the sets
-    all_builtins = set(_BUILTIN_PLATFORM_VALUES)
+    all_builtins = set(_BUILTIN_PLATFORM_VALUES) - set(RETIRED_PLATFORMS)
     missing = (
         all_builtins
         - generic_token_values

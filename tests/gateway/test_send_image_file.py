@@ -89,91 +89,8 @@ class TestTelegramSendImageFile:
 # ---------------------------------------------------------------------------
 
 
-def _ensure_discord_mock():
-    """Install mock discord module so DiscordAdapter can be imported."""
-    if "discord" in sys.modules and hasattr(sys.modules["discord"], "__file__"):
-        return
-
-    discord_mod = MagicMock()
-    discord_mod.Intents.default.return_value = MagicMock()
-    discord_mod.Client = MagicMock
-    discord_mod.File = MagicMock
-
-    for name in ("discord", "discord.ext", "discord.ext.commands"):
-        sys.modules.setdefault(name, discord_mod)
-
-
-_ensure_discord_mock()
 
 import discord as discord_mod_ref  # noqa: E402
-from plugins.platforms.discord.adapter import DiscordAdapter  # noqa: E402
-
-
-class TestDiscordSendImageFile:
-    @pytest.fixture
-    def adapter(self):
-        config = PlatformConfig(enabled=True, token="fake-token")
-        a = DiscordAdapter(config)
-        a._client = MagicMock()
-        return a
-
-
-    def test_send_document_uploads_file_attachment(self, adapter, tmp_path):
-        """send_document should upload a native Discord attachment."""
-        pdf = tmp_path / "sample.pdf"
-        pdf.write_bytes(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
-
-        mock_channel = MagicMock()
-        mock_msg = MagicMock()
-        mock_msg.id = 100
-        mock_channel.send = AsyncMock(return_value=mock_msg)
-        adapter._client.get_channel = MagicMock(return_value=mock_channel)
-
-        with patch.object(discord_mod_ref, "File", MagicMock()) as file_cls:
-            result = _run(
-                adapter.send_document(
-                    chat_id="67890",
-                    file_path=str(pdf),
-                    file_name="renamed.pdf",
-                    metadata={"thread_id": "123"},
-                )
-            )
-
-        assert result.success
-        assert result.message_id == "100"
-        # #66797: path-based File sent via plural files=[...] (matches the
-        # image-batch path; the singular file= handle form could race the
-        # multipart encoder and silently drop the attachment).
-        sent_files = mock_channel.send.call_args.kwargs.get("files")
-        assert sent_files and len(sent_files) == 1
-        assert file_cls.call_args.kwargs["filename"] == "renamed.pdf"
-
-    def test_send_video_uploads_file_attachment(self, adapter, tmp_path):
-        """send_video should upload a native Discord attachment."""
-        video = tmp_path / "clip.mp4"
-        video.write_bytes(b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 50)
-
-        mock_channel = MagicMock()
-        mock_msg = MagicMock()
-        mock_msg.id = 101
-        mock_channel.send = AsyncMock(return_value=mock_msg)
-        adapter._client.get_channel = MagicMock(return_value=mock_channel)
-
-        with patch.object(discord_mod_ref, "File", MagicMock()) as file_cls:
-            result = _run(
-                adapter.send_video(
-                    chat_id="67890",
-                    video_path=str(video),
-                    metadata={"thread_id": "123"},
-                )
-            )
-
-        assert result.success
-        assert result.message_id == "101"
-        # #66797: path-based File sent via plural files=[...] (see above).
-        sent_files = mock_channel.send.call_args.kwargs.get("files")
-        assert sent_files and len(sent_files) == 1
-        assert file_cls.call_args.kwargs["filename"] == "clip.mp4"
 
 
 # ---------------------------------------------------------------------------
@@ -181,37 +98,6 @@ class TestDiscordSendImageFile:
 # ---------------------------------------------------------------------------
 
 
-def _ensure_slack_mock():
-    """Install mock slack_bolt module so SlackAdapter can be imported."""
-    if "slack_bolt" in sys.modules and hasattr(sys.modules["slack_bolt"], "__file__"):
-        return
-
-    slack_mod = MagicMock()
-    for name in ("slack_bolt", "slack_bolt.async_app", "slack_sdk", "slack_sdk.web.async_client"):
-        sys.modules.setdefault(name, slack_mod)
-
-
-_ensure_slack_mock()
-
-from plugins.platforms.slack.adapter import SlackAdapter  # noqa: E402
-
-
-class TestSlackSendImageFile:
-    @pytest.fixture
-    def adapter(self):
-        config = PlatformConfig(enabled=True, token="xoxb-fake")
-        a = SlackAdapter(config)
-        a._app = MagicMock()
-        return a
-
-
-    def test_returns_error_when_not_connected(self, adapter):
-        adapter._app = None
-        result = _run(
-            adapter.send_image_file(chat_id="C12345", image_path="/tmp/img.png")
-        )
-        assert not result.success
-        assert "Not connected" in result.error
 
 
 # ---------------------------------------------------------------------------
@@ -263,5 +149,3 @@ class TestScreenshotCleanup:
         _cleanup_old_screenshots(tmp_path, max_age_hours=24)
 
         assert old.exists(), "Repeated cleanup should be skipped while throttled"
-
-

@@ -3,6 +3,83 @@ import { defineFieldCopy } from '@/app/settings/field-copy'
 import { defineLocale } from './define-locale'
 
 export const zh = defineLocale({
+  taskCenter: {
+    title: '任务中心',
+    activity: '活动',
+    automation: '自动化',
+    sessionUnavailable: '会话不可用',
+    recoveryAvailable: '可恢复',
+    approvalRequired: '需要批准',
+    loadFailed: '任务读取失败',
+    someUnavailable: '部分任务状态不可用',
+    loading: '正在加载任务',
+    emptyTitle: '暂时没有活动任务',
+    emptyDescription: '会话中的确认、后台命令和子代理进度会显示在这里。',
+    groups: {
+      attention: '需要你处理',
+      running: '进行中',
+      upcoming: '即将开始',
+      recent: '最近完成',
+      other: '其他状态'
+    },
+    states: {
+      blocked: '受阻',
+      cancelled: '已取消',
+      completed: '已完成',
+      failed: '失败',
+      interrupted: '已中断',
+      paused: '已暂停',
+      queued: '排队中',
+      running: '执行中',
+      waiting_for_user: '等待你处理'
+    },
+    load: {
+      degraded: '部分已保存任务来源读取失败；下方显示的是可读取来源的任务。',
+      error: '无法读取已保存的任务状态。请检查连接后重试。',
+      loading: '正在读取已保存的任务状态…',
+      retrying: '当前显示上次成功读取的任务状态；最近一次刷新失败。'
+    },
+    rails: {
+      approval: '批准请求',
+      clarify: '待回答的问题',
+      sudo: '管理员权限',
+      secret: '需要密钥',
+      'vault-unlock': '解锁密码管理器',
+      'vault-save': '保存登录信息',
+      'vault-code': '验证码',
+      process: '后台命令',
+      delegation: '委派任务',
+      cron: '定时任务',
+      goal: '持续目标'
+    },
+    phases: {
+      active: '进行中',
+      waiting: '等待中',
+      scheduled: '已安排',
+      last_failed: '上次运行失败',
+      stalling: '等待进展',
+      finalizing: '正在收尾',
+      timeout: '已超时',
+      stalled: '进展停滞',
+      unknown: '状态不可用',
+      claimed: '已领取待执行',
+      delivery_failed: '结果发送失败',
+      skipped: '已跳过'
+    },
+    recoveryActions: {
+      retry: '重试',
+      review_or_retry: '检查或重试',
+      resume: '恢复'
+    },
+    summary: (running: number, attention: number) => `${running} 项进行中 · ${attention} 项需要处理`,
+    workingOn: (tool: string) => `正在使用 ${tool}`,
+    exitCode: (code: number) => `退出码 ${code}`,
+    needsSecret: (name: string) => `需要密钥：${name}`,
+    needsVault: (name: string) => `解锁密码管理器：${name}`,
+    unknownStatus: (value: string) => `未知状态（${value}）`,
+    unknownRecovery: (value: string) => `其他恢复方式（${value}）`,
+    unknownRail: (value: string) => `任务（${value}）`
+  },
   personalization: {
     opacityLabel: '图片不透明度'
   },
@@ -1720,6 +1797,23 @@ export const zh = defineLocale({
       reasoning: '推理',
       reasoningOff: '关闭',
       defaultsFailed: '保存模型默认值失败',
+      testModel: '测试所选模型',
+      testingModel: '正在测试模型…',
+      stopModelTest: '停止等待',
+      modelTestDisclosure: '此操作会真实调用所选模型，可能产生费用。',
+      modelTestNeedSession: '请先在所选配置中打开一个聊天，再测试模型。',
+      modelTestSuccess: '模型已返回响应。',
+      modelTestFailed: '模型请求失败。',
+      modelTestUnsupported: '此提供方路由暂不支持推理测试。',
+      modelTestCanceled: '模型测试已停止；如果请求已经发出，提供方可能仍会完成处理。',
+      modelTestTimedOut: '模型请求超时。',
+      modelTestStopping: '正在发送中断请求…',
+      modelTestStoppedWaiting: '此面板已停止等待；服务端请求可能持续到超时。',
+      modelTestAuthError: '提供方拒绝了身份验证。',
+      modelTestRateLimitError: '已达到提供方速率限制。',
+      modelTestNetworkError: '无法连接到所选模型路由。',
+      modelTestServerError: '提供方返回了服务器错误。',
+      modelTestEmptyResponse: '模型返回了空响应。',
       loadFailed: '无法加载模型',
       restartRequired: '更新后此后端仍在运行旧代码。请重启以加载新代码。',
       restartBackend: '重启后端',
@@ -2862,9 +2956,9 @@ export const zh = defineLocale({
     deliverOptions: {
       log: '日志',
       telegram: 'Telegram',
-      discord: 'Discord',
-      slack: 'Slack',
-      email: '电子邮件',
+      whatsapp: 'WhatsApp',
+      whatsapp_cloud: 'WhatsApp Business（云 API）',
+      weixin: '微信',
       github_comment: 'GitHub 评论'
     }
   },

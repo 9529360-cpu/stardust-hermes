@@ -1465,15 +1465,18 @@ class TestWebServerEndpoints:
         """
         from hermes_cli.web_server_messaging import _MESSAGING_KEYS_PAGE_KEYS, _build_catalog_entry, _channel_managed_env_keys
 
-        discord = _build_catalog_entry("discord")
-        assert "DISCORD_BOT_TOKEN" in discord["env_vars"]
-        assert "DISCORD_ALLOWED_USERS" in discord["env_vars"]
+        telegram = _build_catalog_entry("telegram")
+        assert "TELEGRAM_BOT_TOKEN" in telegram["env_vars"]
+        cloud = _build_catalog_entry("whatsapp_cloud")
+        assert {"WHATSAPP_CLOUD_PHONE_NUMBER_ID", "WHATSAPP_CLOUD_ACCESS_TOKEN"} <= set(cloud["env_vars"])
+        assert set(cloud["required_env"]) == {"WHATSAPP_CLOUD_PHONE_NUMBER_ID", "WHATSAPP_CLOUD_ACCESS_TOKEN"}
 
         managed = _channel_managed_env_keys()
-        assert "DISCORD_BOT_TOKEN" in managed
-        assert "MATTERMOST_TOKEN" in managed
+        assert "TELEGRAM_BOT_TOKEN" in managed
+        assert "WHATSAPP_CLOUD_ACCESS_TOKEN" in managed
         assert "GATEWAY_PROXY_URL" not in managed
         assert "GATEWAY_PROXY_URL" in _MESSAGING_KEYS_PAGE_KEYS
+        assert not {"DISCORD_BOT_TOKEN", "SLACK_BOT_TOKEN", "EMAIL_PASSWORD"} & managed
 
 
 
@@ -2957,7 +2960,8 @@ class TestNewEndpoints:
 
         listing = {t["name"]: t for t in self.client.get("/api/tools/toolsets").json()}
         assert listing["discord"]["platform"] == "discord"
-        assert listing["discord"]["platform_label"] == "Discord"
+        # Gateway platform labels exclude retired adapters; the distinct toolset scope remains readable.
+        assert listing["discord"]["platform_label"] == "discord"
         assert listing["discord"]["enabled"] is False
 
         resp = self.client.put("/api/tools/toolsets/discord", json={"enabled": True})

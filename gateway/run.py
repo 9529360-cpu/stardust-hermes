@@ -1839,7 +1839,12 @@ async def _discover_gateway_mcp_tools(config: object) -> None:
 def _platform_has_bot_credential(platform: "Platform", platform_config: "PlatformConfig") -> bool:
     """Return True when a token-authenticated platform has a usable bot credential; platforms not using
     ``PlatformConfig.token`` (Signal session paths, port-binding HTTP adapters) always return True."""
-    from gateway.config import PLATFORM_TOKEN_ENV_NAMES, Platform
+    from gateway.config import PLATFORM_TOKEN_ENV_NAMES, Platform, RETIRED_PLATFORMS
+    if platform.value in RETIRED_PLATFORMS:
+        return False
+    if platform is Platform.WHATSAPP_CLOUD:
+        extra = getattr(platform_config, "extra", None) or {}
+        return all(str(extra.get(key) or "").strip() for key in ("phone_number_id", "access_token"))
     if platform not in PLATFORM_TOKEN_ENV_NAMES:
         return True
     for attr in ("token", "api_key"):  # some adapters accept api_key as the primary credential
@@ -2163,10 +2168,7 @@ _EXECUTOR_QUIESCE_TIMEOUT = 2.0
 
 
 _OWN_POLICY_OPEN_ENV = {
-    Platform.WECOM: ("WECOM_DM_POLICY", "WECOM_GROUP_POLICY", "WECOM_ALLOW_ALL_USERS"),
     Platform.WEIXIN: ("WEIXIN_DM_POLICY", "WEIXIN_GROUP_POLICY", "WEIXIN_ALLOW_ALL_USERS"),
-    Platform.YUANBAO: ("YUANBAO_DM_POLICY", "YUANBAO_GROUP_POLICY", "YUANBAO_ALLOW_ALL_USERS"),
-    Platform.QQBOT: (None, None, "QQ_ALLOW_ALL_USERS"),
     Platform.WHATSAPP: ("WHATSAPP_DM_POLICY", "WHATSAPP_GROUP_POLICY", "WHATSAPP_ALLOW_ALL_USERS")}
 
 
@@ -2785,12 +2787,6 @@ def _platform_config_key(platform: "Platform") -> str:
     return "cli" if platform == Platform.LOCAL else platform.value
 
 
-def _teams_pipeline_plugin_enabled() -> bool:
-    """Return True when the standalone Teams pipeline plugin is enabled."""
-    enabled = cfg_get(_load_gateway_config(), "plugins", "enabled", default=[])
-    return isinstance(enabled, list) and ("teams_pipeline" in enabled or "teams-pipeline" in enabled)
-
-
 def _gateway_config_home() -> Path:
     """Return the Hermes home that gateway config reads should use."""
     override = get_hermes_home_override()
@@ -3251,22 +3247,13 @@ def _builtin_adapter_import(module: str, adapter_name: str, requirement: str):
 _BUILTIN_ADAPTERS: dict[Platform, tuple[str, str, str, str]] = {
     Platform.WHATSAPP_CLOUD: ("whatsapp_cloud", "WhatsAppCloudAdapter", "check_whatsapp_cloud_requirements",
                               "WhatsApp Cloud: aiohttp/httpx missing — reinstall hermes-agent"),
-    Platform.SIGNAL: ("signal", "SignalAdapter", "check_signal_requirements",
-                      "Signal: runtime requirements not met"),
     Platform.WEIXIN: ("weixin", "WeixinAdapter", "check_weixin_requirements",
                       "Weixin: aiohttp/cryptography not installed"),
     Platform.API_SERVER: ("api_server", "APIServerAdapter", "check_api_server_requirements",
                           "API Server: aiohttp not installed"),
     Platform.WEBHOOK: ("webhook", "WebhookAdapter", "check_webhook_requirements",
                        "Webhook: aiohttp not installed"),
-    Platform.MSGRAPH_WEBHOOK: ("msgraph_webhook", "MSGraphWebhookAdapter", "check_msgraph_webhook_requirements",
-                               "MSGraph webhook: aiohttp not installed"),
-    Platform.BLUEBUBBLES: ("bluebubbles", "BlueBubblesAdapter", "check_bluebubbles_requirements",
-                           "BlueBubbles: aiohttp/httpx missing or BLUEBUBBLES_SERVER_URL/BLUEBUBBLES_PASSWORD not configured"),
-    Platform.QQBOT: ("qqbot", "QQAdapter", "check_qq_requirements",
-                     "QQBot: aiohttp/httpx missing or QQ_APP_ID/QQ_CLIENT_SECRET not configured"),
-    Platform.YUANBAO: ("yuanbao", "YuanbaoAdapter", "WEBSOCKETS_AVAILABLE",
-                       "Yuanbao: websockets not installed. Run: pip install websockets")}
+}
 
 
 def _instantiate_builtin_adapter(platform: Platform, config: Any) -> Optional[BasePlatformAdapter]:
@@ -3279,11 +3266,6 @@ def _instantiate_builtin_adapter(platform: Platform, config: Any) -> Optional[Ba
     if not (requirements_ok() if callable(requirements_ok) else requirements_ok):
         logger.warning(warning)
         return None
-    if platform == Platform.SIGNAL:
-        from gateway.platforms.signal import validate_signal_config
-        if not validate_signal_config(config):
-            logger.warning("Signal: SIGNAL_HTTP_URL or SIGNAL_ACCOUNT not configured")
-            return None
     return adapter_cls(config)
 
 
@@ -3532,8 +3514,6 @@ class GatewayRunner(
         # compares against this rather than the per-turn ``_active_profile_name()``.
         self._primary_profile_name = self._active_profile_name()
         # Teams meeting pipeline runtime (bound later when msgraph_webhook adapter exists).
-        self._teams_pipeline_runtime = None
-        self._teams_pipeline_runtime_error: Optional[str] = None
         # Failed-to-connect platforms for background reconnection: Platform -> {config, attempts, next_retry}
         self._failed_platforms: Dict[Platform, Dict[str, Any]] = {}
         # Strong refs to detached fatal-error handler tasks so the loop can't GC them mid-run.
@@ -3763,28 +3743,6 @@ class GatewayRunner(
 
         self._session_db_handle_cache.close_all(_close)
 
-    def _wire_teams_pipeline_runtime(self) -> None:
-        """Bind the Teams meeting pipeline runtime to Graph webhook ingress (no-op if adapter/plugin off)."""
-        if Platform.MSGRAPH_WEBHOOK not in self.adapters:
-            return
-        if not _teams_pipeline_plugin_enabled():
-            logger.debug("Teams pipeline plugin is disabled; skipping runtime wiring")
-            return
-        try:
-            from plugins.teams_pipeline.runtime import bind_gateway_runtime
-        except Exception as exc:
-            logger.warning("Teams pipeline runtime import failed: %s", exc)
-            return
-        try:
-            bound = bind_gateway_runtime(self)
-        except Exception as exc:
-            logger.warning("Teams pipeline runtime wiring failed: %s", exc)
-            return
-        if bound:
-            logger.info("Teams pipeline runtime bound to msgraph webhook ingress")
-        elif self._teams_pipeline_runtime_error:
-            logger.warning(
-                "Teams pipeline runtime unavailable: %s", self._teams_pipeline_runtime_error)
 
     def _warn_if_docker_media_delivery_is_risky(self) -> None:
         """Warn when Docker-backed gateways lack an explicit export mount: MEDIA delivery runs in the

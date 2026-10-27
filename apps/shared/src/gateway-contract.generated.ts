@@ -1458,6 +1458,37 @@ export interface MemoryForgetParams {
   text?: string | null
   expected_text?: string | null
 }
+export interface ModelInferenceTestParams {
+  profile?: string
+  session_id: string
+  probe_id: string
+  provider: string
+  model: string
+  timeout_s?: number
+}
+export interface ModelInferenceTestResult {
+  status: 'success' | 'failed' | 'unsupported' | 'canceled' | 'cancel_not_supported' | 'timed_out'
+  inference_ok: boolean | null
+  provider?: string | null
+  model?: string | null
+  source?: string | null
+  latency_ms?: number | null
+  error_kind?: 'auth' | 'rate_limit' | 'timeout' | 'network' | 'server' | 'empty_response' | 'unknown' | null
+  error?: string | null
+  response_summary?: string | null
+  nonempty_response?: boolean | null
+  cancel_supported?: boolean
+}
+export interface ModelInferenceTestCancelParams {
+  profile?: string
+  session_id: string
+  probe_id: string
+}
+export interface ModelInferenceTestCancelResult {
+  status: 'cancel_requested' | 'not_running' | 'cancel_not_supported' | 'forbidden'
+  message: string
+  cancel_supported: boolean
+}
 /** ``word`` is the token under the cursor (``@`` prefix = context reference); ``cwd`` / ``session_id`` pick the directory the listing resolves against. */
 export interface CompletePathParams {
   profile?: string | null
@@ -4780,6 +4811,10 @@ export interface RpcMethods {
   'session.usage': { params: SessionUsageParams; result: SessionUsageResult }
   /** Re-home a stored session's workspace; git identity is replaced and a live agent follows. */
   'session.workspace.move': { params: SessionWorkspaceMoveParams; result: SessionWorkspaceMoveResult }
+  /** Explicit one-request inference test for the selected route; never called by readiness polling. */
+  'setup.inference_test': { params: ModelInferenceTestParams; result: ModelInferenceTestResult }
+  /** Cancel one in-flight inference test owned by this exact RPC transport, profile, and session. */
+  'setup.inference_test_cancel': { params: ModelInferenceTestCancelParams; result: ModelInferenceTestCancelResult }
   /** Strict provider check through the same runtime resolution the agent uses on session creation. */
   'setup.runtime_check': { params: SetupRuntimeCheckParams; result: SetupRuntimeCheckResult }
   /** Loose provider check: is ANY provider auth state discoverable for the (launch or named) profile. */
@@ -5060,6 +5095,8 @@ export const RPC_METHODS = [
   'session.undo',
   'session.usage',
   'session.workspace.move',
+  'setup.inference_test',
+  'setup.inference_test_cancel',
   'setup.runtime_check',
   'setup.status',
   'shell.exec',

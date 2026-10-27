@@ -9,7 +9,14 @@ import type {
   ModelInfoResponse
 } from '@/types/hermes'
 
-import { capabilityScoped, hermesApi, type ProfileScope, profileScoped, STARTUP_REQUEST_TIMEOUT_MS } from './client'
+import {
+  capabilityScoped,
+  hermesApi,
+  type HermesGateway,
+  type ProfileScope,
+  profileScoped,
+  STARTUP_REQUEST_TIMEOUT_MS
+} from './client'
 
 export function getGlobalModelInfo(profile?: null | string): Promise<ModelInfoResponse> {
   return hermesApi<ModelInfoResponse>({
@@ -17,6 +24,50 @@ export function getGlobalModelInfo(profile?: null | string): Promise<ModelInfoRe
     path: '/api/model/info',
     timeoutMs: STARTUP_REQUEST_TIMEOUT_MS
   })
+}
+
+export interface ModelInferenceTestRequest {
+  profile: string
+  session_id: string
+  probe_id: string
+  provider: string
+  model: string
+  timeout_s: number
+}
+
+export interface ModelInferenceTestResult {
+  status: 'success' | 'failed' | 'unsupported' | 'canceled' | 'cancel_not_supported' | 'timed_out'
+  inference_ok: boolean | null
+  provider?: string | null
+  model?: string | null
+  source?: string | null
+  latency_ms?: number | null
+  error_kind?: 'auth' | 'rate_limit' | 'timeout' | 'network' | 'server' | 'empty_response' | 'unknown' | null
+  error?: string | null
+  response_summary?: string | null
+  nonempty_response?: boolean | null
+  cancel_supported: boolean
+}
+
+export interface ModelInferenceTestCancelResult {
+  status: 'cancel_requested' | 'not_running' | 'cancel_not_supported' | 'forbidden'
+  message: string
+  cancel_supported: boolean
+}
+
+export function runSelectedModelInferenceTest(
+  gateway: HermesGateway,
+  params: ModelInferenceTestRequest,
+  timeoutMs: number
+): Promise<ModelInferenceTestResult> {
+  return gateway.request<ModelInferenceTestResult>('setup.inference_test', { ...params }, timeoutMs)
+}
+
+export function cancelSelectedModelInferenceTest(
+  gateway: HermesGateway,
+  params: Pick<ModelInferenceTestRequest, 'profile' | 'session_id' | 'probe_id'>
+): Promise<ModelInferenceTestCancelResult> {
+  return gateway.request<ModelInferenceTestCancelResult>('setup.inference_test_cancel', params, 5000)
 }
 
 export function getUsageAnalytics(days = 30, profile?: ProfileScope): Promise<AnalyticsResponse> {
