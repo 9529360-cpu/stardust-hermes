@@ -407,7 +407,7 @@ function GuiSkewView({ message, onDone }: { message?: string; onDone: () => void
   return (
     <div className="grid gap-5 px-6 pb-6 pt-7 pr-8">
       <div className="flex flex-col items-center gap-3 text-center">
-        <AlertCircle className="size-8 text-amber-500" />
+        <AlertCircle className="size-8 text-(--ui-amber-text)" />
 
         <DialogTitle className="text-center text-xl">{u.guiSkewTitle}</DialogTitle>
         <DialogDescription className="max-w-prose text-center text-sm leading-5 text-muted-foreground">

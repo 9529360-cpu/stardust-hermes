@@ -151,9 +151,9 @@ function statusOf(server: Record<string, unknown>, probe: Probe | undefined): Se
 }
 
 const STATUS_DOT: Record<ServerStatus, string> = {
-  ok: 'bg-emerald-500',
-  error: 'bg-red-500',
-  'needs-auth': 'bg-amber-500',
+  ok: 'bg-(--ui-bg-green)',
+  error: 'bg-(--ui-bg-red)',
+  'needs-auth': 'bg-(--ui-bg-amber)',
   probing: 'animate-pulse bg-foreground/40',
   off: 'bg-foreground/20',
   unknown: 'bg-foreground/20'
@@ -1631,7 +1631,7 @@ function McpCatalog({
                   {entry.auth_type === 'api_key' && <CatalogTag>{t.settings.mcp.apiKeyTag}</CatalogTag>}
                   {entry.needs_install && !entry.installed && <CatalogTag>{m.catalogNeedsInstall}</CatalogTag>}
                   {entry.installed && (
-                    <span className="text-[0.6rem] text-emerald-400">
+                    <span className="text-[0.6rem] text-(--ui-green-text)">
                       {entry.enabled ? m.catalogEnabled : m.catalogInstalled}
                     </span>
                   )}

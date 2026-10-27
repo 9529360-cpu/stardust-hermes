@@ -65,12 +65,12 @@ const INDENT = 12
 // Per git status letter: a tinted diff codicon so the file's nature reads at a
 // glance (added / modified / deleted / renamed / untracked).
 const STATUS_GLYPH: Record<string, { icon: string; tone: string }> = {
-  A: { icon: 'diff-added', tone: 'text-(--ui-green)' },
-  C: { icon: 'diff-added', tone: 'text-(--ui-green)' },
-  D: { icon: 'diff-removed', tone: 'text-(--ui-red)' },
-  M: { icon: 'diff-modified', tone: 'text-amber-500/85' },
-  R: { icon: 'diff-renamed', tone: 'text-sky-500/85' },
-  U: { icon: 'warning', tone: 'text-(--ui-red)' },
+  A: { icon: 'diff-added', tone: 'text-(--ui-green-text)' },
+  C: { icon: 'diff-added', tone: 'text-(--ui-green-text)' },
+  D: { icon: 'diff-removed', tone: 'text-(--ui-red-text)' },
+  M: { icon: 'diff-modified', tone: 'text-(--ui-amber-text)/85' },
+  R: { icon: 'diff-renamed', tone: 'text-(--ui-blue-text)/85' },
+  U: { icon: 'warning', tone: 'text-(--ui-red-text)' },
   '?': { icon: 'diff-added', tone: 'text-muted-foreground/60' }
 }
 
@@ -531,9 +531,7 @@ function ReviewFileRow({ node, depth }: { node: ReviewTreeNode; depth: number })
           className="text-[0.64rem] leading-4 group-hover/review-row:hidden"
           removed={node.removed}
         />
-        {file.staged && (
-          <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-(--ui-green)/70" title={c.staged} />
-        )}
+        {file.staged && <span aria-label={c.staged} className="size-1.5 shrink-0 rounded-full bg-(--ui-green-text)/70" role="img" />}
       </div>
     </ReviewFileContextMenu>
   )

@@ -69,7 +69,7 @@ afterEach(() => {
 })
 
 describe('Bot Routines control geometry', () => {
-  it('uses shared 32px selects and a compact repeat-count field', () => {
+  it('uses consistent select and repeat-count control sizing', () => {
     render(<CreateRoutineDialog bot={{ name: 'ops' }} onClose={() => undefined} open />)
 
     const dialog = screen.getByRole('dialog')
@@ -77,17 +77,18 @@ describe('Bot Routines control geometry', () => {
 
     const compactInputs = within(dialog)
       .getAllByRole('textbox')
-      .filter(element => element.className.split(/\s+/).includes('h-7'))
+      .filter(element => element.className.split(/\s+/).includes('h-8'))
 
     expect(selects).toHaveLength(3)
 
     for (const select of selects) {
       expect(select.className).toContain('h-8')
-      expect(select.className).toContain('rounded-[6px]')
+      expect(select.className).toContain('rounded-[4px]')
     }
 
     expect(compactInputs).toHaveLength(1)
-    expect(compactInputs[0].className).toContain('rounded-[2.5px]')
+    expect(compactInputs[0].className).toContain('h-8')
+    expect(compactInputs[0].className).toContain('rounded-[4px]')
   })
 })
 

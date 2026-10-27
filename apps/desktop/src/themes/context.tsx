@@ -24,6 +24,7 @@ import { $backendThemes, $pendingSkinApply } from './backend-sync'
 import { $chatFontFamily, resolveChatFontFamily } from './chat-font'
 import { harmonize, readableInk } from './color'
 import { BUILTIN_THEME_LIST, DEFAULT_SKIN_NAME, DEFAULT_TYPOGRAPHY, nousTheme } from './presets'
+import { radixDefaultThemeOverrides } from './radix-default'
 import { retintTheme } from './retint'
 import type { DesktopTheme, DesktopThemeColors } from './types'
 import { $userThemes, listAllThemes, resolveTheme } from './user-themes'
@@ -196,6 +197,18 @@ const NEUTRAL_CHROME = { light: '#f3f3f3', dark: '#0d0d0e' } as const
 // styles.css --dt-primary-solid-foreground fallback — keep in sync.
 const PRIMARY_SOLID_FOREGROUND = '#fcfcfc'
 
+const RADIX_COLOR_FAMILIES = [
+  { names: ['amber', 'orange', 'yellow'], scale: 'amber' },
+  { names: ['blue', 'cyan', 'sky', 'teal'], scale: 'blue' },
+  { names: ['gray', 'slate', 'zinc', 'neutral', 'stone'], scale: 'gray' },
+  { names: ['green', 'emerald', 'lime'], scale: 'green' },
+  { names: ['red', 'rose', 'pink'], scale: 'red' },
+  { names: ['violet', 'purple', 'fuchsia', 'indigo'], scale: 'violet' }
+] as const
+
+const RADIX_UTILITY_COLORS = RADIX_COLOR_FAMILIES.flatMap(family => family.names)
+const RADIX_DEFAULT_OVERRIDE_KEYS = Object.keys(radixDefaultThemeOverrides('light'))
+
 const chromeBackground = (background: string, isDark: boolean) =>
   mix(background, NEUTRAL_CHROME[isDark ? 'dark' : 'light'], isDark ? 0.26 : 0.08)
 
@@ -207,7 +220,7 @@ const mixesFor = (isDark: boolean): Record<string, string> => ({
   '--theme-mix-bubble': isDark ? '46%' : '0%'
 })
 
-function applyTheme(theme: DesktopTheme, mode: 'light' | 'dark', chatFontFamily = $chatFontFamily.get()) {
+export function applyTheme(theme: DesktopTheme, mode: 'light' | 'dark', chatFontFamily = $chatFontFamily.get()) {
   if (typeof document === 'undefined') {
     return
   }
@@ -215,10 +228,11 @@ function applyTheme(theme: DesktopTheme, mode: 'light' | 'dark', chatFontFamily 
   const root = document.documentElement
   const c = theme.colors
   const typo = { ...DEFAULT_TYPOGRAPHY, ...nousTheme.typography, ...theme.typography }
+  const skinName = theme.name.endsWith(`-${mode}`) ? theme.name.slice(0, -mode.length - 1) : theme.name
+  const radixOverrides = skinName === DEFAULT_SKIN_NAME ? radixDefaultThemeOverrides(mode) : null
   const rendered = renderedModeFor(c, mode)
   const isDark = rendered === 'dark'
   const midground = c.midground ?? c.ring
-  const skinName = theme.name.endsWith(`-${mode}`) ? theme.name.slice(0, -mode.length - 1) : theme.name
 
   root.style.setProperty('color-scheme', rendered)
   root.dataset.hermesTheme = skinName
@@ -233,28 +247,31 @@ function applyTheme(theme: DesktopTheme, mode: 'light' | 'dark', chatFontFamily 
 
   // Brand seeds feed every glass + shadcn token via `color-mix()` in styles.css.
   const seeds: Record<string, string> = {
-    '--theme-foreground': c.foreground,
-    '--theme-primary': c.primary,
-    '--theme-secondary': c.secondary,
-    '--theme-accent-soft': c.accent,
-    '--theme-midground': midground,
-    '--theme-warm': c.primary,
-    '--theme-background-seed': c.background,
-    '--theme-sidebar-seed': c.sidebarBackground ?? c.background,
-    '--theme-card-seed': c.card,
-    '--theme-elevated-seed': c.popover,
-    '--theme-bubble-seed': c.userBubble ?? c.popover
+    '--theme-foreground': radixOverrides?.['--theme-foreground'] ?? c.foreground,
+    '--theme-primary': radixOverrides?.['--theme-primary'] ?? c.primary,
+    '--theme-secondary': radixOverrides?.['--theme-secondary'] ?? c.secondary,
+    '--theme-accent-soft': radixOverrides?.['--theme-accent-soft'] ?? c.accent,
+    '--theme-midground': radixOverrides?.['--theme-midground'] ?? midground,
+    '--theme-warm': radixOverrides?.['--theme-warm'] ?? c.primary,
+    '--theme-background-seed': radixOverrides?.['--theme-background-seed'] ?? c.background,
+    '--theme-sidebar-seed': radixOverrides?.['--theme-sidebar-seed'] ?? c.sidebarBackground ?? c.background,
+    '--theme-card-seed': radixOverrides?.['--theme-card-seed'] ?? c.card,
+    '--theme-elevated-seed': radixOverrides?.['--theme-elevated-seed'] ?? c.popover,
+    '--theme-bubble-seed': radixOverrides?.['--theme-bubble-seed'] ?? c.userBubble ?? c.popover
   }
 
   // shadcn/Tailwind tokens that aren't derived from the seed chain.
   const palette: Record<string, string> = {
-    '--dt-primary-foreground': c.primaryForeground,
+    '--dt-primary': radixOverrides?.['--dt-primary'] ?? c.primary,
+    '--dt-secondary': radixOverrides?.['--dt-secondary'] ?? c.secondary,
+    '--dt-accent': radixOverrides?.['--dt-accent'] ?? c.accent,
+    '--dt-primary-foreground': radixOverrides?.['--dt-primary-foreground'] ?? c.primaryForeground,
     '--dt-secondary-foreground': c.secondaryForeground,
     '--dt-accent-foreground': c.accentForeground,
-    '--dt-border': c.border,
-    '--dt-input': c.input,
-    '--dt-ring': c.ring,
-    '--dt-muted': c.muted,
+    '--dt-border': radixOverrides?.['--dt-border'] ?? c.border,
+    '--dt-input': radixOverrides?.['--dt-input'] ?? c.input,
+    '--dt-ring': radixOverrides?.['--dt-ring'] ?? c.ring,
+    '--dt-muted': radixOverrides?.['--dt-muted'] ?? c.muted,
     '--dt-midground-foreground': c.midgroundForeground ?? readableInk(midground),
     // A LOUD fill of the brand colour, for the rare surface that has to read as
     // the app speaking rather than as chrome. `primary` alone can't do that job:
@@ -264,10 +281,10 @@ function applyTheme(theme: DesktopTheme, mode: 'light' | 'dark', chatFontFamily 
     // whispering. Deepening the hue until the LIGHT foreground clears AA keeps
     // one look across every theme: no-ops on an accent that is already deep,
     // and only ever darkens, so the hue survives.
-    '--dt-primary-solid': ensureContrast(c.primary, PRIMARY_SOLID_FOREGROUND, 4.5),
-    '--dt-primary-solid-foreground': PRIMARY_SOLID_FOREGROUND,
+    '--dt-primary-solid': radixOverrides?.['--dt-primary-solid'] ?? ensureContrast(c.primary, PRIMARY_SOLID_FOREGROUND, 4.5),
+    '--dt-primary-solid-foreground': radixOverrides?.['--dt-primary-solid-foreground'] ?? PRIMARY_SOLID_FOREGROUND,
     '--dt-composer-ring': c.composerRing ?? midground,
-    '--dt-destructive': c.destructive,
+    '--dt-destructive': radixOverrides?.['--dt-destructive'] ?? c.destructive,
     '--dt-destructive-foreground': c.destructiveForeground,
     '--dt-sidebar-border': c.sidebarBorder ?? c.border,
     '--dt-user-bubble-border': c.userBubbleBorder ?? c.border,
@@ -275,21 +292,42 @@ function applyTheme(theme: DesktopTheme, mode: 'light' | 'dark', chatFontFamily 
     // instead of clashing with it. A green accent barely moves it (see
     // `harmonize`); a blue one turns the sidebar's finished dots teal rather
     // than leaving eight emerald spots fighting the theme.
-    '--ui-success': harmonize('#10b981', midground, 0.25),
+    '--ui-success': radixOverrides?.['--ui-success'] ?? harmonize('#10b981', midground, 0.25),
     '--dt-font-sans': resolveChatFontFamily(chatFontFamily, typo.fontSans),
     '--dt-font-mono': typo.fontMono,
     '--noise-opacity-mul': isDark ? 'calc(0.04 / 0.21)' : 'calc(0.34 / 0.21)'
   }
 
-  for (const [k, v] of Object.entries({ ...seeds, ...mixesFor(isDark), ...palette })) {
+  for (const key of RADIX_DEFAULT_OVERRIDE_KEYS) {
+    root.style.removeProperty(key)
+  }
+
+  for (const [k, v] of Object.entries({ ...seeds, ...mixesFor(isDark), ...palette, ...radixOverrides })) {
     root.style.setProperty(k, v)
   }
 
-  const chromeBg = chromeBackground(c.background, isDark)
+  if (radixOverrides) {
+    for (const family of RADIX_COLOR_FAMILIES) {
+      const scale = Array.from({ length: 12 }, (_, index) => radixOverrides[`--ui-${family.scale}-scale-${index + 1}`])
+
+      for (const utilityName of family.names) {
+        for (let step = 50; step <= 950; step += 50) {
+          const radixStep = Math.min(12, Math.max(1, Math.ceil(step / 100)))
+          const value = scale[radixStep - 1]
+
+          if (value) {
+            root.style.setProperty(`--color-${utilityName}-${step}`, value)
+          }
+        }
+      }
+    }
+  }
+
+  const chromeBg = chromeBackground(radixOverrides?.['--theme-background-seed'] ?? c.background, isDark)
 
   window.stardustDesktop?.setTitleBarTheme?.({
     background: chromeBg,
-    foreground: c.foreground
+    foreground: radixOverrides?.['--theme-foreground'] ?? c.foreground
   })
 
   // Raw (non-JSON) keys read by the inline pre-paint script in index.html —

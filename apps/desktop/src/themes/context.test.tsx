@@ -2,8 +2,8 @@ import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { __resetBackendSkinSync, ingestBackendSkin } from './backend-sync'
-import { getBaseColors, skinPref, ThemeProvider, useTheme } from './context'
-import { BUILTIN_THEME_LIST, everforestTheme } from './presets'
+import { applyTheme, getBaseColors, skinPref, ThemeProvider, useTheme } from './context'
+import { BUILTIN_THEME_LIST, everforestTheme, nousTheme } from './presets'
 
 // The live-authoring loop: Hermes writes/edits one skin file and every surface
 // repaints. An in-place edit keeps the NAME — only the palette moves.
@@ -13,6 +13,76 @@ const bloomberg = (foreground: string) => ({
 })
 
 const cssVar = (name: string) => window.document.documentElement.style.getPropertyValue(name)
+
+function Probe({ state }: { state: { theme: ReturnType<typeof useTheme> } }) {
+  state.theme = useTheme()
+
+  return null
+}
+
+describe('Radix default theme', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    __resetBackendSkinSync()
+  })
+
+  afterEach(cleanup)
+
+  it('maps the default Nous light and dark appearances to Radix scales', () => {
+    const state: { theme: ReturnType<typeof useTheme> } = { theme: null as never }
+
+    render(
+      <ThemeProvider>
+        <Probe state={state} />
+      </ThemeProvider>
+    )
+
+    expect(cssVar('--ui-gray-1')).toBe('#fcfcfc')
+    expect(cssVar('--ui-blue-11')).toBe('#0d74ce')
+    expect(cssVar('--ui-amber-scale-6')).toBe('#f3d673')
+    expect(cssVar('--color-blue-800')).toBe('#5eb1ef')
+    expect(cssVar('--ui-text-tertiary')).toBe('#646464')
+    expect(cssVar('--color-amber-500')).toBe('#fbe577')
+    expect(cssVar('--color-red-900')).toBe('#e5484d')
+    expect(cssVar('--dt-primary-foreground')).toBe('#113264')
+
+    act(() => state.theme.setMode('dark'))
+
+    expect(cssVar('--ui-gray-1')).toBe('#111111')
+    expect(cssVar('--ui-blue-11')).toBe('#70b8ff')
+    expect(cssVar('--ui-amber-scale-6')).toBe('#5c3d05')
+    expect(cssVar('--color-blue-800')).toBe('#2870bd')
+    expect(cssVar('--ui-text-tertiary')).toBe('#b4b4b4')
+    expect(cssVar('--dt-primary-solid-foreground')).toBe('#0d1520')
+  })
+
+  it('restores the selected non-default skin after leaving Nous', () => {
+    const state: { theme: ReturnType<typeof useTheme> } = { theme: null as never }
+
+    render(
+      <ThemeProvider>
+        <Probe state={state} />
+      </ThemeProvider>
+    )
+
+    act(() => state.theme.setTheme('everforest'))
+    expect(cssVar('--ui-gray-1')).toBe('')
+    expect(cssVar('--theme-primary')).toBe(everforestTheme.colors.primary)
+    expect(cssVar('--ui-text-tertiary')).not.toBe('#646464')
+    expect(cssVar('--ui-red-scale-1')).toBe('')
+    expect(document.documentElement.style.getPropertyValue('--dt-primary')).toBe(everforestTheme.colors.primary)
+  })
+
+  it('applies Radix defaults only to the built-in default skin', () => {
+    applyTheme(everforestTheme, 'light')
+    expect(cssVar('--ui-gray-1')).not.toBe('#fcfcfc')
+    expect(cssVar('--theme-primary')).toBe(everforestTheme.colors.primary)
+
+    applyTheme(nousTheme, 'light')
+    expect(cssVar('--ui-gray-1')).toBe('#fcfcfc')
+    expect(cssVar('--ui-text-tertiary')).toBe('#646464')
+  })
+})
 
 describe('ThemeProvider ← backend skin sync', () => {
   beforeEach(() => {
@@ -257,7 +327,11 @@ describe('ThemeProvider --dt-primary-solid preset parity', () => {
     const primary = getBaseColors(name, mode).primary
     const expected = oldEnsureContrast(primary, '#fcfcfc', 4.5)
 
-    expect(cssVar('--dt-primary-solid')).toBe(expected)
+    if (name === 'nous') {
+      expect(cssVar('--dt-primary-solid')).toBe(mode === 'light' ? '#0d74ce' : '#0090ff')
+    } else {
+      expect(cssVar('--dt-primary-solid')).toBe(expected)
+    }
 
     // At least some presets need a lift; the assertion must not be vacuous.
     if (name === 'nous' && mode === 'dark') {

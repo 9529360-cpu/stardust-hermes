@@ -409,7 +409,7 @@ export function WebhooksView({ onClose }: WebhooksViewProps) {
               {visible.map(sub => (
                 <PanelListRow
                   active={selectedSub?.name === sub.name}
-                  dotClassName={sub.enabled ? 'bg-emerald-500' : 'bg-muted-foreground/50'}
+                  dotClassName={sub.enabled ? 'bg-(--ui-bg-green)' : 'bg-muted-foreground/50'}
                   key={sub.name}
                   menuItems={[
                     {

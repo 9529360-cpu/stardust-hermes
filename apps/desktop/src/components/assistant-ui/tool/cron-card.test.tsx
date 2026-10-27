@@ -49,7 +49,7 @@ describe('cron tool card', () => {
   it('shows a dry run as a preview in the collapsed row and lists its runs when opened', () => {
     const { container } = renderCronRow(dryRunCreate)
 
-    const title = screen.getByText('Cron job preview · every day 09:00')
+    const title = screen.getByText('Cron job preview: every day 09:00')
 
     expect(container.textContent).not.toContain('Not saved')
 

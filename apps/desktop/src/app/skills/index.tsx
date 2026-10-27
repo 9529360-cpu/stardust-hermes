@@ -955,7 +955,6 @@ export function CapabilitiesView({
           <header className="flex shrink-0 items-start justify-between gap-4 px-6 py-4">
             <div className="min-w-0">
               <h1 className="text-lg font-semibold text-(--ui-text-primary)">{t.connectors.pageTitle}</h1>
-              <p className="mt-1 text-sm text-(--ui-text-tertiary)">{t.connectors.pageDescription}</p>
             </div>
             <ConnectedSummary profile={scopeProfile} />
           </header>

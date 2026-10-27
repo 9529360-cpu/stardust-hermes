@@ -16,6 +16,19 @@
 @custom-variant hover (&:hover);
 @custom-variant dark (&:is(.dark *));
 
+@theme inline {
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.25rem;
+  --text-3xl: 1.25rem;
+  --text-4xl: 1.25rem;
+  --default-border-width: 0.5px;
+  --ui-stroke-width: 0.5px;
+}
+
 /* Blanket reduced-motion override: kill ALL CSS animations and transitions
    when the user (or the E2E test harness via prefers-reduced-motion) requests
    it. Per-component @media rules below handle specific cases; this catches
@@ -152,6 +165,17 @@
 
   --spacing-mul: var(--dt-spacing-mul, 1);
 
+  /* Shared desktop type scale: 12, 14, 16, and 20 px. */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.25rem;
+  --text-3xl: 1.25rem;
+  --text-4xl: 1.25rem;
+  --default-border-width: 0.5px;
+
   --radius-xs: calc(var(--radius-scalar) * 0.125rem);
   --radius-sm: calc(var(--radius-scalar) * 0.5rem);
   --radius-md: calc(var(--radius-scalar) * 0.625rem);
@@ -216,6 +240,7 @@
     --theme-neutral-chrome: #f3f3f3;
     --theme-neutral-sidebar: #f3f3f3;
     --theme-neutral-card: #fcfcfc;
+    --radius-scalar: 0.4;
     --theme-mix-chrome: 92%;
     --theme-mix-sidebar: 100%;
     --theme-mix-card: 22%;
@@ -503,8 +528,8 @@
 
     --composer-shell-pad-block-end: 0.625rem;
     --message-text-indent: 0.75rem;
-    --conversation-text-font-size: 0.8125rem;
-    --conversation-tool-font-size: 0.6875rem;
+    --conversation-text-font-size: 1rem;
+    --conversation-tool-font-size: 0.75rem;
     --conversation-caption-font-size: 0.75rem;
     --conversation-line-height: 1.125rem;
     --conversation-caption-line-height: 1rem;
@@ -580,6 +605,7 @@
   }
 
   :root.dark {
+    --radius-scalar: 0.4;
     /* Per-mode mix knobs — overridden inline by `applyTheme()` per skin. */
     --theme-mix-chrome: 74%;
     --theme-mix-card: 38%;
@@ -2264,11 +2290,11 @@ button[data-slot='aui_msg-reactions']:not([data-reacted])[data-state='open'] {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  border: 1px solid color-mix(in srgb, var(--dt-destructive) 30%, transparent);
+  border: var(--ui-stroke-width) solid color-mix(in srgb, var(--dt-destructive) 30%, transparent);
   border-radius: 9999px;
   background: transparent;
   padding: 0.1rem 0.55rem;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   line-height: 1.1rem;
   color: color-mix(in srgb, var(--dt-destructive) 80%, var(--ui-text-secondary));
   cursor: pointer;
@@ -3446,7 +3472,7 @@ button[data-slot='aui_msg-reactions'] svg {
    breathing belongs to the thread and the chat surface; the bar just sits
    there, solid, like Spotlight does. */
 [data-hud-shell] [data-slot='composer-surface'] {
-  border: 1px solid var(--ui-stroke-secondary) !important;
+  border: var(--ui-stroke-width) solid var(--ui-stroke-secondary) !important;
   /* Same radius as the band's top and the window's own corners, so the HUD
      reads as one object however the band is behaving. Its top corners let a
      sliver of band through, which is the point — the glass wraps the bar's

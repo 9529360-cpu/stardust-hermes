@@ -122,7 +122,7 @@ export function ArtifactCard({ code, detection, streaming = false }: ArtifactCar
           {streaming
             ? copy.generating(lineCount)
             : versionCount > 1
-              ? `${kindLabel} · ${copy.versionBadge(versionCount)}`
+              ? `${kindLabel}: ${copy.versionBadge(versionCount)}`
               : kindLabel}
         </span>
       </span>

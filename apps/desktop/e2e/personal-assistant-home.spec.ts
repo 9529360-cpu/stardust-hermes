@@ -42,7 +42,7 @@ test('personal assistant workspace keeps conversation primary and navigation unc
   await expect(page.getByRole('tab', { name: '智能体' })).toHaveCount(0)
   await expect(page.getByRole('tab', { name: 'SESSIONS' })).toHaveCount(0)
   await expect(page.getByRole('tab', { name: 'BOTS' })).toHaveCount(0)
-  await expect(page.getByText('今天想做什么？', { exact: true })).toBeVisible()
+  await expect(page.getByText('有什么需要处理？', { exact: true })).toBeVisible()
   await expect(newChatButton).toBeVisible()
   await expect(productNav.getByRole('button', { name: '任务', exact: true })).toBeVisible()
   await expect(productNav.getByRole('button', { name: '工具' })).toBeVisible()

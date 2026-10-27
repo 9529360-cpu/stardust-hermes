@@ -15,7 +15,6 @@ export function Intro({ personality: _personality, seed: _seed }: IntroProps) {
   return (
     <div className="assistant-home" data-slot="aui_intro">
       <div className="assistant-home-copy">
-        <span className="assistant-home-eyebrow">{assistant.eyebrow}</span>
         <h1>{assistant.headline}</h1>
         <p>{assistant.body}</p>
       </div>

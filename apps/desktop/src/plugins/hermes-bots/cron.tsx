@@ -888,7 +888,7 @@ function SchedulePicker({ state, setState }: SchedulePickerProps) {
               raw: event.target.value
             })
           }
-          placeholder="every 1d · every 2h · 0 9 * * * (cron)"
+          placeholder="every 1d or 2h, or 0 9 * * * (cron)"
           size="sm"
           value={state.raw}
         />

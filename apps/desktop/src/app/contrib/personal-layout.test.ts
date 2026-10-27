@@ -9,12 +9,11 @@ describe('personal desktop default layout', () => {
     expect(allPaneIds(DEFAULT_TREE)).toEqual(['sessions', 'workspace', 'review', 'files'])
   })
 
-  it('keeps developer tools and the retired overview out of the first view', () => {
+  it('keeps developer tools out of the first view', () => {
     expect(allPaneIds(DEFAULT_TREE)).not.toContain('terminal')
-    expect(allPaneIds(DEFAULT_TREE)).not.toContain('workspace-overview')
   })
 
-  it('hosts review and files in one right rail without the overview tab', () => {
+  it('hosts review and files in one right rail', () => {
     expect(DEFAULT_TREE.type).toBe('split')
 
     if (DEFAULT_TREE.type !== 'split') {

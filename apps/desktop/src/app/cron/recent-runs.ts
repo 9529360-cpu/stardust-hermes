@@ -30,7 +30,7 @@ export function runStatus(run: WorkItem): RunStatus {
 export const RUN_DOT: Record<RunStatus, string> = {
   completed: 'bg-(--ui-text-quaternary)',
   failed: 'bg-destructive',
-  interrupted: 'bg-amber-500',
+  interrupted: 'bg-(--ui-bg-amber)',
   running: 'bg-primary',
   unknown: 'bg-muted-foreground'
 }

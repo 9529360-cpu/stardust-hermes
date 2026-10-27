@@ -181,8 +181,8 @@ export function AgentsHome({
                               status.key === 'unknown'
                                 ? 'bg-(--ui-text-quaternary)'
                                 : status.available
-                                  ? 'bg-emerald-500'
-                                  : 'bg-amber-500'
+                                  ? 'bg-(--ui-bg-green)'
+                                  : 'bg-(--ui-bg-amber)'
                             )}
                           />
                           {statusLabel}

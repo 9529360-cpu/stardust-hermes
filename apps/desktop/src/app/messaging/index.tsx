@@ -54,7 +54,7 @@ type EditMap = Record<string, Record<string, string>>
 const PILL_TONE: Record<StatusTone, string> = {
   good: 'bg-primary/10 text-primary',
   muted: 'bg-muted text-muted-foreground',
-  warn: 'bg-amber-500/10 text-amber-600 dark:text-amber-300',
+  warn: 'bg-(--ui-bg-amber)/10 text-(--ui-amber-text) dark:text-(--ui-amber-text)',
   bad: 'bg-destructive/10 text-destructive'
 }
 
@@ -509,7 +509,6 @@ export function MessagingView({ setStatusbarItemGroup: _setStatusbarItemGroup, .
       searchValue={query}
       title={m.pageTitle}
     >
-      <p className="shrink-0 px-6 pb-3 text-sm text-(--ui-text-tertiary)">{m.pageDescription}</p>
       {!platforms ? (
         <PageLoader label={m.loading} />
       ) : (
@@ -644,7 +643,7 @@ function PlatformRow({
             <span
               aria-label={t.messaging.pendingAria(pendingCount)}
               className={cn(
-                'inline-flex min-w-4 items-center justify-center rounded-full px-1 text-[0.66rem] font-medium tabular-nums',
+                'inline-flex min-w-5 min-h-5 items-center justify-center rounded-full px-1 text-xs font-medium tabular-nums',
                 PILL_TONE.warn
               )}
             >

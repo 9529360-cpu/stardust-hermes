@@ -418,12 +418,12 @@ export function MaintenancePanel() {
 
         {share && Object.keys(share.urls).length > 0 && (
           <div className="mt-2 rounded-lg border border-(--ui-stroke-tertiary) bg-(--ui-bg-quinary) p-3">
-            <div className="mb-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            <div className="mb-1.5 text-xs font-semibold text-muted-foreground">
               {mm.debugShareLinks}
             </div>
             {Object.entries(share.urls).map(([key, url]) => (
               <div className="flex items-center justify-between gap-2 py-1" key={key}>
-                <span className="min-w-0 truncate font-mono text-[0.7rem]">
+                <span className="min-w-0 truncate font-mono text-xs">
                   {key}: {url}
                 </span>
                 <Button
@@ -443,7 +443,7 @@ export function MaintenancePanel() {
 
         {actionStatus && (
           <div className="mt-2">
-            <div className="mb-1.5 flex items-center gap-2 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            <div className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
               {mm.viewLog}
               {actionStatus.running && <span className="normal-case tracking-normal">{mm.running}</span>}
             </div>
@@ -471,8 +471,8 @@ export function MaintenancePanel() {
                     !curator.enabled
                       ? 'bg-(--ui-bg-quinary) text-(--ui-text-tertiary)'
                       : curator.paused
-                        ? 'bg-amber-500/15 text-amber-400'
-                        : 'bg-emerald-500/15 text-emerald-400'
+                        ? 'bg-(--ui-bg-amber)/15 text-(--ui-amber-text)'
+                        : 'bg-(--ui-bg-green)/15 text-(--ui-green-text)'
                   )}
                 >
                   {!curator.enabled ? mm.curatorDisabled : curator.paused ? mm.curatorPaused : mm.curatorActive}
@@ -480,7 +480,7 @@ export function MaintenancePanel() {
               </div>
               <div className="mt-0.5 text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">
                 {mm.curatorDesc}
-                {' · '}
+                {', '}
                 {curator.last_run_at ? mm.curatorLastRun(curator.last_run_at) : mm.curatorNeverRan}
               </div>
             </div>
@@ -511,7 +511,7 @@ export function MaintenancePanel() {
           <div>
             <div className="py-1 text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">
               {mm.memoryDataDesc}
-              {' · '}
+              {', '}
               {mm.memoryProvider(memory.active || mm.builtinMemory)}
             </div>
             <MemoryFileRow

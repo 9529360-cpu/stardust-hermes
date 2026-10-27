@@ -436,7 +436,7 @@ export function CommandCenterView({ initialSection, onClose, onDeleteSession, on
                               session.archived ? cc.archivedChats : null
                             ]
                               .filter(Boolean)
-                              .join(' · ')}
+                              .join(', ')}
                           </div>
                         </button>
                         <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
@@ -487,7 +487,7 @@ export function CommandCenterView({ initialSection, onClose, onDeleteSession, on
                           <span
                             className={cn(
                               'size-2 shrink-0 rounded-full',
-                              status.gateway_running ? 'bg-emerald-500' : 'bg-amber-500'
+                              status.gateway_running ? 'bg-(--ui-bg-green)' : 'bg-(--ui-bg-amber)'
                             )}
                           />
                           <span className="text-[length:var(--conversation-text-font-size)] font-medium text-foreground">
@@ -509,7 +509,7 @@ export function CommandCenterView({ initialSection, onClose, onDeleteSession, on
                     </div>
                     {systemAction && (
                       <div className="text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">
-                        {systemAction.name} ·{' '}
+                        {systemAction.name}: {' '}
                         {systemAction.running
                           ? cc.actionRunning
                           : systemAction.exit_code === 0
@@ -525,7 +525,7 @@ export function CommandCenterView({ initialSection, onClose, onDeleteSession, on
 
               <div className="flex min-h-0 flex-col pt-2">
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                  <span className="text-[0.625rem] font-medium uppercase tracking-[0.08em] text-(--ui-text-tertiary)">
+                  <span className="text-xs font-medium text-(--ui-text-tertiary)">
                     {cc.recentLogs}
                   </span>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -648,7 +648,7 @@ function UsagePanel({ error, loading, onRefresh, period, usage }: UsagePanelProp
 
       <section>
         <div className="mb-2 flex items-baseline justify-between">
-          <span className="text-[0.625rem] font-medium uppercase tracking-[0.08em] text-(--ui-text-tertiary)">
+          <span className="text-xs font-medium text-(--ui-text-tertiary)">
             {cc.dailyTokens}
           </span>
           <span className="flex items-center gap-3 text-[0.65rem] text-(--ui-text-tertiary)">
@@ -656,7 +656,7 @@ function UsagePanel({ error, loading, onRefresh, period, usage }: UsagePanelProp
               <span className="size-2 rounded-[1px] bg-[color:var(--dt-primary)]/60" /> {cc.input}
             </span>
             <span className="inline-flex items-center gap-1">
-              <span className="size-2 rounded-[1px] bg-emerald-500/70" /> {cc.output}
+              <span className="size-2 rounded-[1px] bg-(--ui-bg-green)/70" /> {cc.output}
             </span>
           </span>
         </div>
@@ -675,14 +675,14 @@ function UsagePanel({ error, loading, onRefresh, period, usage }: UsagePanelProp
                   <div
                     className="group relative flex h-24 min-w-0 flex-1 flex-col justify-end"
                     key={entry.day}
-                    title={`${entry.day} · in ${compactNumber(entry.input_tokens)} · out ${compactNumber(entry.output_tokens)}`}
+                    title={`${entry.day}, in ${compactNumber(entry.input_tokens)}, out ${compactNumber(entry.output_tokens)}`}
                   >
                     <div
                       className="w-full rounded-t-[1px] bg-[color:var(--dt-primary)]/50"
                       style={{ height: Math.max(inputH, entry.input_tokens > 0 ? 1 : 0) }}
                     />
                     <div
-                      className="w-full bg-emerald-500/60"
+                      className="w-full bg-(--ui-bg-green)/60"
                       style={{ height: Math.max(outputH, entry.output_tokens > 0 ? 1 : 0) }}
                     />
                   </div>

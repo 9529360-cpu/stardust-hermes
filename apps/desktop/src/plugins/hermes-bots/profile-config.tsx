@@ -475,7 +475,7 @@ export function AdvancedProfileConfig({ bot, state, setState }: AdvancedProfileC
                         <span>{m.name}</span>
                         {m.fromCatalog && !needsSetup ? (
                           <span className="ml-1.5 text-[0.65rem] text-(--ui-text-quaternary)">
-                            {m.installed ? 'catalog · installed' : 'catalog'}
+                            {m.installed ? 'Catalog, installed' : 'Catalog'}
                           </span>
                         ) : null}
                         {needsSetup ? (

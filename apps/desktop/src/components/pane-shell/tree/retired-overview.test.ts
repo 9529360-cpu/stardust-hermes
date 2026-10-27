@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { allPaneIds, findGroup, group, split } from './model'
 import { withoutRetiredOverview } from './store'
 
-describe('retired overview layout migration', () => {
+describe('retired Workspace pane migration', () => {
   it('removes only the old overview tab and selects its surviving neighbor', () => {
     const saved = split('row', [
       group(['sessions'], { id: 'left' }),

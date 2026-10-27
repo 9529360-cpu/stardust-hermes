@@ -90,9 +90,9 @@ describe('cron dry-run preview', () => {
     const view = buildToolView(part({ toolName: name, result: dryRunCreate }), '')
 
     expect(view.subtitle).toContain('every day 09:00')
-    expect(view.subtitle).toContain('preview')
+    expect(view.subtitle).toContain('Preview:')
     // The collapsed row shows only the title, so the title must say it too.
-    expect(view.title).toBe('Cron job preview · every day 09:00')
+    expect(view.title).toBe('Cron job preview: every day 09:00')
   })
 
   it.each(CRON_NAMES)('lists the next runs, the delivery target and a not-saved line for a %s dry run', name => {
@@ -121,7 +121,7 @@ describe('cron dry-run preview', () => {
     const view = buildToolView(part({ result: dryRunCreate }), '')
 
     expect(view.title).toContain('定时任务预览')
-    expect(view.subtitle).toContain('定时任务预览')
+    expect(view.subtitle).toContain('预览：')
     expect(view.detail).toContain('当前对话')
     expect(view.detail).toContain('未保存')
     expect(view.detail).not.toContain('Not saved')

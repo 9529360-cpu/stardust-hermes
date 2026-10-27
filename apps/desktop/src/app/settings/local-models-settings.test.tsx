@@ -252,7 +252,7 @@ describe('LocalModelsSettings', () => {
     // The fitting model reads as pills, not prose: green memory pill +
     // green full-context pill (start_window == native, resident on GPU).
     expect(screen.getByText('Fits your GPU')).toBeTruthy()
-    expect(screen.getByText('Full 256K context').className).toContain('emerald')
+    expect(screen.getByText('Full 256K context').className).toContain('green-text')
 
     // The refused model is NOT hidden (discoverability rule): red memory
     // pill, plus the ceiling it would have had.
@@ -269,7 +269,7 @@ describe('LocalModelsSettings', () => {
     // Its download button is disabled; the fitting model's is enabled once
     // the runtime exists (here runtime_installed=false, so both disabled —
     // asserted separately below).
-    const buttons = screen.getAllByRole('button', { name: /download · 17\.6 GB/i })
+    const buttons = screen.getAllByRole('button', { name: /download.*17\.6 GB/i })
     expect(buttons.every(b => (b as HTMLButtonElement).disabled)).toBe(true)
   })
 
@@ -307,7 +307,7 @@ describe('LocalModelsSettings', () => {
 
     expect(screen.queryByRole('button', { name: /set up for me/i })).toBeNull()
     expect(screen.getByRole('button', { name: /browse models/i })).toBeTruthy()
-    expect(screen.getByText('Full 256K context').className).not.toContain('emerald')
+    expect(screen.getByText('Full 256K context').className).not.toContain('green-text')
   })
 
   it('explains the Recommended pick on hover', async () => {
@@ -338,7 +338,7 @@ describe('LocalModelsSettings', () => {
     await renderFullPane()
 
     await screen.findByText('Qwen3.6 27B')
-    const [fittingButton] = screen.getAllByRole('button', { name: /download · 17\.6 GB/i })
+    const [fittingButton] = screen.getAllByRole('button', { name: /download.*17\.6 GB/i })
     expect((fittingButton as HTMLButtonElement).disabled).toBe(false)
   })
 
@@ -379,7 +379,7 @@ describe('LocalModelsSettings', () => {
     await renderFullPane()
     await screen.findByText('Qwen3.6 27B')
 
-    const [download] = screen.getAllByRole('button', { name: /download · 17\.6 GB/i })
+    const [download] = screen.getAllByRole('button', { name: /download.*17\.6 GB/i })
     download.click()
 
     // The app-level watcher follows the job; when it settles the pane
@@ -420,7 +420,7 @@ describe('LocalModelsSettings', () => {
     // The fitting row shows byte progress; the remaining download
     // buttons belong to the other rows (spilled + refused).
     expect(screen.getAllByText(/0\.0 GB of 0\.0 GB|of/).length).toBeGreaterThan(0)
-    const remaining = screen.queryAllByRole('button', { name: /download · 17\.6 GB/i })
+    const remaining = screen.queryAllByRole('button', { name: /download.*17\.6 GB/i })
     expect(remaining.length).toBe(2)
     expect(remaining.some(b => (b as HTMLButtonElement).disabled)).toBe(true)
   })
@@ -558,7 +558,7 @@ describe('BrowseSection', () => {
     mocked.getLocalCatalog.mockResolvedValue({
       models: [{ ...SPILLED_MODEL, downloaded: true, downloaded_model_id: stagedId }]
     })
-    fireEvent.click(screen.getByRole('button', { name: /download ·/i }))
+    fireEvent.click(screen.getByRole('button', { name: /download[ —].*/i }))
     await waitFor(() => expect(mocked.downloadLocalModel).toHaveBeenCalledWith(SPILLED_MODEL.id))
     mocked.activateLocalModel.mockResolvedValue({ job_id: 'explicit-spill' })
     fireEvent.click(await screen.findByRole('button', { name: /^use$/i }))

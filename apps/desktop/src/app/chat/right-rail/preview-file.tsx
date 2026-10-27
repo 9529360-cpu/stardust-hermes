@@ -59,9 +59,9 @@ const TONE_STYLES: Record<EmptyStateTone, { cube: string; primary: string }> = {
     primary: 'border-border bg-background text-foreground hover:bg-accent'
   },
   warning: {
-    cube: 'text-amber-500/70 dark:text-amber-300/70',
+    cube: 'text-(--ui-amber-text)/70 dark:text-(--ui-amber-text)/70',
     primary:
-      'border-amber-400/40 bg-amber-50 text-amber-900 hover:bg-amber-100 dark:border-amber-300/30 dark:bg-amber-300/15 dark:text-amber-100 dark:hover:bg-amber-300/20'
+      'border-(--ui-border-amber)/40 bg-(--ui-bg-amber) text-(--ui-amber-text) hover:bg-(--ui-bg-amber) dark:border-(--ui-border-amber)/30 dark:bg-(--ui-bg-amber)/15 dark:text-(--ui-amber-text) dark:hover:bg-(--ui-bg-amber)/20'
   }
 }
 
@@ -335,7 +335,7 @@ function MarkdownCode({ className, children, ...props }: ComponentProps<'code'>)
     return (
       <code
         className={cn(
-          'rounded bg-muted px-1 py-0.5 font-mono text-[0.86em] text-pink-700 dark:text-pink-300',
+          'rounded bg-muted px-1 py-0.5 font-mono text-[0.86em] text-(--ui-violet-text) dark:text-(--ui-violet-text)',
           className
         )}
         {...props}
@@ -634,7 +634,7 @@ export function SourceView({ filePath, language, text }: { filePath?: string; la
                       'h-5 w-9 pr-2 leading-5 tabular-nums transition-colors',
                       filePath && 'cursor-pointer',
                       selected
-                        ? 'bg-amber-200/45 text-amber-900 dark:bg-amber-300/20 dark:text-amber-100'
+                        ? 'bg-(--ui-bg-amber)/45 text-(--ui-amber-text) dark:bg-(--ui-bg-amber)/20 dark:text-(--ui-amber-text)'
                         : filePath && 'hover:text-foreground'
                     )}
                     draggable={Boolean(filePath)}
@@ -974,7 +974,7 @@ export function LocalFilePreview({ reloadKey, target }: { reloadKey: number; tar
           trailing={<EditControls dirty={dirty} onCancel={cancelEdit} onSave={() => void saveEdit()} saving={saving} />}
         />
         {conflict && (
-          <div className="shrink-0 border-b border-amber-400/40 bg-amber-50 px-3 py-2 text-[0.7rem] text-amber-900 dark:border-amber-300/30 dark:bg-amber-300/10 dark:text-amber-100">
+          <div className="shrink-0 border-b border-(--ui-border-amber)/40 bg-(--ui-bg-amber) px-3 py-2 text-[0.7rem] text-(--ui-amber-text) dark:border-(--ui-border-amber)/30 dark:bg-(--ui-bg-amber)/10 dark:text-(--ui-amber-text)">
             <div className="font-semibold">{t.preview.diskChangedTitle}</div>
             <div className="mt-0.5 leading-relaxed">{t.preview.diskChangedBody}</div>
             <div className="mt-1.5 flex gap-3">

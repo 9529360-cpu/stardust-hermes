@@ -19,7 +19,7 @@ const toolLabel = (name: string) => name.split('_').filter(Boolean).map(capitali
 // the in-progress item.
 const TODO_GLYPHS: Record<Exclude<TodoStatus, 'in_progress' | 'pending'>, { icon: string; tone: string }> = {
   cancelled: { icon: 'circle-slash', tone: 'text-muted-foreground/45' },
-  completed: { icon: 'pass-filled', tone: 'text-emerald-500/80' }
+  completed: { icon: 'pass-filled', tone: 'text-(--ui-green-text)/80' }
 }
 
 // Left slot: braille spinner while running, otherwise a small status dot
@@ -31,13 +31,13 @@ function leadingGlyph(item: ComposerStatusItem, s: Translations['statusStack']):
     }
 
     if (item.goalStatus === 'done') {
-      return <Codicon className="text-emerald-500/80" name="pass-filled" size="0.8rem" />
+      return <Codicon className="text-(--ui-green-text)/80" name="pass-filled" size="0.8rem" />
     }
 
     return (
       <GlyphSpinner
         ariaLabel={s.running}
-        className="text-[0.85rem] leading-none text-emerald-500/80"
+        className="text-[0.85rem] leading-none text-(--ui-green-text)/80"
         spinner="braille"
       />
     )
@@ -71,7 +71,7 @@ function leadingGlyph(item: ComposerStatusItem, s: Translations['statusStack']):
   return (
     <span
       aria-hidden
-      className={cn('size-1.5 rounded-full', item.state === 'failed' ? 'bg-destructive/80' : 'bg-emerald-500/70')}
+      className={cn('size-1.5 rounded-full', item.state === 'failed' ? 'bg-destructive/80' : 'bg-(--ui-bg-green)/70')}
     />
   )
 }
@@ -159,7 +159,7 @@ export const StatusItemRow = memo(function StatusItemRow({ item, onDismiss, onOp
           {item.title}
         </span>
         {item.type === 'todo' && item.blockedBy && item.blockedBy.length > 0 && (
-          <span className="shrink-0 truncate text-[0.62rem] leading-4 text-amber-600/80 dark:text-amber-400/80">
+          <span className="shrink-0 truncate text-[0.62rem] leading-4 text-(--ui-amber-text)/80 dark:text-(--ui-amber-text)/80">
             {s.blockedBy(item.blockedBy)}
           </span>
         )}

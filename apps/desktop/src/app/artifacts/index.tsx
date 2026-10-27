@@ -533,7 +533,7 @@ function ArtifactImageCard({ artifact, failedImage, onImageError, onOpenChat }: 
         </div>
 
         <div className="truncate text-[0.625rem] text-(--ui-text-tertiary)">
-          {artifact.sessionTitle} · {formatArtifactTime(artifact.timestamp)}
+          {artifact.sessionTitle}, {formatArtifactTime(artifact.timestamp)}
         </div>
 
         <div className="flex flex-wrap gap-1.5">

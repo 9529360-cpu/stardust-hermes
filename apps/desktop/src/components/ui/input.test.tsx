@@ -11,7 +11,7 @@ describe('Input', () => {
     const el = getByRole('textbox')
 
     expect(el.className).toContain('h-8')
-    expect(el.className).toContain('rounded-[6px]')
+    expect(el.className).toContain('rounded-[4px]')
   })
 
   it('renders a bare input carrying the control chrome when unadorned', () => {

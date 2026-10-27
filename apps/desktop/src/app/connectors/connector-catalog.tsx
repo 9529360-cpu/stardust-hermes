@@ -106,7 +106,7 @@ function ConnectedRow({ name, server, scopeKey }: { name: string; server: Record
           <span
             className={
               probe?.result.ok && enabled
-                ? 'text-[0.62rem] text-emerald-400'
+                ? 'text-[0.62rem] text-(--ui-green-text)'
                 : 'text-[0.62rem] text-(--ui-text-tertiary)'
             }
           >
@@ -115,7 +115,7 @@ function ConnectedRow({ name, server, scopeKey }: { name: string; server: Record
         </div>
         <span className="block truncate text-[0.62rem] text-muted-foreground/60">
           {probe?.result.ok
-            ? `${c.availableTools}: ${probe.result.tools.length}${checkedAt ? ` · ${c.lastChecked(checkedAt)}` : ''}`
+            ? `${c.availableTools}: ${probe.result.tools.length}${checkedAt ? `, ${c.lastChecked(checkedAt)}` : ''}`
             : server.url
               ? String(server.url)
               : String(server.command ?? '')}
@@ -215,7 +215,6 @@ export function ConnectorCatalogView({ profile }: { profile: ProfileScope | null
       <header className="flex shrink-0 items-start justify-between gap-4 px-6 py-4">
         <div className="min-w-0">
           <h1 className="text-lg font-semibold text-(--ui-text-primary)">{t.connectors.pageTitle}</h1>
-          <p className="mt-1 text-sm text-(--ui-text-tertiary)">{t.connectors.pageDescription}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <ConnectedSummary profile={scopeProfile} />
