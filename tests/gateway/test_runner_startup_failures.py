@@ -29,13 +29,14 @@ def test_is_global_startup_conflict_matches_lock_code_families(code, expected):
 
 
 class _RetryableFailureAdapter(BasePlatformAdapter):
-    def __init__(self):
-        super().__init__(PlatformConfig(enabled=True, token="***"), Platform.TELEGRAM)
+    def __init__(self, platform=Platform.TELEGRAM):
+        super().__init__(PlatformConfig(enabled=True, token="***", extra={"account_id": "acct-test"}), platform)
 
     async def connect(self, *, is_reconnect: bool = False) -> bool:
+        platform_name = self.platform.value
         self._set_fatal_error(
-            "telegram_connect_error",
-            "Telegram startup failed: temporary DNS resolution failure.",
+            f"{platform_name}_connect_error",
+            f"{platform_name} startup failed: temporary DNS resolution failure.",
             retryable=True,
         )
         return False
@@ -69,7 +70,7 @@ class _DisabledAdapter(BasePlatformAdapter):
 
 class _SuccessfulAdapter(BasePlatformAdapter):
     def __init__(self):
-        super().__init__(PlatformConfig(enabled=True, token="***"), Platform.DISCORD)
+        super().__init__(PlatformConfig(enabled=True, token="***"), Platform.WEIXIN)
 
     async def connect(self, *, is_reconnect: bool = False) -> bool:
         return True
@@ -349,7 +350,7 @@ async def test_runner_degrades_gracefully_when_all_adapters_missing(monkeypatch,
     config = GatewayConfig(
         platforms={
             Platform.TELEGRAM: PlatformConfig(enabled=True, token="***"),
-            Platform.DISCORD: PlatformConfig(enabled=True, token="***"),
+            Platform.WEIXIN: PlatformConfig(enabled=True, token="***", extra={"account_id": "acct-test"}),
         },
         sessions_dir=tmp_path / "sessions",
     )
@@ -380,12 +381,12 @@ async def test_runner_degrades_gracefully_when_all_adapters_missing(monkeypatch,
 class _NonRetryableFailureAdapter(BasePlatformAdapter):
     """Simulates a fatal config error like token collision."""
     def __init__(self):
-        super().__init__(PlatformConfig(enabled=True, token="***"), Platform.DISCORD)
+        super().__init__(PlatformConfig(enabled=True, token="***"), Platform.WEIXIN)
 
     async def connect(self, *, is_reconnect: bool = False) -> bool:
         self._set_fatal_error(
-            "discord-bot-token_lock",
-            "Discord bot token already in use (PID 999). Stop the other gateway first.",
+            "weixin-bot-token_lock",
+            "Weixin bot token already in use (PID 999). Stop the other gateway first.",
             retryable=False,
         )
         return False
@@ -408,7 +409,7 @@ async def test_runner_exits_with_ex_config_on_nonretryable_startup_error(monkeyp
     monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     config = GatewayConfig(
         platforms={
-            Platform.DISCORD: PlatformConfig(enabled=True, token="***")
+            Platform.WEIXIN: PlatformConfig(enabled=True, token="***", extra={"account_id": "acct-test"})
         },
         sessions_dir=tmp_path / "sessions",
     )
@@ -441,7 +442,7 @@ async def test_start_gateway_propagates_fatal_config_exit_code(monkeypatch, tmp_
         def __init__(self, config):
             self.config = config
             self.should_exit_cleanly = True
-            self.exit_reason = "discord: Discord bot token already in use"
+            self.exit_reason = "weixin: Weixin bot token already in use"
             self.exit_code = GATEWAY_FATAL_CONFIG_EXIT_CODE
             self.adapters = {}
 
@@ -466,7 +467,7 @@ async def test_start_gateway_propagates_fatal_config_exit_code(monkeypatch, tmp_
 
 
 class _ForeignTokenLockAdapter(BasePlatformAdapter):
-    """Connects exactly like telegram/discord do: production
+    """Connects exactly like Telegram/Weixin do: production
     ``_acquire_platform_lock`` first, which emits ``{scope}_lock`` with
     ``retryable=True`` (so a mid-run reconnect can recover, #54167)."""
 
@@ -543,23 +544,21 @@ async def test_token_lock_plus_retryable_peer_stays_alive(monkeypatch, tmp_path)
     config = GatewayConfig(
         platforms={
             Platform.TELEGRAM: PlatformConfig(enabled=True, token="***"),
-            Platform.DISCORD: PlatformConfig(enabled=True, token="***"),
+            Platform.WEIXIN: PlatformConfig(enabled=True, token="***", extra={"account_id": "acct-test"}),
         },
         sessions_dir=tmp_path / "sessions",
     )
     runner = GatewayRunner(config)
 
-    class _DiscordBlip(_RetryableFailureAdapter):
+    class _WeixinBlip(_RetryableFailureAdapter):
         def __init__(self):
-            BasePlatformAdapter.__init__(
-                self, PlatformConfig(enabled=True, token="***"), Platform.DISCORD
-            )
+            super().__init__(Platform.WEIXIN)
 
     monkeypatch.setattr(
         runner,
         "_create_adapter",
         lambda platform, cfg: (
-            _ForeignTokenLockAdapter() if platform is Platform.TELEGRAM else _DiscordBlip()
+            _ForeignTokenLockAdapter() if platform is Platform.TELEGRAM else _WeixinBlip()
         ),
     )
 
@@ -568,10 +567,10 @@ async def test_token_lock_plus_retryable_peer_stays_alive(monkeypatch, tmp_path)
         assert ok is True
         assert runner.should_exit_cleanly is False
         assert runner.exit_code is None
-        assert set(runner._failed_platforms) == {Platform.DISCORD}
+        assert set(runner._failed_platforms) == {Platform.WEIXIN}
         state = read_runtime_status()
         assert state["gateway_state"] == "running"
         assert state["platforms"]["telegram"]["state"] == "fatal"
-        assert state["platforms"]["discord"]["state"] == "retrying"
+        assert state["platforms"]["weixin"]["state"] == "retrying"
     finally:
         await runner.stop()

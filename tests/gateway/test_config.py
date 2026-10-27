@@ -155,13 +155,13 @@ class TestGetConnectedPlatforms:
         config = GatewayConfig(
             platforms={
                 Platform.TELEGRAM: PlatformConfig(enabled=True, token="t"),
-                Platform.TELEGRAM: PlatformConfig(enabled=False, token="d"),
-                Platform.SLACK: PlatformConfig(enabled=True),  # no token
+                Platform.WEIXIN: PlatformConfig(enabled=False, token="d"),
+                Platform.SLACK: PlatformConfig(enabled=True),  # retired and has no usable credentials
             },
         )
         connected = config.get_connected_platforms()
         assert Platform.TELEGRAM in connected
-        assert Platform.TELEGRAM not in connected
+        assert Platform.WEIXIN not in connected
         assert Platform.SLACK not in connected
 
 
@@ -710,6 +710,7 @@ class TestLoadGatewayConfig:
         monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         monkeypatch.setenv("GATEWAY_RELAY_URL", "https://connector.example/relay")
         monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "fake-token-for-test")
+        monkeypatch.setenv("WHATSAPP_ENABLED", "true")
 
         with caplog.at_level(_logging.INFO, logger="gateway.config"):
             config = load_gateway_config()
@@ -719,12 +720,12 @@ class TestLoadGatewayConfig:
             if r.levelno == _logging.WARNING and "telegram" in r.getMessage()
         ]
         assert warnings, "explicit platform must be disabled at WARNING"
-        discord_infos = [
+        whatsapp_infos = [
             r for r in caplog.records
-            if r.levelno == _logging.INFO and "discord" in r.getMessage()
+            if r.levelno == _logging.INFO and "whatsapp" in r.getMessage()
         ]
         if config.platforms.get(Platform.TELEGRAM) is not None:
-            assert discord_infos, "auto-enabled platform must be disabled at INFO"
+            assert whatsapp_infos, "auto-enabled platform must be disabled at INFO"
 
         for pc in config.platforms.values():
             assert "_enabled_explicit" not in (pc.extra or {})
@@ -736,18 +737,18 @@ class TestLoadGatewayConfig:
         hermes_home.mkdir()
         config_path = hermes_home / "config.yaml"
         config_path.write_text(
-            "discord:\n"
-            "  thread_require_mention: false\n",
+            "telegram:\n"
+            "  require_mention: false\n",
             encoding="utf-8",
         )
 
         monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
-        monkeypatch.setenv("DISCORD_THREAD_REQUIRE_MENTION", "true")  # user override
+        monkeypatch.setenv("TELEGRAM_REQUIRE_MENTION", "true")  # user override
 
         load_gateway_config()
 
         # Env value preserved, not clobbered by yaml.
-        assert os.environ.get("DISCORD_THREAD_REQUIRE_MENTION") == "true"
+        assert os.environ.get("TELEGRAM_REQUIRE_MENTION") == "true"
 
 
     @pytest.mark.parametrize("yaml_text", ["gateway:\n  allow_all_users: true\n", "allow_all_users: true\n"])

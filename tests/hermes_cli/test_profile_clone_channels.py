@@ -69,7 +69,9 @@ def _fingerprints(profile_home: Path) -> set:
 
 def test_clone_strips_every_channel_credential_but_keeps_model_and_tool_keys(home):
     source_claims = _fingerprints(home)
-    assert {p for p, _ in source_claims} >= {"telegram", "discord"}
+    assert {p for p, _ in source_claims} >= {"telegram"}
+    # The legacy Discord config is preserved as disabled data, not an active credential claim.
+    assert "discord" not in {p for p, _ in source_claims}
 
     profile_dir = create_profile("bot2", clone_config=True, no_alias=True)
 
@@ -95,7 +97,7 @@ def test_clone_strips_every_channel_credential_but_keeps_model_and_tool_keys(hom
 def test_clone_channels_opt_in_keeps_the_source_channels(home):
     profile_dir = create_profile("twin", clone_config=True, no_alias=True, clone_channels=True)
     assert _fingerprints(profile_dir) == _fingerprints(home)
-    assert set(shared_channel_credentials(profile_dir, home)) >= {"telegram", "discord"}
+    assert set(shared_channel_credentials(profile_dir, home)) >= {"telegram"}
     assert set(channel_platforms_configured(profile_dir)) >= {"telegram", "discord", "whatsapp", "api_server"}
     assert gm.build_migration_plan().blocked
 
@@ -182,28 +184,81 @@ _SHARED_ENV = (
     "GATEWAY_RELAY_ID=gw-1\nGATEWAY_RELAY_SECRET=s\nGATEWAY_RELAY_DELIVERY_KEY=k\n"
     "WECOM_DM_POLICY=open\nSMS_WEBHOOK_PORT=8700\n"
     "HASS_TOKEN=hass-tool-token\nHASS_URL=http://ha.local\n"
-    "TWILIO_ACCOUNT_SID=AC1\nTWILIO_AUTH_TOKEN=tw\nTWILIO_PHONE_NUMBER=+1\n"
+    "TWILIO_ACCOUNT_SID=AC1\nTWILIO_AUTH_TOKEN=tw\nTWILIO_PHONE_NUMBER=+1\nTWILIO_PHONE_NUMBER_SID=PN1\n"
+    "MSGRAPH_TENANT_ID=tenant-tool\nMSGRAPH_CLIENT_ID=client-tool\nMSGRAPH_CLIENT_SECRET=graph-tool-secret\n"
+    "MSGRAPH_SCOPE=scope-tool\nMSGRAPH_AUTHORITY_URL=https://login.example.test/\n"
+    "MSGRAPH_WEBHOOK_PORT=8199\n"
     "EMAIL_ADDRESS=a@b\nEMAIL_PASSWORD=p\nEMAIL_SMTP_HOST=smtp\nEMAIL_IMAP_HOST=imap\nEMAIL_ALLOWED_USERS=x@y\n"
 )
 
 
 def test_ownership_inventory_strips_policy_relay_and_aliases_but_keeps_tool_credentials(home):
-    """Gateway-wide policy, relay identity and alias-prefixed keys are channel settings. HASS/TWILIO/EMAIL
-    credentials are shared with tools: they leave with the channel only when the source's gateway would
-    run that adapter (email here — complete creds, not disabled); an explicitly disabled channel means
-    the key is a tool credential and stays. Its policy keys (allowlists, ports) go regardless."""
+    """Gateway policy, relay identity and alias-prefixed keys are channel settings. HASS/TWILIO/EMAIL
+    credentials are shared with tools: because these adapters are retired, their values now stay for
+    the independent tool integrations; policy keys and retired channel config are stripped."""
     (home / ".env").write_text(_SHARED_ENV, encoding="utf-8")
+    source_env = (home / ".env").read_text(encoding="utf-8")
     (home / "config.yaml").write_text(
         yaml.safe_dump({"model": {"default": "gpt-5", "provider": "openai"},
-                        "platforms": {"homeassistant": {"enabled": False}, "sms": {"enabled": False}}}),
+                        "platforms": {"homeassistant": {"enabled": False}, "sms": {"enabled": False},
+                                      "msgraph_webhook": {"enabled": False}}}),
         encoding="utf-8")
 
     profile_dir = create_profile("bot3", clone_config=True, no_alias=True)
 
     keys = {line.split("=", 1)[0] for line in (profile_dir / ".env").read_text(encoding="utf-8").splitlines()
             if "=" in line and not line.startswith("#")}
-    assert keys == {"OPENAI_API_KEY", "HASS_TOKEN", "HASS_URL",
-                    "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_PHONE_NUMBER"}
+    assert keys == {
+        "OPENAI_API_KEY", "HASS_TOKEN", "HASS_URL",
+        "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_PHONE_NUMBER", "TWILIO_PHONE_NUMBER_SID",
+        "MSGRAPH_TENANT_ID", "MSGRAPH_CLIENT_ID", "MSGRAPH_CLIENT_SECRET", "MSGRAPH_SCOPE", "MSGRAPH_AUTHORITY_URL",
+        "EMAIL_ADDRESS", "EMAIL_PASSWORD", "EMAIL_SMTP_HOST", "EMAIL_IMAP_HOST",
+    }
+    assert (home / ".env").read_text(encoding="utf-8") == source_env
+
+
+def test_sms_source_clone_strips_twilio_channel_credentials_but_keeps_other_tool_credentials(home):
+    """An active SMS source owns TWILIO values; other non-channel tool credentials remain."""
+    (home / ".env").write_text(_SHARED_ENV, encoding="utf-8")
+    source_env = (home / ".env").read_text(encoding="utf-8")
+    config = yaml.safe_load((home / "config.yaml").read_text(encoding="utf-8"))
+    config.setdefault("platforms", {})["sms"] = {"enabled": True}
+    config["platforms"]["homeassistant"] = {"enabled": False}
+    config["platforms"]["msgraph_webhook"] = {"enabled": False}
+    (home / "config.yaml").write_text(yaml.safe_dump(config), encoding="utf-8")
+
+    profile_dir = create_profile("sms-bot", clone_config=True, no_alias=True)
+    keys = {line.split("=", 1)[0] for line in (profile_dir / ".env").read_text(encoding="utf-8").splitlines()
+            if "=" in line and not line.startswith("#")}
+
+    assert not {"TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_PHONE_NUMBER", "TWILIO_PHONE_NUMBER_SID"} & keys
+    assert {"HASS_TOKEN", "HASS_URL", "MSGRAPH_TENANT_ID", "MSGRAPH_CLIENT_ID", "MSGRAPH_CLIENT_SECRET"} <= keys
+    assert "MSGRAPH_WEBHOOK_PORT" not in keys
+    assert (home / ".env").read_text(encoding="utf-8") == source_env
+
+
+def test_homeassistant_and_msgraph_gateway_aliases_strip_only_channel_owned_values(home):
+    """An active gateway owns its channel policy; shared HASS/TWILIO/Graph tool credentials stay distinct."""
+    (home / ".env").write_text(_SHARED_ENV, encoding="utf-8")
+    source_env = (home / ".env").read_text(encoding="utf-8")
+    config = {
+        "model": {"default": "gpt-5", "provider": "openai"},
+        "platforms": {
+            "homeassistant": {"enabled": True},
+            "sms": {"enabled": False},
+            "msgraph_webhook": {"enabled": True},
+        },
+    }
+    (home / "config.yaml").write_text(yaml.safe_dump(config), encoding="utf-8")
+
+    profile_dir = create_profile("shared-tools", clone_config=True, no_alias=True)
+    keys = {line.split("=", 1)[0] for line in (profile_dir / ".env").read_text(encoding="utf-8").splitlines()
+            if "=" in line and not line.startswith("#")}
+
+    assert not {"HASS_TOKEN", "HASS_URL", "MSGRAPH_WEBHOOK_PORT"} & keys
+    assert {"TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_PHONE_NUMBER"} <= keys
+    assert {"MSGRAPH_TENANT_ID", "MSGRAPH_CLIENT_ID", "MSGRAPH_CLIENT_SECRET", "MSGRAPH_SCOPE"} <= keys
+    assert (home / ".env").read_text(encoding="utf-8") == source_env
 
 
 def test_clone_all_drops_directory_shaped_channel_state(home):

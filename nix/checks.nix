@@ -1070,9 +1070,11 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
           test -d ${hermes-agent}/share/hermes-agent/plugins || (echo "FAIL: plugins directory missing"; exit 1)
           echo "PASS: plugins directory exists"
 
-          test -f ${hermes-agent}/share/hermes-agent/plugins/platforms/irc/plugin.yaml || \
-            (echo "FAIL: irc plugin manifest missing"; exit 1)
-          echo "PASS: irc plugin manifest present"
+          for platform in telegram whatsapp; do
+            test -f ${hermes-agent}/share/hermes-agent/plugins/platforms/$platform/plugin.yaml || \
+              (echo "FAIL: $platform plugin manifest missing"; exit 1)
+            echo "PASS: $platform plugin manifest present"
+          done
 
           grep -q "STARDUST_BUNDLED_PLUGINS" ${hermes-agent}/bin/stardust || \
             (echo "FAIL: STARDUST_BUNDLED_PLUGINS not in wrapper"; exit 1)

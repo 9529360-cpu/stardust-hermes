@@ -28,9 +28,18 @@ _STATIC_PROVIDER_ENV_BLOCKLIST = frozenset({
     "DISCORD_HOME_CHANNEL_NAME", "DISCORD_REQUIRE_MENTION",
     "DISCORD_FREE_RESPONSE_CHANNELS", "DISCORD_AUTO_THREAD", "SLACK_HOME_CHANNEL",
     "SLACK_HOME_CHANNEL_NAME", "SLACK_ALLOWED_USERS", "WHATSAPP_ENABLED",
+    # The retired Buzz plugin manifest used to add these category=messaging vars to
+    # OPTIONAL_ENV_VARS. Keep their child-process blocklist after adapter removal; the
+    # context-gated terminal carve-out below remains the only permitted pass-through.
+    "BUZZ_RELAY_URL", "BUZZ_PRIVATE_KEY", "BUZZ_TRANSPORT", "BUZZ_AUTH_TAG",
+    "BUZZ_CHANNELS", "BUZZ_HOME_CHANNEL", "BUZZ_ALLOWED_USERS", "BUZZ_ALLOW_ALL_USERS",
+    "BUZZ_POLL_INTERVAL", "BUZZ_CLI_PATH", "BUZZ_CREDENTIALS_FILE", "BUZZ_REPLY_IN_THREAD",
     "WHATSAPP_MODE", "WHATSAPP_ALLOWED_USERS", "SIGNAL_HTTP_URL", "SIGNAL_ACCOUNT",
     "SIGNAL_ALLOWED_USERS", "SIGNAL_GROUP_ALLOWED_USERS", "SIGNAL_HOME_CHANNEL",
     "SIGNAL_HOME_CHANNEL_NAME", "SIGNAL_IGNORE_STORIES", "HASS_TOKEN", "HASS_URL",
+    "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_PHONE_NUMBER", "TWILIO_PHONE_NUMBER_SID",
+    "MSGRAPH_TENANT_ID", "MSGRAPH_CLIENT_ID", "MSGRAPH_CLIENT_SECRET", "MSGRAPH_SCOPE",
+    "MSGRAPH_AUTHORITY_URL",
     "EMAIL_ADDRESS", "EMAIL_PASSWORD", "EMAIL_IMAP_HOST", "EMAIL_SMTP_HOST",
     "EMAIL_HOME_ADDRESS", "EMAIL_HOME_ADDRESS_NAME", "STARDUST_DASHBOARD_SESSION_TOKEN",
     "GATEWAY_ALLOWED_USERS", "GH_TOKEN", "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY_PATH",
@@ -80,6 +89,48 @@ def _build_provider_env_blocklist() -> frozenset:
 
 
 _HERMES_PROVIDER_ENV_BLOCKLIST = _build_provider_env_blocklist()
+
+# These namespaces are shared with non-gateway tools. They stay blocked by default everywhere,
+# but a small exact-name set may be explicitly passed to a local terminal child under its active
+# profile secret scope. Other target surfaces never receive them, even when allowlisted.
+_SHARED_TOOL_ENV_PREFIXES = ("HASS_", "TWILIO_", "MSGRAPH_")
+_LOCAL_TERMINAL_PROFILE_SECRET_ENV_VARS = frozenset({
+    "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_PHONE_NUMBER", "TWILIO_PHONE_NUMBER_SID",
+})
+
+
+def _is_shared_tool_env(name: str) -> bool:
+    """True for shared tool/gateway namespaces, including unknown future names (fail closed)."""
+    upper = str(name).upper()
+    return upper.startswith(_SHARED_TOOL_ENV_PREFIXES)
+
+
+def _is_local_terminal_profile_secret(name: str) -> bool:
+    """True only for the exact shared credentials eligible for explicit local terminal passthrough."""
+    return str(name).upper() in _LOCAL_TERMINAL_PROFILE_SECRET_ENV_VARS
+
+
+# Only aliases whose variables are gateway-owned belong in the process-wide retired-platform filter.
+# HASS_* / TWILIO_* are shared with tools, and MS Graph tool keys are distinct from
+# MSGRAPH_WEBHOOK_* (which is the retired gateway adapter's actual namespace).
+_RETIRED_PLATFORM_ENV_PREFIX_ALIASES = {
+    "qqbot": ("QQ_",),
+}
+
+
+def _is_retired_platform_env(name: str) -> bool:
+    """True for an environment name owned by a retired messaging adapter."""
+    from gateway.config import RETIRED_PLATFORMS
+
+    upper = name.upper()
+    for platform in RETIRED_PLATFORMS:
+        canonical = platform.upper().replace("-", "_") + "_"
+        if upper.startswith(canonical):
+            return True
+        if any(upper.startswith(prefix) for prefix in _RETIRED_PLATFORM_ENV_PREFIX_ALIASES.get(platform, ())):
+            return True
+    return False
+
 
 # First-party platform credentials (``BUZZ_*``, driving the platform-mandated ``buzz``
 # CLI) carved out of the TERMINAL scrub only (``_make_run_env``,

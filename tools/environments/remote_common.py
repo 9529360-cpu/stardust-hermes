@@ -8,7 +8,9 @@ import subprocess
 from typing import Callable, Iterable
 
 from tools.environments.base_session_env import _SHELL_ENV_NAME_RE
-from tools.environments.local_env_policy import _HERMES_PROVIDER_ENV_BLOCKLIST, _is_hermes_internal_secret
+from tools.environments.local_env_policy import (
+    _HERMES_PROVIDER_ENV_BLOCKLIST, _is_hermes_internal_secret, _is_retired_platform_env, _is_shared_tool_env,
+)
 
 
 def load_hermes_env_vars() -> dict[str, str]:
@@ -26,11 +28,11 @@ def resolve_passthrough_env(explicit_forward: Iterable[str] = (),
     """Values to forward into a remote shell plus the scoped names that must be unset there.
 
     Implicit passthrough (skill ``required_environment_variables`` + ``terminal.env_passthrough``)
-    is filtered through the Hermes provider-credential blocklist and the dynamic internal-secret
-    check; ``explicit_forward`` entries (docker_forward_env) are an operator opt-in that bypasses
-    both. Each value is the routed profile's secret when multiplex is active; a name the active
-    scope lacks is returned in the unset set so a shared sandbox cannot leak another profile's
-    value.
+    is filtered through the Hermes provider-credential blocklist and dynamic internal-secret check;
+    ``explicit_forward`` entries are an operator opt-in for ordinary vars, but shared tool credential
+    namespaces remain local-only and are always excluded. Each forwarded value resolves to the routed
+    profile's secret when multiplex is active; a scoped miss is returned in the unset set so a shared
+    sandbox cannot leak another profile's value.
     """
     passthrough_keys: set[str] = set()
     resolve_passthrough_value = None
@@ -43,8 +45,16 @@ def resolve_passthrough_env(explicit_forward: Iterable[str] = (),
         passthrough_keys = set(get_all_passthrough())
     except Exception:
         pass
-    implicit_forward = {k for k in passthrough_keys if not _is_hermes_internal_secret(k)}
-    forward_keys = set(explicit_forward) | (implicit_forward - _HERMES_PROVIDER_ENV_BLOCKLIST)
+    implicit_forward = {
+        k for k in passthrough_keys
+        if not _is_hermes_internal_secret(k)
+        and not _is_retired_platform_env(k)
+        and not _is_shared_tool_env(k)
+    }
+    forward_keys = {
+        key for key in (set(explicit_forward) | (implicit_forward - _HERMES_PROVIDER_ENV_BLOCKLIST))
+        if not _is_shared_tool_env(key)
+    }
     hermes_env = hermes_env_loader() if forward_keys else {}
     exec_env: dict[str, str] = {}
     unset_names: set[str] = set()

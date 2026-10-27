@@ -38,9 +38,9 @@ def profile(tmp_path, monkeypatch):
     # A deployment stamp: URL + identity provider, no pinned secret, so an
     # un-vetoed boot would resolve a token and provision credentials.
     monkeypatch.setenv("GATEWAY_RELAY_URL", URL)
-    monkeypatch.setenv("GATEWAY_RELAY_PLATFORMS", "slack")
+    monkeypatch.setenv("GATEWAY_RELAY_PLATFORMS", "telegram")
     monkeypatch.setenv("GATEWAY_RELAY_IDP_TOKEN_URL", "https://identity.example/token")
-    monkeypatch.setenv("SLACK_BOT_TOKEN", "native-test-token")
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "native-test-token")
     monkeypatch.setattr("hermes_cli.plugins.discover_plugins", lambda: None)
     monkeypatch.setattr(GatewayStartupMixin, "_register_config_hooks", lambda *a, **k: None)
     platform_registry.unregister("relay")
@@ -90,7 +90,7 @@ def test_url_only_activation_is_unchanged(profile, monkeypatch):
 
     provision.assert_called_once()
     assert platform_registry.is_registered("relay")
-    assert relay.relay_fronted_platforms() == {"slack"}
+    assert relay.relay_fronted_platforms() == {"telegram"}
 
 
 @pytest.mark.parametrize("spelling", list(SPELLINGS))
@@ -103,15 +103,15 @@ def test_predicate_agrees_with_loader_and_keeps_native_adapters(profile, monkeyp
     assert relay.relay_explicitly_disabled() is True
     assert config.platforms[Platform.RELAY].enabled is False
     # Without the veto GATEWAY_RELAY_URL disables every directly-connected platform.
-    assert config.platforms[Platform.SLACK].enabled is True
+    assert config.platforms[Platform.TELEGRAM].enabled is True
 
     from cron.scheduler_delivery import _resolve_target_transport
 
     resolved, error = _resolve_target_transport(
-        {"id": "job"}, Platform.SLACK, "slack", {"chat_id": "channel"}, {}, config,
+        {"id": "job"}, Platform.TELEGRAM, "telegram", {"chat_id": "channel"}, {}, config,
     )
     assert error is None
-    assert resolved[1] is config.platforms[Platform.SLACK]
+    assert resolved[1] is config.platforms[Platform.TELEGRAM]
 
 
 def test_legacy_json_disable_is_advisory_like_other_platforms(profile, monkeypatch):

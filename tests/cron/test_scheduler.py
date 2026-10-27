@@ -215,20 +215,21 @@ class TestResolveDeliveryTarget:
 
 
     def test_bare_platform_delivery_uses_home_root_instead_of_origin_thread(self, monkeypatch):
-        monkeypatch.setenv("DISCORD_HOME_CHANNEL", "home-parent")
-        monkeypatch.delenv("DISCORD_HOME_CHANNEL_THREAD_ID", raising=False)
+        monkeypatch.setenv("TELEGRAM_HOME_CHANNEL", "home-parent")
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "123:cron-test-token")
+        monkeypatch.delenv("TELEGRAM_HOME_CHANNEL_THREAD_ID", raising=False)
 
         job = {
-            "deliver": "discord",
+            "deliver": "telegram",
             "origin": {
-                "platform": "discord",
+                "platform": "telegram",
                 "chat_id": "origin-parent",
                 "thread_id": "origin-thread",
             },
         }
 
         assert _resolve_delivery_target(job) == {
-            "platform": "discord",
+            "platform": "telegram",
             "chat_id": "home-parent",
             "thread_id": None,
             "_resolved_from": "home",
@@ -343,20 +344,21 @@ class TestRoutingIntents:
         from cron.scheduler import _resolve_delivery_targets
 
         monkeypatch.setenv("TELEGRAM_HOME_CHANNEL", "-111")
-        monkeypatch.setenv("DISCORD_HOME_CHANNEL", "-222")
-        monkeypatch.setenv("SLACK_HOME_CHANNEL", "C333")
-        # Sanity: platforms without the env var must NOT appear in the expansion.
-        monkeypatch.delenv("SIGNAL_HOME_CHANNEL", raising=False)
-        monkeypatch.delenv("MATRIX_HOME_ROOM", raising=False)
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "123:cron-test-token")
+        monkeypatch.setenv("WHATSAPP_ENABLED", "true")
+        monkeypatch.setenv("WHATSAPP_HOME_CHANNEL", "12345@lid")
+        monkeypatch.setenv("WHATSAPP_CLOUD_PHONE_NUMBER_ID", "1234567890")
+        monkeypatch.setenv("WHATSAPP_CLOUD_ACCESS_TOKEN", "cloud-test-token")
+        monkeypatch.setenv("WHATSAPP_CLOUD_HOME_CHANNEL", "15550000000")
+        monkeypatch.setenv("WEIXIN_TOKEN", "wx-test-token")
+        monkeypatch.setenv("WEIXIN_ACCOUNT_ID", "acct-test")
+        monkeypatch.setenv("WEIXIN_HOME_CHANNEL", "weixin-home")
 
         targets = _resolve_delivery_targets({"deliver": "all", "origin": None})
-        platforms = sorted(t["platform"] for t in targets)
+        platforms = {t["platform"] for t in targets}
 
-        assert "telegram" in platforms
-        assert "discord" in platforms
-        assert "slack" in platforms
-        assert "signal" not in platforms
-        assert "matrix" not in platforms
+        assert {"telegram", "whatsapp", "whatsapp_cloud", "weixin"} <= platforms
+        assert not {"discord", "slack", "signal", "matrix"} & platforms
 
 
 class TestDeliverResultWrapping:
@@ -478,8 +480,7 @@ class TestDeliverResultWrapping:
 
     def test_live_adapter_sends_media_as_attachments(self, tmp_path, monkeypatch):
         """When a live adapter is available, MEDIA files should be sent as native
-        platform attachments (e.g., Discord voice, Telegram audio) rather than
-        as literal 'MEDIA:/path' text."""
+        platform attachments rather than as literal 'MEDIA:/path' text."""
         from gateway.config import Platform
         from concurrent.futures import Future
         media_path = self._safe_media_path(tmp_path, monkeypatch, "cron-voice.mp3")
@@ -491,7 +492,7 @@ class TestDeliverResultWrapping:
         pconfig = MagicMock()
         pconfig.enabled = True
         mock_cfg = MagicMock()
-        mock_cfg.platforms = {Platform.DISCORD: pconfig}
+        mock_cfg.platforms = {Platform.TELEGRAM: pconfig}
 
         loop = MagicMock()
         loop.is_running.return_value = True
@@ -512,7 +513,7 @@ class TestDeliverResultWrapping:
         job = {
             "id": "tts-job",
             "deliver": "origin",
-            "origin": {"platform": "discord", "chat_id": "9876"},
+            "origin": {"platform": "telegram", "chat_id": "9876"},
         }
 
         with patch("gateway.config.load_gateway_config", return_value=mock_cfg), \
@@ -521,7 +522,7 @@ class TestDeliverResultWrapping:
             _deliver_result(
                 job,
                 f"Here is TTS\nMEDIA:{media_path}",
-                adapters={Platform.DISCORD: adapter},
+                adapters={Platform.TELEGRAM: adapter},
                 loop=loop,
             )
 
@@ -2302,8 +2303,8 @@ class TestCronDeliveryTargets:
     def test_lists_configured_platforms_flagging_missing_home_channel(self, monkeypatch):
         from cron.scheduler_delivery import cron_delivery_targets
 
-        self._patch_connected(monkeypatch, ["matrix", "telegram"])
-        monkeypatch.delenv("MATRIX_HOME_ROOM", raising=False)
+        self._patch_connected(monkeypatch, ["weixin", "telegram"])
+        monkeypatch.delenv("WEIXIN_HOME_CHANNEL", raising=False)
         monkeypatch.delenv("TELEGRAM_HOME_CHANNEL", raising=False)
 
         targets = {t["id"]: t for t in cron_delivery_targets()}
@@ -2313,10 +2314,10 @@ class TestCronDeliveryTargets:
         # platform assertions to the gateway entries.
         platform_targets = {k: v for k, v in targets.items() if not k.startswith("bot-chat")}
 
-        assert set(platform_targets) == {"matrix", "telegram"}
+        assert set(platform_targets) == {"weixin", "telegram"}
         # Configured but no home channel → surfaced, flagged for the UI.
-        assert platform_targets["matrix"]["home_target_set"] is False
-        assert platform_targets["matrix"]["home_env_var"] == "MATRIX_HOME_ROOM"
+        assert platform_targets["weixin"]["home_target_set"] is False
+        assert platform_targets["weixin"]["home_env_var"] == "WEIXIN_HOME_CHANNEL"
         assert platform_targets["telegram"]["home_target_set"] is False
         # Bot Chat targets need no home channel: whatever profiles exist on
         # this machine must all be listed as ready.
@@ -2449,41 +2450,38 @@ class TestCronDeliveryMirror:
         assert mirror_mock.call_args.kwargs.get("thread_id") == "9001"
 
 
-class TestCronContinuableSurfaceInChannel:
+class TestCronContinuableSurfaceCapability:
     """cron_continuable_surface: in_channel — deliver a continuable cron FLAT
     into a channel (no dedicated thread), so a plain channel reply continues the
     job via the shared-channel session (platform, chat_id, None).
 
     Design: decisions.md D1/D2/D6 + F5. The scheduler reads the per-platform key
     generically from pconfig.extra; the in_channel branch is gated on the
-    adapter capability flag ``supports_inchannel_continuable`` (Slack=True,
-    others fail SAFE to thread). In in_channel mode the thread-open branch is
-    SKIPPED (thread_id stays None), then ``_seed_cron_channel_session`` CREATES
-    the flat shared-channel session and mirrors the brief into it (the shipped
-    mirror only APPENDS to an existing session, and the flat channel row is
-    otherwise absent for a chat_postMessage delivery).
+    adapter capability flag ``supports_inchannel_continuable``. These tests use
+    a fake Weixin-shaped adapter with that flag enabled to exercise the shared
+    scheduler contract; the built-in Weixin adapter does not advertise it.
     """
 
-    def _slack_cfg(self, extra):
-        """A mock GatewayConfig with a Slack pconfig carrying ``extra``."""
+    def _weixin_cfg(self, extra):
+        """A mock GatewayConfig with a retained-platform pconfig carrying ``extra``."""
         from gateway.config import Platform
 
         pconfig = MagicMock()
         pconfig.enabled = True
         pconfig.extra = extra
         mock_cfg = MagicMock()
-        mock_cfg.platforms = {Platform.SLACK: pconfig}
+        mock_cfg.platforms = {Platform.WEIXIN: pconfig}
         return mock_cfg
 
     def _run_inchannel_delivery(self, extra, adapter, *, mirror_ok=True, origin=None,
                                 attach_to_session=True):
-        """Drive _deliver_result down the live-adapter path for a Slack
+        """Drive _deliver_result down the live-adapter path for a retained-platform
         channel-origin job with the given ``extra`` config. Returns the
         _open_continuable_cron_thread mock and the mirror_to_session mock."""
         from gateway.config import Platform
         from concurrent.futures import Future
 
-        mock_cfg = self._slack_cfg(extra)
+        mock_cfg = self._weixin_cfg(extra)
 
         loop = MagicMock()
         loop.is_running.return_value = True
@@ -2504,7 +2502,7 @@ class TestCronContinuableSurfaceInChannel:
             # Channel origin: no thread_id (flat channel message scheduled it).
             # Carries the scheduling user's id — the in_channel seed must key
             # the flat channel session to THIS user (see build_session_key).
-            "origin": origin or {"platform": "slack", "chat_id": "C123", "user_id": "U_HUMAN"},
+            "origin": origin or {"platform": "weixin", "chat_id": "C123", "user_id": "U_HUMAN"},
             # Opt into the continuable mirror (parameterized: the seed must
             # NOT depend on this — see the no-attach regression test).
             "attach_to_session": attach_to_session,
@@ -2517,11 +2515,11 @@ class TestCronContinuableSurfaceInChannel:
              patch("gateway.mirror.mirror_to_session", return_value=mirror_ok) as mirror_mock:
             _deliver_result(
                 job, "Here is today's brief.",
-                adapters={Platform.SLACK: adapter}, loop=loop,
+                adapters={Platform.WEIXIN: adapter}, loop=loop,
             )
         return open_thread_mock, mirror_mock
 
-    def _slack_adapter(self, supports_inchannel=True, with_store=True):
+    def _weixin_adapter(self, supports_inchannel=True, with_store=True):
         adapter = AsyncMock()
         adapter.send.return_value = MagicMock(
             success=True, message_id="msg_1", raw_response=None,
@@ -2544,7 +2542,7 @@ class TestCronContinuableSurfaceInChannel:
 
     def test_in_channel_skips_thread_open(self):
         """G2: in_channel mode must NOT open a handoff thread."""
-        adapter = self._slack_adapter(supports_inchannel=True)
+        adapter = self._weixin_adapter(supports_inchannel=True)
         open_thread_mock, _ = self._run_inchannel_delivery(
             {"cron_continuable_surface": "in_channel"}, adapter,
         )
@@ -2568,7 +2566,7 @@ class TestCronContinuableSurfaceInChannel:
 
         with patch("gateway.mirror.mirror_to_session", return_value=True) as mirror_mock:
             ok = _seed_cron_channel_session(
-                {"id": "j1", "name": "Brief"}, adapter, "slack", "C123",
+                {"id": "j1", "name": "Brief"}, adapter, "weixin", "C123",
                 "Daily brief", is_dm=False, user_id="U_HUMAN", chat_name="ops",
             )
         assert ok is True
@@ -2578,7 +2576,7 @@ class TestCronContinuableSurfaceInChannel:
         # What a plain top-level channel reply (reply_in_thread:false → thread
         # None) from the same user resolves to:
         inbound = SessionSource(
-            platform=Platform.SLACK, chat_id="C123", chat_type="group",
+            platform=Platform.WEIXIN, chat_id="C123", chat_type="group",
             user_id="U_HUMAN", thread_id=None,
         )
         assert seed_key == build_session_key(inbound), (
@@ -2602,10 +2600,10 @@ class TestCronContinuableSurfaceInChannel:
         default-surface mirror behavior; it must not be required here."""
         from cron.scheduler import _deliver_result  # noqa: F401 (driven via helper)
 
-        adapter = self._slack_adapter(supports_inchannel=True)
+        adapter = self._weixin_adapter(supports_inchannel=True)
         with patch("cron.scheduler_delivery._seed_cron_channel_session", return_value=True) as seed_mock:
             self._run_inchannel_delivery(
-                {"slack": {"cron_continuable_surface": "in_channel"}}, adapter,
+                {"weixin": {"cron_continuable_surface": "in_channel"}}, adapter,
                 attach_to_session=False,
             )
         seed_mock.assert_called_once()
@@ -2632,16 +2630,16 @@ class TestCronContinuableSurfaceInChannel:
                 captured["target"] = target
                 return {"success": True, "message_id": "msg_1"}
 
-        adapter = self._slack_adapter(supports_inchannel=True)
+        adapter = self._weixin_adapter(supports_inchannel=True)
         origin_with_thread = {
-            "platform": "slack", "chat_id": "C123", "user_id": "U_HUMAN",
+            "platform": "weixin", "chat_id": "C123", "user_id": "U_HUMAN",
             # Genuine origin thread (job created from inside a thread).
             "thread_id": "1787188000.000100",
         }
         with patch("gateway.delivery.DeliveryRouter", _SpyRouter), \
              patch("cron.scheduler_delivery._seed_cron_channel_session", return_value=True) as seed_mock:
             self._run_inchannel_delivery(
-                {"slack": {"cron_continuable_surface": "in_channel"}}, adapter,
+                {"weixin": {"cron_continuable_surface": "in_channel"}}, adapter,
                 attach_to_session=False, origin=origin_with_thread,
             )
         seed_mock.assert_called_once()
@@ -2656,7 +2654,7 @@ class TestCronContinuableSurfaceInChannel:
         guard resolves the workspace from metadata.scope_id. After a gateway
         restart the RelayAdapter's per-chat scope cache is cold, and
         DeliveryRouter stamps scope only for the configured HOME channel —
-        so a scoped Slack origin that is NOT the home chat egressed with no
+        so a scoped retained-platform origin that is NOT the home chat egressed with no
         scope_id and could be rejected before delivery. The scheduler must
         stamp the persisted origin scope onto origin-matching routing
         metadata (and never onto fan-out targets, which the origin-match
@@ -2671,9 +2669,9 @@ class TestCronContinuableSurfaceInChannel:
                 captured["metadata"] = metadata
                 return {"success": True, "message_id": "msg_1"}
 
-        adapter = self._slack_adapter(supports_inchannel=True)
+        adapter = self._weixin_adapter(supports_inchannel=True)
         scoped_origin = {
-            "platform": "slack", "chat_id": "C123", "user_id": "U_HUMAN",
+            "platform": "weixin", "chat_id": "C123", "user_id": "U_HUMAN",
             # Persisted workspace scope (captured at job creation). C123 is
             # not any configured home channel in this harness.
             "scope_id": "T0AAAA111",
@@ -2681,7 +2679,7 @@ class TestCronContinuableSurfaceInChannel:
         with patch("gateway.delivery.DeliveryRouter", _SpyRouter), \
              patch("cron.scheduler_delivery._seed_cron_channel_session", return_value=True):
             self._run_inchannel_delivery(
-                {"slack": {"cron_continuable_surface": "in_channel"}}, adapter,
+                {"weixin": {"cron_continuable_surface": "in_channel"}}, adapter,
                 attach_to_session=False, origin=scoped_origin,
             )
         assert captured["metadata"].get("scope_id") == "T0AAAA111", (
@@ -2703,11 +2701,11 @@ class TestCronContinuableSurfaceInChannel:
                 captured["metadata"] = metadata
                 return {"success": True, "message_id": "msg_1"}
 
-        adapter = self._slack_adapter(supports_inchannel=True)
+        adapter = self._weixin_adapter(supports_inchannel=True)
         with patch("gateway.delivery.DeliveryRouter", _SpyRouter), \
              patch("cron.scheduler_delivery._seed_cron_channel_session", return_value=True):
             self._run_inchannel_delivery(
-                {"slack": {"cron_continuable_surface": "in_channel"}}, adapter,
+                {"weixin": {"cron_continuable_surface": "in_channel"}}, adapter,
                 attach_to_session=False,
             )
         assert "scope_id" not in captured["metadata"]
@@ -2737,7 +2735,7 @@ class TestCronContinuableSurfaceInChannel:
         )
         with patch("cron.scheduler_delivery._seed_cron_channel_session") as seed_mock:
             self._run_inchannel_delivery(
-                {"slack": {"cron_continuable_surface": "in_channel"}}, adapter,
+                {"weixin": {"cron_continuable_surface": "in_channel"}}, adapter,
                 attach_to_session=False,
             )
         # Delivery must have gone through the LIVE adapter — otherwise a
@@ -2768,7 +2766,7 @@ class TestCronContinuableSurfaceInChannel:
 
         with patch("gateway.mirror.mirror_to_session", return_value=True) as mirror_mock:
             ok = _seed_cron_channel_session(
-                {"id": "j1", "name": "Brief"}, adapter, "slack", "D0BJTDCSR7C",
+                {"id": "j1", "name": "Brief"}, adapter, "weixin", "D0BJTDCSR7C",
                 "Daily brief", is_dm=True, user_id="U_HUMAN", chat_name=None,
             )
         assert ok is True
@@ -2778,15 +2776,15 @@ class TestCronContinuableSurfaceInChannel:
 
     def test_in_channel_also_seeds_thread_surface_of_delivered_brief(self):
         """REGRESSION (live, Alice 2026-08-19 19:19): the user replied IN THE
-        BRIEF'S THREAD (Slack's natural affordance on a flat message). That
+        BRIEF'S THREAD (retained-platform's natural affordance on a flat message). That
         reply keys to (chat, thread=<brief ts>) — a session in_channel mode
         never seeded, so the agent had no idea about its own brief. The flat
         delivery's message_id must anchor a companion thread-surface seed."""
-        adapter = self._slack_adapter(supports_inchannel=True)
+        adapter = self._weixin_adapter(supports_inchannel=True)
         with patch("cron.scheduler_delivery._seed_cron_channel_session", return_value=True), \
              patch("cron.scheduler_delivery._seed_cron_thread_session") as thread_seed_mock:
             self._run_inchannel_delivery(
-                {"slack": {"cron_continuable_surface": "in_channel"}}, adapter,
+                {"weixin": {"cron_continuable_surface": "in_channel"}}, adapter,
                 attach_to_session=False,
             )
         thread_seed_mock.assert_called_once()
@@ -2805,23 +2803,23 @@ class TestMultiTargetDeliveryContinuesOnFailure:
     and silently dropping every subsequent target.
     """
 
-    def _email_cfg(self):
+    def _telegram_cfg(self):
         from gateway.config import Platform
 
         pconfig = MagicMock()
         pconfig.enabled = True
         mock_cfg = MagicMock()
-        mock_cfg.platforms = {Platform.EMAIL: pconfig}
+        mock_cfg.platforms = {Platform.TELEGRAM: pconfig}
         return mock_cfg
 
     def test_first_target_failure_does_not_crash_loop(self):
-        """First email target fails in the fallback; the second is still attempted."""
+        """First Telegram target fails in the fallback; the second is still attempted."""
         job = {
-            "id": "multi-email-job",
-            "deliver": "email:a@example.com,email:b@example.com",
+            "id": "multi-telegram-job",
+            "deliver": "telegram:chat-a,telegram:chat-b",
         }
 
-        with patch("gateway.config.load_gateway_config", return_value=self._email_cfg()), \
+        with patch("gateway.config.load_gateway_config", return_value=self._telegram_cfg()), \
              patch("cron.scheduler.load_config", return_value={"cron": {"wrap_response": False}}), \
              patch("asyncio.run", side_effect=RuntimeError("no running loop")), \
              patch("concurrent.futures.ThreadPoolExecutor") as mock_pool_cls:
@@ -2829,7 +2827,7 @@ class TestMultiTargetDeliveryContinuesOnFailure:
             mock_pool_cls.return_value = mock_pool
 
             fail_future = MagicMock()
-            fail_future.result.side_effect = ConnectionError("SMTP connection refused")
+            fail_future.result.side_effect = ConnectionError("Telegram transport refused")
             ok_future = MagicMock()
             ok_future.result.return_value = {"success": True}
             mock_pool.submit.side_effect = [fail_future, ok_future]
@@ -2842,17 +2840,17 @@ class TestMultiTargetDeliveryContinuesOnFailure:
         )
         # First target's failure is surfaced in the returned error string.
         assert result is not None
-        assert "a@example.com" in result
-        assert "SMTP connection refused" in result
+        assert "chat-a" in result
+        assert "Telegram transport refused" in result
 
     def test_all_targets_fail_returns_combined_errors(self):
-        """When every target fails, the result reports all of them."""
+        """When every Telegram target fails, the result reports all of them."""
         job = {
             "id": "all-fail-job",
-            "deliver": "email:a@example.com,email:b@example.com",
+            "deliver": "telegram:chat-a,telegram:chat-b",
         }
 
-        with patch("gateway.config.load_gateway_config", return_value=self._email_cfg()), \
+        with patch("gateway.config.load_gateway_config", return_value=self._telegram_cfg()), \
              patch("cron.scheduler.load_config", return_value={"cron": {"wrap_response": False}}), \
              patch("asyncio.run", side_effect=RuntimeError("no running loop")), \
              patch("concurrent.futures.ThreadPoolExecutor") as mock_pool_cls:
@@ -2866,8 +2864,8 @@ class TestMultiTargetDeliveryContinuesOnFailure:
             result = _deliver_result(job, "Report content")
 
         assert result is not None
-        assert "a@example.com" in result
-        assert "b@example.com" in result
+        assert "chat-a" in result
+        assert "chat-b" in result
         assert mock_pool.submit.call_count == 2
 
 class TestBuildJobPromptExtraPrompt:

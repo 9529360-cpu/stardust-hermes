@@ -52,12 +52,12 @@ _WINDOWS_ESSENTIAL_ENV_VARS = frozenset({
 def _scrub_child_env(source_env, is_passthrough=None, is_windows=None):
     """Produce the scrubbed child-process env for execute_code.
 
-    Rules, in order: (1) passthrough vars (skill/config-declared) resolve
-    through the active profile secret scope — an absent scoped value is
-    omitted; (2) secret-substring names are blocked; (3) safe prefixes pass;
-    (4) operational STARDUST_* pass by exact name; (5) on Windows the
-    OS-essential allowlist passes by exact name.
+    Shared tool/gateway namespaces and retired-platform env are rejected before passthrough is
+    consulted. Other passthrough vars resolve through the active profile secret scope — an absent
+    scoped value is omitted; secret-substring names are then blocked, followed by safe prefixes,
+    operational STARDUST_* exact names, and (on Windows) the OS-essential exact-name allowlist.
     """
+    from tools.environments.local_env_policy import _is_retired_platform_env, _is_shared_tool_env
     try:
         from tools.env_passthrough import is_env_passthrough, resolve_passthrough_value
     except Exception:
@@ -72,6 +72,8 @@ def _scrub_child_env(source_env, is_passthrough=None, is_windows=None):
     # repo module that reads one would see it silently unset — log the drop, point at the opt-in.
     _dropped_hermes = []
     for k, v in source_env.items():
+        if _is_retired_platform_env(k) or _is_shared_tool_env(k):
+            continue
         if is_passthrough(k):
             resolved = resolve_passthrough_value(k, v)
             if resolved is not None:

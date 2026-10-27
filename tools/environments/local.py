@@ -22,7 +22,8 @@ from tools.environments.base_output import _pipe_stdin
 from hermes_cli._subprocess_compat import windows_hide_flags
 from tools.environments.local_env_policy import (
     _ALWAYS_STRIP_KEYS, _HERMES_PROVIDER_ENV_BLOCKLIST, _HERMES_PROVIDER_ENV_FORCE_PREFIX,
-    _is_hermes_internal_secret, _is_terminal_first_party_env,
+    _is_hermes_internal_secret, _is_local_terminal_profile_secret, _is_retired_platform_env,
+    _is_shared_tool_env, _is_terminal_first_party_env,
     _matches_terminal_first_party_prefix, _plugin_terminal_env_strip_keys)
 from tools.environments.local_gitbash_probe import (
     _bash_probe_details_cache, _bash_starts, _git_bash_aslr_help,
@@ -237,10 +238,9 @@ def _filter_secret_env(
     items: Mapping[str, str], out: dict, *, unwrap_force: bool,
     plugin_strip: frozenset = frozenset()) -> None:
     """Copy *items* into *out*, dropping Hermes-managed secrets. ``_HERMES_FORCE_<NAME>``
-    unwraps to ``NAME`` when ``unwrap_force`` (caller extras / terminal env), else is
-    dropped. Blocklisted names survive only via env_passthrough registration or as
-    context-entitled first-party ``BUZZ_*`` vars; the latter are used directly, never
-    scope-resolved (UnscopedSecretError under multiplex)."""
+    unwraps to ``NAME`` when ``unwrap_force`` (caller extras / terminal env), else is dropped.
+    Exact shared-tool secrets survive only through an explicit allowlist and the active profile
+    secret scope; the BUZZ carve-out remains context-gated and is never scope-resolved."""
     try:
         from tools.env_passthrough import is_env_passthrough, resolve_passthrough_value
     except Exception:
@@ -250,14 +250,25 @@ def _filter_secret_env(
             if not unwrap_force:
                 continue
             key = key[len(_HERMES_PROVIDER_ENV_FORCE_PREFIX):]
-            if not _is_hermes_internal_secret(key):
+            if not _is_hermes_internal_secret(key) and not _is_shared_tool_env(key):
                 out[key] = value
             continue
         if _is_hermes_internal_secret(key) or key in plugin_strip:
             continue
         first_party = _is_terminal_first_party_env(key)
         passthrough = is_env_passthrough(key)
-        if key in _HERMES_PROVIDER_ENV_BLOCKLIST and not (passthrough or first_party):
+        if _is_shared_tool_env(key):
+            if not (_is_local_terminal_profile_secret(key) and passthrough):
+                continue
+            from tools.env_passthrough import resolve_local_terminal_profile_secret
+            scoped_value = resolve_local_terminal_profile_secret(key)
+            if scoped_value is not None:
+                out[key] = scoped_value
+            continue
+        if _is_retired_platform_env(key):
+            if not first_party:
+                continue
+        elif key in _HERMES_PROVIDER_ENV_BLOCKLIST and not (passthrough or first_party):
             continue
         if passthrough and not first_party:
             value = resolve_passthrough_value(key, value)
@@ -318,7 +329,7 @@ def hermes_subprocess_env(*, inherit_credentials: bool = False) -> dict[str, str
         strip |= _HERMES_PROVIDER_ENV_BLOCKLIST
     for key in list(env):
         if (key in strip or key.startswith(_HERMES_PROVIDER_ENV_FORCE_PREFIX)
-                or _is_hermes_internal_secret(key)):
+                or _is_hermes_internal_secret(key) or _is_retired_platform_env(key) or _is_shared_tool_env(key)):
             del env[key]
     env.setdefault("PYTHONUTF8", "1")  # Windows UTF-8 safety for spawned processes
     return _finalize_child_env(env)

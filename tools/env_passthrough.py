@@ -35,29 +35,35 @@ _config_passthrough: dict[str, frozenset[str]] = {}
 
 
 def _is_hermes_provider_credential(name: str) -> bool:
-    """True if ``name`` is a Hermes-managed provider credential per
-    ``_HERMES_PROVIDER_ENV_BLOCKLIST`` or a dynamic Hermes-internal secret
-    (AUXILIARY_*_API_KEY / _BASE_URL, GATEWAY_RELAY_*). Skill-declared
-    ``required_environment_variables`` must not override this — that was the
-    GHSA-rhgp-j443-p4rf bypass (a skill registered ``OPENAI_API_KEY`` and received it
-    in the ``execute_code`` child); non-Hermes keys (TENOR_API_KEY, …) stay
-    registerable. Fails closed when the blocklist cannot be imported."""
+    """True for Hermes/provider credentials, dynamic internal secrets, retired gateway env, or an
+    unknown shared-tool namespace name. Exact TWILIO telephony credentials are the narrow exception:
+    they may be explicitly allowlisted for the local terminal only; other child targets enforce their
+    own rejection boundary. Skill-declared ``required_environment_variables`` cannot override inference
+    credentials or other protected secrets (GHSA-rhgp-j443-p4rf). Fails closed if the blocklist import fails."""
     try:
         from tools.environments.local_env_policy import (
-            _HERMES_PROVIDER_ENV_BLOCKLIST, _is_hermes_internal_secret)
+            _HERMES_PROVIDER_ENV_BLOCKLIST, _is_hermes_internal_secret, _is_local_terminal_profile_secret,
+            _is_retired_platform_env, _is_shared_tool_env,
+        )
     except Exception as e:
         logger.warning(
             "env passthrough: provider credential blocklist import failed; "
             "failing closed and refusing passthrough registration for %r: %s", name, e)
         return True
-    return _is_hermes_internal_secret(name) or name in _HERMES_PROVIDER_ENV_BLOCKLIST
+    # Exact TWILIO telephony secrets stay blocked by default but may be explicitly registered for the
+    # local terminal target only. HASS/MSGRAPH and unknown shared-prefix names remain blocked by their
+    # existing blocklist/namespace boundary; other consumers enforce their own target rejection.
+    if _is_shared_tool_env(name):
+        return not _is_local_terminal_profile_secret(name)
+    return _is_hermes_internal_secret(name) or _is_retired_platform_env(name) or name in _HERMES_PROVIDER_ENV_BLOCKLIST
 
 
 def register_env_passthrough(var_names: Iterable[str]) -> None:
-    """Register env var names as allowed in sandboxed environments (typically a
-    skill's ``required_environment_variables``). Hermes-managed provider credentials
-    are rejected (GHSA-rhgp-j443-p4rf) — such skills should use the main-process tools
-    (web_search, web_extract, …); third-party keys pass normally."""
+    """Register explicitly approved names in the session scope.
+
+    Normal values may feed existing consumers; exact TWILIO telephony secrets are local-terminal-only
+    and are rejected again by execute_code, hermes_subprocess_env, and remote forwarding. Other
+    Hermes-managed provider credentials remain refused (GHSA-rhgp-j443-p4rf)."""
     for name in _accepted((n.strip() for n in var_names), (
         "env passthrough: refusing to register Hermes provider "
         "credential %r (blocked by _HERMES_PROVIDER_ENV_BLOCKLIST). "
@@ -139,6 +145,25 @@ def resolve_passthrough_value(name: str, fallback: str | None = None) -> str | N
     if current_secret_scope() is None:
         return get_secret(name) if multiplex_active else fallback
     return get_secret(name, None if multiplex_active else fallback)
+
+
+def resolve_local_terminal_profile_secret(name: str) -> str | None:
+    """Resolve an exact shared-tool secret from the active profile scope only.
+
+    Unlike the general passthrough resolver, this path never reads ``os.environ`` or a fallback
+    snapshot. It exists only for the local terminal child; execute_code and remote targets reject
+    the whole shared-tool namespace before calling it.
+    """
+    from agent.secret_scope import current_secret_scope
+    from tools.environments.local_env_policy import _is_local_terminal_profile_secret
+
+    if not _is_local_terminal_profile_secret(name):
+        return None
+    scope = current_secret_scope()
+    if scope is None:
+        return None
+    value = scope.get(name)
+    return value if isinstance(value, str) and value.strip() else None
 
 
 def clear_env_passthrough() -> None:

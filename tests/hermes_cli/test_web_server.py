@@ -2960,7 +2960,8 @@ class TestNewEndpoints:
 
         listing = {t["name"]: t for t in self.client.get("/api/tools/toolsets").json()}
         assert listing["discord"]["platform"] == "discord"
-        assert listing["discord"]["platform_label"] == "Discord"
+        # Gateway platform labels exclude retired adapters; the distinct toolset scope remains readable.
+        assert listing["discord"]["platform_label"] == "discord"
         assert listing["discord"]["enabled"] is False
 
         resp = self.client.put("/api/tools/toolsets/discord", json={"enabled": True})

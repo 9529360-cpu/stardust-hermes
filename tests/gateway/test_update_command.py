@@ -187,77 +187,49 @@ class TestHandleUpdateCommand:
 
 
 class TestUpdateCommandPlatformGate:
-    """Tests for the platform-allowlist gate at the top of
-    ``_handle_update_command``.  Built-in messaging platforms are listed in
-    ``_UPDATE_ALLOWED_PLATFORMS``; plugin-migrated platforms (discord,
-    mattermost, teams, …) are NOT in the frozenset and rely on the
-    registry's ``allow_update_command=True`` fallback.  Programmatic
-    interfaces (ACP, API server, webhooks) must be blocked.
-    """
+    """Tests for the built-in messaging allowlist and plugin-owned update opt-in."""
 
 
     @pytest.mark.asyncio
     async def test_allows_plugin_platform_via_registry_fallback(self, monkeypatch):
-        """A plugin-migrated platform (DISCORD) is no longer in
-        ``_UPDATE_ALLOWED_PLATFORMS`` but must still pass the gate via
-        the registry's ``allow_update_command=True`` flag.
-
-        This test is the empirical guarantee that removing DISCORD from
-        the hardcoded frozenset does not regress the /update command for
-        Discord users.
-        """
+        """A registered plugin opts into /update even when it is outside the built-in allowlist."""
         from gateway.run import GatewayRunner
+        from gateway.platform_registry import PlatformEntry, platform_registry
 
-        # Precondition: DISCORD is NOT in the hardcoded set anymore.
-        assert Platform.DISCORD not in GatewayRunner._UPDATE_ALLOWED_PLATFORMS
+        plugin_name = "test_update_plugin"
+        entry = PlatformEntry(
+            name=plugin_name,
+            label="Test update plugin",
+            adapter_factory=lambda _config: None,
+            check_fn=lambda: True,
+            allow_update_command=True,
+        )
+        platform_registry.unregister(plugin_name)
+        platform_registry.register(entry)
+        try:
+            platform = Platform(plugin_name)
+            assert platform not in GatewayRunner._UPDATE_ALLOWED_PLATFORMS
 
-        # Make sure the plugin registry is populated so the fallback fires.
-        from hermes_cli.plugins import PluginManager
-        PluginManager().discover_and_load(force=True)
-        from gateway.platform_registry import platform_registry
-        discord_entry = platform_registry.get("discord")
-        assert discord_entry is not None
-        assert discord_entry.allow_update_command is True
+            runner = _make_runner()
+            event = _make_event(platform=platform)
+            monkeypatch.setenv("STARDUST_MANAGED", "")
 
-        runner = _make_runner()
-        event = _make_event(platform=Platform.DISCORD)
-        monkeypatch.setenv("STARDUST_MANAGED", "")
+            with patch("subprocess.Popen"):
+                result = await runner._handle_update_command(event)
 
-        with patch("subprocess.Popen"):
-            result = await runner._handle_update_command(event)
-
-        # The gate must NOT have rejected us — anything other than the
-        # ``platform_not_messaging`` rejection string is acceptable here.
-        # Later steps may legitimately return success ("Starting Hermes
-        # update…") or fail for environment reasons.
-        assert "only available from messaging platforms" not in result
+            assert "only available from messaging platforms" not in result
+        finally:
+            platform_registry.unregister(plugin_name)
 
 
     @pytest.mark.asyncio
-    async def test_allows_homeassistant_via_registry_fallback(self, monkeypatch):
-        """Same as DISCORD/MATTERMOST: HOMEASSISTANT is now plugin-migrated
-        (PR #40709) and not in the hardcoded frozenset; the registry must
-        keep /update working via ``allow_update_command=True``.
-        """
-        from gateway.run import GatewayRunner
-
-        assert Platform.HOMEASSISTANT not in GatewayRunner._UPDATE_ALLOWED_PLATFORMS
-
-        from hermes_cli.plugins import PluginManager
-        PluginManager().discover_and_load(force=True)
-        from gateway.platform_registry import platform_registry
-        ha_entry = platform_registry.get("homeassistant")
-        assert ha_entry is not None
-        assert ha_entry.allow_update_command is True
-
+    async def test_blocks_programmatic_api_server(self):
         runner = _make_runner()
-        event = _make_event(platform=Platform.HOMEASSISTANT)
-        monkeypatch.setenv("STARDUST_MANAGED", "")
+        event = _make_event(platform=Platform.API_SERVER)
 
-        with patch("subprocess.Popen"):
-            result = await runner._handle_update_command(event)
+        result = await runner._handle_update_command(event)
 
-        assert "only available from messaging platforms" not in result
+        assert "only available from messaging platforms" in result
 
 
 # ---------------------------------------------------------------------------

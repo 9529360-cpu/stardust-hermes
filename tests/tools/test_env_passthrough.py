@@ -102,6 +102,108 @@ class TestProfileScopedResolution:
             ss.reset_secret_scope(token)
 
 
+class TestProfileScopedSharedToolPassthrough:
+    @pytest.mark.parametrize(
+        "name,process_value,profile_value",
+        [
+            ("TWILIO_AUTH_TOKEN", "default-twilio", "profile-twilio"),
+        ],
+    )
+    def test_explicit_local_terminal_allowlist_requires_current_profile_scope(
+        self, name, process_value, profile_value, monkeypatch
+    ):
+        """Tool/shared secrets stay blocked by default and use only the active profile scope."""
+        from tools.environments.local import _make_run_env
+
+        monkeypatch.setenv(name, process_value)
+        ss.set_multiplex_active(True)
+        scope_token = ss.set_secret_scope({name: profile_value})
+        try:
+            clear_env_passthrough()
+            assert name not in _make_run_env({})
+
+            register_env_passthrough([name])
+            assert is_env_passthrough(name)
+            register_env_passthrough(["TWILIO_UNDECLARED", "HASS_FUTURE_SECRET", "MSGRAPH_WEBHOOK_PORT"])
+            assert not is_env_passthrough("TWILIO_UNDECLARED")
+            assert not is_env_passthrough("HASS_FUTURE_SECRET")
+            assert not is_env_passthrough("MSGRAPH_WEBHOOK_PORT")
+            assert _make_run_env({}).get(name) == profile_value
+
+            missing_token = ss.set_secret_scope({})
+            try:
+                assert name not in _make_run_env({})
+            finally:
+                ss.reset_secret_scope(missing_token)
+
+            unscoped_token = ss.set_secret_scope(None)
+            try:
+                assert name not in _make_run_env({})
+            finally:
+                ss.reset_secret_scope(unscoped_token)
+        finally:
+            ss.reset_secret_scope(scope_token)
+            ss.set_multiplex_active(False)
+            clear_env_passthrough()
+
+    def test_hass_and_msgraph_credentials_remain_blocked_from_terminal_passthrough(self, monkeypatch):
+        from tools.environments.local import _make_run_env
+
+        for name in ("HASS_TOKEN", "HASS_URL", "MSGRAPH_CLIENT_SECRET"):
+            clear_env_passthrough()
+            monkeypatch.setenv(name, f"launch-{name.lower()}")
+            ss.set_multiplex_active(True)
+            token = ss.set_secret_scope({name: f"profile-{name.lower()}"})
+            try:
+                register_env_passthrough([name])
+                assert not is_env_passthrough(name)
+                assert name not in _make_run_env({})
+            finally:
+                ss.reset_secret_scope(token)
+                ss.set_multiplex_active(False)
+
+    def test_unknown_shared_namespace_and_retired_gateway_names_remain_denied(self):
+        for name in ("TWILIO_UNDECLARED_SECRET", "HASS_FUTURE_SECRET", "MSGRAPH_WEBHOOK_PORT"):
+            register_env_passthrough([name])
+            assert not is_env_passthrough(name)
+
+    def test_same_twilio_allowlist_never_reaches_other_child_targets(self, monkeypatch):
+        """An existing local allowlist cannot open execute_code, helper, or remote child paths."""
+        from tools.code_execution_env import _scrub_child_env
+        from tools.environments.local import hermes_subprocess_env
+        from tools.environments.remote_common import resolve_passthrough_env
+
+        name = "TWILIO_AUTH_TOKEN"
+        secret = "profile-scoped-twilio"
+        monkeypatch.setenv(name, "process-default-twilio")
+        register_env_passthrough([name])
+        assert is_env_passthrough(name)
+        ss.set_multiplex_active(True)
+        scope_token = ss.set_secret_scope({name: secret})
+        try:
+            execute_env = _scrub_child_env(
+                {name: secret, "PATH": "/usr/bin"},
+                is_passthrough=is_env_passthrough,
+                is_windows=False,
+            )
+            assert name not in execute_env
+
+            helper_env = hermes_subprocess_env(inherit_credentials=True)
+            assert name not in helper_env
+
+            remote_implicit, _ = resolve_passthrough_env(
+                hermes_env_loader=lambda: {name: secret}
+            )
+            assert name not in remote_implicit
+            remote_explicit, _ = resolve_passthrough_env(
+                explicit_forward=[name], hermes_env_loader=lambda: {name: secret}
+            )
+            assert name not in remote_explicit
+        finally:
+            ss.reset_secret_scope(scope_token)
+            ss.set_multiplex_active(False)
+
+
 class TestExecuteCodeIntegration:
     """Verify that the passthrough is checked in execute_code's env filtering."""
 
@@ -308,7 +410,7 @@ class TestTerminalIntegration:
         from tools.environments.local import _sanitize_subprocess_env
         from tools.environments.local_env_policy import _HERMES_PROVIDER_ENV_BLOCKLIST
 
-        blocked_var = next(iter(_HERMES_PROVIDER_ENV_BLOCKLIST))
+        blocked_var = "OPENAI_API_KEY"
         # Attempt to register — must be silently refused (logged warning).
         register_env_passthrough([blocked_var])
 
@@ -390,7 +492,7 @@ class TestTerminalIntegration:
         from tools.environments.local import _make_run_env
         from tools.environments.local_env_policy import _HERMES_PROVIDER_ENV_BLOCKLIST
 
-        blocked_var = next(iter(_HERMES_PROVIDER_ENV_BLOCKLIST))
+        blocked_var = "OPENAI_API_KEY"
         os.environ[blocked_var] = "secret_value"
         try:
             # Without passthrough — blocked

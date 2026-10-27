@@ -35,16 +35,22 @@ from cron.scheduler_delivery import _target_mirror_eligible
 
 @pytest.fixture(autouse=True)
 def _home_channel(monkeypatch):
-    monkeypatch.setenv("SLACK_HOME_CHANNEL", "D0HOME")
+    monkeypatch.setenv("SLACK_HOME_CHANNEL", "-100123")
     monkeypatch.delenv("TELEGRAM_HOME_CHANNEL", raising=False)
     monkeypatch.delenv("DISCORD_HOME_CHANNEL", raising=False)
 
 
 class TestMirrorEligibilityResolution:
+    @pytest.fixture(autouse=True)
+    def _telegram_home(self, monkeypatch):
+        monkeypatch.delenv("SLACK_HOME_CHANNEL", raising=False)
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "123:cron-test-token")
+        monkeypatch.setenv("TELEGRAM_HOME_CHANNEL", "-100123")
+
     def test_origin_target_is_eligible(self):
         job = {
             "deliver": "origin",
-            "origin": {"platform": "slack", "chat_id": "D0AAA", "chat_type": "dm"},
+            "origin": {"platform": "telegram", "chat_id": "tg-origin", "chat_type": "dm"},
         }
         targets = _resolve_delivery_targets(job)
         assert len(targets) == 1
@@ -56,7 +62,7 @@ class TestMirrorEligibilityResolution:
         job = {"deliver": "origin", "origin": None}
         targets = _resolve_delivery_targets(job)
         assert len(targets) == 1
-        assert targets[0]["chat_id"] == "D0HOME"
+        assert targets[0]["chat_id"] == "-100123"
         assert _target_mirror_eligible(job, targets[0], global_mirror=True)
 
     def test_all_expansion_is_never_eligible(self):
@@ -77,7 +83,7 @@ class TestMirrorEligibilityResolution:
         managed ``deliver: slack`` crons delivered but never injected).
         Broadcast expansions from ``all`` remain ineligible — see
         test_all_expansion_is_never_eligible."""
-        job = {"deliver": "slack", "origin": None}
+        job = {"deliver": "telegram", "origin": None}
         targets = _resolve_delivery_targets(job)
         assert len(targets) == 1
         assert _target_mirror_eligible(job, targets[0], global_mirror=True)
@@ -89,19 +95,19 @@ class TestMirrorEligibilityResolution:
             {**job, "attach_to_session": False}, targets[0], global_mirror=True
         )
 
-    @pytest.mark.parametrize("deliver", ["slack,all", "all,slack", " ALL , slack "])
+    @pytest.mark.parametrize("deliver", ["telegram,all", "all,telegram", " ALL , telegram "])
     def test_dedup_bare_and_all_keeps_home_eligibility(self, deliver):
         """An explicit home address stays continuable regardless of broadcast token order."""
         job = {"deliver": deliver, "origin": None}
         targets = _resolve_delivery_targets(job)
-        slack_targets = [t for t in targets if t["platform"].lower() == "slack"]
-        assert len(slack_targets) == 1
-        assert _target_mirror_eligible(job, slack_targets[0], global_mirror=True)
+        telegram_targets = [t for t in targets if t["platform"].lower() == "telegram"]
+        assert len(telegram_targets) == 1
+        assert _target_mirror_eligible(job, telegram_targets[0], global_mirror=True)
 
     def test_explicit_target_not_eligible_under_global_flag(self):
         """Global mirror_delivery must not write sessions into arbitrary
         explicitly-addressed chats."""
-        job = {"deliver": "slack:D0EXPL", "origin": None}
+        job = {"deliver": "telegram:1234567", "origin": None}
         targets = _resolve_delivery_targets(job)
         assert len(targets) == 1
         assert not _target_mirror_eligible(job, targets[0], global_mirror=True)
@@ -110,7 +116,7 @@ class TestMirrorEligibilityResolution:
         """attach_to_session=true on the job is the author declaring the
         explicit target a conversation — managed per-user DM crons."""
         job = {
-            "deliver": "slack:D0EXPL",
+            "deliver": "telegram:1234567",
             "origin": None,
             "attach_to_session": True,
         }
@@ -124,23 +130,23 @@ class TestMirrorEligibilityResolution:
         job = {"deliver": "origin,all", "origin": None}
         targets = _resolve_delivery_targets(job)
         # Home channel deduped to one target.
-        slack_targets = [t for t in targets if t["platform"].lower() == "slack"]
-        assert len(slack_targets) == 1
-        assert _target_mirror_eligible(job, slack_targets[0], global_mirror=True)
+        telegram_targets = [t for t in targets if t["platform"].lower() == "telegram"]
+        assert len(telegram_targets) == 1
+        assert _target_mirror_eligible(job, telegram_targets[0], global_mirror=True)
 
     def test_all_and_origin_reversed_order_keeps_eligibility(self):
         job = {"deliver": "all,origin", "origin": None}
         targets = _resolve_delivery_targets(job)
-        slack_targets = [t for t in targets if t["platform"].lower() == "slack"]
-        assert len(slack_targets) == 1
-        assert _target_mirror_eligible(job, slack_targets[0], global_mirror=True)
+        telegram_targets = [t for t in targets if t["platform"].lower() == "telegram"]
+        assert len(telegram_targets) == 1
+        assert _target_mirror_eligible(job, telegram_targets[0], global_mirror=True)
 
     def test_explicit_other_chat_with_origin_not_eligible(self):
         """An explicit target that is NOT the origin stays unmirrored under
         the global flag even when the job has an origin elsewhere."""
         job = {
-            "deliver": "slack:D0OTHER",
-            "origin": {"platform": "slack", "chat_id": "D0AAA", "chat_type": "dm"},
+            "deliver": "telegram:other-chat",
+            "origin": {"platform": "telegram", "chat_id": "tg-origin", "chat_type": "dm"},
         }
         targets = _resolve_delivery_targets(job)
         assert len(targets) == 1
@@ -151,37 +157,25 @@ class TestFallbackMirrorEndToEnd:
     """Drive _deliver_result with a stubbed sender + mirror recorder."""
 
     @pytest.fixture()
-    def slack_env(self, monkeypatch, tmp_path):
+    def telegram_env(self, monkeypatch, tmp_path):
         home = tmp_path / "hermes-home"
         home.mkdir()
         (home / "config.yaml").write_text(
             "cron:\n  mirror_delivery: true\n"
-            "platforms:\n  slack:\n    enabled: true\n    token: xoxb-test\n"
+            "platforms:\n  telegram:\n    enabled: true\n    token: 123:telegram-test-token\n"
         )
         monkeypatch.setenv("STARDUST_HOME", str(home))
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "123:telegram-test-token")
+        monkeypatch.setenv("TELEGRAM_HOME_CHANNEL", "-100123")
 
         send_calls = []
 
-        async def fake_sender(pconfig, chat_id, message, *, thread_id=None,
+        async def fake_sender(platform, pconfig, chat_id, message, *, thread_id=None,
                               media_files=None, force_document=False, caption=None):
             send_calls.append({"chat_id": chat_id, "thread_id": thread_id})
             return {"success": True, "chat_id": chat_id, "message_id": "1.2"}
 
-        import gateway.platform_registry as reg
-        import hermes_cli.plugins as hp
-
-        entry = reg.platform_registry.get("slack")
-        if entry is None:
-            hp.discover_plugins()
-            entry = reg.platform_registry.get("slack")
-        if entry is None:
-            pytest.skip("slack platform entry not registered")
-        monkeypatch.setattr(entry, "standalone_sender_fn", fake_sender)
-        monkeypatch.setattr(hp, "discover_plugins", lambda *a, **k: None)
-
         mirror_calls = []
-
-        import cron.scheduler as sched
 
         def fake_mirror(platform, chat_id, text, source_label="cli",
                         thread_id=None, user_id=None, role="assistant"):
@@ -195,43 +189,44 @@ class TestFallbackMirrorEndToEnd:
 
         real_mirror = mirror_mod.mirror_to_session
         monkeypatch.setattr(mirror_mod, "mirror_to_session", fake_mirror)
+        monkeypatch.setattr("tools.send_message_tool._send_to_platform", fake_sender)
         return {"send": send_calls, "mirror": mirror_calls, "real_mirror": real_mirror, "home": home}
 
-    def test_origin_fallback_job_mirrors_brief(self, slack_env):
+    def test_origin_fallback_job_mirrors_brief(self, telegram_env):
         """The field repro: managed cron, deliver=origin, no origin captured.
         The brief must be mirrored into the home-channel session."""
         job = {"id": "j1", "name": "brief", "deliver": "origin", "origin": None}
         err = _deliver_result(job, "Risk-off close brief", adapters=None, loop=None)
         assert err is None
-        assert len(slack_env["send"]) == 1
-        assert len(slack_env["mirror"]) == 1, (
+        assert len(telegram_env["send"]) == 1
+        assert len(telegram_env["mirror"]) == 1, (
             "origin-fallback delivery must mirror the brief into the "
             "home-channel session (the reply-continuity bug)"
         )
-        assert slack_env["mirror"][0]["chat_id"] == "D0HOME"
-        assert slack_env["mirror"][0]["role"] == "user"
+        assert telegram_env["mirror"][0]["chat_id"] == "-100123"
+        assert telegram_env["mirror"][0]["role"] == "user"
 
-    def test_all_broadcast_does_not_mirror(self, slack_env):
+    def test_all_broadcast_does_not_mirror(self, telegram_env):
         job = {"id": "j2", "name": "cast", "deliver": "all", "origin": None}
         err = _deliver_result(job, "broadcast text", adapters=None, loop=None)
         assert err is None
-        assert len(slack_env["send"]) == 1
-        assert len(slack_env["mirror"]) == 0
+        assert len(telegram_env["send"]) == 1
+        assert len(telegram_env["mirror"]) == 0
 
-    def test_managed_bare_platform_job_mirrors_brief(self, slack_env, monkeypatch):
+    def test_managed_bare_platform_job_mirrors_brief(self, telegram_env, monkeypatch):
         """The managed-cron shape delivers into the session a home-channel reply resumes."""
         import gateway.mirror as mirror_mod
         from gateway.config import GatewayConfig, Platform
         from gateway.session import SessionSource, SessionStore
 
-        monkeypatch.setattr(mirror_mod, "mirror_to_session", slack_env["real_mirror"])
-        store = SessionStore(slack_env["home"] / "sessions", GatewayConfig())
-        source = SessionSource(platform=Platform.SLACK, chat_id="D0HOME", chat_type="dm")
+        monkeypatch.setattr(mirror_mod, "mirror_to_session", telegram_env["real_mirror"])
+        store = SessionStore(telegram_env["home"] / "sessions", GatewayConfig())
+        source = SessionSource(platform=Platform.TELEGRAM, chat_id="-100123", chat_type="dm")
         session = store.get_or_create_session(source)
-        job = {"id": "h1", "name": "managed", "deliver": "slack", "origin": None}
+        job = {"id": "h1", "name": "managed", "deliver": "telegram", "origin": None}
         err = _deliver_result(job, "morning brief", adapters=None, loop=None)
         assert err is None
-        assert len(slack_env["send"]) == 1
+        assert len(telegram_env["send"]) == 1
         reply_session = store.get_or_create_session(source)
         assert reply_session.session_id == session.session_id
         messages = store.load_transcript(reply_session.session_id)
@@ -239,35 +234,35 @@ class TestFallbackMirrorEndToEnd:
             ("user", "[Cron delivery: managed]\nmorning brief")
         ]
 
-    def test_explicit_target_with_attach_mirrors(self, slack_env):
+    def test_explicit_target_with_attach_mirrors(self, telegram_env):
         job = {
-            "id": "j3", "name": "managed-dm", "deliver": "slack:D0USER7",
+            "id": "j3", "name": "managed-dm", "deliver": "telegram:1234567",
             "origin": None, "attach_to_session": True,
         }
         err = _deliver_result(job, "managed brief", adapters=None, loop=None)
         assert err is None
-        assert len(slack_env["mirror"]) == 1
-        assert slack_env["mirror"][0]["chat_id"] == "D0USER7"
+        assert len(telegram_env["mirror"]) == 1
+        assert telegram_env["mirror"][0]["chat_id"] == "1234567"
 
-    def test_explicit_target_without_attach_does_not_mirror(self, slack_env):
+    def test_explicit_target_without_attach_does_not_mirror(self, telegram_env):
         job = {
-            "id": "j4", "name": "plain-explicit", "deliver": "slack:D0USER8",
+            "id": "j4", "name": "plain-explicit", "deliver": "telegram:1234568",
             "origin": None,
         }
         err = _deliver_result(job, "plain text", adapters=None, loop=None)
         assert err is None
-        assert len(slack_env["mirror"]) == 0
+        assert len(telegram_env["mirror"]) == 0
 
-    def test_origin_job_still_mirrors_unchanged(self, slack_env):
+    def test_origin_job_still_mirrors_unchanged(self, telegram_env):
         """Regression control: the June origin-scoped behavior is untouched."""
         job = {
             "id": "j5", "name": "origin-job", "deliver": "origin",
-            "origin": {"platform": "slack", "chat_id": "D0AAA", "chat_type": "dm"},
+            "origin": {"platform": "telegram", "chat_id": "tg-origin", "chat_type": "dm"},
         }
         err = _deliver_result(job, "origin brief", adapters=None, loop=None)
         assert err is None
-        assert len(slack_env["mirror"]) == 1
-        assert slack_env["mirror"][0]["chat_id"] == "D0AAA"
+        assert len(telegram_env["mirror"]) == 1
+        assert telegram_env["mirror"][0]["chat_id"] == "tg-origin"
 
 
 class TestInChannelSeedUserIdGuard:

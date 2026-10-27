@@ -1839,7 +1839,9 @@ async def _discover_gateway_mcp_tools(config: object) -> None:
 def _platform_has_bot_credential(platform: "Platform", platform_config: "PlatformConfig") -> bool:
     """Return True when a token-authenticated platform has a usable bot credential; platforms not using
     ``PlatformConfig.token`` (Signal session paths, port-binding HTTP adapters) always return True."""
-    from gateway.config import PLATFORM_TOKEN_ENV_NAMES, Platform
+    from gateway.config import PLATFORM_TOKEN_ENV_NAMES, Platform, RETIRED_PLATFORMS
+    if platform.value in RETIRED_PLATFORMS:
+        return False
     if platform is Platform.WHATSAPP_CLOUD:
         extra = getattr(platform_config, "extra", None) or {}
         return all(str(extra.get(key) or "").strip() for key in ("phone_number_id", "access_token"))

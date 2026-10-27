@@ -5,7 +5,6 @@ import importlib.util
 import json
 import os
 import queue
-import sys
 import threading
 import time
 import pytest
@@ -85,6 +84,17 @@ class TestHandleVoiceCommand:
         assert data["telegram:123"] == "voice_only"
 
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("platform", ["telegram", "weixin"])
+    async def test_voice_channel_join_fails_closed_on_retained_platforms(self, runner, platform):
+        from gateway.config import Platform
+
+        event = _make_event("/voice channel")
+        event.source.platform = Platform(platform)
+        result = await runner._handle_voice_channel_join(event)
+
+        assert result == "Voice channels are not supported on this platform."
+
     def test_sync_populates_enabled_chats_from_voice_modes(self, runner):
         """Issue #16007: sync also restores per-chat /voice on|tts opt-ins.
 
@@ -137,14 +147,14 @@ class TestHandleVoiceCommand:
     async def test_platform_isolation(self, runner):
         """Same chat_id on different platforms must not collide (#12542)."""
         telegram_event = _make_event("/voice on", chat_id="999")
-        slack_event = _make_event("/voice off", chat_id="999")
-        slack_event.source.platform.value = "slack"
+        weixin_event = _make_event("/voice off", chat_id="999")
+        weixin_event.source.platform.value = "weixin"
 
         await runner._handle_voice_command(telegram_event)
-        await runner._handle_voice_command(slack_event)
+        await runner._handle_voice_command(weixin_event)
 
         assert runner._voice_mode["telegram:999"] == "voice_only"
-        assert runner._voice_mode["slack:999"] == "off"
+        assert runner._voice_mode["weixin:999"] == "off"
 
 
 # =====================================================================
@@ -337,253 +347,6 @@ class TestVoiceInHelp:
 
 
 # =====================================================================
-# VoiceReceiver unit tests
-# =====================================================================
-
-class TestVoiceReceiver:
-    """Test VoiceReceiver silence detection, SSRC mapping, and lifecycle."""
-
-
-    def test_initial_state(self):
-        receiver = self._make_receiver()
-        assert receiver._running is False
-        assert receiver._paused is False
-        assert len(receiver._buffers) == 0
-        assert len(receiver._ssrc_to_user) == 0
-
-    def test_start_sets_running(self):
-        receiver = self._make_receiver()
-        receiver.start()
-        assert receiver._running is True
-
-
-    def test_map_ssrc_overwrites(self):
-        receiver = self._make_receiver()
-        receiver.map_ssrc(100, 42)
-        receiver.map_ssrc(100, 99)
-        assert receiver._ssrc_to_user[100] == 99
-
-
-    def test_check_silence_returns_completed_utterance(self):
-        receiver = self._make_receiver()
-        receiver.map_ssrc(100, 42)
-        # 48kHz, stereo, 16-bit = 192000 bytes/sec
-        # MIN_SPEECH_DURATION = 0.5s → need 96000 bytes
-        pcm_data = bytearray(b"\x00" * 96000)
-        receiver._buffers[100] = pcm_data
-        # Set last_packet_time far enough in the past to exceed SILENCE_THRESHOLD
-        receiver._last_packet_time[100] = time.monotonic() - 3.0
-        completed = receiver.check_silence()
-        assert len(completed) == 1
-        user_id, data = completed[0]
-        assert user_id == 42
-        assert len(data) == 96000
-        # Buffer should be cleared after extraction
-        assert len(receiver._buffers[100]) == 0
-
-    def test_check_silence_ignores_short_buffer(self):
-        receiver = self._make_receiver()
-        receiver.map_ssrc(100, 42)
-        # Too short to meet MIN_SPEECH_DURATION
-        receiver._buffers[100] = bytearray(b"\x00" * 100)
-        receiver._last_packet_time[100] = time.monotonic() - 3.0
-        completed = receiver.check_silence()
-        assert len(completed) == 0
-
-
-    def test_on_packet_skips_non_rtp(self):
-        receiver = self._make_receiver()
-        receiver.start()
-        # Valid length but wrong RTP version
-        data = bytearray(b"\x00" * 20)
-        data[0] = 0x00  # version 0, not 2
-        receiver._on_packet(bytes(data))
-        assert len(receiver._buffers) == 0
-
-
-# =====================================================================
-# Gateway voice channel commands (join / leave / input)
-# =====================================================================
-
-class TestVoiceChannelCommands:
-    """Test _handle_voice_channel_join, _handle_voice_channel_leave,
-    _handle_voice_channel_input on the GatewayRunner."""
-
-    @pytest.fixture
-    def runner(self, tmp_path):
-        return _make_runner(tmp_path)
-
-
-    # -- _handle_voice_channel_join --
-
-
-    @pytest.mark.asyncio
-    async def test_join_success(self, runner):
-        """Successful join sets voice_mode and returns confirmation."""
-        mock_channel = MagicMock()
-        mock_channel.name = "General"
-        mock_adapter = AsyncMock()
-        mock_adapter.join_voice_channel = AsyncMock(return_value=True)
-        mock_adapter.get_user_voice_channel = AsyncMock(return_value=mock_channel)
-        mock_adapter._voice_text_channels = {}
-        mock_adapter._voice_sources = {}
-        mock_adapter._voice_input_callback = None
-        event = self._make_discord_event()
-        event.source.chat_type = "group"
-        event.source.chat_name = "Hermes Server / #general"
-        runner.adapters[event.source.platform] = mock_adapter
-        result = await runner._handle_voice_channel_join(event)
-        assert "joined" in result.lower()
-        assert "General" in result
-        assert runner._voice_mode["discord:123"] == "all"
-        assert mock_adapter._voice_sources[111]["chat_id"] == "123"
-        assert mock_adapter._voice_sources[111]["chat_type"] == "group"
-
-
-    @pytest.mark.asyncio
-    async def test_join_missing_voice_dependencies(self, runner):
-        """Missing PyNaCl/davey should return a user-actionable install hint."""
-        mock_channel = MagicMock()
-        mock_channel.name = "General"
-        mock_adapter = AsyncMock()
-        mock_adapter.join_voice_channel = AsyncMock(
-            side_effect=RuntimeError("PyNaCl library needed in order to use voice")
-        )
-        mock_adapter.get_user_voice_channel = AsyncMock(return_value=mock_channel)
-        event = self._make_discord_event()
-        runner.adapters[event.source.platform] = mock_adapter
-
-        result = await runner._handle_voice_channel_join(event)
-
-        assert "voice dependencies are missing" in result.lower()
-        assert "PyNaCl" in result
-
-    # -- _handle_voice_channel_leave --
-
-
-    @pytest.mark.asyncio
-    async def test_leave_success(self, runner):
-        """Successful leave disconnects and clears voice mode."""
-        mock_adapter = AsyncMock()
-        mock_adapter.is_in_voice_channel = MagicMock(return_value=True)
-        mock_adapter.leave_voice_channel = AsyncMock()
-        event = self._make_discord_event("/voice leave")
-        runner.adapters[event.source.platform] = mock_adapter
-        runner._voice_mode["discord:123"] = "all"
-        result = await runner._handle_voice_channel_leave(event)
-        assert "left" in result.lower()
-        assert runner._voice_mode["discord:123"] == "off"
-        mock_adapter.leave_voice_channel.assert_called_once_with(111)
-
-    # -- _handle_voice_channel_input --
-
-
-    @pytest.mark.asyncio
-    async def test_input_creates_event_and_dispatches(self, runner):
-        """Voice input creates synthetic event and calls handle_message."""
-        from gateway.config import Platform
-        mock_adapter = AsyncMock()
-        mock_adapter._voice_text_channels = {111: 123}
-        mock_adapter._voice_sources = {}
-        mock_channel = AsyncMock()
-        mock_adapter._client = MagicMock()
-        mock_adapter._client.get_channel = MagicMock(return_value=mock_channel)
-        mock_adapter.handle_message = AsyncMock()
-        runner.adapters[Platform.DISCORD] = mock_adapter
-        await runner._handle_voice_channel_input(111, 42, "Hello from VC")
-        mock_adapter.handle_message.assert_called_once()
-        event = mock_adapter.handle_message.call_args[0][0]
-        assert event.text == "Hello from VC"
-        assert event.message_type == MessageType.VOICE
-        assert event.source.chat_id == "123"
-        assert event.source.chat_type == "channel"
-
-    @pytest.mark.asyncio
-    async def test_input_resolves_channel_prompt(self, runner):
-        """Voice input must carry the bound text channel's channel_prompt (#50149)."""
-        from gateway.config import Platform
-        mock_adapter = AsyncMock()
-        mock_adapter._voice_text_channels = {111: 123}
-        mock_adapter._voice_sources = {}
-        mock_adapter._client = MagicMock()
-        mock_adapter._client.get_channel = MagicMock(return_value=AsyncMock())
-        mock_adapter.handle_message = AsyncMock()
-        mock_adapter._resolve_channel_prompt = MagicMock(return_value="Be terse in #dev.")
-        runner.adapters[Platform.DISCORD] = mock_adapter
-        await runner._handle_voice_channel_input(111, 42, "Hello from VC")
-        mock_adapter._resolve_channel_prompt.assert_called_once_with("123")
-        event = mock_adapter.handle_message.call_args[0][0]
-        assert event.channel_prompt == "Be terse in #dev."
-
-
-    @pytest.mark.asyncio
-    async def test_input_reuses_bound_source_metadata(self, runner):
-        """Voice input should share the linked text channel session metadata."""
-        from gateway.config import Platform
-
-        bound_source = SessionSource(
-            chat_id="123",
-            chat_name="Hermes Server / #general",
-            chat_type="group",
-            user_id="user1",
-            user_name="user1",
-            platform=Platform.DISCORD,
-        )
-
-        mock_adapter = AsyncMock()
-        mock_adapter._voice_text_channels = {111: 123}
-        mock_adapter._voice_sources = {111: bound_source.to_dict()}
-        mock_channel = AsyncMock()
-        mock_adapter._client = MagicMock()
-        mock_adapter._client.get_channel = MagicMock(return_value=mock_channel)
-        mock_adapter.handle_message = AsyncMock()
-        runner.adapters[Platform.DISCORD] = mock_adapter
-
-        await runner._handle_voice_channel_input(111, 42, "Hello from VC")
-
-        mock_adapter.handle_message.assert_called_once()
-        event = mock_adapter.handle_message.call_args[0][0]
-        assert event.source.chat_id == "123"
-        assert event.source.chat_type == "group"
-        assert event.source.chat_name == "Hermes Server / #general"
-        assert event.source.user_id == "42"
-
-
-    # -- _get_guild_id --
-
-    def test_get_guild_id_from_guild(self, runner):
-        event = _make_event()
-        mock_guild = MagicMock()
-        mock_guild.id = 555
-        event.raw_message = SimpleNamespace(guild_id=None, guild=mock_guild)
-        result = runner._get_guild_id(event)
-        assert result == 555
-
-    def test_get_guild_id_from_interaction(self, runner):
-        event = _make_event()
-        event.raw_message = SimpleNamespace(guild_id=777, guild=None)
-        result = runner._get_guild_id(event)
-        assert result == 777
-
-
-# =====================================================================
-# Discord adapter voice channel methods
-# =====================================================================
-
-
-        # Should not raise
-
-
-# =====================================================================
-# stream_tts_to_speaker functional tests
-# =====================================================================
-
-# =====================================================================
-# VoiceReceiver thread-safety (lock coverage)
-# =====================================================================
-
-
-# =====================================================================
 # Callback wiring order (join)
 # =====================================================================
 
@@ -722,83 +485,6 @@ class TestStreamTtsToSpeaker:
 
 
 # =====================================================================
-# Bug 1: VoiceReceiver.stop() must hold lock while clearing shared state
-# =====================================================================
-
-class TestStopAcquiresLock:
-    """stop() must acquire _lock before clearing buffers/state."""
-
-
-    def test_stop_clears_under_lock(self):
-        """stop() acquires _lock before clearing buffers.
-
-        Verify by holding the lock from another thread and checking that
-        stop() blocks until the lock is released.
-        """
-        receiver = self._make_receiver()
-        receiver.start()
-        receiver._buffers[100] = bytearray(b"\x00" * 500)
-        receiver._last_packet_time[100] = time.monotonic()
-        receiver.map_ssrc(100, 42)
-
-        # Hold the lock from another thread
-        lock_acquired = threading.Event()
-        release_lock = threading.Event()
-
-        def hold_lock():
-            with receiver._lock:
-                lock_acquired.set()
-                release_lock.wait(timeout=5)
-
-        holder = threading.Thread(target=hold_lock, daemon=True)
-        holder.start()
-        lock_acquired.wait(timeout=2)
-
-        # stop() in another thread — should block on the lock
-        stop_done = threading.Event()
-
-        def do_stop():
-            receiver.stop()
-            stop_done.set()
-
-        stopper = threading.Thread(target=do_stop, daemon=True)
-        stopper.start()
-
-        # stop should NOT complete while lock is held
-        assert not stop_done.wait(timeout=0.3), \
-            "stop() should block while _lock is held by another thread"
-
-        # Release the lock — stop should complete
-        release_lock.set()
-        assert stop_done.wait(timeout=2), \
-            "stop() should complete after lock is released"
-
-        # State should be cleared
-        assert len(receiver._buffers) == 0
-        assert len(receiver._ssrc_to_user) == 0
-        holder.join(timeout=2)
-        stopper.join(timeout=2)
-
-
-# =====================================================================
-# Bug 2: _packet_debug_count must be instance-level, not class-level
-# =====================================================================
-
-class TestPacketDebugCounterIsInstanceLevel:
-    """Each VoiceReceiver instance has its own debug counter."""
-
-
-    def test_counter_is_per_instance(self):
-        """Two receivers have independent counters."""
-        r1 = self._make_receiver()
-        r2 = self._make_receiver()
-
-        r1._packet_debug_count = 10
-        assert r2._packet_debug_count == 0, \
-            "_packet_debug_count must be instance-level, not shared across instances"
-
-
-# =====================================================================
 # Bug 3: play_in_voice_channel uses get_running_loop not get_event_loop
 # =====================================================================
 
@@ -828,52 +514,6 @@ class TestSendVoiceReplyFilename:
         runner_source = inspect.getsource(GatewayRunner._send_voice_reply)
         assert "build_auto_tts_output_path" in runner_source, \
             "_send_voice_reply should build its path via build_auto_tts_output_path"
-
-
-# =====================================================================
-# Bug 5: Voice timeout cleans up runner voice_mode via callback
-# =====================================================================
-
-class TestVoiceTimeoutCleansRunnerState:
-    """Timeout disconnect notifies runner to clean voice_mode."""
-
-
-    @pytest.fixture
-    def adapter(self):
-        return self._make_discord_adapter()
-
-    def test_adapter_has_on_voice_disconnect_attr(self, adapter):
-        """DiscordAdapter has _on_voice_disconnect callback attribute."""
-        assert hasattr(adapter, "_on_voice_disconnect")
-        assert adapter._on_voice_disconnect is None
-
-    @pytest.mark.asyncio
-    async def test_timeout_calls_disconnect_callback(self, adapter):
-        """_voice_timeout_handler calls _on_voice_disconnect with chat_id."""
-        callback_calls = []
-        adapter._on_voice_disconnect = lambda chat_id: callback_calls.append(chat_id)
-
-        # Set up state as if we're in a voice channel
-        mock_vc = MagicMock()
-        mock_vc.is_connected.return_value = True
-        mock_vc.disconnect = AsyncMock()
-        adapter._voice_clients[111] = mock_vc
-        adapter._voice_text_channels[111] = 999
-        adapter._voice_timeout_tasks[111] = MagicMock()
-        adapter._voice_receivers[111] = MagicMock()
-        adapter._voice_listen_tasks[111] = MagicMock()
-
-        # Patch sleep to return immediately
-        with patch("asyncio.sleep", new_callable=AsyncMock):
-            await adapter._voice_timeout_handler(111)
-
-        assert "999" in callback_calls, \
-            "_on_voice_disconnect must be called with chat_id on timeout"
-
-
-# =====================================================================
-# Bug 6: play_in_voice_channel has playback timeout
-# =====================================================================
 
 
 # =====================================================================
@@ -927,57 +567,6 @@ class TestAutoTtsTempFileCleanup:
 
 
 # =====================================================================
-# Voice channel awareness (get_voice_channel_info / context)
-# =====================================================================
-
-
-class TestVoiceChannelAwareness:
-    """Tests for get_voice_channel_info() and get_voice_channel_context()."""
-
-
-    def _make_member(self, user_id, display_name, is_bot=False):
-        return SimpleNamespace(
-            id=user_id, display_name=display_name, bot=is_bot,
-        )
-
-
-    def test_returns_info_with_members(self):
-        adapter = self._make_adapter()
-        vc = MagicMock()
-        vc.is_connected.return_value = True
-        bot_member = self._make_member(99999, "HermesBot", is_bot=True)
-        user_a = self._make_member(1001, "Alice")
-        user_b = self._make_member(1002, "Bob")
-        vc.channel.name = "general-voice"
-        vc.channel.members = [bot_member, user_a, user_b]
-        adapter._voice_clients[111] = vc
-
-        info = adapter.get_voice_channel_info(111)
-        assert info is not None
-        assert info["channel_name"] == "general-voice"
-        assert info["member_count"] == 2  # bot excluded
-        names = [m["display_name"] for m in info["members"]]
-        assert "Alice" in names
-        assert "Bob" in names
-        assert "HermesBot" not in names
-
-
-    def test_context_string_format(self):
-        adapter = self._make_adapter()
-        vc = MagicMock()
-        vc.is_connected.return_value = True
-        user_a = self._make_member(1001, "Alice")
-        vc.channel.name = "chat-room"
-        vc.channel.members = [user_a]
-        adapter._voice_clients[111] = vc
-
-        ctx = adapter.get_voice_channel_context(111)
-        assert "#chat-room" in ctx
-        assert "1 participant" in ctx
-        assert "Alice" in ctx
-
-
-# ---------------------------------------------------------------------------
 # Bugfix: disconnect() must clean up voice state
 # ---------------------------------------------------------------------------
 
@@ -1012,171 +601,8 @@ class TestDisconnectVoiceCleanup:
 
 
 # =====================================================================
-# Discord Voice Channel Flow Tests
-# =====================================================================
-
-
-@pytest.mark.skipif(
-    importlib.util.find_spec("nacl") is None,
-    reason="PyNaCl not installed",
-)
-class TestVoiceReception:
-    """Audio reception: SSRC mapping, DAVE passthrough, buffer lifecycle."""
-
-
-    @staticmethod
-    def _fill_buffer(receiver, ssrc, duration_s=1.0, age_s=3.0):
-        """Add PCM data to buffer. 48kHz stereo 16-bit = 192000 bytes/sec."""
-        size = int(192000 * duration_s)
-        receiver._buffers[ssrc] = bytearray(b"\x00" * size)
-        receiver._last_packet_time[ssrc] = time.monotonic() - age_s
-
-    # -- Known SSRC (normal flow) --
-
-    def test_known_ssrc_returns_completed(self):
-        receiver = self._make_receiver()
-        receiver.start()
-        receiver.map_ssrc(100, 42)
-        self._fill_buffer(receiver, 100)
-        completed = receiver.check_silence()
-        assert len(completed) == 1
-        assert completed[0][0] == 42
-        assert len(receiver._buffers[100]) == 0  # cleared
-
-
-    # -- Unknown SSRC + DAVE passthrough --
-
-
-    def test_unknown_ssrc_late_speaking_event(self):
-        """Audio buffered before SPEAKING → SPEAKING maps → next check returns it."""
-        receiver = self._make_receiver(dave=True)
-        receiver.start()
-        self._fill_buffer(receiver, 100, age_s=0.0)  # still receiving
-        # No user yet
-        assert receiver.check_silence() == []
-        # SPEAKING event arrives
-        receiver.map_ssrc(100, 42)
-        # Silence kicks in
-        receiver._last_packet_time[100] = time.monotonic() - 3.0
-        completed = receiver.check_silence()
-        assert len(completed) == 1
-        assert completed[0][0] == 42
-
-    # -- SSRC auto-mapping --
-
-
-    def test_automap_persists_across_calls(self):
-        """Auto-mapped SSRC stays mapped for subsequent checks."""
-        members = [
-            SimpleNamespace(id=9999, name="Bot"),
-            SimpleNamespace(id=42, name="Alice"),
-        ]
-        receiver = self._make_receiver(allowed_ids={"42"}, members=members)
-        receiver.start()
-        self._fill_buffer(receiver, 100)
-        receiver.check_silence()
-        assert receiver._ssrc_to_user[100] == 42
-        # Second utterance — should use cached mapping
-        self._fill_buffer(receiver, 100)
-        completed = receiver.check_silence()
-        assert len(completed) == 1
-        assert completed[0][0] == 42
-
-    # -- Stale buffer cleanup --
-
-    def test_stale_unknown_buffer_discarded(self):
-        """Buffer with no user and very old timestamp is discarded."""
-        receiver = self._make_receiver()
-        receiver.start()
-        receiver._buffers[200] = bytearray(b"\x00" * 100)
-        receiver._last_packet_time[200] = time.monotonic() - 10.0
-        receiver.check_silence()
-        assert 200 not in receiver._buffers
-
-    # -- Pause / resume (echo prevention) --
-
-    def test_paused_receiver_ignores_packets(self):
-        receiver = self._make_receiver()
-        receiver.start()
-        receiver.pause()
-        receiver._on_packet(b"\x00" * 100)
-        assert len(receiver._buffers) == 0
-
-    def test_resumed_receiver_accepts_packets(self):
-        receiver = self._make_receiver()
-        receiver.start()
-        receiver.pause()
-        receiver.resume()
-        assert receiver._paused is False
-
-    # -- _on_packet DAVE passthrough behavior --
-
-
-    @staticmethod
-    def _build_rtp_packet(ssrc=100, seq=1, timestamp=960):
-        """Build a minimal valid RTP packet for _on_packet.
-
-        We need: RTP header (12 bytes) + encrypted payload + 4-byte nonce.
-        NaCl decrypt is mocked so payload content doesn't matter.
-        """
-        import struct
-        # RTP header: version=2, payload_type=0x78, no extension, no CSRC
-        header = struct.pack(">BBHII", 0x80, 0x78, seq, timestamp, ssrc)
-        # Fake encrypted payload (NaCl will be mocked) + 4 byte nonce
-        payload = b"\x00" * 20 + b"\x00\x00\x00\x01"
-        return header + payload
-
-    def _inject_mock_decoder(self, receiver, ssrc):
-        """Pre-inject a mock Opus decoder for the given SSRC."""
-        mock_decoder = MagicMock()
-        mock_decoder.decode.return_value = b"\x00" * 3840
-        receiver._decoders[ssrc] = mock_decoder
-        return mock_decoder
-
-
-    def test_on_packet_dave_unencrypted_error_passthrough(self):
-        """DAVE decrypt 'Unencrypted' error → use data as-is, don't drop."""
-        dave = MagicMock()
-        dave.decrypt.side_effect = Exception(
-            "Failed to decrypt: DecryptionFailed(UnencryptedWhenPassthroughDisabled)"
-        )
-        receiver = self._make_receiver_with_nacl(
-            dave_session=dave, mapped_ssrcs={100: 42}
-        )
-        self._inject_mock_decoder(receiver, 100)
-
-        with patch("nacl.secret.Aead") as mock_aead:
-            mock_aead.return_value.decrypt.return_value = b"\xf8\xff\xfe"
-            receiver._on_packet(self._build_rtp_packet(ssrc=100))
-
-        assert 100 in receiver._buffers
-        assert len(receiver._buffers[100]) > 0
-
-
 class TestVoiceTTSPlayback:
     """TTS playback: play_tts in VC, dedup, fallback."""
-
-
-    # -- play_tts behavior --
-
-    @pytest.mark.asyncio
-    async def test_play_tts_plays_in_vc(self):
-        """play_tts calls play_in_voice_channel when bot is in VC."""
-        adapter = self._make_discord_adapter()
-        mock_vc = MagicMock()
-        mock_vc.is_connected.return_value = True
-        adapter._voice_clients[111] = mock_vc
-        adapter._voice_text_channels[111] = 123
-
-        played = []
-        async def fake_play(gid, path):
-            played.append((gid, path))
-            return True
-        adapter.play_in_voice_channel = fake_play
-
-        result = await adapter.play_tts(chat_id="123", audio_path="/tmp/tts.ogg")
-        assert result.success is True
-        assert played == [(111, "/tmp/tts.ogg")]
 
 
     # -- Runner dedup --
@@ -1194,9 +620,9 @@ class TestVoiceTTSPlayback:
         from gateway.platforms.base import SessionSource
         from gateway.platforms.event import MessageEvent
         from gateway.config import Platform
-        runner._voice_mode["discord:ch1"] = voice_mode
+        runner._voice_mode["telegram:ch1"] = voice_mode
         source = SessionSource(
-            platform=Platform.DISCORD, chat_id="ch1",
+            platform=Platform.TELEGRAM, chat_id="ch1",
             user_id="1", user_name="test", chat_type="channel",
         )
         event = MessageEvent(source=source, text="test", message_type=msg_type)

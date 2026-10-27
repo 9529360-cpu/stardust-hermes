@@ -257,55 +257,46 @@ class TestGatewayRunnerInjection:
         runner = object.__new__(GatewayRunner)
         adapter = MagicMock(spec=BasePlatformAdapter)
         monkeypatch.setattr(runner, "_instantiate_adapter", lambda platform, config: adapter)
-        assert runner._create_adapter(Platform.SIGNAL, PlatformConfig(enabled=True)) is adapter
+        assert runner._create_adapter(Platform.WEIXIN, PlatformConfig(enabled=True)) is adapter
         assert adapter.gateway_runner is runner
         monkeypatch.setattr(runner, "_instantiate_adapter", lambda platform, config: None)
-        assert runner._create_adapter(Platform.SIGNAL, PlatformConfig(enabled=True)) is None
+        assert runner._create_adapter(Platform.WEIXIN, PlatformConfig(enabled=True)) is None
 
     @pytest.mark.asyncio
-    async def test_real_signal_factory_routes_inbound_group_event(self, monkeypatch):
-        """A factory-built (built-in) Signal adapter resolves profile_routes
-        for a real inbound envelope — fails on main where the Signal branch
-        returned a bare ``SignalAdapter(config)`` with no runner."""
+    async def test_real_weixin_factory_routes_inbound_message(self, monkeypatch, tmp_path):
+        """A retained adapter factory stamps the routed profile on a real inbound message event."""
         from gateway.config import PlatformConfig
 
-        group_id = "test-signal-route"
-        monkeypatch.setenv("SIGNAL_GROUP_ALLOWED_USERS", group_id)
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         runner = object.__new__(GatewayRunner)
         runner.config = GatewayConfig(
             multiplex_profiles=True,
             profile_routes=[
-                ProfileRoute(name="signal", platform="signal", profile="ops", chat_id=f"group:{group_id}"),
+                ProfileRoute(name="weixin-ops", platform="weixin", profile="ops", chat_id="u-123"),
             ],
         )
         adapter = runner._create_adapter(
-            Platform.SIGNAL,
-            PlatformConfig(enabled=True, extra={"http_url": "http://127.0.0.1:18080", "account": "+15555550123"}),
+            Platform.WEIXIN,
+            PlatformConfig(enabled=True, extra={"account_id": "bot-account", "dm_policy": "pairing"}),
         )
         assert adapter is not None and adapter.gateway_runner is runner
-
+        adapter._poll_session = object()
         captured = {}
+        adapter._enqueue_text_event = lambda event: captured.update(event=event)
 
-        async def capture_event(event):
-            captured["event"] = event
-
-        adapter.handle_message = capture_event
         with patch(
             "hermes_cli.profiles.profiles_to_serve",
             return_value=[("default", Path("/profiles/default")), ("ops", Path("/profiles/ops"))],
         ):
-            await adapter._handle_envelope({
-                "envelope": {
-                    "sourceNumber": "+15555550124",
-                    "sourceName": "Test Operator",
-                    "timestamp": 1700000000000,
-                    "dataMessage": {
-                        "message": "diagnose the cluster",
-                        "groupInfo": {"groupId": group_id, "groupName": "US East 7"},
-                    },
-                },
+            await adapter._process_message({
+                "from_user_id": "u-123",
+                "to_user_id": "bot-account",
+                "message_id": "weixin-msg-1",
+                "item_list": [{"type": 1, "text_item": {"text": "diagnose the cluster"}}],
             })
+
         source = captured["event"].source
+        assert source.platform.value == "weixin"
         assert source.profile == "ops"
         assert build_session_key(source, profile=source.profile).startswith("agent:ops:")
 

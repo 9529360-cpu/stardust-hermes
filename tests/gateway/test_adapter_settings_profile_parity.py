@@ -51,7 +51,7 @@ _SETTINGS = [
     ("gateway.platforms.weixin", "WEIXIN_BASE_URL", "https://default.invalid", "https://secondary.invalid",
      lambda m: m._wx_secret("WEIXIN_BASE_URL", "")),
     ("gateway.platforms.whatsapp_cloud", "WHATSAPP_CLOUD_WEBHOOK_PORT", "18010", "18110",
-     lambda m: m._get_scoped_secret("WHATSAPP_CLOUD_WEBHOOK_PORT", "")),
+     lambda m: m._get_wsecret("WHATSAPP_CLOUD_WEBHOOK_PORT", default="")),
 ]
 
 
@@ -60,11 +60,14 @@ _SETTINGS = [
                          ids=[f"{m.rsplit('.', 2)[-2]}:{v}" for m, v, *_ in _SETTINGS])
 def test_served_secondary_resolves_its_own_setting(monkeypatch, module, var, default_value, secondary_value, resolve):
     mod = importlib.import_module(module)
-    for name in (var, "LINE_CHANNEL_ACCESS_TOKEN", "LINE_CHANNEL_SECRET", "TEAMS_CLIENT_ID", "TEAMS_CLIENT_SECRET",
-                 "TEAMS_TENANT_ID", "SIGNAL_ACCOUNT", "BUZZ_PRIVATE_KEY"):
+    for name in (var, "TELEGRAM_BOT_TOKEN", "WHATSAPP_ENABLED", "WEIXIN_TOKEN", "WEIXIN_ACCOUNT_ID",
+                 "WHATSAPP_CLOUD_ACCESS_TOKEN"):
         monkeypatch.delenv(name, raising=False)
-    creds = {"LINE_CHANNEL_ACCESS_TOKEN": "t", "LINE_CHANNEL_SECRET": "s", "TEAMS_CLIENT_ID": "a",
-             "TEAMS_CLIENT_SECRET": "b", "TEAMS_TENANT_ID": "c", "SIGNAL_ACCOUNT": "+1", "BUZZ_PRIVATE_KEY": "k"}
+    creds = {
+        "TELEGRAM_BOT_TOKEN": "123:token", "WHATSAPP_ENABLED": "true",
+        "WEIXIN_TOKEN": "wx-token", "WEIXIN_ACCOUNT_ID": "acct-1",
+        "WHATSAPP_CLOUD_ACCESS_TOKEN": "cloud-token",
+    }
     standalone, served = _served(monkeypatch, {var: default_value, **creds}, {var: secondary_value, **creds},
                                  lambda: resolve(mod))
     assert served == standalone, f"{var}: served={served!r} standalone={standalone!r}"

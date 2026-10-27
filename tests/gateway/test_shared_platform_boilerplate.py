@@ -1,70 +1,65 @@
 """Invariants for the shared adapter boilerplate in ``gateway/platforms/_shared.py``.
 
-Contract under test: every plugin platform's env-driven enablement reads through the ONE
-profile-scoped reader (never an ambient ``os.environ``/``get_env_value`` read), and the table-driven
-``apply_yaml_bridge`` seeds ``extra`` for a secondary profile even though it must not write env.
+Contract under test: profile-scoped readers and table-driven YAML bridges keep adapter configuration
+isolated between profiles without writing to ambient environment state.
 """
 
 from __future__ import annotations
 
 import importlib
 import os
+from types import SimpleNamespace
 
 import pytest
 
 import agent.secret_scope as ss
 import gateway.platforms._shared as shared
-import hermes_cli.config as cli_config
 
-_ENV_ENABLEMENT_PLUGINS = ("buzz", "google_chat", "irc", "line", "ntfy", "photon", "simplex", "teams")
+@pytest.mark.parametrize(
+    "module_name,platform,env_name,launch_value,scoped_value",
+    [
+        ("plugins.platforms.telegram.adapter", "telegram", "TELEGRAM_BOT_TOKEN", "launch-token", "profile-token"),
+        ("plugins.platforms.whatsapp.adapter", "whatsapp", "WHATSAPP_ENABLED", "false", "true"),
+    ],
+)
+def test_retained_plugin_connection_check_uses_only_the_active_profile_env(
+    module_name, platform, env_name, launch_value, scoped_value, monkeypatch, tmp_path
+):
+    """The real adapter registration path must not seed connection state from another profile's env."""
+    from gateway.config import PlatformConfig
 
+    module = importlib.import_module(module_name)
+    entry: dict = {}
+    module.register(SimpleNamespace(register_platform=lambda **kwargs: entry.update(kwargs)))
+    assert entry["name"] == platform
 
-@pytest.fixture(autouse=True)
-def _multiplex_off():
-    prev = ss._MULTIPLEX_ACTIVE
-    ss.set_multiplex_active(False)
-    yield
-    ss.set_multiplex_active(prev)
+    (tmp_path / ".env").write_text("", encoding="utf-8")
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
+    monkeypatch.setenv(env_name, launch_value)
+    monkeypatch.setattr("hermes_cli.config.load_env", lambda: {})
+    raw_reads: list[str] = []
+    real_getenv = os.getenv
 
+    def track_raw_env(name, default=None):
+        if name == env_name:
+            raw_reads.append(name)
+        return real_getenv(name, default)
 
-@pytest.mark.parametrize("plugin", _ENV_ENABLEMENT_PLUGINS)
-def test_env_enablement_reads_only_through_scoped_getter(plugin, monkeypatch):
-    """A secondary profile is seeded only from its own scope: every var the hook consults must go through
-    ``_shared.get_scoped_secret`` (a fake scope answers them) and never through a raw env read."""
-    mod = importlib.import_module(f"plugins.platforms.{plugin}.adapter")
-    # Anything the plugin resolves through raw env would be visible here; the scoped reader hides it.
-    for var in list(os.environ):
-        if var.startswith(plugin.upper().replace("GOOGLE_CHAT", "GOOGLE")):
-            monkeypatch.delenv(var, raising=False)
-    fake_scope = {
-        "BUZZ_RELAY_URL": "wss://relay", "BUZZ_PRIVATE_KEY": "k" * 8, "BUZZ_CHANNELS": "a,b",
-        "GOOGLE_CHAT_PROJECT_ID": "p", "GOOGLE_CHAT_SUBSCRIPTION_NAME": "s", "GOOGLE_CHAT_MAX_MESSAGES": "3",
-        "IRC_SERVER": "irc.example", "IRC_CHANNEL": "#h", "IRC_PORT": "6697",
-        "LINE_CHANNEL_ACCESS_TOKEN": "t", "LINE_CHANNEL_SECRET": "s", "LINE_PORT": "8081",
-        "NTFY_TOPIC": "topic", "NTFY_TOKEN": "tok",
-        "PHOTON_PROJECT_ID": "pid", "PHOTON_PROJECT_SECRET": "sec", "PHOTON_HOME_CHANNEL": "line-1",
-        "SIMPLEX_WS_URL": "ws://x", "SIMPLEX_GROUP_ALLOWED": "g",
-        "TEAMS_CLIENT_ID": "c", "TEAMS_CLIENT_SECRET": "s", "TEAMS_TENANT_ID": "t", "TEAMS_PORT": "3979",
-    }
-    scoped_hits: list[str] = []
-    raw_hits: list[str] = []
-    real = shared.get_scoped_secret
+    monkeypatch.setattr(os, "getenv", track_raw_env)
+    ss.set_multiplex_active(True)
+    scoped_token = ss.set_secret_scope({env_name: scoped_value})
+    try:
+        assert entry["is_connected"](PlatformConfig(enabled=True)) is True
+        missing_token = ss.set_secret_scope({})
+        try:
+            assert entry["is_connected"](PlatformConfig(enabled=True)) is False
+        finally:
+            ss.reset_secret_scope(missing_token)
+    finally:
+        ss.reset_secret_scope(scoped_token)
+        ss.set_multiplex_active(False)
 
-    def spy(name, default=None, **kw):
-        scoped_hits.append(name)
-        return fake_scope.get(name, default)
-
-    monkeypatch.setattr(shared, "get_scoped_secret", spy)
-    monkeypatch.setattr(shared, "_scoped_get_secret", lambda name, default=None: fake_scope.get(name, default))
-    monkeypatch.setattr(cli_config, "get_env_value", lambda key: raw_hits.append(key))
-    monkeypatch.setattr(os, "getenv", lambda key, default=None: raw_hits.append(key) or default)
-
-    seed = mod._env_enablement()
-
-    assert real is not shared.get_scoped_secret  # the spy really replaced the seam
-    assert seed, f"{plugin}: fake scope holds the required vars, hook must enable"
-    assert scoped_hits, f"{plugin}: enablement never touched the scoped reader"
-    assert not raw_hits, f"{plugin}: raw env reads during enablement: {raw_hits}"
+    assert raw_reads == []
 
 
 def test_home_channel_name_defaults_to_home_everywhere(monkeypatch):
@@ -118,8 +113,8 @@ def test_extra_or_secret_scoped_miss_never_reads_launch_env(monkeypatch):
 
 
 def test_external_fallback_consults_profile_scope_only_when_unscoped(monkeypatch):
-    """Buzz's startup gate rung: a Bitwarden-managed key is visible through ``external_fallback`` before any
-    scope exists, but never overrides an installed (authoritative) scope."""
+    """A profile-scoped value is visible through ``external_fallback`` before a scope exists, but never
+    overrides an installed (authoritative) scope."""
     monkeypatch.delenv("K", raising=False)
     monkeypatch.setattr(shared, "_UNSCOPED_PROFILE_SECRETS", {"K": "external"})
     assert shared.get_scoped_secret("K") is None

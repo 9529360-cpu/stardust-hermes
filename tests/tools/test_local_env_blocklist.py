@@ -1399,6 +1399,40 @@ class TestProfileScopedPassthrough:
         assert "SERVICE_TOKEN" not in result
 
 
+class TestRetiredSharedToolEnvOwnership:
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "HASS_TOKEN",
+            "HASS_URL",
+            "TWILIO_ACCOUNT_SID",
+            "TWILIO_AUTH_TOKEN",
+            "TWILIO_PHONE_NUMBER",
+            "TWILIO_PHONE_NUMBER_SID",
+            "MSGRAPH_TENANT_ID",
+            "MSGRAPH_CLIENT_ID",
+            "MSGRAPH_CLIENT_SECRET",
+            "MSGRAPH_SCOPE",
+            "MSGRAPH_AUTHORITY_URL",
+        ],
+    )
+    def test_shared_tool_credentials_are_blocked_by_default(self, name):
+        from tools.environments.local_env_policy import _is_retired_platform_env
+
+        assert name in _HERMES_PROVIDER_ENV_BLOCKLIST
+        assert not _is_retired_platform_env(name)
+        assert name not in _run_with_env(extra_os_env={name: "process-secret"})
+
+    def test_retired_gateway_aliases_remain_narrow(self):
+        from tools.environments.local_env_policy import _is_retired_platform_env
+
+        assert _is_retired_platform_env("SMS_WEBHOOK_PORT")
+        assert _is_retired_platform_env("MSGRAPH_WEBHOOK_PORT")
+        assert not _is_retired_platform_env("TWILIO_AUTH_TOKEN")
+        assert not _is_retired_platform_env("HASS_TOKEN")
+        assert not _is_retired_platform_env("MSGRAPH_CLIENT_SECRET")
+
+
 class TestBlocklistCoverage:
     """Sanity checks that the blocklist covers all known providers."""
 
