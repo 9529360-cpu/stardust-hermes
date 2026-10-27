@@ -126,8 +126,8 @@ test('Bot Routines keeps its 32px schedule fields separate from the main Cron fo
     }
   })
 
-  expect(scheduleGeometry).toEqual({ borderRadius: '6px', height: '32px' })
-  expect(compactGeometry).toEqual({ borderRadius: '2.5px', height: '28px' })
+  expect(scheduleGeometry).toEqual({ borderRadius: '4px', height: '32px' })
+  expect(compactGeometry).toEqual({ borderRadius: '4px', height: '32px' })
   await page.screenshot({ path: test.info().outputPath('bot-routine-control-1220x800.png') })
 
   await frequency.click()
@@ -144,7 +144,7 @@ test('Bot Routines keeps its 32px schedule fields separate from the main Cron fo
     }
   })
 
-  expect(onceGeometry).toEqual({ borderRadius: '6px', height: '32px' })
+  expect(onceGeometry).toEqual({ borderRadius: '4px', height: '32px' })
   await onceCount.fill('45')
   await expect(onceCount).toHaveValue('45')
 
