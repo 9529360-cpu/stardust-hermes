@@ -74,7 +74,7 @@ export function SendDiagnosticsHost() {
             <DialogHeader>
               <DialogTitle>{copy.failedTitle}</DialogTitle>
               <DialogDescription className="text-left">
-                {state.error}
+                {state.errorCode === 'gateway-unavailable' ? copy.gatewayUnavailable : state.error}
                 {'\n'}
                 {copy.failedHint}
               </DialogDescription>

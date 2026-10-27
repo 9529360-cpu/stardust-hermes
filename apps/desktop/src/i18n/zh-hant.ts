@@ -330,6 +330,7 @@ export const zhHant = defineLocale({
     doneTitle: '診斷資訊已儲存',
     doneDescription: '已將遮罩後的診斷套件儲存到您的電腦。如需支援，可將此檔案附加到 Stardust 的 GitHub Issue。',
     failedTitle: '無法儲存診斷資訊',
+    gatewayUnavailable: '請先連線閘道，然後再試一次。',
     failedHint: '請更新 Stardust 與後端後重試。此流程不會退回到把日誌上傳到支援服務的舊路徑。',
     handoffLead: '需要協助？',
     links: {

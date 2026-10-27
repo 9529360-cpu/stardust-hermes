@@ -474,6 +474,7 @@ export interface Translations {
     doneDescription: string
     failedTitle: string
     failedHint: string
+    gatewayUnavailable: string
     handoffLead: string
     links: {
       github: string

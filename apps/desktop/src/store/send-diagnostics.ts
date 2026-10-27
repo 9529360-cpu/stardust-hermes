@@ -25,6 +25,7 @@ export interface SendDiagnosticsState {
   /** Short text describing the failure that prompted the report (attached
    *  to the bundle as error-context.txt, force-redacted server-side). */
   errorContext?: string
+  errorCode?: 'gateway-unavailable'
   error?: string
   phase: 'consent' | 'done' | 'error' | 'preparing'
   result?: SendDiagnosticsResult
@@ -115,7 +116,7 @@ export async function confirmSendDiagnostics(): Promise<void> {
   const connection = $connection.get()
 
   if (!gateway) {
-    $sendDiagnostics.set({ ...current, error: 'Hermes gateway unavailable', phase: 'error' })
+    $sendDiagnostics.set({ ...current, errorCode: 'gateway-unavailable', phase: 'error' })
 
     return
   }

@@ -444,6 +444,7 @@ export const en: Translations = {
     doneDescription:
       'The redacted bundle was saved to your computer. If you want support, attach it to a Stardust issue.',
     failedTitle: 'Couldn’t save diagnostics',
+    gatewayUnavailable: 'Connect to a gateway, then try again.',
     failedHint:
       'Try again after updating Stardust and the backend. This flow does not fall back to uploading your logs to a support service.',
     handoffLead: 'Need help?',
