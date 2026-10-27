@@ -14,6 +14,7 @@ import { expect, test } from './test'
 const DISABLE_AUTO_TITLE = 'auxiliary:\n  title_generation:\n    enabled: false'
 
 const TRIGGER = 'E2E_THINK'
+const SCROLL_INTENT_TRIGGER = 'E2E_THINK_SCROLL_INTENT'
 // Under SIDEBAR_DOCK_MIN_WIDTH_PX (640) and above the main window's minimum (400).
 const NARROW_WIDTH = 560
 // Long enough that the live block shows its timer for a few seconds.
@@ -41,7 +42,9 @@ test.beforeAll(async () => {
   fixture = await setupMockBackend({
     extraConfig: DISABLE_AUTO_TITLE,
     mockServer: {
-      reasoningForPrompt: prompt => (prompt.includes(TRIGGER) ? REASONING : undefined),
+      reasoningForPrompt: prompt => prompt.includes(SCROLL_INTENT_TRIGGER) ? REASONING.repeat(100) : prompt.includes(TRIGGER) ? REASONING : undefined,
+      reasoningChunkSize: 16,
+      reasoningChunkDelayMs: 20,
       replyForPrompt: prompt => (prompt.includes(TRIGGER) ? REPLY : 'Plain reply.'),
     },
   })
@@ -50,6 +53,58 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   await fixture?.cleanup()
   fixture = null
+})
+
+test('a live reasoning preview preserves reading position and re-locks at its bottom', async () => {
+  test.setTimeout(240_000)
+  const page = fixture!.page
+  await waitForAppReady(fixture!, 120_000)
+
+  await page.evaluate(() => window.localStorage.setItem('hermes.desktop.reasoning.collapsedByDefault.v2', 'false'))
+  await page.reload()
+  await waitForAppReady(fixture!, 120_000)
+
+  const composer = page.locator('[contenteditable="true"]').first()
+  await composer.waitFor({ state: 'visible', timeout: 10_000 })
+  await composer.click()
+  await composer.type(`${SCROLL_INTENT_TRIGGER} stream a long reasoning block`, { delay: 2 })
+  await page.keyboard.press('Enter')
+
+  const thinking = page.locator('[data-slot="aui_thinking-disclosure"]').first()
+  await expect(thinking).toBeVisible({ timeout: 60_000 })
+  const toggle = thinking.getByRole('button')
+
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') {
+    await toggle.click()
+  }
+
+  const body = thinking.locator('[data-slot="aui_thinking-body"]')
+  await expect(body).toBeVisible()
+  await expect(body.locator('[data-slot="aui_reasoning-text"]')).toContainText('先看看问题的背景')
+  await expect.poll(async () => body.evaluate(element => element.scrollHeight)).toBeGreaterThan(320)
+
+  const bodyBounds = await body.boundingBox()
+
+  if (!bodyBounds) {
+    throw new Error('The reasoning preview has no visible scroll area.')
+  }
+
+  await page.mouse.move(bodyBounds.x + bodyBounds.width / 2, bodyBounds.y + bodyBounds.height / 2)
+  await page.mouse.wheel(0, -10_000)
+  await expect.poll(async () => body.evaluate(element => element.scrollTop)).toBeLessThan(40)
+  const positionWhileReading = await body.evaluate(element => element.scrollTop)
+  const heightWhileReading = await body.evaluate(element => element.scrollHeight)
+  await expect.poll(async () => body.evaluate(element => element.scrollHeight)).toBeGreaterThan(heightWhileReading + 120)
+  await expect.poll(async () => body.evaluate(element => element.scrollTop)).toBe(positionWhileReading)
+  await capture(page, '5-thinking-preview-user-reading')
+
+  await page.mouse.wheel(0, 10_000)
+  await expect.poll(async () => body.evaluate(element => element.scrollHeight - element.scrollTop - element.clientHeight)).toBeLessThanOrEqual(40)
+
+  const beforeFollowGrowth = await body.evaluate(element => element.scrollHeight)
+  await expect.poll(async () => body.evaluate(element => element.scrollHeight)).toBeGreaterThan(beforeFollowGrowth + 120)
+  await expect.poll(async () => body.evaluate(element => element.scrollHeight - element.scrollTop - element.clientHeight)).toBeLessThanOrEqual(40)
+  await capture(page, '6-thinking-preview-following-again')
 })
 
 test('a settled reasoning block keeps how long the model thought, even after the session is reopened', async () => {

@@ -24,6 +24,10 @@ class TestResizeObserver {
     this.target = target
   }
 
+  observes(target: Element) {
+    return this.target === target
+  }
+
   unobserve() {}
 
   disconnect() {
@@ -38,7 +42,10 @@ class TestResizeObserver {
     this.callback(
       [
         {
+          borderBoxSize: [{ blockSize: height }] as unknown as ResizeObserverSize[],
+          contentBoxSize: [{ blockSize: height }] as unknown as ResizeObserverSize[],
           contentRect: { height } as DOMRectReadOnly,
+          devicePixelContentBoxSize: [{ blockSize: height }] as unknown as ResizeObserverSize[],
           target: this.target
         } as ResizeObserverEntry
       ],
@@ -655,6 +662,49 @@ describe('assistant-ui streaming renderer', () => {
       expect(container.querySelector('[data-slot="aui_reasoning-text"]')?.textContent).toContain('const answer = 42')
     })
     expect(container.textContent).not.toContain('```ts')
+  })
+
+  it('lets the reader pause live reasoning follow, then re-engage it at the bottom', async () => {
+    const { container } = render(<RunningReasoningHarness />)
+    const reasoningBody = container.querySelector('[data-slot="aui_thinking-body"]') as HTMLElement
+    const scrollHeight = 640
+    const clientHeight = 160
+    let scrollTop = scrollHeight - clientHeight
+    let bodyHeight = 180
+    let scrollWrites = 0
+
+    Object.defineProperty(reasoningBody, 'scrollHeight', { configurable: true, get: () => scrollHeight })
+    Object.defineProperty(reasoningBody, 'clientHeight', { configurable: true, get: () => clientHeight })
+    Object.defineProperty(reasoningBody, 'scrollTop', {
+      configurable: true,
+      get: () => scrollTop,
+      set: value => {
+        scrollWrites += 1
+        scrollTop = value
+      }
+    })
+
+    const observer = [...resizeObservers].find(candidate => candidate.observes(reasoningBody.firstElementChild!))
+    expect(observer).toBeTruthy()
+
+    act(() => observer!.trigger(bodyHeight))
+    expect(scrollTop).toBe(scrollHeight)
+
+    // A real scroll event leaves the bottom lock. Later streamed content grows,
+    // but the reasoning body must preserve the reader's position.
+    scrollTop = 220
+    fireEvent.scroll(reasoningBody)
+    bodyHeight = 240
+    act(() => observer!.trigger(bodyHeight))
+    expect(scrollTop).toBe(220)
+
+    // Returning to the bottom re-locks; the next streamed growth follows again.
+    scrollTop = scrollHeight - clientHeight
+    fireEvent.scroll(reasoningBody)
+    bodyHeight = 300
+    act(() => observer!.trigger(bodyHeight))
+    expect(scrollTop).toBe(scrollHeight)
+    expect(scrollWrites).toBe(2)
   })
 
   it('keeps the height-capped thinking preview scrollable after the turn settles', async () => {

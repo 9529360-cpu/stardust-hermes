@@ -215,28 +215,34 @@ const ThinkingDisclosure: FC<{
       return
     }
 
-    // Height-gated: the observer also fires when the container's WIDTH changes
-    // (sidebar sash drag resizes every message), and pinning there forces a
-    // scrollHeight read+write per preview per frame. Only actual content
-    // growth needs the pin; the height rides the RO entry, reflow-free.
+    // This height-capped body is its own scroller. Keep following newly streamed
+    // reasoning only while the reader is near its bottom; once they scroll up,
+    // let them read older tokens and re-lock only when they return to the tail.
+    let followGrowth = true
     let lastHeight = -1
 
-    const pin = (entries: readonly ResizeObserverEntry[]) => {
+    const onScroll = () => {
+      followGrowth = el.scrollHeight - el.scrollTop - el.clientHeight <= 40
+    }
+
+    const followResize = (entries: readonly ResizeObserverEntry[]) => {
       const height = entries[entries.length - 1]?.borderBoxSize?.[0]?.blockSize ?? -1
       const grew = height < 0 || height > lastHeight
       lastHeight = height
 
-      if (grew) {
+      if (followGrowth && grew) {
         el.scrollTop = el.scrollHeight
       }
     }
 
-    // No sync pin(): the observer's guaranteed initial delivery runs it with
-    // layout already clean (still before paint), avoiding a forced reflow.
-    const observer = new ResizeObserver(pin)
+    el.addEventListener('scroll', onScroll, { passive: true })
+    const observer = new ResizeObserver(followResize)
     observer.observe(content)
 
-    return () => observer.disconnect()
+    return () => {
+      el.removeEventListener('scroll', onScroll)
+      observer.disconnect()
+    }
     // Re-run when the disclosure toggles so the observer attaches to the new
     // DOM after expand/collapse (refs are conditionally rendered on `open`).
   }, [isPreview, open])
