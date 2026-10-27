@@ -70,7 +70,6 @@ export interface Translations {
     someUnavailable: string
     loading: string
     emptyTitle: string
-    emptyDescription: string
     groups: { attention: string; running: string; upcoming: string; recent: string; other: string }
     states: {
       blocked: string
@@ -112,7 +111,6 @@ export interface Translations {
       skipped: string
     }
     recoveryActions: { retry: string; review_or_retry: string; resume: string }
-    summary: (running: number, attention: number) => string
     workingOn: (tool: string) => string
     exitCode: (code: number) => string
     needsSecret: (name: string) => string
@@ -504,7 +502,6 @@ export interface Translations {
   keybinds: {
     keys: Record<string, string>
     title: string
-    subtitle: (open: string) => string
     search: string
     rebind: string
     reset: string
@@ -3454,7 +3451,6 @@ export interface Translations {
   }
 
   freeTier: {
-    /** Settings › Providers row title while the Nous identity is the free tier. */
     providerRowTitle: string
     /** The featured row's pitch while the identity is the free tier: what signing in adds. */
     providerRowPitch: string
@@ -3587,6 +3583,7 @@ export interface Translations {
       unknown: string
     }
     statusbar: {
+      modelTitle: (provider: string, model: string) => string
       unknown: string
       reading: string
       restart: string
@@ -3691,8 +3688,6 @@ export interface Translations {
       switchModel: string
       openModelPicker: string
       modelPinned: string
-      modelTitle: (provider: string, model: string) => string
-      providerModelTitle: (provider: string, model: string) => string
     }
     tiles: {
       sessionOpenFailed: string
@@ -3921,7 +3916,6 @@ export interface Translations {
 
   assistant: {
     intro: {
-      eyebrow: string
       headline: string
       body: string
       start: string
@@ -4203,6 +4197,7 @@ export interface Translations {
         notSaved: string
         preview: string
         previewWithSchedule: (schedule: string) => string
+        previewJobTitle: (schedule: string) => string
         previousSchedule: string
         repeat: string
         repeatForever: string

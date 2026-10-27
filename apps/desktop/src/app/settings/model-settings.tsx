@@ -220,7 +220,7 @@ function StaleAuxWarning({ applying, onReset, slots, taskLabel }: StaleAuxWarnin
   const aux = t.settings.model.auxiliaryRunOn(slots.length, names)
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+    <div className="flex flex-wrap items-center gap-2 rounded-md border border-(--ui-border-amber)/40 bg-(--ui-bg-amber)/10 px-3 py-2 text-xs text-(--ui-amber-text)">
       <AlertTriangle className="size-3.5 shrink-0" />
       <span className="grow">
         {aux.before}
@@ -1173,7 +1173,7 @@ export function ModelSettings({ onConfigSaved, onMainModelChanged, scopeProfile 
                   }
                   description={
                     <span className="font-mono text-[0.68rem]">
-                      {isAuto ? m.autoUseMain : `${current.provider} · ${current.model || m.providerDefault}`}
+                      {isAuto ? m.autoUseMain : `${current.provider}, ${current.model || m.providerDefault}`}
                       {!isAuto && current.base_url && (
                         <span className="text-muted-foreground"> · {current.base_url}</span>
                       )}

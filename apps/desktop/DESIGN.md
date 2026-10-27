@@ -33,7 +33,20 @@ one-off at the call site.
    one `SearchField`, one `Loader`, one `ErrorState`. Migrate onto them; don't
    fork.
 4. **Tokens, not literals.** Reference CSS vars (`--ui-*`, `--shadow-nous`,
-   `--theme-*`), never raw hex / ad-hoc rgba in components.
+   `--theme-*`), never raw hex / ad-hoc rgba in components. Stardust's default
+   appearance uses official Radix Gray, Blue, Red, Green, Amber, and Violet
+   scales. Steps 1–2 are field surfaces, 3–5 interactive states, 6–8 borders and
+   focus, 9–10 solid fills, and 11–12 text. Imported themes and terminal ANSI/code
+   palettes retain their source colors.
+5. **Readable hierarchy.** Chrome and controls use 12, 14, 16, and 20 px text
+   levels. Code editors, terminal output, and authored message content keep their
+   own format-specific scale. Remove eyebrow text when the adjacent heading
+   already names the product or section.
+6. **Concentric geometry.** Use tokenized radii for nested surfaces: controls stay
+   flatter than their parent, dialogs use a consistent 4–8 px family, and cards
+   do not nest rounded panels. Use a 0.5 px hairline for visual boundaries.
+7. **Motion follows action.** Avoid decorative movement and layout transitions.
+   Direct feedback uses ease-out up to 250 ms; preserve reduced-motion behavior.
 5. **Style lives in the primitive.** Variants and sizes own padding, radius,
    color, chrome. Call sites pass a `variant`/`size`, not `className` overrides
    that re-specify those.

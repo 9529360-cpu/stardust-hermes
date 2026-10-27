@@ -508,62 +508,6 @@
 }
 
 
-/* Side-rail mode switches — the workspace overview's tabs — are not global app
-   navigation. Keep the shared pane groups, but render their titlebar tabs as one
-   quiet segmented control inside the rail. */
-:root[data-hermes-reference-shell='aurora']
-  :is(
-    [data-zone-tabstrip]:has([data-tree-tab='workspace-overview'])
-  ) {
-  background: transparent !important;
-  box-shadow: none;
-  --pane-tab-active-bg: var(--ui-control-active-background);
-}
-
-:root[data-hermes-reference-shell='aurora']
-  :is(
-    [data-zone-tabstrip]:has([data-tree-tab='workspace-overview'])
-  )
-  > [role='tablist'] {
-  align-self: center;
-  flex: 0 0 auto;
-  height: 26px;
-  gap: 2px;
-  margin-inline-start: 5px;
-  padding: 2px;
-  border-radius: 7px;
-  background: var(--ui-bg-quaternary);
-}
-:root[data-hermes-reference-shell='aurora']
-  :is(
-    [data-zone-tabstrip]:has([data-tree-tab='workspace-overview'])
-  )
-  [data-slot='pane-tab'] {
-  height: 22px;
-  min-width: 0;
-  border: 0 !important;
-  border-radius: 5px;
-  box-shadow: none !important;
-}
-
-:root[data-hermes-reference-shell='aurora']
-  :is(
-    [data-zone-tabstrip]:has([data-tree-tab='workspace-overview'])
-  )
-  [data-slot='pane-tab'][data-active='false'] {
-  --tab-bg: transparent;
-}
-
-:root[data-hermes-reference-shell='aurora']
-  :is(
-    [data-zone-tabstrip]:has([data-tree-tab='workspace-overview'])
-  )
-  [data-slot='pane-tab'] .pane-tab-content > span > span {
-  font-size: 0.67rem;
-  font-weight: 520;
-  letter-spacing: 0.01em;
-  text-transform: none;
-}
 
 /* JARVIS workspace refinement — selected Stardust product direction. */
 :root[data-hermes-reference-shell='aurora'] {
@@ -629,35 +573,6 @@
   border-radius: 6px;
 }
 
-:root[data-hermes-reference-shell='aurora'] [data-jarvis-workspace] {
-  background:
-    radial-gradient(
-      46rem 25rem at 92% 0%,
-      color-mix(in srgb, var(--ui-accent) 10%, transparent),
-      transparent 68%
-    ),
-    radial-gradient(
-      34rem 20rem at 8% 100%,
-      color-mix(in srgb, var(--theme-primary) 7%, transparent),
-      transparent 72%
-    ),
-    var(--ui-chat-surface-background);
-}
-
-:root[data-hermes-reference-shell='aurora'] [data-jarvis-workspace] section {
-  backdrop-filter: blur(14px);
-}
-
-:root[data-hermes-reference-shell='aurora'] [data-jarvis-workspace] .jarvis-earth {
-  mix-blend-mode: screen;
-  filter: saturate(0.82) brightness(0.72) hue-rotate(3deg);
-  mask-image: radial-gradient(circle at 52% 51%, black 0 45%, rgba(0, 0, 0, 0.82) 61%, transparent 78%);
-}
-
-:root[data-hermes-reference-shell='aurora'] [data-jarvis-workspace] .jarvis-command-capsule {
-  -webkit-app-region: no-drag;
-}
-
 :root[data-hermes-reference-shell='aurora'] [data-personal-sidebar-shell] {
   position: relative;
   background: var(--ui-sidebar-surface-background);
@@ -665,21 +580,6 @@
 
 :root[data-hermes-reference-shell='aurora'] [data-personal-sidebar-shell]::after {
   content: none;
-}
-
-:root[data-hermes-reference-shell='aurora'] [data-jarvis-workspace] button {
-  transition:
-    border-color 120ms ease,
-    background-color 120ms ease,
-    color 120ms ease;
-}
-
-:root[data-hermes-reference-shell='aurora'] .jarvis-context-rail {
-  background: var(--ui-panel-surface-background) !important;
-}
-
-:root[data-hermes-reference-shell='aurora'] .jarvis-context-rail section {
-  background: transparent !important;
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-panel-header] {
@@ -704,10 +604,6 @@
     max-width: 246px;
   }
 
-  :root[data-hermes-reference-shell='aurora'] [data-jarvis-workspace] .jarvis-earth {
-    right: -14rem;
-    opacity: 0.38;
-  }
 }
 
 /* Conversation readability: human turns must read as compact chat bubbles,
@@ -943,20 +839,6 @@
   box-shadow: inset 2px 0 0 var(--ui-accent);
 }
 
-:root[data-hermes-reference-shell='aurora'] [data-jarvis-workspace] {
-  background:
-    radial-gradient(
-      46rem 25rem at 92% 0%,
-      color-mix(in srgb, var(--ui-accent) 10%, transparent),
-      transparent 68%
-    ),
-    radial-gradient(
-      34rem 20rem at 8% 100%,
-      color-mix(in srgb, var(--theme-primary) 7%, transparent),
-      transparent 72%
-    ),
-    var(--ui-chat-surface-background);
-}
 
 :root[data-hermes-reference-shell='aurora']
   [data-tour='sessions-sidebar']
@@ -1031,8 +913,7 @@
 }
 
 :root[data-hermes-reference-shell='aurora'][data-stardust-window-backdrop]
-  [data-tree-group='grp-context'],
-:root[data-hermes-reference-shell='aurora'][data-stardust-window-backdrop] .jarvis-context-rail {
+  [data-tree-group='grp-context'] {
   background: var(--ui-panel-surface-background) !important;
 }
 

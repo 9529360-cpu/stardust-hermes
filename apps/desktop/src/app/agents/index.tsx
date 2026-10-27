@@ -30,7 +30,7 @@ function statusGlyph(status: SubagentStatus, a: Translations['agents']): ReactNo
     return (
       <GlyphSpinner
         ariaLabel={a.running}
-        className="size-3.5 shrink-0 text-[0.95rem] text-muted-foreground/80"
+        className="size-3.5 shrink-0 text-base text-muted-foreground/80"
         spinner="breathe"
       />
     )
@@ -40,7 +40,7 @@ function statusGlyph(status: SubagentStatus, a: Translations['agents']): ReactNo
     return <AlertCircle aria-label={a.failed} className="size-3.5 shrink-0 text-destructive" />
   }
 
-  return <CheckCircle2 aria-label={a.done} className="size-3.5 shrink-0 text-emerald-600/85 dark:text-emerald-400/85" />
+  return <CheckCircle2 aria-label={a.done} className="size-3.5 shrink-0 text-(--ui-green-text)/85 dark:text-(--ui-green-text)/85" />
 }
 
 const STREAM_TONE: Record<SubagentStreamEntry['kind'], string> = {
@@ -60,12 +60,12 @@ function streamGlyph(entry: SubagentStreamEntry): ReactNode {
   }
 
   if (entry.kind === 'summary') {
-    return <CheckCircle2 aria-hidden className="mt-0.5 size-3 shrink-0 text-emerald-600/85 dark:text-emerald-400/85" />
+    return <CheckCircle2 aria-hidden className="mt-0.5 size-3 shrink-0 text-(--ui-green-text)/85 dark:text-(--ui-green-text)/85" />
   }
 
   if (entry.kind === 'thinking') {
     return (
-      <span aria-hidden className="font-mono text-[0.7rem] leading-none text-muted-foreground/70">
+      <span aria-hidden className="font-mono text-xs leading-4 text-muted-foreground/70">
         …
       </span>
     )
@@ -250,7 +250,7 @@ function SubagentTree({ tree }: { tree: SubagentNode[] }) {
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden">
-      <p className="shrink-0 text-[0.7rem] text-muted-foreground/70">{summary.join(' · ')}</p>
+      <p className="shrink-0 text-sm text-muted-foreground/70">{summary.join(', ')}</p>
       <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain pr-1">
         <div className="flex min-w-0 flex-col gap-6">
           {groups.map(group => (
@@ -273,10 +273,10 @@ function DelegationGroup({ group, nowMs }: { group: RootGroup; nowMs: number }) 
 
   return (
     <section className="grid min-w-0 gap-3">
-      <p className="text-[0.66rem] font-medium uppercase tracking-wider text-muted-foreground/70">
-        {group.delegationIndex > 0 ? t.agents.delegation(group.delegationIndex) : ''}{' '}
-        <span className="text-muted-foreground/50">·</span> {t.agents.workers(group.nodes.length)}
-        {activeWorkers > 0 ? <span className="text-primary/85"> · {t.agents.workersActive(activeWorkers)}</span> : null}
+      <p className="text-xs font-medium text-muted-foreground/70">
+        {group.delegationIndex > 0 ? `${t.agents.delegation(group.delegationIndex)}, ` : ''}
+        {t.agents.workers(group.nodes.length)}
+        {activeWorkers > 0 ? <span className="text-primary/85">, {t.agents.workersActive(activeWorkers)}</span> : null}
       </p>
       <div className="grid min-w-0 gap-4">
         {group.nodes.map(node => (
@@ -304,9 +304,9 @@ function StreamLine({
   const tone = entry.isError ? 'text-destructive' : STREAM_TONE[entry.kind]
 
   return (
-    <div className="flex min-w-0 items-baseline gap-2 text-[0.72rem] leading-relaxed" ref={enterRef}>
+    <div className="flex min-w-0 items-baseline gap-2 text-sm leading-5" ref={enterRef}>
       <span className="flex h-[0.95rem] shrink-0 items-center">{streamGlyph(entry)}</span>
-      <span className={cn('min-w-0 flex-1 wrap-anywhere', tone, isMono && 'font-mono text-[0.69rem]')}>
+      <span className={cn('min-w-0 flex-1 wrap-anywhere', tone, isMono && 'font-mono text-xs')}>
         {entry.text}
         {active ? (
           <GlyphSpinner
@@ -338,7 +338,7 @@ export function SubagentRow({ node, depth = 0, nowMs }: { node: SubagentNode; de
   }, [running])
 
   const visibleRows = open ? node.stream.slice(-10) : node.stream.slice(-2)
-  const fileLines = [...node.filesWritten.map(p => `+ ${p}`), ...node.filesRead.map(p => `· ${p}`)]
+  const fileLines = [...node.filesWritten.map(p => `+ ${p}`), ...node.filesRead.map(p => `• ${p}`)]
 
   const subtitle = [
     node.model,
@@ -360,15 +360,15 @@ export function SubagentRow({ node, depth = 0, nowMs }: { node: SubagentNode; de
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span
             className={cn(
-              'wrap-anywhere text-[0.82rem] font-medium leading-[1.1rem] text-foreground/90 transition-colors group-hover:text-foreground',
+              'wrap-anywhere text-sm font-medium leading-5 text-foreground/90 transition-colors duration-150 ease-out group-hover:text-foreground',
               running && 'shimmer text-foreground/65'
             )}
           >
             {node.goal}
           </span>
           {subtitle.length > 0 ? (
-            <FadeText className="text-[0.66rem] leading-[1.05rem] text-muted-foreground/65">
-              {subtitle.join(' · ')}
+            <FadeText className="text-xs leading-4 text-muted-foreground/65">
+              {subtitle.join(', ')}
             </FadeText>
           ) : null}
         </span>
@@ -391,16 +391,16 @@ export function SubagentRow({ node, depth = 0, nowMs }: { node: SubagentNode; de
 
       {open && fileLines.length > 0 ? (
         <div className="grid min-w-0 gap-0.5 pl-6" data-selectable-text="true">
-          <p className="text-[0.58rem] font-medium tracking-wider text-muted-foreground/60 uppercase">
+          <p className="text-xs font-medium text-muted-foreground/60">
             {t.agents.files}
           </p>
           {fileLines.slice(0, 8).map(line => (
-            <p className="wrap-break-word font-mono text-[0.67rem] leading-relaxed text-muted-foreground/80" key={line}>
+            <p className="wrap-break-word font-mono text-xs leading-4 text-muted-foreground/80" key={line}>
               {line}
             </p>
           ))}
           {fileLines.length > 8 ? (
-            <p className="font-mono text-[0.67rem] leading-relaxed text-muted-foreground/65">
+            <p className="font-mono text-xs leading-4 text-muted-foreground/65">
               {t.agents.moreFiles(fileLines.length - 8)}
             </p>
           ) : null}

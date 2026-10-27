@@ -18,7 +18,6 @@ import {
   buildSessionTaskRows,
   groupTaskRows,
   stateMeta,
-  summarizeTaskGroups,
   type TrackedTaskRow,
   trackTaskRows
 } from '@/lib/task-model'
@@ -327,7 +326,6 @@ export function TaskCenterView({ onOpenSession }: { onOpenSession?: (sessionId: 
   const [tab, setTab] = useState<'activity' | 'automation'>('activity')
   const taskState = useTaskRows()
   const { degraded, groups } = taskState
-  const summary = useMemo(() => summarizeTaskGroups(groups), [groups])
   const copy = t.taskCenter
   const loadCopy = copy.load
   const labels = copy.groups
@@ -345,7 +343,6 @@ export function TaskCenterView({ onOpenSession }: { onOpenSession?: (sessionId: 
       >
         <div>
           <h1 className="text-lg font-semibold text-foreground">{title}</h1>
-          <p className="text-xs text-muted-foreground">{copy.summary(summary.running, summary.attention)}</p>
         </div>
         <SegmentedControl
           aria-label={title}
@@ -412,7 +409,7 @@ export function TaskCenterView({ onOpenSession }: { onOpenSession?: (sessionId: 
         ) : taskState.isError ? (
           <EmptyState description={loadCopy.error} title={copy.loadFailed} />
         ) : (
-          <EmptyState description={copy.emptyDescription} title={copy.emptyTitle} />
+          <EmptyState title={copy.emptyTitle} />
         )}
       </div>
     </section>

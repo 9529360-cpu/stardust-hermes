@@ -50,7 +50,7 @@ export interface ConnectorRowProps {
 const SHELL_CLASS = `${WIDGET_SHELL_CLASS} text-[length:var(--conversation-text-font-size)] text-(--ui-text-primary)`
 
 const MARKS = {
-  connected: { Icon: Check, className: 'text-emerald-600 dark:text-emerald-400' },
+  connected: { Icon: Check, className: 'text-(--ui-green-text)' },
   idle: { Icon: CircleIcon, className: 'text-(--ui-text-quaternary)' },
   waiting: { Icon: Loader2, className: 'animate-spin text-primary' }
 } satisfies Record<ConnectorRowMark, { Icon: typeof Check; className: string }>
@@ -147,7 +147,7 @@ export function ConnectorSummary({
           {connector.title || connector.name}
         </span>
         {meta ? (
-          <span className={cn(SCAFFOLD_META_CLASS, tone === 'ok' && 'text-emerald-600/85 dark:text-emerald-400/85')}>
+          <span className={cn(SCAFFOLD_META_CLASS, tone === 'ok' && 'text-(--ui-green-text)/85 dark:text-(--ui-green-text)/85')}>
             {meta}
           </span>
         ) : null}

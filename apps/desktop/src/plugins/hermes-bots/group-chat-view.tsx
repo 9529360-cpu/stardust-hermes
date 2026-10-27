@@ -666,7 +666,7 @@ export function GroupChatWorkspace({ group, members, onBack, visible = true }: G
           aria-label={availabilityLabel}
           className={cn(
             'shrink-0 text-[0.65rem] text-(--ui-text-quaternary)',
-            members.length > 0 && availableMembers < members.length && 'text-amber-600 dark:text-amber-300'
+            members.length > 0 && availableMembers < members.length && 'text-(--ui-amber-text) dark:text-(--ui-amber-text)'
           )}
         >
           {members.length > 0 && availableMembers < members.length
@@ -754,7 +754,7 @@ export function GroupChatWorkspace({ group, members, onBack, visible = true }: G
           <Codicon className="shrink-0 text-[0.65rem]" name={activityOpen ? 'chevron-down' : 'chevron-right'} />
           <span className="shrink-0 font-medium">{b.group.activity}</span>
           {summaryActivity ? (
-            <span className={cn('min-w-0 flex-1 truncate', groupActivityTone(summaryActivity.kind))}>{`${groupActivityLabel(summaryActivity)} · ${relativeTime(summaryActivity.at)}`}</span>
+            <span className={cn('min-w-0 flex-1 truncate', groupActivityTone(summaryActivity.kind))}>{`${groupActivityLabel(summaryActivity)}, ${relativeTime(summaryActivity.at)}`}</span>
           ) : null}
         </RowButton>
         {room.running ? (

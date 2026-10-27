@@ -462,10 +462,10 @@ export function PluginInstallModal() {
                 )}
 
                 {(probe.insecure || (probe.warnings?.length ?? 0) > 0) && (
-                  <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[length:var(--conversation-caption-font-size)] text-foreground">
+                  <div className="flex items-start gap-2 rounded-lg border border-(--ui-border-amber)/30 bg-(--ui-bg-amber)/10 px-3 py-2 text-[length:var(--conversation-caption-font-size)] text-foreground">
                     <AlertTriangle
                       aria-hidden
-                      className="mt-0.5 size-3.5 shrink-0 text-amber-600 dark:text-amber-400"
+                      className="mt-0.5 size-3.5 shrink-0 text-(--ui-amber-text) dark:text-(--ui-amber-text)"
                     />
                     <span>
                       {[...new Set([...(probe.warnings ?? []), probe.insecure ? m.insecureWarning : ''])]

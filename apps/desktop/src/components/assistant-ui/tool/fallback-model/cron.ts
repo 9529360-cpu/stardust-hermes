@@ -99,6 +99,12 @@ function cronRunTime(iso: string): string {
   return Number.isNaN(ts) ? iso : fmtDayTime.format(ts)
 }
 
+export function cronPreviewSchedule(resultRecord: Record<string, unknown>): string {
+  const schedule = cronScalar(cronPreview(resultRecord)?.schedule)
+
+  return schedule ? translateNow('assistant.tool.cron.previewWithSchedule', schedule) : translateNow('assistant.tool.cron.preview')
+}
+
 // The line that says what a dry run is. It is the row title, because a collapsed
 // row shows only its title: a preview must not read as a saved job there. Empty
 // for anything that is not a preview.
@@ -112,7 +118,7 @@ export function cronPreviewHeadline(resultRecord: Record<string, unknown>): stri
   const schedule = cronScalar(preview.schedule)
 
   if (schedule) {
-    return translateNow('assistant.tool.cron.previewWithSchedule', schedule)
+    return translateNow('assistant.tool.cron.previewJobTitle', schedule)
   }
 
   return translateNow('assistant.tool.cron.preview')
@@ -159,10 +165,8 @@ function cronJobFields(resultRecord: Record<string, unknown>): Record<string, un
 // The subtitle of a cron result: the preview's headline, the job count of a list, the
 // backend's sentence, or else the action and the job's name.
 export function cronSubtitle(argsRecord: Record<string, unknown>, resultRecord: Record<string, unknown>): string {
-  const headline = cronPreviewHeadline(resultRecord)
-
-  if (headline) {
-    return headline
+  if (cronPreview(resultRecord)) {
+    return cronPreviewSchedule(resultRecord)
   }
 
   const jobs = Array.isArray(resultRecord.jobs) ? resultRecord.jobs : null

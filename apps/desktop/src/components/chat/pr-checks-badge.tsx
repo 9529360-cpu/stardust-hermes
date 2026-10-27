@@ -7,7 +7,7 @@ const CHECK_STYLE: Record<PullRequestChecksState, { className: string; icon: str
   failed: { className: 'text-(--ui-red)', icon: 'error' },
   loading: { className: 'text-(--theme-primary)', icon: 'loading', spinning: true },
   passed: { className: 'text-(--ui-green)', icon: 'check' },
-  pending: { className: 'text-amber-500', icon: 'warning' },
+  pending: { className: 'text-(--ui-amber-text)', icon: 'warning' },
   unavailable: { className: 'text-(--ui-text-quaternary)', icon: 'circle-slash' }
 }
 

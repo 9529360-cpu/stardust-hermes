@@ -345,7 +345,7 @@ export function useStatusbarItems({
   const gatewayClassName = inferenceReady
     ? undefined
     : gatewayDegraded
-      ? 'text-amber-600 hover:text-amber-600'
+      ? 'text-(--ui-amber-text) hover:text-(--ui-amber-text)'
       : 'text-destructive hover:text-destructive'
 
   const clientVersionItem = useMemo<StatusbarItem>(() => {

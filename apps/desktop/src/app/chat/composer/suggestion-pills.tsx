@@ -145,7 +145,7 @@ function SessionSuggestionPills({ sessionId }: { sessionId: null | string }) {
           {phase === 'working' ? (
             <Codicon className="shrink-0 opacity-70" name="loading" size="0.75rem" spinning />
           ) : phase === 'done' ? (
-            <Codicon className="shrink-0 text-emerald-400" name="check" size="0.75rem" />
+            <Codicon className="shrink-0 text-(--ui-green-text)" name="check" size="0.75rem" />
           ) : brand ? (
             <brand.Icon aria-hidden className="size-3 shrink-0" style={brandGlyphStyle(brand)} />
           ) : (

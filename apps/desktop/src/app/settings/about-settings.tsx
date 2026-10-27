@@ -134,9 +134,9 @@ export function AboutSettings() {
           </p>
         </div>
         {(version?.bundleOutOfSync || version?.bundleSwapPending) && (
-          <div className="mx-auto w-full max-w-2xl rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-left text-sm">
+          <div className="mx-auto w-full max-w-2xl rounded-xl border border-(--ui-border-amber)/40 bg-(--ui-bg-amber)/10 px-4 py-3 text-left text-sm">
             <div className="flex items-start gap-2">
-              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-(--ui-amber-text) dark:text-(--ui-amber-text)" />
               <div className="min-w-0">
                 {version?.bundleSwapPending ? (
                   // The updated app is already on disk — the updater swapped it
@@ -198,7 +198,7 @@ export function AboutSettings() {
             {statusTone === 'available' ? (
               <Codicon className="mt-0.5 size-4 shrink-0 text-primary" name="cloud-download" size="1rem" />
             ) : statusTone === 'error' ? null : (
-              <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-(--ui-green-text) dark:text-(--ui-green-text)" />
             )}
             <div className="min-w-0">
               <p className="font-medium">{statusLine}</p>

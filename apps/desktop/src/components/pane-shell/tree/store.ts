@@ -47,12 +47,14 @@ import { tabStripVisibleForZone } from './renderer/strip-visibility'
 // v2: v1 trees were saved against placeholder panes with index-order zone
 // assignment (chat could land in a corner cell). Retire them wholesale.
 const STORAGE_KEY = 'hermes.desktop.layoutTree.v2'
-const RETIRED_PANE_ID = 'workspace-overview'
+const RETIRED_PRODUCT_PANE_IDS = new Set(['workspace-overview'])
 
 /** Drop retired product chrome from saved/custom layouts without resetting the
  * user's remaining groups, previews, tab order, or pane placement. */
 export function withoutRetiredOverview(tree: LayoutNode): LayoutNode | null {
-  return allPaneIds(tree).includes(RETIRED_PANE_ID) ? removePane(tree, RETIRED_PANE_ID) : tree
+  const retired = allPaneIds(tree).filter(paneId => RETIRED_PRODUCT_PANE_IDS.has(paneId))
+
+  return retired.length ? retired.reduce<LayoutNode | null>((current, paneId) => current && removePane(current, paneId), tree) : tree
 }
 
 writeKey('hermes.desktop.layoutTree.v1', null)

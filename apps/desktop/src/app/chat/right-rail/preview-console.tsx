@@ -21,8 +21,8 @@ const consoleLevelLabel: Record<number, string> = {
 
 const consoleLevelClass: Record<number, string> = {
   0: 'text-foreground',
-  1: 'text-sky-700 dark:text-sky-300',
-  2: 'text-amber-700 dark:text-amber-300',
+  1: 'text-(--ui-blue-text) dark:text-(--ui-blue-text)',
+  2: 'text-(--ui-amber-text) dark:text-(--ui-amber-text)',
   3: 'text-destructive'
 }
 

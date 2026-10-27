@@ -392,7 +392,7 @@ describe('ModelSettings', () => {
     expect(screen.queryByText('Triage specifier')).toBeNull()
     expect(screen.queryByText('Kanban decomposer')).toBeNull()
     expect(screen.getByText('Profile describer')).toBeTruthy()
-    expect(screen.getAllByText('auto · use main model').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Auto. Use main model').length).toBeGreaterThan(0)
   })
 
   it('edits auxiliary reasoning effort below the selected model and applies it with the assignment', async () => {

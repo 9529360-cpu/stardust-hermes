@@ -229,7 +229,7 @@ export function ConnectorAddDialog({ entry, profile, onClose, onConnected }: Con
     <Dialog onOpenChange={openNow => !openNow && close()} open={open}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>{`${c.dialogTitle} · ${prettyName(entry.name)}`}</DialogTitle>
+          <DialogTitle>{`${c.dialogTitle}: ${prettyName(entry.name)}`}</DialogTitle>
           <DialogDescription className="line-clamp-2">{entry.description}</DialogDescription>
         </DialogHeader>
 
@@ -237,8 +237,8 @@ export function ConnectorAddDialog({ entry, profile, onClose, onConnected }: Con
           <DetailRow label={c.publisher}>{detail?.publisher || entry.source || '—'}</DetailRow>
           <DetailRow label={c.runtimeLocation}>
             {runtime === 'local' ? c.runtimeLocal : c.runtimeRemote}
-            {detail?.transport === 'stdio' && detail?.command ? ` · ${detail.command}` : null}
-            {detail?.transport === 'http' && detail?.url ? ` · ${detail.url}` : null}
+            {detail?.transport === 'stdio' && detail?.command ? `: ${detail.command}` : null}
+            {detail?.transport === 'http' && detail?.url ? `: ${detail.url}` : null}
           </DetailRow>
           {(detail?.permissions?.length ?? 0) > 0 && (
             <DetailRow label={c.requiredPermissions}>

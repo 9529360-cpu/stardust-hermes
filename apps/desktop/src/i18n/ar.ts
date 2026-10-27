@@ -12,7 +12,6 @@ export const ar = defineLocale({
     someUnavailable: 'بعض المهام غير متاحة',
     loading: 'جارٍ تحميل المهام',
     emptyTitle: 'لا توجد مهام نشطة',
-    emptyDescription: 'تظهر هنا الموافقات والأوامر الخلفية وتقدم الوكلاء الفرعيين من محادثاتك.',
     groups: {
       attention: 'يتطلب انتباهك',
       running: 'قيد التنفيذ',
@@ -69,7 +68,6 @@ export const ar = defineLocale({
       review_or_retry: 'مراجعة أو إعادة المحاولة',
       resume: 'استئناف'
     },
-    summary: (running: number, attention: number) => `${running} قيد التنفيذ · ${attention} تتطلب انتباهك`,
     workingOn: (tool: string) => `جارٍ استخدام ${tool}`,
     exitCode: (code: number) => `رمز الخروج ${code}`,
     needsSecret: (name: string) => `مطلوب سر: ${name}`,
@@ -330,7 +328,6 @@ export const ar = defineLocale({
   keybinds: {
     keys: { space: 'مسافة', escape: 'إلغاء' },
     title: 'اختصارات لوحة المفاتيح',
-    subtitle: open => `انقر على اختصار لإعادة تعيينه · ${open} يعيد فتح هذه اللوحة.`,
     search: 'ابحث في الاختصارات...',
     rebind: 'إعادة تعيين',
     reset: 'إعادة إلى الافتراضي',
@@ -422,7 +419,7 @@ export const ar = defineLocale({
       'composer.slash': 'لوحة الأوامر المائلة',
       'composer.help': 'مساعدة سريعة',
       'composer.history': 'التنقل في النافذة المنبثقة / السجل',
-      'composer.cancel': 'إغلاق النافذة المنبثقة · إلغاء التشغيل'
+      'composer.cancel': 'إغلاق النافذة المنبثقة،إلغاء التشغيل'
     }
   },
   language: {
@@ -1050,7 +1047,7 @@ export const ar = defineLocale({
       savedTitle: 'تم حفظ إعدادات البوابة',
       restartingMessage: 'سيعيد Stardust Desktop الاتصال باستخدام الإعدادات المحفوظة.',
       savedMessage: 'تم الحفظ للتشغيل القادم.',
-      connectedTo: (baseUrl, version) => `متصل بـ ${baseUrl}${version ? ` · Stardust ${version}` : ''}`,
+      connectedTo: (baseUrl, version) => `متصل بـ ${baseUrl}${version ? `،Stardust ${version}` : ''}`,
       reachableTitle: 'البوابة البعيدة قابلة للوصول',
       signedOutTitle: 'تم تسجيل الخروج',
       signedOutMessage: 'تم مسح جلسة البوابة البعيدة.',
@@ -1150,8 +1147,8 @@ export const ar = defineLocale({
       auxiliaryDesc: 'تعمل المهام المساعدة على النموذج الرئيسي افتراضيا. عيّن نموذجا مخصصا لأي مهمة لتجاوز ذلك.',
       setToMain: 'ضبط على الرئيسي',
       change: 'تغيير',
-      autoUseMain: 'تلقائي · استخدام النموذج الرئيسي',
-      inheritMainEffort: 'وراثة · جهد النموذج الرئيسي',
+      autoUseMain: 'تلقائي،استخدام النموذج الرئيسي',
+      inheritMainEffort: 'وراثة،جهد النموذج الرئيسي',
       providerDefault: '(افتراضي المزوّد)',
       tasks: {
         vision: {
@@ -2423,10 +2420,10 @@ export const ar = defineLocale({
       'composer.mention': 'الإشارة إلى الملفات والمجلدات والروابط وgit',
       'composer.slash': 'لوحة أوامر الشرطة المائلة',
       'composer.help': 'هذه المساعدة السريعة (احذف للإخفاء)',
-      'composer.sendNewline': 'إرسال · Shift+Enter لسطر جديد',
+      'composer.sendNewline': 'إرسال،Shift+Enter لسطر جديد',
       'composer.sendQueued': 'إرسال الدور التالي في قائمة الانتظار',
       'keybinds.openPanel': 'كل اختصارات لوحة المفاتيح',
-      'composer.cancel': 'إغلاق النافذة المنبثقة · إلغاء التشغيل',
+      'composer.cancel': 'إغلاق النافذة المنبثقة،إلغاء التشغيل',
       'composer.history': 'التنقل في النافذة المنبثقة / السجل'
     },
     attachUrlTitle: 'إرفاق رابط',
@@ -2529,7 +2526,7 @@ export const ar = defineLocale({
       clearCriteria: 'مسح جميع المعايير',
       clearCriteriaConfirmTitle: 'مسح جميع المعايير؟',
       clearCriteriaConfirmBody: 'هل أنت متأكد من رغبتك في إزالة جميع المعايير من هذا الهدف؟',
-      criteriaHeader: count => `المعايير · ${count}`,
+      criteriaHeader: count => `المعايير،${count}`,
       noCriteria: 'لا توجد معايير',
       goalDetailsTitle: 'تفاصيل الهدف',
       objectiveLabel: 'الهدف',
@@ -2975,7 +2972,6 @@ export const ar = defineLocale({
       openModelPicker: 'فتح اختيار النموذج',
       modelPinned: 'النموذج مثبت',
       modelTitle: (provider, model) => `${provider}: ${model}`,
-      providerModelTitle: (provider, model) => `${provider}: ${model}`
     },
     tiles: {
       sessionOpenFailed: 'تعذّر فتح هذه المحادثة',
@@ -3029,7 +3025,7 @@ export const ar = defineLocale({
     popIn: 'إدخال',
     popOut: 'إخراج',
     linkHint: '⌘/Ctrl-نقر لجزء المعاينة',
-    sourceLineTitle: 'انقر للتحديد · shift-نقر للتوسيع · اسحب إلى المُنشئ',
+    sourceLineTitle: 'انقر للتحديد،shift-نقر للتوسيع،اسحب إلى المُنشئ',
     source: 'المصدر',
     renderedPreview: 'المعاينة',
     diff: 'الفرق',
@@ -3147,8 +3143,8 @@ export const ar = defineLocale({
     nameLayoutPlaceholder: 'سم هذا التخطيط...',
     deletePreset: name => `حذف ${name}`,
     zoneEditorTitle: 'محرر المناطق',
-    editorHintPre: 'انقر للتقسيم · ',
-    editorHintPost: ' يعكس الخط · اسحب عبر المناطق للدمج · اسحب الحواف المشتركة لتغيير الحجم',
+    editorHintPre: 'انقر للتقسيم،',
+    editorHintPost: ' يعكس الخط،اسحب عبر المناطق للدمج،اسحب الحواف المشتركة لتغيير الحجم',
     templateColumns: 'أعمدة',
     templateRows: 'صفوف',
     templateGrid: 'شبكة',
@@ -3187,7 +3183,6 @@ export const ar = defineLocale({
   },
   assistant: {
     intro: {
-      eyebrow: 'Stardust',
       headline: 'بماذا نبدأ؟',
       body: 'اسأل مباشرة، أو أعطني مهمة. يظهر سياق المشروع أو الملفات أو المعاينة بجانب المحادثة فقط عند الحاجة.',
       start: 'ابدأ برسالة',
@@ -3417,7 +3412,7 @@ export const ar = defineLocale({
         noJobsScheduled: 'لا توجد مهام مجدولة مضبوطة',
         notSaved: 'لم يُحفظ',
         preview: 'معاينة مهمة مجدولة',
-        previewWithSchedule: schedule => `معاينة مهمة مجدولة · ${schedule}`,
+        previewWithSchedule: schedule => `معاينة مهمة مجدولة،${schedule}`,
         previousSchedule: 'الجدول السابق',
         repeat: 'التكرار',
         repeatForever: 'دائم',
@@ -3773,7 +3768,7 @@ export const ar = defineLocale({
     continueWithCount: (count: number) => `متابعة (${count})`
   },
   starmap: {
-    legendCoreOuter: 'المركز = الأقدم · الخارج = الأحدث',
+    legendCoreOuter: 'المركز = الأقدم،الخارج = الأحدث',
     legendMemory: 'الذاكرة',
     nodeMenu: {
       editMemory: 'تعديل الذاكرة…',

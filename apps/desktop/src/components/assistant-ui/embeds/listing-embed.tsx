@@ -62,9 +62,8 @@ export default function ListingEmbed({ code, streaming }: RichFenceProps) {
 
 function ListingCard({ listing }: { listing: Listing }) {
   const specs = specLine(listing)
-  // Facts are supporting detail, not headline — one dot-joined meta line
-  // beside the specs reads as one thought instead of a badge grid.
-  const meta = [specs, ...listing.facts].filter(Boolean).join(' · ')
+  // Facts stay in one quiet metadata line beside the specs.
+  const meta = [specs, ...listing.facts].filter(Boolean).join(', ')
 
   return (
     // The shell's fill and radius, but NOT its uniform padding: the photos
@@ -95,8 +94,8 @@ function ListingCard({ listing }: { listing: Listing }) {
 
         {listing.catches.length > 0 && (
           <span className={cn(META_CLASS, 'mt-2 flex gap-1.5 text-muted-foreground')}>
-            <Codicon className="mt-px shrink-0 text-amber-500" name="warning" size="0.75rem" />
-            <span className="min-w-0">{listing.catches.join(' · ')}</span>
+            <Codicon className="mt-px shrink-0 text-(--ui-amber-text)" name="warning" size="0.75rem" />
+            <span className="min-w-0">{listing.catches.join(', ')}</span>
           </span>
         )}
 

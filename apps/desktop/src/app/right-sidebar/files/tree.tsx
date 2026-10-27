@@ -255,9 +255,9 @@ function ProjectTreeRowContainer({ attrs, children, innerRef, node }: RowRendere
 }
 
 const CHANGE_TINT: Record<RepoChangeKind, string> = {
-  added: 'text-(--ui-green)',
-  conflicted: 'text-(--ui-red)',
-  modified: 'text-(--ui-yellow)'
+  added: 'text-(--ui-green-text)',
+  conflicted: 'text-(--ui-red-text)',
+  modified: 'text-(--ui-amber-text)'
 }
 
 function ProjectTreeRow({

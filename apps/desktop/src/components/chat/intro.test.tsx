@@ -17,9 +17,9 @@ describe('personal assistant intro', () => {
   it('keeps the empty conversation quiet and immediately readable', () => {
     renderIntro('zh')
 
-    expect(screen.getByText('今天想做什么？')).toBeTruthy()
+    expect(screen.getByText('有什么需要处理？')).toBeTruthy()
     expect(screen.getByText(/需要项目、文件或预览时/)).toBeTruthy()
-    expect(screen.queryByText('你的个人助理')).toBeNull()
+    expect(screen.queryByText('Stardust')).toBeNull()
     expect(screen.getByTestId('assistant-quick-actions')).toBeTruthy()
     expect(screen.getByRole('button', { name: '从一条消息开始' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '浏览命令' })).toBeTruthy()
@@ -29,7 +29,7 @@ describe('personal assistant intro', () => {
     renderIntro('en')
 
     expect(screen.getByText('What should we work on?')).toBeTruthy()
-    expect(screen.getByText(/Project, file, or preview context/)).toBeTruthy()
+    expect(screen.getByText(/Project files and previews/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Start with a message' })).toBeTruthy()
   })
 })

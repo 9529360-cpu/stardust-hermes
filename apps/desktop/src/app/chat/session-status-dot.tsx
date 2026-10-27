@@ -31,7 +31,7 @@ const DOT_VARIANTS: Record<SessionDotState, DotVariant> = {
   // and the only state the user is required to do something about.
   'needs-input': {
     ariaLabel: r => r.needsInput,
-    className: `${DOT_BASE} bg-amber-500`,
+    className: `${DOT_BASE} bg-(--ui-bg-amber)`,
     role: 'status',
     title: r => r.waitingForAnswer
   },

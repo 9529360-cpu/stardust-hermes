@@ -63,9 +63,9 @@ export function BillingBanner({ sessionId }: { sessionId: null | string }) {
       }
       trailingVisible
     >
-      <span className="min-w-0 truncate text-[0.73rem] leading-4 text-foreground/92">
+      <span className="min-w-0 truncate text-sm leading-5 text-foreground/92">
         <span className="font-medium">{title}</span>
-        {message && <span className="text-muted-foreground/80"> · {message}</span>}
+        {message && <span className="text-muted-foreground/80">, {message}</span>}
       </span>
     </StatusRow>
   )
