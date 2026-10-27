@@ -31,7 +31,7 @@ describe('SendDiagnosticsHost', () => {
     $sendDiagnostics.set({ phase: 'error', errorCode: 'gateway-unavailable' })
     render(<SendDiagnosticsHost />)
 
-    expect(screen.getByText('Connect to a gateway, then try again.')).toBeTruthy()
+    expect(screen.getByRole('dialog').textContent).toContain('Connect to a gateway, then try again.')
     expect(screen.queryByText(/Hermes/i)).toBeNull()
   })
 
