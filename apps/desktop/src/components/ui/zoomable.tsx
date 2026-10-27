@@ -70,7 +70,7 @@ function ZoomPanViewer({
   onOpenChange: (open: boolean) => void
   open: boolean
 }) {
-  const { panning, reset, stageProps, style, zoomIn, zoomOut } = useZoomPan()
+  const { panning, reset, stageProps, style, transformElementRef, zoomIn, zoomOut } = useZoomPan()
 
   useEffect(() => {
     if (open) {
@@ -91,9 +91,10 @@ function ZoomPanViewer({
             panning ? 'cursor-grabbing' : 'cursor-grab'
           )}
           {...stageProps}
+          data-slot="zoomable-stage"
         >
           <div className="absolute inset-0 grid place-items-center">
-            <div className="origin-center" style={style}>
+            <div className="origin-center" ref={transformElementRef} style={style}>
               {children}
             </div>
           </div>
