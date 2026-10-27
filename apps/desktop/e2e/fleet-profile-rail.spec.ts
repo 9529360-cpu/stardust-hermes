@@ -36,6 +36,7 @@ const REPO_ROOT = path.resolve(DESKTOP_ROOT, '..', '..')
 const REMOTE_LABEL = 'Homelab'
 const REMOTE_ID = 'homelab'
 const REMOTE_TOKEN = 'e2e-fleet-homelab-token'
+const qualifiedProfile = (name: string, gateway: string) => `${name} —${gateway}`
 
 interface RemoteGateway {
   url: string
@@ -260,9 +261,9 @@ test.describe('fleet profile rail — two registered gateways', () => {
     // The remote gateway's group appears once the roster has enumerated it.
     const homelab = gatewayGroup(page, REMOTE_ID)
     await expect(homelab).toBeVisible({ timeout: 60_000 })
-    await expect(homelab.getByRole('button', { name: `default · ${REMOTE_LABEL}` })).toBeVisible()
-    await expect(homelab.getByRole('button', { name: `inbox · ${REMOTE_LABEL}` })).toBeVisible()
-    await expect(homelab.getByRole('button', { name: `research · ${REMOTE_LABEL}` })).toBeVisible()
+    await expect(homelab.getByRole('button', { name: qualifiedProfile('default', REMOTE_LABEL) })).toBeVisible()
+    await expect(homelab.getByRole('button', { name: qualifiedProfile('inbox', REMOTE_LABEL) })).toBeVisible()
+    await expect(homelab.getByRole('button', { name: qualifiedProfile('research', REMOTE_LABEL) })).toBeVisible()
     await expect(homelab).toHaveAttribute('data-reachable', 'true')
 
     // Its marker carries the remote (network) glyph.
@@ -285,13 +286,13 @@ test.describe('fleet profile rail — two registered gateways', () => {
     await expect(rail(page).getByRole('button', { name: 'All profiles on this gateway' })).toBeVisible()
     await expect(rail(page).getByRole('button', { name: 'Manage gateways…' })).toHaveCount(0)
 
-    await gatewayGroup(page, REMOTE_ID).getByRole('button', { name: `inbox · ${REMOTE_LABEL}` }).hover()
+    await gatewayGroup(page, REMOTE_ID).getByRole('button', { name: qualifiedProfile('inbox', REMOTE_LABEL) }).hover()
     await capture(page, '1-on-this-device-hover-inbox-homelab')
   })
 
   test('clicking an at-rest square re-homes onto that exact gateway and profile', async () => {
     test.setTimeout(180_000)
-    await gatewayGroup(page, REMOTE_ID).getByRole('button', { name: `inbox · ${REMOTE_LABEL}` }).click()
+    await gatewayGroup(page, REMOTE_ID).getByRole('button', { name: qualifiedProfile('inbox', REMOTE_LABEL) }).click()
 
     // The workspace follows the agent: statusbar readout flips to Homelab…
     await expect(activeGatewayLabel(page)).toHaveAttribute('aria-label', `Registered gateways: ${REMOTE_LABEL}`, { timeout: 120_000 })
@@ -304,7 +305,7 @@ test.describe('fleet profile rail — two registered gateways', () => {
     // …This device is at rest with qualified squares…
     const local = gatewayGroup(page, 'local')
     await expect(local).toHaveAttribute('data-active', 'false')
-    await expect(local.getByRole('button', { name: 'research · This device' })).toBeVisible()
+    await expect(local.getByRole('button', { name: qualifiedProfile('research', 'This device') })).toBeVisible()
 
     // …and nothing moved: the order is still This device, then Homelab.
     expect(await groupOrder(page)).toEqual([
@@ -316,7 +317,7 @@ test.describe('fleet profile rail — two registered gateways', () => {
   })
 
   test('an at-rest square offers gateway-scoped actions, never the legacy remote override', async () => {
-    const square = gatewayGroup(page, 'local').getByRole('button', { name: 'research · This device' })
+    const square = gatewayGroup(page, 'local').getByRole('button', { name: qualifiedProfile('research', 'This device') })
     await square.click({ button: 'right' })
 
     const menu = page.getByRole('menu', { name: 'Actions' })
@@ -333,26 +334,26 @@ test.describe('fleet profile rail — two registered gateways', () => {
   })
 
   test('editing SOUL.md on an at-rest square reads the owning gateway, not the foreground one', async () => {
-    const square = gatewayGroup(page, 'local').getByRole('button', { name: 'research · This device' })
+    const square = gatewayGroup(page, 'local').getByRole('button', { name: qualifiedProfile('research', 'This device') })
     await square.click({ button: 'right' })
     await page.getByRole('menu', { name: 'Actions' }).getByRole('menuitem', { name: 'Edit SOUL.md…' }).click()
 
     const dialog = page.getByRole('dialog')
     await expect(dialog).toBeVisible()
-    await expect(dialog.getByText('research · This device · SOUL.md')).toBeVisible()
+    await expect(dialog.getByText(`${qualifiedProfile('research', 'This device')} · SOUL.md`)).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(dialog).toBeHidden()
   })
 
   test('switching back lands on the clicked profile of This device and keeps the order', async () => {
     test.setTimeout(180_000)
-    await gatewayGroup(page, 'local').getByRole('button', { name: 'research · This device' }).click()
+    await gatewayGroup(page, 'local').getByRole('button', { name: qualifiedProfile('research', 'This device') }).click()
 
     await expect(activeGatewayLabel(page)).toHaveAttribute('aria-label', 'Registered gateways: This device', { timeout: 120_000 })
     const local = gatewayGroup(page, 'local')
     await expect(local).toHaveAttribute('data-active', 'true', { timeout: 30_000 })
     await expect(local.getByRole('button', { name: 'research', exact: true })).toHaveAttribute('aria-pressed', 'true', { timeout: 30_000 })
-    await expect(gatewayGroup(page, REMOTE_ID).getByRole('button', { name: `inbox · ${REMOTE_LABEL}` })).toBeVisible()
+    await expect(gatewayGroup(page, REMOTE_ID).getByRole('button', { name: qualifiedProfile('inbox', REMOTE_LABEL) })).toBeVisible()
 
     expect(await groupOrder(page)).toEqual([
       ['local', true],
