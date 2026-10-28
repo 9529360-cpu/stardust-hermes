@@ -41,7 +41,17 @@ type BotsMessages = {
     eyebrow: string
     title: string
     description: string
-    manage: string
+    mainAssistantLabel: string
+    mainAssistantDescription: string
+    openMainChat: string
+    managePartners: string
+    deletePartner: string
+    deletePartnerFor: (name: string) => string
+    deletePartnerTitle: (name: string) => string
+    deletePartnerDescription: (name: string) => string
+    deletingPartner: string
+    deletePartnerDone: string
+    partnerDeleted: (name: string) => string
     backToPartners: string
     hiddenPartners: (count: number, showing: boolean) => string
     create: string
@@ -368,7 +378,17 @@ const en: BotsMessages = {
     eyebrow: 'YOUR AI TEAM',
     title: 'Meet your AI partners',
     description: 'Choose someone to talk to, or create a new partner for the things you want help with.',
-    manage: 'Manage',
+    mainAssistantLabel: 'Your main assistant',
+    mainAssistantDescription: 'Stardust coordinates your work and stays in charge of your partners.',
+    openMainChat: 'Chat with Stardust',
+    managePartners: 'Manage partners',
+    deletePartner: 'Delete partner',
+    deletePartnerFor: name => `Delete ${name}`,
+    deletePartnerTitle: name => `Delete ${name}?`,
+    deletePartnerDescription: name => `This permanently deletes ${name}'s profile, configuration, memories, conversations, skills, and scheduled jobs. This cannot be undone.`,
+    deletingPartner: 'Deleting partner…',
+    deletePartnerDone: 'Partner deleted',
+    partnerDeleted: name => `Deleted partner ${name}`,
     backToPartners: 'Back to my partners',
     hiddenPartners: (count, showing) => (showing ? 'Hide hidden partners' : `Show ${count} hidden partners`),
     create: 'Create a partner',
@@ -684,7 +704,17 @@ const ja: BotsMessages = {
     eyebrow: 'あなたのAIチーム',
     title: 'AIパートナーに会いましょう',
     description: '話したい相手を選ぶか、手伝ってほしいことに合わせて新しいパートナーを作成できます。',
-    manage: '管理',
+    mainAssistantLabel: 'メインアシスタント',
+    mainAssistantDescription: 'Stardust が作業をまとめ、パートナーを管理します。',
+    openMainChat: 'Stardust と話す',
+    managePartners: 'パートナーを管理',
+    deletePartner: 'パートナーを削除',
+    deletePartnerFor: name => `${name} を削除`,
+    deletePartnerTitle: name => `${name} を削除しますか？`,
+    deletePartnerDescription: name => `「${name}」のプロフィール、設定、メモリー、会話、スキル、スケジュール済みジョブを完全に削除します。この操作は取り消せません。`,
+    deletingPartner: 'パートナーを削除中…',
+    deletePartnerDone: 'パートナーを削除しました',
+    partnerDeleted: name => `パートナー「${name}」を削除しました`,
     backToPartners: 'パートナーに戻る',
     hiddenPartners: (count, showing) => (showing ? '非表示のパートナーを隠す' : `非表示のパートナーを${count}人表示`),
     create: 'パートナーを作成',
@@ -999,7 +1029,17 @@ const zh: BotsMessages = {
     eyebrow: '你的 AI 团队',
     title: '认识你的 AI 伙伴',
     description: '选择一位伙伴开始交流，也可以为你想做的事创建新的帮手。',
-    manage: '管理伙伴',
+    mainAssistantLabel: '你的主助手',
+    mainAssistantDescription: 'Stardust 负责协调工作，并管理你的伙伴。',
+    openMainChat: '与 Stardust 对话',
+    managePartners: '管理伙伴',
+    deletePartner: '删除伙伴',
+    deletePartnerFor: name => `删除${name}`,
+    deletePartnerTitle: name => `删除${name}？`,
+    deletePartnerDescription: name => `这会永久删除“${name}”的配置档案、设置、记忆、对话、技能和定时任务。此操作无法撤销。`,
+    deletingPartner: '正在删除伙伴…',
+    deletePartnerDone: '已删除伙伴',
+    partnerDeleted: name => `已删除伙伴“${name}”`,
     backToPartners: '返回我的伙伴',
     hiddenPartners: (count, showing) => (showing ? '隐藏这些伙伴' : `显示 ${count} 位已隐藏伙伴`),
     create: '创建伙伴',
@@ -1308,7 +1348,17 @@ const zhHant: BotsMessages = {
     eyebrow: '你的 AI 團隊',
     title: '認識你的 AI 夥伴',
     description: '選擇一位夥伴開始交流，也可以為想做的事建立新的幫手。',
-    manage: '管理夥伴',
+    mainAssistantLabel: '你的主助手',
+    mainAssistantDescription: 'Stardust 負責協調工作並管理你的夥伴。',
+    openMainChat: '與 Stardust 對話',
+    managePartners: '管理夥伴',
+    deletePartner: '刪除夥伴',
+    deletePartnerFor: name => `刪除${name}`,
+    deletePartnerTitle: name => `刪除${name}？`,
+    deletePartnerDescription: name => `這會永久刪除「${name}」的設定檔、設定、記憶、對話、技能和排程任務。此操作無法復原。`,
+    deletingPartner: '正在刪除夥伴…',
+    deletePartnerDone: '已刪除夥伴',
+    partnerDeleted: name => `已刪除夥伴「${name}」`,
     backToPartners: '返回我的夥伴',
     hiddenPartners: (count, showing) => (showing ? '隱藏這些夥伴' : `顯示 ${count} 位已隱藏夥伴`),
     create: '建立夥伴',

@@ -1,9 +1,16 @@
-import { Button, cn, Codicon, useValue } from '@stardust/plugin-sdk'
+import { Button, cn, Codicon, ConfirmDialog, host, useValue } from '@stardust/plugin-sdk'
 import { useState } from 'react'
 
 import { avatarColor, botAppearance, BotFace } from './avatar'
 import { CreateAgentDialog, CreateGroupChatDialog } from './create-dialog'
-import { $botMeta, $lastRoster, botSourceStatus, useRoster } from './data'
+import {
+  $botMeta,
+  $lastRoster,
+  botSourceStatus,
+  isDefaultBot,
+  partitionAgentHomeRoster,
+  useRoster
+} from './data'
 import { EditProfileDialog } from './edit-profile-dialog'
 import { $groupChats } from './group-chat'
 import { openGroupChat } from './group-chat-view'
@@ -11,6 +18,7 @@ import { groupChatMemberBots, groupChatNames } from './group-membership'
 import { $showHiddenBots, isBotHidden } from './hidden-bots'
 import { useBots } from './i18n'
 import { displayName } from './labels'
+import { deleteBot } from './profile-ops'
 import { openRosterBot } from './roster-actions'
 import { usePublishRosterSnapshot } from './roster-pane-lifecycle'
 import { botRosterMeta } from './routing'
@@ -35,14 +43,17 @@ interface AgentsHomeProps {
   onToggleHidden?: () => void
   manageLabel?: string
   onOpenAgent: (agent: RosterRow) => void
+  onOpenMainAssistant?: () => void
+  mainAssistant?: RosterRow | null
   onOpenGroup: (name: string) => void
+  onDeleteProfile?: (agent: RosterRow) => Promise<void>
   onRetry?: () => void
 }
 
 export function AgentsHome({
   agents,
   allMeta,
-  canCreateGroup = agents.filter(agent => !agent.ghost).length > 1,
+  canCreateGroup = partitionAgentHomeRoster(agents).partners.length > 1,
   error = false,
   groups = [],
   initialLoading,
@@ -53,11 +64,17 @@ export function AgentsHome({
   onToggleHidden,
   manageLabel,
   onOpenAgent,
+  onOpenMainAssistant,
+  mainAssistant: providedMainAssistant,
+  onDeleteProfile,
   onOpenGroup,
   onRetry
 }: AgentsHomeProps) {
   const b = useBots()
-  const visibleAgents = agents.filter(agent => !agent.ghost)
+  const [deleting, setDeleting] = useState<RosterRow | null>(null)
+  const partition = partitionAgentHomeRoster(agents)
+  const mainAssistant = providedMainAssistant ?? partition.mainAssistant ?? null
+  const visibleAgents = partition.partners
 
   return (
     <main className="min-h-0 flex-1 overflow-y-auto" data-slot="bots-roster" data-slot-page="agents-home">
@@ -79,11 +96,6 @@ export function AgentsHome({
                 {b.home.createGroup}
               </Button>
             ) : null}
-            {onManageAgents ? (
-              <Button onClick={onManageAgents} variant="ghost">
-                {b.home.manage}
-              </Button>
-            ) : null}
             {manageLabel ? (
               <Button onClick={onToggleHidden} variant="ghost">
                 {manageLabel}
@@ -95,6 +107,43 @@ export function AgentsHome({
             </Button>
           </div>
         </header>
+
+        {!error && !initialLoading && mainAssistant ? (
+          <section aria-label={b.home.mainAssistantLabel} data-main-assistant-card="">
+            <div className="flex flex-col gap-4 rounded-2xl border border-(--ui-stroke-primary) bg-(--ui-sidebar-surface-background) p-5 md:flex-row md:items-center md:justify-between md:p-6">
+              <div className="flex min-w-0 items-start gap-4">
+                {(() => {
+                  const appearance = botAppearance(mainAssistant.name, botRosterMeta(mainAssistant, allMeta))
+
+                  return (
+                    <BotFace
+                      color={avatarColor(appearance.color, mainAssistant.name)}
+                      image={appearance.image}
+                      name={mainAssistant.name}
+                      shape={appearance.shape}
+                      size={56}
+                    />
+                  )
+                })()}
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-(--ui-text-tertiary)">{b.home.mainAssistantLabel}</p>
+                  <h2 className="mt-1 text-lg font-semibold text-(--ui-text-primary)">
+                    {displayName(mainAssistant, botRosterMeta(mainAssistant, allMeta))}
+                  </h2>
+                  <p className="mt-1 max-w-2xl text-sm leading-5 text-(--ui-text-secondary)">
+                    {b.home.mainAssistantDescription}
+                  </p>
+                </div>
+              </div>
+              {onOpenMainAssistant ? (
+                <Button className="shrink-0" onClick={onOpenMainAssistant}>
+                  <Codicon className="mr-1.5" name="comment-discussion" />
+                  {b.home.openMainChat}
+                </Button>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
 
         {error ? (
           <section className="rounded-xl border border-(--ui-stroke-secondary) bg-(--ui-sidebar-surface-background) p-5">
@@ -116,7 +165,7 @@ export function AgentsHome({
               />
             ))}
           </div>
-        ) : visibleAgents.length === 0 ? (
+        ) : visibleAgents.length === 0 && !mainAssistant ? (
           <section className="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-(--ui-stroke-secondary) px-6 py-10 text-center">
             <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-(--chrome-action-hover) text-(--ui-text-secondary)">
               <Codicon name="hubot" size="1.5rem" />
@@ -131,7 +180,14 @@ export function AgentsHome({
           <section aria-label={b.home.partners}>
             <div className="mb-3 flex items-baseline justify-between gap-3">
               <h2 className="text-sm font-medium text-(--ui-text-primary)">{b.home.partners}</h2>
-              <span className="text-xs text-(--ui-text-tertiary)">{b.home.partnerCount(visibleAgents.length)}</span>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-(--ui-text-tertiary)">{b.home.partnerCount(visibleAgents.length)}</span>
+                {onManageAgents ? (
+                  <Button onClick={onManageAgents} size="sm" variant="ghost">
+                    {b.home.managePartners}
+                  </Button>
+                ) : null}
+              </div>
             </div>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
               {visibleAgents.map(agent => {
@@ -216,6 +272,17 @@ export function AgentsHome({
                       >
                         <Codicon name="settings-gear" />
                       </Button>
+                      {!isDefaultBot(agent) ? (
+                        <Button
+                          aria-label={b.home.deletePartnerFor(name)}
+                          onClick={() => setDeleting(agent)}
+                          size="icon-sm"
+                          title={b.home.deletePartner}
+                          variant="ghost"
+                        >
+                          <Codicon name="trash" />
+                        </Button>
+                      ) : null}
                     </div>
                   </article>
                 )
@@ -262,6 +329,25 @@ export function AgentsHome({
           </section>
         ) : null}
       </div>
+      <ConfirmDialog
+        busyLabel={b.home.deletingPartner}
+        confirmLabel={b.home.deletePartner}
+        description={
+          deleting
+            ? b.home.deletePartnerDescription(displayName(deleting, botRosterMeta(deleting, allMeta)))
+            : null
+        }
+        destructive
+        doneLabel={b.home.deletePartnerDone}
+        onClose={() => setDeleting(null)}
+        onConfirm={async () => {
+          if (deleting) {
+            await onDeleteProfile?.(deleting)
+          }
+        }}
+        open={Boolean(deleting)}
+        title={deleting ? b.home.deletePartnerTitle(displayName(deleting, botRosterMeta(deleting, allMeta))) : b.home.deletePartner}
+      />
     </main>
   )
 }
@@ -285,9 +371,16 @@ export function AgentsHomePage({ onManageAgents }: { onManageAgents: () => void 
   const [createGroupOpen, setCreateGroupOpen] = useState(false)
   const [editing, setEditing] = useState<RosterRow | null>(null)
   const showHiddenBots = useValue($showHiddenBots)
-  const hiddenAgents = roster.filter(agent => !agent.ghost && isBotHidden(agent, allMeta))
-  const agents = roster.filter(agent => !agent.ghost && (showHiddenBots || !isBotHidden(agent, allMeta)))
-  const canCreateGroup = roster.filter(agent => !agent.ghost).length >= 2
+  const partition = partitionAgentHomeRoster(roster)
+  const mainAssistant = partition.mainAssistant
+  const hiddenAgents = partition.partners.filter(agent => isBotHidden(agent, allMeta))
+  const agents = partition.partners.filter(agent => showHiddenBots || !isBotHidden(agent, allMeta))
+
+  if (mainAssistant) {
+    agents.unshift(mainAssistant)
+  }
+
+  const canCreateGroup = partition.partners.length >= 2
 
   const groups = groupChatNames(allMeta, groupsState)
     .filter(name => !groupsState[name]?.tombstone)
@@ -302,13 +395,21 @@ export function AgentsHomePage({ onManageAgents }: { onManageAgents: () => void 
         error={Boolean(error && !data && !cachedRoster.length)}
         groups={groups}
         initialLoading={isLoading && !data}
+        mainAssistant={mainAssistant}
         manageLabel={hiddenAgents.length ? b.home.hiddenPartners(hiddenAgents.length, showHiddenBots) : undefined}
         onConfigureAgent={setEditing}
         onCreateAgent={() => setCreateOpen(true)}
         onCreateGroup={() => setCreateGroupOpen(true)}
+        onDeleteProfile={async agent => {
+          const name = displayName(agent, botRosterMeta(agent, allMeta))
+          await deleteBot(agent)
+          await refetch()
+          host.notify({ kind: 'success', message: b.home.partnerDeleted(name) })
+        }}
         onManageAgents={onManageAgents}
         onOpenAgent={agent => void openRosterBot(agent)}
         onOpenGroup={openGroupChat}
+        onOpenMainAssistant={() => host.newChat('default')}
         onRetry={() => void refetch()}
         onToggleHidden={() => $showHiddenBots.set(!showHiddenBots)}
       />

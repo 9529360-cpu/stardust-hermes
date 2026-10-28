@@ -24,8 +24,10 @@ import {
   botSelectionKey,
   clearBotAttention,
   filterBots,
+  isMainAssistant,
   mentionNameForms,
   noteBotAttention,
+  partitionAgentHomeRoster,
   preferReachableSameNameRows,
   resolveRosterMentions
 } from './data'
@@ -69,6 +71,33 @@ beforeEach(() => {
   indexAliasRoutes([])
   $botMeta.set({})
   $botAttention.set({})
+})
+
+describe('the main assistant identity follows the active source', () => {
+  it('partitions the active primary from source-scoped partners without losing remote defaults', () => {
+    const primary = row({ connectionId: 'local', handle: 'default-this-device', name: 'default' })
+    const remoteDefault = row({ connectionId: 'studio', handle: 'default-studio', name: 'default', remoteSource: true })
+    const partner = row({ connectionId: 'local', name: 'research' })
+    const ghost = row({ connectionId: 'local', ghost: true, name: 'offline' })
+
+    expect(partitionAgentHomeRoster([primary, remoteDefault, partner, ghost])).toEqual({
+      mainAssistant: primary,
+      partners: [remoteDefault, partner]
+    })
+  })
+
+  it('recognizes the active default even when its handle is source-qualified', () => {
+    expect(isMainAssistant(row({ connectionId: 'local', handle: 'default-this-device', name: 'default' }))).toBe(true)
+  })
+
+  it('keeps a remote default profile as a partner agent', () => {
+    expect(isMainAssistant(row({ connectionId: 'studio', handle: 'default-studio', name: 'default', remoteSource: true }))).toBe(false)
+  })
+
+  it('does not treat a non-default local profile as the main assistant', () => {
+    expect(isMainAssistant(row({ connectionId: 'local', name: 'research' }))).toBe(false)
+    expect(isMainAssistant(null)).toBe(false)
+  })
 })
 
 describe('the @handle a bot answers to', () => {

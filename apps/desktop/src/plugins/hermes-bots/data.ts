@@ -1014,6 +1014,33 @@ export function claimsPrimaryAlias(bot: null | undefined | { handle?: null | str
   return !handle || handle === 'default' || PRIMARY_ALIASES.includes(handle)
 }
 
+/** The active source's default profile is the app's main assistant. Its handle may
+ * be connection-qualified when another source has a same-named profile; that
+ * display handle does not change who owns the primary role. */
+export function isMainAssistant(bot: Partial<RosterRow> | null | undefined): boolean {
+  const profile = String(bot?.route?.profile || bot?.name || '')
+    .trim()
+    .toLowerCase()
+
+  return Boolean(bot && !bot.ghost && !bot.remoteSource && profile === 'default')
+}
+
+/** Split the active-source primary from visible partner agents, preserving each roster row. */
+export function partitionAgentHomeRoster<T extends Partial<RosterRow>>(agents: T[]) {
+  return agents.reduce<{ mainAssistant: null | T; partners: T[] }>(
+    (result, agent) => {
+      if (isMainAssistant(agent)) {
+        result.mainAssistant = agent
+      } else if (!agent.ghost) {
+        result.partners.push(agent)
+      }
+
+      return result
+    },
+    { mainAssistant: null, partners: [] }
+  )
+}
+
 /** The @handle users tag a bot with. Multi-source rosters precompute the handle (bare name, or
  *  name-device when the profile exists on several registered sources) — prefer it when present.
  *  The primary profile is @stardust, so the word 'default' never surfaces in the UI; a legacy
