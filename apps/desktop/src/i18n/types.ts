@@ -166,6 +166,9 @@ export interface Translations {
     continueWithCount: (count: number) => string
     // CX5 unified catalog + connect dialog (connectors.unified_dialog).
     catalogTitle: string
+    catalogLoadFailed: string
+    catalogLoadFailedHelp: string
+    catalogRefreshFailed: string
     addConnection: string
     dialogCancel: string
     publisher: string

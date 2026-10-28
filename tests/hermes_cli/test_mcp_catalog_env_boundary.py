@@ -301,6 +301,24 @@ def test_catalog_entry_detail_prefers_manifest_runtime_and_metadata(
     assert detail["runtime"] == "remote"  # explicit manifest choice wins
 
 
+def test_catalog_list_failure_returns_an_error_instead_of_an_empty_catalog(
+    client: TestClient,
+    catalog_env: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import hermes_cli.mcp_catalog as mcp_catalog
+
+    def fail_catalog_read():
+        raise OSError("catalog directory is unavailable")
+
+    monkeypatch.setattr(mcp_catalog, "list_catalog", fail_catalog_read)
+
+    response = client.get("/api/mcp/catalog", headers=HEADERS)
+
+    assert response.status_code == 500
+    assert response.json() == {"detail": "Catalog unavailable"}
+
+
 def test_catalog_manifest_rejects_bad_publisher_and_runtime(catalog_env: Path):
     from hermes_cli.mcp_catalog import catalog_diagnostics, list_catalog
 

@@ -4525,6 +4525,9 @@ export const zhHant = defineLocale({
     continueWithCount: (count: number) => `繼續（${count}）`,
     // CX5 unified catalog + connect dialog (connectors.unified_dialog).
     catalogTitle: '服務目錄',
+    catalogLoadFailed: '無法載入服務目錄',
+    catalogLoadFailedHelp: '請檢查後端連線後重試。',
+    catalogRefreshFailed: '無法重新整理服務目錄。',
     addConnection: '新增連線',
     dialogCancel: '取消',
     publisher: '發布者',

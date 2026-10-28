@@ -123,6 +123,9 @@ export const en: Translations = {
     continueWithCount: (count: number) => `Continue with ${count}`,
     // CX5 unified catalog + connect dialog (connectors.unified_dialog).
     catalogTitle: 'Service catalog',
+    catalogLoadFailed: 'Could not load service catalog',
+    catalogLoadFailedHelp: 'Check your backend connection, then try again.',
+    catalogRefreshFailed: 'Could not refresh service catalog.',
     addConnection: 'Add connection',
     dialogCancel: 'Cancel',
     publisher: 'Publisher',

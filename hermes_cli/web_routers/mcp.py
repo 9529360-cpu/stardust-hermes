@@ -425,8 +425,9 @@ async def list_mcp_catalog(profile: Optional[str] = None):
             entries.append(_catalog_entry_json(entry, installed, enabled))
     except HTTPException:  # unknown/invalid profile → 404, not a silently-empty catalog
         raise
-    except Exception:
+    except Exception as exc:
         _log.exception("list_mcp_catalog failed")
+        raise HTTPException(status_code=500, detail="Catalog unavailable") from exc
 
     diagnostics = []
     try:

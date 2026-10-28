@@ -4337,6 +4337,9 @@ export const ru = defineLocale({
     nothingYetBody:
       'Stardust предложит подключить их, когда задача потребует, и спросит разрешение, прежде чем что-либо читать.',
     noneOfThese: 'Ничего из этого',
-    continueWithCount: (count: number) => `Продолжить (${count})`
+    continueWithCount: (count: number) => `Продолжить (${count})`,
+    catalogLoadFailed: 'Не удалось загрузить каталог сервисов',
+    catalogLoadFailedHelp: 'Проверьте подключение к серверу и повторите попытку.',
+    catalogRefreshFailed: 'Не удалось обновить каталог сервисов.'
   }
 })
