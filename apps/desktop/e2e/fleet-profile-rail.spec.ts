@@ -17,6 +17,8 @@ import * as fs from 'node:fs'
 import * as net from 'node:net'
 import * as path from 'node:path'
 
+import { startMockServer } from '../../../tests-js/scripts/mock-server'
+
 import {
   buildAppEnv,
   createSandbox,
@@ -25,9 +27,8 @@ import {
   type Sandbox,
   waitForAppReady,
   writeEnvFile,
-  writeMockProviderConfig,
+  writeMockProviderConfig
 } from './fixtures'
-import { startMockServer } from '../../../tests-js/scripts/mock-server'
 import { type ElectronApplication, expect, type Page, test } from './test'
 
 const DESKTOP_ROOT = path.resolve(import.meta.dirname, '..')
@@ -45,19 +46,21 @@ interface RemoteGateway {
 }
 
 function findHermesBinary(): string {
-  const venv = path.join(REPO_ROOT, '.venv', 'bin', 'stardust')
+  const venv = path.join(REPO_ROOT, '.venv', process.platform === 'win32' ? 'Scripts' : 'bin')
+  const candidates = [path.join(venv, process.platform === 'win32' ? 'stardust.exe' : 'stardust'), path.join(venv, process.platform === 'win32' ? 'hermes.exe' : 'hermes')]
+  const localBinary = candidates.find(candidate => fs.existsSync(candidate))
 
-  if (fs.existsSync(venv)) {
-    return venv
+  if (localBinary) {
+    return localBinary
   }
 
-  const result = spawnSync('which', ['stardust'], { encoding: 'utf8' })
+  const result = spawnSync(process.platform === 'win32' ? 'where' : 'which', ['stardust'], { encoding: 'utf8' })
 
   if (result.status === 0 && result.stdout.trim()) {
-    return result.stdout.trim()
+    return result.stdout.trim().split(/\r?\n/, 1)[0]
   }
 
-  throw new Error('hermes binary not found: create the repo venv (uv sync) or put hermes on PATH')
+  throw new Error('Stardust executable not found: reuse the repository venv or put Stardust on PATH')
 }
 
 async function freePort(): Promise<number> {
