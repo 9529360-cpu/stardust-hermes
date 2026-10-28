@@ -14,13 +14,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control'
 import { useI18n } from '@/i18n'
 import { queryClient } from '@/lib/query-client'
 import { $taskHistoryByScope, readTaskHistory } from '@/lib/task-history'
-import {
-  buildSessionTaskRows,
-  groupTaskRows,
-  stateMeta,
-  type TrackedTaskRow,
-  trackTaskRows
-} from '@/lib/task-model'
+import { buildSessionTaskRows, groupTaskRows, stateMeta, type TrackedTaskRow, trackTaskRows } from '@/lib/task-model'
 import { $clarifyRequests } from '@/store/clarify'
 import { $backgroundStatusBySession } from '@/store/composer-status'
 import { $activeConnectionId } from '@/store/connections'
@@ -276,6 +270,12 @@ export function TaskRow({ row, onOpen }: { row: TaskCenterRow; onOpen: () => voi
   const recoveryAction = row.recoveryAction ?? 'resume'
   const recoveryLabel = translatedToken(copy.recoveryActions, recoveryAction) ?? copy.unknownRecovery(recoveryAction)
 
+  const hasSessionTarget = Boolean(row.storedSessionId)
+
+  const sessionLabel = hasSessionTarget
+    ? (row.sessionTitle ?? row.sessionId ?? copy.sessionUnavailable)
+    : copy.sessionUnavailable
+
   const icon = !meta.known
     ? 'question'
     : meta.terminal
@@ -288,34 +288,50 @@ export function TaskRow({ row, onOpen }: { row: TaskCenterRow; onOpen: () => voi
           ? 'watch'
           : 'loading'
 
+  const content = (
+    <>
+      <Codicon
+        className={
+          meta.tone === 'bad' ? 'text-destructive' : meta.tone === 'active' ? 'text-primary' : 'text-muted-foreground'
+        }
+        name={icon}
+        spinning={!meta.terminal && meta.family === 'active'}
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium">{title}</span>
+        <span className="block truncate text-xs text-muted-foreground">
+          {sessionLabel}
+          {` · ${stateLabel}`}
+          {phase ? ` · ${phase}` : ''}
+          {row.recoverable
+            ? ` · ${copy.recoveryAvailable} (${recoveryLabel})`
+            : row.requiresApproval
+              ? ` · ${copy.approvalRequired}`
+              : ''}
+        </span>
+        {(row.summary || row.detail) && (
+          <span className="block truncate text-xs text-muted-foreground">{row.summary ?? row.detail}</span>
+        )}
+      </span>
+    </>
+  )
+
   return (
     <li className="border-b border-(--ui-stroke-tertiary) last:border-0">
-      <Button className="h-auto w-full justify-start rounded-none px-3 py-3 text-left" onClick={onOpen} variant="ghost">
-        <Codicon
-          className={
-            meta.tone === 'bad' ? 'text-destructive' : meta.tone === 'active' ? 'text-primary' : 'text-muted-foreground'
-          }
-          name={icon}
-          spinning={!meta.terminal && meta.family === 'active'}
-        />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium">{title}</span>
-          <span className="block truncate text-xs text-muted-foreground">
-            {row.sessionTitle ?? row.sessionId ?? copy.sessionUnavailable}
-            {` · ${stateLabel}`}
-            {phase ? ` · ${phase}` : ''}
-            {row.recoverable
-              ? ` · ${copy.recoveryAvailable} (${recoveryLabel})`
-              : row.requiresApproval
-                ? ` · ${copy.approvalRequired}`
-                : ''}
-          </span>
-          {(row.summary || row.detail) && (
-            <span className="block truncate text-xs text-muted-foreground">{row.summary ?? row.detail}</span>
-          )}
-        </span>
-        <Codicon name="chevron-right" />
-      </Button>
+      {hasSessionTarget ? (
+        <Button
+          className="h-auto w-full justify-start rounded-none px-3 py-3 text-left"
+          onClick={onOpen}
+          variant="ghost"
+        >
+          {content}
+          <Codicon name="chevron-right" />
+        </Button>
+      ) : (
+        <div className="flex w-full items-center gap-1.5 px-3 py-3 text-left text-sm leading-5 font-medium text-(--ui-text-secondary)">
+          {content}
+        </div>
+      )}
     </li>
   )
 }
