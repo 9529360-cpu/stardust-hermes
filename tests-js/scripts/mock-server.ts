@@ -35,9 +35,8 @@ export interface MockServerOptions {
   replyForPrompt?: (prompt: string) => string
   /** Reasoning to stream ahead of the reply for a prompt, so the thinking row has a live block to show. */
   reasoningForPrompt?: (prompt: string) => string | undefined
-  /** Override reasoning chunk size and cadence for focused streaming E2E scenarios. */
-  reasoningChunkSize?: number
-  reasoningChunkDelayMs?: number
+  /** Override reasoning chunk size and cadence for one focused streaming E2E prompt. */
+  reasoningStreamOptionsForPrompt?: (prompt: string) => { chunkDelayMs?: number; chunkSize?: number } | undefined
 
   /** Pause the matching stream after its first token for session-switch E2E coverage. */
   holdFirstStreamForPrompt?: string
@@ -974,7 +973,7 @@ export function startMockServer(options: MockServerOptions = {}): Promise<MockSe
               resolveHeldStreamStarted?.()
 
               return heldStreamReleased
-            } : undefined, options.reasoningForPrompt?.(userText), options.reasoningChunkSize, options.reasoningChunkDelayMs)
+            } : undefined, options.reasoningForPrompt?.(userText), options.reasoningStreamOptionsForPrompt?.(userText))
           } else {
             if (holdThisCompletion) {
               heldCompletionCount++
@@ -1062,8 +1061,7 @@ function streamTextResponse(
   text: string,
   waitForRelease?: () => Promise<void>,
   reasoning?: string,
-  reasoningChunkSize = 4,
-  reasoningChunkDelayMs = 150,
+  reasoningStreamOptions?: { chunkDelayMs?: number; chunkSize?: number },
 ): void {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
@@ -1075,6 +1073,8 @@ function streamTextResponse(
   // thinking row shows a running timer before the reply starts.
   const thinking: string[] = []
   const reasoningCharacters = Array.from(reasoning ?? '')
+  const reasoningChunkSize = reasoningStreamOptions?.chunkSize ?? 4
+  const reasoningChunkDelayMs = reasoningStreamOptions?.chunkDelayMs ?? 150
 
   for (let index = 0; index < reasoningCharacters.length; index += reasoningChunkSize) {
     thinking.push(reasoningCharacters.slice(index, index + reasoningChunkSize).join(''))

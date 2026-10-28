@@ -43,8 +43,8 @@ test.beforeAll(async () => {
     extraConfig: DISABLE_AUTO_TITLE,
     mockServer: {
       reasoningForPrompt: prompt => prompt.includes(SCROLL_INTENT_TRIGGER) ? REASONING.repeat(100) : prompt.includes(TRIGGER) ? REASONING : undefined,
-      reasoningChunkSize: 16,
-      reasoningChunkDelayMs: 20,
+      reasoningStreamOptionsForPrompt: prompt =>
+        prompt.includes(SCROLL_INTENT_TRIGGER) ? { chunkDelayMs: 20, chunkSize: 16 } : undefined,
       replyForPrompt: prompt => (prompt.includes(TRIGGER) ? REPLY : 'Plain reply.'),
     },
   })
@@ -112,13 +112,14 @@ test('a settled reasoning block keeps how long the model thought, even after the
   const page = fixture!.page
   await waitForAppReady(fixture!, 120_000)
 
+  await page.getByRole('button', { name: /新建对话|New chat/ }).first().click()
   const composer = page.locator('[contenteditable="true"]').first()
   await composer.waitFor({ state: 'visible', timeout: 10_000 })
   await composer.click()
   await composer.type(`${TRIGGER} 帮我看看这个问题`, { delay: 20 })
   await page.keyboard.press('Enter')
 
-  const thinking = page.locator('[data-slot="aui_thinking-disclosure"]').first()
+  const thinking = page.locator('[data-slot="aui_thinking-disclosure"]').last()
 
   await expect(thinking).toContainText(/思考中|Thinking/, { timeout: 60_000 })
   await capture(page, '1-thinking-live')
