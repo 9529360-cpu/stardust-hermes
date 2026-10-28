@@ -3765,7 +3765,10 @@ export const ar = defineLocale({
     nothingYet: 'لا يوجد اتصال بعد.',
     nothingYetBody: 'سيقترح Stardust ربطها عندما تحتاج إليها مهمة، وسيسألك قبل قراءة أي شيء.',
     noneOfThese: 'لا شيء من هذه',
-    continueWithCount: (count: number) => `متابعة (${count})`
+    continueWithCount: (count: number) => `متابعة (${count})`,
+    catalogLoadFailed: 'تعذّر تحميل دليل الخدمات',
+    catalogLoadFailedHelp: 'تحقق من اتصال الواجهة الخلفية ثم حاول مرة أخرى.',
+    catalogRefreshFailed: 'تعذّر تحديث دليل الخدمات.'
   },
   starmap: {
     legendCoreOuter: 'المركز = الأقدم،الخارج = الأحدث',

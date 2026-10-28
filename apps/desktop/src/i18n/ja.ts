@@ -4372,6 +4372,9 @@ export const ja = defineLocale({
     continueWithCount: (count: number) => `${count} 件で続ける`,
     // CX5 unified catalog + connect dialog (connectors.unified_dialog).
     catalogTitle: 'サービスカタログ',
+    catalogLoadFailed: 'サービスカタログを読み込めませんでした',
+    catalogLoadFailedHelp: 'バックエンドの接続を確認して、もう一度お試しください。',
+    catalogRefreshFailed: 'サービスカタログを更新できませんでした。',
     addConnection: '接続を追加',
     dialogCancel: 'キャンセル',
     publisher: '発行元',

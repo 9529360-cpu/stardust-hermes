@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { getMcpCatalog } from '@/api/mcp'
 import { AvatarChip } from '@/components/ui/avatar-chip'
 import { Button } from '@/components/ui/button'
+import { ErrorBanner, ErrorState } from '@/components/ui/error-state'
 import { Input } from '@/components/ui/input'
 import { type ProfileScope, profileScopeKey, testMcpServer } from '@/hermes'
 import { useI18n } from '@/i18n'
@@ -46,7 +47,9 @@ function CatalogCard({ entry, onConnect }: { entry: McpCatalogEntry; onConnect: 
         <span className="min-w-0 truncate text-sm font-medium text-foreground/90">{entry.name}</span>
         <span className="ml-auto flex shrink-0 items-center gap-1">
           {entry.auth_type === 'oauth' && (
-            <span className="rounded bg-(--ui-bg-tertiary) px-1.5 py-0.5 text-[0.6rem] text-(--ui-text-secondary)">OAuth</span>
+            <span className="rounded bg-(--ui-bg-tertiary) px-1.5 py-0.5 text-[0.6rem] text-(--ui-text-secondary)">
+              OAuth
+            </span>
           )}
           {entry.auth_type === 'api_key' && (
             <span className="rounded bg-(--ui-bg-tertiary) px-1.5 py-0.5 text-[0.6rem] text-(--ui-text-secondary)">
@@ -246,14 +249,36 @@ export function ConnectorCatalogView({ profile }: { profile: ProfileScope | null
         </div>
         {catalogQuery.isLoading ? (
           <p className="px-1 py-4 text-xs text-(--ui-text-tertiary)">{c.probing}</p>
-        ) : visibleEntries.length === 0 ? (
-          <p className="px-1 py-4 text-xs text-(--ui-text-tertiary)">{c.empty}</p>
+        ) : catalogQuery.isError && !catalogQuery.data ? (
+          <ErrorState
+            className="mx-auto max-w-sm py-8"
+            description={c.catalogLoadFailedHelp}
+            title={c.catalogLoadFailed}
+          >
+            <Button onClick={() => void refreshCatalog()} size="sm" variant="outline">
+              {t.common.retry}
+            </Button>
+          </ErrorState>
         ) : (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-2">
-            {visibleEntries.map(entry => (
-              <CatalogCard entry={entry} key={entry.name} onConnect={() => setDialogEntry(entry)} />
-            ))}
-          </div>
+          <>
+            {catalogQuery.isError && (
+              <ErrorBanner className="mb-3">
+                {c.catalogRefreshFailed}{' '}
+                <Button onClick={() => void refreshCatalog()} size="xs" variant="ghost">
+                  {t.common.retry}
+                </Button>
+              </ErrorBanner>
+            )}
+            {visibleEntries.length === 0 ? (
+              <p className="px-1 py-4 text-xs text-(--ui-text-tertiary)">{c.empty}</p>
+            ) : (
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-2">
+                {visibleEntries.map(entry => (
+                  <CatalogCard entry={entry} key={entry.name} onConnect={() => setDialogEntry(entry)} />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </section>
 
