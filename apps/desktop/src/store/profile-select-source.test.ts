@@ -10,17 +10,22 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // exception: that name is also the window primary's profile key, so the
 // profile-only door would activate a remote-primary VPS.
 
-const ensureGatewayForProfile = vi.fn(async (_profile: string) => undefined)
+const ensureGatewayForProfile = vi.fn(async (profile: string) => {
+  $activeGatewayProfile.set(profile)
+})
+
 const ensureGatewayForAgent = vi.fn(async (_connectionId: null | string, _profile: string) => true)
+
 const openGatewayForProfile = vi.fn(async (_profile: string) => undefined)
 const activeGatewayConnectionId = vi.fn<() => null | string>(() => null)
+const requestFreshSession = vi.fn()
+const notifyError = vi.fn()
 const $gateway = atom<unknown>({ id: 'live-socket' })
 const resetStarmapGraph = vi.fn()
 
 vi.mock('@/store/gateway', () => ({
   $gateway,
   activeGatewayConnectionId,
-  // Activation now verifies the socket's route before publishing the profile.
   activeGatewayProfileKey: () => ensureGatewayForProfile.mock.lastCall?.[0] ?? $activeGatewayProfile.get(),
   ensureGatewayForAgent,
   ensureGatewayForProfile,
@@ -31,9 +36,15 @@ vi.mock('@/hermes', () => ({
   setApiRequestProfile: vi.fn()
 }))
 vi.mock('@/lib/query-client', () => ({ invalidateProfileScopedQueries: vi.fn() }))
+vi.mock('@/store/notifications', () => ({ notifyError }))
+vi.mock('@/store/session', async () => {
+  const actual = await vi.importActual('@/store/session')
+
+  return { ...actual, requestFreshSession }
+})
 vi.mock('@/store/starmap', () => ({ resetStarmapGraph }))
 
-const { $activeGatewayProfile, newSessionInProfile, selectProfile } = await import('./profile')
+const { $activeGatewayProfile, $freshSessionRequest, $newChatProfile, newSessionInProfile, selectProfile } = await import('./profile')
 
 beforeEach(() => {
   ensureGatewayForProfile.mockClear()
@@ -42,6 +53,10 @@ beforeEach(() => {
   activeGatewayConnectionId.mockReturnValue(null)
   $gateway.set({ id: 'live-socket' })
   $activeGatewayProfile.set('default')
+  $freshSessionRequest.set(0)
+  $newChatProfile.set(null)
+  requestFreshSession.mockClear()
+  notifyError.mockClear()
   // resolveConnectionForAgent is best-effort; without a bridge it resolves
   // null and the previous descriptor stays, which is fine here.
   ;(globalThis as { window?: unknown }).window = {}
@@ -54,6 +69,9 @@ describe('selectProfile', () => {
     selectProfile('researcher')
 
     await vi.waitFor(() => expect(ensureGatewayForAgent).toHaveBeenCalledWith('mini', 'researcher'))
+    await vi.waitFor(() => expect($activeGatewayProfile.get()).toBe('researcher'))
+    await vi.waitFor(() => expect($newChatProfile.get()).toBe('researcher'))
+    expect($freshSessionRequest.get()).toBe(1)
     expect(ensureGatewayForProfile).not.toHaveBeenCalled()
   })
 
@@ -82,6 +100,25 @@ describe('selectProfile', () => {
 
     await vi.waitFor(() => expect(ensureGatewayForAgent).toHaveBeenCalledWith('local', 'default'))
     expect(ensureGatewayForProfile).not.toHaveBeenCalled()
+  })
+
+  it('keeps the prior profile and does not start a draft when registry activation does not land', async () => {
+    activeGatewayConnectionId.mockReturnValue('mini')
+    ensureGatewayForAgent.mockResolvedValueOnce(false)
+
+    selectProfile('researcher')
+
+    await vi.waitFor(() => expect(ensureGatewayForAgent).toHaveBeenCalledWith('mini', 'researcher'))
+
+    await vi.waitFor(() =>
+      expect(notifyError).toHaveBeenCalledWith(
+        new Error('The connection for profile "researcher" did not become active.'),
+        'Failed to switch to profile "researcher"'
+      )
+    )
+    expect($activeGatewayProfile.get()).toBe('default')
+    expect($newChatProfile.get()).toBeNull()
+    expect($freshSessionRequest.get()).toBe(0)
   })
 })
 

@@ -29,7 +29,12 @@ import {
 import { notifyError } from '@/store/notifications'
 import { $poolLimits } from '@/store/pool-limits'
 import { notifyRemoteOverrideAuthFailure } from '@/store/profile-remote-override'
-import { $connection, clearComposerSelectionOwner, setComposerSelectionOwner, setConnection } from '@/store/session'
+import {
+  $connection,
+  clearComposerSelectionOwner,
+  setComposerSelectionOwner,
+  setConnection
+} from '@/store/session'
 import type { SessionOwnerRoute } from '@/store/session-request-router'
 import { resetStarmapGraph } from '@/store/starmap'
 import type { ProfileInfo } from '@/types/hermes'
@@ -748,6 +753,8 @@ export async function openGatewayAgent(connectionId: string, profile: string): P
 // null-connectionId profile fallthrough.
 export interface EnsureGatewayAgentOptions {
   beforeActivate?: () => boolean
+  /** Reject when a direct user profile pick does not activate its target route. */
+  failIfActivationDoesNotLand?: boolean
   /** Revokes this caller's right to activate or publish after async work. */
   signal?: AbortSignal
 }
@@ -780,10 +787,16 @@ function releaseWhenAborted(promise: Promise<void>, signal?: AbortSignal): Promi
   })
 }
 
+function ensureUserProfileActivation(activated: boolean, profile: string): void {
+  if (!activated) {
+    throw new Error(`The connection for profile "${profile}" did not become active.`)
+  }
+}
+
 export async function ensureGatewayAgent(
   connectionId: null | string,
   profile: string,
-  { beforeActivate, signal }: EnsureGatewayAgentOptions = {}
+  { beforeActivate, failIfActivationDoesNotLand = false, signal }: EnsureGatewayAgentOptions = {}
 ): Promise<void> {
   const target = normalizeProfileKey(profile)
   const connection = (connectionId ?? '').trim() || null
@@ -811,7 +824,9 @@ export async function ensureGatewayAgent(
       return
     }
 
-    if (beforeActivate && !beforeActivate()) {
+    const activationDeclined = Boolean(beforeActivate && !beforeActivate())
+
+    if (activationDeclined) {
       return
     }
 
@@ -828,10 +843,12 @@ export async function ensureGatewayAgent(
     }
 
     if (!activated) {
-      // The target stopped existing mid-dial (source edited/removed). Keep
-      // every atom on the previous backend; the caller's surfaces re-check
-      // what's active. Log so a dead agent click is diagnosable (#89622's
-      // silence lesson) — but never fail the whole switch closed here.
+      // A direct user pick must not silently create a draft against an inactive
+      // profile; internal lifecycle activations retain the soft decline.
+      if (failIfActivationDoesNotLand && !signal?.aborted && !activationDeclined) {
+        ensureUserProfileActivation(false, target)
+      }
+
       console.warn(`[profile] agent gateway activation for "${connection}:${target}" did not land`)
 
       return
@@ -902,38 +919,26 @@ export function selectProfile(name: string): void {
   // Switching profiles (or coming back from the all-profiles browse view) starts
   // fresh; re-tapping the profile you're already in leaves your session be.
   const switching = $showAllProfiles.get() || target !== normalizeProfileKey($activeGatewayProfile.get())
-  $showAllProfiles.set(false)
-  $newChatProfile.set(target)
-  $newChatRoute.set(null)
-  // Clearing the agent route must NOT discard the registry identity: the pick
-  // is made on the source the user is looking at (activateOnCurrentSource
-  // dials exactly that pair), so the draft's exact owner is that pair — or the
-  // legacy profile-only path when that is the door the pick takes.
-  captureNewChatSource(profilePickConnectionId(target))
-
-  if (switching) {
-    requestFreshSession()
-  }
-
-  // A profile with a remote override can fail to activate because the remote
-  // host rejected its saved token (rotated/revoked). That must surface as a
-  // "re-enter token" affordance, never a silently dead profile (#91349).
-  // #81094: any other failed switch must be visible too — the profile pill
-  // stays on the previous profile and the user learns why the backend is
-  // unreachable.
-  //
-  // The profile rail is a live workspace switch, so it must not call
-  // profile.set() and reload the window. Once activation succeeds, remember
-  // the selection for the next Desktop launch through the persistence-only
-  // IPC instead (#79886). Registry-source picks name ANOTHER source's
-  // profiles, so only a primary-backend activation updates the startup
-  // preference.
   const onPrimary = activeGatewayConnectionId() == null
-
   const shouldRememberStartupProfile = onPrimary ? isLocalDesktopProfile(target) : Promise.resolve(false)
 
-  void Promise.all([activateOnCurrentSource(target), shouldRememberStartupProfile])
+  void Promise.all([activateOnCurrentSource(target, true), shouldRememberStartupProfile])
     .then(([, shouldRemember]) => {
+      // Keep the previous workspace and its chat visible until the new gateway
+      // confirms it is active. A failed registry dial must not leave a fresh
+      // draft whose target differs from the still-active profile.
+      $showAllProfiles.set(false)
+      $newChatProfile.set(target)
+      $newChatRoute.set(null)
+      // Clearing the agent route must NOT discard the registry identity: the pick
+      // is made on the source the user is looking at, so the draft's exact owner
+      // is this registry/profile pair or the legacy profile-only route.
+      captureNewChatSource(profilePickConnectionId(target))
+
+      if (switching) {
+        requestFreshSession()
+      }
+
       if (shouldRemember) {
         return window.stardustDesktop?.profile?.remember(target)
       }
@@ -976,10 +981,12 @@ async function isLocalDesktopProfile(target: string): Promise<boolean> {
 // profile-only path so the main process can resolve a per-profile remote
 // override before falling back to a local backend. Default on `local` stays
 // on that source — see profilePickConnectionId.
-function activateOnCurrentSource(target: string): Promise<void> {
+function activateOnCurrentSource(target: string, strict = false): Promise<void> {
   const connectionId = profilePickConnectionId(target)
 
-  return connectionId ? ensureGatewayAgent(connectionId, target) : ensureGatewayProfile(target)
+  return connectionId
+    ? ensureGatewayAgent(connectionId, target, { failIfActivationDoesNotLand: strict })
+    : ensureGatewayProfile(target)
 }
 
 // Pin the next new chat to `name` (legacy profile-only door) so session.create
