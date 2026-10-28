@@ -20,7 +20,11 @@ function seed(sandbox: Parameters<typeof buildAppEnv>[0]) {
     PYTHONIOENCODING: 'utf-8'
   }
 
-  const output = execFileSync(python, ['-c', `
+  const output = execFileSync(
+    python,
+    [
+      '-c',
+      `
 import json,time
 from hermes_state import SessionDB
 from hermes_cli.goals import GoalState,save_goal
@@ -40,16 +44,27 @@ for label,success in [('完成',True),('失败',False)]:
     job=create_job(prompt='隔离验收任务',schedule='every 7d',name='持久化自动化-'+label,paused=True)
     execution=create_execution(job['id'],source='manual')
     assert finish_execution(execution['id'],success=success,error=None if success else '隔离验收失败证据')
-_persist_dispatch({'delegation_id':'acceptance-owner-lost','goal':'持久化委派-owner-lost','dispatched_at':now,'parent_session_id':'acceptance-running'})
+_persist_dispatch({'delegation_id':'acceptance-owner-lost','goal':'持久化委派-owner-lost','dispatched_at':now})
 db.close()
-`], { encoding: 'utf8', env: backendEnv })
+`
+    ],
+    { encoding: 'utf8', env: backendEnv }
+  )
 
   fs.writeFileSync(path.join(evidence, 'seed-output.txt'), output)
   baseline('backend-before-launch')
 }
 
 function baseline(name: string) {
-  const output = execFileSync(python, ['-c', 'import json; from tools.task_projection import list_task_rows; print(json.dumps(list_task_rows(limit=50),ensure_ascii=False))'], { encoding: 'utf8', env: backendEnv })
+  const output = execFileSync(
+    python,
+    [
+      '-c',
+      'import json; from tools.task_projection import list_task_rows; print(json.dumps(list_task_rows(limit=50),ensure_ascii=False))'
+    ],
+    { encoding: 'utf8', env: backendEnv }
+  )
+
   fs.writeFileSync(path.join(evidence, name + '.json'), output)
 
   return JSON.parse(output)
@@ -60,7 +75,12 @@ function baseline(name: string) {
 test.afterEach(async ({}, info) => {
   if (info.status !== info.expectedStatus && fixture) {
     await fixture.page.screenshot({ path: path.join(evidence, 'failure.png') }).catch(() => undefined)
-    const text = await fixture.page.locator('body').innerText().catch(() => '')
+
+    const text = await fixture.page
+      .locator('body')
+      .innerText()
+      .catch(() => '')
+
     fs.writeFileSync(path.join(evidence, 'failure-body.txt'), text)
   }
 })
@@ -89,17 +109,38 @@ test('持久化任务在真实桌面交互及两次冷重启后恢复', async ({
     await page.getByRole('button', { name: '任务', exact: true }).click()
     const center = page.locator('[data-task-center]')
 
-    for (const [group, title] of [['running', '持久化目标-running'], ['attention', '持久化目标-blocked'], ['upcoming', '持久化目标-paused'], ['recent', '持久化目标-done'], ['attention', '持久化委派-owner-lost']] as const) {
-      await expect(page.locator(`[data-task-group="${group}"]`).getByRole('button').filter({ hasText: title })).toBeVisible({ timeout: 20_000 })
+    for (const [group, title] of [
+      ['running', '持久化目标-running'],
+      ['attention', '持久化目标-blocked'],
+      ['upcoming', '持久化目标-paused'],
+      ['recent', '持久化目标-done']
+    ] as const) {
+      await expect(
+        page.locator(`[data-task-group="${group}"]`).getByRole('button').filter({ hasText: title })
+      ).toBeVisible({ timeout: 20_000 })
     }
 
-    for (const status of ['执行中', '受阻', '已暂停', '已完成', '已中断', '失败']) {
+    const ownerLost = page.locator('[data-task-group="attention"] li').filter({ hasText: '持久化委派-owner-lost' })
+    await expect(ownerLost).toBeVisible({ timeout: 20_000 })
+    await expect(ownerLost).toContainText('对话不可用')
+    await expect(ownerLost).toContainText('已中断')
+    await expect(ownerLost.getByRole('button')).toHaveCount(0)
+    await expect(ownerLost.locator('.codicon-chevron-right')).toHaveCount(0)
+    await ownerLost.click()
+    await expect(center).toBeVisible()
+
+    for (const status of ['执行中', '受阻', '已暂停', '已完成']) {
       await expect(center.getByRole('button').filter({ hasText: status }).first()).toBeVisible()
     }
 
-    await expect(page.locator('[data-task-group="attention"]').getByRole('button').filter({ hasText: '持久化自动化-失败' }).first()).toBeVisible()
+    const failedAutomation = page.locator('[data-task-group="attention"] li').filter({ hasText: '持久化自动化-失败' })
+    await expect(failedAutomation).toContainText('失败')
     await page.screenshot({ path: path.join(evidence, `persistent-round-${round}.png`) })
-    await page.locator('[data-task-group="running"]').getByRole('button').filter({ hasText: '持久化目标-running' }).click()
+    await page
+      .locator('[data-task-group="running"]')
+      .getByRole('button')
+      .filter({ hasText: '持久化目标-running' })
+      .click()
     await expect(center).toHaveCount(0)
     await expect(page.getByText('验收会话-running', { exact: true }).first()).toBeVisible()
 
@@ -111,10 +152,17 @@ test('持久化任务在真实桌面交互及两次冷重启后恢复', async ({
       const form = page.locator('form[data-clarify-batch]').first()
       await expect(form).toBeVisible({ timeout: 60_000 })
       await page.getByRole('button', { name: '任务', exact: true }).click()
-      const clarify = page.locator('[data-task-group="attention"]').getByRole('button').filter({ hasText: BATCH_CLARIFY_QUESTIONS[0].question }).first()
+
+      const clarify = page
+        .locator('[data-task-group="attention"]')
+        .getByRole('button')
+        .filter({ hasText: BATCH_CLARIFY_QUESTIONS[0].question })
+        .first()
+
       await expect(clarify).toBeVisible()
       await page.screenshot({ path: path.join(evidence, 'persistent-live-clarify.png') })
       await clarify.click()
+      await expect(form).toBeVisible({ timeout: 15_000 })
       await form.getByRole('button', { name: /Coffee/ }).click()
       await form.getByRole('button', { name: /Morning/ }).click()
       await form.locator('button[type="submit"]').click()

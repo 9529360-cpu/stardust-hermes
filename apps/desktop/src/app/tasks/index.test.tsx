@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { I18nProvider } from '@/i18n'
@@ -16,6 +16,7 @@ const task = (overrides: Partial<TrackedTaskRow> & { statusPhase?: string } = {}
   rail: 'delegation',
   state: 'interrupted',
   phase: { kind: 'none' } as const,
+  storedSessionId: 'session-1',
   observedAt: 1,
   seq: 0,
   ...overrides
@@ -32,20 +33,47 @@ function renderRow(row = task(), locale: Locale = 'zh', onOpen = vi.fn()) {
 }
 
 describe('Task Center localized row copy', () => {
+  it('renders a task without a stored session as a non-interactive row', () => {
+    const onOpen = vi.fn()
+    renderRow(task({ storedSessionId: undefined }), 'zh', onOpen)
+    const row = screen.getByRole('listitem')
+
+    expect(within(row).queryByRole('button')).toBeNull()
+    expect(row.textContent).toContain('对话不可用')
+    expect(row.querySelector('.codicon-chevron-right')).toBeNull()
+    fireEvent.click(row)
+    expect(onOpen).not.toHaveBeenCalled()
+  })
+
+  it('does not expose a runtime-only session as a navigation target', () => {
+    renderRow(task({ sessionId: 'runtime-1', storedSessionId: undefined }))
+    const row = screen.getByRole('listitem')
+
+    expect(within(row).queryByRole('button')).toBeNull()
+    expect(row.textContent).toContain('对话不可用')
+    expect(row.textContent).not.toContain('runtime-1')
+  })
+
+  it('keeps a task with a stored session openable', () => {
+    const onOpen = vi.fn()
+    renderRow(task({ storedSessionId: 'session-1' }), 'zh', onOpen)
+    const button = screen.getByRole('button')
+
+    fireEvent.click(button)
+    expect(onOpen).toHaveBeenCalledOnce()
+  })
+
   it.each([
     ['retry', '重试'],
     ['review_or_retry', '检查或重试'],
     ['resume', '恢复']
   ])('renders recovery action %s without exposing the protocol token', (recoveryAction, label) => {
-    const onOpen = vi.fn()
-    renderRow(task({ recoverable: true, recoveryAction }), 'zh', onOpen)
-    const row = screen.getByRole('button')
+    renderRow(task({ recoverable: true, recoveryAction }))
+    const row = screen.getByRole('listitem')
     expect(row.textContent).toContain('委派任务')
     expect(row.textContent).toContain('对话不可用 · 已中断')
     expect(row.textContent).toContain(`可恢复 (${label})`)
     expect(row.textContent).not.toMatch(/Chat unavailable|retry|resume/)
-    fireEvent.click(row)
-    expect(onOpen).toHaveBeenCalledOnce()
   })
 
   it.each([
@@ -112,7 +140,9 @@ describe('Task Center localized row copy', () => {
       for (const state of KNOWN_TASK_STATES) {
         expect(copy.states[state]).toBeTruthy()
 
-        if (locale !== 'en') {expect(copy.states[state]).not.toBe(TRANSLATIONS.en.taskCenter.states[state])}
+        if (locale !== 'en') {
+          expect(copy.states[state]).not.toBe(TRANSLATIONS.en.taskCenter.states[state])
+        }
       }
 
       if (locale !== 'en') {
