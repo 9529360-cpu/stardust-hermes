@@ -37,8 +37,7 @@ import {
   CONNECTORS_ROUTE,
   MESSAGING_ROUTE,
   routePathname,
-  SKILLS_ROUTE,
-  TASKS_ROUTE
+  SKILLS_ROUTE
 } from '../routes'
 import type { SidebarNavItem } from '../types'
 
@@ -222,12 +221,12 @@ export function PersonalProductNav({
       route: BOTS_ROUTE
     })
 
-  const openTasks = () =>
+  const openScheduledJobs = () =>
     pick({
-      id: 'tasks',
-      label: copy.tasks,
+      id: 'cron',
+      label: t.cron.title,
       icon: NULL_ICON,
-      route: TASKS_ROUTE
+      route: CRON_ROUTE
     })
 
   const openTools = () =>
@@ -309,10 +308,10 @@ export function PersonalProductNav({
         <ProductNavButton icon="add" label={copy.newChat} onClick={newChat} tour="sidebar-nav-new-session" />
         <ProductNavButton active={agentSpaceShowing} icon="hubot" label={copy.agentSpace} onClick={openAgentSpace} />
         <ProductNavButton
-          active={currentView === 'tasks' || currentView === 'cron'}
-          icon="checklist"
-          label={copy.tasks}
-          onClick={openTasks}
+          active={currentView === 'cron'}
+          icon="watch"
+          label={t.cron.title}
+          onClick={openScheduledJobs}
           tour="sidebar-nav-cron"
         />
         <ProductNavButton

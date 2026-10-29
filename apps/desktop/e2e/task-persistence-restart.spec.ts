@@ -2,8 +2,6 @@ import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 
-import { BATCH_CLARIFY_QUESTIONS, BATCH_CLARIFY_TRIGGER } from '../../../tests-js/scripts/mock-server'
-
 import { buildAppEnv, launchDesktop, type MockBackendFixture, setupMockBackend, waitForAppReady } from './fixtures'
 import { collectErrorBanners, expect, test } from './test'
 
@@ -25,49 +23,19 @@ function seed(sandbox: Parameters<typeof buildAppEnv>[0]) {
     [
       '-c',
       `
-import json,time
-from hermes_state import SessionDB
-from hermes_cli.goals import GoalState,save_goal
 from cron.jobs import create_job
 from cron.executions import create_execution,finish_execution
-from tools.async_delegation import _persist_dispatch
-now=time.time()-60
-db=SessionDB()
-for label,status,verdict in [('running','active','continue'),('done','done','done'),('paused','paused',None),('blocked','paused','blocked')]:
-    sid='acceptance-'+label
-    db.create_session(sid,'desktop')
-    db.set_session_title(sid,'验收会话-'+label)
-    db.append_message(sid,'user','隔离验收持久化会话-'+label)
-    db.append_message(sid,'assistant','隔离验收历史内容-'+label)
-    save_goal(sid,GoalState(goal='持久化目标-'+label,status=status,last_verdict=verdict,created_at=now,last_turn_at=now))
 for label,success in [('完成',True),('失败',False)]:
     job=create_job(prompt='隔离验收任务',schedule='every 7d',name='持久化自动化-'+label,paused=True)
     execution=create_execution(job['id'],source='manual')
     assert finish_execution(execution['id'],success=success,error=None if success else '隔离验收失败证据')
-_persist_dispatch({'delegation_id':'acceptance-owner-lost','goal':'持久化委派-owner-lost','dispatched_at':now})
-db.close()
+print('Seeded two isolated scheduled jobs and runs')
 `
     ],
     { encoding: 'utf8', env: backendEnv }
   )
 
   fs.writeFileSync(path.join(evidence, 'seed-output.txt'), output)
-  baseline('backend-before-launch')
-}
-
-function baseline(name: string) {
-  const output = execFileSync(
-    python,
-    [
-      '-c',
-      'import json; from tools.task_projection import list_task_rows; print(json.dumps(list_task_rows(limit=50),ensure_ascii=False))'
-    ],
-    { encoding: 'utf8', env: backendEnv }
-  )
-
-  fs.writeFileSync(path.join(evidence, name + '.json'), output)
-
-  return JSON.parse(output)
 }
 
 // Playwright requires destructuring even when this hook uses no fixtures.
@@ -92,85 +60,25 @@ test.afterAll(async () => {
 })
 
 // eslint-disable-next-line no-empty-pattern
-test('持久化任务在真实桌面交互及两次冷重启后恢复', async ({}, testInfo) => {
+test('scheduled jobs and their run history survive two cold desktop restarts', async ({}, testInfo) => {
   test.setTimeout(240_000)
   evidence = testInfo.outputPath('evidence')
   fs.mkdirSync(evidence, { recursive: true })
   fixture = await setupMockBackend({ extraDisplayConfig: '  language: zh', seedSandbox: seed })
-  const initial = baseline('backend-baseline')
-  expect(initial.degraded).toEqual([])
-  expect(initial.tasks.find((row: any) => row.title === '持久化目标-running')?.state).toBe('running')
-  expect(initial.tasks.find((row: any) => row.title === '持久化目标-blocked')?.state).toBe('blocked')
-  expect(initial.tasks.find((row: any) => row.title === '持久化委派-owner-lost')?.state).toBe('interrupted')
 
   for (let round = 0; round < 3; round++) {
     await waitForAppReady(fixture, 100_000)
     const { page } = fixture
-    await page.getByRole('button', { name: '任务', exact: true }).click()
-    const center = page.locator('[data-task-center]')
+    await page.getByRole('button', { name: '定时任务', exact: true }).click()
 
-    for (const [group, title] of [
-      ['running', '持久化目标-running'],
-      ['attention', '持久化目标-blocked'],
-      ['upcoming', '持久化目标-paused'],
-      ['recent', '持久化目标-done']
-    ] as const) {
-      await expect(
-        page.locator(`[data-task-group="${group}"]`).getByRole('button').filter({ hasText: title })
-      ).toBeVisible({ timeout: 20_000 })
+    const scheduledJobs = page.locator('[data-cron-page]')
+    await expect(scheduledJobs).toBeVisible()
+
+    for (const name of ['持久化自动化-完成', '持久化自动化-失败']) {
+      await expect(scheduledJobs.locator('[data-panel-row]').filter({ hasText: name })).toBeVisible({ timeout: 20_000 })
     }
 
-    const ownerLost = page.locator('[data-task-group="attention"] li').filter({ hasText: '持久化委派-owner-lost' })
-    await expect(ownerLost).toBeVisible({ timeout: 20_000 })
-    await expect(ownerLost).toContainText('对话不可用')
-    await expect(ownerLost).toContainText('已中断')
-    await expect(ownerLost.getByRole('button')).toHaveCount(0)
-    await expect(ownerLost.locator('.codicon-chevron-right')).toHaveCount(0)
-    await ownerLost.click()
-    await expect(center).toBeVisible()
-
-    for (const status of ['执行中', '受阻', '已暂停', '已完成']) {
-      await expect(center.getByRole('button').filter({ hasText: status }).first()).toBeVisible()
-    }
-
-    const failedAutomation = page.locator('[data-task-group="attention"] li').filter({ hasText: '持久化自动化-失败' })
-    await expect(failedAutomation).toContainText('失败')
-    await page.screenshot({ path: path.join(evidence, `persistent-round-${round}.png`) })
-    await page
-      .locator('[data-task-group="running"]')
-      .getByRole('button')
-      .filter({ hasText: '持久化目标-running' })
-      .click()
-    await expect(center).toHaveCount(0)
-    await expect(page.getByText('验收会话-running', { exact: true }).first()).toBeVisible()
-
-    if (round === 0) {
-      await page.locator('[data-personal-product-nav]').getByRole('button', { name: '新建对话', exact: true }).click()
-      const composer = page.locator('[contenteditable="true"]').first()
-      await composer.fill(BATCH_CLARIFY_TRIGGER)
-      await composer.press('Enter')
-      const form = page.locator('form[data-clarify-batch]').first()
-      await expect(form).toBeVisible({ timeout: 60_000 })
-      await page.getByRole('button', { name: '任务', exact: true }).click()
-
-      const clarify = page
-        .locator('[data-task-group="attention"]')
-        .getByRole('button')
-        .filter({ hasText: BATCH_CLARIFY_QUESTIONS[0].question })
-        .first()
-
-      await expect(clarify).toBeVisible()
-      await page.screenshot({ path: path.join(evidence, 'persistent-live-clarify.png') })
-      await clarify.click()
-      await expect(form).toBeVisible({ timeout: 15_000 })
-      await form.getByRole('button', { name: /Coffee/ }).click()
-      await form.getByRole('button', { name: /Morning/ }).click()
-      await form.locator('button[type="submit"]').click()
-      await expect(page.locator('[data-clarify-settled]').first()).toBeVisible({ timeout: 30_000 })
-      await page.getByRole('button', { name: '任务', exact: true }).click()
-      await expect(clarify).toHaveCount(0)
-    }
-
+    await page.screenshot({ path: path.join(evidence, `scheduled-jobs-round-${round}.png`) })
     expect(await collectErrorBanners(page)).toEqual([])
 
     if (round < 2) {
@@ -180,6 +88,5 @@ test('持久化任务在真实桌面交互及两次冷重启后恢复', async ({
     }
   }
 
-  baseline('backend-after-two-restarts')
   await fixture.app.close()
 })

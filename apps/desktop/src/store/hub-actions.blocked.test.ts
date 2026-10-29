@@ -8,7 +8,6 @@ vi.mock('@/hermes', () => ({
 }))
 vi.mock('@/lib/query-client', () => ({ queryClient: { invalidateQueries: vi.fn() } }))
 vi.mock('@/lib/slash-completion-cache', () => ({ invalidateSlashCompletions: vi.fn() }))
-vi.mock('@/store/activity', () => ({ upsertDesktopActionTask: vi.fn() }))
 vi.mock('@/store/profile', () => ({
   $activeGatewayProfile: { subscribe: vi.fn(), get: () => 'default' },
   normalizeProfileKey: (v: string | null | undefined) => v || 'default'

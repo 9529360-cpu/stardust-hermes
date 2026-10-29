@@ -28,10 +28,7 @@ test('the Cron editor keeps its shared 36px form fields at desktop and narrow wi
   const page = fixture!.page
 
   await resizeWindow(fixture!, DESKTOP_WINDOW)
-  await page.getByRole('button', { name: /^(任务|Tasks)$/ }).click()
-  const taskCenter = page.locator('[data-task-center]')
-  await expect(taskCenter).toBeVisible()
-  await taskCenter.getByRole('button', { name: /^(自动化|Automation)$/ }).click()
+  await page.getByRole('button', { name: /^(定时任务|Scheduled jobs)$/ }).click()
   await expect(page.locator('[data-cron-page]')).toBeVisible()
 
   const newCron = page.getByRole('button', { name: 'New cron', exact: true })

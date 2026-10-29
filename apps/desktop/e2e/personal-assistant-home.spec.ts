@@ -20,7 +20,9 @@ test('personal assistant workspace keeps conversation primary and navigation unc
   const pageErrors: string[] = []
 
   const noteConsole = (message: { text: () => string; type: () => string }) => {
-    if (message.type() === 'error') {consoleErrors.push(message.text())}
+    if (message.type() === 'error') {
+      consoleErrors.push(message.text())
+    }
   }
 
   const notePageError = (error: Error) => pageErrors.push(error.stack ?? error.message)
@@ -44,7 +46,7 @@ test('personal assistant workspace keeps conversation primary and navigation unc
   await expect(page.getByRole('tab', { name: 'BOTS' })).toHaveCount(0)
   await expect(page.getByText('有什么需要处理？', { exact: true })).toBeVisible()
   await expect(newChatButton).toBeVisible()
-  await expect(productNav.getByRole('button', { name: '任务', exact: true })).toBeVisible()
+  await expect(productNav.getByRole('button', { name: '定时任务', exact: true })).toBeVisible()
   await expect(productNav.getByRole('button', { name: '工具' })).toBeVisible()
   await expect(productNav.getByRole('button', { name: '消息渠道' })).toBeVisible()
   await expect(productNav.getByRole('button', { name: '项目' })).toBeVisible()

@@ -59,67 +59,6 @@ interface AuxTaskCopy {
 }
 
 export interface Translations {
-  taskCenter: {
-    title: string
-    activity: string
-    automation: string
-    sessionUnavailable: string
-    recoveryAvailable: string
-    approvalRequired: string
-    loadFailed: string
-    someUnavailable: string
-    loading: string
-    emptyTitle: string
-    groups: { attention: string; running: string; upcoming: string; recent: string; other: string }
-    states: {
-      blocked: string
-      cancelled: string
-      completed: string
-      failed: string
-      interrupted: string
-      paused: string
-      queued: string
-      running: string
-      waiting_for_user: string
-    }
-    load: { degraded: string; error: string; loading: string; retrying: string }
-    rails: {
-      approval: string
-      clarify: string
-      sudo: string
-      secret: string
-      'vault-unlock': string
-      'vault-save': string
-      'vault-code': string
-      process: string
-      delegation: string
-      cron: string
-      goal: string
-    }
-    phases: {
-      active: string
-      waiting: string
-      scheduled: string
-      last_failed: string
-      stalling: string
-      finalizing: string
-      timeout: string
-      stalled: string
-      unknown: string
-      claimed: string
-      delivery_failed: string
-      skipped: string
-    }
-    recoveryActions: { retry: string; review_or_retry: string; resume: string }
-    workingOn: (tool: string) => string
-    exitCode: (code: number) => string
-    needsSecret: (name: string) => string
-    needsVault: (name: string) => string
-    unknownStatus: (value: string) => string
-    unknownRecovery: (value: string) => string
-    unknownRail: (value: string) => string
-  }
-
   /** Backdrop opacity copy shared with Settings > Appearance. */
   personalization: {
     opacityLabel: string

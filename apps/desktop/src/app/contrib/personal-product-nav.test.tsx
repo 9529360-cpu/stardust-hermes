@@ -147,7 +147,7 @@ describe('PersonalProductNav', () => {
     expect(screen.getAllByRole('button').map(button => button.textContent?.trim())).toEqual([
       '新建对话',
       '智能体空间',
-      '任务',
+      '定时任务',
       '消息渠道',
       '连接器',
       '工具',
@@ -179,7 +179,7 @@ describe('PersonalProductNav', () => {
     vi.mocked(dismissNarrowSidebar).mockClear()
     renderNav('chat')
 
-    for (const name of ['新建对话', '智能体空间', '任务', '消息渠道', '工具']) {
+    for (const name of ['新建对话', '智能体空间', '定时任务', '消息渠道', '工具']) {
       fireEvent.click(screen.getByRole('button', { name }))
     }
 
@@ -195,8 +195,8 @@ describe('PersonalProductNav', () => {
     fireEvent.click(screen.getByRole('button', { name: '新建对话' }))
     expect(onNavigate).toHaveBeenLastCalledWith(expect.objectContaining({ action: 'new-session', id: 'new-session' }))
 
-    fireEvent.click(screen.getByRole('button', { name: '任务' }))
-    expect(onNavigate).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'tasks', route: '/tasks' }))
+    fireEvent.click(screen.getByRole('button', { name: '定时任务' }))
+    expect(onNavigate).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'cron', route: '/cron' }))
 
     fireEvent.click(screen.getByRole('button', { name: '消息渠道' }))
     expect(onNavigate).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'messaging', route: '/messaging' }))
@@ -392,12 +392,12 @@ describe('PersonalProductNav', () => {
   })
 
   it('marks exactly the page that owns the current route', () => {
-    renderNav('tasks', '/tasks')
-    expect(currentButtons()).toEqual(['任务'])
+    renderNav('cron', '/tasks')
+    expect(currentButtons()).toEqual(['定时任务'])
     cleanup()
 
     renderNav('cron', '/cron')
-    expect(currentButtons()).toEqual(['任务'])
+    expect(currentButtons()).toEqual(['定时任务'])
     cleanup()
 
     renderNav('skills', '/skills?tab=toolsets')
@@ -430,12 +430,12 @@ describe('PersonalProductNav', () => {
     noteActiveTreeGroup('workspace-group')
 
     renderNav('cron', '/cron')
-    expect(currentButtons()).toEqual(['任务'])
+    expect(currentButtons()).toEqual(['定时任务'])
 
     act(() => noteActiveTreeGroup('tile-one-group'))
     expect(currentButtons()).toEqual([])
 
     act(() => noteActiveTreeGroup('workspace-group'))
-    expect(currentButtons()).toEqual(['任务'])
+    expect(currentButtons()).toEqual(['定时任务'])
   })
 })

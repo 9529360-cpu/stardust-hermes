@@ -129,12 +129,12 @@ def build_blueprint_seed(blueprint) -> str:
 
     lines.append("")
     if blueprint.trigger is not None:
-        # The cronjob tool creates clock jobs only. A trigger job is added from the Tasks page.
+        # The cronjob tool creates clock jobs only. Trigger jobs are managed in Scheduled jobs.
         lines.append(
             "This automation runs on a trigger, not on a clock, and the cronjob tool cannot create "
             "trigger jobs yet. Do not create a schedule. Once you have my answers, tell me to add it "
-            "from the Tasks page (New cron job, then Start from this blueprint) and list the answers "
-            "to enter there."
+            "from the Scheduled jobs page (New scheduled task, then Start from this blueprint) and "
+            "list the answers to enter there."
         )
         return "\n".join(lines)
     lines.append(

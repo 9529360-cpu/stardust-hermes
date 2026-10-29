@@ -31,7 +31,6 @@ import { sessionSourceLabel } from '@/lib/session-source'
 import { fmtDateTime } from '@/lib/time'
 import { useStoreSelector } from '@/lib/use-session-slice'
 import { cn } from '@/lib/utils'
-import { upsertDesktopActionTask } from '@/store/activity'
 import { $pinnedSessionIds, pinSession, unpinSession } from '@/store/layout'
 import { notify } from '@/store/notifications'
 import { $sessions, sessionPinId } from '@/store/session'
@@ -273,7 +272,6 @@ export function CommandCenterView({ initialSection, onClose, onDeleteSession, on
           const polled = await getActionStatus(started.name, 180)
           nextStatus = polled
           setSystemAction(polled)
-          upsertDesktopActionTask(polled)
 
           if (!polled.running) {
             break
@@ -294,7 +292,6 @@ export function CommandCenterView({ initialSection, onClose, onDeleteSession, on
           }
 
           setSystemAction(pendingStatus)
-          upsertDesktopActionTask(pendingStatus)
         }
       } catch (error) {
         setSystemError(error instanceof Error ? error.message : String(error))

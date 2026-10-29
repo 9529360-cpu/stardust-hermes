@@ -84,10 +84,7 @@ async function expectStatusBarAcrossPages(page: MockBackendFixture['page'], widt
   await expect(page.locator('[data-statusbar-item="gateway-health"]')).toBeVisible()
   await capture(page, `${widthName}-agent-space`)
 
-  await goTo(page, /^(任务|Tasks)$/, narrow)
-  const taskCenter = page.locator('[data-task-center]')
-  await expect(taskCenter).toBeVisible()
-  await taskCenter.getByRole('button', { name: /^(自动化|Automation)$/ }).click()
+  await goTo(page, /^(定时任务|Scheduled jobs)$/, narrow)
   await expect(page.locator('[data-cron-page]')).toBeVisible()
   await expect.poll(() => approvalText(page)).toMatch(CONFIGURED_MODE)
   expect(await dashItemCount(page)).toBe(0)
@@ -144,8 +141,11 @@ test('at 1220x800 the status bar reads the same on every page', async () => {
 test('at 560x820 the status bar reads the same on every page', async () => {
   test.setTimeout(240_000)
   const page = fixture!.page
-  // The previous test leaves the Tasks page open, which has no composer to wait for.
-  await page.getByRole('button', { name: /^(新建对话|New chat)$/ }).first().click()
+  // The previous test leaves Scheduled jobs open, which has no composer to wait for.
+  await page
+    .getByRole('button', { name: /^(新建对话|New chat)$/ })
+    .first()
+    .click()
   await page.waitForSelector('textarea, [contenteditable="true"]', { state: 'attached', timeout: 30_000 })
   await waitForAppReady(fixture!, 120_000)
 

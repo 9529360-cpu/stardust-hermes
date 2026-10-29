@@ -19,8 +19,8 @@ describe('primaryRouteSelectedSessionId', () => {
     expect(legacyMcpRedirect('?tab=skills&server=files')).toBeNull()
   })
 
-  it('routes the task center as a page while preserving the legacy cron page', () => {
-    expect(appViewForPath(TASKS_ROUTE)).toBe('tasks')
+  it('routes the legacy tasks URL to automation while preserving the cron page', () => {
+    expect(appViewForPath(TASKS_ROUTE)).toBe('cron')
     expect(routeSessionId(TASKS_ROUTE)).toBeNull()
     expect(appViewForPath(CRON_ROUTE)).toBe('cron')
   })

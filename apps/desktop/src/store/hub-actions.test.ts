@@ -22,10 +22,6 @@ vi.mock('@/lib/slash-completion-cache', () => ({
   invalidateSlashCompletions: vi.fn()
 }))
 
-vi.mock('@/store/activity', () => ({
-  upsertDesktopActionTask: vi.fn()
-}))
-
 // hub-actions subscribes to the active gateway profile at module scope (its
 // per-profile state wipe); a minimal stub keeps this test off the real store.
 vi.mock('@/store/profile', () => ({

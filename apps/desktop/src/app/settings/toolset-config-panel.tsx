@@ -19,7 +19,6 @@ import {
 import { useI18n } from '@/i18n'
 import { Check, Loader2, Save, Terminal } from '@/lib/icons'
 import { cn } from '@/lib/utils'
-import { upsertDesktopActionTask } from '@/store/activity'
 import { confirm } from '@/store/confirm'
 import { notify, notifyError } from '@/store/notifications'
 import type {
@@ -298,9 +297,8 @@ function PostSetupRunner({ toolset, postSetupKey, installed = false, onComplete,
 
       let last: ActionStatusResponse | null = null
 
-      // Mirror command-center's runSystemAction poll loop: poll the action log
-      // until it exits (or we hit the attempt ceiling), feeding the global
-      // activity rail as we go.
+      // Poll the action log until it exits or the attempt ceiling is reached;
+      // this panel owns the visible status and error feedback.
       for (let attempt = 0; attempt < 150 && activeRef.current; attempt += 1) {
         await new Promise(resolve => window.setTimeout(resolve, 1200))
 
@@ -311,7 +309,6 @@ function PostSetupRunner({ toolset, postSetupKey, installed = false, onComplete,
         const polled = await getActionStatus(started.name, 300, profile)
         last = polled
         setStatus(polled)
-        upsertDesktopActionTask(polled)
 
         if (!polled.running) {
           break

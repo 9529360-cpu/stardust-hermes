@@ -1,6 +1,5 @@
 /**
- * The Tasks list has one create control: a labelled row at the top of the list, aligned
- * with the search field and the rows, the same at the full and the narrow width.
+ * The Scheduled jobs page has one create control: a labelled row aligned with the search field.
  *
  * SHELL_STATES_SCREENSHOT_DIR=<dir> saves captures for design review; never part of the
  * assertions.
@@ -30,22 +29,22 @@ async function capture(page: MockBackendFixture['page'], name: string): Promise<
 
 /** Opens a new chat, which has the composer that waitForAppReady looks for. */
 async function toComposer(page: MockBackendFixture['page']): Promise<void> {
-  await page.getByRole('button', { name: /^(新建对话|New chat)$/ }).first().click()
+  await page
+    .getByRole('button', { name: /^(新建对话|New chat)$/ })
+    .first()
+    .click()
   await page.waitForSelector('textarea, [contenteditable="true"]', { state: 'attached', timeout: 30_000 })
 }
 
-async function openTasks(page: MockBackendFixture['page'], narrow: boolean): Promise<void> {
-  const tasks = page.getByRole('button', { name: /^(任务|Tasks)$/ }).first()
+async function openScheduledJobs(page: MockBackendFixture['page'], narrow: boolean): Promise<void> {
+  const scheduledJobs = page.getByRole('button', { name: /^(定时任务|Scheduled jobs)$/ }).first()
 
-  if (narrow && !(await tasks.isVisible().catch(() => false))) {
+  if (narrow && !(await scheduledJobs.isVisible().catch(() => false))) {
     await page.keyboard.press('Control+b')
-    await expect(tasks).toBeVisible({ timeout: 10_000 })
+    await expect(scheduledJobs).toBeVisible({ timeout: 10_000 })
   }
 
-  await tasks.click()
-  const taskCenter = page.locator('[data-task-center]')
-  await expect(taskCenter).toBeVisible({ timeout: 20_000 })
-  await taskCenter.getByRole('button', { name: /^(自动化|Automation)$/ }).click()
+  await scheduledJobs.click()
   await expect(page.locator('[data-cron-page]')).toBeVisible({ timeout: 20_000 })
 }
 
@@ -88,19 +87,19 @@ test.afterAll(async () => {
   fixture = null
 })
 
-test('at 1220x800 the create control is one labelled row at the top of the Tasks list', async () => {
+test('at 1220x800 the create control is one labelled row at the top of Scheduled jobs', async () => {
   test.setTimeout(180_000)
   const page = fixture!.page
   await waitForAppReady(fixture!, 120_000)
 
-  await openTasks(page, false)
+  await openScheduledJobs(page, false)
   await expectCreateRowAligned(page, '1220x800')
 })
 
-test('at 560x820 the create control is the same labelled row in the Tasks list', async () => {
+test('at 560x820 the create control is the same labelled row in Scheduled jobs', async () => {
   test.setTimeout(180_000)
   const page = fixture!.page
-  // The previous test leaves the Tasks page open, which has no composer to wait for.
+  // The previous test leaves Scheduled jobs open, which has no composer to wait for.
   await toComposer(page)
   await waitForAppReady(fixture!, 120_000)
 
@@ -112,6 +111,6 @@ test('at 560x820 the create control is the same labelled row in the Tasks list',
   )
   await page.waitForTimeout(600)
 
-  await openTasks(page, true)
+  await openScheduledJobs(page, true)
   await expectCreateRowAligned(page, '560x820')
 })

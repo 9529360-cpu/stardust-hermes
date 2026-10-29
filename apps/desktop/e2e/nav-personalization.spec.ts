@@ -137,6 +137,7 @@ test.beforeAll(async () => {
   fixture = await setupMockBackend({ seedSandbox: pinPlainChatCwd })
 })
 
+// eslint-disable-next-line no-empty-pattern -- Playwright needs the object pattern here.
 test.beforeEach(async ({}, testInfo) => {
   // The first wake of the profile can outlast the 90 s default, and hook time counts toward the test.
   testInfo.setTimeout(240_000)
@@ -204,21 +205,18 @@ test('the open page nav row carries aria-current="page"', async () => {
   await setWindowSize(WIDE)
   await revealNav(page)
 
-  const tasks = nav.getByRole('button', { name: '任务', exact: true })
+  const scheduledJobs = nav.getByRole('button', { name: '定时任务', exact: true })
   const tools = nav.getByRole('button', { name: '工具', exact: true })
 
-  await tasks.click()
-  const taskCenter = page.locator('[data-task-center]')
-  await expect(taskCenter).toBeVisible()
-  await taskCenter.getByRole('button', { name: '自动化', exact: true }).click()
+  await scheduledJobs.click()
   await expect(page.locator('[data-cron-page]')).toBeVisible()
-  await expect(tasks).toHaveAttribute('aria-current', 'page')
+  await expect(scheduledJobs).toHaveAttribute('aria-current', 'page')
   await expect(tools).not.toHaveAttribute('aria-current', 'page')
   await expect(nav.locator('button[aria-current="page"]')).toHaveCount(1)
 
   await tools.click()
   await expect(page.getByRole('textbox', { name: '搜索工具集…' })).toBeVisible({ timeout: 15_000 })
   await expect(tools).toHaveAttribute('aria-current', 'page')
-  await expect(tasks).not.toHaveAttribute('aria-current', 'page')
+  await expect(scheduledJobs).not.toHaveAttribute('aria-current', 'page')
   await expect(nav.locator('button[aria-current="page"]')).toHaveCount(1)
 })

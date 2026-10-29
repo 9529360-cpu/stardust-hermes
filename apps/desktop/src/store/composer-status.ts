@@ -3,7 +3,6 @@ import { atom, computed } from 'nanostores'
 
 import { translateNow } from '@/i18n'
 import { stableArray } from '@/lib/stable-array'
-import { clearTaskHistory, recordTaskHistory } from '@/lib/task-history'
 import { todoBlockers, type TodoItem, type TodoStatus, todoTree } from '@/lib/todos'
 
 import { $gateway } from './gateway'
@@ -285,40 +284,7 @@ export function groupStatusItems(items: readonly ComposerStatusItem[]): StatusGr
   return TYPE_ORDER.filter(type => byType.has(type)).map(type => ({ items: byType.get(type)!, type }))
 }
 
-function historyOwner(sid: string) {
-  const owner = knownOwnerForSession(sid)
-  if (!owner) {
-    return undefined
-  }
-  const connectionId = typeof owner === 'string' ? LOCAL_CONNECTION_ID : owner.connectionId
-  const profileId = typeof owner === 'string' ? owner : owner.profile
-  return connectionId && profileId ? { connectionId, profileId, sessionId: sid } : undefined
-}
-
 const writeBackground = (sid: string, items: ComposerStatusItem[]) => {
-  const scope = historyOwner(sid)
-  if (scope) {
-    const storedId = $sessionStates.get()[sid]?.storedSessionId
-    const session = $sessions.get().find(row => row.id === (storedId ?? sid))
-    recordTaskHistory(
-      scope,
-      items
-        .filter(item => item.type === 'background')
-        .map(item => ({
-          id: `process:${item.id}`,
-          rail: 'process',
-          sessionId: sid,
-          storedSessionId: storedId ?? session?.id,
-          sessionTitle: session?.title ?? undefined,
-          title: item.title.slice(0, 200),
-          state: item.state === 'done' ? 'completed' : item.state,
-          phase:
-            item.state === 'failed' && typeof item.exitCode === 'number'
-              ? { kind: 'exit-code', code: item.exitCode }
-              : { kind: 'none' }
-        }))
-    )
-  }
   const current = $backgroundStatusBySession.get()
   const next = { ...current }
 
@@ -536,11 +502,6 @@ export function resetSessionBackground(sid: string) {
   }
 
   cancelAllAutoDismiss(sid)
-  const scope = historyOwner(sid)
-  if (scope) {
-    clearTaskHistory(scope)
-  }
-
   const gateway = $gateway.get()
   const list = $backgroundStatusBySession.get()[sid] ?? []
   const dismissed = dismissedBySession.get(sid) ?? new Set<string>()

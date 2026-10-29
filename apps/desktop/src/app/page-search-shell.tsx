@@ -19,7 +19,7 @@ export interface PageShellTab {
 
 interface PageSearchShellProps extends React.ComponentProps<'section'> {
   children: ReactNode
-  /** Page title row above the search and tabs: the same PanelHeader the Tasks page uses. */
+  /** Page title row above the search and tabs, matching Scheduled jobs. */
   title?: string
   tabs?: PageShellTab[]
   activeTab?: string
