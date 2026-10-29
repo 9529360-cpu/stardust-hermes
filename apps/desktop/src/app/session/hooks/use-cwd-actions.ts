@@ -77,9 +77,6 @@ export function useCwdActions({
       }
 
       if (!sessionId) {
-        setSelectedProjectCwd(trimmed)
-        setWorkspaceCwdOwner(null)
-
         const workspaceGeneration = $newChatWorkspaceTargetGeneration.get()
 
         try {
@@ -96,18 +93,20 @@ export function useCwdActions({
             return false
           }
 
-          // Adopt the backend's normalized cwd so the persisted workspace and
-          // branch stay consistent with what the agent will use.
-          if (info.cwd) {
-            setSelectedProjectCwd(info.cwd)
-          }
-
+          // Commit the draft target only after the backend accepts it, then
+          // adopt its normalized cwd so future sessions start in the same path.
+          setSelectedProjectCwd(info.cwd || trimmed)
+          setWorkspaceCwdOwner(null)
           setCurrentBranch(info.branch || '')
 
           return true
-        } catch {
-          if ($newChatWorkspaceTargetGeneration.get() === workspaceGeneration && !activeSessionIdRef.current) {
-            setCurrentBranch('')
+        } catch (err) {
+          if (
+            workspaceChangeRequestRef.current === requestId &&
+            $newChatWorkspaceTargetGeneration.get() === workspaceGeneration &&
+            !activeSessionIdRef.current
+          ) {
+            notifyError(err, copy.cwdChangeFailed)
           }
 
           return false

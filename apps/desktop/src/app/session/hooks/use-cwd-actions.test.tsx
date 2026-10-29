@@ -278,6 +278,44 @@ describe('useCwdActions', () => {
     expect(onSessionRuntimeInfo).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps the accepted draft workspace when the backend rejects a project change', async () => {
+    const requestGateway = vi.fn(async () => {
+      throw new Error('config lookup failed')
+    })
+
+    const activeSessionIdRef: MutableRefObject<string | null> = { current: null }
+    const selectedStoredSessionIdRef: MutableRefObject<string | null> = { current: null }
+
+    // Capture the hook's public action before exercising the failed lookup.
+    let handle: CwdActionsHandle | null = null
+
+    setCurrentCwd('/accepted-project')
+    setCurrentBranch('accepted-branch')
+
+    setNewChatWorkspaceTarget('/accepted-project')
+    render(
+      <Harness
+        activeSessionIdRef={activeSessionIdRef}
+        onReady={value => (handle = value)}
+        requestGateway={requestGateway}
+        selectedStoredSessionIdRef={selectedStoredSessionIdRef}
+      />
+    )
+    await waitFor(() => expect(handle).not.toBeNull())
+
+    let changed: boolean | undefined
+
+    await act(async () => {
+      changed = await handle!.changeSessionCwd('/rejected-project')
+    })
+
+    expect(changed).toBe(false)
+    expect(requestGateway).toHaveBeenCalledWith('config.get', { key: 'project', cwd: '/rejected-project' })
+    expect($currentCwd.get()).toBe('/accepted-project')
+    expect($newChatWorkspaceTarget.get()).toBe('/accepted-project')
+    expect($currentBranch.get()).toBe('accepted-branch')
+  })
+
   it('ignores stale draft cwd normalization after a newer no-workspace target wins', async () => {
     const projectInfo = deferred<{ branch?: string; cwd?: string }>()
     const requestGateway = vi.fn(async () => projectInfo.promise as never)
@@ -301,7 +339,7 @@ describe('useCwdActions', () => {
       pendingChange = handle!.changeSessionCwd('/stale-workspace')
     })
 
-    expect($newChatWorkspaceTarget.get()).toBe('/stale-workspace')
+    expect($newChatWorkspaceTarget.get()).toBeUndefined()
 
     setNewChatWorkspaceTarget(null)
     setCurrentCwdTransient('')
