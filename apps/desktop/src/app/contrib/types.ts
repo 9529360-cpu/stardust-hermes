@@ -19,6 +19,7 @@ export type SidebarActions = Pick<
   | 'onNewSessionInWorkspace'
   | 'onNewSessionSplit'
   | 'onResumeSession'
+  | 'onSelectProjectWorkspace'
 > & {
   onNavigate: (item: SidebarNavItem) => void
 }
@@ -63,6 +64,7 @@ export interface WiringActions extends SidebarActions, ChatActions {
   /** Imperative access to the live gateway for controller-owned callbacks.
    *  Rendered surfaces subscribe to the active `$gateway` atom directly. */
   getGateway: () => ComponentProps<typeof ChatView>['gateway']
+  onSelectProjectWorkspace: (cwd: string) => Promise<boolean> | boolean | void
   openAgents: () => void
   openCommandCenterSection: (section: CommandCenterSection) => void
   requestGateway: GatewayRequester

@@ -68,6 +68,7 @@ export const SidebarSurface = memo(function SidebarSurface({
         onNavigate={latestActions.onNavigate}
         onNewSessionInWorkspace={latestActions.onNewSessionInWorkspace}
         onResumeSession={latestActions.onResumeSession}
+        onSelectProjectWorkspace={latestActions.onSelectProjectWorkspace!}
       />
       <div className="min-h-0 flex-1 overflow-hidden" data-personal-conversations="">
         <ChatSidebar currentView={currentView} projectChatsInNav {...latestActions} />

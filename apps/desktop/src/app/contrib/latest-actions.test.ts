@@ -44,7 +44,8 @@ function makeSidebarActions(): SidebarActions {
     onNavigate: vi.fn(),
     onNewSessionInWorkspace: vi.fn(),
     onNewSessionSplit: vi.fn(),
-    onResumeSession: vi.fn()
+    onResumeSession: vi.fn(),
+    onSelectProjectWorkspace: vi.fn()
   }
 }
 
@@ -70,6 +71,20 @@ describe('latestActions adapters', () => {
     await expect(adapted.onSteer('continue in selected session')).resolves.toBe(true)
     expect(staleSteer).not.toHaveBeenCalled()
     expect(latestSteer).toHaveBeenCalledWith('continue in selected session')
+  })
+
+  it('dereferences the latest project workspace handler from a stable sidebar actions object', async () => {
+    const staleSelect = vi.fn(async () => false)
+    const latestSelect = vi.fn(async () => true)
+    const actions = makeSidebarActions()
+    actions.onSelectProjectWorkspace = staleSelect
+    const adapted = latestSidebarActions(actions)
+
+    actions.onSelectProjectWorkspace = latestSelect
+
+    await expect(adapted.onSelectProjectWorkspace!('D:/Projects/Example')).resolves.toBe(true)
+    expect(staleSelect).not.toHaveBeenCalled()
+    expect(latestSelect).toHaveBeenCalledWith('D:/Projects/Example')
   })
 
   it('dereferences the latest sidebar handler from a stable actions object', () => {

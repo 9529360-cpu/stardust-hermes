@@ -78,7 +78,8 @@ function renderNav(
   path = '/',
   onNavigate = vi.fn(),
   onResumeSession = vi.fn(),
-  onNewSessionInWorkspace?: (path: null | string) => void
+  onNewSessionInWorkspace?: (path: null | string) => void,
+  onSelectProjectWorkspace = vi.fn()
 ) {
   render(
     <MemoryRouter initialEntries={[path]}>
@@ -88,6 +89,7 @@ function renderNav(
           onNavigate={onNavigate}
           onNewSessionInWorkspace={onNewSessionInWorkspace}
           onResumeSession={onResumeSession}
+          onSelectProjectWorkspace={onSelectProjectWorkspace}
         />
       </I18nProvider>
     </MemoryRouter>
@@ -126,6 +128,27 @@ describe('PersonalProductNav', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '新建对话' }))
     expect($projectScope.get()).toBe(ALL_PROJECTS)
+  })
+
+  it('preserves the current project when its owner refuses a workspace change', async () => {
+    $projectTree.set([
+      { id: 'p_current', label: 'Current', path: 'D:/Current', repos: [], sessionCount: 1 },
+      { id: 'p_target', label: 'Target', path: 'D:/Target', repos: [], sessionCount: 1 }
+    ])
+    $projectScope.set('p_current')
+    const selectProjectWorkspace = vi.fn().mockResolvedValue(false)
+    renderNav('chat', '/', vi.fn(), vi.fn(), undefined, selectProjectWorkspace)
+
+    fireEvent.click(screen.getByRole('button', { name: '项目' }))
+    const target = screen.getByRole('button', { name: 'Target' })
+
+    await act(async () => {
+      await target.click()
+    })
+
+    expect(selectProjectWorkspace).toHaveBeenCalledWith('D:/Target')
+    expect($projectScope.get()).toBe('p_current')
+    expect(target.getAttribute('aria-expanded')).toBe('false')
   })
 
   it('restores pointer events when the surrounding chat/sidebar surface disables them', () => {
@@ -239,10 +262,11 @@ describe('PersonalProductNav', () => {
     expect(deleteProject).toHaveBeenCalledWith('p_example')
   })
 
-  it('expands projects beneath the nav without replacing recent conversations', () => {
+  it('expands projects beneath the nav without replacing recent conversations', async () => {
     $projectTree.set([{ id: 'p_example', label: 'Example', path: 'D:/Example', repos: [], sessionCount: 2 }])
     setSidebarAgentsGrouped(true) // persisted legacy view must return to recents
-    const onNavigate = renderNav('chat')
+    const onSelectProjectWorkspace = vi.fn().mockResolvedValue(true)
+    const onNavigate = renderNav('chat', '/', vi.fn(), vi.fn(), undefined, onSelectProjectWorkspace)
     const projectButton = screen.getByRole('button', { name: '项目' })
 
     fireEvent.click(projectButton)
@@ -252,9 +276,12 @@ describe('PersonalProductNav', () => {
     expect($sidebarGrouping.get()).not.toBe('project')
     expect(onNavigate).not.toHaveBeenCalled()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Example' }))
+    await act(async () => {
+      await fireEvent.click(screen.getByRole('button', { name: 'Example' }))
+    })
+    expect(onSelectProjectWorkspace).toHaveBeenCalledWith('D:/Example')
     expect($projectScope.get()).toBe('p_example')
-    expect($currentCwd.get()).toBe('D:/Example')
+    expect($currentCwd.get()).toBe('')
     expect($sidebarGrouping.get()).not.toBe('project')
     expect(onNavigate).not.toHaveBeenCalled()
 

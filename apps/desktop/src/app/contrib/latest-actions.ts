@@ -67,6 +67,7 @@ export function latestSidebarActions(actions: SidebarActions): SidebarActions {
     onNavigate: (...args) => actions.onNavigate(...args),
     onNewSessionInWorkspace: (...args) => actions.onNewSessionInWorkspace(...args),
     onNewSessionSplit: (...args) => actions.onNewSessionSplit(...args),
-    onResumeSession: (...args) => actions.onResumeSession(...args)
+    onResumeSession: (...args) => actions.onResumeSession(...args),
+    onSelectProjectWorkspace: latestOptional(() => actions.onSelectProjectWorkspace)
   }
 }
