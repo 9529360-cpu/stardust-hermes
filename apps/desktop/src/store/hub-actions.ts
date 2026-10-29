@@ -4,7 +4,6 @@ import { getActionStatus, installSkillFromHub, type ProfileScope, scanSkillHub, 
 import { translateNow } from '@/i18n'
 import { queryClient } from '@/lib/query-client'
 import { invalidateSlashCompletions } from '@/lib/slash-completion-cache'
-import { upsertDesktopActionTask } from '@/store/activity'
 import { notify, notifyError } from '@/store/notifications'
 import { $activeGatewayProfile, normalizeProfileKey } from '@/store/profile'
 
@@ -95,7 +94,6 @@ async function runHubAction(
         return
       }
 
-      upsertDesktopActionTask(status)
       $hubActions.setKey(key, { kind, running: status.running, lines: status.lines })
 
       if (!status.running) {

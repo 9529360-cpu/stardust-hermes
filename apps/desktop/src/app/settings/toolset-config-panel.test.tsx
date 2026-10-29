@@ -82,10 +82,6 @@ vi.mock('@/store/notifications', () => ({
   notifyError: vi.fn()
 }))
 
-vi.mock('@/store/activity', () => ({
-  upsertDesktopActionTask: vi.fn()
-}))
-
 function config(overrides: Partial<ToolsetConfig> = {}): ToolsetConfig {
   return {
     name: 'tts',

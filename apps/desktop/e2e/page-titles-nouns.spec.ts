@@ -1,7 +1,7 @@
 /**
  * Page titles and nouns, checked in the real window at full width and at a narrow width.
  *
- * - Tools and Plugins carry the same title row as Tasks, in the same place.
+ * - The scheduled jobs page retains its shared page title and aligned content.
  * - The Projects list says there are no projects yet when there are none.
  * - The Command Center names conversations 对话, not 会话.
  *
@@ -82,7 +82,7 @@ async function openCommandCenter(page: MockBackendFixture['page']): Promise<void
   await expect(page.getByText('暂无会话。', { exact: true })).toHaveCount(0)
 }
 
-test('Tools and Plugins share the Tasks title row, and the Projects list names the empty state', async () => {
+test('Scheduled jobs, Tools and Plugins align their page titles, and Projects names its empty state', async () => {
   test.setTimeout(240_000)
   const page = fixture!.page
   await waitForAppReady(fixture!, 120_000)
@@ -90,24 +90,21 @@ test('Tools and Plugins share the Tasks title row, and the Projects list names t
 
   const nav = page.getByRole('navigation', { name: 'Product navigation' })
 
-  // Task Center is the top-level title-row reference; Cron is nested beneath it.
-  await nav.getByRole('button', { name: '任务', exact: true }).click()
-  const taskCenter = page.locator('[data-task-center]')
-  await expect(taskCenter).toBeVisible()
-  await taskCenter.getByRole('button', { name: '自动化', exact: true }).click()
+  await nav.getByRole('button', { name: '定时任务', exact: true }).click()
   await expect(page.locator('[data-cron-page]')).toBeVisible()
-  const tasksTitle = taskCenter.getByRole('heading', { name: '任务中心', level: 1, exact: true })
-  await expect(tasksTitle).toBeVisible({ timeout: 20_000 })
-  const tasksBox = await tasksTitle.boundingBox()
-  expect(tasksBox).not.toBeNull()
+  const scheduledJobsTitle = page.getByRole('heading', { name: '定时任务', exact: true })
+  await expect(scheduledJobsTitle).toBeVisible({ timeout: 20_000 })
+  const scheduledJobsBox = await scheduledJobsTitle.boundingBox()
+  expect(scheduledJobsBox).not.toBeNull()
 
   await nav.getByRole('button', { name: '工具', exact: true }).click()
   const toolsTitle = page.getByRole('heading', { name: '工具', exact: true })
   await expect(toolsTitle).toBeVisible({ timeout: 20_000 })
   const toolsBox = await toolsTitle.boundingBox()
   expect(toolsBox).not.toBeNull()
-  expect(Math.abs(toolsBox!.y - tasksBox!.y)).toBeLessThanOrEqual(2)
-  expect(Math.abs(toolsBox!.x - tasksBox!.x)).toBeLessThanOrEqual(2)
+  expect(Math.abs(toolsBox!.y - scheduledJobsBox!.y)).toBeLessThanOrEqual(2)
+  expect(Math.abs(toolsBox!.x - scheduledJobsBox!.x)).toBeLessThanOrEqual(2)
+
   await capture(page, `tools-${WIDE_WIDTH}`)
 
   // Plugins has no nav button of its own; it is the Plugins tab of the Tools page.
@@ -153,6 +150,7 @@ test('at a narrow width the same pages open from the overlay, and the Projects e
   if (!(await nav.isVisible())) {
     await page.keyboard.press('Control+b')
   }
+
   await nav.getByRole('button', { name: '项目', exact: true }).click()
   await expect(nav.getByText('暂无项目', { exact: true })).toBeVisible({ timeout: 20_000 })
   await capture(page, `projects-${NARROW_WIDTH}`)

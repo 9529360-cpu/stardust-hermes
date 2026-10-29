@@ -78,8 +78,8 @@ python -m evals.assistant_scenarios --base-url https://api.deepseek.com/v1 --mod
 ## Limitations
 
 - Transport is stdio (`python -m tui_gateway.entry`), not the desktop's WebSocket/dashboard host; the session,
-  approval, clarify and completion machinery is the same dispatcher. The renderer (Task Center UI) is out of
-  scope — scenario 8 checks the backend truth the renderer projects.
+  approval, clarify and completion machinery is the same dispatcher. Desktop rendering is out of scope —
+  scenario 8 checks the backend task projection independently of its presentation.
 - Scores are model-dependent; use `--repeat` before drawing conclusions from one run.
 - `--from-my-config` resolves the main model through the canonical runtime resolver and hands the child a
   static base URL + key. Routes that need provider-specific headers beyond an OpenAI/Anthropic-compatible

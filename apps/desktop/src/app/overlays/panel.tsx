@@ -83,16 +83,18 @@ export function PanelHeader({ actions, subtitle, title }: PanelHeaderProps) {
 
 export function PanelBody({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div
-      className={cn(
-        // Side-by-side master/detail on a wide card; once it narrows (same
-        // threshold the other overlays collapse at) stack the list above the
-        // detail so the detail keeps full width instead of being squished.
-        'flex min-h-0 flex-1 flex-col gap-4 overflow-hidden min-[47.5rem]:flex-row min-[47.5rem]:gap-5',
-        className
-      )}
-    >
-      {children}
+    <div className="@container/panel-body min-h-0 min-w-0 w-full flex-1">
+      <div
+        className={cn(
+          // Respond to the panel's actual width: docked side rails can leave
+          // much less room than the window width suggests.
+          'flex h-full min-h-0 flex-col gap-4 overflow-hidden @min-[47.5rem]/panel-body:flex-row',
+          '@min-[47.5rem]/panel-body:gap-5',
+          className
+        )}
+      >
+        {children}
+      </div>
     </div>
   )
 }
@@ -123,9 +125,15 @@ export function PanelList({
   searchValue
 }: PanelListProps) {
   return (
-    // Full-width and height-capped when stacked (narrow); a fixed 13rem rail
-    // beside the detail when wide.
-    <div className={cn('flex w-full shrink-0 flex-col max-[47.5rem]:max-h-[40%] min-[47.5rem]:w-52', className)}>
+    // Full-width and height-capped only when this panel is stacked; a fixed
+    // 13rem rail beside the detail once the panel itself is wide enough.
+    <div
+      className={cn(
+        'flex w-full shrink-0 flex-col max-h-[40%] @min-[47.5rem]/panel-body:max-h-none',
+        '@min-[47.5rem]/panel-body:w-52',
+        className
+      )}
+    >
       {onSearchChange ? (
         <SearchField
           aria-label={searchLabel ?? searchPlaceholder ?? ''}

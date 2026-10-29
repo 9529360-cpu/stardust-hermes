@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button'
 import { getActionStatus, getComputerUseStatus, grantComputerUsePermissions } from '@/hermes'
 import { type Translations, useI18n } from '@/i18n'
 import { AlertTriangle, Check, ExternalLink, Loader2, RefreshCw, X } from '@/lib/icons'
-import { upsertDesktopActionTask } from '@/store/activity'
 import { notify, notifyError } from '@/store/notifications'
 import type { ComputerUseStatus } from '@/types/hermes'
 
@@ -126,7 +125,6 @@ export function ComputerUsePanel({ onConfiguredChange }: ComputerUsePanelProps) 
         }
 
         const polled = await getActionStatus(started.name, 200)
-        upsertDesktopActionTask(polled)
 
         if (!polled.running) {
           break

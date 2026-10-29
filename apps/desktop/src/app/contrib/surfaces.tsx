@@ -21,13 +21,12 @@ import { $freshDraftReady, $gatewayState } from '@/store/session'
 import { ChatView } from '../chat'
 import { ChatSidebar } from '../chat/sidebar'
 import { TerminalPaneChrome } from '../right-sidebar/terminal/chrome'
-import { contributedRoutes, NEW_CHAT_ROUTE, ROUTES_AREA, sessionRoute } from '../routes'
+import { contributedRoutes, CRON_ROUTE, NEW_CHAT_ROUTE, ROUTES_AREA, sessionRoute } from '../routes'
 import { useStatusSnapshot } from '../shell/hooks/use-status-snapshot'
 import { useStatusbarItems } from '../shell/hooks/use-statusbar-items'
 import { ModelMenuPanel } from '../shell/model-menu-panel'
 import { ReasoningMenuPanel } from '../shell/reasoning-menu-panel'
 import { StatusbarControls } from '../shell/statusbar-controls'
-import { TaskCenterView } from '../tasks'
 
 import { latestChatActions, latestSidebarActions } from './latest-actions'
 import { setStatusbarItemGroup, useStatusbarContributions } from './panes'
@@ -69,6 +68,7 @@ export const SidebarSurface = memo(function SidebarSurface({
         onNavigate={latestActions.onNavigate}
         onNewSessionInWorkspace={latestActions.onNewSessionInWorkspace}
         onResumeSession={latestActions.onResumeSession}
+        onSelectProjectWorkspace={latestActions.onSelectProjectWorkspace!}
       />
       <div className="min-h-0 flex-1 overflow-hidden" data-personal-conversations="">
         <ChatSidebar currentView={currentView} projectChatsInNav {...latestActions} />
@@ -208,7 +208,7 @@ export const ChatRoutesSurface = memo(function ChatRoutesSurface({
       <Route element={page(<MessagingView setStatusbarItemGroup={setStatusbarItemGroup} />)} path="messaging" />
       <Route element={page(<ArtifactsView setStatusbarItemGroup={setStatusbarItemGroup} />)} path="artifacts" />
       <Route element={page(<CronView onOpenSession={actions.onResumeSession} />)} path="cron" />
-      <Route element={page(<TaskCenterView onOpenSession={actions.onResumeSession} />)} path="tasks" />
+      <Route element={<Navigate replace to={CRON_ROUTE} />} path="tasks" />
       <Route element={chatView} path="workspace" />
       <Route element={null} path="agents" />
       <Route element={null} path="command-center" />

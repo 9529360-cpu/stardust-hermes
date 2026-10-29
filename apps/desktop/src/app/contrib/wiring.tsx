@@ -57,6 +57,7 @@ import { $previewTarget } from '@/store/preview'
 import {
   $activeGatewayProfile,
   $freshSessionRequest,
+  $newChatProfile,
   $profileScope,
   ensureGatewayProfile,
   newSessionInProfile,
@@ -87,6 +88,7 @@ import {
   setBusy,
   setMessages
 } from '@/store/session'
+import { $focusedSessionIsTile } from '@/store/session-states'
 import { $titlebarAppActionsSide, titlebarAppActionsClusterCounts } from '@/store/titlebar-app-actions'
 import { clearSessionTodos, setSessionTodos, todosForHydration } from '@/store/todos'
 import { armWakeWord, stopClientCapture } from '@/store/wake-word'
@@ -425,8 +427,9 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     [activeSessionIdRef, updateSessionState]
   )
 
-  const { refreshProjectBranch } = useCwdActions({
+  const { changeSessionCwd } = useCwdActions({
     activeSessionIdRef,
+    selectedStoredSessionIdRef,
     onSessionRuntimeInfo: updateActiveSessionRuntimeInfo,
     requestGateway
   })
@@ -649,6 +652,28 @@ export function ContribWiring({ children }: { children: ReactNode }) {
   // tab instead of replacing it (see mainChatOccupied). The composer's
   // "branch off into a new worktree" flow keeps the fresh-draft path — it
   // prefills the MAIN composer right after, so it has to own that surface.
+  const selectProjectWorkspace = useCallback(
+    async (cwd: string) => {
+      const target = cwd.trim()
+
+      if (!target || $focusedSessionIsTile.get()) {
+        return false
+      }
+
+      const changed = await changeSessionCwd(target)
+
+      if (!changed) {
+        return false
+      }
+
+      setWorkspaceScope('sessions')
+      $newChatProfile.set(null)
+
+      return true
+    },
+    [changeSessionCwd]
+  )
+
   const startSessionInWorkspace = useCallback(
     (path: null | string, options?: { openTab?: boolean }) => {
       setWorkspaceScope('sessions')
@@ -1158,6 +1183,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     // ambient/id-only path. Clear any stale explicit hint first: older builds
     // incorrectly persisted those rows as `local`, which made a remote session
     // click switch to the Mac backend and fail with "session not found".
+    onSelectProjectWorkspace: selectProjectWorkspace,
     onResumeSession: (sessionId, session) => {
       const ownerRoute = sessionOwnerRouteFromRow(session)
 

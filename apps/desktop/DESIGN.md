@@ -63,9 +63,11 @@ one-off at the call site.
   required first. A legacy `/workspace` target may resolve back to chat for
   compatibility, but Workspace is contextual state, not a product destination.
 - **The desktop shell is three-column by contract.** Left is navigation,
-  conversations, and project/task entry; center is the persistent conversation;
-  right is contextual capability and working state. No dashboard or project
-  surface may replace the center conversation.
+  conversations, and project entry; center is the persistent conversation;
+  right is contextual capability and working state. Scheduled jobs remain a
+  separate management page. Session work and questions stay with their owner
+  conversation and sidebar status, rather than a second activity inventory. No
+  dashboard or project surface may replace the center conversation.
 - **The right context rail is intent-driven, not always-on.** Ordinary questions
   and casual chat do not force it open. Explicit project, Browser/Preview,
   Files, Review, Terminal, or development actions may reveal it; passive

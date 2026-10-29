@@ -1,6 +1,5 @@
-import { expect, test } from './test'
-
 import { type MockBackendFixture, setupMockBackend, waitForAppReady } from './fixtures'
+import { expect, test } from './test'
 
 let fixture: MockBackendFixture | null = null
 
@@ -13,27 +12,31 @@ test.afterAll(async () => {
   await fixture?.cleanup()
 })
 
-test('retiring the board preserves cron navigation and a usable conversation', async ({}, testInfo) => {
+// eslint-disable-next-line no-empty-pattern -- Playwright needs the object pattern here.
+test('retiring the board preserves scheduled-job navigation and a usable conversation', async ({}, testInfo) => {
   const page = fixture!.page
   const nav = page.locator('[data-personal-product-nav]')
-  const tasks = nav.getByRole('button', { name: '任务', exact: true })
+  const scheduledJobs = nav.getByRole('button', { name: '定时任务', exact: true })
   const newChat = nav.getByRole('button', { name: '新建对话', exact: true })
 
-  await tasks.click()
-  const taskCenter = page.locator('[data-task-center]')
-  await expect(taskCenter).toBeVisible()
-  await taskCenter.getByRole('button', { name: '自动化', exact: true }).click()
+  await scheduledJobs.click()
   await expect(page.locator('[data-cron-page]')).toBeVisible()
-  await expect(tasks).toHaveAttribute('aria-current', 'page')
+  await expect(scheduledJobs).toHaveAttribute('aria-current', 'page')
   await expect(page.getByRole('button', { name: /kanban|看板/i })).toHaveCount(0)
 
   await newChat.click()
   await expect(page.locator('[contenteditable="true"]').first()).toBeVisible()
 
-  for (const [width, height] of [[1220, 800], [960, 700]]) {
-    await fixture!.app.evaluate(({ BrowserWindow }, size) => {
-      BrowserWindow.getAllWindows()[0].setSize(size[0], size[1])
-    }, [width, height])
+  for (const [width, height] of [
+    [1220, 800],
+    [960, 700]
+  ]) {
+    await fixture!.app.evaluate(
+      ({ BrowserWindow }, size) => {
+        BrowserWindow.getAllWindows()[0].setSize(size[0], size[1])
+      },
+      [width, height]
+    )
     await expect(nav).toBeVisible()
     await expect(newChat).toBeVisible()
     const bounds = await nav.boundingBox()

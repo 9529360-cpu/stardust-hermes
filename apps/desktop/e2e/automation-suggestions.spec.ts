@@ -1,9 +1,8 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
-import { expect, test } from './test'
-
 import { type MockBackendFixture, setupMockBackend, waitForAppReady } from './fixtures'
+import { expect, test } from './test'
 
 let fixture: MockBackendFixture | null = null
 
@@ -53,10 +52,7 @@ test.afterAll(async () => {
 
 test('pending automation is localized, consent-gated, and dismissible from Scheduled jobs', async () => {
   const page = fixture!.page
-  await page.locator('[data-personal-product-nav]').getByRole('button', { name: '任务', exact: true }).click()
-  const taskCenter = page.locator('[data-task-center]')
-  await expect(taskCenter).toBeVisible()
-  await taskCenter.getByRole('button', { name: '自动化', exact: true }).click()
+  await page.locator('[data-personal-product-nav]').getByRole('button', { name: '定时任务', exact: true }).click()
   await expect(page.locator('[data-cron-page]')).toBeVisible()
 
   await expect(page.getByText('建议的自动化', { exact: true })).toBeVisible()

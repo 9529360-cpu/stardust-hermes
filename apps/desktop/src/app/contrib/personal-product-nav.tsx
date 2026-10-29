@@ -24,7 +24,6 @@ import {
   refreshProjects,
   refreshProjectTree
 } from '@/store/projects'
-import { $currentCwd, setCurrentCwd } from '@/store/session'
 import { $focusedSessionIsTile } from '@/store/session-states'
 import type { SessionInfo } from '@/types/hermes'
 
@@ -35,10 +34,10 @@ import {
   type AppView,
   BOTS_ROUTE,
   CONNECTORS_ROUTE,
+  CRON_ROUTE,
   MESSAGING_ROUTE,
   routePathname,
-  SKILLS_ROUTE,
-  TASKS_ROUTE
+  SKILLS_ROUTE
 } from '../routes'
 import type { SidebarNavItem } from '../types'
 
@@ -79,6 +78,7 @@ interface PersonalProductNavProps {
   /** Starts a chat in a folder; the project rows' "+" uses it so the chat belongs to that project. */
   onNewSessionInWorkspace?: (path: null | string) => void
   onResumeSession?: (sessionId: string, session?: SessionInfo) => void
+  onSelectProjectWorkspace: (cwd: string) => Promise<boolean> | boolean | void
 }
 
 interface ProductNavButtonProps extends Omit<ComponentPropsWithoutRef<'button'>, 'children'> {
@@ -119,7 +119,8 @@ export function PersonalProductNav({
   currentView: routeView,
   onNavigate,
   onNewSessionInWorkspace,
-  onResumeSession
+  onResumeSession,
+  onSelectProjectWorkspace
 }: PersonalProductNavProps) {
   const { locale, t } = useI18n()
   const { pathname } = useLocation()
@@ -177,7 +178,6 @@ export function PersonalProductNav({
       cancelled = true
     }
   }, [projectsOpen, expandedProjectId, projects, profileScope])
-  const currentCwd = useStore($currentCwd)
   const sidebarGrouping = useStore($sidebarGrouping)
   // Selection follows the focused pane, exactly as the conversation list below
   // does: while a session tile owns focus, no page is current even if the
@@ -222,12 +222,12 @@ export function PersonalProductNav({
       route: BOTS_ROUTE
     })
 
-  const openTasks = () =>
+  const openScheduledJobs = () =>
     pick({
-      id: 'tasks',
-      label: copy.tasks,
+      id: 'cron',
+      label: t.cron.title,
       icon: NULL_ICON,
-      route: TASKS_ROUTE
+      route: CRON_ROUTE
     })
 
   const openTools = () =>
@@ -267,21 +267,23 @@ export function PersonalProductNav({
     setProjectsOpen(!projectsOpen)
   }
 
-  const selectProject = (id: string) => {
+  const selectProject = async (id: string) => {
     if (expandedProjectId === id) {
       setExpandedProjectId(null)
 
       return
     }
 
+    const project = projects.find(candidate => candidate.id === id)
+    const cwd = projectRootCwd(project)
+
+    if (cwd && (await onSelectProjectWorkspace(cwd)) === false) {
+      return
+    }
+
     setSidebarAgentsGrouped(false)
     enterProject(id)
     setExpandedProjectId(id)
-    const cwd = projectRootCwd(projects.find(project => project.id === id))
-
-    if (cwd && cwd !== currentCwd) {
-      setCurrentCwd(cwd)
-    }
   }
 
   const newChatInProject = (project: SidebarProjectTree) => {
@@ -309,10 +311,10 @@ export function PersonalProductNav({
         <ProductNavButton icon="add" label={copy.newChat} onClick={newChat} tour="sidebar-nav-new-session" />
         <ProductNavButton active={agentSpaceShowing} icon="hubot" label={copy.agentSpace} onClick={openAgentSpace} />
         <ProductNavButton
-          active={currentView === 'tasks' || currentView === 'cron'}
-          icon="checklist"
-          label={copy.tasks}
-          onClick={openTasks}
+          active={currentView === 'cron'}
+          icon="watch"
+          label={t.cron.title}
+          onClick={openScheduledJobs}
           tour="sidebar-nav-cron"
         />
         <ProductNavButton

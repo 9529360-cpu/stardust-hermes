@@ -1,25 +1,33 @@
-import { type MutableRefObject, useCallback } from 'react'
+import { type MutableRefObject, useCallback, useRef } from 'react'
 
 import { useI18n } from '@/i18n'
-import { notify, notifyError } from '@/store/notifications'
+import { notifyError } from '@/store/notifications'
 import {
   $currentCwd,
   $newChatWorkspaceTargetGeneration,
   setCurrentBranch,
   setCurrentCwd,
-  setNewChatWorkspaceTarget
+  setSelectedProjectCwd,
+  setWorkspaceCwdOwner
 } from '@/store/session'
 import type { SessionRuntimeInfo } from '@/types/hermes'
 
 interface CwdActionsOptions {
   activeSessionIdRef: MutableRefObject<string | null>
+  selectedStoredSessionIdRef: MutableRefObject<string | null>
   onSessionRuntimeInfo?: (info: Pick<SessionRuntimeInfo, 'branch' | 'cwd'>) => void
   requestGateway: <T = unknown>(method: string, params?: Record<string, unknown>) => Promise<T>
 }
 
-export function useCwdActions({ activeSessionIdRef, onSessionRuntimeInfo, requestGateway }: CwdActionsOptions) {
+export function useCwdActions({
+  activeSessionIdRef,
+  selectedStoredSessionIdRef,
+  onSessionRuntimeInfo,
+  requestGateway
+}: CwdActionsOptions) {
   const { t } = useI18n()
   const copy = t.desktop
+  const workspaceChangeRequestRef = useRef(0)
 
   const refreshProjectBranch = useCallback(
     async (cwd: string) => {
@@ -46,11 +54,11 @@ export function useCwdActions({ activeSessionIdRef, onSessionRuntimeInfo, reques
   )
 
   const changeSessionCwd = useCallback(
-    async (cwd: string) => {
+    async (cwd: string): Promise<boolean> => {
       const trimmed = cwd.trim()
 
       if (!trimmed) {
-        return
+        return false
       }
 
       // Ref, not the closure-captured prop: this hook's consumers are memoized
@@ -58,10 +66,18 @@ export function useCwdActions({ activeSessionIdRef, onSessionRuntimeInfo, reques
       // focused chat. Re-anchoring the wrong session's workspace would point
       // that agent's terminal/file tools at another conversation's project.
       const sessionId = activeSessionIdRef.current
+      const selectedStoredSessionId = selectedStoredSessionIdRef.current
+
+      const requestId = ++workspaceChangeRequestRef.current
+
+      if (Boolean(sessionId) !== Boolean(selectedStoredSessionId)) {
+        notifyError(new Error(copy.cwdChangePending), copy.cwdChangeFailed)
+
+        return false
+      }
 
       if (!sessionId) {
-        setCurrentCwd(trimmed)
-        const workspaceGeneration = setNewChatWorkspaceTarget(trimmed)
+        const workspaceGeneration = $newChatWorkspaceTargetGeneration.get()
 
         try {
           const info = await requestGateway<{ branch?: string; cwd?: string }>('config.get', {
@@ -69,25 +85,32 @@ export function useCwdActions({ activeSessionIdRef, onSessionRuntimeInfo, reques
             cwd: trimmed
           })
 
-          if ($newChatWorkspaceTargetGeneration.get() !== workspaceGeneration || activeSessionIdRef.current) {
-            return
+          if (
+            workspaceChangeRequestRef.current !== requestId ||
+            $newChatWorkspaceTargetGeneration.get() !== workspaceGeneration ||
+            activeSessionIdRef.current
+          ) {
+            return false
           }
 
-          // Adopt the backend's normalized cwd so the persisted workspace and
-          // branch stay consistent with what the agent will use.
-          if (info.cwd) {
-            setCurrentCwd(info.cwd)
-            setNewChatWorkspaceTarget(info.cwd)
-          }
-
+          // Commit the draft target only after the backend accepts it, then
+          // adopt its normalized cwd so future sessions start in the same path.
+          setSelectedProjectCwd(info.cwd || trimmed)
+          setWorkspaceCwdOwner(null)
           setCurrentBranch(info.branch || '')
-        } catch {
-          if ($newChatWorkspaceTargetGeneration.get() === workspaceGeneration && !activeSessionIdRef.current) {
-            setCurrentBranch('')
-          }
-        }
 
-        return
+          return true
+        } catch (err) {
+          if (
+            workspaceChangeRequestRef.current === requestId &&
+            $newChatWorkspaceTargetGeneration.get() === workspaceGeneration &&
+            !activeSessionIdRef.current
+          ) {
+            notifyError(err, copy.cwdChangeFailed)
+          }
+
+          return false
+        }
       }
 
       try {
@@ -96,28 +119,42 @@ export function useCwdActions({ activeSessionIdRef, onSessionRuntimeInfo, reques
           cwd: trimmed
         })
 
-        setCurrentCwd(info.cwd || trimmed)
-        setCurrentBranch(info.branch || '')
-        onSessionRuntimeInfo?.({ branch: info.branch || '', cwd: info.cwd || trimmed })
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err)
-
-        if (!message.includes('unknown method')) {
-          notifyError(err, copy.cwdChangeFailed)
-
-          return
+        if (
+          activeSessionIdRef.current !== sessionId ||
+          selectedStoredSessionIdRef.current !== selectedStoredSessionId ||
+          workspaceChangeRequestRef.current !== requestId
+        ) {
+          return false
         }
 
-        setCurrentCwd(trimmed)
-        setCurrentBranch('')
-        notify({
-          kind: 'warning',
-          title: copy.cwdStagedTitle,
-          message: copy.cwdStagedMessage
-        })
+        const resolvedCwd = info.cwd || trimmed
+
+        setCurrentCwd(resolvedCwd)
+        setWorkspaceCwdOwner(selectedStoredSessionId)
+
+        setCurrentBranch(info.branch || '')
+        onSessionRuntimeInfo?.({ branch: info.branch || '', cwd: resolvedCwd })
+
+        return true
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        const isBusy = /session busy|4009/.test(message)
+
+        if (workspaceChangeRequestRef.current === requestId) {
+          notifyError(err, isBusy ? copy.cwdChangeBusy : copy.cwdChangeFailed)
+        }
+
+        return false
       }
     },
-    [activeSessionIdRef, copy, onSessionRuntimeInfo, requestGateway]
+    [
+      activeSessionIdRef,
+      copy,
+      onSessionRuntimeInfo,
+      requestGateway,
+      selectedStoredSessionIdRef,
+      workspaceChangeRequestRef
+    ]
   )
 
   return { changeSessionCwd, refreshProjectBranch }

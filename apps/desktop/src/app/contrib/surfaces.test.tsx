@@ -31,7 +31,6 @@ vi.mock('@/store/session', () => ({
 vi.mock('../chat', () => ({
   ChatView: ({ gateway }: { gateway: { id?: string } | null }) => <div data-testid="gateway">{gateway?.id}</div>
 }))
-vi.mock('../tasks', () => ({ TaskCenterView: () => null }))
 vi.mock('../chat/sidebar', () => ({ ChatSidebar: () => null }))
 vi.mock('./personal-product-nav', () => ({ PersonalProductNav: () => null }))
 vi.mock('../right-sidebar/terminal/chrome', () => ({ TerminalPaneChrome: () => null }))
@@ -43,6 +42,7 @@ vi.mock('../shell/statusbar-controls', () => ({ StatusbarControls: () => null })
 vi.mock('../routes', () => ({
   contributedRoutes: () => [],
   NEW_CHAT_ROUTE: '/new',
+  CRON_ROUTE: '/cron',
   ROUTES_AREA: 'routes',
   sessionRoute: (id: string) => `/${id}`
 }))

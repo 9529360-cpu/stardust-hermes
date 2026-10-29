@@ -1455,6 +1455,12 @@ export const setTerminalBackend = (next: Updater<string>) => updateAtom($termina
  */
 export const setCurrentCwdTransient = (next: Updater<string>) => updateAtom($currentCwd, next)
 
+/** Follow a directory the user deliberately selected as the current project workspace. */
+export const setSelectedProjectCwd = (cwd: string) => {
+  setCurrentCwd(cwd)
+  setNewChatWorkspaceTarget(cwd)
+}
+
 // Released-ownership marker: the live path belongs to no conversation. `null`
 // cannot serve as the release value because it MATCHES a fresh draft (whose
 // selected id is also null), which would declare a leftover path to be the
