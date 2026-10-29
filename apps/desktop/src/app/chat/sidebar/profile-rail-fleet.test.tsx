@@ -32,7 +32,6 @@ vi.mock('@/i18n', () => ({
         color: 'Color…',
         colorFor: 'Color',
         connectGateway: 'Manage gateways…',
-        profileActions: 'Profile actions',
         editSoul: 'Edit SOUL.md…',
         exportProfile: 'Export profile…',
         failedLoadSoul: 'Failed to load SOUL.md',
@@ -280,11 +279,7 @@ describe('ProfileRail fleet mode', () => {
     expect(getAgentRoster).not.toHaveBeenCalled()
     expect(screen.queryByRole('group', { name: /^Profiles on/ })).toBeNull()
     expect(container.querySelector('[data-slot="profile-rail-divider"]')).toBeNull()
-    const profileActions = screen.getByRole('button', { name: 'Profile actions' })
-    fireEvent.pointerDown(profileActions, { button: 0, pointerType: 'mouse' })
-    fireEvent.pointerUp(profileActions, { button: 0, pointerType: 'mouse' })
-    fireEvent.click(profileActions)
-    expect(screen.getByRole('menuitem', { name: 'Manage gateways…' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Manage gateways…' })).toBeTruthy()
   })
 
   it('lays every other gateway on the strip as an at-rest group, in switcher order', async () => {
@@ -318,7 +313,7 @@ describe('ProfileRail fleet mode', () => {
     expect(within(local).getByRole('button', { name: 'default · This device' })).toBeTruthy()
     expect(within(local).getByRole('button', { name: 'builder · This device' })).toBeTruthy()
 
-    // The active gateway's named profile squares are unchanged and unqualified.
+    // The active gateway's own squares are unchanged and unqualified.
     expect(screen.getByRole('button', { name: 'scout' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'default' })).toBeTruthy()
 

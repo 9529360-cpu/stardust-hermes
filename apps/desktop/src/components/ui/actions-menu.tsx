@@ -155,8 +155,6 @@ interface ActionsContextMenuProps {
   /** Skip the wrapper (render children bare) — e.g. nothing is actionable yet. */
   disabled?: boolean
   onCloseAutoFocus?: (event: Event) => void
-  onOpenChange?: (open: boolean) => void
-  open?: boolean
 }
 
 /**
@@ -169,16 +167,14 @@ export function ActionsContextMenu({
   contentClassName,
   disabled,
   items,
-  onCloseAutoFocus,
-  onOpenChange,
-  open
+  onCloseAutoFocus
 }: ActionsContextMenuProps) {
   if (disabled) {
     return <>{children}</>
   }
 
   return (
-    <ContextMenu onOpenChange={onOpenChange} open={open}>
+    <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent aria-label={ariaLabel} className={contentClassName} onCloseAutoFocus={onCloseAutoFocus}>
         {items(CONTEXT_KIT)}

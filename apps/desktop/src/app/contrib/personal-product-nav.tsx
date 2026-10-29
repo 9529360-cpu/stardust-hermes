@@ -24,10 +24,10 @@ import {
   refreshProjects,
   refreshProjectTree
 } from '@/store/projects'
+import { $currentCwd, setCurrentCwd } from '@/store/session'
 import { $focusedSessionIsTile } from '@/store/session-states'
 import type { SessionInfo } from '@/types/hermes'
 
-import { ProjectMenu } from '../chat/sidebar/projects'
 import { ProjectContextMenu } from '../chat/sidebar/projects/project-menu'
 import type { SidebarProjectTree } from '../chat/sidebar/projects/workspace-groups'
 import { WorkspaceAddButton } from '../chat/sidebar/projects/workspace-header'
@@ -35,7 +35,6 @@ import {
   type AppView,
   BOTS_ROUTE,
   CONNECTORS_ROUTE,
-  CRON_ROUTE,
   MESSAGING_ROUTE,
   routePathname,
   SKILLS_ROUTE
@@ -49,23 +48,26 @@ const PRODUCT_NAV_COPY = {
     agentSpace: 'مساحة الوكلاء',
     newChat: 'محادثة جديدة',
     project: 'المشروع',
+    tasks: 'المهام',
     tools: 'الأدوات'
   },
-  en: { agentSpace: 'Agent space', newChat: 'New chat', project: 'Project', tools: 'Tools' },
+  en: { agentSpace: 'Agent space', newChat: 'New chat', project: 'Project', tasks: 'Tasks', tools: 'Tools' },
   ja: {
     agentSpace: 'エージェント空間',
     newChat: '新しいチャット',
     project: 'プロジェクト',
+    tasks: 'タスク',
     tools: 'ツール'
   },
   ru: {
     agentSpace: 'Пространство агентов',
     newChat: 'Новый чат',
     project: 'Проект',
+    tasks: 'Задачи',
     tools: 'Инструменты'
   },
-  zh: { agentSpace: '智能体空间', newChat: '新建对话', project: '项目', tools: '工具' },
-  'zh-hant': { agentSpace: '智能體空間', newChat: '新增對話', project: '專案', tools: '工具' }
+  zh: { agentSpace: '智能体空间', newChat: '新建对话', project: '项目', tasks: '任务', tools: '工具' },
+  'zh-hant': { agentSpace: '智能體空間', newChat: '新增對話', project: '專案', tasks: '任務', tools: '工具' }
 } as const
 
 const NULL_ICON: SidebarNavItem['icon'] = () => null
@@ -76,7 +78,6 @@ interface PersonalProductNavProps {
   /** Starts a chat in a folder; the project rows' "+" uses it so the chat belongs to that project. */
   onNewSessionInWorkspace?: (path: null | string) => void
   onResumeSession?: (sessionId: string, session?: SessionInfo) => void
-  onSelectProjectWorkspace?: (cwd: string) => Promise<boolean> | boolean | void
 }
 
 interface ProductNavButtonProps extends Omit<ComponentPropsWithoutRef<'button'>, 'children'> {
@@ -117,8 +118,7 @@ export function PersonalProductNav({
   currentView: routeView,
   onNavigate,
   onNewSessionInWorkspace,
-  onResumeSession,
-  onSelectProjectWorkspace
+  onResumeSession
 }: PersonalProductNavProps) {
   const { locale, t } = useI18n()
   const { pathname } = useLocation()
@@ -176,6 +176,7 @@ export function PersonalProductNav({
       cancelled = true
     }
   }, [projectsOpen, expandedProjectId, projects, profileScope])
+  const currentCwd = useStore($currentCwd)
   const sidebarGrouping = useStore($sidebarGrouping)
   // Selection follows the focused pane, exactly as the conversation list below
   // does: while a session tile owns focus, no page is current even if the
@@ -265,30 +266,29 @@ export function PersonalProductNav({
     setProjectsOpen(!projectsOpen)
   }
 
+  const selectProject = (id: string) => {
+    if (expandedProjectId === id) {
+      setExpandedProjectId(null)
+
+      return
+    }
+
+    setSidebarAgentsGrouped(false)
+    enterProject(id)
+    setExpandedProjectId(id)
+    const cwd = projectRootCwd(projects.find(project => project.id === id))
+
+    if (cwd && cwd !== currentCwd) {
+      setCurrentCwd(cwd)
+    }
+  }
+
   const newChatInProject = (project: SidebarProjectTree) => {
     setSidebarAgentsGrouped(false)
     $newChatProfile.set(null)
     enterProject(project.id)
     setExpandedProjectId(project.id)
     onNewSessionInWorkspace?.(projectRootCwd(project))
-  }
-
-  const selectProjectWorkspace = async (project: SidebarProjectTree) => {
-    if (expandedProjectId === project.id) {
-      setExpandedProjectId(null)
-
-      return
-    }
-
-    const cwd = projectRootCwd(project)
-
-    if (cwd && (await onSelectProjectWorkspace?.(cwd)) === false) {
-      return
-    }
-
-    setSidebarAgentsGrouped(false)
-    enterProject(project.id)
-    setExpandedProjectId(project.id)
   }
 
   const projectLaneSessions = enteredProject?.repos.flatMap(repo => repo.groups.flatMap(group => group.sessions)) ?? []
@@ -303,6 +303,7 @@ export function PersonalProductNav({
       className="jarvis-product-nav relative isolate shrink-0 overflow-hidden border-b border-(--ui-stroke-tertiary) bg-(--ui-sidebar-surface-background) px-2.5 pb-2 pt-0 pointer-events-auto"
       data-personal-product-nav=""
     >
+      <div className="mb-3 px-2 text-sm font-semibold tracking-[-0.01em] text-(--ui-text-primary)">Stardust</div>
       <div className="flex flex-col gap-0.5">
         <ProductNavButton icon="add" label={copy.newChat} onClick={newChat} tour="sidebar-nav-new-session" />
         <ProductNavButton active={agentSpaceShowing} icon="hubot" label={copy.agentSpace} onClick={openAgentSpace} />
@@ -347,7 +348,7 @@ export function PersonalProductNav({
                     aria-expanded={expandedProjectId === project.id}
                     aria-pressed={projectScope === project.id}
                     className="flex min-h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-left text-[0.72rem] text-(--ui-text-tertiary) hover:text-(--ui-text-primary)"
-                    onClick={() => selectProjectWorkspace(project)}
+                    onClick={() => selectProject(project.id)}
                     title={project.label}
                     type="button"
                   >
@@ -359,15 +360,14 @@ export function PersonalProductNav({
                       size="0.7rem"
                     />
                   </button>
-                  <div className="flex shrink-0 items-center gap-0.5 pr-1">
-                    {canStartChat && (
+                  {canStartChat && (
+                    <div className="shrink-0 pr-1.5">
                       <WorkspaceAddButton
                         label={t.sidebar.newSessionIn(project.label)}
                         onClick={() => newChatInProject(project)}
                       />
-                    )}
-                    <ProjectMenu isActive={project.id === activeProjectId} project={project} />
-                  </div>
+                    </div>
+                  )}
                 </div>
               )
 

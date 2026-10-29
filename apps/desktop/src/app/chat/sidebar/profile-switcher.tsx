@@ -435,14 +435,26 @@ export function ProfileRail() {
           <ProfilePill active={isAll} glyph="layers" label={p.allProfiles} onSelect={() => setShowAllProfiles(true)} />
         ))}
 
+      {/* Single-profile: the active default's home icon next to the create +. */}
+      {!fleet && !multiProfile && defaultProfile && (
+        <ProfilePill
+          active
+          glyph="home"
+          label={profileLabel(defaultProfile)}
+          onSelect={() => selectProfile(defaultProfile.name)}
+        />
+      )}
+
       {condensed ? (
         // Condensed path: one compact dropdown instead of N squares. No drag
-        // reorder, no long-press recolor, no per-square context menu — profile
-        // changes move into the same actions menu as create/import/manage.
+        // reorder, no long-press recolor, no per-square context menu — Manage
+        // covers rename/delete at this scale.
         <div className="flex min-w-0 flex-1 items-center gap-1">
           <ProfileDropdown
             activeKey={isAll ? null : activeKey}
             colors={colors}
+            onCreate={() => setCreateOpen(true)}
+            onImport={() => void runImportProfileFlow()}
             onSelect={selectProfile}
             onSelectRest={switchToRest}
             profiles={named}
@@ -503,16 +515,28 @@ export function ProfileRail() {
               )
             : activeStrip}
 
+          <AddProfileButton label={p.newProfile} onClick={() => setCreateOpen(true)} />
+          <ImportProfileButton label={p.importProfile} />
         </div>
       )}
-      <ProfileActionsMenu
-        connectGateway={!multipleConnections ? () => navigate(`${SETTINGS_ROUTE}?tab=gateway`) : undefined}
-        importProfile={() => void runImportProfileFlow()}
-        label={p.profileActions}
-        manageProfiles={() => navigate(PROFILES_ROUTE)}
-        newProfile={() => setCreateOpen(true)}
-        p={p}
-      />
+
+      {/* Always reachable, even with only the default profile: the manage
+          overlay is the only place to edit a profile's SOUL.md, and a
+          single-profile user must be able to edit the default's persona
+          without first creating a throwaway second profile. */}
+      <ProfilePill active={false} glyph="ellipsis" label={p.manageProfiles} onSelect={() => navigate(PROFILES_ROUTE)} />
+
+      {/* Multi-gateway discoverability: before a second source exists, a plug
+          pinned beside Manage deep-links to the unified Gateways page. Once
+          there are several sources, the same action lives in their selector. */}
+      {!multipleConnections && (
+        <ProfilePill
+          active={false}
+          glyph="plug"
+          label={p.connectGateway}
+          onSelect={() => navigate(`${SETTINGS_ROUTE}?tab=gateway`)}
+        />
+      )}
 
       {/* Land in the new profile on a fresh chat (selectProfile triggers the
           new-session reset), not stuck on the session you were just in. */}
@@ -663,51 +687,37 @@ function EditSoulDialog({
   )
 }
 
-function ProfileActionsMenu({
-  connectGateway,
-  importProfile,
-  label,
-  manageProfiles,
-  newProfile,
-  p
-}: {
-  connectGateway?: () => void
-  importProfile: () => void
-  label: string
-  manageProfiles: () => void
-  newProfile: () => void
-  p: ReturnType<typeof useI18n>['t']['profiles']
-}) {
+// The "+" create button, shared by both rail render paths.
+function AddProfileButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button aria-label={label} data-profile-actions-trigger="" size="icon-sm" variant="ghost">
-          <Codicon name="ellipsis" size="0.875rem" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-52" side="top">
-        <DropdownMenuLabel className={dropdownMenuSectionLabel}>{p.profileActions}</DropdownMenuLabel>
-        <DropdownMenuItem onSelect={newProfile}>
-          <Codicon name="add" />
-          {p.newProfile}
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={importProfile}>
-          <Codicon name="cloud-download" />
-          {p.importProfile}
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={manageProfiles}>
-          <Codicon name="settings-gear" />
-          {p.manageProfiles}
-        </DropdownMenuItem>
-        {connectGateway ? (
-          <DropdownMenuItem onSelect={connectGateway}>
-            <Codicon name="plug" />
-            {p.connectGateway}
-          </DropdownMenuItem>
-        ) : null}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <Tip label={label}>
+      <button
+        aria-label={label}
+        className="grid size-5 shrink-0 place-items-center rounded-[3px] text-(--ui-text-tertiary) opacity-55 transition hover:bg-(--ui-control-hover-background) hover:text-foreground hover:opacity-100"
+        onClick={onClick}
+        type="button"
+      >
+        <Codicon name="add" size="0.75rem" />
+      </button>
+    </Tip>
+  )
+}
+
+// Import-archive door beside the "+": adopt a shared profile bundle (theme,
+// skills, layout) as a new profile. Same chrome as AddProfileButton; the whole
+// flow (picker → import → apply overlay → switch) lives in the store.
+function ImportProfileButton({ label }: { label: string }) {
+  return (
+    <Tip label={label}>
+      <button
+        aria-label={label}
+        className="grid size-5 shrink-0 place-items-center rounded-[3px] text-(--ui-text-tertiary) opacity-55 transition hover:bg-(--ui-control-hover-background) hover:text-foreground hover:opacity-100"
+        onClick={() => void runImportProfileFlow()}
+        type="button"
+      >
+        <Codicon name="cloud-download" size="0.75rem" />
+      </button>
+    </Tip>
   )
 }
 
@@ -717,6 +727,8 @@ function ProfileActionsMenu({
 function ProfileDropdown({
   activeKey,
   colors,
+  onCreate,
+  onImport,
   onSelect,
   onSelectRest,
   profiles,
@@ -724,6 +736,8 @@ function ProfileDropdown({
 }: {
   activeKey: null | string
   colors: Record<string, string>
+  onCreate: () => void
+  onImport: () => void
   onSelect: (name: string) => void
   onSelectRest: (agent: FleetAgent) => void
   profiles: ProfileInfo[]
@@ -766,6 +780,15 @@ function ProfileDropdown({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-48 max-w-72" collisionPadding={8} side="top">
+        <DropdownMenuItem onSelect={onCreate}>
+          <Codicon aria-hidden="true" name="add" size="0.875rem" />
+          <span className="truncate">{p.newProfile}</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={onImport}>
+          <Codicon aria-hidden="true" name="cloud-download" size="0.875rem" />
+          <span className="truncate">{p.importProfile}</span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuRadioGroup onValueChange={name => name && onSelect(name)} value={value}>
           {profiles.map(profile => (
             <ProfileDropdownItem

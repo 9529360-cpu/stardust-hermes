@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -7,7 +7,7 @@ import { group, split } from '@/components/pane-shell/tree/model'
 import { $layoutTree, noteActiveTreeGroup, revealTreePane } from '@/components/pane-shell/tree/store'
 import { I18nProvider } from '@/i18n'
 import { $sidebarGrouping, dismissNarrowSidebar, setSidebarAgentsGrouped } from '@/store/layout'
-import { $activeGatewayProfile, $newChatProfile, $profiles } from '@/store/profile'
+import { $newChatProfile } from '@/store/profile'
 import {
   $projectScope,
   $projectsRpcAvailable,
@@ -63,8 +63,6 @@ afterEach(() => {
   cleanup()
   vi.mocked(fetchProjectSessions).mockResolvedValue(null)
   $newChatProfile.set(null)
-  $activeGatewayProfile.set('default')
-  $profiles.set([])
   $projectTree.set([])
   $projectsRpcAvailable.set(null)
   $projectTreeLoading.set(false)
@@ -80,8 +78,7 @@ function renderNav(
   path = '/',
   onNavigate = vi.fn(),
   onResumeSession = vi.fn(),
-  onNewSessionInWorkspace?: (path: null | string) => void,
-  onSelectProjectWorkspace = vi.fn()
+  onNewSessionInWorkspace?: (path: null | string) => void
 ) {
   render(
     <MemoryRouter initialEntries={[path]}>
@@ -91,7 +88,6 @@ function renderNav(
           onNavigate={onNavigate}
           onNewSessionInWorkspace={onNewSessionInWorkspace}
           onResumeSession={onResumeSession}
-          onSelectProjectWorkspace={onSelectProjectWorkspace}
         />
       </I18nProvider>
     </MemoryRouter>
@@ -114,54 +110,22 @@ describe('PersonalProductNav', () => {
     expect(navigate).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'connectors', route: '/connectors' }))
   })
 
-  it('starts project chats in their folder and leaves project scope for a plain new chat', async () => {
+  it('starts project chats in their folder and leaves project scope for a plain new chat', () => {
     $projectTree.set([
       { id: 'no-project', isNoProject: true, label: 'Home', path: null, repos: [], sessionCount: 1 },
       { id: 'p_example', label: 'Example', path: 'D:/Example', repos: [], sessionCount: 1 }
     ])
     const startInWorkspace = vi.fn()
-    const selectProjectWorkspace = vi.fn().mockResolvedValue(true)
-    $currentCwd.set('D:/OriginalSession')
-    $activeGatewayProfile.set('default')
-    $profiles.set([{ is_default: true, name: 'default' }, { name: 'research' }] as never)
-    renderNav('chat', '/', vi.fn(), vi.fn(), startInWorkspace, selectProjectWorkspace)
+    renderNav('chat', '/', vi.fn(), vi.fn(), startInWorkspace)
 
     fireEvent.click(screen.getByRole('button', { name: '项目' }))
     expect(screen.queryByRole('button', { name: /Home.*新建|新建.*Home/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: '项目操作: Example' })).toBeTruthy()
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Example' }))
-    })
-    await waitFor(() => expect($projectScope.get()).toBe('p_example'))
-    expect(selectProjectWorkspace).toHaveBeenCalledWith('D:/Example')
-    expect($currentCwd.get()).toBe('D:/OriginalSession')
-    expect($projectScope.get()).toBe('p_example')
     fireEvent.click(screen.getByRole('button', { name: /Example.*新建|新建.*Example/ }))
     expect(startInWorkspace).toHaveBeenCalledWith('D:/Example')
     expect($projectScope.get()).toBe('p_example')
 
     fireEvent.click(screen.getByRole('button', { name: '新建对话' }))
     expect($projectScope.get()).toBe(ALL_PROJECTS)
-  })
-
-  it('keeps the current project scope when the selected session rejects a cwd change', async () => {
-    $projectTree.set([
-      { id: 'p_current', label: 'Current', path: 'D:/Current', repos: [], sessionCount: 1 },
-      { id: 'p_target', label: 'Target', path: 'D:/Target', repos: [], sessionCount: 1 }
-    ])
-    $projectScope.set('p_current')
-    const onSelectProjectWorkspace = vi.fn().mockResolvedValue(false)
-    renderNav('chat', '/', vi.fn(), vi.fn(), undefined, onSelectProjectWorkspace)
-
-    fireEvent.click(screen.getByRole('button', { name: '项目' }))
-    await screen.findByRole('button', { name: 'Target' })
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Target' }))
-    })
-
-    await waitFor(() => expect(onSelectProjectWorkspace).toHaveBeenCalledWith('D:/Target'))
-    expect($projectScope.get()).toBe('p_current')
-    expect(screen.getByRole('button', { name: 'Target' }).getAttribute('aria-expanded')).toBe('false')
   })
 
   it('restores pointer events when the surrounding chat/sidebar surface disables them', () => {
@@ -177,9 +141,9 @@ describe('PersonalProductNav', () => {
     renderNav('chat')
 
     const nav = screen.getByRole('navigation', { name: 'Product navigation' })
-    expect(screen.queryByText('Stardust')).toBeNull()
     expect(nav.className).toContain('pt-0')
     expect(nav.className).not.toContain('titlebar-height')
+
     expect(screen.getAllByRole('button').map(button => button.textContent?.trim())).toEqual([
       '新建对话',
       '智能体空间',
@@ -195,8 +159,7 @@ describe('PersonalProductNav', () => {
   })
 
   it.each(['/command-center', '/command-center?section=sessions', '/command-center?section=system'])(
-    'has no sidebar search entry or stale page highlight at %s',
-    path => {
+    'has no sidebar search entry or stale page highlight at %s', path => {
       renderNav('command-center', path)
       expect(screen.queryByRole('button', { name: '搜索对话' })).toBeNull()
       expect(currentButtons()).toEqual([])
@@ -257,7 +220,7 @@ describe('PersonalProductNav', () => {
     expect(onNavigate).toHaveBeenCalledTimes(1)
   })
 
-  it('offers visible project actions so the project can be deleted without a right click', async () => {
+  it('offers the project actions on right-click, so a project can be deleted', async () => {
     $projectTree.set([
       { id: 'no-project', isNoProject: true, label: 'Home', path: null, repos: [], sessionCount: 3 },
       { id: 'p_example', label: 'Example', path: 'D:/Example', repos: [], sessionCount: 2 }
@@ -268,10 +231,7 @@ describe('PersonalProductNav', () => {
     // Home is not listed as a project, so there is no row to act on.
     expect(screen.queryByRole('button', { name: 'Home' })).toBeNull()
 
-    const menuTrigger = screen.getByRole('button', { name: '项目操作: Example' })
-    fireEvent.pointerDown(menuTrigger, { button: 0, pointerType: 'mouse' })
-    fireEvent.pointerUp(menuTrigger, { button: 0, pointerType: 'mouse' })
-    fireEvent.click(menuTrigger)
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Example' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: '删除…' }))
     fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '删除' }))
 
@@ -279,11 +239,10 @@ describe('PersonalProductNav', () => {
     expect(deleteProject).toHaveBeenCalledWith('p_example')
   })
 
-  it('expands projects beneath the nav without replacing recent conversations', async () => {
+  it('expands projects beneath the nav without replacing recent conversations', () => {
     $projectTree.set([{ id: 'p_example', label: 'Example', path: 'D:/Example', repos: [], sessionCount: 2 }])
     setSidebarAgentsGrouped(true) // persisted legacy view must return to recents
-    const selectProjectWorkspace = vi.fn().mockResolvedValue(true)
-    const onNavigate = renderNav('chat', '/', vi.fn(), vi.fn(), undefined, selectProjectWorkspace)
+    const onNavigate = renderNav('chat')
     const projectButton = screen.getByRole('button', { name: '项目' })
 
     fireEvent.click(projectButton)
@@ -293,12 +252,9 @@ describe('PersonalProductNav', () => {
     expect($sidebarGrouping.get()).not.toBe('project')
     expect(onNavigate).not.toHaveBeenCalled()
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Example' }))
-    })
-    await waitFor(() => expect($projectScope.get()).toBe('p_example'))
-    expect(selectProjectWorkspace).toHaveBeenCalledWith('D:/Example')
-    expect($currentCwd.get()).toBe('')
+    fireEvent.click(screen.getByRole('button', { name: 'Example' }))
+    expect($projectScope.get()).toBe('p_example')
+    expect($currentCwd.get()).toBe('D:/Example')
     expect($sidebarGrouping.get()).not.toBe('project')
     expect(onNavigate).not.toHaveBeenCalled()
 

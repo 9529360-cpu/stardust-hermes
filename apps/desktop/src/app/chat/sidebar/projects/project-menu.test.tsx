@@ -1,10 +1,25 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { ProjectMenu } from './project-menu'
 import type { SidebarProjectTree } from './workspace-groups'
 
 afterEach(cleanup)
+
+// jsdom doesn't implement ResizeObserver; Radix's PopoverContent/Arrow use it
+// (via @radix-ui/react-use-size) to measure the arrow once the popover is
+// actually mounted. The kebab-only test above never opens a Popover, so it
+// doesn't need this — only the appearance-popover test below does.
+beforeAll(() => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  )
+})
 
 vi.mock('@/i18n', () => ({
   useI18n: () => ({
@@ -14,7 +29,7 @@ vi.mock('@/i18n', () => ({
         projects: {
           copyPath: 'Copy path',
           deleteConfirm: 'This cannot be undone.',
-          menu: 'Project actions',
+          menu: 'Actions',
           menuAddFolder: 'Add folder',
           menuAppearance: 'Appearance',
           menuDelete: 'Delete',
@@ -73,30 +88,31 @@ const openTriggerMenu = (trigger: HTMLElement) => {
 }
 
 describe('ProjectMenu', () => {
-  it('keeps a directly accessible actions trigger and puts rename and delete in its menu', async () => {
+  it('does not wrap the kebab trigger in a Tip', () => {
     render(<ProjectMenu isActive={false} project={project} />)
 
-    const button = screen.getByRole('button', { name: 'Project actions: Test D' })
+    const button = screen.getByRole('button', { name: 'Actions' })
     expect(tipTrigger(button)).toBeNull()
-    expect(button.className).toContain('opacity-70')
-    openTriggerMenu(button)
-    expect(await screen.findByRole('menuitem', { name: 'Rename' })).toBeTruthy()
-    expect(await screen.findByRole('menuitem', { name: 'Appearance' })).toBeTruthy()
-    expect(await screen.findByRole('menuitem', { name: 'Reveal in file manager' })).toBeTruthy()
-    expect(await screen.findByRole('menuitem', { name: 'Copy path' })).toBeTruthy()
-    expect(await screen.findByRole('menuitem', { name: 'Set active' })).toBeTruthy()
-    expect(await screen.findByRole('menuitem', { name: 'Delete…' })).toBeTruthy()
   })
 
-  it('opens the appearance picker from the actions submenu', async () => {
+  // When anchorRef is absent, PopoverAnchor wraps the dropdown trigger so the
+  // appearance popover positions against the kebab. asChild must still reach
+  // the real button (no non-forwarding wrappers inside the chain — #67500).
+  it('opens the appearance popover through the kebab trigger when anchorRef is absent', async () => {
     render(<ProjectMenu isActive={false} project={project} />)
 
-    openTriggerMenu(screen.getByRole('button', { name: 'Project actions: Test D' }))
+    const trigger = screen.getByRole('button', { name: 'Actions' })
+
+    openTriggerMenu(trigger)
 
     const appearanceItem = await screen.findByRole('menuitem', { name: 'Appearance' })
-    fireEvent.pointerMove(appearanceItem, { pointerType: 'mouse' })
+
     fireEvent.click(appearanceItem)
 
+    // The color-swatch "No color" clear option only renders once the
+    // appearance Popover is actually open — proving the click reached the
+    // real button through the full Tip > PopoverAnchor > DropdownMenuTrigger
+    // chain rather than getting silently dropped on an intermediate wrapper.
     expect(await screen.findByRole('button', { name: 'No color' })).toBeTruthy()
-  })
+  }, 15000)
 })

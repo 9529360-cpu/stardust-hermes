@@ -2315,7 +2315,6 @@ export interface Translations {
     switchConnectionFailed: (name: string) => string
     manageProfiles: string
     connectGateway: string
-    profileActions: string
     fleet: {
       allOnGateway: string
       gateway: (gateway: string) => string
