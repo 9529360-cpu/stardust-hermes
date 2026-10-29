@@ -1,6 +1,6 @@
 name: auto-fix lint issues & formatting
 
-# On push to main (or manual trigger), run `npm run fix` on each workspace
+# On manual trigger, run `npm run fix` on each workspace
 # package and produce a reviewable patch artifact. Repositories that explicitly
 # configure a GitHub App may additionally turn that patch into an automated PR.
 #
@@ -37,17 +37,10 @@ name: auto-fix lint issues & formatting
 #      workflow intentionally stays report-only instead of falling back to a
 #      partially-capable GITHUB_TOKEN.
 
+# Run fixes locally before pushing an integrated candidate. Keep the hosted
+# patch generator available on demand without reinstalling dependencies after
+# every merge; the ordinary PR lint/typecheck lanes remain authoritative.
 on:
-  push:
-    branches: [main]
-    paths:
-      - '**/*.js'
-      - '**/*.cjs'
-      - '**/*.mjs'
-      - '**/*.ts'
-      - '**/*.tsx'
-      - 'package.json'
-      - 'package-lock.json'
   workflow_dispatch:
 
 permissions:

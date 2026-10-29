@@ -281,8 +281,10 @@ def build_verify_on_stop_nudge(
         )
 
     return (
-        "[System: You edited code in this turn, but the workspace does not have "
-        "fresh passing verification evidence yet.\n\n"
+        "[System: The workspace may have changed since its last verification, and fresh passing "
+        "verification evidence is not recorded yet. This is a conservative command/edit signal, "
+        "not proof that source files actually changed. Inspect the trigger and affected workspace "
+        "before repeating checks.\n\n"
         f"Verification status: {_status_detail(status)}\n\n"
         f"Changed paths:\n{_format_changed_paths(paths)}\n\n"
         f"{command_instruction} If verification is not possible, explain the "

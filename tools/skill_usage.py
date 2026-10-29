@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Set, Tuple
 
 from hermes_constants import get_hermes_home
-from agent.skill_utils import is_excluded_skill_path, is_external_skill_path
+from agent.skill_utils import is_excluded_skill_path, is_external_skill_path, is_org_mirror_path
 from utils import atomic_write_text
 
 logger = logging.getLogger(__name__)
@@ -194,10 +194,11 @@ def _toggle_suppressed_name(skill_name: str, *, add: bool) -> None:
 
 
 def _iter_skill_mds(base: Path, *, local_only: bool) -> Iterator[Tuple[str, Path]]:
-    """``(frontmatter name, SKILL.md)`` under *base* minus metadata/VCS/venv/cache dirs; *local_only* also skips
-    external skill dirs mounted below the tree (curation must not touch them)."""
+    """``(frontmatter name, SKILL.md)`` under *base* minus metadata/VCS/venv/cache dirs and the retired org mirror;
+    *local_only* also skips external skill dirs mounted below the tree (curation must not touch them)."""
     for skill_md in base.rglob("SKILL.md"):
-        if not (is_excluded_skill_path(skill_md) or (local_only and is_external_skill_path(skill_md))):
+        if not (is_excluded_skill_path(skill_md) or is_org_mirror_path(skill_md, base)
+                or (local_only and is_external_skill_path(skill_md))):
             yield _read_skill_name(skill_md, fallback=skill_md.parent.name), skill_md
 
 
@@ -573,15 +574,6 @@ def set_pinned(skill_name: str, pinned: bool) -> bool:
     return _set_field(skill_name, "pinned", bool(pinned))
 
 
-def set_sync(skill_name: str, sync: bool) -> None:
-    """Opt-in ``sync`` flag (read by ``skills_sync_client``); curation-gated so bundled/hub/external can't be marked."""
-    _set_field(skill_name, "sync", bool(sync))
-
-
-def is_sync_enabled(skill_name: str) -> bool:
-    return get_record(skill_name).get("sync") is True
-
-
 def forget(skill_name: str) -> None:
     if skill_name:
         _locked_update(skill_name, lambda d: (None, d.pop(skill_name, None) is not None), "skill_usage.forget(%s) failed: %s")
@@ -671,7 +663,7 @@ def _match_skill_dir(skill_mds: Iterable[Path], skill_name: str) -> Optional[Pat
 
 
 def _find_skill_dir(skill_name: str) -> Optional[Path]:
-    """Skill dir by frontmatter ``name`` (flat or nested); the gated index iterator sees only the active org mirror."""
+    """Skill dir by frontmatter ``name`` (flat or nested); the index iterator never sees the retired org mirror."""
     from agent.skill_utils import iter_skill_index_files
     base = _skills_dir()
     return _match_skill_dir((p for p in iter_skill_index_files(base, "SKILL.md") if not is_external_skill_path(p)),

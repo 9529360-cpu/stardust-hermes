@@ -1888,6 +1888,21 @@ export interface SubagentSnapshot {
 }
 /** Lifecycle of one delegated child (``tools/delegate_tool_child_run.py``); ``failed`` / ``error`` / ``timeout`` / ``interrupted`` / ``completed`` are terminal. */
 export type SubagentStatus = 'queued' | 'running' | 'completed' | 'failed' | 'error' | 'timeout' | 'interrupted'
+export interface DelegationRecoveryListResult {
+  receipts?: DelegationRecoveryReceipt[]
+}
+/** ``tools/async_delegation.py::list_unknown_delegation_receipts`` allowlist. ``unknown`` means the owner exited before a trustworthy result: the work may or may not have run, and is never re-dispatched automatically. A batch reports only how many goals it held (``goal_count``), never child outcomes. */
+export interface DelegationRecoveryReceipt {
+  delegation_id: string
+  state: DelegationRecoveryState
+  dispatched_at: number
+  completed_at?: number | null
+  delivery_state: string
+  goal: string
+  is_batch?: boolean
+  goal_count?: number
+}
+export type DelegationRecoveryState = 'unknown'
 export interface SubagentIdParams {
   session_id: string
   profile?: string | null
@@ -4523,6 +4538,8 @@ export interface RpcMethods {
   'cron.manage': { params: CronManageParams; result: CronManageResult }
   /** Block/unblock NEW spawns globally (active children keep running); returns the new state. */
   'delegation.pause': { params: DelegationPauseParams; result: DelegationPauseResult }
+  /** Bounded, sanitized unknown-outcome receipts for this session's exited background owners. */
+  'delegation.recovery.list': { params: SessionParams; result: DelegationRecoveryListResult }
   /** Running subagent tree plus the spawn pause flag and limits. */
   'delegation.status': { params: ProfileParams; result: DelegationStatusResult }
   /** Delete one temporary Stardust diagnostics archive from the current profile cache. */
@@ -4951,6 +4968,7 @@ export const RPC_METHODS = [
   'cron.executions.list',
   'cron.manage',
   'delegation.pause',
+  'delegation.recovery.list',
   'delegation.status',
   'diagnostics.discard_bundle',
   'diagnostics.prepare_bundle',

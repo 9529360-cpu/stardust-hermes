@@ -38,6 +38,36 @@ def _(rid, params):
     })
 
 
+@method("delegation.recovery.list")
+def _(rid, params):
+    """Display-only receipts for this session's background work whose owner process exited.
+
+    Identity comes from the authorized live record (durable ``session_key`` + ``profile_home``), never
+    from params; ``subagent.list`` keeps ``delegations: []`` because async units lack generation authority."""
+    from tools.async_delegation import list_unknown_delegation_receipts
+
+    transport, owner = _current_session_steer_authority(_str_param(params, "session_id"))
+    if transport is None or owner is None:
+        return _err(rid, 4001, "session not found or not owned by this transport")
+    try:
+        from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+        home_token = set_hermes_home_override(owner.get("profile_home")) if owner.get("profile_home") else None
+        try:
+            compression_lineage = _get_db().get_compression_lineage(str(owner.get("session_key") or ""))
+            from tools import async_delegation
+            async_delegation.recover_abandoned_delegations()
+        finally:
+            if home_token is not None:
+                reset_hermes_home_override(home_token)
+        receipts = list_unknown_delegation_receipts(
+            session_key=str(owner.get("session_key") or ""), profile_home=owner.get("profile_home"),
+            compression_lineage=compression_lineage)
+    except Exception:
+        logger.warning("delegation recovery receipts unavailable", exc_info=True)
+        return _err(rid, 5000, "recovery receipts unavailable")
+    return _ok(rid, {"receipts": receipts})
+
+
 @method("subagent.interrupt")
 def _(rid, params):
     from agent.interrupt_compat import request_hard_interrupt

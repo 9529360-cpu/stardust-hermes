@@ -3875,6 +3875,10 @@ export const zh = defineLocale({
     stop: '停止',
     dismiss: '关闭',
     exit: code => `退出码 ${code}`,
+    recoveryUnknown: count => `${count} 项子代理结果未知`,
+    recoveryNote: '执行它们的后台进程在回报结果前已停止，无法确定是否已完成。系统没有自动重新执行任何任务。',
+    recoveryRowState: '结果未知',
+    recoveryGoalCount: count => `批量 ${count} 个目标`,
     control: {
       goalActiveTurns: (turn, maxTurns) => `第 ${turn}/${maxTurns} 轮`,
       goalDoneTurns: turns => `共 ${turns} 轮`,

@@ -3082,6 +3082,10 @@ export interface Translations {
     stop: string
     dismiss: string
     exit: (code: number) => string
+    recoveryUnknown: (count: number) => string
+    recoveryNote: string
+    recoveryRowState: string
+    recoveryGoalCount: (count: number) => string
     control: {
       goalActiveTurns: (turn: number, maxTurns: number) => string
       goalDoneTurns: (turns: number) => string

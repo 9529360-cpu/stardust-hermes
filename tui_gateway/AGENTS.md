@@ -85,6 +85,21 @@ indicator. Async completion units are not agents and lack exact generation autho
 results, callbacks, or routing keys are sent. Clients hydrate from this snapshot
 on their existing poll and avoid updates when unchanged.
 
+`delegation.recovery.list({session_id})` returns `{receipts}`: display-only **unknown** receipts for
+background work whose owner process exited (`tools/async_delegation.list_unknown_delegation_receipts`).
+It is separate from `subagent.list` on purpose. Identity is never read from params: the handler takes
+the durable `session_key` and `profile_home` from the live record that
+`_current_session_steer_authority` authorized, so a reconnect under a new runtime session id still
+finds the receipts (the runtime UI id is not matched; for desktop/TUI dispatch both `origin_session` and
+`parent_session_id` carry the durable id). A row shows only when `state='unknown'`, it carries this
+profile as `owner_home`, and the recorded `owner_pid` + `owner_started_at` generation is gone — the same
+proof `recover_abandoned_delegations` uses. Fields are an allowlist (id, state, times, delivery state,
+short goal, `is_batch`, `goal_count`); never context, results, error, model, toolsets, routing keys, or
+paths. Bounded: 7-day window, 20 rows, corrupt rows skipped. Unknown means the work may or may not have
+run: nothing is re-dispatched automatically, partial child results stay in the internal ledger, and a
+batch reports only its goal count. Known gap: a dispatch stamped with a pre-compression session id is not
+matched after the record re-anchors to the rotated id.
+
 `subagent.tail({session_id, subagent_id})` returns
 `{subagent_id, available, text, truncated}`: the last 16 KiB of the live child's
 existing transcript. Poll only the selected detail. Missing/finished/foreign
