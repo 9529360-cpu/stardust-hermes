@@ -1,9 +1,9 @@
 /**
  * Narrow chrome in the real window. Below the sidebar breakpoint the sessions
- * overlay opens over the layout, and it must clear the titlebar's own controls
- * (the sidebar toggle at the top left) at every narrow width: its zone tabs and
- * its brand title stay fully visible, and the toggle stays the thing a click
- * lands on. The status bar's approval item names what it controls.
+ * overlay opens over the layout and must clear the titlebar toggle at every
+ * narrow width; zone tabs remain visible, and the status bar approval item names
+ * what it controls. Product identity lives in window chrome, so navigation does
+ * not add a duplicate brand row.
  */
 import fs from 'node:fs'
 import os from 'node:os'
@@ -47,8 +47,7 @@ interface OverlayGeometry {
   overlay: Box | null
   toggle: Box | null
   toggleHitsToggle: boolean
-  brandText: Box | null
-  brandHitIsBrand: boolean
+  hasDuplicateBrand: boolean
   tabs: { id: string; box: Box; label: Box | null; hitIsTab: boolean }[]
 }
 
@@ -65,14 +64,12 @@ async function measureOverlay(page: Page): Promise<OverlayGeometry> {
       return { x: r.left, y: r.top, r: r.right, b: r.bottom }
     }
 
-    // Text bounds, not the element's: a block element spans its whole row.
     const textBoxOf = (el: Element | null): Box | null => {
       if (!el) {
         return null
       }
 
       const range = document.createRange()
-
       range.selectNodeContents(el)
       const r = range.getBoundingClientRect()
 
@@ -90,8 +87,8 @@ async function measureOverlay(page: Page): Promise<OverlayGeometry> {
     }
 
     const toggleEl = document.querySelector<HTMLElement>('[data-titlebar-cluster="left"] button')
-    const brandEl = document.querySelector<HTMLElement>('[data-personal-product-nav] > div')
     const overlayEl = document.querySelector<HTMLElement>('[data-narrow-overlay]')
+    const navEl = document.querySelector<HTMLElement>('[data-personal-product-nav]')
     const tabEls = [...document.querySelectorAll<HTMLElement>('[data-narrow-overlay-tab]')]
     const toggle = boxOf(toggleEl)
 
@@ -99,8 +96,7 @@ async function measureOverlay(page: Page): Promise<OverlayGeometry> {
       overlay: boxOf(overlayEl),
       toggle,
       toggleHitsToggle: hitWithin(toggle, toggleEl),
-      brandText: textBoxOf(brandEl),
-      brandHitIsBrand: hitWithin(textBoxOf(brandEl), brandEl),
+      hasDuplicateBrand: Boolean(navEl?.querySelector(':scope > .brand-row')),
       tabs: tabEls.map(tab => {
         const label = tab.querySelector<HTMLElement>('span.truncate')
         const box = boxOf(tab)
@@ -238,8 +234,8 @@ test('the narrow sessions overlay clears the titlebar controls at every narrow w
       expect.soft(tab.hitIsTab, `tab ${tab.id} takes its own clicks at ${width}px`).toBe(true)
     }
 
-    expect.soft(intersects(geometry.brandText, geometry.toggle), `brand under the toggle at ${width}px`).toBe(false)
-    expect.soft(geometry.brandHitIsBrand, `brand takes its own hits at ${width}px`).toBe(true)
+    expect.soft(geometry.hasDuplicateBrand, `duplicate brand row at ${width}px`).toBe(false)
+    await expect(page.locator('[data-personal-product-nav] button').first()).toBeVisible()
     expect.soft(geometry.toggleHitsToggle, `toggle stays clickable at ${width}px`).toBe(true)
 
     // The status bar stays whole: its clusters must not clip any item.

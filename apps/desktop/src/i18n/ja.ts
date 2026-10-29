@@ -102,7 +102,8 @@ export const ja = defineLocale({
 
   keybinds: { keys: { space: 'スペース', escape: '取消' } },
   boot: {
-    providerRetry: (seconds, attempt, maxAttempts) => `⏳ モデルサービスを待機中 — ${seconds}秒後に再試行（${attempt}/${maxAttempts}回目）`,
+    providerRetry: (seconds, attempt, maxAttempts) =>
+      `⏳ モデルサービスを待機中 — ${seconds}秒後に再試行（${attempt}/${maxAttempts}回目）`,
     ready: 'Stardust Desktop の準備ができました',
     desktopBootFailedWithMessage: message => `デスクトップの起動に失敗しました: ${message}`,
     steps: {
@@ -313,7 +314,16 @@ export const ja = defineLocale({
       confirmationsEmpty: 'まだ確認が必要な操作はありません。',
       confirmationCommand: (command: string) => `${command} を実行`,
       confirmationTool: (tool: string) => `${tool} を使用`,
-      outcome: { approved_once: '1回許可', approved_session: 'このチャットで許可', approved_permanent: '常に許可', auto_approved: '自動で許可', denied: '拒否', blocked: 'ブロック', notify_failed: '通知できませんでした', unknown: '記録済み' },
+      outcome: {
+        approved_once: '1回許可',
+        approved_session: 'このチャットで許可',
+        approved_permanent: '常に許可',
+        auto_approved: '自動で許可',
+        denied: '拒否',
+        blocked: 'ブロック',
+        notify_failed: '通知できませんでした',
+        unknown: '記録済み'
+      },
       dayToday: '今日',
       dayYesterday: '昨日',
       loadFailed: '権限を読み込めませんでした。',
@@ -336,7 +346,7 @@ export const ja = defineLocale({
       memoryChanged: 'その内容は今変更されたため、一覧を更新しました。',
       memorySaveFailed: '保存できませんでした。もう一度お試しください。',
       memoryLoadFailed: '覚えている内容を読み込めませんでした。',
-      advancedTitle: '詳細設定',
+      advancedTitle: '詳細設定'
     },
     plugins: {
       installModal: {
@@ -1215,10 +1225,12 @@ export const ja = defineLocale({
       modelTestSuccess: 'モデルから応答がありました。',
       modelTestFailed: 'モデルリクエストに失敗しました。',
       modelTestUnsupported: 'このプロバイダールートでは推論テストを利用できません。',
-      modelTestCanceled: 'モデルテストを停止しました。リクエスト送信後の場合、プロバイダー側で処理が続くことがあります。',
+      modelTestCanceled:
+        'モデルテストを停止しました。リクエスト送信後の場合、プロバイダー側で処理が続くことがあります。',
       modelTestTimedOut: 'モデルリクエストがタイムアウトしました。',
       modelTestStopping: '中断リクエストを送信中…',
-      modelTestStoppedWaiting: 'このパネルでの待機を停止しました。サーバー側のリクエストはタイムアウトまで続く場合があります。',
+      modelTestStoppedWaiting:
+        'このパネルでの待機を停止しました。サーバー側のリクエストはタイムアウトまで続く場合があります。',
       modelTestAuthError: 'プロバイダーが認証を拒否しました。',
       modelTestRateLimitError: 'プロバイダーのレート制限に達しました。',
       modelTestNetworkError: '選択したモデルルートに接続できませんでした。',
@@ -1250,8 +1262,10 @@ export const ja = defineLocale({
         profile_describer: { label: 'プロファイル記述', hint: 'プロファイル概要の自動生成' },
         curator: { label: 'キュレーター', hint: 'スキル使用レビュー' }
       },
-      auxiliaryRunOn:
-        (count: number, names: string) => ({ before: `${count} 件の補助タスク（${names}）は `, after: ' で実行されたままです（メインのモデルではありません）。' }),
+      auxiliaryRunOn: (count: number, names: string) => ({
+        before: `${count} 件の補助タスク（${names}）は `,
+        after: ' で実行されたままです（メインのモデルではありません）。'
+      }),
       otherProviders: 'ほかのプロバイダー',
       slotProviderAria: (label: string) => `${label} プロバイダー`,
       slotModelAria: (label: string) => `${label} モデル`,
@@ -1489,11 +1503,12 @@ export const ja = defineLocale({
         enabledMessage: '新しいチャットは既定ブラウザプロファイルのスナップショットでブラウジングします。',
         disabledTitle: '実プロファイルブラウジング：オフ',
         disabledMessage: 'プロファイルのスナップショットは削除され、新しいチャットはクリーンなブラウザを使用します。',
-        failedSave: '実プロファイル設定を保存できませんでした',
+        failedSave: '実プロファイル設定を保存できませんでした'
       },
       browserHostControl: {
         label: '開いている Chrome プロファイルに接続',
-        description: '承認済みブラウザー拡張機能を通して、このチャットを開いている Chrome プロファイルに明示的にペアリングします。Chrome の Cookie はコピーしません。',
+        description:
+          '承認済みブラウザー拡張機能を通して、このチャットを開いている Chrome プロファイルに明示的にペアリングします。Chrome の Cookie はコピーしません。',
         statusLabel: '状態',
         profileLabel: 'Chrome プロファイルのディレクトリ',
         connect: 'Chrome に接続',
@@ -1502,13 +1517,13 @@ export const ja = defineLocale({
         connectedTitle: 'Chrome に接続しました',
         connectedMessage: '各操作の承認後、このチャットでペアリングした Chrome プロファイルを使用できます。',
         agentConnectingTitle: 'Chrome に接続しています',
-        agentConnectingMessage:
-          'この会話は開いている Chrome に接続し、ログイン済みのサイトを使います。',
+        agentConnectingMessage: 'この会話は開いている Chrome に接続し、ログイン済みのサイトを使います。',
         connectFailed: 'Chrome に接続できませんでした',
         disconnectFailed: 'Chrome を切断できませんでした',
         noSession: '先に Desktop チャットを開くか選択してください。',
         invalidProfile: 'Default や Profile 1 のような Chrome プロファイル名だけを入力してください。',
-        warning: '先に Chrome に Stardust ブラウザー拡張機能をインストールして有効にしてください。接続はチャット単位で、切断すると停止します。',
+        warning:
+          '先に Chrome に Stardust ブラウザー拡張機能をインストールして有効にしてください。接続はチャット単位で、切断すると停止します。',
         status: {
           inactive: '未接続',
           starting: '接続中…',
@@ -1523,11 +1538,13 @@ export const ja = defineLocale({
       notSupported: (platform: string) => `このプラットフォームでは Computer Use を利用できません（${platform}）。`,
       installBackend: 'このマシンを操作するには、下の cua-driver バックエンドをインストールしてください。',
       grantHint: ' 続けて、ここで「アクセシビリティ」と「画面収録」を許可してください。',
-      grantIdentity: '権限は Stardust ではなく CuaDriver 自身の識別子（com.trycua.driver）に付与されるため、ダイアログには Mac を操作しているプロセスとして表示されます。',
+      grantIdentity:
+        '権限は Stardust ではなく CuaDriver 自身の識別子（com.trycua.driver）に付与されるため、ダイアログには Mac を操作しているプロセスとして表示されます。',
       recheck: '再確認',
       ready: 'Computer Use の準備ができました。エージェントにアプリを撮影させ、操作させてください。',
       platformNoteLinux: 'X11/XWayland のアクセシビリティ機能でデスクトップを操作します。権限の確認は不要です。',
-      platformNoteWin32: '初回実行時に、cua-driver UIAccess ワーカーについて Windows SmartScreen の確認が表示されることがあります。許可してください。',
+      platformNoteWin32:
+        '初回実行時に、cua-driver UIAccess ワーカーについて Windows SmartScreen の確認が表示されることがあります。許可してください。',
       granted: '許可済み',
       notGranted: '未許可',
       unknownState: '不明',
@@ -1551,8 +1568,10 @@ export const ja = defineLocale({
       notSetLabel: (label: string) => `${label} 未設定`,
       fullConfig: '詳細設定…',
       modalTitle: (label: string) => `${label} — 詳細設定`,
-      modalDescription:
-        (label: string) => ({ before: `${label} のすべての設定は「`, after: '」プロファイル用です。空欄の項目は、解決されたホストまたは組み込みの既定値を使います。' }),
+      modalDescription: (label: string) => ({
+        before: `${label} のすべての設定は「`,
+        after: '」プロファイル用です。空欄の項目は、解決されたホストまたは組み込みの既定値を使います。'
+      }),
       docsLink: (label: string) => `${label} の設定リファレンス`,
       saveChanges: '変更を保存',
       keepCurrentValue: '空欄のままだと現在の値を保持します',
@@ -1572,7 +1591,8 @@ export const ja = defineLocale({
     poolLimits: {
       warmBotBackendsDesc:
         'すぐに切り替えられるよう起動したままにしておくボットバックエンドの数です。多いほど切り替えが速くなりますが、メモリを多く使います（バックエンド 1 つあたり約 60MB）。すぐに適用されます。',
-      backendIdleTimeoutDesc: '使われていないボットバックエンドを停止するまで待機させておく時間です。数分おきに使うボットで毎回コールドスタートにならないよう、この値を大きくしてください。'
+      backendIdleTimeoutDesc:
+        '使われていないボットバックエンドを停止するまで待機させておく時間です。数分おきに使うボットで毎回コールドスタートにならないよう、この値を大きくしてください。'
     }
   },
 
@@ -2081,6 +2101,8 @@ export const ja = defineLocale({
     switchToConnection: name => `${name} に切り替え`,
     switchConnectionFailed: name => `${name} に接続できませんでした`,
     manageProfiles: 'プロファイルを管理…',
+    connectGateway: 'ゲートウェイを管理…',
+    profileActions: 'プロファイル操作',
     remoteOverride: {
       menuItem: 'リモートホストに接続…',
       badge: (host: string) => `${host} で実行中`,
@@ -2136,6 +2158,7 @@ export const ja = defineLocale({
     modelLabel: 'モデル',
     skillsLabel: 'スキル',
     notSet: '未設定',
+    roleDescription: '役割の説明',
     soulDesc: 'このプロファイルに組み込まれたシステムプロンプトとペルソナの指示。',
     soulOptional: '省略可能',
     soulPlaceholder: mode =>
@@ -2204,7 +2227,7 @@ export const ja = defineLocale({
       errorTitle: 'エラーの内容',
       openJob: 'このタスクを開く',
       jobRemoved: 'このタスクは削除されました',
-      unknownJob: '定期タスク',
+      unknownJob: '定期タスク'
     },
     close: 'Cron を閉じる',
     title: 'スケジュール済みジョブ',
@@ -2355,7 +2378,8 @@ export const ja = defineLocale({
       folderPickerTitle: '監視するフォルダーを選択',
       folderRequired: '監視するフォルダーを選択してください。',
       folderNotAbsolute: '完全なパスを入力してください（例 D:\\Downloads）。',
-      folderRestriction: 'システムフォルダー（Windows、Program Files、ProgramData、/usr、/etc）とドライブのルートは監視できません。',
+      folderRestriction:
+        'システムフォルダー（Windows、Program Files、ProgramData、/usr、/etc）とドライブのルートは監視できません。',
       folderHint: '新しいファイルの名前と情報だけを読み、ファイルの中身は開きません。',
       patternLabel: 'ファイル名のパターン',
       patternPlaceholder: '* または *.pdf',
@@ -2369,15 +2393,24 @@ export const ja = defineLocale({
     },
     blueprints: {
       catalog: {
-        'startup-briefing': { title: '起動時のブリーフィング', description: 'Stardust が起動するたびに、今日のタスクと未読メッセージを短くまとめます。' },
+        'startup-briefing': {
+          title: '起動時のブリーフィング',
+          description: 'Stardust が起動するたびに、今日のタスクと未読メッセージを短くまとめます。'
+        },
         'new-pdf-summary': {
           title: '新しい PDF の要約',
           description: 'フォルダーに新しい PDF が現れたら、ファイル名と情報だけをもとに 1 ページ目の要約を書きます。',
-          fields: { folder: { label: '監視するフォルダー', help: 'このコンピューター上のフォルダーを選びます。新しい PDF が入ると要約が始まります。' } }
+          fields: {
+            folder: {
+              label: '監視するフォルダー',
+              help: 'このコンピューター上のフォルダーを選びます。新しい PDF が入ると要約が始まります。'
+            }
+          }
         },
         'downloads-report': {
           title: '新しいダウンロードの報告',
-          description: 'ダウンロードフォルダー（または選んだフォルダー）に新しいファイルが現れたら、届いたものを短く報告します。読み取りのみ：移動・名前変更・削除はしません。',
+          description:
+            'ダウンロードフォルダー（または選んだフォルダー）に新しいファイルが現れたら、届いたものを短く報告します。読み取りのみ：移動・名前変更・削除はしません。',
           fields: { folder: { label: '監視するフォルダー', help: '既定はダウンロードフォルダーです。' } }
         }
       },
@@ -2528,7 +2561,7 @@ export const ja = defineLocale({
       primaryBadge: 'メイン',
       removeFolder: '削除',
       create: '作成',
-      menu: 'アクション',
+      menu: 'プロジェクト操作',
       menuRename: '名前を変更…',
       menuAppearance: '外観',
       noColor: '色なし',
@@ -3016,7 +3049,8 @@ export const ja = defineLocale({
     done: '完了',
     applyingBody:
       'Stardust アップデーターが独自のウィンドウで引き継ぎ、完了後に自動的に Stardust を再度開きます。更新中はご自分で Stardust を開き直さないでください。',
-    applyingBodyBackend: 'リモートバックエンドが更新を適用して再起動します。復帰すると Stardust が自動的に再接続します。',
+    applyingBodyBackend:
+      'リモートバックエンドが更新を適用して再起動します。復帰すると Stardust が自動的に再接続します。',
     applyingClose: 'このウィンドウは更新中に閉じ、その後 Stardust が自動的に再度開きます。',
     errorTitle: '更新が完了しませんでした',
     errorBody: 'ご安心ください。何も失われていません。今すぐ再試行できます。',
@@ -3082,7 +3116,8 @@ export const ja = defineLocale({
     connectExistingDesc:
       'セッショントークンまたはブラウザーサインインでリモートバックエンドを使用します。ローカルインストールは開始されません。',
     installLocalTitle: 'Stardust をローカルにインストール',
-    installLocalDesc: 'Stardust をダウンロードし、Python 環境を作成して、このコンピューターでバックエンドを実行します。',
+    installLocalDesc:
+      'Stardust をダウンロードし、Python 環境を作成して、このコンピューターでバックエンドを実行します。',
     localStartUnavailable:
       'ローカルインストールを開始できません。Stardust Desktop を再起動して、もう一度お試しください。',
     remoteSetupTitle: '既存の Stardust に接続',
@@ -3393,7 +3428,7 @@ export const ja = defineLocale({
       switchModel: 'モデルを切り替え',
       openModelPicker: 'モデルピッカーを開く',
       modelPinned: '手動で固定中 — 新しいチャットは設定のデフォルトではなくこのモデルを使用します',
-      modelTitle: (provider, model) => `モデル、${provider}: ${model}`,
+      modelTitle: (provider, model) => `モデル、${provider}: ${model}`
     },
     tiles: {
       sessionOpenFailed: 'このチャットを開けませんでした',
@@ -3708,7 +3743,8 @@ export const ja = defineLocale({
         },
         connection_error: {
           title: 'AIサービスに接続できません',
-          body: provider => `${provider} に接続できません。サービスのアドレス、起動状態、ネットワークやプロキシを確認してから再試行してください。`
+          body: provider =>
+            `${provider} に接続できません。サービスのアドレス、起動状態、ネットワークやプロキシを確認してから再試行してください。`
         },
         timeout: {
           title: '返信がタイムアウトしました',
@@ -4059,7 +4095,8 @@ export const ja = defineLocale({
       }
     },
     media: {
-      fetchFailed: (name: string) => `ゲートウェイから ${name} を取得できませんでした（見つからない、読み取れない、またはサイズが大きすぎます）。`,
+      fetchFailed: (name: string) =>
+        `ゲートウェイから ${name} を取得できませんでした（見つからない、読み取れない、またはサイズが大きすぎます）。`,
       openMediaFile: (kind: 'audio' | 'video') => (kind === 'audio' ? '音声ファイルを開く' : '動画ファイルを開く'),
       couldntLoad: (name: string) => `${name} を読み込めませんでした。`,
       openImage: '画像を開く',
@@ -4165,6 +4202,8 @@ export const ja = defineLocale({
     deleteFailed: '削除に失敗しました',
     archived: 'アーカイブしました',
     archiveFailed: 'アーカイブに失敗しました',
+    cwdChangePending: '選択したチャットを開いています。読み込みが完了してから、もう一度プロジェクトを選択してください。',
+    cwdChangeBusy: 'チャットは処理中です。現在のターンが終わってから、もう一度プロジェクトを選択してください。',
     cwdChangeFailed: '作業ディレクトリの変更に失敗しました',
     cwdStagedTitle: '作業ディレクトリがステージングされました',
     cwdStagedMessage:

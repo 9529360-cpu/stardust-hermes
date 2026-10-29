@@ -1771,6 +1771,8 @@ export const ar = defineLocale({
       collisionWarning: (label: string) =>
         `توجد بوابة باسم «${label}» في الإعدادات بالفعل. اتصال هذا الملف الشخصي منفصل ولن يغيّرها.`,
       confirmTitle: 'ربط هذا الملف الشخصي بمضيف بعيد؟',
+    connectGateway: 'إدارة البوابات…',
+    profileActions: 'إجراءات الملف الشخصي',
       confirmNote: (profile: string, host: string) =>
         `ستعمل المحادثات الجديدة في ${profile} على ${host}. سيقوم ذلك الجهاز بتنفيذ الأوامر وقراءة الملفات هناك، وليس هنا. اتصل فقط بمضيف تثق به.`,
       confirmBack: 'رجوع',
@@ -2175,7 +2177,7 @@ export const ar = defineLocale({
       primaryBadge: 'أساسي',
       removeFolder: 'إزالة',
       create: 'إنشاء',
-      menu: 'إجراءات',
+      menu: 'إجراءات المشروع',
       menuRename: 'إعادة تسمية…',
       menuAppearance: 'المظهر',
       noColor: 'بلا لون',
