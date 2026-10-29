@@ -18,6 +18,7 @@ import {
   type SidebarListRow,
   toSessionRows
 } from '@/lib/session-date-groups'
+import { isSelectedSessionRow } from '@/lib/session-selection'
 import { sessionBucketLabel } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import {
@@ -109,6 +110,7 @@ interface SidebarSessionsSectionProps {
   onToggle: () => void
   sessions: SessionInfo[]
   activeSessionId: null | string
+  activeIdentityKey?: null | string
   onResumeSession: (sessionId: string, session?: SessionInfo) => void
   onDeleteSession: (sessionId: string) => void
   onArchiveSession: (sessionId: string) => void
@@ -189,6 +191,7 @@ export function SidebarSessionsSection({
   onToggle,
   sessions,
   activeSessionId,
+  activeIdentityKey: providedActiveIdentityKey,
   onResumeSession,
   onDeleteSession,
   onArchiveSession,
@@ -251,6 +254,8 @@ export function SidebarSessionsSection({
   const showEmptyState =
     forceEmptyState || (!hasGroupedSessions && !hasProjectOverview && !hasProjectContent && sessions.length === 0)
 
+  const activeIdentityKey = providedActiveIdentityKey
+
   // The flat recents/pinned list is the only place sessions reorder by hand;
   // grouped/tree views always sort by creation date and never drag.
   const sessionsDraggable = sortable && !!onReorderSessions
@@ -269,7 +274,7 @@ export function SidebarSessionsSection({
         branchStem,
         card,
         isPinned: pinned,
-        isSelected: session.id === activeSessionId,
+        isSelected: isSelectedSessionRow(session, activeSessionId, activeIdentityKey),
         onArchive: () => onArchiveSession(session.id),
         onBranch: onBranchSession ? () => onBranchSession(session.id, session.profile) : undefined,
         onDelete: () => onDeleteSession(session.id),
@@ -292,6 +297,7 @@ export function SidebarSessionsSection({
       )
     },
     [
+      activeIdentityKey,
       activeSessionId,
       card,
       onArchiveSession,
@@ -567,6 +573,7 @@ export function SidebarSessionsSection({
   } else if (flatVirtualized) {
     const virtual = (
       <VirtualSessionList
+        activeIdentityKey={activeIdentityKey}
         activeSessionId={activeSessionId}
         card={card}
         className={contentClassName}

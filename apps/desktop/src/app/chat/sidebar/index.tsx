@@ -12,8 +12,11 @@ import { Tip } from '@/components/ui/tooltip'
 import type { SessionInfo } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { isCanonicalBotChatSession } from '@/lib/session-title'
+import { deduplicateSessionRows, sessionRowsMatchIdentity } from '@/lib/session-identity'
+import { selectedSessionIdentityKey } from '@/lib/session-selection'
 import { cn } from '@/lib/utils'
 import { $activeConnectionId } from '@/store/connections'
+import { hasRegistryTopology } from '@/store/connection-registry-state'
 import {
   $dismissedAutoProjectIds,
   $panesFlipped,
@@ -83,6 +86,7 @@ import {
   $messagingSessions,
   $sessionProfilesTruncated,
   $sessions,
+  $sessionSelectionOwner,
   $sessionsLoading,
   $unreadFinishedSessionIds,
   markAllSessionsRead,
@@ -176,6 +180,7 @@ interface ChatSidebarProps extends React.ComponentProps<typeof Sidebar> {
   onArchiveSession: (sessionId: string) => void
   onBranchSession: (sessionId: string) => void
   onNewSessionInWorkspace: (path: null | string) => void
+  onSelectProjectWorkspace: (cwd: string) => Promise<boolean> | boolean | void
   /** Create a brand-new session and open it as a tile. `dir` is the dock edge
    *  (or `center` to stack a tab); `anchor`/`before` optionally pin it to a
    *  specific zone / tab-strip slot, and `cwd` pins it to a project's path —
@@ -197,6 +202,7 @@ export function ChatSidebar({
   onBranchSession,
   onNewSessionInWorkspace,
   onNewSessionSplit,
+  onSelectProjectWorkspace,
   projectChatsInNav = false
 }: ChatSidebarProps) {
   const { t } = useI18n()
@@ -229,16 +235,58 @@ export function ChatSidebar({
   // tab, else the main selection — so it stays 1:1 with whatever tab is active.
   const selectedSessionId = useStore($focusedStoredSessionId)
   const focusedSessionIsTile = useStore($focusedSessionIsTile)
+  const requestedSelectionOwner = useStore($sessionSelectionOwner)
   const currentView = focusedSessionIsTile ? 'chat' : routeView
   const sessions = useStore($sessions)
   const cronSessions = useStore($cronSessions)
   const messagingSessions = useStore($messagingSessions)
   const sessionsLoading = useStore($sessionsLoading)
+  const profiles = useStore($profiles)
+  const activeConnectionId = useStore($activeConnectionId)
+  const selectionRows = useMemo(
+    () => [...sessions, ...cronSessions, ...messagingSessions],
+    [cronSessions, messagingSessions, sessions]
+  )
+  const selectedRows = useMemo(
+    () =>
+      selectedSessionId
+        ? selectionRows.filter(session =>
+            sessionRowsMatchIdentity(session, { ...session, id: selectedSessionId })
+          )
+        : [],
+    [selectedSessionId, selectionRows]
+  )
+  const sessionSelectionOwnerIsCurrent = requestedSelectionOwner?.sessionId === selectedSessionId
+  const inferredSelection = useMemo(() => {
+    const owners = new Map(
+      selectedRows.map(session => [
+        JSON.stringify([session.connection_id?.trim() || '', normalizeProfileKey(session.profile)]),
+        session.connection_id?.trim()
+          ? { connectionId: session.connection_id.trim(), profile: normalizeProfileKey(session.profile) }
+          : normalizeProfileKey(session.profile)
+      ])
+    )
+
+    if (owners.size === 1) {
+      return [...owners.values()][0]
+    }
+
+    if (owners.size === 0 && !hasRegistryTopology()) {
+      return normalizeProfileKey($profileScope.get())
+    }
+
+    return null
+  }, [selectedRows])
+  const selectionOwner = sessionSelectionOwnerIsCurrent
+    ? requestedSelectionOwner.owner
+    : inferredSelection
+  const activeIdentityKey = useMemo(
+    () => selectedSessionIdentityKey(selectionRows, selectedSessionId, selectionOwner, Boolean(sessionSelectionOwnerIsCurrent)),
+    [selectedSessionId, selectionOwner, selectionRows, sessionSelectionOwnerIsCurrent]
+  )
   const sessionProfilesTruncated = useStore($sessionProfilesTruncated)
   const unreadCount = useStore($unreadFinishedSessionIds).length
-  const profiles = useStore($profiles)
   const profileScope = useStore($profileScope)
-  const activeConnectionId = useStore($activeConnectionId)
 
   // Toggle the persisted read-state watermark from a row menu. The row's own
   // `unread` prop mirrors what the dot paints; flip it and let the backend
@@ -379,23 +427,10 @@ export function ChatSidebar({
   // to render in separate platform sections; fold them into the same recency
   // stream instead. Deduplicate both live ids and lineage roots so a conversation
   // present in both backend slices still paints exactly once.
-  const sortedConversationSessions = useMemo(() => {
-    const seen = new Set<string>()
-    const rows: SessionInfo[] = []
-
-    for (const session of [...visibleSessions, ...visibleMessagingSessions]) {
-      const identities = [session.id, session._lineage_root_id].filter((id): id is string => Boolean(id))
-
-      if (identities.some(id => seen.has(id))) {
-        continue
-      }
-
-      identities.forEach(id => seen.add(id))
-      rows.push(session)
-    }
-
-    return rows.sort((a, b) => sessionTime(b) - sessionTime(a))
-  }, [visibleMessagingSessions, visibleSessions])
+  const sortedConversationSessions = useMemo(
+    () => deduplicateSessionRows([...visibleSessions, ...visibleMessagingSessions]).sort((a, b) => sessionTime(b) - sessionTime(a)),
+    [visibleMessagingSessions, visibleSessions]
+  )
 
   // Index sessions by every id a pin might be stored under — recents, cron,
   // AND messaging, since all three can be pinned (see session-index.ts).
@@ -1141,6 +1176,7 @@ export function ChatSidebar({
               line is chrome, not content (pin from a row's menu or with Shift-click). */}
           {pinnedSessions.length > 0 && (
             <SidebarSessionsSection
+              activeIdentityKey={activeIdentityKey}
               activeSessionId={activeSidebarSessionId}
               contentClassName="flex flex-col gap-px rounded-lg pb-2 pt-1"
               dndSensors={dndSensors}
@@ -1165,6 +1201,7 @@ export function ChatSidebar({
 
           {inProject && projectLoadFailed && <SidebarLoadErrorState onRetry={retryProject} />}
           <SidebarSessionsSection
+            activeIdentityKey={activeIdentityKey}
             activeProjectId={activeProjectId}
             activeSessionId={activeSidebarSessionId}
             // Inbox style is a render variant, not a grouping — it rides

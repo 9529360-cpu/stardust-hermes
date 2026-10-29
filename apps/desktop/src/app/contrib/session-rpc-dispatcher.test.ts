@@ -44,7 +44,7 @@ const { _resetSessionOwnerHintsForTests, setCronSessions, setMessagingSessions, 
   await import('@/store/session')
 
 const { isSessionOwnerResolutionError } = await import('@/store/session-owner-resolution')
-const { $sessionTiles } = await import('@/store/session-states')
+const { $sessionTiles, recordSessionEventScope } = await import('@/store/session-states')
 const { makeSessionInfo } = await import('@/test/session-info')
 
 function dispatcher(
@@ -147,6 +147,29 @@ describe('createSessionRpcDispatcher: exact owner rungs', () => {
     })
     expect(ambientRequest).not.toHaveBeenCalled()
     expect(probe.resolveSessionOwner).not.toHaveBeenCalled()
+  })
+
+  it('routes a runtime CWD write by its recorded owner when a twin row sorts first', async () => {
+    const runtimeSessionId = 'runtime-default'
+    const storedSessionId = 'shared-session'
+
+    setSessions([
+      makeSessionInfo({ connection_id: 'research-host', id: storedSessionId, profile: 'research' }),
+      makeSessionInfo({ connection_id: 'local', id: storedSessionId, profile: 'default' })
+    ])
+    recordSessionEventScope({ connectionId: 'local', profile: 'default', session_id: runtimeSessionId })
+
+    const { request } = dispatcher()
+
+    await expect(request('session.cwd.set', { session_id: runtimeSessionId, cwd: 'D:/Project B' })).resolves.toEqual({
+      routed: true
+    })
+    expect(gatewayMocks.requestGatewayForAgent).toHaveBeenLastCalledWith(
+      'local',
+      'default',
+      'session.cwd.set',
+      { session_id: runtimeSessionId, cwd: 'D:/Project B' }
+    )
   })
 
   it('prefers the exact hint over an untagged row profile, and the probe result over nothing', async () => {

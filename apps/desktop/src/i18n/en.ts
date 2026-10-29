@@ -4909,6 +4909,8 @@ export const en: Translations = {
     deleteFailed: 'Delete failed',
     archived: 'Archived',
     archiveFailed: 'Archive failed',
+    cwdChangePending: 'The selected chat is still opening. Wait for it to finish, then choose the project again.',
+    cwdChangeBusy: 'The chat is working. Wait for the current turn to finish, then choose the project again.',
     cwdChangeFailed: 'Working directory change failed',
     cwdStagedTitle: 'Working directory staged',
     cwdStagedMessage: 'Restart the desktop backend to apply cwd changes to this active chat.',

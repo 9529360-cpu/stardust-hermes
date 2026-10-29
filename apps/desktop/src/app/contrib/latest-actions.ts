@@ -58,7 +58,9 @@ export function latestChatActions(actions: ChatActions): ChatActions {
   }
 }
 
-export function latestSidebarActions(actions: SidebarActions): SidebarActions {
+export function latestSidebarActions(actions: SidebarActions): SidebarActions & {
+  onSelectProjectWorkspace: NonNullable<SidebarActions['onSelectProjectWorkspace']>
+} {
   return {
     onArchiveSession: (...args) => actions.onArchiveSession(...args),
     onBranchSession: (...args) => actions.onBranchSession(...args),
@@ -68,6 +70,6 @@ export function latestSidebarActions(actions: SidebarActions): SidebarActions {
     onNewSessionInWorkspace: (...args) => actions.onNewSessionInWorkspace(...args),
     onNewSessionSplit: (...args) => actions.onNewSessionSplit(...args),
     onResumeSession: (...args) => actions.onResumeSession(...args),
-    onSelectProjectWorkspace: latestOptional(() => actions.onSelectProjectWorkspace)
+    onSelectProjectWorkspace: (...args) => actions.onSelectProjectWorkspace(...args)
   }
 }

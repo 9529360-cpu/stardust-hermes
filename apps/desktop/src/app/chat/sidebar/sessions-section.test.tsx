@@ -1,8 +1,10 @@
-import { cleanup, render } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import type * as React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { SessionInfo } from '@/hermes'
+import { selectedSessionIdentityKey } from '@/lib/session-selection'
+import { makeSessionInfo } from '@/test/session-info'
 
 import { SidebarSessionsSection, VIRTUALIZE_THRESHOLD } from './sessions-section'
 import type { VirtualSessionListProps } from './virtual-session-list'
@@ -37,8 +39,10 @@ vi.mock('./virtual-session-list', () => ({
 }))
 
 vi.mock('./session-row', () => ({
-  SidebarSessionRow: ({ session }: { session: SessionInfo }) => (
-    <div data-testid={`session-row-${session.id}`}>{session.id}</div>
+  SidebarSessionRow: ({ isSelected, session }: { isSelected: boolean; session: SessionInfo }) => (
+    <div className={`group row-hover ${isSelected ? 'bg-(--ui-row-active-background)' : ''}`} data-testid={`session-row-${session.id}`}>
+      {session.title ?? session.id}
+    </div>
   )
 }))
 
@@ -58,6 +62,45 @@ function generateSessions(count: number): SessionInfo[] {
 }
 
 const noop = () => {}
+
+function renderSessions(sessions: SessionInfo[], activeSessionId: string, activeIdentityKey: string | null) {
+  return render(
+    <SidebarSessionsSection
+      activeIdentityKey={activeIdentityKey}
+      activeSessionId={activeSessionId}
+      emptyState={null}
+      label="Chats"
+      onArchiveSession={noop}
+      onDeleteSession={noop}
+      onResumeSession={noop}
+      onToggle={noop}
+      onTogglePin={noop}
+      onToggleUnread={noop}
+      open
+      pinned={false}
+      sessions={sessions}
+    />
+  )
+}
+
+describe('SidebarSessionsSection owner-aware selection', () => {
+  it('highlights only the selected owner when two profiles share one stored id', () => {
+    const research = makeSessionInfo({ id: 'shared', profile: 'research', title: 'Research twin' })
+    const defaultProfile = makeSessionInfo({ id: 'shared', profile: 'default', title: 'Default twin' })
+    const identity = selectedSessionIdentityKey([research, defaultProfile], 'shared', {
+      connectionId: 'local',
+      profile: 'default'
+    }, true)
+
+    renderSessions([research, defaultProfile], 'shared', identity)
+
+    const researchRow = screen.getByText('Research twin').closest('.group.row-hover')
+    const defaultRow = screen.getByText('Default twin').closest('.group.row-hover')
+
+    expect(researchRow?.className.includes('bg-(--ui-row-active-background)')).toBe(false)
+    expect(defaultRow?.className.includes('bg-(--ui-row-active-background)')).toBe(true)
+  })
+})
 
 describe('SidebarSessionsSection memoization & virtualizer stability', () => {
   it('memoizes flatRows and passes the exact same rows array reference across parent re-renders', () => {

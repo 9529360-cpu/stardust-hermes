@@ -1045,6 +1045,10 @@ export function openTileGatewayScopes(): Set<string> {
  * Returns undefined when no owner is known — the caller fails closed
  * (assertSessionOwnerResolved), never falls to "active".
  */
+export function knownOwnerForRuntimeId(runtimeId: null | string | undefined): SessionOwnerScope {
+  return runtimeId ? sessionOwnerByRuntimeId.get(runtimeId) : undefined
+}
+
 export function knownOwnerForSession(sessionId: null | string | undefined): SessionOwnerScope {
   if (!sessionId) {
     return undefined

@@ -912,8 +912,36 @@ export interface SessionResumeRequest {
   sequence: number
   sessionId: string
 }
+
 let sessionResumeRequestSequence = 0
 export const $sessionResumeRequest = atom<SessionResumeRequest | null>(null)
+
+/** Owner captured synchronously by the latest explicit session selection. */
+export interface SessionSelectionOwner {
+  owner: SessionOwnerRoute | string | null
+  sessionId: string
+}
+
+export const $sessionSelectionOwner = atom<SessionSelectionOwner | null>(null)
+
+export function setSessionSelectionOwner(sessionId: string, owner: SessionOwnerRoute | string | null): void {
+  const id = sessionId.trim()
+
+  $sessionSelectionOwner.set(
+    id
+      ? { owner: owner ? (typeof owner === 'string' ? owner : { ...owner }) : null, sessionId: id }
+      : null
+  )
+}
+
+$selectedStoredSessionId.listen(sessionId => {
+  const selectionOwner = $sessionSelectionOwner.get()
+
+  if (selectionOwner && selectionOwner.sessionId !== sessionId) {
+    $sessionSelectionOwner.set(null)
+  }
+})
+
 // ── Exact session owner hints ───────────────────────────────────────────────
 // The (connectionId, profile[, targetProfile, mode]) route a session was
 // created / resumed / opened on, keyed by stored id. Bounded LRU and
@@ -1347,6 +1375,12 @@ export const requestSessionResume = (sessionId: string, ownerRoute?: SessionOwne
     forgetSessionOwnerHintsForSession(id)
   }
 
+  const selectionOwner: SessionOwnerRoute | string | null = ownerRoute
+    ? { ...ownerRoute }
+    : selectedProfile?.trim()
+      ? sidebarProfileKey({ profile: selectedProfile })
+      : null
+  $sessionSelectionOwner.set({ owner: selectionOwner, sessionId: id })
   $sessionResumeRequest.set({
     ...(ownerRoute ? { ownerRoute: { ...ownerRoute } } : {}),
     ...(!ownerRoute && selectedProfile?.trim() ? { selectedProfile: selectedProfile.trim() } : {}),

@@ -32,6 +32,16 @@ describe('flattenSessionsWithBranches', () => {
     ])
   })
 
+  it('keeps same-id sessions from different owners as separate rows', () => {
+    const research = session('shared', { connection_id: 'research-host', profile: 'research', title: 'Research twin' })
+    const defaultProfile = session('shared', { connection_id: 'local', profile: 'default', title: 'Default twin' })
+
+    expect(flattenSessionsWithBranches([research, defaultProfile]).map(entry => entry.session)).toEqual([
+      research,
+      defaultProfile
+    ])
+  })
+
   it('keeps orphan branches at the top level when the parent is missing', () => {
     const branch = session('branch', { parent_session_id: 'missing' })
 
