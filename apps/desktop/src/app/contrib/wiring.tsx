@@ -66,6 +66,7 @@ import {
 } from '@/store/profile'
 import { $newProjectSessionRequest, $startWorkSessionRequest, followActiveSessionCwd } from '@/store/projects'
 import { $backendRestartRequest, $routeRequest } from '@/store/recovery-requests'
+import type { SessionOwnerRoute } from '@/store/session-request-router'
 import {
   $activeSessionId,
   $connection,
@@ -79,9 +80,9 @@ import {
   $selectedStoredSessionId,
   $sessionResumeRequest,
   $sessions,
-  forgetSessionOwnerHintsForSession,
   requestSessionResume,
   sessionMatchesStoredId,
+  setSessionSelectionOwner,
   sessionOwnerRouteFromRow,
   sessionPinId,
   setAwaitingResponse,
@@ -1186,11 +1187,16 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     onSelectProjectWorkspace: selectProjectWorkspace,
     onResumeSession: (sessionId, session) => {
       const ownerRoute = sessionOwnerRouteFromRow(session)
+      const profile = session?.profile?.trim()
+      const selectionOwner: SessionOwnerRoute | string | null = ownerRoute ?? (profile ? normalizeProfileKey(profile) : null)
+
+      setSessionSelectionOwner(sessionId, selectionOwner)
 
       if (ownerRoute) {
         requestSessionResume(sessionId, ownerRoute)
+      } else if (profile) {
+        requestSessionResume(sessionId, undefined, profile)
       } else {
-        forgetSessionOwnerHintsForSession(sessionId)
         requestSessionResume(sessionId)
       }
 

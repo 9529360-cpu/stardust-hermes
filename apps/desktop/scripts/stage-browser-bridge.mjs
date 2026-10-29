@@ -21,7 +21,10 @@ const here = dirname(fileURLToPath(import.meta.url))
 const projectRoot = resolve(here, '..')
 const bridgeSource = resolve(projectRoot, '../../experiments/playwright-mcp-host-bridge')
 
-export const BRIDGE_STAGE_DIR = resolve(projectRoot, 'dist/browser-bridge')
+export const BRIDGE_STAGE_DIR = resolve(
+  process.env.STARDUST_DESKTOP_DIST_DIR || resolve(projectRoot, 'dist'),
+  'browser-bridge'
+)
 
 /** How to run npm: the npm CLI script this build runs under (no shell needed), else `npm` from PATH. */
 function npmInvocation(args) {

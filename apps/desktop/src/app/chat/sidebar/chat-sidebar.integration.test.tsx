@@ -8,8 +8,9 @@ import { $layoutTree, noteActiveTreeGroup } from '@/components/pane-shell/tree/s
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { registry } from '@/contrib/registry'
 import { $pinnedSessionIds } from '@/store/layout'
+import { $showAllProfiles } from '@/store/profile'
 import { $projects } from '@/store/projects'
-import { $selectedStoredSessionId, $sessions, $sessionsLoading } from '@/store/session'
+import { $selectedStoredSessionId, $sessions, $sessionSelectionOwner, $sessionsLoading } from '@/store/session'
 import { $removedSessionIds } from '@/store/session-removal'
 import { makeSessionInfo } from '@/test/session-info'
 
@@ -37,6 +38,7 @@ const renderSidebar = (pathname: string, currentView: AppView, projectChatsInNav
           onNewSessionInWorkspace={noop}
           onNewSessionSplit={noop}
           onResumeSession={noop}
+          onSelectProjectWorkspace={noop}
           projectChatsInNav={projectChatsInNav}
         />
       </SidebarProvider>
@@ -62,6 +64,8 @@ describe('ChatSidebar compact conversation surface', () => {
       { area: SIDEBAR_NAV_AREA, id: 'kanban-nav', data: { codicon: 'project', label: 'Kanban', path: '/kanban' } }
     ])
     $selectedStoredSessionId.set('tile-one')
+    $sessionSelectionOwner.set(null)
+    $showAllProfiles.set(false)
     $sessions.set(sessionRows)
     $projects.set([])
     $removedSessionIds.set(new Set())
@@ -79,6 +83,8 @@ describe('ChatSidebar compact conversation surface', () => {
     cleanup()
     disposeContributions()
     $selectedStoredSessionId.set(null)
+    $sessionSelectionOwner.set(null)
+    $showAllProfiles.set(false)
     $sessions.set([])
     $projects.set([])
     $sessionsLoading.set(true)

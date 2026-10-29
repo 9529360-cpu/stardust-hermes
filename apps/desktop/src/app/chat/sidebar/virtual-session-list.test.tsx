@@ -2,7 +2,9 @@ import { cleanup, render } from '@testing-library/react'
 import type * as React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import type { SessionInfo } from '@/hermes'
 import type { SidebarListRow } from '@/lib/session-date-groups'
+import { sessionIdentityKey } from '@/lib/session-identity'
 
 import { VirtualSessionList } from './virtual-session-list'
 

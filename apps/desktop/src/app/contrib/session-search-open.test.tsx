@@ -18,6 +18,7 @@ import {
   $resumeFailedSessionId,
   $selectedStoredSessionId,
   $sessionResumeRequest,
+  $sessionSelectionOwner,
   $sessions,
   _resetSessionOwnerHintsForTests,
   setConnection,
@@ -170,6 +171,7 @@ beforeEach(() => {
   $selectedStoredSessionId.set(SESSION.id)
   $activeSessionId.set(null)
   $sessionResumeRequest.set(null)
+  $sessionSelectionOwner.set(null)
   $resumeFailedSessionId.set(null)
   $sessionTiles.set([])
   setMessages([])
@@ -206,6 +208,7 @@ afterEach(() => {
   $sessions.set([])
   $messages.set([])
   $sessionResumeRequest.set(null)
+  $sessionSelectionOwner.set(null)
   $resumeFailedSessionId.set(null)
   $selectedStoredSessionId.set(null)
   $activeSessionId.set(null)
@@ -215,6 +218,15 @@ afterEach(() => {
 })
 
 describe('search result opens through the row owner', () => {
+  it('captures the clicked search row owner for sidebar highlighting', () => {
+    openSessionSearchResult(SESSION, () => {})
+
+    expect($sessionSelectionOwner.get()).toMatchObject({
+      owner: { connectionId: 'local', profile: 'work' },
+      sessionId: SESSION.id
+    })
+  })
+
   it.each([
     ['exact', 'default-first'],
     ['exact', 'work-first'],

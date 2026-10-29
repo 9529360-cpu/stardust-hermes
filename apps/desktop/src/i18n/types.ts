@@ -4248,6 +4248,8 @@ export interface Translations {
     deleteFailed: string
     archived: string
     archiveFailed: string
+    cwdChangePending: string
+    cwdChangeBusy: string
     cwdChangeFailed: string
     cwdStagedTitle: string
     cwdStagedMessage: string

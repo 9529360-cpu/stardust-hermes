@@ -6,8 +6,11 @@ import {
   $sessionResumeRequest,
   forgetSessionOwnerHintsForSession,
   requestSessionResume,
-  sessionOwnerRouteFromRow
+  sessionOwnerRouteFromRow,
+  setSessionSelectionOwner
 } from '@/store/session'
+
+import { normalizeProfileKey } from '@/store/profile'
 
 import type { OpenSessionNavigate } from '../open-session'
 import { sessionRoute } from '../routes'
@@ -36,10 +39,15 @@ export function openSessionSearchResult(session: SessionInfo, navigate: OpenSess
     connection_id: session.connection_id || ambientOwnerConnectionId()
   })
 
+  const profile = session.profile?.trim()
+  const selectionOwner = ownerRoute ?? (profile ? normalizeProfileKey(profile) : null)
+
+  setSessionSelectionOwner(session.id, selectionOwner)
+
   if (ownerRoute) {
     requestSessionResume(session.id, ownerRoute)
-  } else if (session.profile?.trim()) {
-    requestSessionResume(session.id, undefined, session.profile)
+  } else if (profile) {
+    requestSessionResume(session.id, undefined, profile)
   } else {
     forgetSessionOwnerHintsForSession(session.id)
     requestSessionResume(session.id)

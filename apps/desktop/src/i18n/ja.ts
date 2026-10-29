@@ -4166,6 +4166,8 @@ export const ja = defineLocale({
     archived: 'アーカイブしました',
     archiveFailed: 'アーカイブに失敗しました',
     cwdChangeFailed: '作業ディレクトリの変更に失敗しました',
+    cwdChangePending: '選択したチャットを開いています。完了してからもう一度プロジェクトを選択してください。',
+    cwdChangeBusy: 'チャットが応答中です。現在のターンが終わってから、もう一度プロジェクトを選択してください。',
     cwdStagedTitle: '作業ディレクトリがステージングされました',
     cwdStagedMessage:
       'このアクティブなチャットへの cwd の変更を適用するにはデスクトップバックエンドを再起動してください。',

@@ -82,7 +82,7 @@ describe('latestActions adapters', () => {
 
     actions.onSelectProjectWorkspace = latestSelect
 
-    await expect(adapted.onSelectProjectWorkspace!('D:/Projects/Example')).resolves.toBe(true)
+    await expect(adapted.onSelectProjectWorkspace('D:/Projects/Example')).resolves.toBe(true)
     expect(staleSelect).not.toHaveBeenCalled()
     expect(latestSelect).toHaveBeenCalledWith('D:/Projects/Example')
   })

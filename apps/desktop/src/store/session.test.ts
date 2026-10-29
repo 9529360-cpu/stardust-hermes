@@ -26,6 +26,7 @@ import {
   $currentProvider,
   $selectedStoredSessionId,
   $sessions,
+  $sessionSelectionOwner,
   $unreadFinishedSessionIds,
   _resetLegacyDiscardForTests,
   _resetSessionOwnerHintsForTests,
@@ -48,6 +49,7 @@ import {
   lineageAliases,
   mergeSessionPage,
   rememberedSessionProfile,
+  requestSessionResume,
   resolveComposerSessionKey,
   sessionBelongsToProfile,
   sessionMatchesStoredId,
@@ -158,6 +160,29 @@ describe('composer model persistence scope', () => {
 describe('session owner hints', () => {
   afterEach(() => {
     _resetSessionOwnerHintsForTests({ storage: true })
+    $selectedStoredSessionId.set(null)
+    $sessionSelectionOwner.set(null)
+  })
+
+  it('keeps an explicit sidebar owner separate from an automatic resume request', () => {
+    $sessionSelectionOwner.set({
+      owner: { connectionId: 'remote-a', profile: 'worker' },
+      sessionId: 'selected'
+    })
+
+    requestSessionResume('selected')
+
+    expect($sessionSelectionOwner.get()).toEqual({
+      owner: { connectionId: 'remote-a', profile: 'worker' },
+      sessionId: 'selected'
+    })
+  })
+
+  it('clears the captured owner when the selected session changes', () => {
+    $sessionSelectionOwner.set({ owner: 'worker', sessionId: 'selected' })
+    $selectedStoredSessionId.set('next')
+
+    expect($sessionSelectionOwner.get()).toBeNull()
   })
 
   it('preserves the registry owner recorded on a discovered session row', () => {
@@ -1071,6 +1096,7 @@ describe('unread finished sessions', () => {
     clearAllSessionStates()
     $unreadFinishedSessionIds.set([])
     $selectedStoredSessionId.set(null)
+    $sessionSelectionOwner.set(null)
     $sessions.set([])
   })
 

@@ -39,7 +39,12 @@ import { isSessionGoneForBackgroundPolling } from '@/store/runtime-gone'
 import { getSessionOwnerHint, knownSessionOwner, ownerLookupSessionRows, requestSessionResume } from '@/store/session'
 import { assertSessionOwnerResolved } from '@/store/session-owner-resolution'
 import { requestForSessionProfile, type SessionOwnerScope } from '@/store/session-request-router'
-import { $focusedStoredSessionId, sessionTileOwnerRoute, storedSessionIdForRuntimeId } from '@/store/session-states'
+import {
+  $focusedStoredSessionId,
+  knownOwnerForRuntimeId,
+  sessionTileOwnerRoute,
+  storedSessionIdForRuntimeId
+} from '@/store/session-states'
 
 import { findStoredIdForRuntimeId, resolveRoutingSessionId, resolveSessionRpcOwner } from './wiring-routing'
 
@@ -74,7 +79,8 @@ export function createSessionRpcDispatcher(deps: SessionRpcDispatcherDeps): Ambi
         undefined
     })
 
-    let owner: SessionOwnerScope = resolveSessionRpcOwner({
+    const runtimeOwner = paramSessionId ? knownOwnerForRuntimeId(paramSessionId) : undefined
+    let owner: SessionOwnerScope = runtimeOwner ?? resolveSessionRpcOwner({
       routingSessionId,
       sessionOwnerHint: storedSessionId => getSessionOwnerHint(storedSessionId),
       sessionRowOwner: storedSessionId => knownSessionOwner(ownerLookupSessionRows(), storedSessionId),

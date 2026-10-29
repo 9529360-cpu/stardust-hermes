@@ -28,6 +28,7 @@ const mount = () =>
           onNewSessionInWorkspace={noop}
           onNewSessionSplit={noop}
           onResumeSession={resume}
+          onSelectProjectWorkspace={noop}
         />
       </SidebarProvider>
     </MemoryRouter>

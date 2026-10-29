@@ -8,6 +8,7 @@ import { type FC, useEffect, useRef } from 'react'
 import type { SessionInfo } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { type SidebarListRow } from '@/lib/session-date-groups'
+import { isSelectedSessionRow } from '@/lib/session-selection'
 import { sessionBucketLabel } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { sessionPinId } from '@/store/session'
@@ -34,6 +35,7 @@ interface SessionRowCommonProps {
 }
 
 export interface VirtualSessionListProps {
+  activeIdentityKey?: null | string
   activeSessionId: null | string
   /** Render every session row as the three-line inbox card. */
   card?: boolean
@@ -66,6 +68,7 @@ const DIVIDER_ESTIMATE_PX = 28
 const OVERSCAN_ROWS = 12
 
 export const VirtualSessionList: FC<VirtualSessionListProps> = ({
+  activeIdentityKey,
   activeSessionId,
   card = false,
   className,
@@ -162,7 +165,7 @@ export const VirtualSessionList: FC<VirtualSessionListProps> = ({
       branchStem,
       card,
       isPinned: pinned,
-      isSelected: session.id === activeSessionId,
+      isSelected: isSelectedSessionRow(session, activeSessionId, activeIdentityKey),
       onArchive: () => onArchiveSession(session.id),
       onBranch: onBranchSession ? () => onBranchSession(session.id, session.profile) : undefined,
       onDelete: () => onDeleteSession(session.id),

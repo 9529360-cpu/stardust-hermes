@@ -1,3 +1,4 @@
+import { sessionIdentityKey } from '@/lib/session-identity'
 import type { SessionInfo } from '@/types/hermes'
 
 export interface SidebarSessionEntry {
@@ -29,11 +30,11 @@ export function flattenSessionsWithBranches(
   const byVisibleId = new Map<string, SessionInfo>()
 
   for (const session of sessions) {
-    byVisibleId.set(session.id, session)
+    byVisibleId.set(sessionIdentityKey(session), session)
     const rootId = session._lineage_root_id?.trim()
 
     if (rootId) {
-      byVisibleId.set(rootId, session)
+      byVisibleId.set(sessionIdentityKey(session, rootId), session)
     }
   }
 
@@ -47,16 +48,18 @@ export function flattenSessionsWithBranches(
       continue
     }
 
-    const parent = byVisibleId.get(parentId)
+    const parent = byVisibleId.get(sessionIdentityKey(session, parentId))
 
-    if (!parent || parent.id === session.id) {
+    if (!parent || sessionIdentityKey(parent) === sessionIdentityKey(session)) {
       continue
     }
 
-    nestedIds.add(session.id)
-    const siblings = childrenByParent.get(parent.id) ?? []
+    const parentKey = sessionIdentityKey(parent)
+    const sessionKey = sessionIdentityKey(session)
+    nestedIds.add(sessionKey)
+    const siblings = childrenByParent.get(parentKey) ?? []
     siblings.push(session)
-    childrenByParent.set(parent.id, siblings)
+    childrenByParent.set(parentKey, siblings)
   }
 
   for (const siblings of childrenByParent.values()) {
@@ -70,20 +73,21 @@ export function flattenSessionsWithBranches(
   const groupRecencyMemo = new Map<string, number>()
 
   const groupRecency = (session: SessionInfo): number => {
-    const cached = groupRecencyMemo.get(session.id)
+    const sessionKey = sessionIdentityKey(session)
+    const cached = groupRecencyMemo.get(sessionKey)
 
     if (cached !== undefined) {
       return cached
     }
 
-    groupRecencyMemo.set(session.id, recency(session)) // cycle guard
+    groupRecencyMemo.set(sessionKey, recency(session)) // cycle guard
 
-    const max = (childrenByParent.get(session.id) ?? []).reduce(
+    const max = (childrenByParent.get(sessionKey) ?? []).reduce(
       (acc, child) => Math.max(acc, groupRecency(child)),
       recency(session)
     )
 
-    groupRecencyMemo.set(session.id, max)
+    groupRecencyMemo.set(sessionKey, max)
 
     return max
   }
@@ -95,18 +99,20 @@ export function flattenSessionsWithBranches(
   const seen = new Set<string>()
 
   const emit = (session: SessionInfo, branchStem?: string) => {
-    if (seen.has(session.id)) {
+    const sessionKey = sessionIdentityKey(session)
+
+    if (seen.has(sessionKey)) {
       return
     }
 
-    seen.add(session.id)
+    seen.add(sessionKey)
     out.push(branchStem ? { branchStem, session } : { session })
 
-    const children = childrenByParent.get(session.id)
+    const children = childrenByParent.get(sessionKey)
     children?.forEach((child, index) => emit(child, index === children.length - 1 ? '└─ ' : '├─ '))
   }
 
-  const roots = sessions.filter(session => !nestedIds.has(session.id)).map((session, index) => ({ index, session }))
+  const roots = sessions.filter(session => !nestedIds.has(sessionIdentityKey(session))).map((session, index) => ({ index, session }))
 
   if (!options.preserveOrder) {
     roots.sort((a, b) => groupRecency(b.session) - groupRecency(a.session) || a.index - b.index)
@@ -115,7 +121,7 @@ export function flattenSessionsWithBranches(
   roots.forEach(({ session }) => emit(session))
 
   for (const session of sessions) {
-    if (!seen.has(session.id)) {
+    if (!seen.has(sessionIdentityKey(session))) {
       out.push({ session })
     }
   }

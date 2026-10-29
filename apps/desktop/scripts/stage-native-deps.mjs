@@ -343,9 +343,12 @@ export function stageNodePtyInto(srcRoot, destRoot, { platform = process.platfor
   return destRoot
 }
 
-export function stageNodePty({ platform = process.platform, arch = process.arch } = {}) {
+export function stageNodePty({
+  platform = process.platform,
+  arch = process.arch,
+  destRoot = resolve(process.env.STARDUST_DESKTOP_DIST_DIR || resolve(projectRoot, 'dist'), 'node_modules/node-pty')
+} = {}) {
   const srcRoot = resolveNodePtyRoot()
-  const destRoot = resolve(projectRoot, 'dist/node_modules/node-pty')
   return stageNodePtyInto(srcRoot, destRoot, { platform, arch })
 }
 
@@ -580,11 +583,11 @@ export function stageGetWindows(
   {
     platform = process.platform,
     arch = process.arch,
-    resolveRoot = resolveGetWindowsRoot
+    resolveRoot = resolveGetWindowsRoot,
+    destRoot = resolve(process.env.STARDUST_DESKTOP_DIST_DIR || resolve(projectRoot, 'dist'), 'node_modules/get-windows')
   } = {}
 ) {
   const srcRoot = resolveRoot()
-  const destRoot = resolve(projectRoot, 'dist/node_modules/get-windows')
 
   if (!srcRoot) {
     // npm may omit an optional dependency whose install script fails. That is
